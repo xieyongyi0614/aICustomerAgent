@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.models.memory import UserMemory
+
 
 class ChatMessage(BaseModel):
     role: Literal["human", "ai"]
@@ -13,5 +15,5 @@ class ConversationState(BaseModel):
     user_id: str
     messages: list[ChatMessage]
     summary: str | None
-    memories: list["UserMemory"]
+    memories: list[UserMemory]
     current_input: str
