@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.modules.llm.model import llm_chat_open_ai
+from app.modules.llm.services import llm_chat_open_ai
 
 chat_router = APIRouter()
 
