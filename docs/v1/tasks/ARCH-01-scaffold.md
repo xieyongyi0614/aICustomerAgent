@@ -16,7 +16,7 @@
 - 创建新目录与 `__init__.py`：`app/core/`、`app/services/`、`app/repositories/`、`app/chains/`、`app/models/`、`app/prompts/`、`app/character/`
 - 迁移 `RoleMode` 至 `app/models/router.py`
 - 迁移 `role_router_prompt` 至 `app/prompts/router.py`
-- 迁移角色人设至 `app/character/`（identity / personality / relationship / behavior / modes 五个文件）
+- 迁移角色人设至 `app/character/asuna/`（identity / personality / relationship / behavior / modes 五个文件）
 - 删除旧 `app/modules/llm/` 全部文件
 - 删除遗留文件 `app/api/__init__ copy.py`
 - 各新目录仅放 `__init__.py` 与空占位（具体实现由后续 Task 填充）
@@ -42,13 +42,13 @@
 - 新三层目录结构（空壳）
 - `app/models/router.py`（RoleMode 原样迁移）
 - `app/prompts/router.py`（role_router_prompt 原样迁移）
-- `app/character/*.py`（人设内容按文件拆分）
+- `app/character/asuna/*.py`（人设内容按文件拆分）
 - 旧 `modules/llm/` 删除、`__init__ copy.py` 删除
 
 ## Business Rules
 
 1. 依赖方向单向：`api → services → repositories → core`；`models/prompts/character/chains` 为共享层，禁止反向引用。
-2. `app/character/` 五文件内容划分：`identity.py`=ASUNA_CORE 核心人格段；`personality.py`=人格细化；`relationship.py`=用户身份关系段；`behavior.py`=行为原则段；`modes.py`=MODE_INSTRUCTIONS。
+2. `app/character/` 按角色分子目录（如 `asuna/`）；`asuna/` 五文件内容划分：`identity.py`=ASUNA_CORE 核心人格段；`personality.py`=人格细化；`relationship.py`=用户身份关系段；`behavior.py`=行为原则段；`modes.py`=MODE_INSTRUCTIONS。
 3. 迁移时保留原文内容与格式，语义不得改变。
 
 ## API Dependencies
@@ -73,7 +73,7 @@
 - S1：创建新目录与 `__init__.py`
 - S2：迁移 `RoleMode` → `app/models/router.py`
 - S3：迁移 `role_router_prompt` → `app/prompts/router.py`
-- S4：拆分角色人设 → `app/character/` 五文件
+- S4：拆分角色人设 → `app/character/asuna/` 五文件
 - S5：删除旧目录与遗留文件
 - S6：全仓引用扫描清理
 
@@ -82,7 +82,7 @@
 - 新目录结构完整存在，旧 `modules/llm/` 与 `__init__ copy.py` 已删除
 - `from app.models.router import RoleMode` 导入成功
 - `from app.prompts.router import role_router_prompt` 导入成功
-- `from app.character.modes import MODE_INSTRUCTIONS` 导入成功
+- `from app.character.asuna.modes import MODE_INSTRUCTIONS` 导入成功
 - grep `modules/llm` 无命中
 - `pylint` 通过
 

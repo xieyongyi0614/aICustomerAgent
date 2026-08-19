@@ -65,7 +65,7 @@
 core/        基础设施：settings（配置）、llm_factory（LLM 单例）、db（SQLite 引擎）
 models/      Pydantic 数据模型（跨层流通的 DTO）
 prompts/     Prompt 模板 + PromptBuilder（模块化组装）
-character/   角色资产：身份 / 人格 / 关系 / 行为 / 模式
+character/   角色资产：按角色分子目录（如 asuna/），每个角色含 身份/人格/关系/行为/模式
 ```
 
 ---
@@ -153,13 +153,15 @@ apps/backend/app/
 │   ├── extractor.py             # 提取模板
 │   └── builder.py               # PromptBuilder：分节组装，不拼接巨型字符串
 │
-└── character/                   # 角色资产（支撑层）
+└── character/                   # 角色资产（支撑层，按角色分子目录）
     ├── __init__.py
-    ├── identity.py              # 亚丝娜核心人格（拆分自 ASUNA_CORE）
-    ├── personality.py           # 人格细化
-    ├── relationship.py          # 与用户的关系设定
-    ├── behavior.py              # 行为原则
-    └── modes.py                 # 三档模式指令（迁移自 MODE_INSTRUCTIONS）
+    └── asuna/                   # 亚丝娜人设
+        ├── __init__.py
+        ├── identity.py          # 核心人格（拆分自 ASUNA_CORE）
+        ├── personality.py       # 人格细化
+        ├── relationship.py      # 与用户的关系设定
+        ├── behavior.py          # 行为原则
+        └── modes.py             # 三档模式指令（迁移自 MODE_INSTRUCTIONS）
 ```
 
 > 注：旧 `modules/llm/`（config.py / models.py / services.py）按上表拆分迁移后废弃删除。
@@ -320,12 +322,12 @@ agent_pipeline = (
 ### Task 1 — 基础设施重构（不引入新功能）
 
 - **目标**：修正 V0 硬伤，为记忆层打地基；API Key 出源码、LLM 单例化、模板写法修正、Prompt 模块化。
-- **涉及文件**：新建 `core/settings.py`、`core/llm_factory.py`、`chains/router_chain.py`、`character/`（identity/personality/relationship/behavior/modes）、`prompts/`（router/builder）、`models/router.py`；删除旧 `modules/llm/`。
+- **涉及文件**：新建 `core/settings.py`、`core/llm_factory.py`、`chains/router_chain.py`、`character/asuna/`（identity/personality/relationship/behavior/modes）、`prompts/`（router/builder）、`models/router.py`；删除旧 `modules/llm/`。
 - **实现步骤**：
   1. `core/settings.py`：用 pydantic-settings 管理 `OPENAI_API_KEY / BASE_URL / MODEL / TEMPERATURE / MAX_TOKENS` 等，支持 `.env`。
   2. `core/llm_factory.py`：`get_llm()` 缓存单例，支持测试注入。
   3. 新建 `chains/router_chain.py`，修正模板变量（去掉手动 `.format`）。
-  4. 拆分 `ASUNA_CORE` 到 `character/`，`MODE_INSTRUCTIONS` 移入 `character/modes.py`；写 `prompts/builder.py` 分节组装。
+  4. 拆分 `ASUNA_CORE` 到 `character/asuna/`，`MODE_INSTRUCTIONS` 移入 `character/asuna/modes.py`；写 `prompts/builder.py` 分节组装。
   5. 删除遗留文件 `app/api/__init__ copy.py` 与旧 `modules/llm/`。
 - **验收标准**：无硬编码密钥（grep 确认）；`agent_service.py` 承担编排；流式功能与 V0 等价；`pylint` 通过。
 
@@ -391,7 +393,7 @@ agent_pipeline = (
 | `chains/extractor_chain.py`、`repositories/memory_repository.py`、`services/memory_service.py` | 原样复用，成为 Graph 的节点或 Tool |
 | `services/summary_service.py` + `chains/summary_chain.py` | 原样复用，作为 "condense" 节点 |
 | `repositories/conversation_repository.py`、`services/conversation_service.py` | 原样复用，承载短期状态（替代或配合 checkpointer） |
-| `character/*`（identity/personality/relationship/behavior/modes） | 纯数据定义，原样复用 |
+| `character/asuna/*`（identity/personality/relationship/behavior/modes） | 纯数据定义，原样复用 |
 | `prompts/builder.py` | 原样复用，Graph 节点内调用即可 |
 | `services/context_builder.py` | 复用作"组装 state 的节点" |
 | `core/`（settings / db / llm_factory） | 原样复用 |

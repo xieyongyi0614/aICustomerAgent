@@ -9,15 +9,16 @@
 
 ## Description
 
-将 V0 巨型 System Message（`config.py:5-167` 的 `ASUNA_CORE` 与 `MODE_INSTRUCTIONS`）拆分为模块化角色资产，存放于 `app/character/`。解决巨型字符串拼接问题（架构文档 A8），为 PromptBuilder 提供分节素材。
+将 V0 巨型 System Message（`config.py:5-167` 的 `ASUNA_CORE` 与 `MODE_INSTRUCTIONS`）拆分为模块化角色资产，存放于 `app/character/asuna/`。`character/` 按角色分子目录，每人设一套资产，为多人设扩展留结构。解决巨型字符串拼接问题（架构文档 A8），为 PromptBuilder 提供分节素材。
 
 ## Scope
 
-- `app/character/identity.py`：亚丝娜核心人格（来自 ASUNA_CORE 的【核心人格】段）
-- `app/character/personality.py`：人格细化描述（温柔、独立、认真等具体化）
-- `app/character/relationship.py`：与用户的关系设定（用户=桐人默认、称呼规则）
-- `app/character/behavior.py`：行为原则（先解决问题再体现角色、不机械说爱、不无条件赞同等）
-- `app/character/modes.py`：三档模式指令（professional / default / immersive，迁移自 MODE_INSTRUCTIONS）
+- `app/character/asuna/identity.py`：亚丝娜核心人格（来自 ASUNA_CORE 的【核心人格】段）
+- `app/character/asuna/personality.py`：人格细化描述（温柔、独立、认真等具体化）
+- `app/character/asuna/relationship.py`：与用户的关系设定（用户=桐人默认、称呼规则）
+- `app/character/asuna/behavior.py`：行为原则（先解决问题再体现角色、不机械说爱、不无条件赞同等）
+- `app/character/asuna/modes.py`：三档模式指令（professional / default / immersive，迁移自 MODE_INSTRUCTIONS）
+- `app/character/asuna/__init__.py`：对外导出（IDENTITY_BLOCK / PERSONALITY_BLOCK / RELATIONSHIP_BLOCK / BEHAVIOR_BLOCK / MODE_INSTRUCTIONS），未来他人设目录同构
 - 语言风格段归属：identity 或 personality，由实现者按内容就近放置
 
 ## Out of Scope
@@ -28,16 +29,16 @@
 
 ## Dependencies
 
-- ARCH-01（character/ 空壳目录与内容迁移）
+- ARCH-01（character/asuna/ 空壳目录与内容迁移）
 
 ## Input
 
-- V0 `app/modules/llm/config.py`（已被 ARCH-01 迁移到 `app/character/`）
+- V0 `app/modules/llm/config.py`（已被 ARCH-01 迁移到 `app/character/asuna/`）
 - 架构文档 A8 与 §3 模块划分
 
 ## Output
 
-- `app/character/identity.py`、`personality.py`、`relationship.py`、`behavior.py`、`modes.py`
+- `app/character/asuna/identity.py`、`personality.py`、`relationship.py`、`behavior.py`、`modes.py` 与 `__init__.py`
 - 每个文件导出语义化常量（如 `IDENTITY_BLOCK`、`PERSONALITY_BLOCK`、`RELATIONSHIP_BLOCK`、`BEHAVIOR_BLOCK`、`MODE_INSTRUCTIONS`）
 
 ## Business Rules

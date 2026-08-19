@@ -22,6 +22,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 启动服务
 - DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM。
 - 所有阈值/魔法数字放 `core/settings.py`，禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；记忆/摘要后处理失败不得影响已产出的回答。
+- 角色资产按人设分子目录存放于 `character/<persona>/`（如 `character/asuna/`），每人设一套 identity/personality/relationship/behavior/modes。
 
 ## 代码规范
 
