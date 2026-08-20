@@ -63,7 +63,7 @@ curl http://localhost:8000/health
 请求体示例：
 
 ```json
-{"content": "我喜欢吃寿司", "session_id": "xxxx"}
+{ "content": "我喜欢吃寿司", "session_id": "xxxx" }
 ```
 
 - 不带 `session_id` 时创建新会话
@@ -81,16 +81,16 @@ uv run pylint app tests    # 代码检查
 
 ## 配置项（app/core/settings.py）
 
-| 配置 | 默认值 | 说明 |
-|---|---|---|
-| `OPENAI_API_KEY` | - | API Key（仅从环境变量 / .env 读取） |
-| `MODEL` | LongCat-2.0 | 模型名 |
-| `SUMMARY_THRESHOLD` | 40 | 触发摘要的消息数阈值 |
-| `ROUTER_CONFIDENCE_THRESHOLD` | 0.5 | 路由降级置信度阈值 |
-| `MEMORY_IMPORTANCE_THRESHOLD` | 0.6 | 记忆落库重要性阈值 |
-| `MEMORY_TOP_K` | 5 | 检索召回条数 |
-| `CONVERSATION_MAX_MESSAGES` | 20 | 窗口消息数上限 |
-| `CONVERSATION_MAX_CHARS` | 8000 | 窗口字符上限 |
+| 配置                          | 默认值      | 说明                                |
+| ----------------------------- | ----------- | ----------------------------------- |
+| `OPENAI_API_KEY`              | -           | API Key（仅从环境变量 / .env 读取） |
+| `MODEL`                       | LongCat-2.0 | 模型名                              |
+| `SUMMARY_THRESHOLD`           | 40          | 触发摘要的消息数阈值                |
+| `ROUTER_CONFIDENCE_THRESHOLD` | 0.5         | 路由降级置信度阈值                  |
+| `MEMORY_IMPORTANCE_THRESHOLD` | 0.6         | 记忆落库重要性阈值                  |
+| `MEMORY_TOP_K`                | 5           | 检索召回条数                        |
+| `CONVERSATION_MAX_MESSAGES`   | 20          | 窗口消息数上限                      |
+| `CONVERSATION_MAX_CHARS`      | 8000        | 窗口字符上限                        |
 
 ## 开发约定
 
