@@ -12,10 +12,10 @@ def _tokenize(text: str) -> set[str]:
     return set(ch for ch in text if ch.strip())
 
 
-async def extract_and_save(user_id: str, user_input: str, ai_reply: str) -> None:
+async def extract_and_save(user_id: str, user_input: str, ai_reply: str, llm=None) -> None:
     settings = get_settings()
     try:
-        decision = await extract(user_input, ai_reply)
+        decision = await extract(user_input, ai_reply, llm=llm)
     except (ValueError, OSError, RuntimeError):
         logger.exception("记忆提取失败，跳过本轮")
         return

@@ -1,5 +1,4 @@
 import json
-import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +6,8 @@ from fastapi.testclient import TestClient
 from app.core import llm_factory
 from app.main import app
 from app.repositories import memory_repository, summary_repository
+
+from tests.conftest import wait_until
 
 
 @pytest.fixture
@@ -17,15 +18,6 @@ def client_fixture():
 
 def _parse_stream(text):
     return [json.loads(line) for line in text.strip().splitlines()]
-
-
-def _wait_until(predicate, timeout=2.0):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.05)
-    return predicate()
 
 
 def _structured_responses(**memory):
@@ -125,7 +117,7 @@ def test_memory_roundtrip(client_fixture, db_session_factory, fake_llm):
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
     session_id = resp.headers.get("x-session-id")
     assert resp.status_code == 200
-    assert _wait_until(
+    assert wait_until(
         lambda: any(
             m.memory == "用户喜欢寿司"
             for m in memory_repository.list_by_user("default-user")
@@ -141,7 +133,7 @@ def test_memory_roundtrip(client_fixture, db_session_factory, fake_llm):
         "/api/v1/chat/message",
         json={"session_id": session_id, "content": "晚上想吃寿司"},
     )
-    assert _wait_until(lambda: any("用户喜欢寿司" in str(m) for m in llm.seen_messages))
+    assert wait_until(lambda: any("用户喜欢寿司" in str(m) for m in llm.seen_messages))
 
 
 def test_summary_trigger_after_threshold(
@@ -161,7 +153,7 @@ def test_summary_trigger_after_threshold(
             body["session_id"] = session_id
         resp = client_fixture.post("/api/v1/chat/message", json=body)
         session_id = resp.headers.get("x-session-id")
-    assert _wait_until(lambda: summary_repository.get_summary(session_id) is not None)
+    assert wait_until(lambda: summary_repository.get_summary(session_id) is not None)
 
 
 def test_llm_failure_streams_detail(client_fixture, db_session_factory, fake_llm):

@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Any
 
 os.environ.setdefault("OPENAI_API_KEY", "test")
@@ -12,10 +13,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
 from app.core.db import Base
 from app.core.settings import get_settings
+from app.main import app
 from app.repositories import conversation_repository, memory_repository, summary_repository
+
+WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
+
+
+def wait_until(predicate, timeout=None):
+    deadline = time.time() + (timeout or WAIT_TIMEOUT)
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.05)
+    return predicate()
 
 
 class FakeLLM(BaseChatModel):
@@ -70,6 +84,16 @@ def fake_llm():
 def _reset_llm():
     yield
     llm_factory.reset_llm()
+
+
+@pytest.fixture
+def llm_override():
+    def _apply(llm):
+        app.dependency_overrides[get_chat_llm] = lambda: llm
+        return llm
+
+    yield _apply
+    app.dependency_overrides.pop(get_chat_llm, None)
 
 
 @pytest.fixture

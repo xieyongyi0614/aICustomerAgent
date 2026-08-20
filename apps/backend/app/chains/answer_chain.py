@@ -7,13 +7,13 @@ from app.models.conversation import ConversationState
 from app.prompts.builder import PromptBuilder
 
 
-def build_chain(mode: str, state: ConversationState) -> Runnable:
+def build_chain(mode: str, state: ConversationState, llm=None) -> Runnable:
     prompt = PromptBuilder.build(mode, state)
-    return prompt | get_llm()
+    return prompt | (llm or get_llm())
 
 
-async def astream(mode: str, state: ConversationState) -> AsyncIterator[str]:
-    chain = build_chain(mode, state)
+async def astream(mode: str, state: ConversationState, llm=None) -> AsyncIterator[str]:
+    chain = build_chain(mode, state, llm)
     async for chunk in chain.astream({}):
         text = getattr(chunk, "content", chunk)
         if text:

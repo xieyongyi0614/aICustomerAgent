@@ -7,9 +7,10 @@ import httpx
 import pytest
 import uvicorn
 
-from app.core import llm_factory
-from app.main import app
 from app.repositories import memory_repository, summary_repository
+from app.main import app
+
+from tests.conftest import wait_until
 
 
 def _free_port():
@@ -30,34 +31,30 @@ class _ServerThread:
         self.server = uvicorn.Server(self.config)
         self.thread = threading.Thread(target=self.server.run, daemon=True)
 
-    def __enter__(self):
+    def start(self):
         self.thread.start()
         while not self.server.started:
             time.sleep(0.05)
-        return f"http://127.0.0.1:{self.port}"
 
-    def __exit__(self, exc_type, exc, tb):
+    def stop(self):
         self.server.should_exit = True
         self.thread.join(timeout=10)
 
+    @property
+    def base_url(self):
+        return f"http://127.0.0.1:{self.port}"
 
-@pytest.fixture
-def base_url(db_session_factory):
-    with _ServerThread(_free_port()) as url:
-        yield url
+
+@pytest.fixture(scope="module")
+def http_server():
+    server = _ServerThread(_free_port())
+    server.start()
+    yield server
+    server.stop()
 
 
 def _parse_stream(text):
     return [json.loads(line) for line in text.strip().splitlines()]
-
-
-def _wait_until(predicate, timeout=3.0):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.05)
-    return predicate()
 
 
 def _structured_responses(**memory):
@@ -78,93 +75,37 @@ def _structured_responses(**memory):
     return base
 
 
-def test_http_health(base_url):
-    with httpx.Client(base_url=base_url) as client:
+def test_http_health(http_server):
+    with httpx.Client(base_url=http_server.base_url) as client:
         assert client.get("/health").json() == {"status": "ok"}
 
 
-def test_http_chat_stream_over_network(base_url, db_session_factory, fake_llm):
-    llm_factory.set_llm(
-        fake_llm(
-            response=["你好", "呀"],
-            structured_responses=_structured_responses(),
-        )
-    )
-    with httpx.Client(base_url=base_url) as client:
-        resp = client.post(
-            "/api/v1/chat/message",
-            json={"content": "在吗"},
-        )
-    assert resp.status_code == 200
-    assert resp.headers.get("x-session-new") == "true"
-    session_id = resp.headers.get("x-session-id")
-    lines = _parse_stream(resp.text)
-    deltas = "".join(line.get("delta", "") for line in lines if "delta" in line)
-    assert deltas == "你好呀"
-    assert lines[-1]["done"] is True
-    assert lines[-1]["session_id"] == session_id
-
-
-def test_http_memory_roundtrip(base_url, db_session_factory, fake_llm):
-    llm_factory.set_llm(
-        fake_llm(
-            response=["好的"],
-            structured_responses=_structured_responses(
-                should_save=True,
-                memory="用户喜欢寿司",
-                memory_type="preference",
-                importance=0.8,
-            ),
-        )
-    )
-    with httpx.Client(base_url=base_url) as client:
-        resp = client.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
-        session_id = resp.headers.get("x-session-id")
-    assert resp.status_code == 200
-    assert _wait_until(
-        lambda: any(
-            m.memory == "用户喜欢寿司"
-            for m in memory_repository.list_by_user("default-user")
-        )
-    )
-
-    llm = fake_llm(
-        response=["嗯"],
-        structured_responses=_structured_responses(),
-    )
-    llm_factory.set_llm(llm)
-    with httpx.Client(base_url=base_url) as client:
-        client.post(
-            "/api/v1/chat/message",
-            json={"session_id": session_id, "content": "晚上想吃寿司"},
-        )
-    assert _wait_until(lambda: any("用户喜欢寿司" in str(m) for m in llm.seen_messages))
-
-
-def test_http_summary_trigger_over_network(
-    base_url, db_session_factory, fake_llm, override_settings
+def test_http_chat_streams_chunks_incrementally(
+    http_server, db_session_factory, llm_override, fake_llm
 ):
-    override_settings(summary_threshold=4)
-    llm_factory.set_llm(
-        fake_llm(
-            response=["嗯嗯"],
-            structured_responses=_structured_responses(),
-        )
-    )
-    session_id = None
-    with httpx.Client(base_url=base_url) as client:
-        for i in range(2):
-            body = {"content": f"第{i}轮"}
-            if session_id:
-                body["session_id"] = session_id
-            resp = client.post("/api/v1/chat/message", json=body)
+    llm_override(fake_llm(
+        response=["你好", "呀"],
+        structured_responses=_structured_responses(),
+    ))
+    with httpx.Client(base_url=http_server.base_url) as client:
+        with client.stream(
+            "POST", "/api/v1/chat/message", json={"content": "在吗"}
+        ) as resp:
+            assert resp.status_code == 200
+            assert resp.headers.get("x-session-new") == "true"
             session_id = resp.headers.get("x-session-id")
-    assert _wait_until(lambda: summary_repository.get_summary(session_id) is not None)
+            chunks = []
+            for line in resp.iter_lines():
+                if line.strip():
+                    chunks.append(json.loads(line))
+    deltas = [line["delta"] for line in chunks if "delta" in line]
+    assert deltas == ["你好", "呀"]
+    assert chunks[-1]["done"] is True
+    assert chunks[-1]["session_id"] == session_id
 
 
-def test_http_full_lifecycle(base_url, db_session_factory, fake_llm, override_settings):
-    override_settings(summary_threshold=4)
-    first_llm = fake_llm(
+def test_http_memory_roundtrip(http_server, db_session_factory, llm_override, fake_llm):
+    llm_override(fake_llm(
         response=["好的"],
         structured_responses=_structured_responses(
             should_save=True,
@@ -172,13 +113,68 @@ def test_http_full_lifecycle(base_url, db_session_factory, fake_llm, override_se
             memory_type="preference",
             importance=0.8,
         ),
+    ))
+    with httpx.Client(base_url=http_server.base_url) as client:
+        resp = client.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
+        session_id = resp.headers.get("x-session-id")
+    assert resp.status_code == 200
+    assert wait_until(
+        lambda: any(
+            m.memory == "用户喜欢寿司"
+            for m in memory_repository.list_by_user("default-user")
+        )
     )
-    llm_factory.set_llm(first_llm)
-    with httpx.Client(base_url=base_url) as client:
+
+    second_llm = fake_llm(
+        response=["嗯"],
+        structured_responses=_structured_responses(),
+    )
+    llm_override(second_llm)
+    with httpx.Client(base_url=http_server.base_url) as client:
+        client.post(
+            "/api/v1/chat/message",
+            json={"session_id": session_id, "content": "晚上想吃寿司"},
+        )
+    assert wait_until(lambda: any("用户喜欢寿司" in str(m) for m in second_llm.seen_messages))
+
+
+def test_http_summary_trigger(
+    http_server, db_session_factory, llm_override, fake_llm, override_settings
+):
+    override_settings(summary_threshold=4)
+    llm_override(fake_llm(
+        response=["嗯嗯"],
+        structured_responses=_structured_responses(),
+    ))
+    session_id = None
+    with httpx.Client(base_url=http_server.base_url) as client:
+        for i in range(2):
+            body = {"content": f"第{i}轮"}
+            if session_id:
+                body["session_id"] = session_id
+            resp = client.post("/api/v1/chat/message", json=body)
+            session_id = resp.headers.get("x-session-id")
+    assert wait_until(lambda: summary_repository.get_summary(session_id) is not None)
+
+
+def test_http_full_lifecycle(
+    http_server, db_session_factory, llm_override, fake_llm, override_settings
+):
+    override_settings(summary_threshold=4)
+    llm_override(fake_llm(
+        response=["好的"],
+        structured_responses=_structured_responses(
+            should_save=True,
+            memory="用户喜欢寿司",
+            memory_type="preference",
+            importance=0.8,
+        ),
+    ))
+    with httpx.Client(base_url=http_server.base_url) as client:
         resp = client.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
         session_id = resp.headers.get("x-session-id")
         assert resp.status_code == 200
-        assert _wait_until(
+        assert wait_until(
             lambda: any(
                 m.memory == "用户喜欢寿司"
                 for m in memory_repository.list_by_user("default-user")
@@ -189,24 +185,24 @@ def test_http_full_lifecycle(base_url, db_session_factory, fake_llm, override_se
             response=["嗯嗯"],
             structured_responses=_structured_responses(),
         )
-        llm_factory.set_llm(second_llm)
+        llm_override(second_llm)
         resp = client.post(
             "/api/v1/chat/message",
             json={"session_id": session_id, "content": "晚上想吃寿司"},
         )
         assert resp.status_code == 200
-        assert any("用户喜欢寿司" in str(m) for m in second_llm.seen_messages)
+        assert wait_until(lambda: any("用户喜欢寿司" in str(m) for m in second_llm.seen_messages))
 
         third_llm = fake_llm(
             response=["嗯嗯"],
             structured_responses=_structured_responses(),
         )
-        llm_factory.set_llm(third_llm)
+        llm_override(third_llm)
         resp = client.post(
             "/api/v1/chat/message",
             json={"session_id": session_id, "content": "继续聊两句"},
         )
         assert resp.status_code == 200
-        assert _wait_until(
+        assert wait_until(
             lambda: summary_repository.get_summary(session_id) is not None
         )

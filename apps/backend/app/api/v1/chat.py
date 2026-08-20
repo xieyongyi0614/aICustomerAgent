@@ -2,9 +2,10 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.api.v1.deps import get_chat_llm
 from app.api.v1.schemas import ChatRequest
 from app.services import agent_service
 
@@ -18,7 +19,11 @@ def _stream_json(payload: dict) -> str:
 
 
 @chat_router.post("/chat/message")
-async def chat_message(request: Request, body: ChatRequest):
+async def chat_message(
+    request: Request,
+    body: ChatRequest,
+    llm=Depends(get_chat_llm),
+):
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content 不能为空")
     session_id = body.session_id or str(uuid.uuid4())
@@ -27,7 +32,7 @@ async def chat_message(request: Request, body: ChatRequest):
     async def generate():
         try:
             async for token in agent_service.stream_chat(
-                session_id, "default-user", body.content
+                session_id, "default-user", body.content, llm=llm
             ):
                 yield _stream_json({"delta": token})
         except Exception:
