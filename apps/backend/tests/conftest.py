@@ -1,0 +1,105 @@
+import os
+from typing import Any
+
+os.environ.setdefault("OPENAI_API_KEY", "test")
+
+import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, AIMessageChunk
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import RunnableLambda
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.core import llm_factory
+from app.core.db import Base
+from app.core.settings import get_settings
+from app.repositories import conversation_repository, memory_repository, summary_repository
+
+
+class FakeLLM(BaseChatModel):
+    response: Any = ""
+    structured_responses: dict[str, Any] = None
+    raise_exc: Exception | None = None
+    seen_messages: list = []
+
+    def __init__(self, response="", structured_responses=None, raise_exc=None, **kwargs):
+        super().__init__(**kwargs)
+        self.response = response
+        self.structured_responses = structured_responses or {}
+        self.raise_exc = raise_exc
+        self.seen_messages = []
+
+    def with_structured_output(self, schema, **kwargs):
+        def _resolve(inputs):
+            self.seen_messages.append([inputs])
+            data = self.structured_responses.get(schema.__name__)
+            if isinstance(data, dict):
+                return schema.model_validate(data)
+            return data
+
+        return RunnableLambda(_resolve)
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        if self.raise_exc:
+            raise self.raise_exc
+        self.seen_messages.append(list(messages))
+        text = self.response if isinstance(self.response, str) else "".join(self.response)
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
+
+    async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
+        if self.raise_exc:
+            raise self.raise_exc
+        self.seen_messages.append(list(messages))
+        chunks = self.response if isinstance(self.response, list) else [self.response]
+        for chunk in chunks:
+            yield ChatGenerationChunk(message=AIMessageChunk(content=chunk))
+
+    @property
+    def _llm_type(self):
+        return "fake"
+
+
+@pytest.fixture
+def fake_llm():
+    return FakeLLM
+
+
+@pytest.fixture(autouse=True)
+def _reset_llm():
+    yield
+    llm_factory.reset_llm()
+
+
+@pytest.fixture
+def db_session_factory(monkeypatch):
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(conversation_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(summary_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
+    yield testing_session
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
+@pytest.fixture
+def override_settings(monkeypatch):
+    def _apply(**kwargs):
+        env_map = {
+            "summary_threshold": "SUMMARY_THRESHOLD",
+            "memory_importance_threshold": "MEMORY_IMPORTANCE_THRESHOLD",
+            "memory_top_k": "MEMORY_TOP_K",
+            "conversation_max_messages": "CONVERSATION_MAX_MESSAGES",
+            "conversation_max_chars": "CONVERSATION_MAX_CHARS",
+        }
+        for key, env in env_map.items():
+            if key in kwargs:
+                monkeypatch.setenv(env, str(kwargs[key]))
+        get_settings.cache_clear()
+
+    return _apply
