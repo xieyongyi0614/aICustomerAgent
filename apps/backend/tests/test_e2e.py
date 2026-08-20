@@ -157,3 +157,52 @@ def test_llm_failure_streams_detail(client_fixture, db_session_factory, fake_llm
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "会不会崩"})
     lines = _parse_stream(resp.text)
     assert any(line.get("detail") == "LLM 调用失败" for line in lines)
+
+
+def test_router_low_confidence_degrades_to_default(client_fixture, db_session_factory, fake_llm):
+    llm = fake_llm(
+        response=["嗯嗯"],
+        structured_responses={
+            "RoleMode": {
+                "mode": "professional",
+                "intent": "technical",
+                "confidence": 0.3,
+                "reason": "不确定用户意图",
+            },
+            "MemoryDecision": {
+                "should_save": False,
+                "memory": None,
+                "memory_type": "preference",
+                "importance": 0.0,
+            },
+        },
+    )
+    llm_factory.set_llm(llm)
+    resp = client_fixture.post("/api/v1/chat/message", json={"content": "随便聊聊"})
+    assert resp.status_code == 200
+    assert any("日常模式" in str(m) for m in llm.seen_messages)
+    assert not any("专业模式" in str(m) for m in llm.seen_messages)
+
+
+def test_router_high_confidence_keeps_mode(client_fixture, db_session_factory, fake_llm):
+    llm = fake_llm(
+        response=["嗯嗯"],
+        structured_responses={
+            "RoleMode": {
+                "mode": "professional",
+                "intent": "technical",
+                "confidence": 0.9,
+                "reason": "明确的编程问题",
+            },
+            "MemoryDecision": {
+                "should_save": False,
+                "memory": None,
+                "memory_type": "preference",
+                "importance": 0.0,
+            },
+        },
+    )
+    llm_factory.set_llm(llm)
+    resp = client_fixture.post("/api/v1/chat/message", json={"content": "Python 报错"})
+    assert resp.status_code == 200
+    assert any("专业模式" in str(m) for m in llm.seen_messages)

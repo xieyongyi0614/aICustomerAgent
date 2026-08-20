@@ -14,6 +14,9 @@ async def stream_chat(session_id: str, user_id: str, content: str) -> AsyncItera
     try:
         role_mode = await router_chain.route(content)
         mode = role_mode.mode
+        if role_mode.confidence < get_settings().router_confidence_threshold:
+            logger.warning("路由低置信度(%s)，降级 default：%s", role_mode.confidence, role_mode.reason)
+            mode = "default"
     except Exception:
         logger.exception("路由解析失败，降级 default")
         mode = "default"

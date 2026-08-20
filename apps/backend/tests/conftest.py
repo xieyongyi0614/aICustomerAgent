@@ -92,6 +92,7 @@ def override_settings(monkeypatch):
     def _apply(**kwargs):
         env_map = {
             "summary_threshold": "SUMMARY_THRESHOLD",
+            "router_confidence_threshold": "ROUTER_CONFIDENCE_THRESHOLD",
             "memory_importance_threshold": "MEMORY_IMPORTANCE_THRESHOLD",
             "memory_top_k": "MEMORY_TOP_K",
             "conversation_max_messages": "CONVERSATION_MAX_MESSAGES",
