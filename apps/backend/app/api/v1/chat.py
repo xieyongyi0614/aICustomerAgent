@@ -26,7 +26,9 @@ async def chat_message(request: Request, body: ChatRequest):
 
     async def generate():
         try:
-            async for token in agent_service.stream_chat(session_id, "default-user", body.content):
+            async for token in agent_service.stream_chat(
+                session_id, "default-user", body.content
+            ):
                 yield _stream_json({"delta": token})
         except Exception:
             logger.exception("LLM 流式回答失败")
@@ -37,4 +39,6 @@ async def chat_message(request: Request, body: ChatRequest):
     headers = {"X-Session-Id": session_id}
     if new_session:
         headers["X-Session-New"] = "true"
-    return StreamingResponse(generate(), media_type="application/x-ndjson", headers=headers)
+    return StreamingResponse(
+        generate(), media_type="application/x-ndjson", headers=headers
+    )

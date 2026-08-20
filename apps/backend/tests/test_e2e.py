@@ -55,11 +55,15 @@ def test_empty_content_422(client_fixture):
     assert resp.status_code == 422
 
 
-def test_stream_contract_and_session_create(client_fixture, db_session_factory, fake_llm):
-    llm_factory.set_llm(fake_llm(
-        response=["你好", "呀"],
-        structured_responses=_structured_responses(),
-    ))
+def test_stream_contract_and_session_create(
+    client_fixture, db_session_factory, fake_llm
+):
+    llm_factory.set_llm(
+        fake_llm(
+            response=["你好", "呀"],
+            structured_responses=_structured_responses(),
+        )
+    )
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "在吗"})
     assert resp.status_code == 200
     assert resp.headers.get("x-session-new") == "true"
@@ -72,10 +76,12 @@ def test_stream_contract_and_session_create(client_fixture, db_session_factory, 
 
 
 def test_existing_session_no_new_header(client_fixture, db_session_factory, fake_llm):
-    llm_factory.set_llm(fake_llm(
-        response=["ok"],
-        structured_responses=_structured_responses(),
-    ))
+    llm_factory.set_llm(
+        fake_llm(
+            response=["ok"],
+            structured_responses=_structured_responses(),
+        )
+    )
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "先来一轮"})
     session_id = resp.headers.get("x-session-id")
     resp2 = client_fixture.post(
@@ -91,7 +97,9 @@ def test_second_turn_knows_first(client_fixture, db_session_factory, fake_llm):
         structured_responses=_structured_responses(),
     )
     llm_factory.set_llm(llm)
-    resp = client_fixture.post("/api/v1/chat/message", json={"content": "我在学 LangGraph"})
+    resp = client_fixture.post(
+        "/api/v1/chat/message", json={"content": "我在学 LangGraph"}
+    )
     session_id = resp.headers.get("x-session-id")
     resp2 = client_fixture.post(
         "/api/v1/chat/message",
@@ -103,21 +111,26 @@ def test_second_turn_knows_first(client_fixture, db_session_factory, fake_llm):
 
 
 def test_memory_roundtrip(client_fixture, db_session_factory, fake_llm):
-    llm_factory.set_llm(fake_llm(
-        response=["好的"],
-        structured_responses=_structured_responses(
-            should_save=True,
-            memory="用户喜欢寿司",
-            memory_type="preference",
-            importance=0.8,
-        ),
-    ))
+    llm_factory.set_llm(
+        fake_llm(
+            response=["好的"],
+            structured_responses=_structured_responses(
+                should_save=True,
+                memory="用户喜欢寿司",
+                memory_type="preference",
+                importance=0.8,
+            ),
+        )
+    )
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
     session_id = resp.headers.get("x-session-id")
     assert resp.status_code == 200
-    assert _wait_until(lambda: any(
-        m.memory == "用户喜欢寿司" for m in memory_repository.list_by_user("default-user")
-    ))
+    assert _wait_until(
+        lambda: any(
+            m.memory == "用户喜欢寿司"
+            for m in memory_repository.list_by_user("default-user")
+        )
+    )
 
     llm = fake_llm(
         response=["嗯"],
@@ -135,10 +148,12 @@ def test_summary_trigger_after_threshold(
     client_fixture, db_session_factory, fake_llm, override_settings
 ):
     override_settings(summary_threshold=4)
-    llm_factory.set_llm(fake_llm(
-        response=["嗯嗯"],
-        structured_responses=_structured_responses(),
-    ))
+    llm_factory.set_llm(
+        fake_llm(
+            response=["嗯嗯"],
+            structured_responses=_structured_responses(),
+        )
+    )
     session_id = None
     for i in range(2):
         body = {"content": f"第{i}轮"}
@@ -150,16 +165,20 @@ def test_summary_trigger_after_threshold(
 
 
 def test_llm_failure_streams_detail(client_fixture, db_session_factory, fake_llm):
-    llm_factory.set_llm(fake_llm(
-        response=[],
-        structured_responses=_structured_responses(),
-    ))
+    llm_factory.set_llm(
+        fake_llm(
+            response=[],
+            structured_responses=_structured_responses(),
+        )
+    )
     resp = client_fixture.post("/api/v1/chat/message", json={"content": "会不会崩"})
     lines = _parse_stream(resp.text)
     assert any(line.get("detail") == "LLM 调用失败" for line in lines)
 
 
-def test_router_low_confidence_degrades_to_default(client_fixture, db_session_factory, fake_llm):
+def test_router_low_confidence_degrades_to_default(
+    client_fixture, db_session_factory, fake_llm
+):
     llm = fake_llm(
         response=["嗯嗯"],
         structured_responses={
@@ -184,7 +203,9 @@ def test_router_low_confidence_degrades_to_default(client_fixture, db_session_fa
     assert not any("专业模式" in str(m) for m in llm.seen_messages)
 
 
-def test_router_high_confidence_keeps_mode(client_fixture, db_session_factory, fake_llm):
+def test_router_high_confidence_keeps_mode(
+    client_fixture, db_session_factory, fake_llm
+):
     llm = fake_llm(
         response=["嗯嗯"],
         structured_responses={
