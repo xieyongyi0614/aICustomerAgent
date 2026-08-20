@@ -69,33 +69,34 @@
 ## 任务进度
 
 > 以 [01-task-registry.md](01-task-registry.md) 为准，此处仅记录完成状态。
+> 状态：全部 P0 / P1 任务已完成并推送 `feat/v1`。
 
 | Task ID | 名称 | 状态 |
 |---|---|---|
-| ARCH-01 | 三层目录落地 | ⬜ |
-| DB-01 | SQLite 建表 | ⬜ |
-| BE-01 | 环境配置 | ⬜ |
-| BE-02 | LLM 工厂 | ⬜ |
-| BE-03 | Pydantic 模型 | ⬜ |
-| BE-04 | 角色资产 | ⬜ |
-| BE-05 | Prompt Builder | ⬜ |
-| DB-02 | conversation_repo | ⬜ |
-| DB-03 | summary_repo | ⬜ |
-| DB-04 | memory_repo | ⬜ |
-| BE-06 | 路由链 | ⬜ |
-| BE-07 | 短期记忆 | ⬜ |
-| BE-08 | 摘要服务 | ⬜ |
-| BE-09 | 提取链 | ⬜ |
-| BE-10 | 长期记忆 | ⬜ |
-| BE-11 | Context Builder | ⬜ |
-| BE-12 | 回答链 | ⬜ |
-| BE-13 | 主编排 | ⬜ |
-| API-01 | chat 端点 | ⬜ |
-| TEST-01 | 测试基座 | ⬜ |
-| TEST-02 | 核心单测 | ⬜ |
-| TEST-03 | 摘要单测 | ⬜ |
-| TEST-04 | 端到端 | ⬜ |
-| BE-14 | 路由降级 (P1) | ⬜ |
+| ARCH-01 | 三层目录落地 | 已完成 |
+| DB-01 | SQLite 建表 | 已完成 |
+| BE-01 | 环境配置 | 已完成 |
+| BE-02 | LLM 工厂 | 已完成 |
+| BE-03 | Pydantic 模型 | 已完成 |
+| BE-04 | 角色资产 | 已完成 |
+| BE-05 | Prompt Builder | 已完成 |
+| DB-02 | conversation_repo | 已完成 |
+| DB-03 | summary_repo | 已完成 |
+| DB-04 | memory_repo | 已完成 |
+| BE-06 | 路由链 | 已完成 |
+| BE-07 | 短期记忆 | 已完成 |
+| BE-08 | 摘要服务 | 已完成 |
+| BE-09 | 提取链 | 已完成 |
+| BE-10 | 长期记忆 | 已完成 |
+| BE-11 | Context Builder | 已完成 |
+| BE-12 | 回答链 | 已完成 |
+| BE-13 | 主编排 | 已完成 |
+| API-01 | chat 端点 | 已完成 |
+| TEST-01 | 测试基座 | 已完成 |
+| TEST-02 | 核心单测 | 已完成 |
+| TEST-03 | 摘要单测 | 已完成 |
+| TEST-04 | 端到端 | 已完成 |
+| BE-14 | 路由降级 (P1) | 已完成 |
 
 ## 目录约定
 
