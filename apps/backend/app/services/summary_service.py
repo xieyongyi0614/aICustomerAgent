@@ -1,6 +1,11 @@
 from app.chains.summary_chain import summarize
 from app.core.settings import get_settings
+from app.models.summary import ConversationSummary
 from app.repositories import summary_repository as repo
+
+
+def get_summary(conv_id: str) -> ConversationSummary | None:
+    return repo.get_summary(conv_id)
 
 
 def should_summarize(message_count: int) -> bool:
