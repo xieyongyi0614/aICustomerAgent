@@ -156,10 +156,27 @@ def test_summary_trigger_after_threshold(
     assert wait_until(lambda: summary_repository.get_summary(session_id) is not None)
 
 
-def test_llm_failure_streams_detail(client_fixture, db_session_factory, fake_llm):
+def test_llm_empty_stream_streams_detail(client_fixture, db_session_factory, fake_llm):
     llm_factory.set_llm(
         fake_llm(
             response=[],
+            structured_responses=_structured_responses(),
+        )
+    )
+    resp = client_fixture.post("/api/v1/chat/message", json={"content": "会不会崩"})
+    lines = _parse_stream(resp.text)
+    assert any(
+        line.get("detail") == "LLM 返回空响应，请检查模型服务商状态或额度"
+        for line in lines
+    )
+
+
+def test_llm_unexpected_failure_streams_detail(
+    client_fixture, db_session_factory, fake_llm
+):
+    llm_factory.set_llm(
+        fake_llm(
+            raise_exc=RuntimeError("boom"),
             structured_responses=_structured_responses(),
         )
     )

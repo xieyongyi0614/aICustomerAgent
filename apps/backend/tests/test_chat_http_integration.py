@@ -4,6 +4,7 @@ import threading
 import time
 
 import httpx
+import openai
 import pytest
 import uvicorn
 
@@ -102,6 +103,40 @@ def test_http_chat_streams_chunks_incrementally(
     assert deltas == ["你好", "呀"]
     assert chunks[-1]["done"] is True
     assert chunks[-1]["session_id"] == session_id
+
+
+def test_http_chat_llm_status_error_streams_provider_detail(
+    http_server, db_session_factory, llm_override, fake_llm
+):
+    quota_message = "调用失败：Token 额度不足。欢迎反馈模型使用case（https://longcat.chat/platform/feedback）获取更多额度"
+    response = httpx.Response(
+        402,
+        request=httpx.Request("POST", "https://api.longcat.chat/openai/v1/chat/completions"),
+        json={
+            "error": {
+                "code": "too_many_requests",
+                "message": quota_message,
+                "type": "rate_limit_error",
+            }
+        },
+    )
+    exc = openai.APIStatusError(
+        "Error code: 402", response=response, body=response.json()
+    )
+    llm_override(fake_llm(raise_exc=exc, structured_responses=_structured_responses()))
+    with httpx.Client(base_url=http_server.base_url) as client:
+        resp = client.post("/api/v1/chat/message", json={"content": "在吗"})
+    chunks = _parse_stream(resp.text)
+    assert chunks == [
+        {
+            "detail": "LLM 调用失败",
+            "error": {
+                "status": 402,
+                "code": "too_many_requests",
+                "message": quota_message,
+            },
+        }
+    ]
 
 
 def test_http_memory_roundtrip(http_server, db_session_factory, llm_override, fake_llm):

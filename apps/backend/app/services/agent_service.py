@@ -9,10 +9,15 @@ from app.services import context_builder, conversation_service, memory_service, 
 logger = logging.getLogger(__name__)
 
 
+class EmptyLLMResponseError(Exception):
+    pass
+
+
 async def stream_chat(session_id: str, user_id: str, content: str, llm=None) -> AsyncIterator[str]:
     state = await context_builder.build(session_id, user_id, content)
     try:
         role_mode = await router_chain.route(content, llm=llm)
+        logger.info("路由输出：mode=%s confidence=%s", role_mode.mode, role_mode.confidence)
         mode = role_mode.mode
         if role_mode.confidence < get_settings().router_confidence_threshold:
             logger.warning("路由低置信度(%s)，降级 default：%s", role_mode.confidence, role_mode.reason)
@@ -26,11 +31,19 @@ async def stream_chat(session_id: str, user_id: str, content: str, llm=None) -> 
         async for token in answer_chain.astream(mode, state, llm=llm):
             full_reply.append(token)
             yield token
+    except ValueError as exc:
+        if "No generation chunks were returned" in str(exc):
+            raise EmptyLLMResponseError("LLM 未返回任何内容") from exc
+        raise
     except Exception:
         logger.exception("回答流式输出失败")
         raise
 
     reply = "".join(full_reply)
+    if reply:
+        logger.info("模型输出：%s", reply)
+    else:
+        logger.warning("模型输出为空")
     conversation_service.save_turn(session_id, content, reply)
     asyncio.create_task(_post_process(session_id, user_id, content, reply, llm=llm))
 
