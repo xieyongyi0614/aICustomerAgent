@@ -21,7 +21,7 @@ async def extract_and_save(user_id: str, user_input: str, ai_reply: str, llm=Non
         return
     if not decision.should_save or decision.importance < settings.memory_importance_threshold:
         return
-    if decision.memory and repo.exists_similar(decision.memory):
+    if decision.memory and repo.exists_similar(user_id, decision.memory):
         return
     try:
         repo.create_memory(user_id, decision.memory, decision.memory_type, decision.importance)

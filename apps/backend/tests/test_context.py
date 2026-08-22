@@ -2,7 +2,14 @@ import pytest
 
 from app.services import context_builder, conversation_service
 from app.models.conversation import ConversationState
-from app.repositories import memory_repository, summary_repository
+from app.repositories import conversation_repository, memory_repository, summary_repository
+from app.core.db import Conversation
+
+
+async def test_build_creates_conversation_record(db_session_factory):
+    await context_builder.build("s6", "u1", "你好")
+    with conversation_repository.SessionLocal() as session:
+        assert session.get(Conversation, "s6") is not None
 
 
 async def test_build_empty_fallback(db_session_factory):

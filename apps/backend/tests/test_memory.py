@@ -49,6 +49,23 @@ async def test_duplicate_not_inserted_twice(db_session_factory):
     assert len(repo.list_by_user("u1")) == 1
 
 
+async def test_dedup_scoped_per_user(db_session_factory):
+    decision = await _decision(
+        should_save=True, memory="用户喜欢寿司", memory_type="preference", importance=0.8
+    )
+    with patch("app.services.memory_service.extract", AsyncMock(return_value=decision)):
+        await memory_service.extract_and_save("u1", "a", "b")
+        await memory_service.extract_and_save("u2", "a", "b")
+    assert len(repo.list_by_user("u1")) == 1
+    assert len(repo.list_by_user("u2")) == 1
+
+
+def test_exists_similar_scoped_by_user(db_session_factory):
+    repo.create_memory("u1", "用户喜欢寿司", "preference", 0.8)
+    assert repo.exists_similar("u1", "用户喜欢寿司") is True
+    assert repo.exists_similar("u2", "用户喜欢寿司") is False
+
+
 async def test_retrieve_hits_matching_memory(db_session_factory):
     repo.create_memory("u1", "用户喜欢寿司", "preference", 0.8)
     repo.create_memory("u1", "用户在学 Python", "goal", 0.7)
