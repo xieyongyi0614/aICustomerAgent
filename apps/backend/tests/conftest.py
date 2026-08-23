@@ -18,7 +18,14 @@ from app.core import llm_factory
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
-from app.repositories import conversation_repository, memory_repository, summary_repository
+from app.repositories import (
+    character_state_repository,
+    conversation_repository,
+    emotion_history_repository,
+    memory_repository,
+    relationship_repository,
+    summary_repository,
+)
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
 
@@ -106,6 +113,9 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(conversation_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(summary_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(character_state_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(relationship_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(emotion_history_repository, "SessionLocal", testing_session)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
