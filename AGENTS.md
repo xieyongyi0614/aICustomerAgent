@@ -4,8 +4,8 @@
 
 「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + SQLite）。
 
-- 当前开发分支：`feat/v1`
-- 开发阶段：V1（记忆能力），任务见 `docs/v1/01-task-registry.md`
+- 当前开发分支：`feat/v2`
+- 开发阶段：V2（角色状态系统），任务见 `docs/v2/01-task-registry.md`
 
 ## 目录结构
 
@@ -16,8 +16,10 @@
 
 ## 文档导航
 
-- `docs/v1/01-task-registry.md` — 任务注册表（唯一入口）
-- `docs/v1/v1-architecture.md` — 三层架构设计
+- `docs/v2/01-task-registry.md` — V2 任务注册表（当前唯一入口）
+- `docs/v2/v2-architecture.md` — V2 角色状态系统设计
+- `docs/v1/01-task-registry.md` — V1 任务注册表（已完结）
+- `docs/v1/v1-architecture.md` — V1 三层架构设计
 
 ## 全局约定
 
