@@ -21,7 +21,11 @@ class Settings(BaseSettings):
     max_tokens: int = 50
     extra_body_thinking: str = "disabled"
 
-    database_url: str = "sqlite:///./asuna.db"
+    database_url: str = "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_recycle: int = 1800
+    db_pool_pre_ping: bool = True
 
     summary_threshold: int = 40
     router_confidence_threshold: float = 0.5

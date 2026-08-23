@@ -98,8 +98,11 @@ def test_second_turn_knows_first(client_fixture, db_session_factory, fake_llm):
         json={"session_id": session_id, "content": "Runnable 是什么"},
     )
     assert resp2.status_code == 200
-    prompt_text = str(llm.seen_messages[-1])
-    assert "我在学 LangGraph" in prompt_text
+    prompt_texts = [str(m) for m in llm.seen_messages]
+    assert any(
+        "我在学 LangGraph" in text and "Runnable 是什么" in text
+        for text in prompt_texts
+    )
 
 
 def test_memory_roundtrip(client_fixture, db_session_factory, fake_llm):
