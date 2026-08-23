@@ -159,4 +159,5 @@ def override_settings(monkeypatch):
                 monkeypatch.setenv(env, str(kwargs[key]))
         get_settings.cache_clear()
 
-    return _apply
+    yield _apply
+    get_settings.cache_clear()
