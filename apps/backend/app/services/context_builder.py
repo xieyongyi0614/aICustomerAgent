@@ -1,6 +1,7 @@
 from app.models.conversation import ConversationState
 from app.services import conversation_service
 from app.services import memory_service
+from app.services import state_service
 from app.services import summary_service
 
 
@@ -12,6 +13,7 @@ async def build(session_id: str, user_id: str, current_input: str) -> Conversati
     current = summary_service.get_summary(session_id)
     summary = current.summary if current else None
     memories = memory_service.retrieve(user_id, current_input)
+    character_state, relationship_state = state_service.load_states(user_id)
     return ConversationState(
         session_id=session_id,
         user_id=user_id,
@@ -19,4 +21,6 @@ async def build(session_id: str, user_id: str, current_input: str) -> Conversati
         summary=summary,
         memories=memories,
         current_input=current_input,
+        character_state=character_state,
+        relationship_state=relationship_state,
     )

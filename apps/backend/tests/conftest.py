@@ -42,14 +42,23 @@ def wait_until(predicate, timeout=None):
 class FakeLLM(BaseChatModel):
     response: Any = ""
     structured_responses: dict[str, Any] = None
+    structured_errors: dict[str, Exception] = None
     raise_exc: Exception | None = None
     seen_messages: list = []
 
-    def __init__(self, response="", structured_responses=None, raise_exc=None, **kwargs):
+    def __init__(
+        self,
+        response="",
+        structured_responses=None,
+        raise_exc=None,
+        structured_errors=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.response = response
         self.structured_responses = structured_responses or {}
         self.raise_exc = raise_exc
+        self.structured_errors = structured_errors or {}
         self.seen_messages = []
 
     def with_structured_output(self, schema, **kwargs):
@@ -57,6 +66,9 @@ class FakeLLM(BaseChatModel):
             self.seen_messages.append([inputs])
             if self.raise_exc:
                 raise self.raise_exc
+            error = self.structured_errors.get(schema.__name__)
+            if error is not None:
+                raise error
             data = self.structured_responses.get(schema.__name__)
             if isinstance(data, dict):
                 return schema.model_validate(data)

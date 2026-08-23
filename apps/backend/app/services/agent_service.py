@@ -2,8 +2,10 @@ import asyncio
 import logging
 from typing import AsyncIterator
 
-from app.chains import answer_chain, router_chain
+from app.chains import answer_chain, router_chain, turn_analysis_chain
 from app.core.settings import get_settings
+from app.models.emotion import TurnAnalysis
+from app.models.router import RoleMode
 from app.services import context_builder, conversation_service, memory_service, summary_service
 
 logger = logging.getLogger(__name__)
@@ -13,22 +15,49 @@ class EmptyLLMResponseError(Exception):
     pass
 
 
+def _resolve_mode(result) -> str:
+    if isinstance(result, BaseException):
+        logger.error("路由解析失败，降级 default", exc_info=result)
+        return "default"
+    if not isinstance(result, RoleMode):
+        logger.error("路由输出非法：%r，降级 default", result)
+        return "default"
+    logger.info("路由输出：mode=%s confidence=%s", result.mode, result.confidence)
+    if result.confidence < get_settings().router_confidence_threshold:
+        logger.warning("路由低置信度(%s)，降级 default：%s", result.confidence, result.reason)
+        return "default"
+    return result.mode
+
+
+def _resolve_analysis(result) -> TurnAnalysis:
+    if isinstance(result, BaseException):
+        logger.error("轮次分析失败，使用默认分析", exc_info=result)
+        return TurnAnalysis()
+    if not isinstance(result, TurnAnalysis):
+        logger.error("轮次分析输出非法：%r，使用默认分析", result)
+        return TurnAnalysis()
+    logger.info(
+        "轮次分析：emotion=%s event=%s behavior=%s",
+        result.user_emotion.emotion,
+        result.user_emotion.event,
+        result.behavior.behavior,
+    )
+    return result
+
+
 async def stream_chat(session_id: str, user_id: str, content: str, llm=None) -> AsyncIterator[str]:
     state = await context_builder.build(session_id, user_id, content)
-    try:
-        role_mode = await router_chain.route(content, llm=llm)
-        logger.info("路由输出：mode=%s confidence=%s", role_mode.mode, role_mode.confidence)
-        mode = role_mode.mode
-        if role_mode.confidence < get_settings().router_confidence_threshold:
-            logger.warning("路由低置信度(%s)，降级 default：%s", role_mode.confidence, role_mode.reason)
-            mode = "default"
-    except Exception:
-        logger.exception("路由解析失败，降级 default")
-        mode = "default"
+    role_mode, analysis = await asyncio.gather(
+        router_chain.route(content, llm=llm),
+        turn_analysis_chain.analyze(content, state, llm=llm),
+        return_exceptions=True,
+    )
+    mode = _resolve_mode(role_mode)
+    turn = _resolve_analysis(analysis)
 
     full_reply = []
     try:
-        async for token in answer_chain.astream(mode, state, llm=llm):
+        async for token in answer_chain.astream(mode, state, turn, llm=llm):
             full_reply.append(token)
             yield token
     except ValueError as exc:
