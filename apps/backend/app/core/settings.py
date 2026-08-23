@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
+    energy_turn_decay: float = 0.05
+    energy_min: float = 0.1
+    energy_reset_hours: int = 12
+    energy_reset_value: float = 0.85
+    stage_friend_familiarity: float = 0.35
+    stage_close_intimacy: float = 0.55
+    stage_close_trust: float = 0.55
+    stage_partner_intimacy: float = 0.75
+    stage_partner_trust: float = 0.75
+    stage_hysteresis: float = 0.10
+    analysis_recent_messages: int = 6
+
     @model_validator(mode="after")
     def validate_api_key(self):
         if not self.openai_api_key:

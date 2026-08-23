@@ -131,6 +131,14 @@ def override_settings(monkeypatch):
             "memory_top_k": "MEMORY_TOP_K",
             "conversation_max_messages": "CONVERSATION_MAX_MESSAGES",
             "conversation_max_chars": "CONVERSATION_MAX_CHARS",
+            "energy_turn_decay": "ENERGY_TURN_DECAY",
+            "energy_reset_hours": "ENERGY_RESET_HOURS",
+            "stage_friend_familiarity": "STAGE_FRIEND_FAMILIARITY",
+            "stage_close_intimacy": "STAGE_CLOSE_INTIMACY",
+            "stage_close_trust": "STAGE_CLOSE_TRUST",
+            "stage_partner_intimacy": "STAGE_PARTNER_INTIMACY",
+            "stage_partner_trust": "STAGE_PARTNER_TRUST",
+            "stage_hysteresis": "STAGE_HYSTERESIS",
         }
         for key, env in env_map.items():
             if key in kwargs:
