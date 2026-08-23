@@ -4,9 +4,16 @@ from typing import AsyncIterator
 
 from app.chains import answer_chain, router_chain, turn_analysis_chain
 from app.core.settings import get_settings
+from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.router import RoleMode
-from app.services import context_builder, conversation_service, memory_service, summary_service
+from app.services import (
+    context_builder,
+    conversation_service,
+    memory_service,
+    state_service,
+    summary_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +81,26 @@ async def stream_chat(session_id: str, user_id: str, content: str, llm=None) -> 
     else:
         logger.warning("模型输出为空")
     conversation_service.save_turn(session_id, content, reply)
-    asyncio.create_task(_post_process(session_id, user_id, content, reply, llm=llm))
+    asyncio.create_task(
+        _post_process(session_id, user_id, content, reply, state, turn, llm=llm)
+    )
 
 
 async def _post_process(
-    session_id: str, user_id: str, user_input: str, ai_reply: str, llm=None
+    session_id: str,
+    user_id: str,
+    user_input: str,
+    ai_reply: str,
+    state: ConversationState,
+    analysis: TurnAnalysis,
+    llm=None,
 ) -> None:
+    try:
+        await state_service.apply_and_save(
+            user_id, session_id, state, analysis, user_input, ai_reply, llm=llm
+        )
+    except Exception:
+        logger.exception("状态更新失败，不影响本轮回答")
     try:
         if conversation_service.message_count(session_id) >= get_settings().summary_threshold:
             await summary_service.update(
