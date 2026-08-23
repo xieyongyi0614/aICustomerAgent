@@ -11,7 +11,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core import llm_factory
 from app.core.db import Base, Conversation, Message
 from app.main import app
-from app.repositories import conversation_repository, memory_repository, summary_repository
+from app.repositories import (
+    character_state_repository,
+    conversation_repository,
+    emotion_history_repository,
+    memory_repository,
+    relationship_repository,
+    summary_repository,
+)
 from tests.conftest import wait_until
 
 PG_TEST_URL = os.environ.get(
@@ -96,6 +103,9 @@ def test_http_lifecycle_on_postgres(postgres_url, fake_llm):
     monkey.setattr(conversation_repository, "SessionLocal", pg_session)
     monkey.setattr(summary_repository, "SessionLocal", pg_session)
     monkey.setattr(memory_repository, "SessionLocal", pg_session)
+    monkey.setattr(character_state_repository, "SessionLocal", pg_session)
+    monkey.setattr(relationship_repository, "SessionLocal", pg_session)
+    monkey.setattr(emotion_history_repository, "SessionLocal", pg_session)
 
     llm = fake_llm(
         response=["好的"],

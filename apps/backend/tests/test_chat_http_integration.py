@@ -241,3 +241,46 @@ def test_http_full_lifecycle(
         assert wait_until(
             lambda: summary_repository.get_summary(session_id) is not None
         )
+
+
+def test_http_state_updates_after_chat(
+    http_server, db_session_factory, llm_override, fake_llm
+):
+    from app.repositories import character_state_repository
+
+    llm_override(fake_llm(
+        response=["好耶"],
+        structured_responses={
+            "RoleMode": {
+                "mode": "default",
+                "intent": "casual",
+                "confidence": 0.9,
+                "reason": "hi",
+            },
+            "TurnAnalysis": {
+                "user_emotion": {"emotion": "happy", "event": "achievement"},
+                "behavior": {"behavior": "celebrate", "reason": "用户达成成就"},
+            },
+            "StateUpdateDecision": {
+                "mood": "happy",
+                "mood_reason": "用户带来好消息",
+                "inner_state": "开心",
+                "current_topic": "项目上线",
+            },
+            "MemoryDecision": {
+                "should_save": False,
+                "memory": None,
+                "memory_type": "preference",
+                "importance": 0.0,
+            },
+        },
+    ))
+    with httpx.Client(base_url=http_server.base_url) as client:
+        resp = client.post("/api/v1/chat/message", json={"content": "我今天终于把项目上线了"})
+        assert resp.status_code == 200
+
+    assert wait_until(
+        lambda: character_state_repository.get_state("default-user").mood == "happy"
+    )
+    state = character_state_repository.get_state("default-user")
+    assert state.current_topic == "项目上线"
