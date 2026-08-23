@@ -2,7 +2,7 @@
 
 ## 项目概览
 
-「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + SQLite）。
+「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + PostgreSQL）。
 
 - 当前开发分支：`feat/v2`
 - 开发阶段：V2（角色状态系统），任务见 `docs/v2/01-task-registry.md`

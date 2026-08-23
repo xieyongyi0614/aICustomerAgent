@@ -9,11 +9,12 @@
 
 ## Description
 
-在 `app/core/db.py` 追加 `character_state` / `relationship_state` / `emotion_history` 三张表的 ORM 行模型，并新建三个 repository，对上层提供"永远有状态"的读取语义。lifespan `create_all` 只增不改，V1 四张表零影响。
+在 `app/core/db.py` 追加 `character_state` / `relationship_state` / `emotion_history` 三张表的 ORM 行模型，交付 Alembic **rev2** 迁移，并新建三个 repository，对上层提供"永远有状态"的读取语义。
 
 ## Scope
 
-- ORM：`CharacterStateRow`、`RelationshipStateRow`、`EmotionHistoryRow`（DDL 见架构文档 §5）
+- ORM：`CharacterStateRow`、`RelationshipStateRow`、`EmotionHistoryRow`（DDL 见架构文档 §5.5）
+- Alembic：`alembic revision --autogenerate` 产出 **rev2（V2 三表）**，人工审阅后入库
 - `app/repositories/character_state_repository.py`：
   - `get_state(user_id) -> CharacterState`（未命中返回默认实例，**不写库**，`updated_at` 填行值）
   - `upsert_state(user_id, state)`（存在则 update，不存在则 insert，维护 `updated_at`）
@@ -30,10 +31,11 @@
 ## Dependencies
 
 - BE-01（DTO 类型）
+- DB-00（PostgreSQL 连接与 Alembic 迁移体系）
 
 ## Input
 
-- `docs/v2/v2-architecture.md` §5 数据库设计（含 CheckConstraint 枚举与索引定义）
+- `docs/v2/v2-architecture.md` §5.5 表设计（PostgreSQL 方言）
 - V1 仓储风格参照：`app/repositories/memory_repository.py`
 
 ## Output
@@ -48,7 +50,7 @@
 2. `get_state` / `get_relationship` 未命中返回 BE-01 默认值（calm / 0.9 / friend），绝不因缺行抛错——上层永远拿到可用状态。
 3. `emotion_history` 只追加不更新不删除；每轮一行，含降级轮。
 4. 保持 V1 风格：模块级函数 + 每次调用独立 `SessionLocal` 短会话。
-5. CheckConstraint 枚举、索引 `(user_id, created_at)`、时间戳 `datetime.now()` 均对齐 V1 惯例。
+5. 表结构变更只走 Alembic revision（rev2），禁止 `create_all` / 手工建表；单元测试内存 SQLite 直接 `metadata.create_all` 属豁免。
 
 ## API Dependencies
 
@@ -69,7 +71,7 @@
 
 ## Subtask 拆分
 
-- S1：三个 ORM 行模型 + 建表验证
+- S1：三个 ORM 行模型 + Alembic rev2（autogenerate + 审阅）
 - S2：`character_state_repository`（get 默认值 + upsert）
 - S3：`relationship_repository`
 - S4：`emotion_history_repository`（append + 倒序查询）
@@ -77,7 +79,8 @@
 
 ## Acceptance Criteria
 
-- 内存 SQLite `create_all` 后三表存在，V1 四表结构不变
+- `alembic upgrade head` 后 PostgreSQL 三表存在，字段 / 约束 / 索引与架构文档 §5.5 一致
+- 单元测试内存 SQLite 建表照常可用（V1 conftest 模式）
 - get 未命中返回默认值且库里无行
 - 同一 user 两次 `upsert_state` 后仍一行、字段为第二次值、`updated_at` 前进
 - history 追加两条后 `list_recent` 倒序返回

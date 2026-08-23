@@ -50,7 +50,7 @@ V2 收官任务：端到端验证状态随对话演化、各降级路径不伤�
 
 ## Data Dependencies
 
-- 内存 SQLite（e2e）/ 真实 uvicorn + 测试库（HTTP 集成，沿用 V1 模式）
+- e2e 用内存 SQLite（单测层）；HTTP 集成连 PostgreSQL（`alembic upgrade head` 建表，本地无实例时 skip）
 
 ## Permission
 
