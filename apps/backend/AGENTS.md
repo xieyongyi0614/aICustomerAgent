@@ -12,7 +12,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 启动服务
 
 ## 任务入口
 
-开发前先读 `docs/v1/01-task-registry.md`（任务注册表），确认当前 Task 及其 Scope / 依赖。架构细节见 `docs/v1/v1-architecture.md`。
+开发前先读 `docs/v2/01-task-registry.md`（任务注册表），确认当前 Task 及其 Scope / 依赖。架构细节见 `docs/v2/v2-architecture.md`。
 
 ## 架构约束
 
@@ -20,6 +20,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 启动服务
 
 - LLM 实例必须来自 `core/llm_factory.get_llm()`，禁止各处新建 `ChatOpenAI`。
 - DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM。
+- 数据库结构变更只走 Alembic（`migrations/`），`create_all` 已退役（单元测试内存建表属豁免）。
 - 所有阈值/魔法数字放 `core/settings.py`，禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；记忆/摘要后处理失败不得影响已产出的回答。
 - 角色资产按人设分子目录存放于 `character/<persona>/`（如 `character/asuna/`），每人设一套 identity/personality/relationship/behavior/modes。
@@ -33,4 +34,4 @@ uv run uvicorn app.main:app --reload --port 8000   # 启动服务
 
 - `pytest` + `pytest-asyncio`，fixture 在 `tests/conftest.py`。
 - **测试禁止真实 LLM 调用**：用 `core/llm_factory.set_llm(mock)` 注入 FakeLLM。
-- DB 用内存 SQLite（`sqlite:///:memory:`），每测试独立建表。
+- 单元测试 DB 用内存 SQLite（`sqlite:///:memory:`），每测试独立建表；HTTP / e2e 集成测试连 PostgreSQL（`alembic upgrade head` 建表）。

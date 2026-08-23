@@ -54,6 +54,7 @@ Subtask（见各 Task 文件内"Subtask 拆分"）
 
 | Feature | Task ID | Task 名称 | 优先级 |
 |---|---|---|---|
+| 数据库切换 | DB-00 | PostgreSQL 切换与 Alembic 迁移体系 | P0 |
 | 状态三表 | DB-01 | 三张状态表 ORM 与三个 repository | P0 |
 
 ### 模块三：状态规则与链（Rules & Chains）
@@ -87,9 +88,11 @@ Subtask（见各 Task 文件内"Subtask 拆分"）
 ## 5. 总体依赖 DAG
 
 ```
+DB-00（PostgreSQL 切换 + Alembic，仅依赖 V1 现状，可与 BE-01 并行）
+
 BE-01（领域模型）
  │
- ├─→ DB-01（三表 + 三仓储）─→ BE-02（规则引擎，还需 settings 阈值）
+ ├─→ DB-01（三表 + 三仓储，还需 DB-00 迁移体系）─→ BE-02（规则引擎，还需 settings 阈值）
  │
  ├─→ BE-03（轮次分析链，还需 V1 conftest FakeLLM）
  ├─→ BE-04（状态更新链）
@@ -102,7 +105,8 @@ BE-07 ─────────────────→ TEST-01（多轮状
 
 ### 并行化建议
 
-- 分支 A：`BE-01 → DB-01 → BE-02`（基础串，最先启动）
+- 分支 A0：`DB-00`（只动 `core/db.py` + settings + migrations，与 BE-01 无依赖，可最先启动）
+- 分支 A：`BE-01 → DB-01 → BE-02`（基础串；DB-01 须等 DB-00 完成）
 - 分支 B：`BE-01 → BE-03` 与 `BE-01 → BE-04`（两条链可并行）
 - 分支 C：`BE-01 → BE-05`（纯资产 + Builder，可并行）
 
@@ -112,14 +116,14 @@ BE-07 ─────────────────→ TEST-01（多轮状
 
 | 优先级 | 定义 | 范围 |
 |---|---|---|
-| **P0** | V2 必须完成 | 全部 9 个实施任务 |
+| **P0** | V2 必须完成 | 全部 10 个实施任务（含 DB-00 数据库切换） |
 | **P1** | 无 | — |
 | **P2** | 后续版本 | 见架构文档第 10 节 backlog（状态调试 API、并发覆盖、时间衰减曲线等） |
 
 ## 7. 执行顺序建议（按队列）
 
 ```
-队列 1：BE-01
+队列 1（可并行）：BE-01、DB-00
 队列 2（可并行）：{DB-01 → BE-02}、{BE-03}、{BE-04}、{BE-05}
 队列 3：BE-06
 队列 4：BE-07
@@ -135,7 +139,8 @@ BE-07 ─────────────────→ TEST-01（多轮状
 - 读取进链、写入出链：状态写入只发生在 `_post_process`
 - Prompt 组装必须走 `PromptBuilder`，禁止手工拼接
 - 不添加代码注释，用命名表达意图
-- 测试禁止真实 LLM 调用（FakeLLM 注入），DB 用内存 SQLite
+- 测试禁止真实 LLM 调用（FakeLLM 注入）；单元测试用内存 SQLite，HTTP / e2e 集成测试连 PostgreSQL（`alembic upgrade head` 建表）
+- 数据库结构变更只走 Alembic revision（autogenerate + 人工审阅），`create_all` 已退役（单元测试内存建表属豁免）
 - 只有用户明确要求时才提交 / 推送 / 建 PR
 
 ---
@@ -148,6 +153,7 @@ docs/v2/
 ├── v2-architecture.md       # V2 架构总设计（任务输入依据）
 └── tasks/
     ├── BE-01-state-models.md
+    ├── DB-00-postgres-migration.md
     ├── DB-01-state-tables.md
     ├── BE-02-state-engine.md
     ├── BE-03-turn-analysis-chain.md
