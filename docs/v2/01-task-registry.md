@@ -4,6 +4,10 @@
 > 输出用途：可直接交给 Coding Agent 逐 Task 执行。
 > 本文件为 V2 唯一任务入口，`tasks/` 目录下每个文件对应一个 Task（DOC-01 已随设计文档完成，不建文件）。
 
+> **断点状态（2026-08-24）**：V2 全部 10 个任务已完成并通过验收（120 tests 全绿，pylint 7.98）。
+> 断点标记：git tag `v2-checkpoint`（commit `81497e3`）。
+> 遗留项：全量测试偶发 1 个 teardown error（断言全过，原因待排查）；backend README 数据库章节仍写 SQLite，待更新。
+
 ---
 
 ## 1. 任务拆分原则
