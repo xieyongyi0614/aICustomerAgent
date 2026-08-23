@@ -77,6 +77,64 @@ class Memory(Base):
     )
 
 
+class CharacterStateRow(Base):
+    __tablename__ = "character_state"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    mood: Mapped[str] = mapped_column(String, nullable=False)
+    energy: Mapped[float] = mapped_column(Float, nullable=False)
+    current_topic: Mapped[str] = mapped_column(String, nullable=False, default="")
+    inner_state: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "mood IN ('happy', 'calm', 'worried', 'sad', 'shy', 'excited', 'tired', 'angry')",
+            name="ck_character_state_mood",
+        ),
+    )
+
+
+class RelationshipStateRow(Base):
+    __tablename__ = "relationship_state"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    intimacy: Mapped[float] = mapped_column(Float, nullable=False)
+    trust: Mapped[float] = mapped_column(Float, nullable=False)
+    familiarity: Mapped[float] = mapped_column(Float, nullable=False)
+    stage: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('stranger', 'friend', 'close_friend', 'partner')",
+            name="ck_relationship_state_stage",
+        ),
+    )
+
+
+class EmotionHistoryRow(Base):
+    __tablename__ = "emotion_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    user_emotion: Mapped[str] = mapped_column(String, nullable=False)
+    event: Mapped[str] = mapped_column(String, nullable=False)
+    behavior: Mapped[str] = mapped_column(String, nullable=False)
+    mood_before: Mapped[str] = mapped_column(String, nullable=False)
+    mood_after: Mapped[str] = mapped_column(String, nullable=False)
+    energy_after: Mapped[float] = mapped_column(Float, nullable=False)
+    stage_after: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("idx_emotion_history_user", "user_id", "created_at"),
+    )
+
+
 def create_engine_from_url(url: str | None = None):
     database_url = url or get_settings().database_url
     if database_url.startswith("sqlite"):
