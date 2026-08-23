@@ -55,6 +55,8 @@ class FakeLLM(BaseChatModel):
     def with_structured_output(self, schema, **kwargs):
         def _resolve(inputs):
             self.seen_messages.append([inputs])
+            if self.raise_exc:
+                raise self.raise_exc
             data = self.structured_responses.get(schema.__name__)
             if isinstance(data, dict):
                 return schema.model_validate(data)
