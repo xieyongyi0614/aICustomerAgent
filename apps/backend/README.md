@@ -1,0 +1,101 @@
+# AICustomerServiceAgent Backend
+
+「角色对话 Agent」后端 —— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + SQLite）。
+
+## 技术栈
+
+- Python 3.13 + FastAPI + Uvicorn
+- LangChain（Chain 编排：路由 / 回答 / 摘要 / 记忆提取）
+- SQLite（SQLAlchemy ORM）+ pydantic-settings
+- pytest + pytest-asyncio（FakeLLM 注入，无真实 LLM 调用）
+
+## 目录结构
+
+```
+app/
+├── api/v1/            # API 表现层（chat 端点）
+├── services/          # 业务服务（会话窗口、记忆、摘要、上下文、编排）
+├── repositories/      # 数据访问层（SQLAlchemy）
+├── chains/            # LangChain 链（路由 / 回答 / 摘要 / 提取）
+├── core/              # 配置、DB 引擎、LLM 工厂
+├── models/            # Pydantic 数据模型
+├── prompts/           # Prompt 模板与 PromptBuilder
+└── character/asuna/   # 亚丝娜角色资产（人设 / 模式指令）
+```
+
+三层单向依赖：`api → services → repositories → core`。
+
+## 快速开始
+
+```bash
+# 1. 配置环境变量（复制 .env.example 为 .env 并填入 OPENAI_API_KEY）
+cp .env.example .env
+
+# 2. 安装依赖并启动
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+
+# 3. 健康检查
+curl http://localhost:8000/health
+```
+
+## 核心能力
+
+- **长期记忆**：对话中自动提取用户偏好 / 目标，落库并在后续回答中召回
+- **对话摘要**：消息数达到阈值后滚动生成摘要，替换超出窗口的上下文
+- **多轮窗口**：保留最近 N 条消息（长度 / 字符双重预算）
+- **路由降级**：路由置信度低于阈值时降级为 default 模式
+
+## API
+
+### POST /api/v1/chat/message
+
+流式对话端点，返回 SSE 风格逐行 JSON：
+
+```json
+{"delta": "你好"}
+{"delta": "呀"}
+{"done": true, "session_id": "xxxx"}
+```
+
+响应头：`X-Session-Id`、`X-Session-New`（首次会话为 `true`）。
+
+请求体示例：
+
+```json
+{ "content": "我喜欢吃寿司", "session_id": "xxxx" }
+```
+
+- 不带 `session_id` 时创建新会话
+- `content` 为空返回 422
+- LLM 调用失败时流内返回 `{"detail": "LLM 调用失败"}`
+
+## 测试
+
+```bash
+uv run pytest tests/ -v    # 45 个用例
+uv run pylint app tests    # 代码检查
+```
+
+测试通过 `tests/conftest.py` 的 FakeLLM 与内存 SQLite（每用例独立建表），不发起真实 LLM 调用。
+
+## 配置项（app/core/settings.py）
+
+| 配置                          | 默认值      | 说明                                |
+| ----------------------------- | ----------- | ----------------------------------- |
+| `OPENAI_API_KEY`              | -           | API Key（仅从环境变量 / .env 读取） |
+| `MODEL`                       | LongCat-2.0 | 模型名                              |
+| `SUMMARY_THRESHOLD`           | 40          | 触发摘要的消息数阈值                |
+| `ROUTER_CONFIDENCE_THRESHOLD` | 0.5         | 路由降级置信度阈值                  |
+| `MEMORY_IMPORTANCE_THRESHOLD` | 0.6         | 记忆落库重要性阈值                  |
+| `MEMORY_TOP_K`                | 5           | 检索召回条数                        |
+| `CONVERSATION_MAX_MESSAGES`   | 20          | 窗口消息数上限                      |
+| `CONVERSATION_MAX_CHARS`      | 8000        | 窗口字符上限                        |
+
+## 开发约定
+
+- 禁止在源码硬编码 API Key / 密钥，只从环境变量或 `.env` 读取
+- LLM 实例统一来自 `app/core/llm_factory.get_llm()`，禁止各处新建
+- DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM
+- 不添加代码注释，用命名表达意图
+- 不提交 `.env`、`__pycache__/`、`.venv/`、`*.db`
