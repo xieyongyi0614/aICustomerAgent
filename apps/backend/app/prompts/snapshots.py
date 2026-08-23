@@ -4,7 +4,11 @@ from app.models.conversation import ChatMessage
 
 
 def format_character(character: CharacterState) -> str:
-    return f"心情：{character.mood}；精力：{character.energy:.2f}；内心：{character.inner_state}"
+    topic = character.current_topic or "暂无明确话题"
+    return (
+        f"心情：{character.mood}；精力：{character.energy:.2f}；"
+        f"最近话题：{topic}；内心：{character.inner_state}"
+    )
 
 
 def format_recent_context(messages: list[ChatMessage]) -> str:
