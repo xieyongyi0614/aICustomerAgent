@@ -4,9 +4,11 @@
 > 输出用途：可直接交给 Coding Agent 逐 Task 执行。
 > 本文件为 V2 唯一任务入口，`tasks/` 目录下每个文件对应一个 Task（DOC-01 已随设计文档完成，不建文件）。
 
-> **断点状态（2026-08-24）**：V2 全部 10 个任务已完成并通过验收（120 tests 全绿，pylint 7.98）。
-> 断点标记：git tag `v2-checkpoint`（指向本提交）。
-> 遗留项：全量测试偶发 1 个 teardown error（断言全过，原因待排查）；backend README 数据库章节仍写 SQLite，待更新。
+> **断点状态（2026-08-24，收尾修复后）**：V2 全部 10 个任务已完成并通过验收。
+> 完成度复审补齐：BE-06 context_builder 状态读取异常兜底、DB-00 未知数据库方言显式抛错（两处任务规格要求项）；补 BE-02 delta 表逐条 / clamp 上界、BE-05 未知键回退、BE-07 与摘要记忆隔离等测试。
+> 验证：全量 pytest 136 项（133 passed + 3 skipped PG 无实例），pylint 7.76（TEST-01 基线约 7.4 达标；低于上次快照 7.98 系新增无 docstring 测试函数所致，docstring 类告警按约定不修）。
+> 断点标记：git tag `v2-checkpoint`。
+> 遗留项：全量测试偶发 HTTP 集成用例失败（复现率约 1/3，单文件隔离必过；失败特征为后台 _post_process 任务越过用例夹具生命周期、monkeypatch 还原后落到 .env 的 sqlite 文件库导致 no such table，待后续收敛）。
 
 ---
 

@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core import llm_factory
-from app.core.db import Base, Conversation, Message
+from app.core.db import Base, Conversation, Message, create_engine_from_url
 from app.main import app
 from app.repositories import (
     character_state_repository,
@@ -41,6 +41,19 @@ def _ensure_test_database() -> str | None:
         if "already exists" in str(exc):
             return PG_TEST_URL
         return None
+
+
+def test_create_engine_rejects_unknown_dialect():
+    with pytest.raises(ValueError):
+        create_engine_from_url("mysql://user:pass@localhost:3306/asuna")
+
+
+def test_create_engine_postgresql_branch_keeps_pool_settings():
+    engine = create_engine_from_url(
+        "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
+    )
+    assert engine.url.get_backend_name() == "postgresql"
+    engine.dispose()
 
 
 @pytest.fixture(scope="module")

@@ -35,6 +35,20 @@ class TestUpdateEnergy:
         state = CharacterState(energy=0.5)
         assert state_engine.update_energy(state, _analysis("farewell")) == pytest.approx(0.45)
 
+    @pytest.mark.parametrize(
+        "event,behavior,expected",
+        [
+            ("help_given", "normal_reply", 0.5),
+            ("setback", "normal_reply", 0.4),
+            ("complaint", "normal_reply", 0.4),
+            ("daily", "show_concern", 0.42),
+        ],
+    )
+    def test_event_and_behavior_energy_modifiers(self, event, behavior, expected):
+        state = CharacterState(energy=0.5)
+        energy = state_engine.update_energy(state, _analysis(event, behavior=behavior))
+        assert energy == pytest.approx(expected)
+
 
 class TestRelationshipDeltas:
     def test_achievement_plus_recall_memory_stacks(self):
@@ -48,6 +62,23 @@ class TestRelationshipDeltas:
         assert delta.intimacy == pytest.approx(0.02)
         assert delta.trust == pytest.approx(0.08)
         assert delta.familiarity == pytest.approx(0.03)
+
+    @pytest.mark.parametrize(
+        "event,behavior,intimacy,trust,familiarity",
+        [
+            ("setback", "normal_reply", 0.03, 0.0, 0.0),
+            ("seek_help", "normal_reply", 0.02, 0.05, 0.02),
+            ("help_given", "normal_reply", 0.03, 0.02, 0.06),
+            ("complaint", "normal_reply", 0.0, -0.03, 0.0),
+            ("daily", "celebrate", 0.02, 0.0, 0.01),
+            ("daily", "encourage", 0.0, 0.01, 0.01),
+        ],
+    )
+    def test_delta_table_entry(self, event, behavior, intimacy, trust, familiarity):
+        delta = state_engine.relationship_deltas(event, behavior)
+        assert delta.intimacy == pytest.approx(intimacy)
+        assert delta.trust == pytest.approx(trust)
+        assert delta.familiarity == pytest.approx(familiarity)
 
     def test_conflict_applies_full_negative_delta(self):
         relationship = state_engine.apply_relationship(
@@ -67,6 +98,17 @@ class TestRelationshipDeltas:
         )
         assert relationship.intimacy == 0.0
         assert relationship.trust == 0.0
+
+    def test_delta_clamps_at_one(self):
+        relationship = state_engine.apply_relationship(
+            _relationship(intimacy=0.99, trust=0.99, familiarity=0.99, stage="partner"),
+            "help_given",
+            "recall_memory",
+        )
+        assert relationship.intimacy == 1.0
+        assert relationship.trust == 1.0
+        assert relationship.familiarity == 1.0
+        assert relationship.stage == "partner"
 
 
 def _relationship(intimacy, trust, familiarity, stage="friend"):
