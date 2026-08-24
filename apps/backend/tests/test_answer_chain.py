@@ -3,6 +3,7 @@ from datetime import datetime
 import pytest
 
 from app.core import llm_factory
+from app.character.asuna import BEHAVIOR_INSTRUCTIONS
 from app.chains import answer_chain
 from app.models.character_state import CharacterState
 from app.models.conversation import ChatMessage, ConversationState
@@ -132,10 +133,26 @@ def test_relationship_and_energy_rendered_without_floats():
 
 
 def test_unknown_behavior_falls_back_to_normal_reply():
-    prompt = PromptBuilder.build("default", _state(), _analysis("ask_followup"))
+    analysis = TurnAnalysis.model_construct(
+        user_emotion=UserEmotion(),
+        behavior=BehaviorDecision.model_construct(
+            behavior="unknown_behavior", reason="测试未知键"
+        ),
+    )
+    prompt = PromptBuilder.build("default", _state(), analysis)
     rendered = str([m.prompt for m in prompt.messages])
     assert "【本轮行为指令】" in rendered
-    assert "追问" in rendered
+    assert BEHAVIOR_INSTRUCTIONS["normal_reply"] in rendered
+
+
+def test_unknown_stage_falls_back_to_friend():
+    state = _state()
+    state.relationship_state = RelationshipState.model_construct(
+        intimacy=0.5, trust=0.5, familiarity=0.5, stage="unknown_stage"
+    )
+    prompt = PromptBuilder.build("default", state, _analysis())
+    rendered = str([m.prompt for m in prompt.messages])
+    assert "当前关系：好友" in rendered
 
 
 @pytest.mark.asyncio

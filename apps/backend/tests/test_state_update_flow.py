@@ -6,7 +6,9 @@ import pytest
 from app.repositories import (
     character_state_repository,
     emotion_history_repository,
+    memory_repository,
     relationship_repository,
+    summary_repository,
 )
 from app.services import agent_service
 
@@ -22,7 +24,20 @@ async def _wait_background(predicate):
     return predicate()
 
 
-def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral"):
+def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", memory=None):
+    memory_decision = {
+        "should_save": False,
+        "memory": None,
+        "memory_type": "preference",
+        "importance": 0.0,
+    }
+    if memory:
+        memory_decision = {
+            "should_save": True,
+            "memory": memory,
+            "memory_type": "preference",
+            "importance": 0.8,
+        }
     return {
         "RoleMode": {
             "mode": "default",
@@ -40,12 +55,7 @@ def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral"):
             "inner_state": "开心",
             "current_topic": "用户的成就",
         },
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        },
+        "MemoryDecision": memory_decision,
     }
 
 
@@ -130,3 +140,34 @@ async def test_two_turns_decay_energy_accumulatively(db_session_factory, fake_ll
     )
     history = emotion_history_repository.list_recent(USER, limit=5)
     assert len(history) == 2
+
+
+async def test_state_persistence_failure_does_not_break_summary_and_memory(
+    db_session_factory, fake_llm, monkeypatch, override_settings
+):
+    override_settings(summary_threshold=1)
+
+    def raise_failure(user_id, state):
+        raise RuntimeError("state db down")
+
+    monkeypatch.setattr(character_state_repository, "upsert_state", raise_failure)
+
+    llm = fake_llm(
+        response=["好耶"],
+        structured_responses=_structured("daily", memory="用户喜欢寿司"),
+    )
+    reply = await _turn("s-be7-4", "我喜欢寿司", llm)
+    assert reply == "好耶"
+
+    assert await _wait_background(
+        lambda: summary_repository.get_summary("s-be7-4") is not None
+    )
+    assert summary_repository.get_summary("s-be7-4").summary == "好耶"
+    assert await _wait_background(
+        lambda: any(
+            m.memory == "用户喜欢寿司"
+            for m in memory_repository.list_by_user(USER)
+        )
+    )
+    assert character_state_repository.get_state(USER).updated_at is None
+    assert len(emotion_history_repository.list_recent(USER, limit=5)) == 0

@@ -1,12 +1,12 @@
 # AICustomerServiceAgent Backend
 
-「角色对话 Agent」后端 —— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + SQLite）。
+「角色对话 Agent」后端 —— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + PostgreSQL）。
 
 ## 技术栈
 
 - Python 3.13 + FastAPI + Uvicorn
-- LangChain（Chain 编排：路由 / 回答 / 摘要 / 记忆提取）
-- SQLite（SQLAlchemy ORM）+ pydantic-settings
+- LangChain（Chain 编排：路由 / 轮次分析 / 回答 / 状态更新 / 摘要 / 记忆提取）
+- PostgreSQL 16（SQLAlchemy ORM + Alembic 版本化迁移）+ pydantic-settings
 - pytest + pytest-asyncio（FakeLLM 注入，无真实 LLM 调用）
 
 ## 目录结构
@@ -31,13 +31,26 @@ app/
 # 1. 配置环境变量（复制 .env.example 为 .env 并填入 OPENAI_API_KEY）
 cp .env.example .env
 
-# 2. 安装依赖并启动
+# 2. 启动本地 PostgreSQL 16（docker-compose，asuna/asuna/asuna）
+docker compose up -d
+
+# 3. 安装依赖并执行数据库迁移
 uv sync
+uv run alembic upgrade head
+
+# 4. 启动服务
 uv run uvicorn app.main:app --reload --port 8000
 
-# 3. 健康检查
+# 5. 健康检查
 curl http://localhost:8000/health
 ```
+
+## 数据库
+
+- 运行库为 PostgreSQL 16，连接串由 `DATABASE_URL` 配置（默认 `postgresql+psycopg://asuna:asuna@localhost:5432/asuna`）。
+- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`）：rev1 为 V1 四表 baseline，rev2 为 V2 三张状态表；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
+- 存量 SQLite 数据可用 `uv run python -m scripts.migrate_sqlite_to_postgres --source sqlite:///./asuna.db` 一次性搬运（幂等，目标表先清后写）。
+- 连接池参数（`DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` / `DB_POOL_PRE_PING`）见配置项表。
 
 ## 核心能力
 
@@ -73,11 +86,11 @@ curl http://localhost:8000/health
 ## 测试
 
 ```bash
-uv run pytest tests/ -v    # 45 个用例
-uv run pylint app tests    # 代码检查
+uv run pytest             # 全量用例（136 项）
+uv run pylint app tests   # 代码检查
 ```
 
-测试通过 `tests/conftest.py` 的 FakeLLM 与内存 SQLite（每用例独立建表），不发起真实 LLM 调用。
+单元 / e2e 测试通过 `tests/conftest.py` 的 FakeLLM 与内存 SQLite（每用例独立建表），不发起真实 LLM 调用；PostgreSQL 集成测试（`tests/test_db_migration.py`）在本地无 PG 实例时自动 skip（`docker compose up -d` 后重跑即执行）。
 
 ## 配置项（app/core/settings.py）
 
@@ -85,6 +98,11 @@ uv run pylint app tests    # 代码检查
 | ----------------------------- | ----------- | ----------------------------------- |
 | `OPENAI_API_KEY`              | -           | API Key（仅从环境变量 / .env 读取） |
 | `MODEL`                       | LongCat-2.0 | 模型名                              |
+| `DATABASE_URL`                | postgresql+psycopg://asuna:asuna@localhost:5432/asuna | 数据库连接串（sqlite 前缀走测试方言分支） |
+| `DB_POOL_SIZE`                | 5           | PG 连接池大小                       |
+| `DB_MAX_OVERFLOW`             | 10          | PG 连接池溢出上限                   |
+| `DB_POOL_RECYCLE`             | 1800        | PG 连接回收秒数                     |
+| `DB_POOL_PRE_PING`            | true        | 取连接前预检活性                    |
 | `SUMMARY_THRESHOLD`           | 40          | 触发摘要的消息数阈值                |
 | `ROUTER_CONFIDENCE_THRESHOLD` | 0.5         | 路由降级置信度阈值                  |
 | `MEMORY_IMPORTANCE_THRESHOLD` | 0.6         | 记忆落库重要性阈值                  |

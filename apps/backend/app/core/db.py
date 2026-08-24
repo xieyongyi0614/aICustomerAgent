@@ -139,6 +139,8 @@ def create_engine_from_url(url: str | None = None):
     database_url = url or get_settings().database_url
     if database_url.startswith("sqlite"):
         return create_engine(database_url, connect_args={"check_same_thread": False})
+    if not database_url.startswith("postgresql"):
+        raise ValueError(f"不支持的数据库 URL：{database_url}")
     settings = get_settings()
     return create_engine(
         database_url,

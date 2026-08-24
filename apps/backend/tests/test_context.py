@@ -1,7 +1,9 @@
 import pytest
 
 from app.services import context_builder, conversation_service
+from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
+from app.models.relationship import RelationshipState
 from app.repositories import conversation_repository, memory_repository, summary_repository
 from app.core.db import Conversation
 
@@ -43,3 +45,13 @@ async def test_build_includes_memories(db_session_factory):
 async def test_build_empty_input_rejected(db_session_factory):
     with pytest.raises(ValueError):
         await context_builder.build("s5", "u1", "")
+
+
+async def test_build_state_read_failure_falls_back_to_default(db_session_factory, monkeypatch):
+    def raise_failure(user_id):
+        raise RuntimeError("状态读取失败")
+
+    monkeypatch.setattr(context_builder.state_service, "load_states", raise_failure)
+    state = await context_builder.build("s7", "u1", "你好")
+    assert state.character_state == CharacterState()
+    assert state.relationship_state == RelationshipState()
