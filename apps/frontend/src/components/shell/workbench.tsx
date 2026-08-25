@@ -3,6 +3,7 @@
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { MessageList } from "@/components/chat/message-list"
 import { DebugPane } from "@/components/debug/debug-pane"
+import { TopBar } from "@/components/shell/top-bar"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -29,7 +30,7 @@ function Workbench() {
         data-testid="topbar-slot"
         className="flex h-12 shrink-0 items-center border-b border-border px-4"
       >
-        <span className="font-mono text-xs text-muted-foreground">Asuna Debug Console</span>
+        <TopBar />
       </header>
 
       <p
