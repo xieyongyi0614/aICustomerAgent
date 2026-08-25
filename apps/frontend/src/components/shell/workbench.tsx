@@ -1,8 +1,8 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { MessageList } from "@/components/chat/message-list"
-import { DebugPanePlaceholder } from "@/components/debug/debug-pane-placeholder"
+import { DebugPane } from "@/components/debug/debug-pane"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -36,7 +36,7 @@ function Workbench() {
         data-testid="mobile-banner"
         className="hidden max-md:block px-4 py-1.5 text-center font-mono text-xs text-status-warn"
       >
-        请使用桌面端获得完整调试体验
+        璇蜂娇鐢ㄦ闈㈢鑾峰緱瀹屾暣璋冭瘯浣撻獙
       </p>
 
       <div className="flex min-h-0 flex-1">
@@ -63,10 +63,10 @@ function Workbench() {
                 data-testid="debug-collapse"
                 onClick={() => setCollapsed(true)}
               >
-                »
+                禄
               </Button>
             </div>
-            <DebugPanePlaceholder />
+            <DebugPane />
           </section>
         ) : (
           <Button
@@ -76,7 +76,7 @@ function Workbench() {
             className="self-start"
             onClick={() => setCollapsed(false)}
           >
-            «
+            芦
           </Button>
         )}
       </div>
@@ -99,7 +99,7 @@ function Workbench() {
             <DrawerTitle className="font-mono text-sm">Agent Debug</DrawerTitle>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-hidden">
-            <DebugPanePlaceholder />
+            <DebugPane />
           </div>
         </DrawerContent>
       </Drawer>
