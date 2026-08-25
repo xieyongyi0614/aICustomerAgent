@@ -1,5 +1,6 @@
 import { useState } from "react"
 
+import { MessageList } from "@/components/chat/message-list"
 import { DebugPanePlaceholder } from "@/components/debug/debug-pane-placeholder"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,7 +44,7 @@ function Workbench() {
           className="flex min-h-0 min-w-0 flex-col lg:flex-1 lg:basis-0 min-[1200px]:basis-[42%] min-[1200px]:grow-0"
         >
           <ScrollArea className="min-h-0 flex-1">
-            <div className="p-4 font-mono text-xs text-fg-tertiary">[chat] Phase 1 后续任务</div>
+            <MessageList />
           </ScrollArea>
         </section>
 
