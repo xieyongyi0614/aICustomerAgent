@@ -36,7 +36,7 @@ beforeEach(() => {
 describe("ChatInputBar", () => {
   it("sends on Enter and clears the draft", async () => {
     const user = userEvent.setup()
-    render(<ChatInputBar />)
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     await user.type(input(), "你好{Enter}")
 
     expect(chatTransport.send).toHaveBeenCalledTimes(1)
@@ -48,7 +48,7 @@ describe("ChatInputBar", () => {
 
   it("keeps the draft on Shift+Enter newline", async () => {
     const user = userEvent.setup()
-    render(<ChatInputBar />)
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     await user.type(input(), "第一行{Shift>}{Enter}{/Shift}第二行")
 
     expect(chatTransport.send).not.toHaveBeenCalled()
@@ -56,7 +56,7 @@ describe("ChatInputBar", () => {
   })
 
   it("blocks Enter while IME composition is active", async () => {
-    render(<ChatInputBar />)
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     fireEvent.compositionStart(input())
     fireEvent.keyDown(input(), { key: "Enter" })
     fireEvent.compositionEnd(input())
@@ -66,7 +66,7 @@ describe("ChatInputBar", () => {
 
   it("disables Send for blank drafts and switches to Stop while streaming", async () => {
     const user = userEvent.setup()
-    render(<ChatInputBar />)
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     expect((screen.getByTestId("send-button") as HTMLButtonElement).disabled).toBe(true)
 
     await user.type(input(), "   ")
@@ -86,7 +86,7 @@ describe("ChatInputBar", () => {
     act(() => {
       useChatStore.setState({ streamingMessageId: "a-1" })
     })
-    render(<ChatInputBar />)
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     fireEvent.keyDown(input(), { key: "Enter" })
     expect(chatTransport.send).not.toHaveBeenCalled()
   })

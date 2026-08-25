@@ -1,9 +1,10 @@
 ﻿import { useState } from "react"
 
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
-import { MessageList } from "@/components/chat/message-list"
+import { ChatScrollRegion } from "@/components/chat/chat-scroll-region"
 import { DebugPane } from "@/components/debug/debug-pane"
 import { TopBar } from "@/components/shell/top-bar"
+import { usePersistedState } from "@/hooks/use-persisted-state"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -12,8 +13,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { usePersistedState } from "@/hooks/use-persisted-state"
 
 const DEBUG_COLLAPSED_KEY = "asuna-debug.debugPaneCollapsed"
 
@@ -21,6 +20,10 @@ function Workbench() {
   const [collapsed, setCollapsed] = usePersistedState<boolean>(
     DEBUG_COLLAPSED_KEY,
     false,
+  )
+  const [autoScroll, setAutoScroll] = usePersistedState<boolean>(
+    "asuna-debug.autoScroll",
+    true,
   )
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -45,10 +48,11 @@ function Workbench() {
           data-testid="chat-pane"
           className="flex min-h-0 min-w-0 flex-col lg:flex-1 lg:basis-0 min-[1200px]:basis-[42%] min-[1200px]:grow-0"
         >
-          <ScrollArea className="min-h-0 flex-1">
-            <MessageList />
-          </ScrollArea>
-          <ChatInputBar />
+          <ChatScrollRegion enabled={autoScroll} />
+          <ChatInputBar
+            autoScrollEnabled={autoScroll}
+            onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
+          />
         </section>
 
         {!collapsed ? (

@@ -7,7 +7,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { useChat } from "@/hooks/use-chat"
 import { cn } from "@/lib/utils"
 
-function ChatInputBar() {
+function ChatInputBar({
+  autoScrollEnabled,
+  onToggleAutoScroll,
+}: {
+  autoScrollEnabled: boolean
+  onToggleAutoScroll: () => void
+}) {
   const { send, stop, isStreaming } = useChat()
   const [draft, setDraft] = useState("")
   const composingRef = useRef(false)
@@ -48,21 +54,36 @@ function ChatInputBar() {
           composingRef.current = false
         }}
       />
-      <div className="mt-2 flex items-center justify-end gap-2">
-        {isStreaming ? (
-          <Button size="sm" variant="destructive" data-testid="stop-button" onClick={() => stop()}>
-            Stop
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            data-testid="send-button"
-            disabled={!canSend}
-            onClick={() => submit()}
-          >
-            Send
-          </Button>
-        )}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid="autoscroll-toggle"
+          onClick={onToggleAutoScroll}
+        >
+          AutoScroll {autoScrollEnabled ? "✓" : "✗"}
+        </Button>
+        <div className="flex items-center gap-2">
+          {isStreaming ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              data-testid="stop-button"
+              onClick={() => stop()}
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              data-testid="send-button"
+              disabled={!canSend}
+              onClick={() => submit()}
+            >
+              Send
+            </Button>
+          )}
+        </div>
       </div>
       <p
         data-testid="streaming-hint"
