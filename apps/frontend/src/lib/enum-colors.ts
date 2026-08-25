@@ -1,24 +1,11 @@
-export type EnumKind = 'mode' | 'emotion' | 'behavior' | 'stage'
+import type {
+  BehaviorValue,
+  EmotionValue,
+  ModeValue,
+  StageValue,
+} from "@/types/domain/enums"
 
-export type ModeValue = 'professional' | 'default' | 'immersive'
-export type EmotionValue =
-  | 'happy'
-  | 'calm'
-  | 'sad'
-  | 'anxious'
-  | 'angry'
-  | 'tired'
-  | 'excited'
-  | 'neutral'
-export type BehaviorValue =
-  | 'normal_reply'
-  | 'comfort'
-  | 'encourage'
-  | 'celebrate'
-  | 'show_concern'
-  | 'recall_memory'
-  | 'ask_followup'
-export type StageValue = 'stranger' | 'friend' | 'close_friend' | 'partner'
+export type EnumKind = 'mode' | 'emotion' | 'behavior' | 'stage'
 
 export const NEUTRAL_BADGE_CLASS = 'bg-neutral-500/15 text-neutral-300 border-neutral-500/40'
 export const DEGRADED_BADGE_CLASS = 'bg-amber-500/15 text-amber-300 border-amber-500/50'
