@@ -1,5 +1,6 @@
 import { useState } from "react"
 
+import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { MessageList } from "@/components/chat/message-list"
 import { DebugPanePlaceholder } from "@/components/debug/debug-pane-placeholder"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ function Workbench() {
           <ScrollArea className="min-h-0 flex-1">
             <MessageList />
           </ScrollArea>
+          <ChatInputBar />
         </section>
 
         {!collapsed ? (
