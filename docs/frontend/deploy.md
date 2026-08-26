@@ -68,6 +68,24 @@ server {
 
 `proxy_buffering off` 是流式回答的关键配置，缺失会导致前端整段等待。
 
+## 方案 C：Docker 一体化部署（已验证）
+
+仓库根目录提供 `Dockerfile`（多阶段：node:22 构建前端 → python:3.13-slim 运行后端并托管 dist）与 `docker-compose.yml`（console + postgres:16）。
+
+```powershell
+# 前置：apps/backend/.env 至少含 OPENAI_API_KEY / BASE_URL / MODEL（数据库地址由 compose 覆盖为 postgres 服务）
+docker compose up -d --build
+# 浏览器 http://localhost:8020 → Console 与 /api 同域
+docker compose down          # 停止（数据卷 asuna_pgdata 保留）
+```
+
+要点：
+
+- 容器启动自动执行 `alembic upgrade head`（0001 → 0002），无需手工迁移
+- 静态托管复用 `scripts/serve_with_frontend.py`，经 `FRONTEND_DIST_DIR=/srv/frontend/dist`、`CONSOLE_HOST=0.0.0.0` 环境变量适配容器；本机直跑行为不变
+- 构建参数 `--build-arg VITE_API_MODE=real VITE_BASE=/` 可覆盖前端构建期环境变量，默认即生产取值
+- 密钥不进镜像：`.dockerignore` 排除 `.env`，LLM 配置经 compose `env_file` 运行时注入
+
 ## 冒烟清单
 
 对话链路以 FakeLLM 注入的完整 FastAPI 应用复验（仓库约定：禁真实 LLM）；浏览器 UI 走查由开发会话人工完成。
@@ -83,6 +101,13 @@ server {
 - [x] 子路径模式下 index.html 引用与 assets 均带 `/console/` 前缀且可达
 
 方案 B：nginx 配置样例供部署时按样例自验（`try_files` 回退 + `proxy_buffering off`），本机无 nginx 环境未实测。
+
+方案 C（Docker，2026-08-26 实测）：
+
+- [x] `docker compose up -d --build` 一键起 postgres + console，console 健康检查通过
+- [x] 容器内 alembic 自动迁移 0001 → 0002 成功（PostgreSQL 方言）
+- [x] `GET /health`、`GET /`、`GET /assets/*.js`、`GET /api/v1/state` 经宿主机端口映射均 200
+- [ ] 流式对话走真实 LLM 未在容器内复测（避免消耗外部配额；流式契约已在本机 FakeLLM 冒烟覆盖，容器仅改变打包方式）
 
 ## 已知边界
 
