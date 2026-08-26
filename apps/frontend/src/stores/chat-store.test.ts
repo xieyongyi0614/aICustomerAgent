@@ -196,4 +196,41 @@ describe("chat store", () => {
     transport.meta("existing", false)
     expect(store.getState().sessionId).toBe("existing")
   })
+
+  it("retry removes the last turn and resends the same human content", () => {
+    const { store, transport } = harness
+    store.getState().send("第一问")
+    transport.emit(DELTA_A)
+    transport.emit({ type: "error", message: "boom" })
+    expect(store.getState().messages).toHaveLength(2)
+
+    expect(store.getState().retry()).toBe(true)
+
+    const messages = store.getState().messages
+    expect(messages).toHaveLength(2)
+    expect(messages[0]).toMatchObject({ role: "human", content: "第一问", status: "complete" })
+    expect(messages[1].status === "pending" || messages[1].status === "streaming").toBe(
+      true,
+    )
+    expect(transport.lastRequest?.content).toBe("第一问")
+
+    transport.emit({ type: "delta", text: "修复后回答" })
+    transport.emit({ type: "done", turnId: "t-2" })
+    expect(assistantOf(store)).toMatchObject({
+      status: "complete",
+      content: "修复后回答",
+    })
+  })
+
+  it("refuses retry while streaming or without any human message", () => {
+    const { store, transport } = harness
+    expect(store.getState().retry()).toBe(false)
+
+    store.getState().send("进行中")
+    expect(store.getState().retry()).toBe(false)
+
+    transport.close(true)
+    store.getState().newSession()
+    expect(store.getState().retry()).toBe(false)
+  })
 })

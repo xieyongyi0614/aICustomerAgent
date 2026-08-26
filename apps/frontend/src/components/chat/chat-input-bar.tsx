@@ -3,8 +3,18 @@ import { useRef, useState } from "react"
 import type { KeyboardEvent } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { useChat } from "@/hooks/use-chat"
+import { useChatStore } from "@/stores/chat-store"
 import { cn } from "@/lib/utils"
 
 function ChatInputBar({
@@ -15,10 +25,18 @@ function ChatInputBar({
   onToggleAutoScroll: () => void
 }) {
   const { send, stop, isStreaming } = useChat()
+  const retry = useChatStore((s) => s.retry)
+  const newSession = useChatStore((s) => s.newSession)
+  const hasHumanMessage = useChatStore((s) =>
+    s.messages.some((m) => m.role === "human"),
+  )
   const [draft, setDraft] = useState("")
+  const [clearOpen, setClearOpen] = useState(false)
   const composingRef = useRef(false)
 
   const canSend = draft.trim().length > 0 && !isStreaming
+  const canRetry = hasHumanMessage && !isStreaming
+  const canClear = !isStreaming
 
   function submit() {
     if (!canSend) return
@@ -55,15 +73,75 @@ function ChatInputBar({
         }}
       />
       <div className="mt-2 flex items-center justify-between gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="autoscroll-toggle"
-          onClick={onToggleAutoScroll}
-        >
-          AutoScroll {autoScrollEnabled ? "✓" : "✗"}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="autoscroll-toggle"
+            onClick={onToggleAutoScroll}
+          >
+            AutoScroll {autoScrollEnabled ? "✓" : "✗"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="global-retry"
+            disabled={!canRetry}
+            onClick={() => retry()}
+          >
+            Retry
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
+          <Dialog
+            open={clearOpen}
+            onOpenChange={(next) => {
+              if (isStreaming) return
+              setClearOpen(next)
+            }}
+          >
+            <DialogTrigger
+              render={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="clear-button"
+                  disabled={!canClear}
+                />
+              }
+            >
+              Clear
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-sm">清空当前会话？</DialogTitle>
+                <DialogDescription>
+                  将清空本地聊天视图并开启新会话；后端已保存的记录不会被删除。
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="clear-cancel"
+                  onClick={() => setClearOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  data-testid="clear-confirm"
+                  onClick={() => {
+                    setClearOpen(false)
+                    newSession()
+                  }}
+                >
+                  确认清空
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {isStreaming ? (
             <Button
               size="sm"

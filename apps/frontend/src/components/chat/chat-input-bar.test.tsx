@@ -23,14 +23,7 @@ function input(): HTMLTextAreaElement {
 beforeEach(() => {
   vi.clearAllMocks()
   cleanup()
-  useChatStore.setState({
-    messages: [],
-    streamingMessageId: null,
-    sessionId: null,
-    connectionStatus: "idle",
-    turnMeta: null,
-    lastTurnId: null,
-  })
+  useChatStore.getState()._hardReset()
 })
 
 describe("ChatInputBar", () => {
@@ -89,5 +82,55 @@ describe("ChatInputBar", () => {
     render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
     fireEvent.keyDown(input(), { key: "Enter" })
     expect(chatTransport.send).not.toHaveBeenCalled()
+  })
+
+  it("disables retry without human messages and triggers resend via store", async () => {
+    const user = userEvent.setup()
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
+    expect((screen.getByTestId("global-retry") as HTMLButtonElement).disabled).toBe(true)
+
+    act(() => {
+      useChatStore.setState({
+        messages: [
+          { id: "h1", role: "human", content: "旧问题", status: "complete", createdAt: 0 },
+          { id: "a1", role: "ai", content: "", status: "error", createdAt: 1 },
+        ],
+      })
+    })
+    expect((screen.getByTestId("global-retry") as HTMLButtonElement).disabled).toBe(false)
+    await user.click(screen.getByTestId("global-retry"))
+
+    expect(chatTransport.send).toHaveBeenCalledTimes(1)
+    expect(useChatStore.getState().messages[0].content).toBe("旧问题")
+  })
+
+  it("clears the conversation only after confirmation", async () => {
+    const user = userEvent.setup()
+    act(() => {
+      useChatStore.setState({
+        sessionId: "s-old",
+        messages: [
+          { id: "h1", role: "human", content: "x", status: "complete", createdAt: 0 },
+        ],
+      })
+    })
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
+
+    await user.click(screen.getByTestId("clear-button"))
+    await user.click(screen.getByTestId("clear-cancel"))
+    expect(useChatStore.getState().sessionId).toBe("s-old")
+
+    await user.click(screen.getByTestId("clear-button"))
+    await user.click(screen.getByTestId("clear-confirm"))
+    expect(useChatStore.getState().sessionId).toBeNull()
+    expect(useChatStore.getState().messages).toHaveLength(0)
+  })
+
+  it("blocks clear while streaming and shows hint text", () => {
+    act(() => {
+      useChatStore.setState({ streamingMessageId: "a-1" })
+    })
+    render(<ChatInputBar autoScrollEnabled onToggleAutoScroll={() => {}} />)
+    expect((screen.getByTestId("clear-button") as HTMLButtonElement).disabled).toBe(true)
   })
 })
