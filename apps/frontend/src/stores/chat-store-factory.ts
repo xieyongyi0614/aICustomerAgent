@@ -19,6 +19,8 @@ interface ChatActions {
   send(content: string): boolean
   stop(): void
   newSession(): void
+  retry(): boolean
+  _hardReset(): void
 }
 
 function createId(): string {
@@ -167,8 +169,39 @@ export function createChatStore(transport: ChatStreamTransport) {
       activeController?.abort()
     },
 
+    retry() {
+      const state = get()
+      if (state.streamingMessageId !== null) return false
+      let lastHumanIndex = -1
+      for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+        if (state.messages[i].role === "human") {
+          lastHumanIndex = i
+          break
+        }
+      }
+      if (lastHumanIndex === -1) return false
+      const content = state.messages[lastHumanIndex].content
+      set({
+        messages: state.messages.slice(0, lastHumanIndex),
+      })
+      return get().send(content)
+    },
+
     newSession() {
       if (get().streamingMessageId !== null) return
+      activeController?.abort()
+      activeController = null
+      set({
+        messages: [],
+        streamingMessageId: null,
+        sessionId: null,
+        connectionStatus: "idle",
+        turnMeta: null,
+        lastTurnId: null,
+      })
+    },
+
+    _hardReset() {
       activeController?.abort()
       activeController = null
       set({

@@ -1,9 +1,11 @@
 import { memo, useEffect, useRef } from "react"
 
 import { TurnBadge } from "@/components/chat/turn-badge"
+import { Button } from "@/components/ui/button"
 import { formatRelativeTime } from "@/lib/format"
 import type { ChatMessage } from "@/types/domain/chat-message"
 import { cn } from "@/lib/utils"
+import { useChatStore } from "@/stores/chat-store"
 
 function MessageItemImpl({
   message,
@@ -13,6 +15,7 @@ function MessageItemImpl({
   highlighted?: boolean
 }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const retry = useChatStore((s) => s.retry)
 
   useEffect(() => {
     if (highlighted) {
@@ -56,9 +59,20 @@ function MessageItemImpl({
           <p className="mt-1 font-mono text-[10px] text-fg-tertiary">已停止</p>
         ) : null}
         {message.status === "error" && message.errorText ? (
-          <p className="mt-1 break-all font-mono text-[10px] text-status-error">
-            {message.errorText}
-          </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="break-all font-mono text-[10px] text-status-error">
+              {message.errorText}
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 shrink-0 px-1.5 font-mono text-[10px]"
+              data-testid={`inline-retry-${message.id}`}
+              onClick={() => retry()}
+            >
+              重试
+            </Button>
+          </div>
         ) : null}
 
         {!isHuman && (message.status === "complete" || message.status === "stopped") ? (
