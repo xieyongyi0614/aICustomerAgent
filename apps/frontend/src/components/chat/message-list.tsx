@@ -20,7 +20,7 @@ function MessageList() {
     return <EmptyConversationGuide />
   }
   return (
-    <div data-testid="message-list" className="flex flex-col gap-3 p-4">
+    <div data-testid="messages-container" className="flex flex-col gap-3 p-4">
       {messages.map((message) => (
         <MessageItem
           key={message.id}
