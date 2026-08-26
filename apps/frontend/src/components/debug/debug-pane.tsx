@@ -1,6 +1,7 @@
 import { OverviewPanel } from "@/components/debug/overview-panel"
 import { StatePanel } from "@/components/debug/state-panel"
 import { MemoryPanel } from "@/components/debug/memory-panel"
+import { TracePanel } from "@/components/debug/trace-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUiStore } from "@/stores/ui-store"
 import type { DebugTabValue } from "@/stores/ui-store"
@@ -20,6 +21,7 @@ function TabPlaceholder({ tab }: { tab: string }) {
 function DebugPane() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setActiveTab = useUiStore((s) => s.setActiveTab)
+  const selectedTurnId = useUiStore((s) => s.selectedTurnId)
 
   return (
     <Tabs
@@ -43,8 +45,15 @@ function DebugPane() {
       <TabsContent value="memory" className="min-h-0 flex-1 overflow-y-auto">
         <MemoryPanel />
       </TabsContent>
+      <TabsContent value="trace" className="min-h-0 flex-1 overflow-y-auto">
+        <TracePanel turnId={selectedTurnId} />
+      </TabsContent>
       {DEBUG_TABS.filter(
-        (t) => t.value !== "overview" && t.value !== "state" && t.value !== "memory",
+        (t) =>
+          t.value !== "overview" &&
+          t.value !== "state" &&
+          t.value !== "memory" &&
+          t.value !== "trace",
       ).map((tab) => (
         <TabsContent key={tab.value} value={tab.value} className="min-h-0 flex-1 overflow-y-auto">
           <TabPlaceholder tab={tab.label} />
