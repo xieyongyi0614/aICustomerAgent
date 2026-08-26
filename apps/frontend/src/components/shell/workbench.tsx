@@ -1,10 +1,13 @@
 ﻿import { useState } from "react"
 
+import { useEffect } from "react"
+
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { ChatScrollRegion } from "@/components/chat/chat-scroll-region"
 import { DebugPane } from "@/components/debug/debug-pane"
 import { TopBar } from "@/components/shell/top-bar"
 import { usePersistedState } from "@/hooks/use-persisted-state"
+import { useUiStore } from "@/stores/ui-store"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -26,6 +29,11 @@ function Workbench() {
     true,
   )
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const selectedTurnId = useUiStore((s) => s.selectedTurnId)
+
+  useEffect(() => {
+    if (selectedTurnId !== null) setCollapsed(false)
+  }, [selectedTurnId, setCollapsed])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
