@@ -17,6 +17,11 @@ def get_or_create_conversation(conv_id: str, user_id: str) -> Conversation:
         return conversation
 
 
+def find_conversation(conv_id: str) -> Conversation | None:
+    with SessionLocal() as session:
+        return session.get(Conversation, conv_id)
+
+
 def save_message(conv_id: str, role: str, content: str) -> Message:
     if role not in ("human", "ai"):
         raise ValueError(f"非法 role: {role}")
@@ -33,15 +38,14 @@ def save_message(conv_id: str, role: str, content: str) -> Message:
         return message
 
 
-def get_recent_messages(conv_id: str, limit: int) -> list[Message]:
+def get_recent_messages(
+    conv_id: str, limit: int, before_id: int | None = None
+) -> list[Message]:
     with SessionLocal() as session:
-        rows = (
-            session.query(Message)
-            .filter(Message.conversation_id == conv_id)
-            .order_by(Message.created_at.desc())
-            .limit(limit)
-            .all()
-        )
+        query = session.query(Message).filter(Message.conversation_id == conv_id)
+        if before_id is not None:
+            query = query.filter(Message.id < before_id)
+        rows = query.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit).all()
         return list(reversed(rows))
 
 
