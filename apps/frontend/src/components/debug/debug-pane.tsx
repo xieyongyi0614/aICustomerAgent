@@ -1,4 +1,5 @@
 import { OverviewPanel } from "@/components/debug/overview-panel"
+import { StatePanel } from "@/components/debug/state-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUiStore } from "@/stores/ui-store"
 import type { DebugTabValue } from "@/stores/ui-store"
@@ -35,7 +36,10 @@ function DebugPane() {
       <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto">
         <OverviewPanel />
       </TabsContent>
-      {DEBUG_TABS.filter((t) => t.value !== "overview").map((tab) => (
+      <TabsContent value="state" className="min-h-0 flex-1 overflow-y-auto">
+        <StatePanel />
+      </TabsContent>
+      {DEBUG_TABS.filter((t) => t.value !== "overview" && t.value !== "state").map((tab) => (
         <TabsContent key={tab.value} value={tab.value} className="min-h-0 flex-1 overflow-y-auto">
           <TabPlaceholder tab={tab.label} />
         </TabsContent>
