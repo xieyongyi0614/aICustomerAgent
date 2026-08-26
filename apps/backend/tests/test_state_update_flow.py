@@ -61,8 +61,9 @@ def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", mem
 
 async def _turn(session_id, content, llm):
     chunks = []
-    async for token in agent_service.stream_chat(session_id, USER, content, llm=llm):
-        chunks.append(token)
+    async for event in agent_service.stream_chat(session_id, USER, content, llm=llm):
+        if event.get("kind") == "token":
+            chunks.append(event["text"])
     return "".join(chunks)
 
 

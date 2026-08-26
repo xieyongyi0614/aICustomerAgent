@@ -43,11 +43,24 @@ async def chat_message(
     new_session = body.session_id is None
 
     async def generate():
+        turn_id = None
         try:
-            async for token in agent_service.stream_chat(
+            async for event in agent_service.stream_chat(
                 session_id, "default-user", body.content, llm=llm
             ):
-                yield _stream_json({"delta": token})
+                kind = event.get("kind")
+                if kind == "turn_meta":
+                    yield _stream_json(
+                        {
+                            "type": "turn_meta",
+                            "role_mode": event["role_mode"].model_dump(),
+                            "analysis": event["analysis"].model_dump(),
+                        }
+                    )
+                elif kind == "token":
+                    yield _stream_json({"delta": event["text"]})
+                elif kind == "done":
+                    turn_id = event["turn_id"]
         except openai.APIStatusError as exc:
             logger.exception("LLM 流式回答失败")
             yield _stream_json({"detail": "LLM 调用失败", "error": _llm_error(exc)})
@@ -60,7 +73,10 @@ async def chat_message(
             logger.exception("LLM 流式回答失败")
             yield _stream_json({"detail": "LLM 调用失败"})
             return
-        yield _stream_json({"done": True, "session_id": session_id})
+        final = {"done": True, "session_id": session_id}
+        if turn_id is not None:
+            final["turn_id"] = turn_id
+        yield _stream_json(final)
 
     headers = {"X-Session-Id": session_id}
     if new_session:
