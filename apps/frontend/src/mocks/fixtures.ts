@@ -49,7 +49,7 @@ export const RICH_USER = {
       updated_at: "2026-08-26T09:30:00",
     },
     relationship_state: {
-      intimacy: 0.54,
+      intimacy: 0.56,
       trust: 0.58,
       familiarity: 0.51,
       stage: "close_friend",
@@ -98,6 +98,51 @@ export const RICH_USER = {
         importance: 0.7,
         created_at: "2026-08-18T12:00:00",
         updated_at: "2026-08-18T12:00:00",
+      },
+    ],
+  },
+}
+
+export const NEAR_UPGRADE_USER = {
+  state: {
+    character_state: {
+      mood: "excited",
+      energy: 0.68,
+      current_topic: "用户的上线冲刺",
+      inner_state: "期待用户的好消息",
+      updated_at: null as string | null,
+    },
+    relationship_state: {
+      intimacy: 0.53,
+      trust: 0.54,
+      familiarity: 0.5,
+      stage: "friend",
+      updated_at: null as string | null,
+    },
+    emotion_history: [
+      {
+        user_emotion: "excited",
+        event: "achievement",
+        behavior: "celebrate",
+        mood_before: "calm",
+        mood_after: "excited",
+        energy_after: 0.68,
+        stage_after: "friend",
+        created_at: "2026-08-26T08:00:00",
+      },
+    ],
+  },
+  memories: {
+    user_id: "near-upgrade-user",
+    memories: [
+      {
+        id: "n-1",
+        user_id: "near-upgrade-user",
+        memory: "用户正在冲刺项目上线",
+        memory_type: "goal",
+        importance: 0.62,
+        created_at: "2026-08-26T07:00:00",
+        updated_at: "2026-08-26T07:00:00",
       },
     ],
   },
