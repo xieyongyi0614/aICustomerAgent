@@ -34,10 +34,11 @@ def _memory_decision():
 
 async def _collect(session_id, content, llm):
     chunks = []
-    async for token in agent_service.stream_chat(
+    async for event in agent_service.stream_chat(
         session_id, "default-user", content, llm=llm
     ):
-        chunks.append(token)
+        if event.get("kind") == "token":
+            chunks.append(event["text"])
     return "".join(chunks)
 
 

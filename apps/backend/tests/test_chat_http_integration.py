@@ -127,7 +127,10 @@ def test_http_chat_llm_status_error_streams_provider_detail(
     with httpx.Client(base_url=http_server.base_url) as client:
         resp = client.post("/api/v1/chat/message", json={"content": "在吗"})
     chunks = _parse_stream(resp.text)
-    assert chunks == [
+    assert chunks[0]["type"] == "turn_meta"
+    assert chunks[0]["role_mode"]["mode"] == "default"
+    assert chunks[0]["analysis"]["behavior"]["behavior"] == "normal_reply"
+    assert chunks[1:] == [
         {
             "detail": "LLM 调用失败",
             "error": {

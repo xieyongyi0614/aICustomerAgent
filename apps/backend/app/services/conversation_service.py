@@ -22,9 +22,10 @@ def load_window(
     return result
 
 
-def save_turn(session_id: str, user_message: str, ai_reply: str) -> None:
+def save_turn(session_id: str, user_message: str, ai_reply: str) -> int:
     repo.save_message(session_id, "human", user_message)
-    repo.save_message(session_id, "ai", ai_reply)
+    ai_message = repo.save_message(session_id, "ai", ai_reply)
+    return ai_message.id
 
 
 def message_count(session_id: str) -> int:
