@@ -157,6 +157,7 @@ def override_settings(monkeypatch):
             "stage_partner_intimacy": "STAGE_PARTNER_INTIMACY",
             "stage_partner_trust": "STAGE_PARTNER_TRUST",
         "trace_capacity": "TRACE_CAPACITY",
+        "state_history_limit": "STATE_HISTORY_LIMIT",
             "stage_hysteresis": "STAGE_HYSTERESIS",
         }
         for key, env in env_map.items():

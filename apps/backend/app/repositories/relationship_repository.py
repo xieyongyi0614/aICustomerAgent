@@ -10,6 +10,7 @@ def _to_relationship(row: RelationshipStateRow) -> RelationshipState:
         trust=row.trust,
         familiarity=row.familiarity,
         stage=row.stage,
+        updated_at=row.updated_at,
     )
 
 

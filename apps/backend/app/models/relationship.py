@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ class RelationshipState(BaseModel):
     trust: float = Field(default=0.35, ge=0.0, le=1.0)
     familiarity: float = Field(default=0.3, ge=0.0, le=1.0)
     stage: RelationshipStage = "friend"
+    updated_at: datetime | None = None
 
 
 class RelationshipDelta(BaseModel):
