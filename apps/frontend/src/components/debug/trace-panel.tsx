@@ -7,6 +7,8 @@ import { useTurnTrace, isTraceNotFound, PendingTraceSignal } from "@/hooks/use-o
 import { formatDurationMs } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { buildWaterfallRows } from "@/lib/waterfall"
+import { useChatStore } from "@/stores/chat-store"
+import { useUiStore } from "@/stores/ui-store"
 
 function StepDot({ status }: { status: string }) {
   const cls =
@@ -126,7 +128,19 @@ function TracePanel({
               ) : null}
               <button
                 type="button"
-                onClick={() => setSelectedName(row.step.name)}
+                onClick={() => {
+                  setSelectedName(row.step.name)
+                  if (row.step.name === "llm") {
+                    const aiMessage = useChatStore
+                      .getState()
+                      .messages.find(
+                        (m) => m.role === "ai" && m.turnId === trace.turnId,
+                      )
+                    if (aiMessage !== undefined) {
+                      useUiStore.getState().setHighlightMessageId(aiMessage.id)
+                    }
+                  }
+                }}
                 className={cn(
                   "flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-accent",
                   row.isBackground && "border border-dashed border-border/70",

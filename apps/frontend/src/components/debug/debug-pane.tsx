@@ -2,6 +2,7 @@ import { OverviewPanel } from "@/components/debug/overview-panel"
 import { StatePanel } from "@/components/debug/state-panel"
 import { MemoryPanel } from "@/components/debug/memory-panel"
 import { TracePanel } from "@/components/debug/trace-panel"
+import { RawPanel } from "@/components/debug/raw-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUiStore } from "@/stores/ui-store"
 import type { DebugTabValue } from "@/stores/ui-store"
@@ -13,10 +14,6 @@ const DEBUG_TABS = [
   { value: "trace", label: "Trace" },
   { value: "raw", label: "Raw" },
 ] as const satisfies ReadonlyArray<{ value: DebugTabValue; label: string }>
-
-function TabPlaceholder({ tab }: { tab: string }) {
-  return <p className="font-mono text-xs text-fg-tertiary">[{tab}] Phase 2 提供</p>
-}
 
 function DebugPane() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -48,17 +45,9 @@ function DebugPane() {
       <TabsContent value="trace" className="min-h-0 flex-1 overflow-y-auto">
         <TracePanel turnId={selectedTurnId} />
       </TabsContent>
-      {DEBUG_TABS.filter(
-        (t) =>
-          t.value !== "overview" &&
-          t.value !== "state" &&
-          t.value !== "memory" &&
-          t.value !== "trace",
-      ).map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="min-h-0 flex-1 overflow-y-auto">
-          <TabPlaceholder tab={tab.label} />
-        </TabsContent>
-      ))}
+      <TabsContent value="raw" className="min-h-0 flex-1 overflow-y-auto">
+        <RawPanel />
+      </TabsContent>
     </Tabs>
   )
 }

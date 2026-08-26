@@ -117,7 +117,15 @@ export function createChatStore(transport: ChatStreamTransport) {
               break
             case "done":
               if (!turnActive) break
-              finalizeTerminal({ status: "complete" })
+              finalizeTerminal({
+                status: "complete",
+                turnId: event.turnId,
+                badge: {
+                  mode: get().turnMeta?.roleMode.mode ?? "—",
+                  behavior: get().turnMeta?.analysis.behavior.behavior ?? "—",
+                  durationMs: Date.now() - assistantMessage.createdAt,
+                },
+              })
               set((state) => ({
                 connectionStatus: "closed",
                 lastTurnId: event.turnId ?? state.lastTurnId,

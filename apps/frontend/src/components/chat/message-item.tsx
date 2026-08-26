@@ -1,13 +1,36 @@
-import { memo } from "react"
+import { memo, useEffect, useRef } from "react"
 
+import { TurnBadge } from "@/components/chat/turn-badge"
 import { formatRelativeTime } from "@/lib/format"
 import type { ChatMessage } from "@/types/domain/chat-message"
 import { cn } from "@/lib/utils"
 
-function MessageItemImpl({ message }: { message: ChatMessage }) {
+function MessageItemImpl({
+  message,
+  highlighted = false,
+}: {
+  message: ChatMessage
+  highlighted?: boolean
+}) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (highlighted) {
+      wrapperRef.current?.scrollIntoView({ block: "center" })
+    }
+  }, [highlighted])
+
   const isHuman = message.role === "human"
   return (
-    <div className={cn("flex w-full", isHuman ? "justify-end" : "justify-start")}>
+    <div
+      ref={wrapperRef}
+      className={cn(
+        "flex w-full",
+        isHuman ? "justify-end" : "justify-start",
+        highlighted && "rounded-lg ring-2 ring-sky-400/70",
+      )}
+      data-highlighted={highlighted ? "true" : undefined}
+    >
       <div
         data-testid={`message-${message.id}`}
         className={cn(
@@ -36,6 +59,10 @@ function MessageItemImpl({ message }: { message: ChatMessage }) {
           <p className="mt-1 break-all font-mono text-[10px] text-status-error">
             {message.errorText}
           </p>
+        ) : null}
+
+        {!isHuman && (message.status === "complete" || message.status === "stopped") ? (
+          <TurnBadge message={message} />
         ) : null}
 
         <p

@@ -1,5 +1,6 @@
 import { MessageItem } from "@/components/chat/message-item"
 import { useChatStore } from "@/stores/chat-store"
+import { useUiStore } from "@/stores/ui-store"
 
 function EmptyConversationGuide() {
   return (
@@ -14,13 +15,18 @@ function EmptyConversationGuide() {
 
 function MessageList() {
   const messages = useChatStore((s) => s.messages)
+  const highlightMessageId = useUiStore((s) => s.highlightMessageId)
   if (messages.length === 0) {
     return <EmptyConversationGuide />
   }
   return (
     <div data-testid="message-list" className="flex flex-col gap-3 p-4">
       {messages.map((message) => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem
+          key={message.id}
+          message={message}
+          highlighted={highlightMessageId === message.id}
+        />
       ))}
     </div>
   )
