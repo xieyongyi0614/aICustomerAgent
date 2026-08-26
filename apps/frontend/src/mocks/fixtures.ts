@@ -1,0 +1,148 @@
+export const EMPTY_USER = {
+  state: {
+    character_state: {
+      mood: "calm",
+      energy: 0.9,
+      current_topic: "",
+      inner_state: "平静，期待和用户聊天",
+      updated_at: null as string | null,
+    },
+    relationship_state: {
+      intimacy: 0.3,
+      trust: 0.35,
+      familiarity: 0.3,
+      stage: "friend",
+      updated_at: null as string | null,
+    },
+    emotion_history: [] as Array<{
+      user_emotion: string
+      event: string
+      behavior: string
+      mood_before: string
+      mood_after: string
+      energy_after: number
+      stage_after: string
+      created_at: string
+    }>,
+  },
+  memories: {
+    user_id: "empty-user",
+    memories: [] as Array<{
+      id: string
+      user_id: string
+      memory: string
+      memory_type: string
+      importance: number
+      created_at: string
+      updated_at: string
+    }>,
+  },
+}
+
+export const RICH_USER = {
+  state: {
+    character_state: {
+      mood: "worried",
+      energy: 0.42,
+      current_topic: "用户的 Debug Console 项目",
+      inner_state: "担心用户连续熬夜赶工",
+      updated_at: "2026-08-26T09:30:00",
+    },
+    relationship_state: {
+      intimacy: 0.54,
+      trust: 0.58,
+      familiarity: 0.51,
+      stage: "close_friend",
+      updated_at: "2026-08-26T09:30:00",
+    },
+    emotion_history: [
+      {
+        user_emotion: "sad",
+        event: "setback",
+        behavior: "comfort",
+        mood_before: "calm",
+        mood_after: "worried",
+        energy_after: 0.42,
+        stage_after: "close_friend",
+        created_at: "2026-08-26T09:30:00",
+      },
+      {
+        user_emotion: "excited",
+        event: "achievement",
+        behavior: "celebrate",
+        mood_before: "worried",
+        mood_after: "happy",
+        energy_after: 0.55,
+        stage_after: "close_friend",
+        created_at: "2026-08-25T21:10:00",
+      },
+    ],
+  },
+  memories: {
+    user_id: "rich-user",
+    memories: [
+      {
+        id: "m-1",
+        user_id: "rich-user",
+        memory: "用户正在开发 AI Character Agent 项目",
+        memory_type: "goal",
+        importance: 0.9,
+        created_at: "2026-08-20T10:00:00",
+        updated_at: "2026-08-20T10:00:00",
+      },
+      {
+        id: "m-2",
+        user_id: "rich-user",
+        memory: "用户喜欢日本料理，尤其是寿司",
+        memory_type: "preference",
+        importance: 0.7,
+        created_at: "2026-08-18T12:00:00",
+        updated_at: "2026-08-18T12:00:00",
+      },
+    ],
+  },
+}
+
+export function makeTraceFixture(status: "pending" | "complete") {
+  return {
+    turn_id: "t-rich-1",
+    status,
+    role_mode:
+      status === "complete"
+        ? { mode: "immersive", intent: "emotional", confidence: 0.88, reason: "情绪倾诉" }
+        : null,
+    analysis:
+      status === "complete"
+        ? {
+            user_emotion: { emotion: "sad", event: "setback" },
+            behavior: { behavior: "comfort", reason: "先接住情绪" },
+          }
+        : null,
+    total_ms: status === "complete" ? 5806.4 : 0,
+    steps:
+      status === "complete"
+        ? [
+            { name: "role_router", status: "ok", durationMs: 120.1, firstTokenMs: null, error: null },
+            { name: "turn_analyzer", status: "degraded", durationMs: 280.0, firstTokenMs: null, error: null },
+            { name: "memory_retrieval", status: "ok", durationMs: 35.0, firstTokenMs: null, error: null },
+            { name: "context_builder", status: "ok", durationMs: 8.2, firstTokenMs: null, error: null },
+            { name: "prompt_builder", status: "ok", durationMs: 10.0, firstTokenMs: null, error: null },
+            { name: "llm", status: "ok", durationMs: 4820.0, firstTokenMs: 380.0, error: null },
+            { name: "state_update", status: "ok", durationMs: 300.0, firstTokenMs: null, error: null },
+            { name: "memory_extractor", status: "ok", durationMs: 300.1, firstTokenMs: null, error: null },
+          ]
+        : [],
+  }
+}
+
+export function messagesFixture(conversationId: string) {
+  if (conversationId === "ghost-session") return null
+  return {
+    conversation_id: conversationId,
+    messages: [
+      { id: 11, role: "human" as const, content: "第一句", created_at: "2026-08-26T09:00:00" },
+      { id: 12, role: "ai" as const, content: "第一答", created_at: "2026-08-26T09:00:05" },
+      { id: 13, role: "human" as const, content: "第二句", created_at: "2026-08-26T09:01:00" },
+    ],
+  }
+}
