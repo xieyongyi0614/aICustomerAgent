@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
+from app.services import agent_service
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
@@ -131,6 +132,9 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(relationship_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(emotion_history_repository, "SessionLocal", testing_session)
     yield testing_session
+    deadline = time.time() + 2.0
+    while agent_service._background_tasks and time.time() < deadline:
+        time.sleep(0.02)
     Base.metadata.drop_all(engine)
     engine.dispose()
 
@@ -152,6 +156,7 @@ def override_settings(monkeypatch):
             "stage_close_trust": "STAGE_CLOSE_TRUST",
             "stage_partner_intimacy": "STAGE_PARTNER_INTIMACY",
             "stage_partner_trust": "STAGE_PARTNER_TRUST",
+        "trace_capacity": "TRACE_CAPACITY",
             "stage_hysteresis": "STAGE_HYSTERESIS",
         }
         for key, env in env_map.items():

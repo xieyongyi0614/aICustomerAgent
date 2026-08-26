@@ -1,3 +1,4 @@
+import time
 from typing import AsyncIterator
 
 from langchain_core.runnables import Runnable
@@ -20,8 +21,12 @@ async def astream(
     state: ConversationState,
     analysis: TurnAnalysis | None = None,
     llm=None,
+    trace=None,
 ) -> AsyncIterator[str]:
+    started = time.perf_counter()
     chain = build_chain(mode, state, analysis, llm)
+    if trace is not None:
+        trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
     async for chunk in chain.astream({}):
         text = getattr(chunk, "content", chunk)
         if text:
