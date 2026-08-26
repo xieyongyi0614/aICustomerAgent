@@ -1,4 +1,4 @@
-import { ApiError, resolveApiBase } from '@/api/http'
+import { ApiError, resolveApiBase, toApiErrorFromResponse } from '@/api/http'
 import type {
   ChatSendRequest,
   ChatStreamListeners,
@@ -235,25 +235,4 @@ export class FetchChatStreamTransport implements ChatStreamTransport {
       if (event !== null) listeners.onEvent(event)
     }
   }
-}
-
-async function toApiErrorFromResponse(response: Response): Promise<ApiError> {
-  let message = `request failed with status ${response.status}`
-  let code: string | undefined
-  try {
-    const data = asRecord(await response.json())
-    if (data !== null) {
-      if (typeof data.detail === 'string') message = data.detail
-      const errorBody = asRecord(data.error)
-      if (errorBody !== null && typeof errorBody.message === 'string') {
-        message = errorBody.message
-      }
-      if (errorBody !== null && errorBody.code !== undefined) {
-        code = String(errorBody.code)
-      }
-    }
-  } catch {
-    return new ApiError(message, { status: response.status, code })
-  }
-  return new ApiError(message, { status: response.status, code })
 }
