@@ -4,7 +4,7 @@ import sys
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(SCRIPTS_DIR)
 REPO_ROOT = os.path.dirname(os.path.dirname(BACKEND_DIR))
-DIST_DIR = os.path.join(REPO_ROOT, "apps", "frontend", "dist")
+DIST_DIR = os.environ.get("FRONTEND_DIST_DIR") or os.path.join(REPO_ROOT, "apps", "frontend", "dist")
 
 sys.path.insert(0, BACKEND_DIR)
 
@@ -40,6 +40,7 @@ def spa_fallback(full_path: str):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8020
+    host = os.environ.get("CONSOLE_HOST", "127.0.0.1")
     location = f"http://127.0.0.1:{port}/{BASE_PREFIX}" if BASE_PREFIX else f"http://127.0.0.1:{port}"
     print(f"serving frontend({DIST_DIR}) base='/{BASE_PREFIX}' + api on {location}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
