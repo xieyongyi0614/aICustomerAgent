@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     stage_partner_trust: float = 0.75
     stage_hysteresis: float = 0.10
     analysis_recent_messages: int = 6
+    trace_capacity: int = 20
 
     @model_validator(mode="after")
     def validate_api_key(self):

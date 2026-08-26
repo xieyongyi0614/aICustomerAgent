@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import AsyncIterator
 
 from app.chains import answer_chain, router_chain, turn_analysis_chain
@@ -13,9 +14,12 @@ from app.services import (
     memory_service,
     state_service,
     summary_service,
+    trace_collector,
 )
 
 logger = logging.getLogger(__name__)
+
+_background_tasks: set = set()
 
 
 class EmptyLLMResponseError(Exception):
@@ -74,29 +78,102 @@ def _resolve_analysis(result) -> TurnAnalysis:
 async def stream_chat(
     session_id: str, user_id: str, content: str, llm=None
 ) -> AsyncIterator[dict]:
-    state = await context_builder.build(session_id, user_id, content)
+    trace = trace_collector.get_trace_collector().begin_trace()
+    try:
+        async for event in _stream_chat_inner(
+            session_id, user_id, content, llm, trace
+        ):
+            yield event
+    except BaseException as exc:
+        trace.record(
+            "llm",
+            0.0,
+            "error",
+            error=exc.__class__.__name__,
+        )
+        raise
+
+
+async def _stream_chat_inner(
+    session_id: str, user_id: str, content: str, llm, trace
+) -> AsyncIterator[dict]:
+    started = time.perf_counter()
+    state = await context_builder.build(session_id, user_id, content, trace=trace)
+    trace.record("context_builder", (time.perf_counter() - started) * 1000)
+
+    async def _timed(name: str, coro):
+        step_started = time.perf_counter()
+        try:
+            result = await coro
+        except BaseException as exc:
+            trace.record(
+                name,
+                (time.perf_counter() - step_started) * 1000,
+                "error",
+                error=exc.__class__.__name__,
+            )
+            raise
+        trace.record(name, (time.perf_counter() - step_started) * 1000)
+        return result
+
     role_mode, analysis = await asyncio.gather(
-        router_chain.route(content, llm=llm),
-        turn_analysis_chain.analyze(content, state, llm=llm),
+        _timed("role_router", router_chain.route(content, llm=llm)),
+        _timed("turn_analyzer", turn_analysis_chain.analyze(content, state, llm=llm)),
         return_exceptions=True,
     )
+    if isinstance(role_mode, RoleMode):
+        if role_mode.confidence < get_settings().router_confidence_threshold:
+            trace.mark_status("role_router", "degraded")
+    else:
+        trace.mark_status("role_router", "degraded")
+    if isinstance(analysis, BaseException) or not isinstance(analysis, TurnAnalysis):
+        trace.mark_status("turn_analyzer", "degraded")
+
     effective_mode = _effective_role_mode(role_mode)
     turn = _resolve_analysis(analysis)
+    trace.set_meta(effective_mode, turn)
 
     yield {"kind": "turn_meta", "role_mode": effective_mode, "analysis": turn}
 
     full_reply = []
+    llm_started = time.perf_counter()
+    first_token_ms = None
     try:
-        async for token in answer_chain.astream(effective_mode.mode, state, turn, llm=llm):
+        async for token in answer_chain.astream(
+            effective_mode.mode, state, turn, llm=llm, trace=trace
+        ):
+            if first_token_ms is None:
+                first_token_ms = (time.perf_counter() - llm_started) * 1000
             full_reply.append(token)
             yield {"kind": "token", "text": token}
     except ValueError as exc:
         if "No generation chunks were returned" in str(exc):
+            trace.record(
+                "llm",
+                (time.perf_counter() - llm_started) * 1000,
+                "error",
+                first_token_ms=first_token_ms,
+                error="empty response",
+            )
             raise EmptyLLMResponseError("LLM 未返回任何内容") from exc
         raise
-    except Exception:
+    except Exception as exc:
+        trace.record(
+            "llm",
+            (time.perf_counter() - llm_started) * 1000,
+            "error",
+            first_token_ms=first_token_ms,
+            error=exc.__class__.__name__,
+        )
         logger.exception("回答流式输出失败")
         raise
+
+    trace.record(
+        "llm",
+        (time.perf_counter() - llm_started) * 1000,
+        "ok",
+        first_token_ms=first_token_ms,
+    )
 
     reply = "".join(full_reply)
     if reply:
@@ -104,9 +181,13 @@ async def stream_chat(
     else:
         logger.warning("模型输出为空")
     ai_message_id = conversation_service.save_turn(session_id, content, reply)
-    asyncio.create_task(
-        _post_process(session_id, user_id, content, reply, state, turn, llm=llm)
+    task = asyncio.create_task(
+        _post_process(session_id, user_id, content, reply, state, turn, llm=llm, trace=trace)
     )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    collector = trace_collector.get_trace_collector()
+    collector.attach(trace, str(ai_message_id))
     yield {
         "kind": "done",
         "session_id": session_id,
@@ -122,13 +203,16 @@ async def _post_process(
     state: ConversationState,
     analysis: TurnAnalysis,
     llm=None,
+    trace=None,
 ) -> None:
     try:
         await state_service.apply_and_save(
-            user_id, session_id, state, analysis, user_input, ai_reply, llm=llm
+            user_id, session_id, state, analysis, user_input, ai_reply, llm=llm, trace=trace
         )
     except Exception:
         logger.exception("状态更新失败，不影响本轮回答")
+        if trace is not None:
+            trace.record("state_update", 0.0, "error", error="apply_and_save failed")
     try:
         if conversation_service.message_count(session_id) >= get_settings().summary_threshold:
             await summary_service.update(
@@ -136,7 +220,17 @@ async def _post_process(
             )
     except Exception:
         logger.exception("摘要更新失败，不影响本轮回答")
+    started = time.perf_counter()
     try:
         await memory_service.extract_and_save(user_id, user_input, ai_reply, llm=llm)
+        if trace is not None:
+            trace.record("memory_extractor", (time.perf_counter() - started) * 1000)
     except Exception:
         logger.exception("记忆提取失败，不影响本轮回答")
+        if trace is not None:
+            trace.record(
+                "memory_extractor",
+                (time.perf_counter() - started) * 1000,
+                "error",
+                error="extract_and_save failed",
+            )

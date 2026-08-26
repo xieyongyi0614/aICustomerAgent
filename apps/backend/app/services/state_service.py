@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from app.chains import state_update_chain
@@ -28,11 +29,16 @@ async def apply_and_save(
     user_input: str,
     ai_reply: str,
     llm=None,
+    trace=None,
 ) -> None:
     now = datetime.now()
+    started = time.perf_counter()
     decision = await state_update_chain.update(
         state, analysis, user_input, ai_reply, llm=llm
     )
+    if trace is not None:
+        elapsed = (time.perf_counter() - started) * 1000
+        trace.record("state_update", elapsed, "degraded" if decision is None else "ok")
     recovered = state_engine.apply_idle_recovery(state.character_state, now)
     new_character = state_engine.apply_character(recovered, decision, analysis, now)
     new_relationship = state_engine.apply_relationship(
