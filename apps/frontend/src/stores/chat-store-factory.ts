@@ -3,6 +3,7 @@ import { create } from "zustand"
 import type { ChatStreamTransport, StreamEvent } from "@/api/transport"
 import type { RoleMode, TurnAnalysis } from "@/types/domain/chat-meta"
 import type { ChatMessage, ConnectionStatus } from "@/types/domain/chat-message"
+import { readStoredLlmProfile } from "@/lib/llm-profile-storage"
 
 export type ChatStore = ChatState & ChatActions
 
@@ -158,7 +159,11 @@ export function createChatStore(transport: ChatStreamTransport) {
       }
 
       void transport.send(
-        { sessionId: get().sessionId, content: trimmed },
+        {
+          sessionId: get().sessionId,
+          content: trimmed,
+          profileId: readStoredLlmProfile(),
+        },
         listeners,
         controller.signal,
       )

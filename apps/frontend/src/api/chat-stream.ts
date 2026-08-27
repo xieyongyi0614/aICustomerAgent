@@ -172,6 +172,7 @@ export class FetchChatStreamTransport implements ChatStreamTransport {
         body: JSON.stringify({
           session_id: request.sessionId ?? null,
           content: request.content,
+          ...(request.profileId ? { profile_id: request.profileId } : {}),
         }),
         signal,
       })

@@ -3,6 +3,11 @@ import time
 from typing import Any
 
 os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault(
+    "LLM_PROFILES_JSON",
+    '[{"id":"longcat","label":"LongCat (test)","base_url":"https://example.invalid/v1","model":"fake","api_key":"test"}]',
+)
+os.environ.setdefault("DEFAULT_LLM_PROFILE", "longcat")
 
 import pytest
 from langchain_core.language_models.chat_models import BaseChatModel

@@ -9,6 +9,8 @@
 > 验证：全量 pytest 136 项（133 passed + 3 skipped PG 无实例），pylint 7.76（TEST-01 基线约 7.4 达标；低于上次快照 7.98 系新增无 docstring 测试函数所致，docstring 类告警按约定不修）。
 > 断点标记：git tag `v2-checkpoint`。
 > 遗留项：全量测试偶发 HTTP 集成用例失败（复现率约 1/3，单文件隔离必过；失败特征为后台 _post_process 任务越过用例夹具生命周期、monkeypatch 还原后落到 .env 的 sqlite 文件库导致 no such table，待后续收敛）。
+>
+> **增量（2026-08-27）**：LLM-01 多模型 Profile 配置与切换已完成——详见模块七与 `tasks/LLM-01-model-profiles.md`。验证：后端全量 pytest 159 passed + 3 skipped（PG 无实例）；前端相关 vitest 全过 + tsc 零错误 + ESLint 零告警。
 
 ---
 
@@ -90,6 +92,12 @@ Subtask（见各 Task 文件内"Subtask 拆分"）
 | Feature | Task ID | Task 名称 | 优先级 | 状态 |
 |---|---|---|---|---|
 | V2 文档 | DOC-01 | 架构文档 + 本注册表 | P0 | ✅ 已完成 |
+
+### 模块七：多模型切换（Multi-Model Profiles）
+
+| Feature | Task ID | Task 名称 | 优先级 | 状态 |
+|---|---|---|---|---|
+| 多模型 Profile | LLM-01 | 多模型 profile 配置与切换（见 tasks/LLM-01-model-profiles.md） | P0 | ✅ 已完成 |
 
 ## 5. 总体依赖 DAG
 

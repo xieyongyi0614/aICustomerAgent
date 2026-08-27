@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import type { ReactNode } from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { TopBar } from "./top-bar"
@@ -12,6 +14,14 @@ const { copyText } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/copy-text", () => ({ copyText }))
+function makeWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  })
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  }
+}
 
 const reloadStub = vi.fn()
 
@@ -40,7 +50,7 @@ afterEach(() => {
 
 describe("TopBar", () => {
   it("shows no-session placeholder and the idle lamp", () => {
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     expect(screen.getByTestId("session-id").textContent).toBe("no-session")
     const dot = screen.getByTestId("connection-dot")
     expect(dot.className).toContain("bg-neutral-500")
@@ -50,7 +60,7 @@ describe("TopBar", () => {
     act(() => {
       useChatStore.setState({ sessionId: "sess-abc-123", connectionStatus: "open" })
     })
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     expect(screen.getByTestId("session-id").textContent).toBe("sess-abc-123")
     const dot = screen.getByTestId("connection-dot")
     expect(dot.className).toContain("bg-status-ok")
@@ -68,7 +78,7 @@ describe("TopBar", () => {
       useChatStore.setState({ sessionId: "copy-me" })
     })
     const user = userEvent.setup()
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     await user.click(screen.getByTestId("session-id"))
     expect(copyText).toHaveBeenCalledWith("copy-me")
   })
@@ -84,7 +94,7 @@ describe("TopBar", () => {
       })
     })
     const user = userEvent.setup()
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     await user.click(screen.getByTestId("new-session"))
     expect(useChatStore.getState().sessionId).toBeNull()
     expect(useChatStore.getState().messages).toHaveLength(0)
@@ -94,13 +104,13 @@ describe("TopBar", () => {
     act(() => {
       useChatStore.setState({ streamingMessageId: "a-1" })
     })
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     expect((screen.getByTestId("new-session") as HTMLButtonElement).disabled).toBe(true)
   })
 
   it("switches api mode after confirmation: persists then reloads", async () => {
     const user = userEvent.setup()
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     await user.click(screen.getByTestId("mode-switch-trigger"))
     await user.click(screen.getByTestId("mode-switch-confirm"))
 
@@ -110,7 +120,7 @@ describe("TopBar", () => {
 
   it("keeps current mode when cancelling the switch dialog", async () => {
     const user = userEvent.setup()
-    render(<TopBar />)
+    render(<TopBar />, { wrapper: makeWrapper() })
     await user.click(screen.getByTestId("mode-switch-trigger"))
     fireEvent.click(screen.getByText("取消"))
     expect(window.localStorage.getItem(API_MODE_STORAGE_KEY)).toBeNull()

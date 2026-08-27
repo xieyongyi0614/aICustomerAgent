@@ -73,7 +73,7 @@ server {
 仓库根目录提供 `Dockerfile`（多阶段：node:22 构建前端 → python:3.13-slim 运行后端并托管 dist）与 `docker-compose.yml`（console + postgres:16）。
 
 ```powershell
-# 前置：apps/backend/.env 至少含 OPENAI_API_KEY / BASE_URL / MODEL（数据库地址由 compose 覆盖为 postgres 服务）
+# 前置：apps/backend/.env 至少含 LLM_PROFILES_JSON / DEFAULT_LLM_PROFILE（数据库地址由 compose 覆盖为 postgres 服务）
 docker compose up -d --build
 # 浏览器 http://localhost:8020 → Console 与 /api 同域
 docker compose down          # 停止（数据卷 asuna_pgdata 保留）

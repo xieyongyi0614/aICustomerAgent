@@ -41,6 +41,7 @@ async def chat_message(
         raise HTTPException(status_code=422, detail="content 不能为空")
     session_id = body.session_id or str(uuid.uuid4())
     new_session = body.session_id is None
+    profile_id = body.profile_id or request.headers.get("x-llm-profile")
 
     async def generate():
         turn_id = None
@@ -81,6 +82,8 @@ async def chat_message(
     headers = {"X-Session-Id": session_id}
     if new_session:
         headers["X-Session-New"] = "true"
+    if profile_id:
+        headers["X-LLM-Profile"] = profile_id
     return StreamingResponse(
         generate(), media_type="application/x-ndjson", headers=headers
     )
