@@ -197,6 +197,24 @@ describe("chat store", () => {
     expect(store.getState().sessionId).toBe("existing")
   })
 
+  it("setSessionId updates and persists the session id when idle", () => {
+    const { store } = harness
+    store.getState().setSessionId("fixed-id")
+    expect(store.getState().sessionId).toBe("fixed-id")
+  })
+
+  it("refuses setSessionId while streaming or blank", () => {
+    const { store, transport } = harness
+    store.getState().send("进行中")
+    store.getState().setSessionId("new-id")
+    expect(store.getState().sessionId).toBeNull()
+
+    transport.close(false)
+    store.getState()._hardReset()
+    store.getState().setSessionId("   ")
+    expect(store.getState().sessionId).toBeNull()
+  })
+
   it("retry removes the last turn and resends the same human content", () => {
     const { store, transport } = harness
     store.getState().send("第一问")

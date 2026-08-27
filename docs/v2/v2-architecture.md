@@ -500,9 +500,10 @@ apps/backend/app/
 apps/backend/（app/ 之外新增）
 ├── migrations/                         [新] Alembic 迁移链（env.py 读 settings.database_url）
 │   └── versions/                       #     rev1：baseline V1 四表；rev2：V2 三表
-├── scripts/
-│   └── migrate_sqlite_to_postgres.py   [新] 存量 SQLite → PostgreSQL 一次性搬运
-└── docker-compose.yml                  [新] 本地 PostgreSQL 16 服务（可选）
+└── scripts/
+    └── migrate_sqlite_to_postgres.py   [新] 存量 SQLite → PostgreSQL 一次性搬运
+
+（Docker 入口统一收敛到仓库根目录：docker-compose.yml 同时提供本地 PostgreSQL 16 服务与完整栈部署）
 ```
 
 API 层零改动：不新增端点，不改 NDJSON 响应契约（已知前端对错误契约敏感）。

@@ -1,13 +1,17 @@
-from langchain_core.prompts import ChatPromptTemplate
-
-from app.core.llm_factory import get_llm
+from app.chains.structured import build_structured_chain
 from app.models.memory import MemoryDecision
 from app.prompts.extractor import extractor_prompt
 
 
 def build_chain(llm=None):
-    prompt = ChatPromptTemplate.from_messages([("system", extractor_prompt)])
-    return prompt | (llm or get_llm()).with_structured_output(MemoryDecision)
+    return build_structured_chain(
+        [
+            ("system", extractor_prompt),
+            ("user", "用户输入：{user_input}\nAI 回复：{ai_reply}"),
+        ],
+        MemoryDecision,
+        llm,
+    )
 
 
 async def extract(user_input: str, ai_reply: str, llm=None) -> MemoryDecision:

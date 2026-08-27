@@ -31,8 +31,8 @@ app/
 # 1. 配置环境变量（复制 .env.example 为 .env，并在 LLM_PROFILES_JSON 中填入可用的 API Key）
 cp .env.example .env
 
-# 2. 启动本地 PostgreSQL 16（docker-compose，asuna/asuna/asuna）
-docker compose up -d
+# 2. 启动本地 PostgreSQL 16（在仓库根目录执行，统一入口为根目录 docker-compose.yml，asuna/asuna/asuna）
+docker compose up -d postgres
 
 # 3. 安装依赖并执行数据库迁移
 uv sync
@@ -110,8 +110,9 @@ uv run pylint app tests   # 代码检查
 
 | 配置                          | 默认值      | 说明                                |
 | ----------------------------- | ----------- | ----------------------------------- |
-| `LLM_PROFILES_JSON`           | -           | 模型 profile 数组（必填字段：id / label / base_url / model / api_key；可选覆盖：max_tokens、temperature、top_p、frequency_penalty、presence_penalty、extra_body_thinking） |
+| `LLM_PROFILES_JSON`           | -           | 模型 profile 数组（必填字段：id / label / base_url / model / api_key；可选覆盖：max_tokens、temperature、top_p、frequency_penalty、presence_penalty、extra_body_thinking；可选 `extra_body` 对象原样透传请求体顶层——如 OpenRouter 的 `{ "reasoning": { "enabled": true } }`，设置后取代默认 thinking 注入） |
 | `DEFAULT_LLM_PROFILE`         | longcat     | 默认 profile id（必须在数组内）      |
+| `ANSWER_MAX_TOKENS`           | 60          | 最终回答链的输出上限；路由/分析/记忆等辅助链不受此限制，使用各 profile 的 `max_tokens`（建议 ≥512） |
 | `TEMPERATURE` 等              | 见 settings | profile 未指定对应字段时的参数缺省   |
 | `DATABASE_URL`                | postgresql+psycopg://asuna:asuna@localhost:5432/asuna | 数据库连接串（sqlite 前缀走测试方言分支） |
 | `DB_POOL_SIZE`                | 5           | PG 连接池大小                       |

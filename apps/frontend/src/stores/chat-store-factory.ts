@@ -4,6 +4,7 @@ import type { ChatStreamTransport, StreamEvent } from "@/api/transport"
 import type { RoleMode, TurnAnalysis } from "@/types/domain/chat-meta"
 import type { ChatMessage, ConnectionStatus } from "@/types/domain/chat-message"
 import { readStoredLlmProfile } from "@/lib/llm-profile-storage"
+import { writeStoredSessionId } from "@/lib/session-id-storage"
 
 export type ChatStore = ChatState & ChatActions
 
@@ -21,6 +22,7 @@ interface ChatActions {
   stop(): void
   newSession(): void
   retry(): boolean
+  setSessionId(sessionId: string): void
   _hardReset(): void
 }
 
@@ -30,13 +32,16 @@ function createId(): string {
     : `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
 
-export function createChatStore(transport: ChatStreamTransport) {
+export function createChatStore(
+  transport: ChatStreamTransport,
+  initialSessionId: string | null = null,
+) {
   let activeController: AbortController | null = null
 
   return create<ChatStore>()((set, get) => ({
     messages: [],
     streamingMessageId: null,
-    sessionId: null,
+    sessionId: initialSessionId,
     connectionStatus: "idle",
     turnMeta: null,
     lastTurnId: null,
@@ -104,6 +109,7 @@ export function createChatStore(transport: ChatStreamTransport) {
         onSessionMeta: (meta: { sessionId: string; isNew: boolean }) => {
           if (!turnActive) return
           if (get().sessionId === null || meta.isNew) {
+            writeStoredSessionId(meta.sessionId)
             set({ sessionId: meta.sessionId })
           }
         },
@@ -204,6 +210,14 @@ export function createChatStore(transport: ChatStreamTransport) {
         turnMeta: null,
         lastTurnId: null,
       })
+    },
+
+    setSessionId(sessionId: string) {
+      if (get().streamingMessageId !== null) return
+      const trimmed = sessionId.trim()
+      if (trimmed.length === 0) return
+      writeStoredSessionId(trimmed)
+      set({ sessionId: trimmed })
     },
 
     _hardReset() {

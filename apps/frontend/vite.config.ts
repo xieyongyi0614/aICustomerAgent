@@ -8,13 +8,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
+    port: 2000,
     proxy: {
-      "/api": {
-        target: "http://localhost:8000",
+      '/api': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
     },
@@ -23,8 +24,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          "vendor-react": ["react", "react-dom"],
-          "vendor-query": ["@tanstack/react-query"],
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-query': ['@tanstack/react-query'],
         },
       },
     },

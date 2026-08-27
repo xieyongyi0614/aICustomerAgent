@@ -25,6 +25,7 @@ class LlmProfile:
         presence_penalty: float,
         extra_body_thinking: str,
         default: bool = False,
+        extra_body: dict | None = None,
     ):
         self.id = id
         self.label = label
@@ -38,6 +39,7 @@ class LlmProfile:
         self.presence_penalty = presence_penalty
         self.extra_body_thinking = extra_body_thinking
         self.default = default
+        self.extra_body = extra_body
 
     def to_public(self) -> dict:
         return {
@@ -57,7 +59,8 @@ class Settings(BaseSettings):
     top_p: float = 0.92
     frequency_penalty: float = 0.4
     presence_penalty: float = 0.5
-    max_tokens: int = 50
+    max_tokens: int = 512
+    answer_max_tokens: int = 60
     extra_body_thinking: str = "disabled"
 
     database_url: str = "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
@@ -103,6 +106,8 @@ class Settings(BaseSettings):
             for key in ("id", "label", "base_url", "model", "api_key"):
                 if not item.get(key):
                     raise SettingsError(f"LLM_PROFILES_JSON 缺少字段: {key}")
+                if "extra_body" in item and not isinstance(item["extra_body"], dict):
+                    raise SettingsError("LLM_PROFILES_JSON 的 extra_body 必须是对象")
         ids = [item["id"] for item in parsed]
         if len(set(ids)) != len(ids):
             raise SettingsError("LLM_PROFILES_JSON id 不可重复")
@@ -132,6 +137,7 @@ class Settings(BaseSettings):
                         item.get("extra_body_thinking", self.extra_body_thinking)
                     ),
                     default=item["id"] == self.default_llm_profile,
+                    extra_body=item.get("extra_body"),
                 )
             )
         return profiles

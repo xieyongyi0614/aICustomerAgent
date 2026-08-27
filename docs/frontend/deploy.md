@@ -70,7 +70,7 @@ server {
 
 ## 方案 C：Docker 一体化部署（已验证）
 
-仓库根目录提供 `Dockerfile`（多阶段：node:22 构建前端 → python:3.13-slim 运行后端并托管 dist）与 `docker-compose.yml`（console + postgres:16）。
+仓库根目录提供 `Dockerfile`（多阶段：node:22 构建前端 → python:3.13-slim 运行后端并托管 dist）与**唯一**入口 `docker-compose.yml`（console + postgres:16）。本地开发只需数据库时同样用它：`docker compose up -d postgres`。
 
 ```powershell
 # 前置：apps/backend/.env 至少含 LLM_PROFILES_JSON / DEFAULT_LLM_PROFILE（数据库地址由 compose 覆盖为 postgres 服务）

@@ -5,7 +5,12 @@ from app.prompts.summary import summary_prompt
 
 
 def build_chain(llm=None):
-    prompt = ChatPromptTemplate.from_messages([("system", summary_prompt)])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", summary_prompt),
+            ("user", "待摘要的新消息：\n{new_messages}"),
+        ]
+    )
     return prompt | (llm or get_llm())
 
 

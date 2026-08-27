@@ -9,11 +9,15 @@ import { TopBar } from "./top-bar"
 import { API_MODE_STORAGE_KEY } from "@/api/api-mode"
 import { useChatStore } from "@/stores/chat-store"
 
-const { copyText } = vi.hoisted(() => ({
-  copyText: vi.fn(),
+const storageMocks = vi.hoisted(() => ({
+  readStoredSessionId: vi.fn((): string | null => null),
+  writeStoredSessionId: vi.fn(),
+  clearStoredSessionId: vi.fn(),
+  resolveInitialSessionId: vi.fn(async () => "fp-default"),
 }))
 
-vi.mock("@/lib/copy-text", () => ({ copyText }))
+vi.mock("@/lib/session-id-storage", () => storageMocks)
+
 function makeWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -51,36 +55,54 @@ afterEach(() => {
 describe("TopBar", () => {
   it("shows no-session placeholder and the idle lamp", () => {
     render(<TopBar />, { wrapper: makeWrapper() })
-    expect(screen.getByTestId("session-id").textContent).toBe("no-session")
+    const input = screen.getByTestId("session-id") as HTMLInputElement
+    expect(input.value).toBe("")
+    expect(input.placeholder).toBe("no-session")
     const dot = screen.getByTestId("connection-dot")
     expect(dot.className).toContain("bg-neutral-500")
   })
 
-  it("reflects the live session id and connection status", () => {
+  it("reflects the live session id in the input and connection status", () => {
     act(() => {
       useChatStore.setState({ sessionId: "sess-abc-123", connectionStatus: "open" })
     })
     render(<TopBar />, { wrapper: makeWrapper() })
-    expect(screen.getByTestId("session-id").textContent).toBe("sess-abc-123")
+    const input = screen.getByTestId("session-id") as HTMLInputElement
+    expect(input.value).toBe("sess-abc-123")
     const dot = screen.getByTestId("connection-dot")
     expect(dot.className).toContain("bg-status-ok")
 
     act(() => {
-      useChatStore.setState({ connectionStatus: "error" })
+      useChatStore.setState({ sessionId: "sess-next" })
     })
-    expect((screen.getByTestId("connection-dot") as HTMLElement).className).toContain(
-      "bg-status-error",
+    expect((screen.getByTestId("session-id") as HTMLInputElement).value).toBe(
+      "sess-next",
     )
   })
 
-  it("copies the session id on click", async () => {
+  it("commits a custom session id on Enter", async () => {
+    const user = userEvent.setup()
+    render(<TopBar />, { wrapper: makeWrapper() })
+
+    const input = screen.getByTestId("session-id")
+    await user.type(input, "fixed-session-1{Enter}")
+
+    expect(useChatStore.getState().sessionId).toBe("fixed-session-1")
+    expect(storageMocks.writeStoredSessionId).toHaveBeenCalledWith("fixed-session-1")
+  })
+
+  it("restores the device fingerprint default when the input is cleared and committed", async () => {
     act(() => {
-      useChatStore.setState({ sessionId: "copy-me" })
+      useChatStore.setState({ sessionId: "custom-old" })
     })
     const user = userEvent.setup()
     render(<TopBar />, { wrapper: makeWrapper() })
-    await user.click(screen.getByTestId("session-id"))
-    expect(copyText).toHaveBeenCalledWith("copy-me")
+
+    await user.clear(screen.getByTestId("session-id"))
+    await user.keyboard("{Enter}")
+
+    expect(storageMocks.clearStoredSessionId).toHaveBeenCalled()
+    expect(useChatStore.getState().sessionId).toBe("fp-default")
   })
 
   it("starts a new session and clears chat state", async () => {
