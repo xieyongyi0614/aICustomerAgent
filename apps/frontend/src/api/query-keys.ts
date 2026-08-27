@@ -3,4 +3,5 @@ export const qk = {
   memories: (userId: string) => ["memories", userId] as const,
   messages: (conversationId: string) => ["messages", conversationId] as const,
   turnTrace: (turnId: string) => ["trace", turnId] as const,
+  llmProfiles: ["llm-profiles"] as const,
 }

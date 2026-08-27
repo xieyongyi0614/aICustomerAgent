@@ -1,6 +1,13 @@
 import { delay, http, HttpResponse } from "msw"
 
-import { EMPTY_USER, makeTraceFixture, messagesFixture, NEAR_UPGRADE_USER, RICH_USER } from "./fixtures"
+import {
+  EMPTY_USER,
+  LLM_PROFILES_FIXTURE,
+  makeTraceFixture,
+  messagesFixture,
+  NEAR_UPGRADE_USER,
+  RICH_USER,
+} from "./fixtures"
 
 function persona(requestUrl: URL) {
   const userId = requestUrl.searchParams.get("user_id") ?? "default-user"
@@ -56,4 +63,6 @@ export const restHandlers = [
     }
     return HttpResponse.json(makeTraceFixture("complete"))
   }),
+
+  http.get("*/api/v1/llm/profiles", () => HttpResponse.json(LLM_PROFILES_FIXTURE)),
 ]

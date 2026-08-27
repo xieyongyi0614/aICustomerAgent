@@ -1,11 +1,12 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
     session_id: str | None = None
     content: str
+    profile_id: str | None = Field(default=None, description="LLM profile id; falls back to default")
 
 
 class ChatSessionResponse(BaseModel):
@@ -18,6 +19,18 @@ class ChatDelta(BaseModel):
 
 class ChatDone(BaseModel):
     done: bool = True
+
+
+class LlmProfileOut(BaseModel):
+    id: str
+    label: str
+    model: str
+    default: bool
+
+
+class LlmProfilesOut(BaseModel):
+    default: str
+    profiles: list[LlmProfileOut]
 
 
 class CharacterStateOut(BaseModel):

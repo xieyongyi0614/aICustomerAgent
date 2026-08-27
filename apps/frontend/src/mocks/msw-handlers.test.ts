@@ -50,4 +50,15 @@ describe("msw handler scenarios", () => {
     expect(body.status).toBe("pending")
     expect(body.steps).toHaveLength(0)
   })
+
+  it("exposes llm profiles with a marked default", async () => {
+    const resp = await fetch(base("/api/v1/llm/profiles"))
+    expect(resp.status).toBe(200)
+    const body = (await resp.json()) as {
+      default: string
+      profiles: Array<{ id: string; default: boolean }>
+    }
+    expect(body.profiles.length).toBeGreaterThan(0)
+    expect(body.profiles.some((p) => p.id === body.default && p.default)).toBe(true)
+  })
 })

@@ -191,3 +191,16 @@ export function messagesFixture(conversationId: string) {
     ],
   }
 }
+
+export const LLM_PROFILES_FIXTURE = {
+  default: "longcat",
+  profiles: [
+    { id: "longcat", label: "LongCat (mock)", model: "LongCat-2.0", default: true },
+    {
+      id: "minimax-m3",
+      label: "MiniMax M3 (mock)",
+      model: "MiniMaxAI/MiniMax-M3",
+      default: false,
+    },
+  ],
+}

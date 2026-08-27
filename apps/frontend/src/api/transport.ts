@@ -4,6 +4,7 @@ import type { RoleMode, TurnAnalysis } from '@/types/domain/chat-meta'
 export interface ChatSendRequest {
   sessionId?: string | null
   content: string
+  profileId?: string | null
 }
 
 export interface SessionMeta {

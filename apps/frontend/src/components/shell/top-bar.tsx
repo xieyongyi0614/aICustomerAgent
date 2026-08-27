@@ -17,6 +17,9 @@ import { useChatStore } from "@/stores/chat-store"
 import type { ConnectionStatus } from "@/types/domain/chat-message"
 import { copyText } from "@/lib/copy-text"
 import { cn } from "@/lib/utils"
+import { useLlmProfiles } from "@/hooks/use-llm-profiles"
+import { LlmProfileSelect } from "@/components/shell/llm-profile-select"
+import { writeStoredLlmProfile } from "@/lib/llm-profile-storage"
 
 const STATUS_DOT_CLASS: Record<ConnectionStatus, string> = {
   idle: "bg-neutral-500",
@@ -98,6 +101,7 @@ function TopBar() {
   const connectionStatus = useChatStore((s) => s.connectionStatus)
   const isStreaming = useChatStore((s) => s.streamingMessageId !== null)
   const newSession = useChatStore((s) => s.newSession)
+  const { profiles, activeProfileId } = useLlmProfiles()
 
   return (
     <TooltipProvider>
@@ -139,6 +143,14 @@ function TopBar() {
           >
             +New
           </Button>
+
+          {profiles.length > 0 && activeProfileId !== null && (
+            <LlmProfileSelect
+              options={profiles}
+              value={activeProfileId}
+              onChange={writeStoredLlmProfile}
+            />
+          )}
 
           <ModeSwitchDialog currentMode={getActiveApiMode()} />
         </div>

@@ -28,7 +28,7 @@ app/
 ## 快速开始
 
 ```bash
-# 1. 配置环境变量（复制 .env.example 为 .env 并填入 OPENAI_API_KEY）
+# 1. 配置环境变量（复制 .env.example 为 .env，并在 LLM_PROFILES_JSON 中填入可用的 API Key）
 cp .env.example .env
 
 # 2. 启动本地 PostgreSQL 16（docker-compose，asuna/asuna/asuna）
@@ -81,7 +81,21 @@ curl http://localhost:8000/health
 
 - 不带 `session_id` 时创建新会话
 - `content` 为空返回 422
+- 通过请求体 `profile_id`（或请求头 `X-LLM-Profile`）选择本次对话的模型 profile；未知 id 在流开始前返回 400；响应头回显实际使用的 `X-LLM-Profile`
 - LLM 调用失败时流内返回 `{"detail": "LLM 调用失败"}`
+
+### GET /api/v1/llm/profiles
+
+返回可用模型列表与默认项：
+
+```json
+{
+  "default": "longcat",
+  "profiles": [
+    { "id": "longcat", "label": "LongCat (longcat.chat)", "model": "LongCat-2.0", "default": true }
+  ]
+}
+```
 
 ## 测试
 
@@ -96,8 +110,9 @@ uv run pylint app tests   # 代码检查
 
 | 配置                          | 默认值      | 说明                                |
 | ----------------------------- | ----------- | ----------------------------------- |
-| `OPENAI_API_KEY`              | -           | API Key（仅从环境变量 / .env 读取） |
-| `MODEL`                       | LongCat-2.0 | 模型名                              |
+| `LLM_PROFILES_JSON`           | -           | 模型 profile 数组（必填字段：id / label / base_url / model / api_key；可选覆盖：max_tokens、temperature、top_p、frequency_penalty、presence_penalty、extra_body_thinking） |
+| `DEFAULT_LLM_PROFILE`         | longcat     | 默认 profile id（必须在数组内）      |
+| `TEMPERATURE` 等              | 见 settings | profile 未指定对应字段时的参数缺省   |
 | `DATABASE_URL`                | postgresql+psycopg://asuna:asuna@localhost:5432/asuna | 数据库连接串（sqlite 前缀走测试方言分支） |
 | `DB_POOL_SIZE`                | 5           | PG 连接池大小                       |
 | `DB_MAX_OVERFLOW`             | 10          | PG 连接池溢出上限                   |
