@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     frequency_penalty: float = 0.4
     presence_penalty: float = 0.5
     max_tokens: int = 512
-    answer_max_tokens: int = 60
+    answer_max_tokens: int = 200
     extra_body_thinking: str = "disabled"
 
     database_url: str = "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
