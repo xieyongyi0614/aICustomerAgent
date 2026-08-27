@@ -1,13 +1,17 @@
-from langchain_core.prompts import ChatPromptTemplate
-
-from app.core.llm_factory import get_llm
+from app.chains.structured import build_structured_chain
 from app.models.router import RoleMode
 from app.prompts.router import role_router_prompt
 
 
 def build_chain(llm=None):
-    prompt = ChatPromptTemplate.from_messages([("system", role_router_prompt)])
-    return prompt | (llm or get_llm()).with_structured_output(RoleMode)
+    return build_structured_chain(
+        [
+            ("system", role_router_prompt),
+            ("user", "{user_message}"),
+        ],
+        RoleMode,
+        llm,
+    )
 
 
 async def route(user_message: str, llm=None) -> RoleMode:

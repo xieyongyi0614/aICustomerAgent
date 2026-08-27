@@ -1,9 +1,8 @@
 import logging
 
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from app.core.llm_factory import get_llm
+from app.chains.structured import build_structured_chain
 from app.models.character_state import StateUpdateDecision
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -14,8 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 def build_chain(llm=None) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([("system", state_update_prompt)])
-    return prompt | (llm or get_llm()).with_structured_output(StateUpdateDecision)
+    return build_structured_chain(
+        [
+            ("system", state_update_prompt),
+            ("user", "用户输入：{user_input}\n助手回复：{ai_reply}"),
+        ],
+        StateUpdateDecision,
+        llm,
+    )
 
 
 async def update(

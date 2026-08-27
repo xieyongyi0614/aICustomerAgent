@@ -17,7 +17,11 @@ def _build_llm(profile: LlmProfile) -> ChatOpenAI:
         frequency_penalty=profile.frequency_penalty,
         presence_penalty=profile.presence_penalty,
         max_tokens=profile.max_tokens,
-        extra_body={"thinking": {"type": profile.extra_body_thinking}},
+        extra_body=(
+            profile.extra_body
+            if profile.extra_body is not None
+            else {"thinking": {"type": profile.extra_body_thinking}}
+        ),
     )
 
 

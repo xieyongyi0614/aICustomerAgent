@@ -1,7 +1,6 @@
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from app.core.llm_factory import get_llm
+from app.chains.structured import build_structured_chain
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.prompts.snapshots import format_character, format_recent_context
@@ -9,8 +8,14 @@ from app.prompts.turn_analysis import turn_analysis_prompt
 
 
 def build_chain(llm=None) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([("system", turn_analysis_prompt)])
-    return prompt | (llm or get_llm()).with_structured_output(TurnAnalysis)
+    return build_structured_chain(
+        [
+            ("system", turn_analysis_prompt),
+            ("user", "{user_message}"),
+        ],
+        TurnAnalysis,
+        llm,
+    )
 
 
 async def analyze(content: str, state: ConversationState, llm=None) -> TurnAnalysis:

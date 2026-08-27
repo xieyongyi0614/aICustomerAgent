@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -15,11 +16,13 @@ import { getActiveApiMode, writeStoredApiMode } from "@/api/api-mode"
 import type { ApiMode } from "@/api/api-mode"
 import { useChatStore } from "@/stores/chat-store"
 import type { ConnectionStatus } from "@/types/domain/chat-message"
-import { copyText } from "@/lib/copy-text"
+import {
+  clearStoredSessionId,
+  resolveInitialSessionId,
+} from "@/lib/session-id-storage"
 import { cn } from "@/lib/utils"
 import { useLlmProfiles } from "@/hooks/use-llm-profiles"
 import { LlmProfileSelect } from "@/components/shell/llm-profile-select"
-import { writeStoredLlmProfile } from "@/lib/llm-profile-storage"
 
 const STATUS_DOT_CLASS: Record<ConnectionStatus, string> = {
   idle: "bg-neutral-500",
@@ -101,7 +104,34 @@ function TopBar() {
   const connectionStatus = useChatStore((s) => s.connectionStatus)
   const isStreaming = useChatStore((s) => s.streamingMessageId !== null)
   const newSession = useChatStore((s) => s.newSession)
-  const { profiles, activeProfileId } = useLlmProfiles()
+  const setSessionId = useChatStore((s) => s.setSessionId)
+  const { profiles, activeProfileId, selectProfile } = useLlmProfiles()
+  const [sessionDraft, setSessionDraft] = useState(sessionId ?? "")
+
+  useEffect(() => {
+    if (sessionId !== null) {
+      setSessionDraft(sessionId)
+    }
+  }, [sessionId])
+
+  function commitSessionDraft(): void {
+    const trimmed = sessionDraft.trim()
+    if (trimmed.length === 0) {
+      void resetSessionToFingerprint()
+      return
+    }
+    if (trimmed !== sessionId) {
+      setSessionId(trimmed)
+    }
+    setSessionDraft(trimmed)
+  }
+
+  async function resetSessionToFingerprint(): Promise<void> {
+    clearStoredSessionId()
+    const fingerprint = await resolveInitialSessionId()
+    setSessionId(fingerprint)
+    setSessionDraft(fingerprint)
+  }
 
   return (
     <TooltipProvider>
@@ -122,17 +152,23 @@ function TopBar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Input
             data-testid="session-id"
-            className="max-w-[220px] truncate rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-accent"
-            title={sessionId ?? "尚未创建会话"}
-            onClick={() => {
-              if (sessionId !== null) copyText(sessionId)
+            placeholder="no-session"
+            value={sessionDraft}
+            disabled={isStreaming}
+            spellCheck={false}
+            title="会话 ID：默认为本机设备指纹，可修改后回车生效；清空并回车恢复指纹"
+            className="w-[220px] font-mono text-xs"
+            onChange={(e) => setSessionDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                commitSessionDraft()
+              }
             }}
-          >
-            {sessionId ?? "no-session"}
-          </button>
+            onBlur={() => commitSessionDraft()}
+          />
 
           <Button
             size="sm"
@@ -148,7 +184,7 @@ function TopBar() {
             <LlmProfileSelect
               options={profiles}
               value={activeProfileId}
-              onChange={writeStoredLlmProfile}
+              onChange={selectProfile}
             />
           )}
 

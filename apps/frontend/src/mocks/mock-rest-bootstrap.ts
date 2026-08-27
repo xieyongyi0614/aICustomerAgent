@@ -1,4 +1,5 @@
 let started = false
+let worker: { stop(): void } | null = null
 
 export async function ensureMockRest(): Promise<void> {
   if (started) return
@@ -6,5 +7,18 @@ export async function ensureMockRest(): Promise<void> {
   if (typeof window === "undefined") return
   const { setupWorker } = await import("msw/browser")
   const { restHandlers } = await import("@/mocks/msw-handlers")
-  await setupWorker(...restHandlers).start({ onUnhandledRequest: "bypass", quiet: true })
+  worker = setupWorker(...restHandlers)
+  await worker.start({ onUnhandledRequest: "bypass", quiet: true })
+}
+
+export async function disableMockRest(): Promise<void> {
+  if (worker !== null) {
+    worker.stop()
+    worker = null
+    started = false
+    return
+  }
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return
+  const registrations = await navigator.serviceWorker.getRegistrations()
+  await Promise.all(registrations.map((registration) => registration.unregister()))
 }

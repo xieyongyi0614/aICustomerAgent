@@ -1,3 +1,7 @@
+export function hoursAgoIso(hours: number): string {
+  return new Date(Date.now() - hours * 3600 * 1000).toISOString()
+}
+
 export const EMPTY_USER = {
   state: {
     character_state: {
@@ -46,14 +50,14 @@ export const RICH_USER = {
       energy: 0.42,
       current_topic: "用户的 Debug Console 项目",
       inner_state: "担心用户连续熬夜赶工",
-      updated_at: "2026-08-26T09:30:00",
+      updated_at: hoursAgoIso(2),
     },
     relationship_state: {
       intimacy: 0.56,
       trust: 0.58,
       familiarity: 0.51,
       stage: "close_friend",
-      updated_at: "2026-08-26T09:30:00",
+      updated_at: hoursAgoIso(2),
     },
     emotion_history: [
       {
@@ -64,7 +68,7 @@ export const RICH_USER = {
         mood_after: "worried",
         energy_after: 0.42,
         stage_after: "close_friend",
-        created_at: "2026-08-26T09:30:00",
+        created_at: hoursAgoIso(5),
       },
       {
         user_emotion: "excited",
@@ -74,7 +78,7 @@ export const RICH_USER = {
         mood_after: "happy",
         energy_after: 0.55,
         stage_after: "close_friend",
-        created_at: "2026-08-25T21:10:00",
+        created_at: hoursAgoIso(20),
       },
     ],
   },
@@ -193,14 +197,14 @@ export function messagesFixture(conversationId: string) {
 }
 
 export const LLM_PROFILES_FIXTURE = {
-  default: "longcat",
+  default: "minimax-m3",
   profiles: [
-    { id: "longcat", label: "LongCat (mock)", model: "LongCat-2.0", default: true },
+    { id: "longcat", label: "LongCat (mock)", model: "LongCat-2.0", default: false },
     {
       id: "minimax-m3",
       label: "MiniMax M3 (mock)",
       model: "MiniMaxAI/MiniMax-M3",
-      default: false,
+      default: true,
     },
   ],
 }

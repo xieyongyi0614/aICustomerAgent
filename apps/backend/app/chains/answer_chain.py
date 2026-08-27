@@ -4,6 +4,7 @@ from typing import AsyncIterator
 from langchain_core.runnables import Runnable
 
 from app.core.llm_factory import get_llm
+from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.prompts.builder import PromptBuilder
@@ -13,7 +14,8 @@ def build_chain(
     mode: str, state: ConversationState, analysis: TurnAnalysis | None = None, llm=None
 ) -> Runnable:
     prompt = PromptBuilder.build(mode, state, analysis)
-    return prompt | (llm or get_llm())
+    model = llm if llm is not None else get_llm()
+    return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
 
 
 async def astream(
