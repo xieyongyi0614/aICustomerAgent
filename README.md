@@ -77,6 +77,7 @@ npm run lint        # eslint
 ## 核心能力
 
 - **流式对话**：NDJSON 流式返回，支持会话续接（`session_id`）
+- **会话历史持久化**：每轮消息写入 PostgreSQL，刷新页面后前端按会话自动回填历史记录，跨会话/重启可续聊
 - **多模型切换**：顶栏选择器按消息级切换 LLM profile（body `profile_id` > header `X-LLM-Profile` > query 参数）
 - **长期记忆**：对话中自动提取用户偏好落库并召回
 - **对话摘要**：消息数达阈值后滚动摘要，替换窗口外上下文
@@ -87,6 +88,8 @@ npm run lint        # eslint
 | 端点 | 说明 |
 |---|---|
 | `POST /chat/message` | 流式对话（NDJSON），响应头回显会话与实际使用的 profile |
+| `GET /conversations/{conversation_id}/messages` | 查询指定会话的历史消息（前端刷新回填数据源，404 表示会话不存在） |
+| `GET /memories` | 查询用户长期记忆列表 |
 | `GET /llm/profiles` | 可用模型 profile 列表与默认项 |
 | `GET /state` | 角色当前状态查询 |
 | `GET /debug/turns/{turn_id}/trace` | 单轮编排 trace（调试用） |
