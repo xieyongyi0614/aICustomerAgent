@@ -12,6 +12,16 @@ SceneIntent = Literal[
     "emotional",
 ]
 
+SCENE_INTENT_EXAMPLES = (
+    ("chat", "你好"),
+    ("request_action", "给我拿瓶水"),
+    ("continue_scene", "好的"),
+    ("correct_scene", "你还没拿给我呢"),
+    ("interrupt", "算了，不用了"),
+    ("question", "你叫什么名字？"),
+    ("emotional", "我有点累"),
+)
+
 ActionStatus = Literal["pending", "completed", "cancelled", "superseded"]
 
 _SCENE_FIELD_MAX_LENGTH = 50

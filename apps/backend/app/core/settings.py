@@ -71,6 +71,7 @@ class Settings(BaseSettings):
 
     summary_threshold: int = 40
     router_confidence_threshold: float = 0.5
+    scene_intent_threshold: float = 0.5
     memory_importance_threshold: float = 0.6
     memory_top_k: int = 5
     conversation_max_messages: int = 20
