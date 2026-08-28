@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { createChatStore } from "./chat-store-factory"
+import { ApiError } from "@/api/http"
 import type {
   ChatSendRequest,
   ChatStreamListeners,
@@ -8,6 +9,33 @@ import type {
   StreamEvent,
 } from "@/api/transport"
 import type { SessionMeta } from "@/api/transport"
+import { fetchConversationMessages } from "@/api/rest"
+import type { ChatHistoryMessage } from "@/types/domain/observability"
+
+vi.mock("@/api/rest", () => ({
+  fetchConversationMessages: vi.fn(),
+}))
+
+const historyFixture: ChatHistoryMessage[] = [
+  {
+    id: 11,
+    role: "human",
+    content: "第一句",
+    createdAt: "2026-08-26T09:00:00",
+  },
+  {
+    id: 12,
+    role: "ai",
+    content: "第一答",
+    createdAt: "2026-08-26T09:00:05",
+  },
+  {
+    id: 13,
+    role: "human",
+    content: "第二句",
+    createdAt: "2026-08-26T09:01:00",
+  },
+]
 
 class ControlledTransport implements ChatStreamTransport {
   lastRequest: ChatSendRequest | null = null
@@ -61,6 +89,7 @@ describe("chat store", () => {
 
   beforeEach(() => {
     harness = setup()
+    vi.mocked(fetchConversationMessages).mockReset()
   })
 
   it("runs the happy path: pending → streaming → complete with session backfill", () => {
@@ -250,5 +279,26 @@ describe("chat store", () => {
     transport.close(true)
     store.getState().newSession()
     expect(store.getState().retry()).toBe(false)
+  })
+
+  it("loadMessages hydrates messages from the backend history", async () => {
+    const { store } = harness
+    expect(store.getState().messages).toHaveLength(0)
+    vi.mocked(fetchConversationMessages).mockResolvedValue(historyFixture)
+    await store.getState().loadMessages("any-session")
+    const messages = store.getState().messages
+    expect(messages).toHaveLength(3)
+    expect(messages[0]).toMatchObject({ role: "human", content: "第一句", status: "complete" })
+    expect(messages[1]).toMatchObject({ role: "ai", content: "第一答", status: "complete" })
+    expect(messages[2]).toMatchObject({ role: "human", content: "第二句", status: "complete" })
+  })
+
+  it("loadMessages ignores 404 for a fresh conversation", async () => {
+    const { store } = harness
+    vi.mocked(fetchConversationMessages).mockRejectedValue(
+      new ApiError("会话不存在", { status: 404 }),
+    )
+    await store.getState().loadMessages("ghost-session")
+    expect(store.getState().messages).toHaveLength(0)
   })
 })
