@@ -20,7 +20,7 @@ V5 Emotion&Rel    角色现在什么情绪？和用户什么关系？关系如�
 |---|---|---|
 | V1 | 完整实现 | 100% |
 | V2 | 完整实现（mood 直写缺陷归 V5 修） | ~95% |
-| V3 | 仅数据模型（V3-001） | ~10% ← 最大断点 |
+| V3 | V3-001~010 全部实现（V3-008 真实模型回归待人工执行） | ~95% |
 | V4 | V1 遗留基础 + 规划文档 | ~35% |
 | V5 | V2 雏形 + 规划文档 | ~50% |
 
@@ -28,11 +28,11 @@ V5 Emotion&Rel    角色现在什么情绪？和用户什么关系？关系如�
 
 ### P1：V3 层纸面承诺未兑现（当前断点）
 
-- [ ] **Q1** `app/models/scene.py` 已存在但无任何链路读写——运行系统中"AI 正在做什么/什么没完成"实际回答不了，西瓜问题未解决。
-- [ ] Q2 scene_state 表 + Alembic 迁移缺失（V3-002）。
-- [ ] Q3 scene_intent_chain / Resolver / Updater / Prompt 注入 / 编排接入全部未实现（V3-003~007）。
-- [ ] Q4 七大 Case 测试（V3-008）未建。
-- [ ] Q5 Debug Panel 无 scene 区块（V3-009）。
+- [x] **Q1** `app/models/scene.py` 已存在但无任何链路读写——已由 V3-003~007 落地：scene_state 读写、意图路由、Resolver、Updater、Prompt 注入、编排接入全部接入主流程，西瓜问题可解。
+- [x] Q2 scene_state 表 + Alembic 迁移缺失（V3-002 已完成，迁移 0003）。
+- [x] Q3 scene_intent_chain / Resolver / Updater / Prompt 注入 / 编排接入全部未实现（V3-003~007 已完成）。
+- [x] Q4 七大 Case 测试（V3-008）未建——已建 `tests/test_scene_cases.py`，真实模型人工回归清单见 `regression-checklist.md`（待人工执行）。
+- [x] Q5 Debug Panel 无 scene 区块（V3-009 已完成，Scene 标签页）。
 
 ### P2：V4 层已知缺陷（V1 遗产的行为问题）
 

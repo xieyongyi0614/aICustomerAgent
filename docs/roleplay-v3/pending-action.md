@@ -43,3 +43,33 @@ AI 说"我去切西瓜"之后，没有任何机制记录这件事还没完成。
 - Case 3：interrupt → status=cancelled（代码路径，可用纯单测验证，无需 LLM）。
 - Case 4：切话题不强行续剧情。
 - Case 5：第二个请求 supersede 第一个。
+
+## 附录：Action Queue 评估（V3-010，默认不实现）
+
+### A.1 评估问题
+
+单主 PendingAction + supersede 会丢弃被取代的任务。需要基于真实使用数据判断丢失率是否高到值得引入 Queue。
+
+### A.2 观测指标（上线后采集）
+
+| 指标 | 定义 | 采集方式 |
+|---|---|---|
+| supersede 丢失率 | 被 supersede 的 action 中，用户后续再次提起的比例 | Debug 面板 / trace 记录 supersede 事件与后续 N 轮消息匹配 |
+| 复合请求占比 | 单条消息同时请求 ≥ 2 个动作的比例 | SceneIntent=request_action 消息人工抽样 |
+| 正常完成率 | pending 在过期/取消前被 completed 的比例 | scene_state trace 统计 |
+| 误 supersede 投诉 | 用户反馈"我让它拿水它忘了"类问题的频次 | 人工回归记录 |
+
+### A.3 判定标准
+
+- supersede 丢失率 < 10% 且复合请求占比 < 15% → **维持单主 PendingAction**（当前默认）。
+- 丢失率 ≥ 10% 或出现明确的用户可感知遗忘 → 再评估 Queue / 复合动作合并优化。
+
+### A.4 结论（V3 第一版）
+
+**不引入 Action Queue**。理由：
+
+1. 真实对话中"拿水+拿苹果"通常被 Updater 合并为一个复合动作，Queue 收益低。
+2. Queue 引入排序、冲突、逐个完成跟踪，复杂度与出错面显著上升。
+3. 上述指标尚未有真实数据支撑，任何 Queue 设计在数据到位前都是猜测。
+
+若后续数据触发 A.3 阈值，先考虑"复合动作合并"优化，其次才是 Queue。
