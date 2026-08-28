@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -50,6 +51,13 @@ class SceneState(BaseModel):
 
     def persistent_dump(self) -> dict:
         return self.model_dump(exclude={"scene_mood"})
+
+
+@dataclass
+class SceneContext:
+    state: SceneState
+    intent: SceneIntent
+    directive: str | None = None
 
 
 class SceneActionDecision(BaseModel):

@@ -65,6 +65,7 @@ class PromptBuilder:
         mode: str,
         state: ConversationState,
         analysis: TurnAnalysis | None = None,
+        scene_ctx=None,
     ) -> ChatPromptTemplate:
         messages = [("system", section) for section in PromptBuilder.build_identity_sections()]
 
@@ -87,6 +88,12 @@ class PromptBuilder:
 
         if analysis is not None:
             messages.append(("system", PromptBuilder.build_behavior_section(analysis)))
+
+        if scene_ctx is not None:
+            from app.prompts.scene import build_scene_sections
+
+            for section in build_scene_sections(scene_ctx):
+                messages.append(("system", section))
 
         messages.append(("human", state.current_input))
 

@@ -11,9 +11,13 @@ from app.prompts.builder import PromptBuilder
 
 
 def build_chain(
-    mode: str, state: ConversationState, analysis: TurnAnalysis | None = None, llm=None
+    mode: str,
+    state: ConversationState,
+    analysis: TurnAnalysis | None = None,
+    llm=None,
+    scene_ctx=None,
 ) -> Runnable:
-    prompt = PromptBuilder.build(mode, state, analysis)
+    prompt = PromptBuilder.build(mode, state, analysis, scene_ctx)
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
 
@@ -24,9 +28,10 @@ async def astream(
     analysis: TurnAnalysis | None = None,
     llm=None,
     trace=None,
+    scene_ctx=None,
 ) -> AsyncIterator[str]:
     started = time.perf_counter()
-    chain = build_chain(mode, state, analysis, llm)
+    chain = build_chain(mode, state, analysis, llm, scene_ctx)
     if trace is not None:
         trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
     async for chunk in chain.astream({}):
