@@ -6,7 +6,9 @@ import { resolveInitialSessionId } from "@/lib/session-id-storage"
 export function useSessionIdHydration(): void {
   useEffect(() => {
     void resolveInitialSessionId().then((id) => {
-      useChatStore.getState().setSessionId(id)
+      const store = useChatStore.getState()
+      store.setSessionId(id)
+      void store.loadMessages(id)
     })
   }, [])
 }

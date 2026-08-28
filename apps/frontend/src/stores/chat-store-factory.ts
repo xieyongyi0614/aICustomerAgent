@@ -1,6 +1,8 @@
 import { create } from "zustand"
 
 import type { ChatStreamTransport, StreamEvent } from "@/api/transport"
+import { ApiError } from "@/api/http"
+import { fetchConversationMessages } from "@/api/rest"
 import type { RoleMode, TurnAnalysis } from "@/types/domain/chat-meta"
 import type { ChatMessage, ConnectionStatus } from "@/types/domain/chat-message"
 import { readStoredLlmProfile } from "@/lib/llm-profile-storage"
@@ -23,6 +25,7 @@ interface ChatActions {
   newSession(): void
   retry(): boolean
   setSessionId(sessionId: string): void
+  loadMessages(sessionId: string): Promise<void>
   _hardReset(): void
 }
 
@@ -218,6 +221,23 @@ export function createChatStore(
       if (trimmed.length === 0) return
       writeStoredSessionId(trimmed)
       set({ sessionId: trimmed })
+    },
+
+    async loadMessages(sessionId: string) {
+      if (get().streamingMessageId !== null) return
+      try {
+        const history = await fetchConversationMessages(sessionId)
+        const messages: ChatMessage[] = history.map((item) => ({
+          id: `history-${item.id}`,
+          role: item.role,
+          content: item.content,
+          status: "complete",
+          createdAt: Date.parse(item.createdAt) || Date.now(),
+        }))
+        set({ messages })
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return
+      }
     },
 
     _hardReset() {
