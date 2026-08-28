@@ -1,4 +1,5 @@
 import { OverviewPanel } from "@/components/debug/overview-panel"
+import { ScenePanel } from "@/components/debug/scene-panel"
 import { StatePanel } from "@/components/debug/state-panel"
 import { MemoryPanel } from "@/components/debug/memory-panel"
 import { TracePanel } from "@/components/debug/trace-panel"
@@ -9,6 +10,7 @@ import type { DebugTabValue } from "@/stores/ui-store"
 
 const DEBUG_TABS = [
   { value: "overview", label: "Overview" },
+  { value: "scene", label: "Scene" },
   { value: "state", label: "State" },
   { value: "memory", label: "Memory" },
   { value: "trace", label: "Trace" },
@@ -35,6 +37,9 @@ function DebugPane() {
       </TabsList>
       <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto">
         <OverviewPanel />
+      </TabsContent>
+      <TabsContent value="scene" className="min-h-0 flex-1 overflow-y-auto">
+        <ScenePanel />
       </TabsContent>
       <TabsContent value="state" className="min-h-0 flex-1 overflow-y-auto">
         <StatePanel />

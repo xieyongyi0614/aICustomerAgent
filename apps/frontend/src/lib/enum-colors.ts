@@ -1,11 +1,17 @@
 import type {
+  ActionStatusValue,
   BehaviorValue,
   EmotionValue,
   ModeValue,
   StageValue,
 } from "@/types/domain/enums"
 
-export type EnumKind = 'mode' | 'emotion' | 'behavior' | 'stage'
+export type EnumKind =
+  | 'mode'
+  | 'emotion'
+  | 'behavior'
+  | 'stage'
+  | 'status'
 
 export const NEUTRAL_BADGE_CLASS = 'bg-neutral-500/15 text-neutral-300 border-neutral-500/40'
 export const DEGRADED_BADGE_CLASS = 'bg-amber-500/15 text-amber-300 border-amber-500/50'
@@ -44,11 +50,19 @@ const STAGE_BADGES: Record<StageValue, string> = {
   partner: 'bg-pink-500/15 text-pink-300 border-pink-500/40',
 }
 
+const ACTION_STATUS_BADGES: Record<ActionStatusValue, string> = {
+  pending: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+  completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+  cancelled: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/40',
+  superseded: 'bg-slate-500/15 text-slate-300 border-slate-500/40',
+}
+
 const BADGE_TABLES: Record<EnumKind, Record<string, string>> = {
   mode: MODE_BADGES,
   emotion: EMOTION_BADGES,
   behavior: BEHAVIOR_BADGES,
   stage: STAGE_BADGES,
+  status: ACTION_STATUS_BADGES,
 }
 
 export const MODE_VALUES = Object.keys(MODE_BADGES) as ModeValue[]

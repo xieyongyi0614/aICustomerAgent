@@ -7,11 +7,15 @@ import type {
 } from '@/api/transport'
 import type {
   RoleModeDto,
+  SceneIntentResultDto,
+  SceneStateDto,
   TurnAnalysisDto,
 } from '@/types/backend/chat-meta'
 import type {
   BehaviorDecision,
   RoleMode,
+  SceneIntentResult,
+  SceneState,
   TurnAnalysis,
 } from '@/types/domain/chat-meta'
 
@@ -53,6 +57,29 @@ export function toTurnAnalysis(dto: TurnAnalysisDto): TurnAnalysis {
   return { userEmotion, behavior }
 }
 
+export function toSceneIntentResult(dto: SceneIntentResultDto): SceneIntentResult {
+  return { intent: dto.intent, confidence: dto.confidence, reason: dto.reason }
+}
+
+export function toSceneState(dto: SceneStateDto): SceneState {
+  const pendingAction = dto.pending_action
+    ? {
+        action: dto.pending_action.action,
+        status: dto.pending_action.status,
+        createdAtTurn: dto.pending_action.created_at_turn,
+      }
+    : null
+  return {
+    sessionId: dto.session_id,
+    turnId: dto.turn_id,
+    location: dto.location,
+    currentActivity: dto.current_activity,
+    currentAction: dto.current_action,
+    pendingAction,
+    sceneMood: dto.scene_mood,
+  }
+}
+
 function parseTypedEvent(record: Record<string, unknown>): StreamEvent | null {
   switch (record.type) {
     case 'delta': {
@@ -71,10 +98,22 @@ function parseTypedEvent(record: Record<string, unknown>): StreamEvent | null {
       ) {
         return null
       }
+      const sceneIntentRaw = asRecord(record.scene_intent)
+      const sceneIntent =
+        sceneIntentRaw !== null && typeof sceneIntentRaw.intent === 'string'
+          ? toSceneIntentResult(sceneIntentRaw as unknown as SceneIntentResultDto)
+          : undefined
+      const sceneStateRaw = asRecord(record.scene_state)
+      const sceneState =
+        sceneStateRaw !== null && typeof sceneStateRaw.session_id === 'string'
+          ? toSceneState(sceneStateRaw as unknown as SceneStateDto)
+          : undefined
       return {
         type: 'turn_meta',
         roleMode: toRoleMode(roleMode),
         analysis: toTurnAnalysis(analysis),
+        sceneIntent,
+        sceneState,
       }
     }
     case 'done': {

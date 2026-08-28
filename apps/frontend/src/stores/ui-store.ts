@@ -1,6 +1,12 @@
 import { create } from "zustand"
 
-export type DebugTabValue = "overview" | "state" | "memory" | "trace" | "raw"
+export type DebugTabValue =
+  | "overview"
+  | "scene"
+  | "state"
+  | "memory"
+  | "trace"
+  | "raw"
 
 interface UiState {
   activeTab: DebugTabValue

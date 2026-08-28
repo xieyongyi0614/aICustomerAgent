@@ -55,3 +55,18 @@ export type IntentValue =
   | 'emotional'
   | 'roleplay'
   | 'sao_lore'
+
+export type SceneIntentValue =
+  | 'chat'
+  | 'request_action'
+  | 'continue_scene'
+  | 'correct_scene'
+  | 'interrupt'
+  | 'question'
+  | 'emotional'
+
+export type ActionStatusValue =
+  | 'pending'
+  | 'completed'
+  | 'cancelled'
+  | 'superseded'

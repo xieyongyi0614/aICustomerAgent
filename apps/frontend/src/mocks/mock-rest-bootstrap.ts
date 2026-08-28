@@ -1,5 +1,9 @@
+import type { setupWorker } from "msw/browser"
+
+type MockServiceWorker = Awaited<ReturnType<typeof setupWorker>>
+
 let started = false
-let worker: { stop(): void } | null = null
+let worker: MockServiceWorker | null = null
 
 export async function ensureMockRest(): Promise<void> {
   if (started) return

@@ -3,7 +3,12 @@ import { create } from "zustand"
 import type { ChatStreamTransport, StreamEvent } from "@/api/transport"
 import { ApiError } from "@/api/http"
 import { fetchConversationMessages } from "@/api/rest"
-import type { RoleMode, TurnAnalysis } from "@/types/domain/chat-meta"
+import type {
+  RoleMode,
+  SceneIntentResult,
+  SceneState,
+  TurnAnalysis,
+} from "@/types/domain/chat-meta"
 import type { ChatMessage, ConnectionStatus } from "@/types/domain/chat-message"
 import { readStoredLlmProfile } from "@/lib/llm-profile-storage"
 import { writeStoredSessionId } from "@/lib/session-id-storage"
@@ -15,7 +20,12 @@ interface ChatState {
   streamingMessageId: string | null
   sessionId: string | null
   connectionStatus: ConnectionStatus
-  turnMeta: { roleMode: RoleMode; analysis: TurnAnalysis } | null
+  turnMeta: {
+    roleMode: RoleMode
+    analysis: TurnAnalysis
+    sceneIntent?: SceneIntentResult
+    sceneState?: SceneState
+  } | null
   lastTurnId: string | null
 }
 
@@ -124,7 +134,12 @@ export function createChatStore(
             case "turn_meta":
               if (!turnActive) break
               set({
-                turnMeta: { roleMode: event.roleMode, analysis: event.analysis },
+                turnMeta: {
+                  roleMode: event.roleMode,
+                  analysis: event.analysis,
+                  sceneIntent: event.sceneIntent,
+                  sceneState: event.sceneState,
+                },
               })
               break
             case "done":

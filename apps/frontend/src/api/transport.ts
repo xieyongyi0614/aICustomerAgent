@@ -1,5 +1,10 @@
 import type { ApiError } from '@/api/http'
-import type { RoleMode, TurnAnalysis } from '@/types/domain/chat-meta'
+import type {
+  RoleMode,
+  SceneIntentResult,
+  SceneState,
+  TurnAnalysis,
+} from '@/types/domain/chat-meta'
 
 export interface ChatSendRequest {
   sessionId?: string | null
@@ -12,9 +17,17 @@ export interface SessionMeta {
   isNew: boolean
 }
 
+export interface TurnMetaEvent {
+  type: 'turn_meta'
+  roleMode: RoleMode
+  analysis: TurnAnalysis
+  sceneIntent?: SceneIntentResult
+  sceneState?: SceneState
+}
+
 export type StreamEvent =
   | { type: 'delta'; text: string }
-  | { type: 'turn_meta'; roleMode: RoleMode; analysis: TurnAnalysis }
+  | TurnMetaEvent
   | { type: 'done'; sessionId?: string; turnId?: string }
   | { type: 'error'; message: string; code?: string }
 

@@ -60,6 +60,94 @@ function run(harness: Harness, signal?: AbortSignal): Promise<void> {
   )
 }
 
+describe("scene meta parsing", () => {
+  it("parses scene_intent and scene_state from turn_meta", () => {
+    const event = parseStreamLine(
+      JSON.stringify({
+        type: "turn_meta",
+        role_mode: {
+          mode: "immersive",
+          intent: "roleplay",
+          confidence: 0.9,
+          reason: "rp",
+        },
+        analysis: {
+          user_emotion: { emotion: "happy", event: "daily" },
+          behavior: { behavior: "normal_reply", reason: "" },
+        },
+        scene_intent: {
+          intent: "request_action",
+          confidence: 0.85,
+          reason: "要求动作",
+        },
+        scene_state: {
+          session_id: "s-1",
+          turn_id: 3,
+          location: "客厅",
+          current_activity: "休息",
+          current_action: "切西瓜",
+          pending_action: {
+            action: "把西瓜拿给用户",
+            status: "pending",
+            created_at_turn: 2,
+          },
+          scene_mood: "relaxed",
+        },
+      }),
+    )
+    expect(event).not.toBeNull()
+    if (event?.type !== "turn_meta") throw new Error("expected turn_meta")
+    expect(event.sceneIntent?.intent).toBe("request_action")
+    expect(event.sceneState?.pendingAction?.status).toBe("pending")
+    expect(event.sceneState?.pendingAction?.createdAtTurn).toBe(2)
+    expect(event.sceneState?.sceneMood).toBe("relaxed")
+  })
+
+  it("keeps scene fields undefined when absent from turn_meta", () => {
+    const event = parseStreamLine(
+      JSON.stringify({
+        type: "turn_meta",
+        role_mode: {
+          mode: "default",
+          intent: "casual",
+          confidence: 0.9,
+          reason: "hi",
+        },
+        analysis: {
+          user_emotion: { emotion: "neutral", event: "daily" },
+          behavior: { behavior: "normal_reply", reason: "" },
+        },
+      }),
+    )
+    expect(event).not.toBeNull()
+    if (event?.type !== "turn_meta") throw new Error("expected turn_meta")
+    expect(event.sceneIntent).toBeUndefined()
+    expect(event.sceneState).toBeUndefined()
+  })
+
+  it("ignores malformed scene_state payloads", () => {
+    const event = parseStreamLine(
+      JSON.stringify({
+        type: "turn_meta",
+        role_mode: {
+          mode: "default",
+          intent: "casual",
+          confidence: 0.9,
+          reason: "hi",
+        },
+        analysis: {
+          user_emotion: { emotion: "neutral", event: "daily" },
+          behavior: { behavior: "normal_reply", reason: "" },
+        },
+        scene_state: { broken: true },
+      }),
+    )
+    expect(event).not.toBeNull()
+    if (event?.type !== "turn_meta") throw new Error("expected turn_meta")
+    expect(event.sceneState).toBeUndefined()
+  })
+})
+
 describe("line framing", () => {
   it("reassembles lines split across chunks", async () => {
     const harness = makeTransport([
