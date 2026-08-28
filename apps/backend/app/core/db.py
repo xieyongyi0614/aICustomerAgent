@@ -115,6 +115,19 @@ class RelationshipStateRow(Base):
     )
 
 
+class SceneStateRow(Base):
+    __tablename__ = "scene_state"
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    turn_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_activity: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_action: Mapped[str | None] = mapped_column(String, nullable=True)
+    pending_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class EmotionHistoryRow(Base):
     __tablename__ = "emotion_history"
 

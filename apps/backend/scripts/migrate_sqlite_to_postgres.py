@@ -3,10 +3,16 @@ import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.core.db import Conversation, ConversationSummary, Memory, Message
+from app.core.db import (
+    Conversation,
+    ConversationSummary,
+    Memory,
+    Message,
+    SceneStateRow,
+)
 from app.core.settings import get_settings
 
-MIGRATION_ORDER = (Conversation, Message, ConversationSummary, Memory)
+MIGRATION_ORDER = (Conversation, Message, ConversationSummary, Memory, SceneStateRow)
 
 
 def _create_engine(url: str):

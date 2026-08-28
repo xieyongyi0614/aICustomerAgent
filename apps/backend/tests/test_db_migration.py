@@ -17,6 +17,7 @@ from app.repositories import (
     emotion_history_repository,
     memory_repository,
     relationship_repository,
+    scene_state_repository,
     summary_repository,
 )
 from tests.conftest import wait_until
@@ -119,6 +120,7 @@ def test_http_lifecycle_on_postgres(postgres_url, fake_llm):
     monkey.setattr(character_state_repository, "SessionLocal", pg_session)
     monkey.setattr(relationship_repository, "SessionLocal", pg_session)
     monkey.setattr(emotion_history_repository, "SessionLocal", pg_session)
+    monkey.setattr(scene_state_repository, "SessionLocal", pg_session)
 
     llm = fake_llm(
         response=["好的"],
@@ -190,6 +192,7 @@ def test_sqlite_to_postgres_migration_script(postgres_url, tmp_path):
         "messages": 2,
         "conversation_summaries": 0,
         "memories": 0,
+        "scene_state": 0,
     }
 
     target_engine = create_engine(postgres_url, pool_pre_ping=True)

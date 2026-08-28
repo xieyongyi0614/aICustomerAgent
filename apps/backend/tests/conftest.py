@@ -30,6 +30,7 @@ from app.repositories import (
     emotion_history_repository,
     memory_repository,
     relationship_repository,
+    scene_state_repository,
     summary_repository,
 )
 
@@ -136,6 +137,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(character_state_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(relationship_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(emotion_history_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(scene_state_repository, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while agent_service._background_tasks and time.time() < deadline:
