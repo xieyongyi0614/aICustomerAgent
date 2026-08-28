@@ -51,13 +51,16 @@ async def chat_message(
             ):
                 kind = event.get("kind")
                 if kind == "turn_meta":
-                    yield _stream_json(
-                        {
-                            "type": "turn_meta",
-                            "role_mode": event["role_mode"].model_dump(),
-                            "analysis": event["analysis"].model_dump(),
-                        }
-                    )
+                    payload = {
+                        "type": "turn_meta",
+                        "role_mode": event["role_mode"].model_dump(),
+                        "analysis": event["analysis"].model_dump(),
+                    }
+                    if "scene_intent" in event:
+                        payload["scene_intent"] = event["scene_intent"].model_dump()
+                    if "scene_state" in event:
+                        payload["scene_state"] = event["scene_state"].model_dump()
+                    yield _stream_json(payload)
                 elif kind == "token":
                     yield _stream_json({"delta": event["text"]})
                 elif kind == "done":

@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 TRACE_STEP_NAMES = (
     "role_router",
     "turn_analyzer",
+    "scene_intent",
+    "scene_resolver",
+    "scene_update",
     "memory_retrieval",
     "context_builder",
     "prompt_builder",
@@ -19,7 +22,7 @@ TRACE_STEP_NAMES = (
     "memory_extractor",
 )
 
-_BACKGROUND_STEPS = ("state_update", "memory_extractor")
+_BACKGROUND_STEPS = ("state_update", "memory_extractor", "scene_update")
 
 
 @dataclass
