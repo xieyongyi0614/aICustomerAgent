@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     analysis_recent_messages: int = 6
     trace_capacity: int = 20
     state_history_limit: int = 20
+    scene_pending_max_turns: int = 5
 
     @model_validator(mode="after")
     def validate_profiles(self):
