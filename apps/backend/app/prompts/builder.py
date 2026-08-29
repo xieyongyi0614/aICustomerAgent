@@ -21,6 +21,20 @@ MEMORY_TYPE_LABELS = {
     "relationship_event": "关系事件",
 }
 
+EMOTION_BUDGET_CHARS = 120
+RELATIONSHIP_BUDGET_CHARS = 150
+
+PERSONALITY_FIRST_CONSTRAINT = (
+    "情绪叠加在你的人格之上：无论此刻情绪如何，你说话的方式、价值观和性格底色不变。"
+    "温柔的角色生气时是“温柔地生气”，不是变成另一个人。"
+)
+
+EXPRESS_EMOTION_RULE = (
+    "表达要求：情绪通过语气、用词和节奏自然流露，不要直接报出情绪名称或数值。"
+)
+
+TENSION_FREEZE_RULE = "最近气氛有些紧张，对话中保持一点距离感，直到氛围缓和。"
+
 
 class PromptBuilder:
     @staticmethod
@@ -31,6 +45,32 @@ class PromptBuilder:
             RELATIONSHIP_BLOCK,
             BEHAVIOR_BLOCK,
         ]
+
+    @staticmethod
+    def build_emotion_section(state: ConversationState) -> str:
+        character = state.character_state
+        intensity = character.intensity
+        if intensity <= 0.3:
+            tier = "淡淡的"
+        elif intensity <= 0.6:
+            tier = "明显的"
+        else:
+            tier = "非常强烈的"
+        header = "【角色当前情绪】"
+        mood_line = f"心情：{character.mood}（强度 {intensity:.1f}，{tier}）"
+        budget = EMOTION_BUDGET_CHARS - len(header) - len(mood_line) - 1
+        cause_line = None
+        if character.cause:
+            cause_text = character.cause
+            if len(cause_text) + 3 > budget:
+                cause_text = cause_text[: max(budget - 4, 0)] + "…"
+            cause_line = f"原因：{cause_text}"
+        lines = [header, mood_line]
+        if cause_line:
+            lines.append(cause_line)
+        lines.append(EXPRESS_EMOTION_RULE)
+        lines.append(PERSONALITY_FIRST_CONSTRAINT)
+        return "\n".join(lines)
 
     @staticmethod
     def build_character_state_section(state: ConversationState) -> str:
@@ -52,12 +92,23 @@ class PromptBuilder:
         description = STAGE_DESCRIPTIONS.get(
             relationship.stage, STAGE_DESCRIPTIONS["friend"]
         )
-        return (
+        tension = relationship.tension
+        if tension <= 0.3:
+            tension_tier = "相处自然"
+        elif tension <= 0.5:
+            tension_tier = "略有尴尬"
+        else:
+            tension_tier = "气氛紧张"
+        section = (
             f"【与用户的关系】\n当前关系：{label}（{description}）\n"
             f"亲密：{describe_level(relationship.intimacy)}　"
             f"信任：{describe_level(relationship.trust)}　"
-            f"熟悉：{describe_level(relationship.familiarity)}"
+            f"熟悉：{describe_level(relationship.familiarity)}\n"
+            f"紧张度：{tension_tier}（{tension:.1f}）"
         )
+        if tension > 0.5:
+            section += f"\n{TENSION_FREEZE_RULE}"
+        return section
 
     @staticmethod
     def build_behavior_section(analysis: TurnAnalysis) -> str:
@@ -77,6 +128,7 @@ class PromptBuilder:
         messages = [("system", section) for section in PromptBuilder.build_identity_sections()]
 
         if analysis is not None:
+            messages.append(("system", PromptBuilder.build_emotion_section(state)))
             messages.append(("system", PromptBuilder.build_character_state_section(state)))
             messages.append(("system", PromptBuilder.build_relationship_section(state)))
 
