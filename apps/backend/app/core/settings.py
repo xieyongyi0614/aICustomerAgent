@@ -182,6 +182,17 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def validate_autonomy_quiet_hours(self):
+        import re as _re
+
+        pattern = _re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+        for name in ("autonomy_quiet_hours_start", "autonomy_quiet_hours_end"):
+            value = getattr(self, name)
+            if not pattern.match(value):
+                raise SettingsError(f"{name} 必须是 HH:MM 格式: {value}")
+        return self
+
     def llm_profiles(self) -> list[LlmProfile]:
         raw = json.loads(self.llm_profiles_json)
         profiles: list[LlmProfile] = []

@@ -39,12 +39,13 @@ def _scene_ctx(state=None, intent="chat"):
     )
 
 
-def test_strategy_mapping_12_intentions():
+def test_strategy_mapping_covers_reactive_intentions():
     from app.services.behavior_engine import INTENTION_STRATEGY_MAP
     from app.models.intention import IntentionType
     from typing import get_args
 
-    assert set(INTENTION_STRATEGY_MAP) == set(get_args(IntentionType))
+    reactive = {name for name in get_args(IntentionType) if name != "check_in"}
+    assert set(INTENTION_STRATEGY_MAP) == reactive
     assert len(INTENTION_STRATEGY_MAP) == 12
 
 
