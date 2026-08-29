@@ -66,6 +66,8 @@ class TraceStep:
 class TurnTraceSession:
     role_mode: object | None = None
     analysis: object | None = None
+    behavior_meta: dict | None = None
+    mode_meta: dict | None = None
     turn_id: str | None = None
     steps: list[TraceStep] = field(default_factory=list)
     request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
@@ -131,6 +133,8 @@ class TurnTraceSession:
             "status": "complete" if self.is_complete else "pending",
             "role_mode": self.role_mode.model_dump() if self.role_mode is not None else None,
             "analysis": self.analysis.model_dump() if self.analysis is not None else None,
+            "behavior": self.behavior_meta,
+            "mode": self.mode_meta,
             "total_ms": round(sum(step.duration_ms for step in self.steps), 2),
             "steps": [
                 {
@@ -185,6 +189,13 @@ class TraceCollector:
                 if pending.turn_id == turn_id:
                     return pending
             return None
+
+    def latest(self) -> TurnTraceSession | None:
+        with self._lock:
+            if not self._finished:
+                return None
+            turn_id = next(reversed(self._finished))
+            return self._finished[turn_id]
 
 
 _collector: TraceCollector | None = None

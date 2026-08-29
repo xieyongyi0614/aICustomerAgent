@@ -13,6 +13,10 @@ def find_conversation_or_none(conversation_id: str):
     return conversation_repository.find_conversation(conversation_id)
 
 
+def find_latest_conversation(user_id: str):
+    return conversation_repository.get_latest_for_user(user_id)
+
+
 def list_recent_messages(
     conversation_id: str, limit: int, before_id: int | None = None
 ) -> list[Message]:

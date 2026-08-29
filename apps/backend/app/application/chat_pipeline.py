@@ -283,6 +283,8 @@ async def run_chat_pipeline(
         "effective": mode_decision.effective,
         "switched": mode_decision.switched,
     }
+    trace.behavior_meta = behavior_meta
+    trace.mode_meta = mode_meta
 
     yield {
         "kind": "turn_meta",

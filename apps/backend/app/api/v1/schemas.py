@@ -77,11 +77,34 @@ class RelationshipEventItem(BaseModel):
     created_at: datetime
 
 
+class BehaviorBudgetOut(BaseModel):
+    max_action_desc: int
+    allow_action_desc: bool
+    physical_contact: str
+    emotion_expression: str
+
+
+class ModeMetaOut(BaseModel):
+    confirmed: str
+    effective: str
+    switched: bool
+
+
+class LastBehaviorOut(BaseModel):
+    strategy: str
+    base_strategy: str
+    budget: BehaviorBudgetOut
+    degraded: bool
+    mode: ModeMetaOut | None = None
+
+
 class StateSnapshotOut(BaseModel):
     character_state: CharacterStateOut
     relationship_state: RelationshipStateOut
     emotion_history: list[EmotionHistoryItem]
     relationship_events: list[RelationshipEventItem] = []
+    mode: str | None = None
+    last_behavior: LastBehaviorOut | None = None
 
 
 class MessageItemOut(BaseModel):

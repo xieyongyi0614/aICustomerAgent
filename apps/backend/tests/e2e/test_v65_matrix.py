@@ -119,3 +119,23 @@ def test_case14_turn_meta_precedes_tokens(client, fake_llm):
     lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
     kinds = ["turn_meta" if line.get("type") == "turn_meta" else "delta" for line in lines]
     assert kinds[0] == "turn_meta"
+
+
+def test_v65_008_state_snapshot_exposes_mode_and_behavior(client, fake_llm):
+    meta, _ = _meta(client, fake_llm, "在吗", IntentionDecision=CONTINUE)
+    snapshot = client.get("/api/v1/state").json()
+    assert snapshot["mode"] == "default"
+    behavior = snapshot["last_behavior"]
+    assert behavior is not None
+    assert behavior["strategy"] == meta["behavior"]["strategy"]
+    assert behavior["degraded"] is False
+    assert behavior["budget"]["max_action_desc"] == meta["behavior"]["budget"]["max_action_desc"]
+    assert behavior["mode"]["effective"] == meta["mode"]["effective"]
+
+
+def test_v65_008_state_snapshot_defaults_without_turn(client):
+    from app.services import trace_collector
+
+    trace_collector.reset_trace_collector()
+    snapshot = client.get("/api/v1/state").json()
+    assert snapshot["last_behavior"] is None

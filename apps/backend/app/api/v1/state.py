@@ -1,16 +1,53 @@
 from fastapi import APIRouter, Query
 
 from app.api.v1.schemas import (
+    BehaviorBudgetOut,
     CharacterStateOut,
     EmotionHistoryItem,
+    LastBehaviorOut,
+    ModeMetaOut,
     RelationshipEventItem,
     RelationshipStateOut,
     StateSnapshotOut,
 )
 from app.core.settings import get_settings
-from app.services import state_service
+from app.services import history_service, state_service, trace_collector
 
 state_router = APIRouter()
+
+
+def _latest_mode() -> str | None:
+    conversation = history_service.find_latest_conversation(get_settings().default_user)
+    return getattr(conversation, "mode", None)
+
+
+def _last_behavior_out() -> LastBehaviorOut | None:
+    session = trace_collector.get_trace_collector().latest()
+    meta = session.behavior_meta if session is not None else None
+    if not meta:
+        return None
+    budget = meta.get("budget") or {}
+    mode_meta = session.mode_meta if session is not None else None
+    return LastBehaviorOut(
+        strategy=meta.get("strategy", "natural_continuation"),
+        base_strategy=meta.get("base_strategy", meta.get("strategy", "natural_continuation")),
+        budget=BehaviorBudgetOut(
+            max_action_desc=budget.get("max_action_desc", 1),
+            allow_action_desc=budget.get("allow_action_desc", True),
+            physical_contact=budget.get("physical_contact", "none"),
+            emotion_expression=budget.get("emotion_expression", "natural"),
+        ),
+        degraded=bool(meta.get("degraded", False)),
+        mode=(
+            ModeMetaOut(
+                confirmed=mode_meta.get("confirmed", "default"),
+                effective=mode_meta.get("effective", "default"),
+                switched=bool(mode_meta.get("switched", False)),
+            )
+            if mode_meta
+            else None
+        ),
+    )
 
 
 @state_router.get("/state", response_model=StateSnapshotOut)
@@ -70,4 +107,6 @@ def get_state_snapshot(
             )
             for event in snapshot.relationship_events
         ],
+        mode=_latest_mode(),
+        last_behavior=_last_behavior_out(),
     )

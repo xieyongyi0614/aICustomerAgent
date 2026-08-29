@@ -22,6 +22,16 @@ def find_conversation(conv_id: str) -> Conversation | None:
         return session.get(Conversation, conv_id)
 
 
+def get_latest_for_user(user_id: str) -> Conversation | None:
+    with SessionLocal() as session:
+        return (
+            session.query(Conversation)
+            .filter(Conversation.user_id == user_id)
+            .order_by(Conversation.updated_at.desc())
+            .first()
+        )
+
+
 def save_message(conv_id: str, role: str, content: str) -> Message:
     if role not in ("human", "ai"):
         raise ValueError(f"非法 role: {role}")
