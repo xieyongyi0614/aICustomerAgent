@@ -4,9 +4,12 @@
 > 策略沿用：逐 Task 测试 + 全量回归（V2~V6 零回归）+ commit/push，连续执行，最后统一汇报。
 > 全局约束：Worker 默认 `autonomy_enabled=False` 注入测试环境；V2~V6 行为在开关关闭时逐字节一致。
 
+> **状态（2026-08-30）**：V7-001~008（P0 全部）+ V7-010/011 完成并推送（全量 858 passed）；
+> V7-009（P1，前端）按实现边界跳过，API 已就绪。实现期偏差见 `implementation-notes.md`。
+
 ## Task 列表
 
-### V7-001 Autonomy 域模型（P0）
+### V7-001 Autonomy 域模型（P0）✅ 9be2aec
 
 - **目标**：TriggerType/TriggerSignal/ProactiveActionType/ProactiveAction/AutonomyVerdict 模型 + PROACTIVE_INTENTION_MAP + IntentionType 注册 check_in。
 - **前置**：V6-005（IntentionType 枚举）。
@@ -15,7 +18,7 @@
 - **验收**：模型校验、非法值拒绝、配置组完整。
 - **测试**：`tests/unit/test_autonomy_models.py`。
 
-### V7-002 proactive_actions 表 + Repository（P0）
+### V7-002 proactive_actions 表 + Repository（P0）✅ 470943b（实际迁移编号 0011）
 
 - **目标**：迁移 0009 + proactive_repository（入队/取非终态/状态迁移/聚合查询 last_proactive+attempt）。
 - **前置**：V7-001。
@@ -24,7 +27,7 @@
 - **验收**：状态机迁移合法路径全覆盖；深度 1 查询正确。
 - **测试**：`tests/integration/test_proactive_repository.py`。
 
-### V7-003 AutonomyPolicy 纯函数（P0）
+### V7-003 AutonomyPolicy 纯函数（P0）✅ 5fe7e81
 
 - **目标**：evaluate() 八步裁决流水（生成标记/静音/冷却/上限/关系门槛/场景压制/动机/放行）+ 冷却退避计算。
 - **前置**：V7-001。
@@ -33,7 +36,7 @@
 - **验收**：矩阵 Case 4~7 全部表驱动通过；永远输出三值之一。
 - **测试**：`tests/unit/test_autonomy_policy.py`。
 
-### V7-004 TriggerEvaluator（P0）
+### V7-004 TriggerEvaluator（P0）✅ d3a51b2
 
 - **目标**：conversation_inactivity 判定 + episode/attempt 记账 + dedupe_key；scheduled_followup 接口预留。
 - **前置**：V7-001。
@@ -42,7 +45,7 @@
 - **验收**：矩阵 Case 1~3。
 - **测试**：`tests/unit/test_trigger_evaluator.py`。
 
-### V7-005 Proactive Chain（P0）
+### V7-005 Proactive Chain（P0）✅ b326e1e
 
 - **目标**：LLM 主动文本生成链（goal/intention 驱动，无用户消息）。
 - **前置**：V6-006（结构化链模式复用）。
@@ -51,7 +54,7 @@
 - **验收**：FakeLLM 生成；文本含 `{}` → 视同失败。
 - **测试**：`tests/unit/test_proactive_chain.py`。
 
-### V7-006 AutonomyEngine + Executor（P0）
+### V7-006 AutonomyEngine + Executor（P0）✅ 72b7c32
 
 - **目标**：trigger→policy→goal select→intention 映射→入队；Executor 锁内二次校验→生成→落库→delivered。
 - **前置**：V7-002~005。
@@ -60,7 +63,7 @@
 - **验收**：矩阵 Case 8~10；全程 trace 三 step。
 - **测试**：`tests/integration/test_proactive_executor.py`。
 
-### V7-007 Worker + API（P0）
+### V7-007 Worker + API（P0）✅ 6883bd3
 
 - **目标**：lifespan tick 循环（autonomy_enabled 开关）+ `GET /proactive/pending` + `POST /proactive/{id}/ack` + chat_pipeline 生成标记/冷却重置挂接。
 - **前置**：V7-006。
@@ -69,7 +72,7 @@
 - **验收**：开关关闭时零启动；pending/ack 端点契约。
 - **测试**：`tests/unit/test_autonomy_worker.py`、`tests/e2e/test_proactive_api.py`。
 
-### V7-008 十五项必测 + 全量回归（P0）
+### V7-008 十五项必测 + 全量回归（P0）✅ 084f397
 
 - **目标**：testing.md 矩阵全绿 + Scenario 1/2/3/5 全链。
 - **前置**：V7-007。
@@ -78,7 +81,7 @@
 - **验收**：全量 `uv run pytest tests/ -v` 通过；V2~V6 零回归；关闭开关后行为与 V6 一致。
 - **测试**：同左。
 
-### V7-009 前端轮询与展示（P1）
+### V7-009 前端轮询与展示（P1，未做——按实现边界禁止改前端，pending/ack API 契约已固化于 tests/e2e/test_proactive_api.py）
 
 - **目标**：前端 30s 轮询 pending → 主动消息气泡展示 → ack 上报。
 - **前置**：V7-007。
@@ -86,7 +89,7 @@
 - **验收**：主动消息以角色气泡自然呈现；Vitest 覆盖轮询/去重/ack。
 - **测试**：Vitest。
 
-### V7-010 scheduled_followup（P1，Memory Trigger）
+### V7-010 scheduled_followup（P1，Memory Trigger）✅ 09a32ea
 
 - **目标**：V4 记忆事件时间到期触发（Scenario 4："今天有面试"→傍晚 check_in）。
 - **前置**：V7-008。
@@ -95,7 +98,7 @@
 - **验收**：Scenario 4 全链；静音不豁免。
 - **测试**：时间注入单测。
 
-### V7-011 真实模型人工回归清单（P2，仅文档）
+### V7-011 真实模型人工回归清单（P2，仅文档）✅ regression-checklist.md（清单已交付；真人执行待办）
 
 - **目标**：docs/roleplay-v7/regression-checklist.md——主动行为自然度/打扰度/人格一致性/关闭开关对照。
 - **前置**：V7-009。
