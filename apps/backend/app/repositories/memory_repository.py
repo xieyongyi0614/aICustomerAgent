@@ -183,6 +183,21 @@ def list_by_user_v4(user_id: str, limit: int = 50) -> list[UserMemoryV4]:
         return [_to_user_memory_v4(row) for row in rows]
 
 
+def list_expired_active(now: datetime, limit: int = 500) -> list[UserMemoryV4]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory)
+            .filter(
+                Memory.status == "active",
+                Memory.expires_at.isnot(None),
+                Memory.expires_at < now,
+            )
+            .limit(limit)
+            .all()
+        )
+        return [_to_user_memory_v4(row) for row in rows]
+
+
 def get_memory(memory_id: str) -> UserMemory | None:
     with SessionLocal() as session:
         row = session.get(Memory, memory_id)

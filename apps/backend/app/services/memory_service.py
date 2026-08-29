@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -276,6 +277,37 @@ def _is_duplicate_content(content: str, seen: list[str]) -> bool:
         normalized == existing or normalized in existing or existing in normalized
         for existing in seen
     )
+
+
+def reclaim_expired_memories(now: datetime | None = None) -> int:
+    now = now or datetime.now()
+    try:
+        expired = repo.list_expired_active(now, limit=500)
+    except (ValueError, OSError, RuntimeError):
+        logger.exception("过期记忆读取失败，本轮回收跳过")
+        return 0
+    for memory in expired:
+        try:
+            repo.invalidate_memory(memory.id)
+        except (ValueError, OSError, RuntimeError):
+            logger.exception("过期记忆失效失败：%s", memory.id)
+    if expired:
+        logger.info("过期记忆回收：%d 条", len(expired))
+    return len(expired)
+
+
+async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
+    interval = (
+        interval_seconds
+        if interval_seconds is not None
+        else get_settings().memory_reclaim_interval_seconds
+    )
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            reclaim_expired_memories()
+        except Exception:
+            logger.exception("过期记忆回收循环异常，继续下一轮")
 
 
 def select_for_context(

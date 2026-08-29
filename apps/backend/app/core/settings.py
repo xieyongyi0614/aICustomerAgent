@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     memory_conflict_threshold: float = 0.6
     memory_min_confidence: float = 0.6
     memory_min_score: float = 0.15
+    memory_reclaim_interval_seconds: int = 3600
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
