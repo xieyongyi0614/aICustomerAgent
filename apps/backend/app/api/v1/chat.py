@@ -61,6 +61,12 @@ async def chat_message(
                         payload["scene_intent"] = event["scene_intent"].model_dump()
                     if "scene_state" in event:
                         payload["scene_state"] = event["scene_state"].model_dump()
+                    if "intention" in event:
+                        intention_payload = event["intention"].model_dump()
+                        intention_payload["type"] = intention_payload.pop("intention")
+                        payload["intention"] = intention_payload
+                    if event.get("current_goal") is not None:
+                        payload["current_goal"] = event["current_goal"]
                     yield _stream_json(payload)
                 elif kind == "token":
                     yield _stream_json({"delta": event["text"]})

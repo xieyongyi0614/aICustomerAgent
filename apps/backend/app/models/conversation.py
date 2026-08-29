@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.models.character_state import CharacterState
+from app.models.goal import GoalRecord
 from app.models.memory import UserMemoryV4
 from app.models.relationship import RelationshipState
 
@@ -21,3 +22,4 @@ class ConversationState(BaseModel):
     current_input: str
     character_state: CharacterState = CharacterState()
     relationship_state: RelationshipState = RelationshipState()
+    goals: list[GoalRecord] = []

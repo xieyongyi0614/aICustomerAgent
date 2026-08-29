@@ -12,6 +12,8 @@ TRACE_STEP_NAMES = (
     "role_router",
     "turn_analyzer",
     "scene_intent",
+    "intention",
+    "goal_selection",
     "scene_resolver",
     "scene_update",
     "memory_retrieval",
@@ -21,6 +23,7 @@ TRACE_STEP_NAMES = (
     "state_update",
     "emotion_update",
     "relationship_event",
+    "goal_review",
     "memory_extractor",
     "memory_extract",
     "memory_policy",
@@ -34,6 +37,7 @@ _BACKGROUND_STEPS = (
     "relationship_event",
     "memory_extractor",
     "scene_update",
+    "goal_review",
 )
 
 

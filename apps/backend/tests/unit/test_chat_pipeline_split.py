@@ -17,13 +17,14 @@ def test_background_tasks_set_shared_with_pipeline_registration():
     assert sentinel not in agent_service._background_tasks
 
 
-def test_post_process_registry_contains_v5_steps():
+def test_post_process_registry_contains_v5_v6_steps():
     from app.application.post_process import STEP_HANDLERS
 
     names = [h.__name__ for h in STEP_HANDLERS]
     assert names == [
         "run_scene_update",
         "run_state_update",
+        "run_goal_review",
         "run_summary",
         "run_memory_extract",
     ]

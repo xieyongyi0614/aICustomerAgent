@@ -99,6 +99,15 @@ def load_states(user_id: str) -> tuple[CharacterState, RelationshipState]:
     return decayed, relationship
 
 
+def load_last_user_emotion(user_id: str) -> str:
+    try:
+        entries = emotion_history_repository.list_recent(user_id, 1)
+        return entries[0].user_emotion if entries else "neutral"
+    except Exception:
+        logger.exception("最近用户情绪读取失败，按 neutral 处理")
+        return "neutral"
+
+
 async def apply_and_save(
     user_id: str,
     session_id: str,

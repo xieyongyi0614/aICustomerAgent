@@ -14,6 +14,7 @@ from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.services import (
     conversation_service,
+    goal_service,
     memory_service,
     scene_service,
     state_service,
@@ -38,6 +39,8 @@ class PostProcessContext:
     current_turn: int = 0
     llm: object | None = None
     trace: object | None = None
+    selected_goal: object | None = None
+    intention: object | None = None
 
 
 async def run_scene_update(ctx: PostProcessContext) -> None:
@@ -76,6 +79,40 @@ async def run_state_update(ctx: PostProcessContext) -> None:
         logger.exception("状态更新失败，不影响本轮回答")
         if ctx.trace is not None:
             ctx.trace.record("state_update", 0.0, "error", error="apply_and_save failed")
+
+
+async def run_goal_review(ctx: PostProcessContext) -> None:
+    started = time.perf_counter()
+    try:
+        character, relationship = state_service.load_states(ctx.user_id)
+        scene = scene_service.load(ctx.session_id)
+        executed = ctx.intention.intention if ctx.intention is not None else None
+        changes = goal_service.review(
+            ctx.user_id,
+            ctx.session_id,
+            ctx.analysis,
+            executed,
+            ctx.current_turn,
+            character=character,
+            relationship=relationship,
+            scene=scene,
+        )
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "goal_review", (time.perf_counter() - started) * 1000
+            )
+            if not changes.is_empty():
+                logger.info(
+                    "目标变更：created=%d completed=%d expired=%d cancelled=%d",
+                    len(changes.created),
+                    len(changes.completed),
+                    len(changes.expired),
+                    len(changes.cancelled),
+                )
+    except Exception:
+        logger.exception("目标评审失败，目标保持原状，下一轮重评")
+        if ctx.trace is not None:
+            ctx.trace.record("goal_review", 0.0, "error", error="goal review failed")
 
 
 async def run_summary(ctx: PostProcessContext) -> None:
@@ -124,6 +161,7 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
+    run_goal_review,
     run_summary,
     run_memory_extract,
 )
@@ -155,6 +193,8 @@ def schedule_post_process(
     current_turn: int = 0,
     llm=None,
     trace=None,
+    selected_goal=None,
+    intention=None,
 ) -> None:
     ctx = PostProcessContext(
         session_id=session_id,
@@ -168,6 +208,8 @@ def schedule_post_process(
         current_turn=current_turn,
         llm=llm,
         trace=trace,
+        selected_goal=selected_goal,
+        intention=intention,
     )
     task = asyncio.create_task(run_post_process(ctx))
     background_tasks.add(task)

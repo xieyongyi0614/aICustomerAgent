@@ -5,6 +5,7 @@ from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.relationship import RelationshipState
 from app.services import conversation_service
+from app.services import goal_service
 from app.services import memory_service
 from app.services import state_service
 from app.services import summary_service
@@ -42,6 +43,7 @@ async def build(
     if trace is not None:
         trace.record("memory_retrieval", (time.perf_counter() - started) * 1000)
     character_state, relationship_state = _load_states_with_fallback(user_id)
+    goals = goal_service.load_active(user_id)
     return ConversationState(
         session_id=session_id,
         user_id=user_id,
@@ -51,4 +53,5 @@ async def build(
         current_input=current_input,
         character_state=character_state,
         relationship_state=relationship_state,
+        goals=goals,
     )

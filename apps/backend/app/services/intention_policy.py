@@ -126,7 +126,11 @@ def enforce(
     now: datetime,
     scene_pending: bool = False,
 ) -> ValidatedIntention:
-    goal_id = selected_goal.goal.id if selected_goal is not None else None
+    goal_id = (
+        selected_goal.goal.id
+        if selected_goal is not None and selected_goal.goal is not None
+        else None
+    )
     if not isinstance(decision, IntentionDecision):
         return _fallback(goal_id, _DEGRADED_REASON)
 
