@@ -194,6 +194,49 @@ class SceneStateRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class GoalRow(Base):
+    __tablename__ = "character_goals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="asuna", server_default="asuna"
+    )
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="active", server_default="active"
+    )
+    horizon: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    created_turn: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    expires_at_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('user_care', 'relationship', 'conversation', 'scene')",
+            name="ck_character_goals_type",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'completed', 'expired', 'cancelled')",
+            name="ck_character_goals_status",
+        ),
+        CheckConstraint(
+            "horizon IN ('persistent', 'current')",
+            name="ck_character_goals_horizon",
+        ),
+        CheckConstraint(
+            "source IN ('definition', 'policy', 'scene')",
+            name="ck_character_goals_source",
+        ),
+        CheckConstraint("priority BETWEEN 1 AND 5", name="ck_character_goals_priority"),
+        Index("idx_character_goals_user_status", "user_id", "status"),
+    )
+
+
 class EmotionHistoryRow(Base):
     __tablename__ = "emotion_history"
 
