@@ -218,14 +218,6 @@ async def apply_and_save(
         energy_after=character.energy,
         stage_after=new_relationship.stage,
     )
-    try:
-        replayed = _replay_relationship_memories(
-            user_id, session_id, state, new_relationship, now
-        )
-        if replayed is not None:
-            relationship_repository.upsert_relationship(user_id, replayed)
-    except Exception:
-        logger.exception("记忆回放补记失败，跳过，不影响主流程")
 
 
 def _replay_type_for(content: str) -> str:
