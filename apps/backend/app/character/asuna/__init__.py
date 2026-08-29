@@ -1,5 +1,6 @@
 from app.character.asuna.behavior import BEHAVIOR_BLOCK
 from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
+from app.character.asuna.goals import PERSISTENT_GOALS
 from app.character.asuna.identity import IDENTITY_BLOCK
 from app.character.asuna.modes import MODE_INSTRUCTIONS
 from app.character.asuna.personality import PERSONALITY_BLOCK
@@ -12,6 +13,7 @@ __all__ = [
     "IDENTITY_BLOCK",
     "MODE_INSTRUCTIONS",
     "PERSONALITY_BLOCK",
+    "PERSISTENT_GOALS",
     "RELATIONSHIP_BLOCK",
     "STAGE_DESCRIPTIONS",
     "STAGE_LABELS",
