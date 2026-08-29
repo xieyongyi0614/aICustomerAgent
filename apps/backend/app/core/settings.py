@@ -79,6 +79,16 @@ class Settings(BaseSettings):
     memory_min_confidence: float = 0.6
     memory_min_score: float = 0.15
     memory_reclaim_interval_seconds: int = 3600
+
+    emotion_max_turn_delta: float = 0.4
+    emotion_strong_threshold: float = 0.6
+    emotion_switch_min_confidence: float = 0.8
+    emotion_inertia: float = 0.2
+    emotion_decay_strong: float = 0.20
+    emotion_decay_mild: float = 0.10
+    emotion_decay_floor: float = 0.15
+    emotion_rest_intensity: float = 0.3
+    emotion_strong_boundary: float = 0.5
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 

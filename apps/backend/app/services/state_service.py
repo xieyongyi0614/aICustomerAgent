@@ -17,8 +17,12 @@ from app.services import state_engine
 def load_states(user_id: str) -> tuple[CharacterState, RelationshipState]:
     character = character_state_repository.get_state(user_id)
     relationship = relationship_repository.get_relationship(user_id)
-    recovered = state_engine.apply_idle_recovery(character, datetime.now())
-    return recovered, relationship
+    now = datetime.now()
+    recovered = state_engine.apply_idle_recovery(character, now)
+    decayed = state_engine.apply_emotion_decay(recovered, now)
+    if decayed != recovered:
+        character_state_repository.upsert_state(user_id, decayed)
+    return decayed, relationship
 
 
 async def apply_and_save(

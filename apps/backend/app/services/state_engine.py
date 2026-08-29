@@ -2,7 +2,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState, EmotionLabel, StateUpdateDecision
-from app.models.emotion import EmotionEventType, TurnAnalysis
+from app.models.emotion import EmotionEvent, EmotionEventType, TurnAnalysis
 from app.models.relationship import RelationshipDelta, RelationshipState
 
 STAGE_ORDER = ("stranger", "friend", "close_friend", "partner")
@@ -60,6 +60,67 @@ ENERGY_BEHAVIOR_MODIFIERS: dict[str, float] = {
 
 def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+def update_emotion(
+    state: CharacterState, event: EmotionEvent, now: datetime
+) -> CharacterState:
+    settings = get_settings()
+    if event.type == "none":
+        return apply_emotion_decay(state, now)
+    spec = EMOTION_EVENTS[event.type]
+    target = spec["emotion"]
+    raw_delta = spec["delta"] * MAGNITUDE_COEFFICIENTS[event.magnitude]
+    if target == state.mood:
+        new_intensity = clamp(state.intensity + raw_delta, 0.0, 1.0)
+    else:
+        if (
+            state.intensity >= settings.emotion_strong_threshold
+            and event.confidence < settings.emotion_switch_min_confidence
+        ):
+            return state
+        new_intensity = clamp(
+            raw_delta + state.intensity * settings.emotion_inertia, 0.0, 1.0
+        )
+    max_delta = settings.emotion_max_turn_delta
+    if abs(new_intensity - state.intensity) > max_delta:
+        step = max_delta if new_intensity > state.intensity else -max_delta
+        new_intensity = clamp(state.intensity + step, 0.0, 1.0)
+    return state.model_copy(
+        update={
+            "mood": target,
+            "intensity": new_intensity,
+            "cause": event.cause or state.cause,
+            "last_event_at": now,
+            "updated_at": now,
+        }
+    )
+
+
+def apply_emotion_decay(
+    state: CharacterState, now: datetime
+) -> CharacterState:
+    settings = get_settings()
+    if state.last_event_at is None:
+        return state
+    elapsed_hours = (now - state.last_event_at).total_seconds() / 3600
+    if elapsed_hours <= 0:
+        return state
+    rate = (
+        settings.emotion_decay_strong
+        if state.intensity > settings.emotion_strong_boundary
+        else settings.emotion_decay_mild
+    )
+    decayed = state.intensity - rate * elapsed_hours
+    if decayed <= settings.emotion_decay_floor:
+        return state.model_copy(
+            update={
+                "mood": "calm",
+                "intensity": settings.emotion_rest_intensity,
+                "cause": "",
+            }
+        )
+    return state.model_copy(update={"intensity": clamp(decayed, 0.0, 1.0)})
 
 
 def apply_idle_recovery(state: CharacterState, now: datetime) -> CharacterState:
