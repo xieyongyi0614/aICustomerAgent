@@ -132,6 +132,9 @@ class RelationshipStateRow(Base):
     intimacy: Mapped[float] = mapped_column(Float, nullable=False)
     trust: Mapped[float] = mapped_column(Float, nullable=False)
     familiarity: Mapped[float] = mapped_column(Float, nullable=False)
+    tension: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0, server_default="0"
+    )
     stage: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

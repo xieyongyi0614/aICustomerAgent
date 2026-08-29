@@ -25,6 +25,19 @@ MAGNITUDE_COEFFICIENTS: dict[str, float] = {
     "strong": 1.4,
 }
 
+RELATIONSHIP_EVENT_DELTAS: dict[str, RelationshipDelta] = {
+    "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, tension=-0.02),
+    "user_help": RelationshipDelta(trust=0.05, intimacy=0.03, familiarity=0.02),
+    "long_interaction": RelationshipDelta(intimacy=0.01, familiarity=0.02),
+    "intimate_moment": RelationshipDelta(trust=0.02, intimacy=0.06, familiarity=0.01, tension=-0.01),
+    "praise": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, tension=-0.01),
+    "warm_moment": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, tension=-0.01),
+    "criticized": RelationshipDelta(trust=-0.03, tension=0.05),
+    "conflict": RelationshipDelta(intimacy=-0.12, trust=-0.10, familiarity=-0.05, tension=0.20),
+    "boundary_violation": RelationshipDelta(trust=-0.08, intimacy=-0.05, tension=0.15),
+    "none": RelationshipDelta(),
+}
+
 EVENT_DELTAS: dict[str, RelationshipDelta] = {
     "achievement": RelationshipDelta(intimacy=0.04, familiarity=0.02),
     "setback": RelationshipDelta(intimacy=0.03),

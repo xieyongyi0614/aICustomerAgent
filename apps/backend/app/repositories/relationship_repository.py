@@ -9,6 +9,7 @@ def _to_relationship(row: RelationshipStateRow) -> RelationshipState:
         intimacy=row.intimacy,
         trust=row.trust,
         familiarity=row.familiarity,
+        tension=row.tension,
         stage=row.stage,
         updated_at=row.updated_at,
     )
@@ -34,6 +35,7 @@ def upsert_relationship(
         row.intimacy = relationship.intimacy
         row.trust = relationship.trust
         row.familiarity = relationship.familiarity
+        row.tension = relationship.tension
         row.stage = relationship.stage
         row.updated_at = now
         session.commit()
