@@ -7,7 +7,7 @@ from app.core.settings import get_settings
 from app.main import app
 from app.services import agent_service
 from app.services import trace_collector as tc_module
-from app.services.trace_collector import get_trace_collector
+from app.services.trace_collector import TraceCollector, TurnTraceSession, get_trace_collector
 from tests.conftest import wait_until
 
 
