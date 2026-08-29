@@ -4,6 +4,7 @@ import type {
   ChatHistoryMessage,
   EmotionHistoryEntry,
   MemoryRecord,
+  RelationshipEventView,
   RelationshipView,
   StateSnapshot,
   TraceStep,
@@ -17,6 +18,7 @@ import type {
   MemoriesDto,
   MemoryItemDto,
   MessageItemDto,
+  RelationshipEventDto,
   RelationshipSnapshotDto,
   StateSnapshotDto,
   TraceStepDto,
@@ -30,6 +32,9 @@ function mapCharacterState(dto: CharacterStateSnapshotDto) {
     currentTopic: dto.current_topic,
     innerState: dto.inner_state,
     updatedAt: dto.updated_at,
+    intensity: dto.intensity ?? 0.3,
+    cause: dto.cause ?? "",
+    lastEventAt: dto.last_event_at ?? null,
   }
 }
 
@@ -38,9 +43,26 @@ function mapRelationship(dto: RelationshipSnapshotDto): RelationshipView {
     intimacy: dto.intimacy,
     trust: dto.trust,
     familiarity: dto.familiarity,
+    tension: dto.tension ?? 0.0,
     stage: dto.stage,
     updatedAt: dto.updated_at,
   }
+}
+
+function mapRelationshipEvents(
+  items: RelationshipEventDto[],
+): RelationshipEventView[] {
+  return items.map((item) => ({
+    type: item.type,
+    magnitude: item.magnitude,
+    impactTrust: item.impact_trust,
+    impactIntimacy: item.impact_intimacy,
+    impactFamiliarity: item.impact_familiarity,
+    impactTension: item.impact_tension,
+    source: item.source,
+    cause: item.cause,
+    createdAt: item.created_at,
+  }))
 }
 
 function mapEmotionHistory(items: StateSnapshotDto["emotion_history"]): EmotionHistoryEntry[] {
@@ -64,6 +86,7 @@ export async function fetchState(userId: string): Promise<StateSnapshot> {
     characterState: mapCharacterState(dto.character_state),
     relationship: mapRelationship(dto.relationship_state),
     emotionHistory: mapEmotionHistory(dto.emotion_history),
+    relationshipEvents: mapRelationshipEvents(dto.relationship_events ?? []),
   }
 }
 

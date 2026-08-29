@@ -3,18 +3,34 @@ import type { RoleMode, TurnAnalysis } from "./chat-meta"
 export type TraceStepStatus = "ok" | "warn" | "error"
 export type TurnTraceStatus = "pending" | "complete"
 
+export interface RelationshipEventView {
+  type: string
+  magnitude: string
+  impactTrust: number
+  impactIntimacy: number
+  impactFamiliarity: number
+  impactTension: number
+  source: string
+  cause: string
+  createdAt: string
+}
+
 export interface CharacterStateView {
   mood: string
   energy: number
   currentTopic: string
   innerState: string
   updatedAt: string | null
+  intensity: number
+  cause: string
+  lastEventAt: string | null
 }
 
 export interface RelationshipView {
   intimacy: number
   trust: number
   familiarity: number
+  tension: number
   stage: string
   updatedAt: string | null
 }
@@ -31,6 +47,7 @@ export interface EmotionHistoryEntry {
 }
 
 export interface StateSnapshot {
+  relationshipEvents: RelationshipEventView[]
   characterState: CharacterStateView
   relationship: RelationshipView
   emotionHistory: EmotionHistoryEntry[]

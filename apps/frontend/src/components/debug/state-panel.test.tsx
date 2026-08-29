@@ -35,6 +35,10 @@ describe("StatePanel", () => {
     )
 
     expect(screen.getByTestId("character-state-card")).toBeTruthy()
+    expect(screen.getByTestId("emotion-intensity")).toBeTruthy()
+    expect(screen.getByText("用户连续熬夜赶工")).toBeTruthy()
+    expect(screen.getByTestId("relationship-events-card")).toBeTruthy()
+    expect(screen.getAllByTestId("relationship-event-item")).toHaveLength(1)
     expect(screen.getByText("worried")).toBeTruthy()
     expect(screen.getByText("0.42")).toBeTruthy()
 

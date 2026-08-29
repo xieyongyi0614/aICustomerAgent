@@ -39,12 +39,16 @@ class CharacterStateOut(BaseModel):
     current_topic: str
     inner_state: str
     updated_at: datetime | None = None
+    intensity: float = 0.3
+    cause: str = ""
+    last_event_at: datetime | None = None
 
 
 class RelationshipStateOut(BaseModel):
     intimacy: float
     trust: float
     familiarity: float
+    tension: float = 0.0
     stage: str
     updated_at: datetime | None = None
 
@@ -60,10 +64,24 @@ class EmotionHistoryItem(BaseModel):
     created_at: datetime
 
 
+class RelationshipEventItem(BaseModel):
+    type: str
+    magnitude: str
+    impact_intimacy: float
+    impact_trust: float
+    impact_familiarity: float
+    impact_tension: float
+    confidence: float
+    source: str
+    cause: str
+    created_at: datetime
+
+
 class StateSnapshotOut(BaseModel):
     character_state: CharacterStateOut
     relationship_state: RelationshipStateOut
     emotion_history: list[EmotionHistoryItem]
+    relationship_events: list[RelationshipEventItem] = []
 
 
 class MessageItemOut(BaseModel):

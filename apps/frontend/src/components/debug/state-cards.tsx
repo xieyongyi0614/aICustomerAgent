@@ -51,6 +51,9 @@ function CharacterStateCard({
     currentTopic: string
     innerState: string
     updatedAt: string | null
+    intensity: number
+    cause: string
+    lastEventAt: string | null
   }
 }) {
   return (
@@ -73,6 +76,19 @@ function CharacterStateCard({
           </div>
           <MeterBar value={character.energy} toneClassName="bg-status-ok" />
         </div>
+        <div data-testid="emotion-intensity">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase text-fg-tertiary">intensity</span>
+            <span className="font-mono tabular-nums">{character.intensity.toFixed(2)}</span>
+          </div>
+          <MeterBar value={character.intensity} toneClassName="bg-status-warn" />
+        </div>
+        {character.cause ? (
+          <p className="leading-relaxed text-fg-tertiary">
+            <span className="font-mono text-[10px] uppercase">cause: </span>
+            {character.cause}
+          </p>
+        ) : null}
         <p>
           <span className="font-mono text-[10px] uppercase text-fg-tertiary">topic: </span>
           {character.currentTopic.length > 0 ? character.currentTopic : "—"}
@@ -87,6 +103,7 @@ function RelationshipCard({ relationship }: { relationship: RelationshipView }) 
   const dims = [
     { key: "intimacy", label: "亲密", value: relationship.intimacy, tone: "bg-rose-400" },
     { key: "trust", label: "信任", value: relationship.trust, tone: "bg-sky-400" },
+    { key: "tension", label: "紧张", value: relationship.tension, tone: "bg-amber-400" },
     {
       key: "familiarity",
       label: "熟悉",

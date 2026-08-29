@@ -6,12 +6,29 @@ export interface CharacterStateSnapshotDto {
   current_topic: string
   inner_state: string
   updated_at: string | null
+  intensity?: number
+  cause?: string
+  last_event_at?: string | null
+}
+
+export interface RelationshipEventDto {
+  type: string
+  magnitude: string
+  impact_intimacy: number
+  impact_trust: number
+  impact_familiarity: number
+  impact_tension: number
+  confidence: number
+  source: string
+  cause: string
+  created_at: string
 }
 
 export interface RelationshipSnapshotDto {
   intimacy: number
   trust: number
   familiarity: number
+  tension?: number
   stage: string
   updated_at: string | null
 }
@@ -29,6 +46,7 @@ export interface EmotionHistoryItemDto {
 
 export interface StateSnapshotDto {
   character_state: CharacterStateSnapshotDto
+  relationship_events?: RelationshipEventDto[]
   relationship_state: RelationshipSnapshotDto
   emotion_history: EmotionHistoryItemDto[]
 }

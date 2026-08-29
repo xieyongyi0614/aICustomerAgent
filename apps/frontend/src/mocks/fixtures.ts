@@ -51,14 +51,32 @@ export const RICH_USER = {
       current_topic: "用户的 Debug Console 项目",
       inner_state: "担心用户连续熬夜赶工",
       updated_at: hoursAgoIso(2),
+      intensity: 0.68,
+      cause: "用户连续熬夜赶工",
+      last_event_at: hoursAgoIso(2),
     },
     relationship_state: {
       intimacy: 0.56,
       trust: 0.58,
       familiarity: 0.51,
+      tension: 0.18,
       stage: "close_friend",
       updated_at: hoursAgoIso(2),
     },
+    relationship_events: [
+      {
+        type: "user_care",
+        magnitude: "normal",
+        impact_intimacy: 0.03,
+        impact_trust: 0.04,
+        impact_familiarity: 0.01,
+        impact_tension: -0.02,
+        confidence: 0.9,
+        source: "conversation",
+        cause: "用户主动关心角色",
+        created_at: hoursAgoIso(2),
+      },
+    ],
     emotion_history: [
       {
         user_emotion: "sad",

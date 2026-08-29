@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -80,6 +81,37 @@ function StatePanelInner({ userId }: { userId: string }) {
           <EmotionHistoryStrip entries={snapshot.emotionHistory} />
         </CardContent>
       </Card>
+
+      {snapshot.relationshipEvents.length > 0 ? (
+        <Card data-testid="relationship-events-card">
+          <CardHeader className="pb-1">
+            <CardTitle className="font-mono text-xs">Relationship Events</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-xs">
+            {snapshot.relationshipEvents.map((event) => (
+              <div
+                key={`${event.type}-${event.createdAt}`}
+                data-testid="relationship-event-item"
+                className="flex items-center gap-2"
+              >
+                <Badge variant="outline" className="font-mono">
+                  {event.type}
+                </Badge>
+                <span className="font-mono text-[10px] text-fg-tertiary">
+                  {event.magnitude}
+                </span>
+                <span className="font-mono text-[10px] text-fg-tertiary">
+                  {event.source}
+                </span>
+                <span className="ml-auto font-mono text-[10px] tabular-nums">
+                  trust {event.impactTrust >= 0 ? "+" : ""}
+                  {event.impactTrust.toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }
