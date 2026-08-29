@@ -21,19 +21,10 @@ from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.router import RoleMode
 from app.models.scene import SceneContext, SceneIntentResult
-from app.services import (
-    context_builder,
-    conversation_service,
-    memory_service,
-    scene_service,
-    state_service,
-    summary_service,
-    trace_collector,
-)
+from app.application.post_process import background_tasks, schedule_post_process
+from app.services import context_builder, conversation_service, scene_service, trace_collector
 
 logger = logging.getLogger(__name__)
-
-background_tasks: set = set()
 
 
 class EmptyLLMResponseError(Exception):
@@ -204,23 +195,19 @@ async def run_chat_pipeline(
     else:
         logger.warning("模型输出为空")
     ai_message_id = conversation_service.save_turn(session_id, content, reply)
-    task = asyncio.create_task(
-        _post_process(
-            session_id,
-            user_id,
-            content,
-            reply,
-            state,
-            turn,
-            scene_state=resolved_state,
-            scene_intent=scene_intent_result,
-            current_turn=current_turn,
-            llm=llm,
-            trace=trace,
-        )
+    schedule_post_process(
+        session_id,
+        user_id,
+        content,
+        reply,
+        state,
+        turn,
+        scene_state=resolved_state,
+        scene_intent=scene_intent_result,
+        current_turn=current_turn,
+        llm=llm,
+        trace=trace,
     )
-    background_tasks.add(task)
-    task.add_done_callback(background_tasks.discard)
     collector = trace_collector.get_trace_collector()
     collector.attach(trace, str(ai_message_id))
     yield {
@@ -229,76 +216,3 @@ async def run_chat_pipeline(
         "turn_id": str(ai_message_id),
     }
 
-
-async def _post_process(
-    session_id: str,
-    user_id: str,
-    user_input: str,
-    ai_reply: str,
-    state: ConversationState,
-    analysis: TurnAnalysis,
-    scene_state=None,
-    scene_intent=None,
-    current_turn: int = 0,
-    llm=None,
-    trace=None,
-) -> None:
-    if scene_state is not None and scene_intent is not None:
-        try:
-            await scene_service.update_and_persist(
-                session_id,
-                scene_state,
-                scene_intent.intent,
-                user_input,
-                ai_reply,
-                current_turn,
-                llm=llm,
-                trace=trace,
-            )
-        except Exception:
-            logger.exception("场景更新失败，保持上一轮状态")
-            if trace is not None:
-                trace.record(
-                    "scene_update", 0.0, "error", error="scene update failed"
-                )
-    try:
-        await state_service.apply_and_save(
-            user_id, session_id, state, analysis, user_input, ai_reply, llm=llm, trace=trace
-        )
-    except Exception:
-        logger.exception("状态更新失败，不影响本轮回答")
-        if trace is not None:
-            trace.record("state_update", 0.0, "error", error="apply_and_save failed")
-    try:
-        if conversation_service.message_count(session_id) >= get_settings().summary_threshold:
-            await summary_service.update(
-                session_id, [f"用户：{user_input}", f"亚丝娜：{ai_reply}"], llm=llm
-            )
-    except Exception:
-        logger.exception("摘要更新失败，不影响本轮回答")
-    started = time.perf_counter()
-    recent_turns = state.messages[-get_settings().memory_recent_context_messages :]
-    recent_context = "\n".join(
-        f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
-        for m in recent_turns
-    )
-    try:
-        await memory_service.extract_and_save(
-            user_id,
-            user_input,
-            ai_reply,
-            llm=llm,
-            trace=trace,
-            recent_context=recent_context,
-        )
-        if trace is not None:
-            trace.record("memory_extractor", (time.perf_counter() - started) * 1000)
-    except Exception:
-        logger.exception("记忆提取失败，不影响本轮回答")
-        if trace is not None:
-            trace.record(
-                "memory_extractor",
-                (time.perf_counter() - started) * 1000,
-                "error",
-                error="extract_and_save failed",
-            )

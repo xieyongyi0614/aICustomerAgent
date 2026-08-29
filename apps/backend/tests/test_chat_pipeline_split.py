@@ -15,3 +15,57 @@ def test_background_tasks_set_shared_with_pipeline_registration():
     assert sentinel in agent_service._background_tasks
     chat_pipeline.background_tasks.discard(sentinel)
     assert sentinel not in agent_service._background_tasks
+
+
+def test_post_process_registry_contains_v5_steps():
+    from app.application.post_process import STEP_HANDLERS
+
+    names = [h.__name__ for h in STEP_HANDLERS]
+    assert names == [
+        "run_scene_update",
+        "run_state_update",
+        "run_summary",
+        "run_memory_extract",
+    ]
+
+
+def test_post_process_step_isolation(db_session_factory, monkeypatch):
+    import asyncio
+
+    from app.application.post_process import (
+        PostProcessContext,
+        run_memory_extract,
+        run_state_update,
+    )
+    from app.models.conversation import ChatMessage, ConversationState
+    from app.services.trace_collector import TurnTraceSession
+    from tests.conftest import FakeLLM
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("state down")
+
+    import app.services.state_service as state_service_module
+
+    monkeypatch.setattr(state_service_module.state_update_chain, "update", boom)
+    ctx = PostProcessContext(
+        session_id="s-iso",
+        user_id="u-iso",
+        user_input="x",
+        ai_reply="y",
+        state=ConversationState(
+            session_id="s-iso",
+            user_id="u-iso",
+            messages=[ChatMessage(role="human", content="x")],
+            summary=None,
+            memories=[],
+            current_input="x",
+        ),
+        analysis=None,
+        llm=FakeLLM(structured_responses={"MemoryExtraction": {"candidates": []}}),
+        trace=TurnTraceSession(),
+    )
+    asyncio.run(run_state_update(ctx))
+    asyncio.run(run_memory_extract(ctx))
+    steps = {s.name: s.status for s in ctx.trace.steps}
+    assert steps.get("state_update") == "error"
+    assert steps.get("memory_extract") == "ok" or "memory_extract" in steps
