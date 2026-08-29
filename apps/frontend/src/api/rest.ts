@@ -94,6 +94,11 @@ function mapMemory(dto: MemoryItemDto): MemoryRecord {
     importance: dto.importance,
     createdAt: dto.created_at,
     hitThisTurn: false,
+    type: dto.type ?? dto.memory_type,
+    status: dto.status ?? "active",
+    source: dto.source,
+    confidence: dto.confidence,
+    supersededBy: dto.superseded_by ?? null,
   }
 }
 

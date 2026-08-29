@@ -53,6 +53,12 @@ export interface MemoryItemDto {
   importance: number
   created_at: string
   updated_at: string
+  character_id?: string
+  type?: string
+  confidence?: number
+  source?: string
+  status?: "active" | "superseded" | "invalidated"
+  superseded_by?: string | null
 }
 
 export interface MemoriesDto {

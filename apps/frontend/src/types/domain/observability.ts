@@ -43,6 +43,8 @@ export interface ChatHistoryMessage {
   createdAt: string
 }
 
+export type MemoryStatus = "active" | "superseded" | "invalidated"
+
 export interface MemoryRecord {
   id: string
   memory: string
@@ -50,6 +52,11 @@ export interface MemoryRecord {
   importance: number
   createdAt: string
   hitThisTurn: boolean
+  type?: string
+  status?: MemoryStatus
+  source?: string
+  confidence?: number
+  supersededBy?: string | null
 }
 
 export interface TraceStep {

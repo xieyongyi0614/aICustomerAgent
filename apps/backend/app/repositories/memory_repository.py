@@ -171,6 +171,18 @@ def list_active_v4(
         return [_to_user_memory_v4(row) for row in rows]
 
 
+def list_by_user_v4(user_id: str, limit: int = 50) -> list[UserMemoryV4]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory)
+            .filter(Memory.user_id == user_id)
+            .order_by(Memory.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_user_memory_v4(row) for row in rows]
+
+
 def get_memory(memory_id: str) -> UserMemory | None:
     with SessionLocal() as session:
         row = session.get(Memory, memory_id)

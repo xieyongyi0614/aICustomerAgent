@@ -143,6 +143,25 @@ def test_memories_isolated_by_user_after_roundtrip(client):
     assert other["memories"] == []
 
 
+def test_memories_endpoint_exposes_v4_lifecycle_fields(client):
+    assert client.get("/api/v1/memories").json()["memories"] == []
+    resp = _post_message(client, "我喜欢寿司")
+    assert resp.status_code == 200
+    assert wait_until(
+        lambda: any(
+            m.memory == "用户喜欢寿司"
+            for m in memory_repository.list_by_user("default-user")
+        )
+    )
+    item = client.get("/api/v1/memories").json()["memories"][0]
+    assert item["type"] == "user_preference"
+    assert item["memory_type"] == "user_preference"
+    assert item["status"] == "active"
+    assert item["source"] == "user_stated"
+    assert item["character_id"] == "asuna"
+    assert item["confidence"] >= 0.0
+
+
 def test_messages_endpoint_does_not_create_conversation(client):
     before = conversation_repository.find_conversation("ghost-session")
     assert before is None

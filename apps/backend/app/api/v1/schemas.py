@@ -86,6 +86,12 @@ class MemoryItemOut(BaseModel):
     importance: float
     created_at: datetime
     updated_at: datetime
+    character_id: str = "asuna"
+    type: str | None = None
+    confidence: float = 0.0
+    source: str = "ai_inferred"
+    status: str = "active"
+    superseded_by: str | None = None
 
 
 class MemoriesOut(BaseModel):

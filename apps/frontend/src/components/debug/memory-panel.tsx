@@ -12,12 +12,15 @@ import { useMemories } from "@/hooks/use-observability"
 
 const CONTENT_PREVIEW_LENGTH = 24
 
-function MemoryItem({ item }: { item: MemoryRecord }) {
+function MemoryItem({ item, historical = false }: { item: MemoryRecord; historical?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const needsTruncation = item.memory.length > CONTENT_PREVIEW_LENGTH
 
   return (
-    <li className="rounded-md border border-border p-2.5" data-testid="memory-item">
+    <li
+      className={cn("rounded-md border border-border p-2.5", historical && "opacity-60")}
+      data-testid={historical ? "memory-history-item" : "memory-item"}
+    >
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
@@ -30,9 +33,25 @@ function MemoryItem({ item }: { item: MemoryRecord }) {
         >
           {item.memory}
         </button>
-        <Badge variant="outline" className={cn("shrink-0 font-mono", "bg-slate-400/15 text-slate-300 border-slate-400/40")}>
-          {item.memoryType}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          {item.status && item.status !== "active" ? (
+            <Badge
+              variant="outline"
+              data-testid={`memory-status-${item.id}`}
+              className={cn(
+                "font-mono",
+                item.status === "superseded"
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                  : "bg-red-500/15 text-red-300 border-red-500/40",
+              )}
+            >
+              {item.status === "superseded" ? "已替代" : "已失效"}
+            </Badge>
+          ) : null}
+          <Badge variant="outline" className={cn("shrink-0 font-mono", "bg-slate-400/15 text-slate-300 border-slate-400/40")}>
+            {item.memoryType}
+          </Badge>
+        </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <span className="font-mono text-[10px] uppercase text-fg-tertiary">imp</span>
@@ -49,6 +68,17 @@ function MemoryItem({ item }: { item: MemoryRecord }) {
         <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
           {item.importance.toFixed(2)}
         </span>
+        {item.confidence !== undefined ? (
+          <>
+            <span className="font-mono text-[10px] uppercase text-fg-tertiary">conf</span>
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              {item.confidence.toFixed(2)}
+            </span>
+          </>
+        ) : null}
+        {item.source ? (
+          <span className="font-mono text-[10px] text-fg-tertiary">{item.source}</span>
+        ) : null}
         <span className="ml-auto font-mono text-[10px] text-fg-tertiary">
           {formatRelativeTime(new Date(item.createdAt).getTime())}
         </span>
@@ -167,11 +197,29 @@ function MemoryPanelInner({
             还没有长期记忆——聊点个人偏好试试
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {query.data.map((item) => (
-              <MemoryItem key={item.id} item={item} />
-            ))}
-          </ul>
+          <div className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-2">
+              {query.data
+                .filter((item) => (item.status ?? "active") === "active")
+                .map((item) => (
+                  <MemoryItem key={item.id} item={item} />
+                ))}
+            </ul>
+            {query.data.some((item) => (item.status ?? "active") !== "active") ? (
+              <div data-testid="memory-history-group">
+                <p className="font-mono text-[10px] uppercase text-fg-tertiary">
+                  历史记忆（已替代 / 已失效）
+                </p>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {query.data
+                    .filter((item) => (item.status ?? "active") !== "active")
+                    .map((item) => (
+                      <MemoryItem key={item.id} item={item} historical />
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         )
       ) : null}
 

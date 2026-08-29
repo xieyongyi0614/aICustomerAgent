@@ -68,6 +68,26 @@ describe("MemoryPanel", () => {
     expect(content.className).not.toContain("truncate")
   })
 
+  it("groups superseded memories into the history section with status badge", async () => {
+    renderPanel({ userId: "rich-user" })
+    await waitFor(() =>
+      expect(screen.getAllByTestId("memory-item")).toHaveLength(2),
+    )
+    expect(screen.getByTestId("memory-history-group")).toBeTruthy()
+    expect(screen.getAllByTestId("memory-history-item")).toHaveLength(1)
+    expect(screen.getByTestId("memory-status-m-3").textContent).toBe("已替代")
+  })
+
+  it("shows source and confidence for v4 memories", async () => {
+    renderPanel({ userId: "rich-user" })
+    await waitFor(() =>
+      expect(screen.getAllByTestId("memory-item")).toHaveLength(2),
+    )
+    expect(screen.getAllByText("conf").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("0.95").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("user_stated").length).toBeGreaterThan(0)
+  })
+
   it("shows empty guide for fresh persona", async () => {
     renderPanel({ userId: "empty-user" })
     await waitFor(() => expect(screen.getByTestId("memory-empty")).toBeTruthy())

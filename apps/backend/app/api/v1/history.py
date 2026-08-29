@@ -51,18 +51,24 @@ def list_memories(
     limit: int = Query(default=50, ge=1, le=200),
 ):
     _ = conversation_id
-    items = memory_repository.list_by_user(user_id, limit=limit)
+    items = memory_repository.list_by_user_v4(user_id, limit=limit)
     return MemoriesOut(
         user_id=user_id,
         memories=[
             MemoryItemOut(
                 id=item.id,
                 user_id=item.user_id,
-                memory=item.memory,
-                memory_type=item.memory_type,
+                memory=item.content,
+                memory_type=item.type,
+                type=item.type,
                 importance=item.importance,
                 created_at=item.created_at,
                 updated_at=item.updated_at,
+                character_id=item.character_id,
+                confidence=item.confidence,
+                source=item.source,
+                status=item.status,
+                superseded_by=item.superseded_by,
             )
             for item in items
         ],
