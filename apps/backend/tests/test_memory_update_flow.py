@@ -156,3 +156,72 @@ def test_policy_report_contract():
     assert report.saved == []
     assert report.privacy_items == []
     assert report.discarded == []
+
+
+async def test_forget_retries_once_then_succeeds(db_session_factory, monkeypatch):
+    existing = repo.create_memory_v4(
+        "u1", "asuna", "用户喜欢咖啡", "user_preference", 0.8, 0.9
+    )
+    trace = TurnTraceSession()
+    llm = FakeLLM(
+        structured_responses=_extraction(
+            [
+                {
+                    "action": "forget",
+                    "type": "user_preference",
+                    "content": "用户喜欢咖啡",
+                    "importance": 0.5,
+                    "confidence": 0.95,
+                    "source": "user_stated",
+                }
+            ]
+        )
+    )
+    calls = {"n": 0}
+    original_delete = memory_service.repo.forget_memory
+
+    def flaky(memory_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("delete down")
+        original_delete(memory_id)
+
+    monkeypatch.setattr(memory_service.repo, "forget_memory", flaky)
+    await memory_service.extract_and_save(
+        "u1", "忘了吧", "好的", llm=llm, trace=trace
+    )
+    assert calls["n"] == 2
+    assert repo.get_memory_v4(existing.id) is None
+    assert _step(trace, "memory_privacy").status == "ok"
+
+
+async def test_forget_failure_after_retry_visible_in_trace(db_session_factory, monkeypatch):
+    repo.create_memory_v4(
+        "u1", "asuna", "用户喜欢咖啡", "user_preference", 0.8, 0.9
+    )
+    trace = TurnTraceSession()
+    llm = FakeLLM(
+        structured_responses=_extraction(
+            [
+                {
+                    "action": "forget",
+                    "type": "user_preference",
+                    "content": "用户喜欢咖啡",
+                    "importance": 0.5,
+                    "confidence": 0.95,
+                    "source": "user_stated",
+                }
+            ]
+        )
+    )
+
+    def boom(memory_id):
+        raise RuntimeError("delete down")
+
+    monkeypatch.setattr(memory_service.repo, "forget_memory", boom)
+    await memory_service.extract_and_save(
+        "u1", "忘了吧", "好的", llm=llm, trace=trace
+    )
+    step = _step(trace, "memory_privacy")
+    assert step.status == "error"
+    assert step.error == "RuntimeError"

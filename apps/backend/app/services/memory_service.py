@@ -105,36 +105,55 @@ async def extract_and_save(
         await _execute_outcome(user_id, character_id, outcome)
 
 
+FORGET_MAX_ATTEMPTS = 2
+
+
 async def _execute_forget(
     user_id: str, character_id: str, item: MemoryCandidate, trace=None
 ) -> None:
-    try:
-        active = repo.list_active_v4(user_id, character_id, limit=200)
-        target = (item.content or "").strip()
-        matched = [
-            memory
-            for memory in active
-            if target
-            and (
-                target == memory.content.strip()
-                or target in memory.content
-                or memory.content in target
-            )
-        ]
-        if not matched:
-            logger.warning(
-                "forget 未匹配到任何记忆，不猜测删除：预览=%s",
-                content_preview(item.content),
-            )
+    for attempt in range(1, FORGET_MAX_ATTEMPTS + 1):
+        try:
+            active = repo.list_active_v4(user_id, character_id, limit=200)
+            target = (item.content or "").strip()
+            matched = [
+                memory
+                for memory in active
+                if target
+                and (
+                    target == memory.content.strip()
+                    or target in memory.content
+                    or memory.content in target
+                )
+            ]
+            if not matched:
+                logger.warning(
+                    "forget 未匹配到任何记忆，不猜测删除：预览=%s",
+                    content_preview(item.content),
+                )
+                if trace is not None:
+                    trace.record(
+                        "memory_privacy", 0.0, "miss", error="forget target not found"
+                    )
+                return
+            for memory in matched:
+                repo.forget_memory(memory.id)
             if trace is not None:
-                trace.record("memory_privacy", 0.0, "miss", error="forget target not found")
+                trace.record("memory_privacy", 0.0)
             return
-        for memory in matched:
-            repo.forget_memory(memory.id)
-        if trace is not None:
-            trace.record("memory_privacy", 0.0)
-    except Exception:
-        logger.exception("forget 执行失败，不影响本轮回答")
+        except Exception as exc:
+            logger.exception("forget 执行失败（第 %d 次）", attempt)
+            if attempt == FORGET_MAX_ATTEMPTS:
+                if trace is not None:
+                    trace.record(
+                        "memory_privacy",
+                        0.0,
+                        "error",
+                        error=exc.__class__.__name__,
+                    )
+                logger.error(
+                    "用户遗忘指令执行失败已重试仍失败，需人工关注：预览=%s",
+                    content_preview(item.content),
+                )
 
 
 async def _execute_outcome(
