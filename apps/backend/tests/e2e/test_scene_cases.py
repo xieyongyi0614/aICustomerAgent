@@ -23,12 +23,6 @@ def _structured(intent="continue_scene", action_decision=None):
             "inner_state": "",
             "current_topic": "",
         },
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        },
         "SceneIntentResult": {"intent": intent, "confidence": 0.9, "reason": "x"},
         "SceneActionDecision": action_decision
         or {

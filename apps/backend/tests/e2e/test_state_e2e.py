@@ -31,12 +31,6 @@ def _structured(event, behavior, emotion, mood="calm", emotion_event=None):
             "inner_state": "平稳",
             "current_topic": "测试话题",
         },
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        },
     }
     if emotion_event is not None:
         payload["TurnAnalysis"]["emotion_event"] = emotion_event

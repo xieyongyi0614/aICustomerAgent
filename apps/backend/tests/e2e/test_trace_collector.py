@@ -29,12 +29,6 @@ def _structured(**overrides):
             "inner_state": "开心",
             "current_topic": "项目上线",
         },
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        },
     }
     payload.update(overrides)
     return payload

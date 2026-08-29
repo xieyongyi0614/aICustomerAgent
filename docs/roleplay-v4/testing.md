@@ -4,6 +4,8 @@
 
 沿用现有约定：pytest + pytest-asyncio、FakeLLM（`set_llm` 注入）、单元测试内存 SQLite、HTTP/e2e 连 PostgreSQL。测试禁止真实 LLM。
 
+> 2026-08-29 测试瘦身：原聚合文件 `tests/e2e/test_memory_matrix.py` 已删除，10 项矩阵的断言由细粒度文件承载（`tests/integration/test_memory.py`、`test_memory_retrieval.py`、`test_memory_e2e.py` 等），覆盖面无损失。
+
 ## 2. 测试矩阵（10 项必测）
 
 | # | Case | 层 | 断言 |

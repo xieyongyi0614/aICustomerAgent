@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from app.core import llm_factory
 from app.main import app
 from app.repositories import memory_repository as repo
-from app.services.trace_collector import get_trace_collector
 from tests.conftest import FakeLLM, wait_until
 
 
@@ -94,29 +93,5 @@ def test_memory_roundtrip_across_turns(db_session_factory, fake_llm):
             assert resp2.status_code == 200
             prompt_texts = [str(m) for m in recall_llm.seen_messages]
             assert any("用户喜欢西瓜" in t for t in prompt_texts)
-    finally:
-        llm_factory.reset_llm()
-
-
-def test_trace_records_memory_pipeline_steps(db_session_factory, fake_llm):
-    llm = fake_llm(
-        response=["好的"],
-        structured_responses=_extraction([_save_candidate("用户喜欢西瓜")]),
-    )
-    llm_factory.set_llm(llm)
-    try:
-        with _client() as client:
-            resp = client.post("/api/v1/chat/message", json={"content": "我喜欢西瓜"})
-            events = _parse_stream(resp.text)
-            final = events[-1]
-            turn_id = final["turn_id"]
-            assert wait_until(
-                lambda: (
-                    get_trace_collector().get(turn_id) is not None
-                    and any(s.name == "memory_extractor" for s in get_trace_collector().get(turn_id).steps)
-                )
-            )
-            names = {s.name for s in get_trace_collector().get(turn_id).steps}
-            assert {"memory_extractor", "memory_extract", "memory_policy", "memory_conflict"} <= names
     finally:
         llm_factory.reset_llm()

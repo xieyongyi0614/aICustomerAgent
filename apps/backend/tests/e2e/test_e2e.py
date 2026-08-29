@@ -20,15 +20,8 @@ def _parse_stream(text):
     return [json.loads(line) for line in text.strip().splitlines()]
 
 
-_LEGACY_TYPE_MAP = {
-    "preference": "user_preference",
-    "fact": "user_fact",
-    "goal": "user_fact",
-    "experience": "important_event",
-    "relationship": "relationship_event",
-}
-def _structured_responses(**memory):
-    base = {
+def _structured_responses():
+    return {
         "RoleMode": {
             "mode": "default",
             "intent": "casual",
@@ -36,20 +29,6 @@ def _structured_responses(**memory):
             "reason": "hi",
         },
     }
-    candidates = []
-    if memory.get("should_save") and memory.get("memory"):
-        candidates = [
-            {
-                "action": "save",
-                "type": _LEGACY_TYPE_MAP.get(memory.get("memory_type", "preference"), "user_preference"),
-                "content": memory.get("memory"),
-                "importance": memory.get("importance", 0.0),
-                "confidence": 0.9,
-                "source": "user_stated",
-            }
-        ]
-    base["MemoryExtraction"] = {"candidates": candidates}
-    return base
 
 
 def test_health(client_fixture):
@@ -119,40 +98,6 @@ def test_second_turn_knows_first(client_fixture, db_session_factory, fake_llm):
     )
 
 
-def test_memory_roundtrip(client_fixture, db_session_factory, fake_llm):
-    llm_factory.set_llm(
-        fake_llm(
-            response=["好的"],
-            structured_responses=_structured_responses(
-                should_save=True,
-                memory="用户喜欢寿司",
-                memory_type="preference",
-                importance=0.8,
-            ),
-        )
-    )
-    resp = client_fixture.post("/api/v1/chat/message", json={"content": "我喜欢寿司"})
-    session_id = resp.headers.get("x-session-id")
-    assert resp.status_code == 200
-    assert wait_until(
-        lambda: any(
-            m.memory == "用户喜欢寿司"
-            for m in memory_repository.list_by_user("default-user")
-        )
-    )
-
-    llm = fake_llm(
-        response=["嗯"],
-        structured_responses=_structured_responses(),
-    )
-    llm_factory.set_llm(llm)
-    client_fixture.post(
-        "/api/v1/chat/message",
-        json={"session_id": session_id, "content": "晚上想吃寿司"},
-    )
-    assert wait_until(lambda: any("用户喜欢寿司" in str(m) for m in llm.seen_messages))
-
-
 def test_summary_trigger_after_threshold(
     client_fixture, db_session_factory, fake_llm, override_settings
 ):
@@ -214,12 +159,6 @@ def test_router_low_confidence_degrades_to_default(
                 "confidence": 0.3,
                 "reason": "不确定用户意图",
             },
-            "MemoryDecision": {
-                "should_save": False,
-                "memory": None,
-                "memory_type": "preference",
-                "importance": 0.0,
-            },
         },
     )
     llm_factory.set_llm(llm)
@@ -240,12 +179,6 @@ def test_router_high_confidence_keeps_mode(
                 "intent": "technical",
                 "confidence": 0.9,
                 "reason": "明确的编程问题",
-            },
-            "MemoryDecision": {
-                "should_save": False,
-                "memory": None,
-                "memory_type": "preference",
-                "importance": 0.0,
             },
         },
     )

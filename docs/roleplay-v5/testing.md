@@ -4,6 +4,8 @@
 
 沿用：pytest + pytest-asyncio、FakeLLM 注入、单元测试内存 SQLite、HTTP/e2e 连 PostgreSQL、测试禁止真实 LLM。
 
+> 2026-08-29 测试瘦身：`tests/e2e/test_v5_matrix.py` 仅保留 Case 12（场景不受 V5 影响）与 Case 16（prompt 分节顺序）两例，其余 Case 的断言由细粒度文件承载（`test_emotion_update` / `test_emotion_decay` / `test_relationship_update` / `test_relationship_stage` / `test_state_engine` / `test_memory_replay` / `test_v5_e2e`），覆盖面无损失。
+
 ## 2. 测试矩阵（17 项必测）
 
 ### Emotion（1~5）

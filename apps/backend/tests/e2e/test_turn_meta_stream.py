@@ -49,14 +49,7 @@ def meta_http_server():
 
 
 def _structured(role_mode=None, turn_analysis=None):
-    payload = {
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        }
-    }
+    payload = {}
     if role_mode is not None:
         payload["RoleMode"] = role_mode
     if turn_analysis is not None:

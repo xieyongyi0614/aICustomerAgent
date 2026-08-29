@@ -67,11 +67,17 @@ llm = FakeLLM(
             "inner_state": "担心用户熬夜赶工",
             "current_topic": "用户的调试控制台项目",
         },
-        "MemoryDecision": {
-            "should_save": True,
-            "memory": "用户正在开发 Character Agent Debug Console",
-            "memory_type": "goal",
-            "importance": 0.85,
+        "MemoryExtraction": {
+            "candidates": [
+                {
+                    "action": "save",
+                    "type": "user_fact",
+                    "content": "用户正在开发 Character Agent Debug Console",
+                    "importance": 0.85,
+                    "confidence": 0.9,
+                    "source": "user_stated",
+                }
+            ]
         },
     },
 )

@@ -21,17 +21,6 @@ def _turn_analysis(event="setback", behavior="comfort", emotion="sad"):
     }
 
 
-def _memory_decision():
-    return {
-        "MemoryDecision": {
-            "should_save": False,
-            "memory": None,
-            "memory_type": "preference",
-            "importance": 0.0,
-        }
-    }
-
-
 async def _collect(session_id, content, llm):
     chunks = []
     async for event in agent_service.stream_chat(
@@ -50,7 +39,6 @@ async def test_stream_chat_injects_state_and_behavior_sections(
         structured_responses={
             **_role_mode(),
             **_turn_analysis(event="setback", behavior="comfort"),
-            **_memory_decision(),
         },
     )
     reply = await _collect("s-v2-1", "我今天压力很大", llm)
@@ -66,7 +54,7 @@ async def test_stream_chat_injects_state_and_behavior_sections(
 async def test_stream_chat_degrades_analysis_failure(db_session_factory, fake_llm):
     llm = fake_llm(
         response=["嗯"],
-        structured_responses={**_role_mode(), **_memory_decision()},
+        structured_responses={**_role_mode()},
         structured_errors={"TurnAnalysis": RuntimeError("analysis boom")},
     )
     reply = await _collect("s-v2-2", "我今天压力很大", llm)
@@ -80,7 +68,7 @@ async def test_stream_chat_degrades_analysis_failure(db_session_factory, fake_ll
 async def test_stream_chat_degrades_analysis_none_output(db_session_factory, fake_llm):
     llm = fake_llm(
         response=["嗯"],
-        structured_responses={**_role_mode(), **_memory_decision()},
+        structured_responses={**_role_mode()},
     )
     reply = await _collect("s-v2-3", "随便聊聊", llm)
     assert reply == "嗯"
@@ -90,7 +78,7 @@ async def test_stream_chat_degrades_analysis_none_output(db_session_factory, fak
 async def test_stream_chat_degrades_router_failure(db_session_factory, fake_llm):
     llm = fake_llm(
         response=["嗯"],
-        structured_responses={**_turn_analysis(), **_memory_decision()},
+        structured_responses={**_turn_analysis()},
         structured_errors={"RoleMode": RuntimeError("router boom")},
     )
     reply = await _collect("s-v2-4", "Python 报错", llm)

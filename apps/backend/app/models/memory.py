@@ -26,19 +26,6 @@ LEGACY_MEMORY_TYPE_MAP = {
 TARGETED_ACTIONS = ("update", "invalidate")
 
 
-class MemoryDecision(BaseModel):
-    should_save: bool
-    memory: str | None
-    memory_type: MemoryType
-    importance: float
-
-    @model_validator(mode="after")
-    def validate_memory(self):
-        if self.should_save and not self.memory:
-            raise ValueError("should_save=True 时 memory 必填")
-        return self
-
-
 class UserMemory(BaseModel):
     id: str
     user_id: str
