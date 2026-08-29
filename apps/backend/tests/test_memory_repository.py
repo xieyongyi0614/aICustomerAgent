@@ -199,3 +199,14 @@ class TestLegacyCompat:
         fetched = repo.get_memory(memory.id)
         assert fetched is not None
         assert fetched.memory_type == "fact"
+
+
+    def test_create_memory_v4_and_supersede_single_transaction(self, db_session_factory):
+        old = repo.create_memory_v4("u-atom2", "asuna", "喜欢咖啡", "user_preference", 0.8, 0.9)
+        new = repo.create_memory_v4_and_supersede(
+            "u-atom2", "asuna", "喜欢喝茶", "user_preference", 0.8, 0.9,
+            superseded_id=old.id,
+        )
+        assert repo.get_memory_v4(old.id).status == "superseded"
+        assert repo.get_memory_v4(old.id).superseded_by == new.id
+        assert repo.get_memory_v4(new.id).status == "active"

@@ -170,7 +170,7 @@ async def _execute_outcome(
                 outcome.target_id, candidate.content, candidate.importance
             )
         elif outcome.action == ACTION_SUPERSEDE:
-            new_row = repo.create_memory_v4(
+            repo.create_memory_v4_and_supersede(
                 user_id,
                 character_id,
                 candidate.content,
@@ -178,8 +178,8 @@ async def _execute_outcome(
                 candidate.importance,
                 confidence=candidate.confidence,
                 source=candidate.source,
+                superseded_id=outcome.target_id,
             )
-            repo.supersede_memory(outcome.target_id, new_row.id)
         elif outcome.action == ACTION_INVALIDATE:
             repo.invalidate_memory(outcome.target_id)
         elif outcome.action == ACTION_DISCARD_PAIR:

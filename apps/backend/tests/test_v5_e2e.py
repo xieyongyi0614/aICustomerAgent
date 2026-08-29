@@ -161,7 +161,9 @@ class TestOrchestrationPipeline:
             raise RuntimeError("rel down")
 
         monkeypatch.setattr(
-            state_service.relationship_event_repository, "create_event", boom
+            state_service.relationship_repository,
+            "commit_relationship_update",
+            boom,
         )
         llm = FakeLLM(structured_responses={"StateUpdateDecision": DECISION})
         original = make_conversation_state()
@@ -169,6 +171,7 @@ class TestOrchestrationPipeline:
         relationship = relationship_repository.get_relationship("u1")
         assert relationship.trust == pytest.approx(0.35)
         assert relationship.tension == pytest.approx(0.0)
+        assert relationship_event_repository.count_events("u1") == 0
 
     @pytest.mark.asyncio
     async def test_trace_records_v5_steps(self, db_session_factory):

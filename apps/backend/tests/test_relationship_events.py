@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.models.relationship import RelationshipDelta, RelationshipEvent
 from app.repositories import relationship_event_repository as repo
+from app.repositories import relationship_repository
 from app.services import state_engine
 
 
@@ -107,3 +108,41 @@ class TestRepository:
         repo.create_event(make_event(source="memory_replay", type="user_help"))
         stored = repo.list_events("u1")[0]
         assert stored.source == "memory_replay"
+
+
+class TestCombinedCommit:
+    def test_commit_relationship_update_writes_state_and_events(self, db_session_factory):
+        from app.models.relationship import RelationshipState
+
+        relationship = RelationshipState(
+            intimacy=0.5, trust=0.6, familiarity=0.4, tension=0.2
+        )
+        event = make_event(user_id="u-combined")
+        saved = relationship_repository.commit_relationship_update(
+            "u-combined", relationship, [event]
+        )
+        assert saved.trust == 0.6
+        assert saved.tension == 0.2
+        assert repo.list_events("u-combined")[0].type == "user_care"
+
+    def test_commit_relationship_update_atomic_on_failure(
+        self, db_session_factory, monkeypatch
+    ):
+        from app.models.relationship import RelationshipState
+
+        relationship = RelationshipState(trust=0.6)
+        event = make_event(user_id="u-combined")
+        real_session_local = relationship_repository.SessionLocal
+
+        def failing_session():
+            session = real_session_local()
+            session.commit = lambda: (_ for _ in ()).throw(RuntimeError("commit down"))
+            return session
+
+        monkeypatch.setattr(relationship_repository, "SessionLocal", failing_session)
+        with pytest.raises(RuntimeError):
+            relationship_repository.commit_relationship_update(
+                "u-combined", relationship, [event]
+            )
+        assert relationship_repository.get_relationship("u-combined").trust == 0.35
+        assert repo.list_events("u-combined") == []

@@ -275,3 +275,47 @@ def exists_similar(user_id: str, memory: str, threshold: float = 1.0) -> bool:
             if memory == row.memory or memory in row.memory or row.memory in memory:
                 return True
         return False
+
+
+def create_memory_v4_and_supersede(
+    user_id: str,
+    character_id: str,
+    content: str,
+    memory_type: str,
+    importance: float,
+    confidence: float = 0.0,
+    source: str = "user_stated",
+    expires_at: datetime | None = None,
+    superseded_id: str | None = None,
+) -> UserMemoryV4:
+    """新建记忆并替代旧记忆：同一事务，避免新旧双 active。"""
+    normalized = _normalize_type(memory_type)
+    if not 0.0 <= importance <= 1.0:
+        raise ValueError(f"importance 越界: {importance}")
+    now = datetime.now()
+    with SessionLocal() as session:
+        row = Memory(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            memory=content,
+            memory_type=normalized,
+            importance=importance,
+            character_id=character_id,
+            confidence=confidence,
+            source=source,
+            status="active",
+            expires_at=expires_at,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+        session.flush()
+        if superseded_id is not None:
+            old = session.get(Memory, superseded_id)
+            if old is not None:
+                old.status = "superseded"
+                old.superseded_by = row.id
+                old.updated_at = now
+        session.commit()
+        session.refresh(row)
+        return _to_user_memory_v4(row)

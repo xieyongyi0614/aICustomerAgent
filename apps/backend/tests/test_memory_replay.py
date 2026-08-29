@@ -51,11 +51,10 @@ def run(memories, relationship=None):
     state = make_state(memories)
     if relationship is not None:
         state = state.model_copy(update={"relationship_state": relationship})
-    updated = state_service._replay_relationship_memories(
+    updated, events = state_service._replay_relationship_memories(
         "u1", "s1", state, state.relationship_state, NOW
     )
-    if updated is not None:
-        relationship_repository.upsert_relationship("u1", updated)
+    relationship_repository.commit_relationship_update("u1", updated, events)
 
 
 class TestMemoryReplay:
@@ -124,7 +123,7 @@ class TestMemoryReplay:
             raise RuntimeError("replay down")
 
         monkeypatch.setattr(
-            state_service.relationship_event_repository, "create_event", boom
+            state_service.relationship_event_repository, "list_events", boom
         )
         run([make_memory()])
         assert relationship_repository.get_relationship("u1").trust == pytest.approx(0.35)

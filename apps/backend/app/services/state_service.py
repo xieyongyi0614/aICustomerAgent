@@ -140,6 +140,7 @@ async def apply_and_save(
 
     relationship_started = time.perf_counter()
     new_relationship = state.relationship_state
+    pending_events: list[RelationshipEvent] = []
     try:
         event_type, magnitude, confidence, cause = _resolve_relationship_event(analysis)
         day_positive, day_negative = _day_impact_totals(user_id, now)
@@ -152,7 +153,7 @@ async def apply_and_save(
             day_negative,
         )
         if event_type != "none":
-            relationship_event_repository.create_event(
+            pending_events.append(
                 RelationshipEvent(
                     user_id=user_id,
                     session_id=session_id,
@@ -180,8 +181,23 @@ async def apply_and_save(
                 error=exc.__class__.__name__,
             )
 
+    try:
+        replay_state, replay_events = _replay_relationship_memories(
+            user_id, session_id, state, new_relationship, now
+        )
+        if replay_events:
+            pending_events.extend(replay_events)
+            new_relationship = replay_state
+    except Exception:
+        logger.exception("记忆回放补记失败，跳过，不影响主流程")
+
     character_state_repository.upsert_state(user_id, character)
-    relationship_repository.upsert_relationship(user_id, new_relationship)
+    try:
+        relationship_repository.commit_relationship_update(
+            user_id, new_relationship, pending_events
+        )
+    except Exception:
+        logger.exception("关系状态与事件账本落库失败，保持上一轮")
     emotion_history_repository.append(
         user_id=user_id,
         session_id=session_id,
@@ -232,9 +248,10 @@ def _replay_relationship_memories(
     state: ConversationState,
     relationship: RelationshipState,
     now: datetime,
-) -> RelationshipState | None:
+) -> tuple[RelationshipState, list[RelationshipEvent]]:
     settings = get_settings()
     updated = relationship
+    replay_events: list[RelationshipEvent] = []
     for memory in state.memories:
         if memory.type != "relationship_event":
             continue
@@ -262,7 +279,7 @@ def _replay_relationship_memories(
                 updated.stage,
                 tension=new_values["tension"],
             )
-            relationship_event_repository.create_event(
+            replay_events.append(
                 RelationshipEvent(
                     user_id=user_id,
                     session_id=session_id,
@@ -278,4 +295,4 @@ def _replay_relationship_memories(
             updated = updated.model_copy(update={**new_values, "stage": stage})
         except Exception:
             logger.exception("单条记忆回放补记失败，跳过该条")
-    return updated if updated != relationship else None
+    return updated, replay_events
