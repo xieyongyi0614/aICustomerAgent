@@ -65,15 +65,37 @@ class Memory(Base):
     memory: Mapped[str] = mapped_column(Text, nullable=False)
     memory_type: Mapped[str] = mapped_column(String, nullable=False)
     importance: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="*", server_default="*"
+    )
+    confidence: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0, server_default="0"
+    )
+    source: Mapped[str] = mapped_column(
+        String, nullable=False, default="ai_inferred", server_default="ai_inferred"
+    )
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="active", server_default="active"
+    )
+    superseded_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
-            "memory_type IN ('preference', 'fact', 'goal', 'experience', 'relationship')",
+            "memory_type IN ('preference', 'fact', 'goal', 'experience', 'relationship',"
+            " 'user_preference', 'user_fact', 'important_event', 'relationship_event')",
             name="ck_memories_memory_type",
         ),
         Index("idx_memories_user", "user_id"),
+        Index(
+            "idx_memories_user_character_status",
+            "user_id",
+            "character_id",
+            "status",
+        ),
     )
 
 
