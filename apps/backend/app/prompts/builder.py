@@ -1,3 +1,4 @@
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.character.asuna import (
@@ -34,6 +35,11 @@ EXPRESS_EMOTION_RULE = (
 )
 
 TENSION_FREEZE_RULE = "最近气氛有些紧张，对话中保持一点距离感，直到氛围缓和。"
+
+
+def _literal(text: str) -> str:
+    """转义花括号，使动态内容不被 ChatPromptTemplate 当作模板变量。"""
+    return text.replace("{", "{{").replace("}", "}}")
 
 
 class PromptBuilder:
@@ -128,9 +134,9 @@ class PromptBuilder:
         messages = [("system", section) for section in PromptBuilder.build_identity_sections()]
 
         if analysis is not None:
-            messages.append(("system", PromptBuilder.build_emotion_section(state)))
-            messages.append(("system", PromptBuilder.build_character_state_section(state)))
-            messages.append(("system", PromptBuilder.build_relationship_section(state)))
+            messages.append(("system", _literal(PromptBuilder.build_emotion_section(state))))
+            messages.append(("system", _literal(PromptBuilder.build_character_state_section(state))))
+            messages.append(("system", _literal(PromptBuilder.build_relationship_section(state))))
 
         if state.memories:
             memory_lines = "\n".join(
@@ -141,16 +147,19 @@ class PromptBuilder:
                 (
                     "system",
                     "【你记得关于用户的事】\n"
-                    f"{memory_lines}\n"
+                    f"{_literal(memory_lines)}\n"
                     "（仅在自然相关时引用，不要主动罗列；已提到过的事不要复述，除非用户问起）",
                 )
             )
 
         if state.summary:
-            messages.append(("system", f"【对话摘要】\n{state.summary}"))
+            messages.append(("system", _literal(f"【对话摘要】\n{state.summary}")))
 
         for message in state.messages:
-            messages.append((message.role, message.content))
+            if message.role == "human":
+                messages.append(HumanMessage(content=message.content))
+            else:
+                messages.append(AIMessage(content=message.content))
 
         mode_instruction = MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
         messages.append(("system", mode_instruction))
@@ -162,8 +171,8 @@ class PromptBuilder:
             from app.prompts.scene import build_scene_sections
 
             for section in build_scene_sections(scene_ctx):
-                messages.append(("system", section))
+                messages.append(("system", _literal(section)))
 
-        messages.append(("human", state.current_input))
+        messages.append(HumanMessage(content=state.current_input))
 
         return ChatPromptTemplate.from_messages(messages)

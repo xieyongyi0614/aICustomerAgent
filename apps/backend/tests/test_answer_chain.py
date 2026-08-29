@@ -14,6 +14,14 @@ from app.models.relationship import RelationshipState
 from app.prompts.builder import PromptBuilder
 
 
+def _rendered(prompt) -> str:
+    texts = []
+    for message in prompt.messages:
+        template = getattr(message, "prompt", None)
+        texts.append(template.format() if template is not None else message.content)
+    return str(texts)
+
+
 def _state():
     return ConversationState(
         session_id="s",
@@ -83,7 +91,7 @@ def test_build_without_analysis_keeps_v1_layout():
     )
     legacy = PromptBuilder.build("default", state)
     compat = PromptBuilder.build("default", state, None)
-    assert [m.prompt for m in compat.messages] == [m.prompt for m in legacy.messages]
+    assert _rendered(compat) == _rendered(legacy)
 
 
 def test_build_with_analysis_injects_state_and_behavior_sections():
@@ -102,7 +110,7 @@ def test_build_with_analysis_injects_state_and_behavior_sections():
         ),
     )
     prompt = PromptBuilder.build("default", state, _analysis("comfort"))
-    rendered = str([m.prompt for m in prompt.messages])
+    rendered = _rendered(prompt)
 
     assert "【角色当前状态】" in rendered
     assert "心情：worried" in rendered
@@ -128,7 +136,7 @@ def test_relationship_and_energy_rendered_without_floats():
         ),
     )
     prompt = PromptBuilder.build("default", state, _analysis())
-    rendered = str([m.prompt for m in prompt.messages])
+    rendered = _rendered(prompt)
     assert not any(token in rendered for token in ("0.73", "0.42", "0.66", "0.31"))
     assert "深" in rendered
 
@@ -141,7 +149,7 @@ def test_unknown_behavior_falls_back_to_normal_reply():
         ),
     )
     prompt = PromptBuilder.build("default", _state(), analysis)
-    rendered = str([m.prompt for m in prompt.messages])
+    rendered = _rendered(prompt)
     assert "【本轮行为指令】" in rendered
     assert BEHAVIOR_INSTRUCTIONS["normal_reply"] in rendered
 
@@ -152,7 +160,7 @@ def test_unknown_stage_falls_back_to_friend():
         intimacy=0.5, trust=0.5, familiarity=0.5, stage="unknown_stage"
     )
     prompt = PromptBuilder.build("default", state, _analysis())
-    rendered = str([m.prompt for m in prompt.messages])
+    rendered = _rendered(prompt)
     assert "当前关系：好友" in rendered
 
 

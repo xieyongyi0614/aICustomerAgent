@@ -113,3 +113,39 @@ class TestV1Compat:
         sections = render(make_state(), analysis=TurnAnalysis())
         assert any("【角色当前状态】" in s for s in sections)
         assert any("【与用户的关系】" in s for s in sections)
+
+
+class TestTemplateInjection:
+    def test_user_input_with_braces_renders_literally(self):
+        state = make_state()
+        state = state.model_copy(
+            update={"current_input": '帮我写个 {"topic": "测试"} 的例子 {x}'}
+        )
+        prompt = PromptBuilder.build("default", state)
+        rendered = prompt.format_messages()
+        assert rendered[-1].content == '帮我写个 {"topic": "测试"} 的例子 {x}'
+
+    def test_history_with_braces_renders_literally(self):
+        state = make_state()
+        state = state.model_copy(
+            update={
+                "messages": [
+                    ChatMessage(role="human", content="之前聊的 {topic}"),
+                    ChatMessage(role="ai", content="回答 {a}"),
+                ]
+            }
+        )
+        prompt = PromptBuilder.build("default", state)
+        rendered = prompt.format_messages()
+        contents = [m.content for m in rendered]
+        assert "之前聊的 {topic}" in contents
+        assert "回答 {a}" in contents
+
+    def test_summary_and_cause_with_braces(self):
+        state = make_state(cause="因为 {user} 夸了我")
+        state = state.model_copy(update={"summary": "用户提到 {project}"})
+        prompt = PromptBuilder.build("default", state, analysis=TurnAnalysis())
+        rendered = [m.content for m in prompt.format_messages()]
+        joined = "\n".join(rendered)
+        assert "因为 {user} 夸了我" in joined
+        assert "用户提到 {project}" in joined
