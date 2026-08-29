@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 
 from app.chains.extractor_chain import extract_candidates
+from app.core.logutils import content_preview
 from app.core.settings import get_settings
 from app.models.memory import MemoryCandidate, UserMemory, UserMemoryV4
 from app.repositories import memory_repository as repo
@@ -121,7 +122,10 @@ async def _execute_forget(
             )
         ]
         if not matched:
-            logger.warning("forget 未匹配到任何记忆，不猜测删除：%s", item.content)
+            logger.warning(
+                "forget 未匹配到任何记忆，不猜测删除：预览=%s",
+                content_preview(item.content),
+            )
             if trace is not None:
                 trace.record("memory_privacy", 0.0, "miss", error="forget target not found")
             return
@@ -166,9 +170,11 @@ async def _execute_outcome(
         elif outcome.action == ACTION_INVALIDATE:
             repo.invalidate_memory(outcome.target_id)
         elif outcome.action == ACTION_DISCARD_PAIR:
-            logger.warning("同轮候选矛盾成对丢弃：%s", candidate.content)
+            logger.warning(
+                "同轮候选矛盾成对丢弃：预览=%s", content_preview(candidate.content)
+            )
         elif outcome.action == ACTION_NOOP:
-            logger.info("候选无可执行动作：%s", candidate.content)
+            logger.info("候选无可执行动作：预览=%s", content_preview(candidate.content))
     except Exception:
         logger.exception("记忆写入失败，单条候选丢弃，不影响其他候选")
 

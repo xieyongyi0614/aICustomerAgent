@@ -9,6 +9,7 @@ from app.chains import (
     scene_intent_chain,
     turn_analysis_chain,
 )
+from app.core.logutils import content_preview
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -216,7 +217,7 @@ async def _stream_chat_inner(
 
     reply = "".join(full_reply)
     if reply:
-        logger.info("模型输出：%s", reply)
+        logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))
     else:
         logger.warning("模型输出为空")
     ai_message_id = conversation_service.save_turn(session_id, content, reply)

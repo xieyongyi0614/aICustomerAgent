@@ -111,6 +111,7 @@ class Settings(BaseSettings):
     stage_hysteresis: float = 0.10
     analysis_recent_messages: int = 6
     trace_capacity: int = 20
+    log_content_preview_chars: int = 0
     state_history_limit: int = 20
     scene_pending_max_turns: int = 5
 
