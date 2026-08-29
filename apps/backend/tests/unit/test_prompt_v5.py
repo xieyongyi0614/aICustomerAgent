@@ -155,7 +155,7 @@ class TestTemplateInjection:
 
 class TestContextTotalBudget:
     def test_over_budget_trims_history_first(self, monkeypatch):
-        get_settings().context_total_char_budget = 800
+        monkeypatch.setattr(get_settings(), "context_total_char_budget", 800)
         big_history = [
             ChatMessage(role="human", content="历史消息" + "甲" * 200) for _ in range(10)
         ]
@@ -170,7 +170,7 @@ class TestContextTotalBudget:
         assert rendered[-1].content == "在吗"
 
     def test_memories_trimmed_before_summary(self, monkeypatch):
-        get_settings().context_total_char_budget = 700
+        monkeypatch.setattr(get_settings(), "context_total_char_budget", 700)
         from app.models.memory import UserMemoryV4
 
         now = datetime(2026, 8, 29, tzinfo=timezone.utc)

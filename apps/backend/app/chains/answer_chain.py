@@ -16,8 +16,9 @@ def build_chain(
     analysis: TurnAnalysis | None = None,
     llm=None,
     scene_ctx=None,
+    goal_ctx=None,
 ) -> Runnable:
-    prompt = PromptBuilder.build(mode, state, analysis, scene_ctx)
+    prompt = PromptBuilder.build(mode, state, analysis, scene_ctx, goal_ctx)
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
 
@@ -29,9 +30,10 @@ async def astream(
     llm=None,
     trace=None,
     scene_ctx=None,
+    goal_ctx=None,
 ) -> AsyncIterator[str]:
     started = time.perf_counter()
-    chain = build_chain(mode, state, analysis, llm, scene_ctx)
+    chain = build_chain(mode, state, analysis, llm, scene_ctx, goal_ctx)
     if trace is not None:
         trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
         trace.model_name = getattr(llm, "model_name", None) or "default"

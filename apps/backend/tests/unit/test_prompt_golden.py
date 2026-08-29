@@ -12,10 +12,14 @@ import pytest
 from app.models.character_state import CharacterState
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
+from app.models.goal import GoalRecord
+from app.models.intention import ValidatedIntention
 from app.models.memory import UserMemoryV4
 from app.models.relationship import RelationshipState
 from app.models.scene import SceneContext, SceneState
 from app.prompts.builder import PromptBuilder
+from app.prompts.goal import GoalContext
+from app.services.goal_service import SelectedGoal
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent / "golden"
 
@@ -103,6 +107,35 @@ def _scene_ctx() -> SceneContext:
     )
 
 
+def _goal_ctx() -> GoalContext:
+    goal = GoalRecord(
+        id="g-1",
+        user_id="golden",
+        type="user_care",
+        description="陪伴用户放松",
+        priority=5,
+        horizon="current",
+        source="policy",
+        created_turn=3,
+        expires_at_turn=23,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    selected = SelectedGoal(
+        goal=goal,
+        reason="用户表达疲惫，user_care 目标提升",
+        suppressed=["g-2"],
+        suppressed_description="守护用户的身心状态",
+    )
+    intention = ValidatedIntention(
+        intention="comfort_user",
+        reason="用户表达疲惫，选择安抚",
+        goal_id="g-1",
+        degraded=False,
+    )
+    return GoalContext(selected_goal=selected, intention=intention)
+
+
 def _assert_golden(name: str, text: str) -> None:
     path = GOLDEN_DIR / name
     if os.environ.get("UPDATE_GOLDEN") == "1":
@@ -129,6 +162,24 @@ def test_golden_v5_full_sections():
     )
 
 
-@pytest.mark.parametrize("name", ["prompt_v1_default.txt", "prompt_v5_full.txt"])
+def test_golden_v6_full_sections():
+    _assert_golden(
+        "prompt_v6_full.txt",
+        _render(
+            PromptBuilder.build(
+                "immersive",
+                _full_state(),
+                _full_analysis(),
+                scene_ctx=_scene_ctx(),
+                goal_ctx=_goal_ctx(),
+            )
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["prompt_v1_default.txt", "prompt_v5_full.txt", "prompt_v6_full.txt"],
+)
 def test_golden_snapshots_exist(name):
     assert (GOLDEN_DIR / name).exists()

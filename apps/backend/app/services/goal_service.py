@@ -48,6 +48,7 @@ class SelectedGoal:
     goal: GoalRecord | None
     reason: str
     suppressed: list[str] = field(default_factory=list)
+    suppressed_description: str | None = None
 
 
 @dataclass
@@ -314,8 +315,14 @@ def select(
     ranked = sorted(goals, key=sort_key)
     selected = ranked[0]
     suppressed = [g.id for g in ranked[1:]]
+    background = ranked[1].description if len(ranked) > 1 else None
 
     reason = _selection_reason(selected, signals, settings)
     if scene_pending and selected.type != "scene":
         reason = f"存在未完成场景承诺；{reason}"
-    return SelectedGoal(goal=selected, reason=reason, suppressed=suppressed)
+    return SelectedGoal(
+        goal=selected,
+        reason=reason,
+        suppressed=suppressed,
+        suppressed_description=background,
+    )

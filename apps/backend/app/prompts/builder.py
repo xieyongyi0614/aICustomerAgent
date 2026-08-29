@@ -156,6 +156,7 @@ class PromptBuilder:
         state: ConversationState,
         analysis: TurnAnalysis | None = None,
         scene_ctx=None,
+        goal_ctx=None,
     ) -> ChatPromptTemplate:
         identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
         state_sections: list[str] = []
@@ -177,10 +178,24 @@ class PromptBuilder:
                 _literal(section) for section in build_scene_sections(scene_ctx)
             )
 
+        from app.prompts.goal import build_goal_section, build_intention_section
+
+        goal_section = None
+        intention_section = None
+        if analysis is not None and goal_ctx is not None:
+            goal_section = build_goal_section(goal_ctx.selected_goal)
+            intention_section = build_intention_section(goal_ctx.intention)
+            if goal_section is not None:
+                goal_section = _literal(goal_section)
+            if intention_section is not None:
+                intention_section = _literal(intention_section)
+
         fixed_chars = (
             sum(len(text) for _, text in identity)
             + sum(len(text) for text in state_sections)
             + sum(len(text) for text in tail_sections)
+            + (len(goal_section) if goal_section else 0)
+            + (len(intention_section) if intention_section else 0)
             + len(state.current_input)
             + 120
         )
@@ -188,6 +203,10 @@ class PromptBuilder:
 
         messages = list(identity)
         messages.extend(("system", text) for text in state_sections)
+        if goal_section is not None:
+            messages.append(("system", goal_section))
+        if intention_section is not None:
+            messages.append(("system", intention_section))
 
         if memories:
             memory_lines = "\n".join(
