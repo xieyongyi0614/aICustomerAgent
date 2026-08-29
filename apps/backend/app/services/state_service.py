@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 
 from app.chains import state_update_chain, turn_analysis_chain
+from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -18,6 +19,13 @@ from app.services import state_engine
 logger = logging.getLogger(__name__)
 
 RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
+
+REPLAY_TYPE_KEYWORDS = (
+    (("安慰", "关心", "陪", "照顾"), "user_care"),
+    (("帮", "帮忙", "支持"), "user_help"),
+    (("送", "礼物", "夸", "称赞"), "praise"),
+    (("吵", "冲突", "生气", "冷战"), "conflict"),
+)
 
 
 def _day_impact_totals(
@@ -162,3 +170,89 @@ async def apply_and_save(
         energy_after=character.energy,
         stage_after=new_relationship.stage,
     )
+    try:
+        replayed = _replay_relationship_memories(
+            user_id, session_id, state, new_relationship, now
+        )
+        if replayed is not None:
+            relationship_repository.upsert_relationship(user_id, replayed)
+    except Exception:
+        logger.exception("记忆回放补记失败，跳过，不影响主流程")
+
+
+def _replay_type_for(content: str) -> str:
+    for keywords, event_type in REPLAY_TYPE_KEYWORDS:
+        if any(keyword in content for keyword in keywords):
+            return event_type
+    return "user_care"
+
+
+def _replay_exists(user_id: str, cause: str) -> bool:
+    events = relationship_event_repository.list_events(user_id, limit=200)
+    return any(
+        event.source == "memory_replay" and event.cause == cause for event in events
+    )
+
+
+def _replay_is_idle(user_id: str, now: datetime) -> bool:
+    settings = get_settings()
+    events = relationship_event_repository.list_events(user_id, limit=1)
+    if not events:
+        return True
+    idle_hours = (now - events[0].created_at).total_seconds() / 3600
+    return idle_hours >= settings.rel_replay_min_idle_hours
+
+
+def _replay_relationship_memories(
+    user_id: str,
+    session_id: str,
+    state: ConversationState,
+    relationship: RelationshipState,
+    now: datetime,
+) -> RelationshipState | None:
+    settings = get_settings()
+    updated = relationship
+    for memory in state.memories:
+        if memory.type != "relationship_event":
+            continue
+        try:
+            cause = memory.content[:50]
+            if _replay_exists(user_id, cause):
+                continue
+            if not _replay_is_idle(user_id, now):
+                continue
+            event_type = _replay_type_for(memory.content)
+            base = state_engine.build_relationship_impact(event_type, "weak")
+            discount = settings.rel_replay_discount
+            new_values = {}
+            applied = {}
+            for dim in RELATIONSHIP_DIMENSIONS:
+                delta = getattr(base, dim) * discount
+                current = getattr(updated, dim)
+                new_value = state_engine.clamp(current + delta, 0.0, 1.0)
+                new_values[dim] = new_value
+                applied[dim] = round(new_value - current, 6)
+            stage = state_engine.next_stage(
+                new_values["intimacy"],
+                new_values["trust"],
+                new_values["familiarity"],
+                updated.stage,
+                tension=new_values["tension"],
+            )
+            relationship_event_repository.create_event(
+                RelationshipEvent(
+                    user_id=user_id,
+                    session_id=session_id,
+                    type=event_type,
+                    magnitude="weak",
+                    impact=RelationshipDelta(**applied),
+                    confidence=0.5,
+                    source="memory_replay",
+                    cause=cause,
+                    created_at=now,
+                )
+            )
+            updated = updated.model_copy(update={**new_values, "stage": stage})
+        except Exception:
+            logger.exception("单条记忆回放补记失败，跳过该条")
+    return updated if updated != relationship else None

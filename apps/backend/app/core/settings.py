@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     rel_max_turn_delta: float = 0.15
     rel_max_day_delta: float = 0.30
     rel_tension_freeze: float = 0.5
+    rel_replay_discount: float = 0.5
+    rel_replay_min_idle_hours: float = 24.0
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
