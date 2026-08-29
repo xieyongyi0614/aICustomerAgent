@@ -80,13 +80,14 @@ def create_memory(
         raise ValueError(f"非法 memory_type: {memory_type}")
     if not 0.0 <= importance <= 1.0:
         raise ValueError(f"importance 越界: {importance}")
+    stored_type = LEGACY_MEMORY_TYPE_MAP[memory_type]
     now = datetime.now()
     with SessionLocal() as session:
         row = Memory(
             id=str(uuid.uuid4()),
             user_id=user_id,
             memory=memory,
-            memory_type=memory_type,
+            memory_type=stored_type,
             importance=importance,
             character_id=character_id,
             confidence=confidence,

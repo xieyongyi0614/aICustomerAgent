@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.models.character_state import CharacterState
-from app.models.memory import UserMemory
+from app.models.memory import UserMemoryV4
 from app.models.relationship import RelationshipState
 
 
@@ -17,7 +17,7 @@ class ConversationState(BaseModel):
     user_id: str
     messages: list[ChatMessage]
     summary: str | None
-    memories: list[UserMemory]
+    memories: list[UserMemoryV4]
     current_input: str
     character_state: CharacterState = CharacterState()
     relationship_state: RelationshipState = RelationshipState()

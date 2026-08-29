@@ -14,6 +14,13 @@ from app.character.asuna import (
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 
+MEMORY_TYPE_LABELS = {
+    "user_preference": "偏好",
+    "user_fact": "事实",
+    "important_event": "事件",
+    "relationship_event": "关系事件",
+}
+
 
 class PromptBuilder:
     @staticmethod
@@ -74,8 +81,18 @@ class PromptBuilder:
             messages.append(("system", PromptBuilder.build_relationship_section(state)))
 
         if state.memories:
-            memory_lines = "\n".join(f"- {m.memory}" for m in state.memories)
-            messages.append(("system", f"【用户记忆】\n{memory_lines}"))
+            memory_lines = "\n".join(
+                f"- ({MEMORY_TYPE_LABELS.get(m.type, m.type)}) {m.content}"
+                for m in state.memories
+            )
+            messages.append(
+                (
+                    "system",
+                    "【你记得关于用户的事】\n"
+                    f"{memory_lines}\n"
+                    "（仅在自然相关时引用，不要主动罗列；已提到过的事不要复述，除非用户问起）",
+                )
+            )
 
         if state.summary:
             messages.append(("system", f"【对话摘要】\n{state.summary}"))

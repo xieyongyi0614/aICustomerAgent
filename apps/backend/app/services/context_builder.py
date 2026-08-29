@@ -33,7 +33,12 @@ async def build(
     current = summary_service.get_summary(session_id)
     summary = current.summary if current else None
     started = time.perf_counter()
-    memories = memory_service.retrieve(user_id, current_input)
+    try:
+        recalled = memory_service.retrieve_v4(user_id, current_input)
+        memories = memory_service.select_for_context(recalled)
+    except Exception:
+        logger.exception("记忆检索失败，降级为空记忆")
+        memories = []
     if trace is not None:
         trace.record("memory_retrieval", (time.perf_counter() - started) * 1000)
     character_state, relationship_state = _load_states_with_fallback(user_id)

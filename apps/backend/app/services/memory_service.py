@@ -139,3 +139,35 @@ def retrieve_v4(
     except (ValueError, OSError, RuntimeError):
         logger.exception("last_accessed_at 回写失败，可容忍")
     return results
+
+
+def _is_duplicate_content(content: str, seen: list[str]) -> bool:
+    normalized = content.strip()
+    return any(
+        normalized == existing or normalized in existing or existing in normalized
+        for existing in seen
+    )
+
+
+def select_for_context(
+    memories: list[UserMemoryV4],
+    max_count: int | None = None,
+    max_chars: int = 400,
+) -> list[UserMemoryV4]:
+    settings = get_settings()
+    limit = max_count or settings.memory_top_k
+    selected: list[UserMemoryV4] = []
+    seen_contents: list[str] = []
+    total_chars = 0
+    for memory in memories:
+        if len(selected) >= limit:
+            break
+        content = memory.content
+        if not content or _is_duplicate_content(content, seen_contents):
+            continue
+        if total_chars + len(content) > max_chars:
+            continue
+        selected.append(memory)
+        seen_contents.append(content)
+        total_chars += len(content)
+    return selected

@@ -9,7 +9,7 @@ from app.models.character_state import CharacterState
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis, UserEmotion
 from app.models.behavior import BehaviorDecision
-from app.models.memory import UserMemory
+from app.models.memory import UserMemoryV4
 from app.models.relationship import RelationshipState
 from app.prompts.builder import PromptBuilder
 
@@ -57,9 +57,10 @@ async def test_prompt_includes_dynamic_sections(fake_llm):
         user_id="u",
         messages=[ChatMessage(role="human", content="过去消息")],
         summary="旧摘要",
-        memories=[UserMemory(
-            id="m1", user_id="u", memory="用户喜欢寿司", memory_type="preference",
-            importance=0.8, created_at=datetime.now(), updated_at=datetime.now(),
+        memories=[UserMemoryV4(
+            id="m1", user_id="u", character_id="asuna", type="user_preference",
+            content="用户喜欢寿司", importance=0.8, confidence=0.9, source="user_stated",
+            created_at=datetime.now(), updated_at=datetime.now(),
         )],
         current_input="现在输入",
     )
