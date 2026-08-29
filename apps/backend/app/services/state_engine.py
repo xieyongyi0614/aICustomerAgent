@@ -179,10 +179,15 @@ def relationship_deltas(event: str, behavior: str) -> RelationshipDelta:
 
 
 def next_stage(
-    intimacy: float, trust: float, familiarity: float, current_stage: str
+    intimacy: float,
+    trust: float,
+    familiarity: float,
+    current_stage: str,
+    tension: float | None = None,
 ) -> str:
     settings = get_settings()
     values = {"intimacy": intimacy, "trust": trust, "familiarity": familiarity}
+    upgrade_frozen = tension is not None and tension > settings.rel_tension_freeze
     upgrade_requirements = {
         "friend": {"familiarity": settings.stage_friend_familiarity},
         "close_friend": {
@@ -194,12 +199,15 @@ def next_stage(
             "trust": settings.stage_partner_trust,
         },
     }
-    for stage in reversed(STAGE_ORDER[1:]):
-        requirements = upgrade_requirements[stage]
-        if all(values[key] >= threshold for key, threshold in requirements.items()):
-            if STAGE_ORDER.index(stage) > STAGE_ORDER.index(current_stage):
-                return stage
-            break
+    current_index = STAGE_ORDER.index(current_stage)
+    next_index = current_index + 1
+    if next_index < len(STAGE_ORDER):
+        candidate = STAGE_ORDER[next_index]
+        requirements = upgrade_requirements[candidate]
+        if all(
+            values[key] >= threshold for key, threshold in requirements.items()
+        ) and not upgrade_frozen:
+            return candidate
     requirements = upgrade_requirements.get(current_stage)
     if requirements and all(
         values[key] < threshold - settings.stage_hysteresis
@@ -225,6 +233,48 @@ def apply_relationship(
             "stage": stage,
         }
     )
+
+
+def apply_relationship_v5(
+    relationship: RelationshipState,
+    event_type: str,
+    magnitude: str,
+    behavior: str,
+    day_positive: RelationshipDelta,
+    day_negative: RelationshipDelta,
+) -> tuple[RelationshipState, RelationshipDelta]:
+    settings = get_settings()
+    event_delta = build_relationship_impact(event_type, magnitude)
+    behavior_delta = BEHAVIOR_DELTAS.get(behavior, RelationshipDelta())
+    dimensions = ("intimacy", "trust", "familiarity", "tension")
+    new_values: dict[str, float] = {}
+    applied_delta = {}
+    for dim in dimensions:
+        total = getattr(event_delta, dim) + getattr(behavior_delta, dim)
+        total = clamp(
+            total, -settings.rel_max_event_delta, settings.rel_max_event_delta
+        )
+        total = clamp(
+            total, -settings.rel_max_turn_delta, settings.rel_max_turn_delta
+        )
+        current = getattr(relationship, dim)
+        improving = total < 0 if dim == "tension" else total > 0
+        if total != 0:
+            used = getattr(day_positive if improving else day_negative, dim)
+            headroom = max(settings.rel_max_day_delta - used, 0.0)
+            total = min(total, headroom) if total > 0 else -min(-total, headroom)
+        new_value = clamp(current + total, 0.0, 1.0)
+        new_values[dim] = new_value
+        applied_delta[dim] = round(new_value - current, 6)
+    stage = next_stage(
+        new_values["intimacy"],
+        new_values["trust"],
+        new_values["familiarity"],
+        relationship.stage,
+        tension=new_values["tension"],
+    )
+    new_state = relationship.model_copy(update={**new_values, "stage": stage})
+    return new_state, RelationshipDelta(**applied_delta)
 
 
 def apply_character(

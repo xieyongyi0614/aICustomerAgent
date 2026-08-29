@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     emotion_decay_floor: float = 0.15
     emotion_rest_intensity: float = 0.3
     emotion_strong_boundary: float = 0.5
+
+    rel_max_event_delta: float = 0.17
+    rel_max_turn_delta: float = 0.15
+    rel_max_day_delta: float = 0.30
+    rel_tension_freeze: float = 0.5
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
