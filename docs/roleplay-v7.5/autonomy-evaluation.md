@@ -81,4 +81,4 @@ Autonomy rules（事后，V7.5）  ：审计层——验证已发送行为的时
 
 - 主动行为当前仅 `send_message` 一种 type、`check_in / repair_rapport` 两种意图，judge 评审标准按此窄域写死；意图扩展时评审标准随 PROACTIVE_INTENTION_MAP 同步扩充。
 - 结果观察窗 24h 内用户可能只是没上线——LOW_OUTCOME 是弱信号，只进离线直方图，永不参与 verdict。
-- tick 循环尚未接入 main.py lifespan（V7 遗留项）：挂载点 B 在接入前只能被测试与手动 tick 触发，本维实时报告产出依赖该前置收口。
+- tick 循环已随 V7 收口接入 main.py lifespan（`autonomy_worker.run_autonomy_worker`，`autonomy_enabled` 门控）：挂载点 B 在生产运行时可用；意图扩展时评审标准随 PROACTIVE_INTENTION_MAP 同步扩充。
