@@ -8,7 +8,7 @@ from app.api.v1.schemas import (
     MemoryItemOut,
     MessageItemOut,
 )
-from app.repositories import conversation_repository, memory_repository
+from app.services import history_service
 
 history_router = APIRouter()
 
@@ -25,10 +25,10 @@ def list_conversation_messages(
     limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
     before_id: int | None = Query(default=None),
 ):
-    conversation = conversation_repository.find_conversation(conversation_id)
+    conversation = history_service.find_conversation_or_none(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="会话不存在")
-    rows = conversation_repository.get_recent_messages(
+    rows = history_service.list_recent_messages(
         conversation_id, limit, before_id=before_id
     )
     return ConversationMessagesOut(
@@ -52,7 +52,7 @@ def list_memories(
     limit: int = Query(default=50, ge=1, le=200),
 ):
     _ = conversation_id
-    items = memory_repository.list_by_user_v4(user_id, limit=limit)
+    items = history_service.list_memories(user_id, limit=limit)
     return MemoriesOut(
         user_id=user_id,
         memories=[

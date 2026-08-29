@@ -8,12 +8,7 @@ from app.api.v1.schemas import (
     StateSnapshotOut,
 )
 from app.core.settings import get_settings
-from app.repositories import (
-    character_state_repository,
-    emotion_history_repository,
-    relationship_event_repository,
-    relationship_repository,
-)
+from app.services import state_service
 
 state_router = APIRouter()
 
@@ -25,9 +20,9 @@ def get_state_snapshot(
 ):
     settings = get_settings()
     history_limit = limit if limit is not None else settings.state_history_limit
-    character_state = character_state_repository.get_state(user_id)
-    relationship_state = relationship_repository.get_relationship(user_id)
-    history = emotion_history_repository.list_recent(user_id, history_limit)
+    snapshot = state_service.load_snapshot(user_id, history_limit)
+    character_state = snapshot.character_state
+    relationship_state = snapshot.relationship_state
     return StateSnapshotOut(
         character_state=CharacterStateOut(
             mood=character_state.mood,
@@ -47,6 +42,19 @@ def get_state_snapshot(
             stage=relationship_state.stage,
             updated_at=relationship_state.updated_at,
         ),
+        emotion_history=[
+            EmotionHistoryItem(
+                user_emotion=item.user_emotion,
+                event=item.event,
+                behavior=item.behavior,
+                mood_before=item.mood_before,
+                mood_after=item.mood_after,
+                energy_after=item.energy_after,
+                stage_after=item.stage_after,
+                created_at=item.created_at,
+            )
+            for item in snapshot.emotion_history
+        ],
         relationship_events=[
             RelationshipEventItem(
                 type=event.type,
@@ -60,21 +68,6 @@ def get_state_snapshot(
                 cause=event.cause,
                 created_at=event.created_at,
             )
-            for event in relationship_event_repository.list_events(
-                user_id, history_limit
-            )
-        ],
-        emotion_history=[
-            EmotionHistoryItem(
-                user_emotion=item.user_emotion,
-                event=item.event,
-                behavior=item.behavior,
-                mood_before=item.mood_before,
-                mood_after=item.mood_after,
-                energy_after=item.energy_after,
-                stage_after=item.stage_after,
-                created_at=item.created_at,
-            )
-            for item in history
+            for event in snapshot.relationship_events
         ],
     )

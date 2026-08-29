@@ -1,5 +1,6 @@
 import logging
 import time
+from dataclasses import dataclass
 from datetime import datetime
 
 from app.chains import state_update_chain, turn_analysis_chain
@@ -8,6 +9,7 @@ from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.relationship import RelationshipDelta, RelationshipEvent, RelationshipState
+from app.models.emotion import EmotionHistoryEntry
 from app.repositories import (
     character_state_repository,
     emotion_history_repository,
@@ -63,6 +65,27 @@ def _resolve_relationship_event(
     if v2_event == "daily":
         return "long_interaction", "weak", 0.3, ""
     return "none", "normal", 0.0, ""
+
+
+@dataclass
+class StateSnapshotData:
+    character_state: CharacterState
+    relationship_state: RelationshipState
+    emotion_history: list[EmotionHistoryEntry]
+    relationship_events: list
+
+
+def load_snapshot(user_id: str, limit: int) -> StateSnapshotData:
+    character = character_state_repository.get_state(user_id)
+    relationship = relationship_repository.get_relationship(user_id)
+    history = emotion_history_repository.list_recent(user_id, limit)
+    events = relationship_event_repository.list_events(user_id, limit)
+    return StateSnapshotData(
+        character_state=character,
+        relationship_state=relationship,
+        emotion_history=history,
+        relationship_events=events,
+    )
 
 
 def load_states(user_id: str) -> tuple[CharacterState, RelationshipState]:
