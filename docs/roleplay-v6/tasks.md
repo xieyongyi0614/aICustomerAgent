@@ -3,9 +3,12 @@
 > 开发入口。按依赖顺序执行；P0 = V6 必须，P1 = 推荐，P2 = 延期。
 > 策略：一次只执行一个 Task，完成后运行测试、全量回归、提交推送，再进入下一个（沿用既有节奏）。
 
+> **状态（2026-08-29）**：V6-001~009（P0 全部）已完成并推送；V6-010（P1）/V6-011（P2）未实现。
+> 实现期解释与偏差见 `implementation-notes.md`。
+
 ## Task 列表
 
-### V6-001 Goal 模型（P0）
+### V6-001 Goal 模型（P0）✅ fbcf505
 
 - **目标**：GoalRecord/GoalSeed/GoalType/GoalStatus/GoalSource 模型 + PERSISTENT_GOALS 角色种子资产。
 - **前置**：无。
@@ -14,7 +17,7 @@
 - **验收**：模型校验、非法值拒绝、种子与 goal-model.md 一致。
 - **测试**：`tests/unit/test_goal_models.py`。
 
-### V6-002 character_goals 表 + Repository（P0）
+### V6-002 character_goals 表 + Repository（P0）✅ 6acf797
 
 - **目标**：建表迁移 0008 + goal_repository（幂等播种/active 查询/创建/complete/expire/cancel）。
 - **前置**：V6-001。
@@ -23,7 +26,7 @@
 - **验收**：迁移与 ORM 一致；幂等播种零重复。
 - **测试**：`tests/integration/test_goal_repository.py` + 迁移一致性测试自动覆盖。
 
-### V6-003 Goal Policy（P0）
+### V6-003 Goal Policy（P0）✅ 4282f31
 
 - **目标**：生命周期纯代码策略（创建/完成/过期/取消/幂等/单轮 ≤1 创建）。
 - **前置**：V6-002。
@@ -32,7 +35,7 @@
 - **验收**：14 项矩阵 Case 2~6；用户语言反例零创建。
 - **测试**：`tests/integration/test_goal_policy.py`。
 
-### V6-004 Goal Selection + Conflict（P0）
+### V6-004 Goal Selection + Conflict（P0）✅ 4282f31
 
 - **目标**：tier 排序 + 上下文修正 + 冲突裁决 + SelectedGoal（含 reason/suppressed）。
 - **前置**：V6-003。
@@ -41,7 +44,7 @@
 - **验收**：矩阵 Case 7~9；凌晨裁决案例。
 - **测试**：`tests/integration/test_goal_selection.py`、`test_goal_conflict.py`。
 
-### V6-005 Intention 模型 + Policy（P0）
+### V6-005 Intention 模型 + Policy（P0）✅ e2103c7
 
 - **目标**：IntentionType 12 值 + IntentionDecision schema + IntentionPolicy（有效性表/goal 一致性/scene 压制/降级）。
 - **前置**：V6-004。
@@ -50,7 +53,7 @@
 - **验收**：矩阵 Case 11；Policy 永远输出合法 intention。
 - **测试**：`tests/unit/test_intention_models.py`、`test_intention_policy.py`。
 
-### V6-006 Intention Chain（P0）
+### V6-006 Intention Chain（P0）✅ 28f5a50
 
 - **目标**：LLM 候选链（build_intention_chain / decide）。
 - **前置**：V6-005。
@@ -59,7 +62,7 @@
 - **验收**：FakeLLM 候选透传；None → 空决策交 Policy 降级。
 - **测试**：`tests/unit/test_intention_chain.py`。
 
-### V6-007 Goal/Intention Context 注入（P0）
+### V6-007 Goal/Intention Context 注入（P0）✅ 20e7b70
 
 - **目标**：目标段 + 意图段 prompt 渲染（格式/预算/空值兼容/人格优先约束）。
 - **前置**：V6-004、V6-005。
@@ -68,7 +71,7 @@
 - **验收**：V1 无 analysis 路径不变；golden 快照新增 v6_full。
 - **测试**：`tests/unit/test_goal_context.py` + golden。
 
-### V6-008 编排接入（P0）
+### V6-008 编排接入（P0）✅ 95effe3
 
 - **目标**：chat_pipeline 接入（goals 加载、gather 4 链、policy 校验、answer 传 ctx、turn_meta 携带）；post_process 注册 run_goal_review。
 - **前置**：V6-003、V6-006、V6-007。
@@ -77,7 +80,7 @@
 - **验收**：SSE 零影响（Case 12）；turn_meta 带 intention/current_goal。
 - **测试**：`tests/integration/test_goal_e2e.py`。
 
-### V6-009 十四项必测 + 全量回归（P0）
+### V6-009 十四项必测 + 全量回归（P0）✅（本次提交）
 
 - **目标**：testing.md 矩阵全绿。
 - **前置**：V6-008。
@@ -85,15 +88,16 @@
 - **验收**：全量 `uv run pytest tests/ -v` 通过；V2~V5 零回归；golden 无意变更零。
 - **测试**：同左。
 
-### V6-010 Debug/API 扩展（P1）
+### V6-010 Debug/API 扩展（P1，未实现）
 
 - **目标**：/state 快照与前端 Debug 面板展示 current_goal/intention（type/reason/degraded）。
 - **前置**：V6-008。
 - **涉及文件**：`app/api/v1/state.py`、`app/api/v1/schemas.py`、前端 state-panel/goal 卡片。
 - **验收**：面板可见"角色这轮想做什么、为什么"。
 - **测试**：API 单测 + 前端 Vitest。
+- **备注**：turn_meta 已携带 intention/current_goal（V6-008），面板展示待前端窗口开放时实施。
 
-### V6-011 Goal Review LLM 评估 + 记忆联动（P2，可选）
+### V6-011 Goal Review LLM 评估 + 记忆联动（P2，未实现）
 
 - **目标**：goal_review 引入 LLM 辅助判定完成（在代码规则之外的语义完成）；Goal 完成产生 V4 relationship_event 记忆。
 - **前置**：V6-009。

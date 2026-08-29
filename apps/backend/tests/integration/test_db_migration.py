@@ -25,7 +25,7 @@ from app.repositories import (
 from tests.conftest import wait_until
 
 PG_TEST_URL = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+psycopg://asuna:asuna@localhost:5432/asuna_test"
+    "TEST_DATABASE_URL", "postgresql+psycopg://asuna:asuna@127.0.0.1:5432/asuna_test"
 )
 
 
