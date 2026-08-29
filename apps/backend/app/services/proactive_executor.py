@@ -100,12 +100,15 @@ async def execute(
     started = time.perf_counter()
     settings = get_settings()
     now = now or datetime.now()
-    approved = proactive_repository.transition(action.id, "approved", now=now)
-    if approved is None:
-        return None
 
     lock = get_user_write_lock(action.user_id)
     async with lock:
+        fresh = proactive_repository.get_by_id(action.id)
+        if fresh is None or fresh.status not in ("candidate", "failed", "approved"):
+            return fresh
+        approved = proactive_repository.transition(action.id, "approved", now=now)
+        if approved is None:
+            return None
         reason = _recheck_failed_reason(action, action.user_id, action.session_id, now)
         if reason == "generating":
             rolled_back = proactive_repository.transition(

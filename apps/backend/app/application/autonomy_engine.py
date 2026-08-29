@@ -159,7 +159,9 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
     active = proactive_repository.get_active(user_id, now)
     if active is None or active.id != action.id:
         return None
-    delivered = await proactive_executor.execute(active, llm=llm, trace=trace)
+    delivered = await proactive_executor.execute(
+        active, llm=llm, trace=trace, now=now
+    )
     if delivered is not None and delivered.status == "delivered":
         collector = get_trace_collector()
         collector.attach(trace, str(delivered.message_id))
