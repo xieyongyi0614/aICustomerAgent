@@ -9,7 +9,44 @@ import uvicorn
 
 from app.api.v1.deps import get_chat_llm
 from app.main import app
-from tests.conftest import FakeLLM
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, AIMessageChunk
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import RunnableLambda
+
+
+class FakeLLM(BaseChatModel):
+    """开发用假 LLM：本地回放固定响应，不产生任何真实调用。"""
+
+    response: object = ""
+    structured_responses: dict = {}
+
+    def __init__(self, response="", structured_responses=None, **kwargs):
+        super().__init__(**kwargs)
+        self.response = response
+        self.structured_responses = structured_responses or {}
+
+    def with_structured_output(self, schema, **kwargs):
+        def _resolve(_inputs):
+            data = self.structured_responses.get(schema.__name__)
+            if isinstance(data, dict):
+                return schema.model_validate(data)
+            return data
+
+        return RunnableLambda(_resolve)
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        text = self.response if isinstance(self.response, str) else "".join(self.response)
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
+
+    async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
+        chunks = self.response if isinstance(self.response, list) else [self.response]
+        for chunk in chunks:
+            yield ChatGenerationChunk(message=AIMessageChunk(content=chunk))
+
+    @property
+    def _llm_type(self):
+        return "fake"
 
 llm = FakeLLM(
     response=["好的", "，我先记下了。"],

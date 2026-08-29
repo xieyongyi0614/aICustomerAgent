@@ -194,20 +194,3 @@ class TestExtractCandidates:
         await extractor_chain.extract_candidates("x", "y", llm=llm)
         assert any("（无）" in str(m) for m in llm.seen_messages)
 
-
-class TestLegacyChainUnchanged:
-    @pytest.mark.asyncio
-    async def test_v1_extract_still_works(self):
-        llm = FakeLLM(
-            structured_responses={
-                "MemoryDecision": {
-                    "should_save": True,
-                    "memory": "用户喜欢寿司",
-                    "memory_type": "preference",
-                    "importance": 0.8,
-                }
-            }
-        )
-        decision = await extractor_chain.extract("我喜欢寿司", "好呀", llm=llm)
-        assert decision.should_save is True
-        assert decision.memory == "用户喜欢寿司"

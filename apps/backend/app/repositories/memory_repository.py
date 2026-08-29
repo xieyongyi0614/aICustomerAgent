@@ -268,13 +268,6 @@ def delete_memory(memory_id: str) -> None:
             session.commit()
 
 
-def exists_similar(user_id: str, memory: str, threshold: float = 1.0) -> bool:
-    with SessionLocal() as session:
-        rows = session.query(Memory).filter(Memory.user_id == user_id).all()
-        for row in rows:
-            if memory == row.memory or memory in row.memory or row.memory in memory:
-                return True
-        return False
 
 
 def create_memory_v4_and_supersede(
