@@ -157,6 +157,7 @@ class PromptBuilder:
         analysis: TurnAnalysis | None = None,
         scene_ctx=None,
         goal_ctx=None,
+        behavior_ctx=None,
     ) -> ChatPromptTemplate:
         identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
         state_sections: list[str] = []
@@ -169,14 +170,35 @@ class PromptBuilder:
         tail_sections: list[str] = [
             MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
         ]
-        if analysis is not None:
+        behavior_section = None
+        activity_section = None
+        if analysis is not None and behavior_ctx is not None:
+            from app.prompts.behavior import build_activity_section, build_behavior_section
+
+            activity_section = build_activity_section(behavior_ctx)
+            if behavior_ctx.fallback_v2 is not None:
+                tail_sections.append(_literal(build_behavior_section(behavior_ctx)))
+            else:
+                behavior_section = build_behavior_section(behavior_ctx)
+                if behavior_section is not None:
+                    behavior_section = _literal(behavior_section)
+            if activity_section is not None:
+                activity_section = _literal(activity_section)
+        elif analysis is not None:
             tail_sections.append(PromptBuilder.build_behavior_section(analysis))
+        scene_budget = (
+            behavior_ctx.budget
+            if behavior_ctx is not None and behavior_ctx.fallback_v2 is None
+            else None
+        )
         if scene_ctx is not None:
             from app.prompts.scene import build_scene_sections
 
             tail_sections.extend(
-                _literal(section) for section in build_scene_sections(scene_ctx)
+                _literal(section) for section in build_scene_sections(scene_ctx, scene_budget)
             )
+        if activity_section is not None:
+            tail_sections.append(activity_section)
 
         from app.prompts.goal import build_goal_section, build_intention_section
 
@@ -196,6 +218,7 @@ class PromptBuilder:
             + sum(len(text) for text in tail_sections)
             + (len(goal_section) if goal_section else 0)
             + (len(intention_section) if intention_section else 0)
+            + (len(behavior_section) if behavior_section else 0)
             + len(state.current_input)
             + 120
         )
@@ -207,6 +230,8 @@ class PromptBuilder:
             messages.append(("system", goal_section))
         if intention_section is not None:
             messages.append(("system", intention_section))
+        if behavior_section is not None:
+            messages.append(("system", behavior_section))
 
         if memories:
             memory_lines = "\n".join(

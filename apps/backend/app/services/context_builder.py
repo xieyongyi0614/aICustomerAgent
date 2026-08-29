@@ -29,7 +29,7 @@ async def build(
 ) -> ConversationState:
     if not current_input:
         raise ValueError("current_input 必填")
-    conversation_service.ensure_conversation(session_id, user_id)
+    conversation_row = conversation_service.ensure_conversation(session_id, user_id)
     messages = conversation_service.load_window(session_id)
     current = summary_service.get_summary(session_id)
     summary = current.summary if current else None
@@ -44,6 +44,8 @@ async def build(
         trace.record("memory_retrieval", (time.perf_counter() - started) * 1000)
     character_state, relationship_state = _load_states_with_fallback(user_id)
     goals = goal_service.load_active(user_id)
+    mode = getattr(conversation_row, "mode", None) or "default"
+    mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(
         session_id=session_id,
         user_id=user_id,
@@ -54,4 +56,6 @@ async def build(
         character_state=character_state,
         relationship_state=relationship_state,
         goals=goals,
+        mode=mode,
+        mode_entered_at=mode_entered_at,
     )

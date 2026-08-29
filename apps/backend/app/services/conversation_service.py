@@ -7,6 +7,10 @@ def ensure_conversation(session_id: str, user_id: str):
     return repo.get_or_create_conversation(session_id, user_id)
 
 
+def find_conversation(session_id: str):
+    return repo.find_conversation(session_id)
+
+
 def load_window(
     session_id: str, max_messages: int | None = None, max_chars: int | None = None
 ) -> list[ChatMessage]:
@@ -22,9 +26,16 @@ def load_window(
     return result
 
 
-def save_turn(session_id: str, user_message: str, ai_reply: str) -> int:
+def save_turn(
+    session_id: str,
+    user_message: str,
+    ai_reply: str,
+    mode_write_back: str | None = None,
+) -> int:
     repo.save_message(session_id, "human", user_message)
     ai_message = repo.save_message(session_id, "ai", ai_reply)
+    if mode_write_back is not None:
+        repo.update_mode(session_id, mode_write_back)
     return ai_message.id
 
 

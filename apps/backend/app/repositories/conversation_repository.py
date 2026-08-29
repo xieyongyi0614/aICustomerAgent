@@ -64,3 +64,14 @@ def touch_conversation(conv_id: str) -> None:
         if conversation is not None:
             conversation.updated_at = datetime.now()
             session.commit()
+
+
+def update_mode(conv_id: str, mode: str) -> None:
+    with SessionLocal() as session:
+        conversation = session.get(Conversation, conv_id)
+        if conversation is not None:
+            now = datetime.now()
+            conversation.mode = mode
+            conversation.mode_entered_at = now
+            conversation.updated_at = now
+            session.commit()

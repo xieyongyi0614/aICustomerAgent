@@ -177,9 +177,82 @@ def test_golden_v6_full_sections():
     )
 
 
+def _behavior_ctx():
+    from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
+    from app.models.behavior_strategy import ActionBudget, BehaviorDirective, BehaviorStrategy, HabitRule
+
+    return BehaviorDirective(
+        strategy=BehaviorStrategy(
+            strategy="quiet_companion",
+            base_strategy="quiet_companion",
+            instruction="先安静地陪着，接住情绪；不急着给建议，问一句「想聊聊吗」就好。",
+            mood_tone="低而稳的语气，不强行打气",
+        ),
+        budget=ActionBudget(max_action_desc=0),
+        habits=[
+            HabitRule(
+                id="habit_question_bounded",
+                domain="pace",
+                priority=3,
+                instruction="一次最多问一个问题，问完先等回答",
+            )
+        ],
+        activity="ambient_activity",
+        activity_text="倒水",
+    )
+
+
+def test_golden_v65_full_sections():
+    _assert_golden(
+        "prompt_v65_full.txt",
+        _render(
+            PromptBuilder.build(
+                "default",
+                _full_state(),
+                _full_analysis(),
+                scene_ctx=_scene_ctx(),
+                goal_ctx=_goal_ctx(),
+                behavior_ctx=_behavior_ctx(),
+            )
+        ),
+    )
+
+
+def test_golden_v65_degraded_fallback():
+    from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
+    from app.models.behavior_strategy import ActionBudget, BehaviorDirective, BehaviorStrategy
+
+    directive = BehaviorDirective(
+        strategy=BehaviorStrategy(
+            strategy="natural_continuation",
+            base_strategy="natural_continuation",
+            degraded=True,
+        ),
+        budget=ActionBudget(),
+        fallback_v2=BEHAVIOR_INSTRUCTIONS["comfort"],
+    )
+    text = _render(
+        PromptBuilder.build(
+            "default",
+            _full_state(),
+            _full_analysis(),
+            scene_ctx=_scene_ctx(),
+            goal_ctx=_goal_ctx(),
+            behavior_ctx=directive,
+        )
+    )
+    assert "【本轮行为指令】" in text
+    assert "【表现方式】" not in text
+
+
 @pytest.mark.parametrize(
     "name",
-    ["prompt_v1_default.txt", "prompt_v5_full.txt", "prompt_v6_full.txt"],
+    [
+        "prompt_v1_default.txt",
+        "prompt_v5_full.txt",
+        "prompt_v6_full.txt",
+        "prompt_v65_full.txt",
+    ],
 )
 def test_golden_snapshots_exist(name):
     assert (GOLDEN_DIR / name).exists()

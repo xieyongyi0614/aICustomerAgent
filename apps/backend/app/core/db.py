@@ -25,8 +25,21 @@ class Conversation(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
+    mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="default", server_default="default"
+    )
+    mode_entered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "mode IN ('professional', 'default', 'immersive')",
+            name="ck_conversations_mode",
+        ),
+    )
 
 
 class Message(Base):

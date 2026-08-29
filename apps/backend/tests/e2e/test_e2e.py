@@ -183,6 +183,10 @@ def test_router_high_confidence_keeps_mode(
         },
     )
     llm_factory.set_llm(llm)
-    resp = client_fixture.post("/api/v1/chat/message", json={"content": "Python 报错"})
-    assert resp.status_code == 200
+    first = client_fixture.post("/api/v1/chat/message", json={"content": "Python 报错"})
+    assert first.status_code == 200
+    session_id = first.headers.get("x-session-id")
+    client_fixture.post(
+        "/api/v1/chat/message", json={"content": "Python 报错", "session_id": session_id}
+    )
     assert any("专业模式" in str(m) for m in llm.seen_messages)

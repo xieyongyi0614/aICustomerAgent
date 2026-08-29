@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     goal_late_night_start: int = 23
     goal_late_night_end: int = 6
 
+    mode_switch_min_confidence: float = 0.7
+    mode_switch_min_turns: int = 2
+    mode_idle_reset_seconds: int = 7200
+
     @model_validator(mode="after")
     def validate_profiles(self):
         if not self.llm_profiles_json:

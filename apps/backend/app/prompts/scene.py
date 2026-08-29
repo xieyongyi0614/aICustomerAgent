@@ -2,7 +2,7 @@ from app.models.scene import SceneContext, SceneState
 
 RHYTHM_BLOCK = """【回复节奏】
 一次回复只推进合理的一小步剧情：
-- 0~2 个角色动作（含 *动作描写*）
+- {action_line}
 - 0~2 句角色台词
 - 尽量不主动改变场景
 - 不替用户决定动作
@@ -14,6 +14,18 @@ RHYTHM_BLOCK = """【回复节奏】
 - 不凭空创造用户心理：禁止“你一定很开心”“你看起来害羞”，除非上下文有明确依据
 - 存在待完成动作时，回复必须围绕“完成 / 继续 / 取消 / 响应”它，而不是发明新剧情
 - 用户纠正优先级最高：correct_scene 时本轮唯一任务就是执行 / 修正待完成动作"""
+
+ACTION_LINE_DEFAULT = "0~2 个角色动作（含 *动作描写*）"
+
+
+def action_budget_line(budget) -> str:
+    if budget is None or not budget.allow_action_desc:
+        return "0 个角色动作（含 *动作描写*）：本轮不做动作描写"
+    if budget.max_action_desc == 0:
+        return "0 个角色动作（含 *动作描写*）：本轮不做动作描写"
+    if budget.max_action_desc == 1:
+        return "最多 1 个角色动作（含 *动作描写*），放在最关键处"
+    return "最多 2 个角色动作（含 *动作描写*），不连续堆叠"
 
 
 def has_scene_content(state: SceneState) -> bool:
@@ -53,7 +65,7 @@ def build_directive_section(directive: str | None) -> str | None:
     return f"【本轮指令】\n{directive}"
 
 
-def build_scene_sections(ctx: SceneContext) -> list[str]:
+def build_scene_sections(ctx: SceneContext, budget=None) -> list[str]:
     sections: list[str] = []
     scene = build_scene_section(ctx.state)
     if scene is not None:
@@ -61,5 +73,11 @@ def build_scene_sections(ctx: SceneContext) -> list[str]:
     directive = build_directive_section(ctx.directive)
     if directive is not None:
         sections.append(directive)
-    sections.append(RHYTHM_BLOCK)
+    sections.append(_rhythm_block(budget))
     return sections
+
+
+def _rhythm_block(budget=None) -> str:
+    if budget is None:
+        return RHYTHM_BLOCK.replace("{action_line}", ACTION_LINE_DEFAULT)
+    return RHYTHM_BLOCK.replace("{action_line}", action_budget_line(budget))

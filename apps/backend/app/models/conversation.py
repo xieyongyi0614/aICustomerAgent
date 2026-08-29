@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
@@ -23,3 +24,5 @@ class ConversationState(BaseModel):
     character_state: CharacterState = CharacterState()
     relationship_state: RelationshipState = RelationshipState()
     goals: list[GoalRecord] = []
+    mode: str = "default"
+    mode_entered_at: datetime | None = None

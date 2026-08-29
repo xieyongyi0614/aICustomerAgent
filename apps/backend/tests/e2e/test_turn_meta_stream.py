@@ -80,17 +80,22 @@ def test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id(
         )
     )
     with httpx.Client(base_url=meta_http_server.base_url) as client:
+        first = client.post("/api/v1/chat/message", json={"content": "我今天压力很大"})
+        assert first.status_code == 200
+        session_id = first.headers.get("x-session-id")
         with client.stream(
-            "POST", "/api/v1/chat/message", json={"content": "我今天压力很大"}
+            "POST",
+            "/api/v1/chat/message",
+            json={"content": "我今天压力很大", "session_id": session_id},
         ) as resp:
             assert resp.status_code == 200
-            session_id = resp.headers.get("x-session-id")
-            assert resp.headers.get("x-session-new") == "true"
             lines = [json.loads(line) for line in resp.iter_lines() if line.strip()]
 
     assert lines[0]["type"] == "turn_meta"
     meta = lines[0]
     assert meta["role_mode"] == IMMERSIVE_ROLE_MODE
+    assert meta["mode"]["effective"] == "immersive"
+    assert meta["mode"]["switched"] is True
     assert meta["analysis"]["user_emotion"] == COMFORT_ANALYSIS["user_emotion"]
     assert meta["analysis"]["behavior"] == COMFORT_ANALYSIS["behavior"]
     assert meta["analysis"]["emotion_event"]["type"] == "none"
@@ -144,7 +149,8 @@ def test_turn_meta_reflects_low_confidence_degradation(
     assert meta["role_mode"]["mode"] == "default"
     assert meta["role_mode"]["confidence"] == 0.1
     assert meta["role_mode"]["intent"] == "roleplay"
-    assert meta["role_mode"]["reason"].startswith("低置信度降级")
+    assert meta["mode"]["effective"] == "default"
+    assert meta["mode"]["switched"] is False
 
 
 def test_turn_meta_uses_default_analysis_when_analyzer_fails(

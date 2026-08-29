@@ -1,3 +1,4 @@
+import json
 import logging
 import threading
 import uuid
@@ -19,6 +20,8 @@ TRACE_STEP_NAMES = (
     "memory_retrieval",
     "context_builder",
     "prompt_builder",
+    "mode_stabilize",
+    "behavior_engine",
     "llm",
     "state_update",
     "emotion_update",
@@ -41,6 +44,14 @@ _BACKGROUND_STEPS = (
 )
 
 
+def _jsonable(value) -> bool:
+    try:
+        json.dumps(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
 @dataclass
 class TraceStep:
     name: str
@@ -48,6 +59,7 @@ class TraceStep:
     status: str = "ok"
     first_token_ms: float | None = None
     error: str | None = None
+    extra: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -71,6 +83,7 @@ class TurnTraceSession:
         status: str = "ok",
         first_token_ms: float | None = None,
         error: str | None = None,
+        **extra,
     ) -> None:
         try:
             self.steps.append(
@@ -82,6 +95,7 @@ class TurnTraceSession:
                         round(first_token_ms, 2) if first_token_ms is not None else None
                     ),
                     error=error,
+                    extra=extra,
                 )
             )
         except Exception:
@@ -125,6 +139,11 @@ class TurnTraceSession:
                     "durationMs": step.duration_ms,
                     "firstTokenMs": step.first_token_ms,
                     "error": step.error,
+                    **(
+                        {"extra": {k: v for k, v in step.extra.items() if _jsonable(v)}}
+                        if step.extra
+                        else {}
+                    ),
                 }
                 for step in self.steps
             ],

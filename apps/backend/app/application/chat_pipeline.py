@@ -27,9 +27,11 @@ from app.models.scene import SceneContext, SceneIntentResult, SceneState
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.services import (
+    behavior_engine,
     context_builder,
     conversation_service,
     goal_service,
+    mode_service,
     scene_service,
     state_service,
     trace_collector,
@@ -44,33 +46,41 @@ class EmptyLLMResponseError(Exception):
     pass
 
 
-def _effective_role_mode(result) -> RoleMode:
+def _router_candidate(result) -> tuple[str, float]:
+    """router 输出 → (候选 mode, 置信度)；故障时返回空候选，由稳定器 R5 兜底。"""
     if isinstance(result, BaseException):
-        logger.error("路由解析失败，降级 default", exc_info=result)
-        return RoleMode(
-            mode="default",
-            intent="casual",
-            confidence=0.0,
-            reason="路由失败，降级 default",
-        )
+        logger.error("路由解析失败，候选置空（生效=confirmed）", exc_info=result)
+        return "", 0.0
     if not isinstance(result, RoleMode):
-        logger.error("路由输出非法：%r，降级 default", result)
-        return RoleMode(
-            mode="default",
-            intent="casual",
-            confidence=0.0,
-            reason="路由输出非法，降级 default",
+        logger.error("路由输出非法：%r，候选置空（生效=confirmed）", result)
+        return "", 0.0
+    logger.info("路由候选：mode=%s confidence=%s", result.mode, result.confidence)
+    return result.mode, result.confidence
+
+
+def _stabilize_mode(role_mode_result, state, session_id: str) -> mode_service.ModeDecision:
+    candidate, confidence = _router_candidate(role_mode_result)
+    confirmed = state.mode or "default"
+    idle_seconds = 0.0
+    if state.mode_entered_at is not None:
+        idle_seconds = max(
+            (datetime.now() - state.mode_entered_at).total_seconds(), 0.0
         )
-    logger.info("路由输出：mode=%s confidence=%s", result.mode, result.confidence)
-    if result.confidence < get_settings().router_confidence_threshold:
-        logger.warning("路由低置信度(%s)，降级 default：%s", result.confidence, result.reason)
-        return RoleMode(
-            mode="default",
-            intent=result.intent,
-            confidence=result.confidence,
-            reason=f"低置信度降级：{result.reason}",
-        )
-    return result
+    decision = mode_service.stabilize(
+        confirmed_mode=confirmed,
+        candidate=candidate,
+        confidence=confidence,
+        session_id=session_id,
+        idle_seconds=idle_seconds,
+    )
+    logger.info(
+        "mode 稳定：confirmed=%s candidate=%s effective=%s rule=%s",
+        confirmed,
+        candidate,
+        decision.effective,
+        decision.rule,
+    )
+    return decision
 
 
 def _resolve_analysis(result) -> TurnAnalysis:
@@ -197,7 +207,22 @@ async def run_chat_pipeline(
     ):
         trace.mark_status("intention", "degraded")
 
-    effective_mode = _effective_role_mode(role_mode)
+    stabilize_started = time.perf_counter()
+    mode_decision = _stabilize_mode(role_mode, state, session_id)
+    trace.record(
+        "mode_stabilize",
+        (time.perf_counter() - stabilize_started) * 1000,
+    )
+    if isinstance(role_mode, RoleMode):
+        effective_mode = role_mode.model_copy(update={"mode": mode_decision.effective})
+    else:
+        effective_mode = RoleMode(
+            mode=mode_decision.effective,
+            intent="casual",
+            confidence=0.0,
+            reason="路由失败，保持已确认模式",
+        )
+
     turn = _resolve_analysis(analysis)
     scene_intent_result = _resolve_scene_intent(scene_intent)
     intention_candidate = _resolve_intention(intention_candidate)
@@ -232,7 +257,32 @@ async def run_chat_pipeline(
         if selected_goal.goal is not None
         else None
     )
+
+    behavior_started = time.perf_counter()
+    behavior_ctx = behavior_engine.resolve(
+        validated_intention, state, scene_ctx, mode_decision.effective, turn
+    )
+    trace.record(
+        "behavior_engine",
+        (time.perf_counter() - behavior_started) * 1000,
+        "degraded" if behavior_ctx.degraded else "ok",
+        strategy=behavior_ctx.strategy.strategy,
+        base_strategy=behavior_ctx.strategy.base_strategy,
+        budget_max=behavior_ctx.budget.max_action_desc,
+        matched_habits=[h.id for h in behavior_ctx.habits],
+    )
     trace.set_meta(effective_mode, turn)
+
+    behavior_meta = {
+        "strategy": behavior_ctx.strategy.strategy,
+        "budget": behavior_ctx.budget.model_dump(),
+        "degraded": behavior_ctx.degraded,
+    }
+    mode_meta = {
+        "confirmed": state.mode or "default",
+        "effective": mode_decision.effective,
+        "switched": mode_decision.switched,
+    }
 
     yield {
         "kind": "turn_meta",
@@ -242,6 +292,8 @@ async def run_chat_pipeline(
         "scene_state": resolved_state,
         "intention": validated_intention,
         "current_goal": current_goal,
+        "behavior": behavior_meta,
+        "mode": mode_meta,
     }
 
     full_reply = []
@@ -250,13 +302,14 @@ async def run_chat_pipeline(
     goal_ctx = GoalContext(selected_goal=selected_goal, intention=validated_intention)
     try:
         async for token in answer_chain.astream(
-            effective_mode.mode,
+            mode_decision.effective,
             state,
             turn,
             llm=llm,
             trace=trace,
             scene_ctx=scene_ctx,
             goal_ctx=goal_ctx,
+            behavior_ctx=behavior_ctx,
         ):
             if first_token_ms is None:
                 first_token_ms = (time.perf_counter() - llm_started) * 1000
@@ -296,7 +349,12 @@ async def run_chat_pipeline(
         logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))
     else:
         logger.warning("模型输出为空")
-    ai_message_id = conversation_service.save_turn(session_id, content, reply)
+    ai_message_id = conversation_service.save_turn(
+        session_id,
+        content,
+        reply,
+        mode_write_back=mode_decision.effective if mode_decision.write_back else None,
+    )
     schedule_post_process(
         session_id,
         user_id,
