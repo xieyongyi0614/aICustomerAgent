@@ -4,22 +4,27 @@
 
 「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆能力的 AI Agent（FastAPI + LangChain + PostgreSQL）。
 
-- 当前开发分支：`feat/v2`
-- 开发阶段：V2（角色状态系统），任务见 `docs/v2/01-task-registry.md`
+- 当前开发分支：`feat/v3`
+- 开发阶段：V4（Long-term Memory）已完成并验收，任务见 `docs/roleplay-v4/tasks.md`；V5 规划见 `docs/roleplay-v5/`
+- 上线前待办：按 `docs/roleplay-v4/regression-checklist.md` 执行真实模型人工回归
 
 ## 目录结构
 
 | 路径 | 说明 | 规则位置 |
 |---|---|---|
 | `apps/backend/` | 后端（Python 3.13 + FastAPI + LangChain） | `apps/backend/AGENTS.md` |
+| `apps/frontend/` | 前端（React + Vite + Vitest） | — |
 | `docs/` | 文档（任务注册表、架构设计） | — |
 
 ## 文档导航
 
-- `docs/v2/01-task-registry.md` — V2 任务注册表（当前唯一入口）
-- `docs/v2/v2-architecture.md` — V2 角色状态系统设计
+- `docs/roleplay-v4/tasks.md` — V4 任务注册表（V4-001~012 已全部完成）
+- `docs/roleplay-v4/architecture.md` — V4 长期记忆架构设计（管线：Extractor → Policy → Conflict → Repository → Retrieval → Context）
+- `docs/roleplay-v4/regression-checklist.md` — V4 真实模型人工回归清单（待执行）
+- `docs/roleplay-v5/` — V5 规划文档
+- `docs/roleplay-v3/` — V3 场景状态与动作连续性设计
+- `docs/v2/01-task-registry.md` — V2 任务注册表（已完结）
 - `docs/v1/01-task-registry.md` — V1 任务注册表（已完结）
-- `docs/v1/v1-architecture.md` — V1 三层架构设计
 
 ## 全局约定
 
