@@ -139,3 +139,30 @@ def test_v65_008_state_snapshot_defaults_without_turn(client):
     trace_collector.reset_trace_collector()
     snapshot = client.get("/api/v1/state").json()
     assert snapshot["last_behavior"] is None
+
+
+def test_v65_010_budget_observer_flags_violation(client, fake_llm):
+    from app.services import trace_collector
+
+    llm = fake_llm(
+        response=["*笑了笑* *点头* *转身走开*"],
+        structured_responses={"RoleMode": DEFAULT_MODE, "TurnAnalysis": ANALYSIS},
+    )
+    llm_factory.set_llm(llm)
+    resp = client.post("/api/v1/chat/message", json={"content": "在吗"})
+    assert resp.status_code == 200
+
+    def _violation_recorded():
+        session = trace_collector.get_trace_collector().latest()
+        if session is None:
+            return False
+        return any(
+            step.name == "budget_observer" and step.status == "violation"
+            for step in session.steps
+        )
+
+    assert wait_until(_violation_recorded)
+    session = trace_collector.get_trace_collector().latest()
+    step = next(s for s in session.steps if s.name == "budget_observer")
+    assert step.extra["action_count"] == 3
+    assert step.extra["budget_max"] == 1

@@ -2,9 +2,11 @@
 
 纯函数：intention → strategy（确定性映射 + 白名单修饰）→ Budget（7 步预算表）
 → habit 匹配（≤2 条）→ activity 分类。无 IO、无 LLM。
+observe_budget 为输出侧只读统计（V6.5-010），不阻塞不重写。
 """
 
 import logging
+import re
 
 from app.character.asuna.behavior_policy import BEHAVIOR_POLICY, STRATEGY_INSTRUCTIONS
 from app.character.asuna.habits import HABIT_LIST
@@ -303,5 +305,61 @@ def _is_pending(scene_ctx: SceneContext | None) -> bool:
         and scene_ctx.state.pending_action is not None
         and scene_ctx.state.pending_action.status == "pending"
     )
+
+
+ACTION_DESC_PATTERN = re.compile(r"\*[^*\n]+\*")
+
+CONTACT_LEVELS = ("none", "light", "moderate")
+
+LIGHT_CONTACT_WORDS = (
+    "递给",
+    "递到",
+    "递上",
+    "整理衣角",
+    "整理衣领",
+    "理了理",
+    "拍了拍",
+    "搭在肩",
+)
+MODERATE_CONTACT_WORDS = (
+    "牵手",
+    "牵起",
+    "握住",
+    "拉住",
+    "挽住",
+    "拥抱",
+    "抱住",
+    "搂",
+    "亲吻",
+    "吻了",
+)
+
+
+def _observed_contact_level(reply: str) -> str:
+    if any(word in reply for word in MODERATE_CONTACT_WORDS):
+        return "moderate"
+    if any(word in reply for word in LIGHT_CONTACT_WORDS):
+        return "light"
+    return "none"
+
+
+def observe_budget(reply: str, budget) -> dict:
+    if reply is None:
+        reply = ""
+    action_count = len(ACTION_DESC_PATTERN.findall(reply))
+    contact_level = _observed_contact_level(reply)
+    action_violated = action_count > budget.max_action_desc
+    contact_violated = (
+        CONTACT_LEVELS.index(contact_level) > CONTACT_LEVELS.index(budget.physical_contact)
+    )
+    return {
+        "action_count": action_count,
+        "contact_level": contact_level,
+        "budget_max": budget.max_action_desc,
+        "budget_contact": budget.physical_contact,
+        "action_violated": action_violated,
+        "contact_violated": contact_violated,
+        "violated": action_violated or contact_violated,
+    }
 
 

@@ -27,6 +27,7 @@ TRACE_STEP_NAMES = (
     "emotion_update",
     "relationship_event",
     "goal_review",
+    "budget_observer",
     "memory_extractor",
     "memory_extract",
     "memory_policy",

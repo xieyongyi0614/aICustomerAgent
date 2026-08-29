@@ -13,6 +13,7 @@ from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.services import (
+    behavior_engine,
     conversation_service,
     goal_service,
     memory_service,
@@ -41,6 +42,7 @@ class PostProcessContext:
     trace: object | None = None
     selected_goal: object | None = None
     intention: object | None = None
+    behavior: object | None = None
 
 
 async def run_scene_update(ctx: PostProcessContext) -> None:
@@ -158,12 +160,42 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
             )
 
 
+async def run_budget_observer(ctx: PostProcessContext) -> None:
+    if ctx.behavior is None:
+        return
+    started = time.perf_counter()
+    try:
+        observation = behavior_engine.observe_budget(ctx.ai_reply, ctx.behavior.budget)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "budget_observer",
+                (time.perf_counter() - started) * 1000,
+                "violation" if observation["violated"] else "ok",
+                **observation,
+            )
+        if observation["violated"]:
+            logger.warning(
+                "动作预算违规：actions=%d max=%d contact=%s allowed=%s",
+                observation["action_count"],
+                observation["budget_max"],
+                observation["contact_level"],
+                observation["budget_contact"],
+            )
+    except Exception:
+        logger.exception("预算观测失败，跳过")
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "budget_observer", 0.0, "error", error="observe_budget failed"
+            )
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
     run_goal_review,
     run_summary,
     run_memory_extract,
+    run_budget_observer,
 )
 
 
@@ -195,6 +227,7 @@ def schedule_post_process(
     trace=None,
     selected_goal=None,
     intention=None,
+    behavior=None,
 ) -> None:
     ctx = PostProcessContext(
         session_id=session_id,
@@ -210,6 +243,7 @@ def schedule_post_process(
         trace=trace,
         selected_goal=selected_goal,
         intention=intention,
+        behavior=behavior,
     )
     task = asyncio.create_task(run_post_process(ctx))
     background_tasks.add(task)

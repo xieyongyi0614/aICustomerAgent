@@ -371,6 +371,7 @@ async def run_chat_pipeline(
         trace=trace,
         selected_goal=selected_goal,
         intention=validated_intention,
+        behavior=behavior_ctx,
     )
     collector = trace_collector.get_trace_collector()
     collector.attach(trace, str(ai_message_id))
