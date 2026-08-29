@@ -1,9 +1,11 @@
 import pytest
+from datetime import datetime, timezone
 
 from app.models.character_state import CharacterState
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.relationship import RelationshipState
+from app.core.settings import get_settings
 from app.prompts.builder import PromptBuilder
 
 
@@ -149,3 +151,55 @@ class TestTemplateInjection:
         joined = "\n".join(rendered)
         assert "因为 {user} 夸了我" in joined
         assert "用户提到 {project}" in joined
+
+
+class TestContextTotalBudget:
+    def test_over_budget_trims_history_first(self, monkeypatch):
+        get_settings().context_total_char_budget = 800
+        big_history = [
+            ChatMessage(role="human", content="历史消息" + "甲" * 200) for _ in range(10)
+        ]
+        state = make_state()
+        state = state.model_copy(
+            update={"messages": big_history, "current_input": "在吗"}
+        )
+        prompt = PromptBuilder.build("default", state)
+        rendered = prompt.format_messages()
+        total = sum(len(m.content) for m in rendered)
+        assert total <= 800 + 200
+        assert rendered[-1].content == "在吗"
+
+    def test_memories_trimmed_before_summary(self, monkeypatch):
+        get_settings().context_total_char_budget = 700
+        from app.models.memory import UserMemoryV4
+
+        now = datetime(2026, 8, 29, tzinfo=timezone.utc)
+        memories = [
+            UserMemoryV4(
+                id=f"m{i}",
+                user_id="u1",
+                character_id="asuna",
+                type="user_preference",
+                content="记忆" + "乙" * 180,
+                importance=0.9 - i * 0.1,
+                created_at=now,
+                updated_at=now,
+            )
+            for i in range(3)
+        ]
+        state = make_state()
+        state = state.model_copy(
+            update={"memories": memories, "summary": "摘要" + "丙" * 500}
+        )
+        prompt = PromptBuilder.build("default", state, analysis=TurnAnalysis())
+        rendered = [m.content for m in prompt.format_messages()]
+        joined = "\n".join(rendered)
+        memory_mentions = joined.count("记忆乙乙乙")
+        assert memory_mentions < 3
+        assert "…" in joined
+
+    def test_within_budget_unchanged(self):
+        state = make_state()
+        before = PromptBuilder.build("default", state)
+        rendered = [m.content for m in before.format_messages()]
+        assert rendered[-1] == "在吗"

@@ -123,6 +123,7 @@ class Settings(BaseSettings):
     memory_context_char_budget: int = 400
     memory_candidate_pool_limit: int = 200
     memory_reclaim_batch_limit: int = 500
+    context_total_char_budget: int = 12000
     state_history_limit: int = 20
     scene_pending_max_turns: int = 5
 

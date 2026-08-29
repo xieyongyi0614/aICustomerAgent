@@ -14,6 +14,7 @@ from app.character.asuna import (
 )
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
+from app.core.settings import get_settings
 
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",
@@ -125,23 +126,73 @@ class PromptBuilder:
         return f"【本轮行为指令】\n{instruction}"
 
     @staticmethod
+    def _fit_variable_parts(
+        state: ConversationState, fixed_chars: int
+    ) -> tuple[list, list, str | None]:
+        settings = get_settings()
+        budget = settings.context_total_char_budget - fixed_chars
+
+        history = list(state.messages)
+        memories = list(state.memories)
+        summary = state.summary
+
+        history_chars = sum(len(m.content) for m in history)
+        memory_chars = sum(len(m.content) for m in memories)
+        while history and history_chars + memory_chars > budget:
+            history_chars -= len(history[0].content)
+            history.pop(0)
+        while memories and history_chars + memory_chars > budget:
+            memory_chars -= len(memories[-1].content)
+            memories.pop()
+        if summary is not None:
+            remaining = budget - history_chars - memory_chars
+            if len(summary) > remaining:
+                summary = summary[: max(remaining - 1, 0)] + "…"
+        return history, memories, summary
+
+    @staticmethod
     def build(
         mode: str,
         state: ConversationState,
         analysis: TurnAnalysis | None = None,
         scene_ctx=None,
     ) -> ChatPromptTemplate:
-        messages = [("system", section) for section in PromptBuilder.build_identity_sections()]
-
+        identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
+        state_sections: list[str] = []
         if analysis is not None:
-            messages.append(("system", _literal(PromptBuilder.build_emotion_section(state))))
-            messages.append(("system", _literal(PromptBuilder.build_character_state_section(state))))
-            messages.append(("system", _literal(PromptBuilder.build_relationship_section(state))))
+            state_sections = [
+                _literal(PromptBuilder.build_emotion_section(state)),
+                _literal(PromptBuilder.build_character_state_section(state)),
+                _literal(PromptBuilder.build_relationship_section(state)),
+            ]
+        tail_sections: list[str] = [
+            MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
+        ]
+        if analysis is not None:
+            tail_sections.append(PromptBuilder.build_behavior_section(analysis))
+        if scene_ctx is not None:
+            from app.prompts.scene import build_scene_sections
 
-        if state.memories:
+            tail_sections.extend(
+                _literal(section) for section in build_scene_sections(scene_ctx)
+            )
+
+        fixed_chars = (
+            sum(len(text) for _, text in identity)
+            + sum(len(text) for text in state_sections)
+            + sum(len(text) for text in tail_sections)
+            + len(state.current_input)
+            + 120
+        )
+        history, memories, summary = PromptBuilder._fit_variable_parts(state, fixed_chars)
+
+        messages = list(identity)
+        messages.extend(("system", text) for text in state_sections)
+
+        if memories:
             memory_lines = "\n".join(
                 f"- ({MEMORY_TYPE_LABELS.get(m.type, m.type)}) {m.content}"
-                for m in state.memories
+                for m in memories
             )
             messages.append(
                 (
@@ -152,27 +203,16 @@ class PromptBuilder:
                 )
             )
 
-        if state.summary:
-            messages.append(("system", _literal(f"【对话摘要】\n{state.summary}")))
+        if summary:
+            messages.append(("system", _literal(f"【对话摘要】\n{summary}")))
 
-        for message in state.messages:
+        for message in history:
             if message.role == "human":
                 messages.append(HumanMessage(content=message.content))
             else:
                 messages.append(AIMessage(content=message.content))
 
-        mode_instruction = MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
-        messages.append(("system", mode_instruction))
-
-        if analysis is not None:
-            messages.append(("system", PromptBuilder.build_behavior_section(analysis)))
-
-        if scene_ctx is not None:
-            from app.prompts.scene import build_scene_sections
-
-            for section in build_scene_sections(scene_ctx):
-                messages.append(("system", _literal(section)))
-
+        messages.extend(("system", text) for text in tail_sections)
         messages.append(HumanMessage(content=state.current_input))
 
         return ChatPromptTemplate.from_messages(messages)
