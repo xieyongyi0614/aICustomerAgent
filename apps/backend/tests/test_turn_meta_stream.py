@@ -98,7 +98,10 @@ def test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id(
     assert lines[0]["type"] == "turn_meta"
     meta = lines[0]
     assert meta["role_mode"] == IMMERSIVE_ROLE_MODE
-    assert meta["analysis"] == COMFORT_ANALYSIS
+    assert meta["analysis"]["user_emotion"] == COMFORT_ANALYSIS["user_emotion"]
+    assert meta["analysis"]["behavior"] == COMFORT_ANALYSIS["behavior"]
+    assert meta["analysis"]["emotion_event"]["type"] == "none"
+    assert meta["analysis"]["relationship_event"]["type"] == "none"
 
     deltas = [line["delta"] for line in lines if "delta" in line]
     assert deltas == ["别急", "，有我呢"]
