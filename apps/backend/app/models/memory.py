@@ -11,6 +11,8 @@ MemorySource = Literal["user_stated", "user_derived", "ai_inferred"]
 
 MemoryAction = Literal["save", "update", "invalidate", "forget", "suppress", "none"]
 
+MemoryRelation = Literal["refine", "replace", "negate"]
+
 MemoryStatus = Literal["active", "superseded", "invalidated"]
 
 LEGACY_MEMORY_TYPE_MAP = {
@@ -55,6 +57,7 @@ class MemoryCandidate(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source: MemorySource = "ai_inferred"
     target_memory_id: str | None = None
+    relation: MemoryRelation | None = None
 
     @model_validator(mode="after")
     def validate_action_fields(self):
@@ -64,8 +67,6 @@ class MemoryCandidate(BaseModel):
             return self
         if not self.content:
             raise ValueError("action!=none 时 content 必填")
-        if self.action in TARGETED_ACTIONS and not self.target_memory_id:
-            raise ValueError("action=update/invalidate 时 target_memory_id 必填")
         if self.action not in TARGETED_ACTIONS and self.target_memory_id is not None:
             raise ValueError("action=save/forget/suppress 时不应携带 target_memory_id")
         return self

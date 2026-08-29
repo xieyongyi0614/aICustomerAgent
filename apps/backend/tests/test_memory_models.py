@@ -88,13 +88,13 @@ class TestMemoryCandidate:
         with pytest.raises(ValidationError):
             make_candidate(action="none", target_memory_id="m-old")
 
-    def test_update_without_target_rejected(self):
-        with pytest.raises(ValidationError):
-            make_candidate(action="update")
+    def test_update_without_target_allowed_for_resolver_matching(self):
+        candidate = make_candidate(action="update")
+        assert candidate.target_memory_id is None
 
-    def test_invalidate_without_target_rejected(self):
-        with pytest.raises(ValidationError):
-            make_candidate(action="invalidate")
+    def test_invalidate_without_target_allowed_for_resolver_matching(self):
+        candidate = make_candidate(action="invalidate")
+        assert candidate.target_memory_id is None
 
     def test_save_with_target_rejected(self):
         with pytest.raises(ValidationError):
