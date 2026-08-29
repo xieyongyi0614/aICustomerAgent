@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    false,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -51,6 +53,9 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    is_proactive: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (
@@ -290,3 +295,47 @@ engine = create_engine_from_url()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+
+
+class ProactiveActionRow(Base):
+    __tablename__ = "proactive_actions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="asuna", server_default="asuna"
+    )
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    trigger_type: Mapped[str] = mapped_column(String, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String, nullable=False)
+    goal_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    intention: Mapped[str] = mapped_column(String, nullable=False)
+    reason: Mapped[str] = mapped_column(String, nullable=False, default="")
+    payload_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    acked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('send_message')",
+            name="ck_proactive_actions_type",
+        ),
+        CheckConstraint(
+            "status IN ('candidate', 'approved', 'delivered', 'acked',"
+            " 'discarded', 'failed', 'expired')",
+            name="ck_proactive_actions_status",
+        ),
+        CheckConstraint(
+            "trigger_type IN ('conversation_inactivity', 'scheduled_followup')",
+            name="ck_proactive_actions_trigger_type",
+        ),
+        Index("idx_proactive_actions_user_status", "user_id", "status"),
+        Index("idx_proactive_actions_dedupe", "dedupe_key"),
+    )
