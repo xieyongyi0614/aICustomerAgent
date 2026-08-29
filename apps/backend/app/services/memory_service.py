@@ -16,7 +16,6 @@ from app.services.memory_conflict import (
     ACTION_SUPERSEDE,
     ACTION_UPDATE,
     resolve_batch,
-    same_topic,
 )
 from app.services.memory_policy import apply_policy
 

@@ -69,3 +69,43 @@ def test_post_process_step_isolation(db_session_factory, monkeypatch):
     steps = {s.name: s.status for s in ctx.trace.steps}
     assert steps.get("state_update") == "error"
     assert steps.get("memory_extract") == "ok" or "memory_extract" in steps
+
+
+def test_user_write_lock_serializes_post_process(monkeypatch):
+    import asyncio
+
+    from app.application import post_process
+
+    order = []
+
+    def make_handler(name, delay):
+        async def handler(ctx):
+            order.append(f"{name}-start")
+            await asyncio.sleep(delay)
+            order.append(f"{name}-end")
+
+        return handler
+
+    async def scenario():
+        monkeypatch.setattr(
+            post_process,
+            "STEP_HANDLERS",
+            (make_handler("a", 0.02), make_handler("b", 0.0)),
+        )
+        contexts = [
+            post_process.PostProcessContext(
+                session_id=f"s{i}",
+                user_id="same-user",
+                user_input="x",
+                ai_reply="y",
+                state=None,
+                analysis=None,
+            )
+            for i in range(2)
+        ]
+        await asyncio.gather(*(post_process.run_post_process(ctx) for ctx in contexts))
+
+    asyncio.run(scenario())
+    assert order.index("a-end") < order.index("b-start") or order.index(
+        "b-end"
+    ) < order.index("a-start")
