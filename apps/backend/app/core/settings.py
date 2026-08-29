@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     memory_top_k: int = 5
     memory_max_candidates: int = 3
     memory_conflict_threshold: float = 0.6
+    memory_min_confidence: float = 0.6
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
