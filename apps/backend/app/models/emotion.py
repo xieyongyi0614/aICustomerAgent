@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.models.behavior import BehaviorDecision
+from app.models.relationship import RelationshipEventDecision
 
 UserEmotionLabel = Literal[
     "happy",
@@ -60,6 +61,10 @@ class EmotionEvent(BaseModel):
 class TurnAnalysis(BaseModel):
     user_emotion: UserEmotion = UserEmotion()
     behavior: BehaviorDecision = BehaviorDecision()
+    emotion_event: EmotionEvent = Field(default_factory=EmotionEvent)
+    relationship_event: RelationshipEventDecision = Field(
+        default_factory=RelationshipEventDecision
+    )
 
 
 class EmotionHistoryEntry(BaseModel):

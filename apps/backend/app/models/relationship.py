@@ -18,6 +18,13 @@ RelationshipEventType = Literal[
 ]
 
 
+class RelationshipEventDecision(BaseModel):
+    type: RelationshipEventType = "none"
+    magnitude: Literal["weak", "normal", "strong"] = "normal"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    cause: str = Field(default="", max_length=50)
+
+
 class RelationshipState(BaseModel):
     intimacy: float = Field(default=0.3, ge=0.0, le=1.0)
     trust: float = Field(default=0.35, ge=0.0, le=1.0)
