@@ -140,6 +140,7 @@ class Settings(BaseSettings):
     mode_switch_min_confidence: float = 0.7
     mode_switch_min_turns: int = 2
     mode_idle_reset_seconds: int = 7200
+    habit_extra_json: str = "[]"
 
     @model_validator(mode="after")
     def validate_profiles(self):

@@ -9,7 +9,6 @@ import logging
 import re
 
 from app.character.asuna.behavior_policy import BEHAVIOR_POLICY, STRATEGY_INSTRUCTIONS
-from app.character.asuna.habits import HABIT_LIST
 from app.models.behavior_strategy import (
     ActionBudget,
     BehaviorDirective,
@@ -21,6 +20,7 @@ from app.models.behavior_strategy import (
     StageBehaviorParams,
 )
 from app.models.scene import SceneContext
+from app.services import habit_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -173,8 +173,9 @@ def compute_budget(
 
 def match_habits(strategy: BehaviorStrategyType) -> list[HabitRule]:
     domains = HABIT_APPLICABILITY.get(strategy, set())
-    candidates = [habit for habit in HABIT_LIST if habit.domain in domains]
-    candidates.sort(key=lambda h: (h.priority, HABIT_LIST.index(h)))
+    effective = habit_runtime.load_effective_habits()
+    candidates = [habit for habit in effective if habit.domain in domains]
+    candidates.sort(key=lambda h: (h.priority, effective.index(h)))
     same_direction = HABIT_SAME_DIRECTION.get(strategy, frozenset())
     return [h for h in candidates if h.id not in same_direction][:HABIT_MAX_COUNT]
 
