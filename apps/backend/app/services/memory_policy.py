@@ -54,12 +54,13 @@ def _evaluate(
         return PolicyOutcome(candidate, DECISION_PRIVACY, "R3", "用户要求遗忘，转隐私执行")
     if candidate.source == "ai_inferred":
         return PolicyOutcome(candidate, DECISION_DISCARD, "R1", "AI 推测不入库")
-    if ONE_OFF_PATTERN.search(candidate.content or ""):
-        return PolicyOutcome(candidate, DECISION_DISCARD, "R4", "一次性信息")
-    if candidate.confidence < settings.memory_min_confidence:
-        return PolicyOutcome(candidate, DECISION_DISCARD, "R5", "置信度过低")
-    if candidate.importance < settings.memory_importance_threshold:
-        return PolicyOutcome(candidate, DECISION_DISCARD, "R6", "重要性过低")
+    if candidate.action != "invalidate":
+        if ONE_OFF_PATTERN.search(candidate.content or ""):
+            return PolicyOutcome(candidate, DECISION_DISCARD, "R4", "一次性信息")
+        if candidate.confidence < settings.memory_min_confidence:
+            return PolicyOutcome(candidate, DECISION_DISCARD, "R5", "置信度过低")
+        if candidate.importance < settings.memory_importance_threshold:
+            return PolicyOutcome(candidate, DECISION_DISCARD, "R6", "重要性过低")
     if (
         candidate.action in ("save", "update")
         and _is_exact_duplicate(candidate.content or "", active_contents)

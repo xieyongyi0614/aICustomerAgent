@@ -20,6 +20,10 @@ TRACE_STEP_NAMES = (
     "llm",
     "state_update",
     "memory_extractor",
+    "memory_extract",
+    "memory_policy",
+    "memory_privacy",
+    "memory_conflict",
 )
 
 _BACKGROUND_STEPS = ("state_update", "memory_extractor", "scene_update")

@@ -32,11 +32,17 @@ def client(db_session_factory, llm_override, fake_llm):
                     "inner_state": "开心",
                     "current_topic": "项目上线",
                 },
-                "MemoryDecision": {
-                    "should_save": True,
-                    "memory": "用户喜欢寿司",
-                    "memory_type": "preference",
-                    "importance": 0.8,
+                "MemoryExtraction": {
+                    "candidates": [
+                        {
+                            "action": "save",
+                            "type": "user_preference",
+                            "content": "用户喜欢寿司",
+                            "importance": 0.8,
+                            "confidence": 0.9,
+                            "source": "user_stated",
+                        }
+                    ]
                 },
             },
         )

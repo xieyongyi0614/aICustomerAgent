@@ -1,10 +1,22 @@
 import logging
+import time
 from datetime import datetime
 
-from app.chains.extractor_chain import extract
+from app.chains.extractor_chain import extract_candidates
 from app.core.settings import get_settings
-from app.models.memory import UserMemory, UserMemoryV4
+from app.models.memory import MemoryCandidate, UserMemory, UserMemoryV4
 from app.repositories import memory_repository as repo
+from app.services.memory_conflict import (
+    ACTION_DISCARD_PAIR,
+    ACTION_INVALIDATE,
+    ACTION_NOOP,
+    ACTION_SAVE,
+    ACTION_SUPERSEDE,
+    ACTION_UPDATE,
+    resolve_batch,
+    same_topic,
+)
+from app.services.memory_policy import apply_policy
 
 logger = logging.getLogger(__name__)
 
@@ -26,21 +38,138 @@ def _tokenize(text: str) -> set[str]:
     return set(ch for ch in text if ch.strip())
 
 
-async def extract_and_save(user_id: str, user_input: str, ai_reply: str, llm=None) -> None:
-    settings = get_settings()
+def _trace_step(trace, name: str, started: float, error: str | None = None) -> None:
+    if trace is None:
+        return
+    duration = (time.perf_counter() - started) * 1000
+    if error is not None:
+        trace.record(name, duration, "error", error=error)
+    else:
+        trace.record(name, duration)
+
+
+async def extract_and_save(
+    user_id: str,
+    user_input: str,
+    ai_reply: str,
+    llm=None,
+    trace=None,
+    recent_context: str = "",
+    character_id: str = "asuna",
+) -> None:
+    started = time.perf_counter()
     try:
-        decision = await extract(user_input, ai_reply, llm=llm)
-    except (ValueError, OSError, RuntimeError):
-        logger.exception("记忆提取失败，跳过本轮")
+        extraction = await extract_candidates(
+            user_input, ai_reply, recent_context=recent_context, llm=llm
+        )
+    except Exception as exc:
+        logger.exception("记忆提取失败，丢弃本轮，不重试")
+        _trace_step(trace, "memory_extract", started, error=exc.__class__.__name__)
         return
-    if not decision.should_save or decision.importance < settings.memory_importance_threshold:
+    _trace_step(trace, "memory_extract", started)
+    candidates = extraction.candidates
+    if not candidates:
         return
-    if decision.memory and repo.exists_similar(user_id, decision.memory):
-        return
+
     try:
-        repo.create_memory(user_id, decision.memory, decision.memory_type, decision.importance)
-    except (ValueError, OSError, RuntimeError):
-        logger.exception("记忆落库失败，不影响本轮回答")
+        active = repo.list_active_v4(user_id, character_id, limit=200)
+    except Exception:
+        logger.exception("记忆读取失败，冲突比对降级为空")
+        active = []
+    started_policy = time.perf_counter()
+    try:
+        report = apply_policy(candidates, [m.content for m in active])
+    except Exception as exc:
+        logger.exception("记忆策略执行失败，丢弃本轮候选")
+        _trace_step(trace, "memory_policy", started_policy, error=exc.__class__.__name__)
+        return
+    _trace_step(trace, "memory_policy", started_policy)
+
+    for item in report.privacy_items:
+        await _execute_forget(user_id, character_id, item, trace)
+    saved = report.saved
+    if not saved:
+        return
+
+    started_conflict = time.perf_counter()
+    try:
+        outcomes = resolve_batch(saved, active)
+    except Exception as exc:
+        logger.exception("记忆冲突处理失败，本轮候选丢弃")
+        _trace_step(trace, "memory_conflict", started_conflict, error=exc.__class__.__name__)
+        return
+    _trace_step(trace, "memory_conflict", started_conflict)
+    for outcome in outcomes:
+        await _execute_outcome(user_id, character_id, outcome)
+
+
+async def _execute_forget(
+    user_id: str, character_id: str, item: MemoryCandidate, trace=None
+) -> None:
+    try:
+        active = repo.list_active_v4(user_id, character_id, limit=200)
+        target = (item.content or "").strip()
+        matched = [
+            memory
+            for memory in active
+            if target
+            and (
+                target == memory.content.strip()
+                or target in memory.content
+                or memory.content in target
+            )
+        ]
+        if not matched:
+            logger.warning("forget 未匹配到任何记忆，不猜测删除：%s", item.content)
+            if trace is not None:
+                trace.record("memory_privacy", 0.0, "miss", error="forget target not found")
+            return
+        for memory in matched:
+            repo.forget_memory(memory.id)
+        if trace is not None:
+            trace.record("memory_privacy", 0.0)
+    except Exception:
+        logger.exception("forget 执行失败，不影响本轮回答")
+
+
+async def _execute_outcome(
+    user_id: str, character_id: str, outcome
+) -> None:
+    candidate = outcome.candidate
+    try:
+        if outcome.action == ACTION_SAVE:
+            repo.create_memory_v4(
+                user_id,
+                character_id,
+                candidate.content,
+                candidate.type,
+                candidate.importance,
+                confidence=candidate.confidence,
+                source=candidate.source,
+            )
+        elif outcome.action == ACTION_UPDATE:
+            repo.update_memory_content(
+                outcome.target_id, candidate.content, candidate.importance
+            )
+        elif outcome.action == ACTION_SUPERSEDE:
+            new_row = repo.create_memory_v4(
+                user_id,
+                character_id,
+                candidate.content,
+                candidate.type,
+                candidate.importance,
+                confidence=candidate.confidence,
+                source=candidate.source,
+            )
+            repo.supersede_memory(outcome.target_id, new_row.id)
+        elif outcome.action == ACTION_INVALIDATE:
+            repo.invalidate_memory(outcome.target_id)
+        elif outcome.action == ACTION_DISCARD_PAIR:
+            logger.warning("同轮候选矛盾成对丢弃：%s", candidate.content)
+        elif outcome.action == ACTION_NOOP:
+            logger.info("候选无可执行动作：%s", candidate.content)
+    except Exception:
+        logger.exception("记忆写入失败，单条候选丢弃，不影响其他候选")
 
 
 def retrieve(user_id: str, user_input: str, top_k: int | None = None) -> list[UserMemory]:

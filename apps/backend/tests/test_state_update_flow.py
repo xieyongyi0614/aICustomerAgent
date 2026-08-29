@@ -55,8 +55,32 @@ def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", mem
             "inner_state": "开心",
             "current_topic": "用户的成就",
         },
-        "MemoryDecision": memory_decision,
+        "MemoryExtraction": {"candidates": _memory_candidates(memory_decision)},
     }
+
+
+_LEGACY_TYPE_MAP = {
+    "preference": "user_preference",
+    "fact": "user_fact",
+    "goal": "user_fact",
+    "experience": "important_event",
+    "relationship": "relationship_event",
+}
+
+
+def _memory_candidates(decision):
+    if not decision.get("should_save") or not decision.get("memory"):
+        return []
+    return [
+        {
+            "action": "save",
+            "type": _LEGACY_TYPE_MAP.get(decision.get("memory_type", "preference"), "user_preference"),
+            "content": decision.get("memory"),
+            "importance": decision.get("importance", 0.0),
+            "confidence": 0.9,
+            "source": "user_stated",
+        }
+    ]
 
 
 async def _turn(session_id, content, llm):

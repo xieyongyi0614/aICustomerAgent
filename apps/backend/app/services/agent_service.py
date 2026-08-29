@@ -293,8 +293,20 @@ async def _post_process(
     except Exception:
         logger.exception("摘要更新失败，不影响本轮回答")
     started = time.perf_counter()
+    recent_turns = state.messages[-4:]
+    recent_context = "\n".join(
+        f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
+        for m in recent_turns
+    )
     try:
-        await memory_service.extract_and_save(user_id, user_input, ai_reply, llm=llm)
+        await memory_service.extract_and_save(
+            user_id,
+            user_input,
+            ai_reply,
+            llm=llm,
+            trace=trace,
+            recent_context=recent_context,
+        )
         if trace is not None:
             trace.record("memory_extractor", (time.perf_counter() - started) * 1000)
     except Exception:

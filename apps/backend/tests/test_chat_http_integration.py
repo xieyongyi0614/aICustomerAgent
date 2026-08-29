@@ -58,6 +58,13 @@ def _parse_stream(text):
     return [json.loads(line) for line in text.strip().splitlines()]
 
 
+_LEGACY_TYPE_MAP = {
+    "preference": "user_preference",
+    "fact": "user_fact",
+    "goal": "user_fact",
+    "experience": "important_event",
+    "relationship": "relationship_event",
+}
 def _structured_responses(**memory):
     base = {
         "RoleMode": {
@@ -67,12 +74,19 @@ def _structured_responses(**memory):
             "reason": "hi",
         },
     }
-    base["MemoryDecision"] = {
-        "should_save": memory.get("should_save", False),
-        "memory": memory.get("memory"),
-        "memory_type": memory.get("memory_type", "preference"),
-        "importance": memory.get("importance", 0.0),
-    }
+    candidates = []
+    if memory.get("should_save") and memory.get("memory"):
+        candidates = [
+            {
+                "action": "save",
+                "type": _LEGACY_TYPE_MAP.get(memory.get("memory_type", "preference"), "user_preference"),
+                "content": memory.get("memory"),
+                "importance": memory.get("importance", 0.0),
+                "confidence": 0.9,
+                "source": "user_stated",
+            }
+        ]
+    base["MemoryExtraction"] = {"candidates": candidates}
     return base
 
 
@@ -270,12 +284,7 @@ def test_http_state_updates_after_chat(
                 "inner_state": "开心",
                 "current_topic": "项目上线",
             },
-            "MemoryDecision": {
-                "should_save": False,
-                "memory": None,
-                "memory_type": "preference",
-                "importance": 0.0,
-            },
+            "MemoryExtraction": {"candidates": []},
         },
     ))
     with httpx.Client(base_url=http_server.base_url) as client:
