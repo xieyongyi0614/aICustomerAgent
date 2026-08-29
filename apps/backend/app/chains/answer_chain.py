@@ -34,7 +34,16 @@ async def astream(
     chain = build_chain(mode, state, analysis, llm, scene_ctx)
     if trace is not None:
         trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
+        trace.model_name = getattr(llm, "model_name", None) or "default"
     async for chunk in chain.astream({}):
+        usage = getattr(chunk, "usage_metadata", None)
+        if usage and trace is not None:
+            trace.add_token_usage(
+                {
+                    "input_tokens": usage.get("input_tokens", 0),
+                    "output_tokens": usage.get("output_tokens", 0),
+                }
+            )
         text = getattr(chunk, "content", chunk)
         if text:
             yield text

@@ -52,6 +52,13 @@ class TurnTraceSession:
     analysis: object | None = None
     turn_id: str | None = None
     steps: list[TraceStep] = field(default_factory=list)
+    request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    token_usage: dict = field(default_factory=dict)
+    model_name: str | None = None
+
+    def add_token_usage(self, usage: dict) -> None:
+        for key, value in usage.items():
+            self.token_usage[key] = self.token_usage.get(key, 0) + value
 
     def record(
         self,
@@ -100,6 +107,9 @@ class TurnTraceSession:
     def snapshot(self) -> dict:
         return {
             "turn_id": self.turn_id,
+            "request_id": self.request_id,
+            "token_usage": dict(self.token_usage),
+            "model_name": self.model_name,
             "status": "complete" if self.is_complete else "pending",
             "role_mode": self.role_mode.model_dump() if self.role_mode is not None else None,
             "analysis": self.analysis.model_dump() if self.analysis is not None else None,
@@ -145,7 +155,13 @@ class TraceCollector:
 
     def get(self, turn_id: str) -> TurnTraceSession | None:
         with self._lock:
-            return self._finished.get(turn_id)
+            session = self._finished.get(turn_id)
+            if session is not None:
+                return session
+            for pending in self._pending.values():
+                if pending.turn_id == turn_id:
+                    return pending
+            return None
 
 
 _collector: TraceCollector | None = None

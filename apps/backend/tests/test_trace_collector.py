@@ -196,3 +196,22 @@ async def test_debug_trace_endpoint_unknown_404_then_snapshot(
         assert body["status"] == "complete"
         names = {step["name"] for step in body["steps"]}
         assert {"llm", "state_update", "memory_extractor"} <= names
+
+
+def test_trace_has_request_id_and_usage_accumulation():
+    session = TurnTraceSession()
+    assert len(session.request_id) == 32
+    session.add_token_usage({"input_tokens": 10, "output_tokens": 5})
+    session.add_token_usage({"input_tokens": 7, "output_tokens": 3})
+    assert session.token_usage == {"input_tokens": 17, "output_tokens": 8}
+    snapshot = session.snapshot()
+    assert snapshot["request_id"] == session.request_id
+    assert snapshot["token_usage"] == {"input_tokens": 17, "output_tokens": 8}
+
+
+def test_pending_trace_queryable_by_turn_id_after_attach():
+    collector = TraceCollector()
+    session = collector.begin_trace()
+    session.turn_id = "turn-pending"
+    collector._pending[session._pending_key] = session
+    assert collector.get("turn-pending") is session

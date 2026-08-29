@@ -214,5 +214,6 @@ async def run_chat_pipeline(
         "kind": "done",
         "session_id": session_id,
         "turn_id": str(ai_message_id),
+        "request_id": trace.request_id,
     }
 
