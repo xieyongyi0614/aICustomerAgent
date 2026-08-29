@@ -107,6 +107,13 @@ class CharacterStateRow(Base):
     energy: Mapped[float] = mapped_column(Float, nullable=False)
     current_topic: Mapped[str] = mapped_column(String, nullable=False, default="")
     inner_state: Mapped[str] = mapped_column(Text, nullable=False)
+    intensity: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.3, server_default="0.3"
+    )
+    cause: Mapped[str] = mapped_column(
+        String, nullable=False, default="", server_default=""
+    )
+    last_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

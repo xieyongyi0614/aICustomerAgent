@@ -17,7 +17,28 @@ class TestCharacterStateRepository:
         with db_session_factory() as session:
             assert session.query(CharacterStateRow).count() == 0
 
-    def test_upsert_is_idempotent_and_moves_updated_at(self, db_session_factory):
+    def test_v5_emotion_fields_roundtrip(self, db_session_factory):
+        from datetime import datetime
+
+        event_at = datetime(2026, 8, 29, 12, 0, 0)
+        saved = character_state_repository.upsert_state(
+            "user-v5",
+            CharacterState(
+                mood="happy",
+                intensity=0.72,
+                cause="用户主动关心角色",
+                last_event_at=event_at,
+            ),
+        )
+        assert saved.intensity == 0.72
+        assert saved.cause == "用户主动关心角色"
+        assert saved.last_event_at == event_at
+        loaded = character_state_repository.get_state("user-v5")
+        assert loaded.intensity == 0.72
+        assert loaded.cause == "用户主动关心角色"
+        assert loaded.last_event_at == event_at
+
+    def test_get_missing_returns_default_without_write(self, db_session_factory):
         first = character_state_repository.upsert_state(
             "user-a",
             CharacterState(

@@ -10,6 +10,9 @@ def _to_state(row: CharacterStateRow) -> CharacterState:
         energy=row.energy,
         current_topic=row.current_topic,
         inner_state=row.inner_state,
+        intensity=row.intensity,
+        cause=row.cause,
+        last_event_at=row.last_event_at,
         updated_at=row.updated_at,
     )
 
@@ -33,6 +36,9 @@ def upsert_state(user_id: str, state: CharacterState) -> CharacterState:
         row.energy = state.energy
         row.current_topic = state.current_topic
         row.inner_state = state.inner_state
+        row.intensity = state.intensity
+        row.cause = state.cause
+        row.last_event_at = state.last_event_at
         row.updated_at = now
         session.commit()
         session.refresh(row)
