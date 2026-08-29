@@ -1,6 +1,6 @@
 # V6.5 实现期说明与偏差记录
 
-> 状态（2026-08-29）：V6.5-001~007（P0 全部）已实现，全量回归 765 passed；V6.5-008~012（P1/P2）待后续。
+> 状态（2026-08-29）：V6.5-001~012 全部完成，全量回归 788 passed。
 > 迁移 0010 已在本地 PG（127.0.0.1 asuna 库）执行：0009 → 0010，存量会话行回填 mode=default。
 
 ## 实现与设计的偏差（均为等价或收窄，不改变语义）
@@ -20,5 +20,10 @@
 
 ## 遗留待办（对应 tasks.md P1/P2）
 
-- V6.5-008 Debug/API 前端展示、V6.5-009 真实模型回归清单（`regression-checklist.md`）、V6.5-010 输出侧预算统计器、V6.5-011 动态 Habit、V6.5-012 V2 behavior 退役评估。
-- 真实效果验证（动作描写是否收敛、strategy 观感稳定性）依赖 V6.5-009 的人工回归，FakeLLM 只能验证机制正确性。
+- V6.5-008~012 已完成（2026-08-29 补齐），补充记录：
+  - **008**：仅做后端（/state 透出 mode + last_behavior，trace session 增 behavior_meta/mode_meta 与 latest()）；前端面板按 V6-010 先例待前端窗口开放。`latest()` 初版误用 `next(reversed(OrderedDict))` 取到键而非值（返回 turn_id 字符串），测试当日捕获修复。
+  - **009**：`regression-checklist.md` 已交付六场景清单（预算收敛/strategy 稳定/mode 迟滞/活动延续/habit 观感/性能）与通过线；真人执行待办，执行时顺带统计 intention degraded 触发率（009 数据同时是 012 复议输入）。
+  - **010**：`observe_budget` 正则口径与 prompt 渲染同源（`\*[^*\n]+\*`）；接触词表分 light/moderate 两档。曾漏改 `schedule_post_process` 签名（PostProcessContext 加了 behavior 但调度函数没加）导致 TypeError，e2e 捕获修复。
+  - **011**：生效集走 `HABIT_EXTRA_JSON` 配置（tasks.md「候选存储或配置」的配置路径，未建表）；`derive_habit_candidates` 为纯函数（事件计数 × 模板表，memory_replay 不计入，auto_ 前缀标识来源），无运行时调用点，供测试/未来 API/人工评审消费；生效集 id 冲突与非法 JSON fail-fast。
+  - **012**：`behavior-retirement-eval.md`，结论 Keep——behavior 字段被 V5 关系增量（BEHAVIOR_DELTAS）、精力修正、emotion_history 三路活跃消费，退役本质是给 V5 换输入信号的重构；仅 fallback prompt 段可待数据复议。
+- 教训重申：全量回归必须显式校验 pytest 退出码（`pytest ...; echo $?`），管道接 tail 会吞掉非零退出码——本轮曾因此把 1 例失败（注册表断言）随 V6.5-010 提交推送，已补 fix 提交（2f818d6）。

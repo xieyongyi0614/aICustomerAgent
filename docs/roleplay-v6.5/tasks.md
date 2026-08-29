@@ -2,8 +2,8 @@
 
 > 开发入口。按依赖顺序执行；P0 = V6.5 必须，P1 = 推荐，P2 = 延期。
 > 策略：一次只执行一个 Task，完成后运行测试、全量回归、提交推送，再进入下一个（沿用既有节奏）。
-> 状态（2026-08-29）：V6.5-001~007 已实现并通过全量回归（`pytest tests/` 765 passed）；
-> V6.5-008~012（P1/P2）待后续。
+> 状态（2026-08-29）：V6.5-001~012 全部完成并推送（全量 788 passed）。
+> 实现期解释与偏差见 `implementation-notes.md`；真实回归待按 `regression-checklist.md` 执行。
 
 ## Task 列表
 
@@ -70,7 +70,7 @@
 - **验收**：V2~V6 全绿；新增快照唯一 diff。
 - **测试**：同左。
 
-### V6.5-008 Debug/API 扩展（P1）
+### V6.5-008 Debug/API 扩展（P1）✅ bfad2c5（后端 /state 部分；前端面板待窗口，备注见下）
 
 - **目标**：turn_meta behavior/mode 字段透传至 /state 快照与前端 Debug 面板（strategy/budget/degraded/confirmed→effective）。
 - **前置**：V6.5-007。
@@ -79,7 +79,7 @@
 - **测试**：API 单测 + 前端 Vitest。
 - **备注**：turn_meta 数据 V6.5-005 已携带，本任务纯展示层。
 
-### V6.5-009 真实模型回归清单（P1）
+### V6.5-009 真实模型回归清单（P1）✅ 3a812ff（清单已交付 `regression-checklist.md`；真人执行待办）
 
 - **目标**：`docs/roleplay-v6.5/regression-checklist.md` 编写并执行：单轮动作数统计、strategy 跨轮稳定观感、mode 跳变频次、活动延续自然度、V4/V5 既有清单并列跑。
 - **前置**：V6.5-007。
@@ -87,7 +87,7 @@
 - **验收**：真实模型下单轮动作 ≤ Budget 上限的轮次占比 ≥ 90%；无 mode 每轮跳变。
 - **测试**：人工回归（非 pytest）。
 
-### V6.5-010 输出侧动作预算统计器（P2）
+### V6.5-010 输出侧动作预算统计器（P2）✅ b65e084
 
 - **目标**：post_process 增加只读统计步骤：正则计数 reply 中 `*...*` 动作段与身体接触词，违规轮次记 trace（budget_violation），不阻塞不重写。
 - **前置**：V6.5-007。
@@ -96,7 +96,7 @@
 - **验收**：违规计数与人工标注抽查一致率 ≥ 95%；零时延回归（后台步骤）。
 - **测试**：`tests/integration/test_budget_observer.py`。
 
-### V6.5-011 动态 Habit 养成（P2）
+### V6.5-011 动态 Habit 养成（P2）✅ 3789460
 
 - **目标**：从 relationship_events/V4 记忆沉淀 habit 候选（角色自身行为习惯），代码规则预筛 + 配置确认后并入运行时生效集（HABIT_LIST 只读不动，生效集可扩展）。
 - **前置**：V6.5-007。
@@ -105,7 +105,7 @@
 - **验收**：候选不自动生效；生效集变更可审计。
 - **测试**：FakeLLM/规则注入单测。
 
-### V6.5-012 V2 behavior 层退役评估（P2）
+### V6.5-012 V2 behavior 层退役评估（P2）✅ behavior-retirement-eval.md（结论：Keep）
 
 - **目标**：V6.5 稳定运行后评估删除 `models/behavior.py` / turn_analysis.behavior 链段的收编终局（fallback 依赖度数据支撑决策）。
 - **前置**：V6.5-009（需真实回归数据）。
