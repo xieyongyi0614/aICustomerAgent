@@ -38,7 +38,7 @@ class CharacterState(BaseModel):
 
 
 class StateUpdateDecision(BaseModel):
-    mood: Mood
+    mood: Mood = "calm"
     mood_reason: str = ""
-    inner_state: str
-    current_topic: str
+    inner_state: str = ""
+    current_topic: str = ""

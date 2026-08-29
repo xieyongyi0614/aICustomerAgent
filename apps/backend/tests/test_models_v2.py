@@ -25,9 +25,11 @@ class TestCharacterState:
         with pytest.raises(ValidationError):
             CharacterState(mood="grumpy")
 
-    def test_state_update_decision_requires_fields(self):
-        with pytest.raises(ValidationError):
-            StateUpdateDecision(mood="happy")
+    def test_state_update_decision_defaults_after_v5_mood_retirement(self):
+        decision = StateUpdateDecision()
+        assert decision.mood == "calm"
+        assert decision.inner_state == ""
+        assert decision.current_topic == ""
 
 
 class TestRelationshipState:

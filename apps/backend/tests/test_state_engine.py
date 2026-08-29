@@ -169,7 +169,7 @@ class TestApplyIdleRecovery:
 
 
 class TestApplyCharacter:
-    def test_decision_updates_mood_inner_state_topic(self):
+    def test_decision_ignores_mood_and_updates_inner_state_topic(self):
         now = datetime.now()
         decision = StateUpdateDecision(
             mood="worried",
@@ -178,9 +178,9 @@ class TestApplyCharacter:
             current_topic="用户的 AI Agent 项目",
         )
         result = state_engine.apply_character(
-            CharacterState(energy=0.9), decision, _analysis("daily"), now
+            CharacterState(energy=0.9, mood="calm"), decision, _analysis("daily"), now
         )
-        assert result.mood == "worried"
+        assert result.mood == "calm"
         assert result.inner_state == "担心用户过度疲劳"
         assert result.current_topic == "用户的 AI Agent 项目"
         assert result.energy == pytest.approx(0.85)

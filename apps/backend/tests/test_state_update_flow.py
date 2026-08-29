@@ -24,7 +24,14 @@ async def _wait_background(predicate):
     return predicate()
 
 
-def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", memory=None):
+def _structured(
+    turn_event,
+    turn_behavior="normal_reply",
+    emotion="neutral",
+    memory=None,
+    emotion_event=None,
+    relationship_event=None,
+):
     memory_decision = {
         "should_save": False,
         "memory": None,
@@ -38,7 +45,7 @@ def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", mem
             "memory_type": "preference",
             "importance": 0.8,
         }
-    return {
+    payload = {
         "RoleMode": {
             "mode": "default",
             "intent": "casual",
@@ -57,6 +64,11 @@ def _structured(turn_event, turn_behavior="normal_reply", emotion="neutral", mem
         },
         "MemoryExtraction": {"candidates": _memory_candidates(memory_decision)},
     }
+    if emotion_event is not None:
+        payload["TurnAnalysis"]["emotion_event"] = emotion_event
+    if relationship_event is not None:
+        payload["TurnAnalysis"]["relationship_event"] = relationship_event
+    return payload
 
 
 _LEGACY_TYPE_MAP = {
@@ -96,7 +108,17 @@ async def test_turn_updates_state_relationship_and_history(
 ):
     llm = fake_llm(
         response=["好耶"],
-        structured_responses=_structured("achievement", "celebrate", emotion="happy"),
+        structured_responses=_structured(
+            "achievement",
+            "celebrate",
+            emotion="happy",
+            emotion_event={
+                "type": "praise",
+                "magnitude": "normal",
+                "confidence": 0.9,
+                "cause": "用户达成成就",
+            },
+        ),
     )
     reply = await _turn("s-be7-1", "我今天终于把项目上线了", llm)
     assert reply == "好耶"
@@ -110,8 +132,8 @@ async def test_turn_updates_state_relationship_and_history(
     assert state.inner_state == "开心"
 
     relationship = relationship_repository.get_relationship(USER)
-    assert relationship.intimacy == pytest.approx(0.3 + 0.04 + 0.02)
-    assert relationship.familiarity == pytest.approx(0.3 + 0.02)
+    assert relationship.intimacy == pytest.approx(0.3 + 0.02 + 0.02)
+    assert relationship.familiarity == pytest.approx(0.3 + 0.01)
     assert relationship.stage == "friend"
 
     history = emotion_history_repository.list_recent(USER, limit=5)
@@ -143,7 +165,7 @@ async def test_state_update_chain_failure_falls_back_to_code_rules(
     assert state.inner_state == "平静，期待和用户聊天"
 
     relationship = relationship_repository.get_relationship(USER)
-    assert relationship.familiarity == pytest.approx(0.31)
+    assert relationship.familiarity == pytest.approx(0.3 + 0.02 * 0.6)
 
     history = emotion_history_repository.list_recent(USER, limit=5)
     assert len(history) == 1

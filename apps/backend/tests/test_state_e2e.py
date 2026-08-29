@@ -13,8 +13,8 @@ from tests.conftest import wait_until
 USER = "default-user"
 
 
-def _structured(event, behavior, emotion, mood="calm"):
-    return {
+def _structured(event, behavior, emotion, mood="calm", emotion_event=None):
+    payload = {
         "RoleMode": {
             "mode": "default",
             "intent": "casual",
@@ -38,6 +38,9 @@ def _structured(event, behavior, emotion, mood="calm"):
             "importance": 0.0,
         },
     }
+    if emotion_event is not None:
+        payload["TurnAnalysis"]["emotion_event"] = emotion_event
+    return payload
 
 
 def _client():
@@ -57,7 +60,7 @@ def test_comfort_path_adjusts_prompt_and_relationship(db_session_factory, fake_l
         assert any("不要急着给建议" in str(m) for m in llm.seen_messages)
         assert wait_until(lambda: len(emotion_history_repository.list_recent(USER, limit=5)) == 1)
     relationship = relationship_repository.get_relationship(USER)
-    assert relationship.intimacy == pytest.approx(0.3 + 0.03 + 0.02)
+    assert relationship.intimacy == pytest.approx(0.3 + 0.02)
     state = character_state_repository.get_state(USER)
     assert state.energy == pytest.approx(0.9 - 0.05 - 0.05 - 0.05)
 
@@ -65,7 +68,18 @@ def test_comfort_path_adjusts_prompt_and_relationship(db_session_factory, fake_l
 def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake_llm):
     llm = fake_llm(
         response=["好耶"],
-        structured_responses=_structured("achievement", "celebrate", "happy", mood="happy"),
+        structured_responses=_structured(
+            "achievement",
+            "celebrate",
+            "happy",
+            mood="happy",
+            emotion_event={
+                "type": "praise",
+                "magnitude": "normal",
+                "confidence": 0.9,
+                "cause": "用户达成成就",
+            },
+        ),
     )
     llm_factory.set_llm(llm)
     with _client() as client:
@@ -77,7 +91,7 @@ def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake
     assert state.energy == pytest.approx(0.9 - 0.05 + 0.10)
     relationship = relationship_repository.get_relationship(USER)
     assert relationship.stage == "friend"
-    assert relationship.intimacy == pytest.approx(0.3 + 0.04 + 0.02)
+    assert relationship.intimacy == pytest.approx(0.3 + 0.02 + 0.02)
 
 
 def test_stage_upgrade_after_share_goal_turns(
@@ -104,8 +118,8 @@ def test_stage_upgrade_after_share_goal_turns(
             )
     relationship = relationship_repository.get_relationship(USER)
     assert relationship.stage == "close_friend"
-    assert relationship.trust == pytest.approx(0.35 + 0.06 * 2)
-    assert relationship.intimacy == pytest.approx(0.3 + 0.02 * 2)
+    assert relationship.trust == pytest.approx(0.35 + 0.05 * 2)
+    assert relationship.intimacy == pytest.approx(0.3 + 0.03 * 2)
 
 
 def test_full_degradation_uses_default_analysis(
@@ -124,7 +138,7 @@ def test_full_degradation_uses_default_analysis(
         assert lines[-1].strip().startswith("{\"done\"")
         assert wait_until(lambda: len(emotion_history_repository.list_recent(USER, limit=5)) == 1)
     relationship = relationship_repository.get_relationship(USER)
-    assert relationship.familiarity == pytest.approx(0.31)
+    assert relationship.familiarity == pytest.approx(0.3 + 0.02 * 0.6)
     state = character_state_repository.get_state(USER)
     assert state.energy == pytest.approx(0.85)
     assert state.mood == "calm"

@@ -19,6 +19,8 @@ TRACE_STEP_NAMES = (
     "prompt_builder",
     "llm",
     "state_update",
+    "emotion_update",
+    "relationship_event",
     "memory_extractor",
     "memory_extract",
     "memory_policy",
@@ -26,7 +28,13 @@ TRACE_STEP_NAMES = (
     "memory_conflict",
 )
 
-_BACKGROUND_STEPS = ("state_update", "memory_extractor", "scene_update")
+_BACKGROUND_STEPS = (
+    "state_update",
+    "emotion_update",
+    "relationship_event",
+    "memory_extractor",
+    "scene_update",
+)
 
 
 @dataclass

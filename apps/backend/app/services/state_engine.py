@@ -288,7 +288,6 @@ def apply_character(
         "updated_at": now,
     }
     if decision is not None:
-        updates["mood"] = decision.mood
         updates["inner_state"] = decision.inner_state
         updates["current_topic"] = decision.current_topic
     return state.model_copy(update=updates)

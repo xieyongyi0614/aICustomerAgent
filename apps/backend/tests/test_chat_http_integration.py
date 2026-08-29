@@ -277,6 +277,12 @@ def test_http_state_updates_after_chat(
             "TurnAnalysis": {
                 "user_emotion": {"emotion": "happy", "event": "achievement"},
                 "behavior": {"behavior": "celebrate", "reason": "用户达成成就"},
+                "emotion_event": {
+                    "type": "praise",
+                    "magnitude": "normal",
+                    "confidence": 0.9,
+                    "cause": "用户达成成就",
+                },
             },
             "StateUpdateDecision": {
                 "mood": "happy",

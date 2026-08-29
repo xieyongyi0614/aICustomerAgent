@@ -16,10 +16,8 @@ state_update_prompt = """你是角色状态更新器。根据本轮对话与旧�
 亚丝娜：{ai_reply}
 
 输出要求：
-- mood：从 happy / calm / worried / sad / shy / excited / tired / angry 中选择
-- mood_reason：一句话说明心情变化的原因
 - inner_state：一句话描述亚丝娜此刻的内心
 - current_topic：当前话题的短语；话题没有明确切换时沿用旧值
-- 心情变化要有连续性，不剧烈跳变
+- 情绪不再由你输出，由系统根据事件计算；只描述内心与话题
 
 只输出符合 StateUpdateDecision 结构的数据。"""
