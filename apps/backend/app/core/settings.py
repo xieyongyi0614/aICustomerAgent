@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     scene_intent_threshold: float = 0.5
     memory_importance_threshold: float = 0.6
     memory_top_k: int = 5
+    memory_max_candidates: int = 3
+    memory_conflict_threshold: float = 0.6
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
