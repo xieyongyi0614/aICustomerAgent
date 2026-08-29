@@ -132,6 +132,10 @@ STEP_HANDLERS = (
 _user_write_locks: dict[str, asyncio.Lock] = {}
 
 
+def reset_user_write_locks() -> None:
+    _user_write_locks.clear()
+
+
 async def run_post_process(ctx: PostProcessContext) -> None:
     lock = _user_write_locks.setdefault(ctx.user_id, asyncio.Lock())
     async with lock:

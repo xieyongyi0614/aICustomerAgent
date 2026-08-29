@@ -144,6 +144,9 @@ def db_session_factory(monkeypatch):
     deadline = time.time() + 2.0
     while agent_service._background_tasks and time.time() < deadline:
         time.sleep(0.02)
+    from app.application import post_process as chat_post_process
+
+    chat_post_process.reset_user_write_locks()
     Base.metadata.drop_all(engine)
     engine.dispose()
 
