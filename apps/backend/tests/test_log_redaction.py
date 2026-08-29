@@ -13,7 +13,7 @@ class TestContentPreview:
 
     def test_positive_limit_truncates(self):
         get_settings().log_content_preview_chars = 4
-        assert content_preview("一句话内容很长") == "一句话内容…"
+        assert content_preview("一句话内容很长") == "一句话内…"
         assert content_preview("短") == "短"
 
     def test_empty_text(self):
