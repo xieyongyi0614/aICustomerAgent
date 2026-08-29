@@ -37,7 +37,7 @@ async def test_build_includes_summary(db_session_factory):
 
 
 async def test_build_includes_memories(db_session_factory):
-    memory_repository.create_memory("u1", "用户喜欢寿司", "preference", 0.8)
+    memory_repository.create_memory("u1", "asuna", "用户喜欢寿司", "user_preference", 0.8)
     state = await context_builder.build("s4", "u1", "我想吃寿司")
     assert any(m.content == "用户喜欢寿司" for m in state.memories)
 

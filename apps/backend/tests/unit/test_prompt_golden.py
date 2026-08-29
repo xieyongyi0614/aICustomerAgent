@@ -14,7 +14,7 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.goal import GoalRecord
 from app.models.intention import ValidatedIntention
-from app.models.memory import UserMemoryV4
+from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
 from app.models.scene import SceneContext, SceneState
 from app.prompts.builder import PromptBuilder
@@ -46,7 +46,7 @@ def _base_state() -> ConversationState:
 
 
 def _full_state() -> ConversationState:
-    memory = UserMemoryV4(
+    memory = UserMemory(
         id="m1",
         user_id="golden",
         character_id="asuna",

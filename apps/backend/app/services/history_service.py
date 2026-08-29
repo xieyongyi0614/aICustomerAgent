@@ -1,12 +1,12 @@
 """读路径查询服务：api 层经由本模块访问仓储，不直接操作 repository。"""
 
 from app.core.db import Message
-from app.models.memory import UserMemoryV4
+from app.models.memory import UserMemory
 from app.repositories import conversation_repository, memory_repository
 
 
-def list_memories(user_id: str, limit: int = 50) -> list[UserMemoryV4]:
-    return memory_repository.list_by_user_v4(user_id, limit=limit)
+def list_memories(user_id: str, limit: int = 50) -> list[UserMemory]:
+    return memory_repository.list_by_user(user_id, limit=limit)
 
 
 def find_conversation_or_none(conversation_id: str):

@@ -144,7 +144,7 @@ def test_http_lifecycle_on_postgres(postgres_url, fake_llm):
             session_id = resp.headers.get("x-session-id")
             assert wait_until(
                 lambda: any(
-                    m.memory == "用户喜欢寿司"
+                    m.content == "用户喜欢寿司"
                     for m in memory_repository.list_by_user("default-user")
                 )
             )

@@ -4,11 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.memory import (
-    LEGACY_MEMORY_TYPE_MAP,
     MemoryCandidate,
     MemoryExtraction,
     UserMemory,
-    UserMemoryV4,
 )
 
 
@@ -25,7 +23,7 @@ def make_candidate(**overrides):
     return MemoryCandidate(**payload)
 
 
-def make_v4_memory(**overrides):
+def make_memory(**overrides):
     now = datetime.now(timezone.utc)
     payload = {
         "id": "m1",
@@ -40,7 +38,7 @@ def make_v4_memory(**overrides):
         "updated_at": now,
     }
     payload.update(overrides)
-    return UserMemoryV4(**payload)
+    return UserMemory(**payload)
 
 
 class TestMemoryCandidate:
@@ -130,10 +128,10 @@ class TestMemoryExtraction:
             MemoryExtraction(candidates=[{"type": "user_fact", "action": "bogus"}])
 
 
-class TestUserMemoryV4:
+class TestUserMemory:
     def test_defaults(self):
         now = datetime.now(timezone.utc)
-        memory = UserMemoryV4(
+        memory = UserMemory(
             id="m1",
             user_id="u1",
             character_id="asuna",
@@ -152,35 +150,13 @@ class TestUserMemoryV4:
 
     def test_invalid_status_rejected(self):
         with pytest.raises(ValidationError):
-            make_v4_memory(status="deleted")
+            make_memory(status="deleted")
 
-    def test_invalid_v4_type_rejected(self):
+    def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):
-            make_v4_memory(type="preference")
+            make_memory(type="preference")
 
     def test_superseded_state(self):
-        memory = make_v4_memory(status="superseded", superseded_by="m2")
+        memory = make_memory(status="superseded", superseded_by="m2")
         assert memory.status == "superseded"
         assert memory.superseded_by == "m2"
-
-
-class TestLegacyCompat:
-    def test_v1_memory_model_unchanged(self):
-        now = datetime.now(timezone.utc)
-        memory = UserMemory(
-            id="m1",
-            user_id="u1",
-            memory="用户喜欢猫",
-            memory_type="preference",
-            importance=0.7,
-            created_at=now,
-            updated_at=now,
-        )
-        assert memory.memory_type == "preference"
-
-    def test_legacy_type_map_covers_all_v1_types(self):
-        assert set(LEGACY_MEMORY_TYPE_MAP) == {"preference", "fact", "goal", "experience", "relationship"}
-
-    def test_legacy_type_map_targets_are_v4_types(self):
-        valid_v4 = {"user_preference", "user_fact", "important_event", "relationship_event"}
-        assert set(LEGACY_MEMORY_TYPE_MAP.values()) <= valid_v4

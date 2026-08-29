@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from app.models.character_state import CharacterState
 from app.models.goal import GoalRecord
-from app.models.memory import UserMemoryV4
+from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
 
 
@@ -18,7 +18,7 @@ class ConversationState(BaseModel):
     user_id: str
     messages: list[ChatMessage]
     summary: str | None
-    memories: list[UserMemoryV4]
+    memories: list[UserMemory]
     current_input: str
     character_state: CharacterState = CharacterState()
     relationship_state: RelationshipState = RelationshipState()

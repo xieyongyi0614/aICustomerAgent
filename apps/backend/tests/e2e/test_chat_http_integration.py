@@ -172,7 +172,7 @@ def test_http_memory_roundtrip(http_server, db_session_factory, llm_override, fa
     assert resp.status_code == 200
     assert wait_until(
         lambda: any(
-            m.memory == "用户喜欢寿司"
+            m.content == "用户喜欢寿司"
             for m in memory_repository.list_by_user("default-user")
         )
     )
@@ -228,7 +228,7 @@ def test_http_full_lifecycle(
         assert resp.status_code == 200
         assert wait_until(
             lambda: any(
-                m.memory == "用户喜欢寿司"
+                m.content == "用户喜欢寿司"
                 for m in memory_repository.list_by_user("default-user")
             )
         )

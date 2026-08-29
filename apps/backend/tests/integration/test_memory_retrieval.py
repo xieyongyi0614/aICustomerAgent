@@ -25,8 +25,8 @@ def _insert_row(
             Memory(
                 id=row_id,
                 user_id=user_id,
-                memory=content,
-                memory_type=memory_type,
+                content=content,
+                type=memory_type,
                 importance=importance,
                 character_id=character_id,
                 status=status,
@@ -41,7 +41,7 @@ def _insert_row(
 
 
 def retrieve_contents(*args, **kwargs):
-    return [m.content for m in memory_service.retrieve_v4(*args, **kwargs)]
+    return [m.content for m in memory_service.retrieve(*args, **kwargs)]
 
 
 class TestWeightedRecall:
@@ -151,7 +151,7 @@ class TestFallbackAndDegradation:
         def boom(*args, **kwargs):
             raise RuntimeError("db down")
 
-        monkeypatch.setattr(memory_service.repo, "list_active_v4", boom)
+        monkeypatch.setattr(memory_service.repo, "list_active", boom)
         assert retrieve_contents("u1", "我喜欢西瓜", character_id="asuna") == []
 
 
@@ -159,7 +159,7 @@ class TestWriteback:
     def test_last_accessed_written_after_recall(self, db_session_factory):
         _insert_row(db_session_factory, "用户喜欢西瓜", memory_id="m1")
         retrieve_contents("u1", "我喜欢西瓜", character_id="asuna")
-        assert repo.get_memory_v4("m1").last_accessed_at is not None
+        assert repo.get_memory("m1").last_accessed_at is not None
 
     def test_writeback_failure_tolerated(self, db_session_factory, monkeypatch):
         _insert_row(db_session_factory, "用户喜欢西瓜", memory_id="m1")
@@ -170,11 +170,3 @@ class TestWriteback:
         monkeypatch.setattr(memory_service.repo, "touch_last_accessed", boom)
         results = retrieve_contents("u1", "我喜欢西瓜", character_id="asuna")
         assert results == ["用户喜欢西瓜"]
-
-
-class TestV1RetrieveUnchanged:
-    def test_v1_retrieve_still_works(self, db_session_factory):
-        repo.create_memory("u1", "用户喜欢寿司", "preference", 0.8)
-        results = memory_service.retrieve("u1", "寿司好吃吗")
-        assert len(results) == 1
-        assert results[0].memory == "用户喜欢寿司"

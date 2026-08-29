@@ -35,7 +35,7 @@ async def build(
     summary = current.summary if current else None
     started = time.perf_counter()
     try:
-        recalled = memory_service.retrieve_v4(user_id, current_input)
+        recalled = memory_service.retrieve(user_id, current_input)
         memories = memory_service.select_for_context(recalled)
     except Exception:
         logger.exception("记忆检索失败，降级为空记忆")

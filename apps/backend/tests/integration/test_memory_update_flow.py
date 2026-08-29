@@ -112,7 +112,7 @@ async def test_single_write_failure_does_not_block_other_candidates(
             ]
         )
     )
-    original_create = memory_service.repo.create_memory_v4
+    original_create = memory_service.repo.create_memory
     calls = {"n": 0}
 
     def flaky(*args, **kwargs):
@@ -121,11 +121,11 @@ async def test_single_write_failure_does_not_block_other_candidates(
             raise RuntimeError("write down")
         return original_create(*args, **kwargs)
 
-    monkeypatch.setattr(memory_service.repo, "create_memory_v4", flaky)
+    monkeypatch.setattr(memory_service.repo, "create_memory", flaky)
     await memory_service.extract_and_save("u1", "x", "y", llm=llm)
     memories = repo.list_by_user("u1")
     assert len(memories) == 1
-    assert memories[0].memory == "用户在深圳工作"
+    assert memories[0].content == "用户在深圳工作"
 
 
 async def test_suppress_round_records_policy_ok_without_writes(db_session_factory):
@@ -159,7 +159,7 @@ def test_policy_report_contract():
 
 
 async def test_forget_retries_once_then_succeeds(db_session_factory, monkeypatch):
-    existing = repo.create_memory_v4(
+    existing = repo.create_memory(
         "u1", "asuna", "用户喜欢咖啡", "user_preference", 0.8, 0.9
     )
     trace = TurnTraceSession()
@@ -191,12 +191,12 @@ async def test_forget_retries_once_then_succeeds(db_session_factory, monkeypatch
         "u1", "忘了吧", "好的", llm=llm, trace=trace
     )
     assert calls["n"] == 2
-    assert repo.get_memory_v4(existing.id) is None
+    assert repo.get_memory(existing.id) is None
     assert _step(trace, "memory_privacy").status == "ok"
 
 
 async def test_forget_failure_after_retry_visible_in_trace(db_session_factory, monkeypatch):
-    repo.create_memory_v4(
+    repo.create_memory(
         "u1", "asuna", "用户喜欢咖啡", "user_preference", 0.8, 0.9
     )
     trace = TurnTraceSession()

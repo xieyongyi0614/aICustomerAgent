@@ -6,7 +6,7 @@ from datetime import datetime
 from app.chains.extractor_chain import extract_candidates
 from app.core.logutils import content_preview
 from app.core.settings import get_settings
-from app.models.memory import MemoryCandidate, UserMemory, UserMemoryV4
+from app.models.memory import MemoryCandidate, UserMemory
 from app.repositories import memory_repository as repo
 from app.services.memory_conflict import (
     ACTION_DISCARD_PAIR,
@@ -67,7 +67,7 @@ async def extract_and_save(
         return
 
     try:
-        active = repo.list_active_v4(user_id, character_id, limit=200)
+        active = repo.list_active(user_id, character_id, limit=200)
     except Exception:
         logger.exception("记忆读取失败，冲突比对降级为空")
         active = []
@@ -106,7 +106,7 @@ async def _execute_forget(
 ) -> None:
     for attempt in range(1, FORGET_MAX_ATTEMPTS + 1):
         try:
-            active = repo.list_active_v4(user_id, character_id, limit=200)
+            active = repo.list_active(user_id, character_id, limit=200)
             target = (item.content or "").strip()
             matched = [
                 memory
@@ -155,7 +155,7 @@ async def _execute_outcome(
     candidate = outcome.candidate
     try:
         if outcome.action == ACTION_SAVE:
-            repo.create_memory_v4(
+            repo.create_memory(
                 user_id,
                 character_id,
                 candidate.content,
@@ -169,7 +169,7 @@ async def _execute_outcome(
                 outcome.target_id, candidate.content, candidate.importance
             )
         elif outcome.action == ACTION_SUPERSEDE:
-            repo.create_memory_v4_and_supersede(
+            repo.create_memory_and_supersede(
                 user_id,
                 character_id,
                 candidate.content,
@@ -191,24 +191,6 @@ async def _execute_outcome(
         logger.exception("记忆写入失败，单条候选丢弃，不影响其他候选")
 
 
-def retrieve(user_id: str, user_input: str, top_k: int | None = None) -> list[UserMemory]:
-    settings = get_settings()
-    limit = top_k or settings.memory_top_k
-    candidates = repo.list_by_user(user_id, limit=100)
-    input_tokens = _tokenize(user_input)
-    scored = []
-    for memory in candidates:
-        memory_tokens = _tokenize(memory.memory)
-        if not memory_tokens:
-            continue
-        overlap = len(input_tokens & memory_tokens)
-        score = overlap / len(memory_tokens)
-        if score > 0:
-            scored.append((score, memory))
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return [memory for _, memory in scored[:limit]]
-
-
 def _detect_query_types(user_input: str) -> set[str]:
     return {
         memory_type
@@ -225,7 +207,7 @@ def _lexical_overlap(user_input: str, content: str) -> float:
     return len(input_tokens & content_tokens) / len(content_tokens)
 
 
-def _recency(memory: UserMemoryV4, now: datetime) -> float:
+def _recency(memory: UserMemory, now: datetime) -> float:
     settings = get_settings()
     reference = memory.last_accessed_at or memory.created_at
     reference = reference.replace(tzinfo=None) if reference.tzinfo else reference
@@ -234,7 +216,7 @@ def _recency(memory: UserMemoryV4, now: datetime) -> float:
 
 
 def _score_memory(
-    memory: UserMemoryV4, user_input: str, query_types: set[str], now: datetime
+    memory: UserMemory, user_input: str, query_types: set[str], now: datetime
 ) -> float:
     settings = get_settings()
     affinity = (
@@ -250,21 +232,21 @@ def _score_memory(
     )
 
 
-def _is_expired(memory: UserMemoryV4, now: datetime) -> bool:
+def _is_expired(memory: UserMemory, now: datetime) -> bool:
     return memory.expires_at is not None and memory.expires_at < now
 
 
-def retrieve_v4(
+def retrieve(
     user_id: str,
     user_input: str,
     character_id: str = "asuna",
     top_k: int | None = None,
-) -> list[UserMemoryV4]:
+) -> list[UserMemory]:
     settings = get_settings()
     limit = top_k or settings.memory_top_k
     now = datetime.now()
     try:
-        candidates = repo.list_active_v4(
+        candidates = repo.list_active(
             user_id, character_id, limit=settings.memory_candidate_pool_limit
         )
     except (ValueError, OSError, RuntimeError):
@@ -335,15 +317,15 @@ async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
 
 
 def select_for_context(
-    memories: list[UserMemoryV4],
+    memories: list[UserMemory],
     max_count: int | None = None,
     max_chars: int | None = None,
-) -> list[UserMemoryV4]:
+) -> list[UserMemory]:
     settings = get_settings()
     if max_chars is None:
         max_chars = settings.memory_context_char_budget
     limit = max_count or settings.memory_top_k
-    selected: list[UserMemoryV4] = []
+    selected: list[UserMemory] = []
     seen_contents: list[str] = []
     total_chars = 0
     for memory in memories:

@@ -56,7 +56,7 @@ def test_extractor_failure_does_not_break_sse(db_session_factory, fake_llm):
             assert [d["delta"] for d in deltas] == ["记得", "呀"]
             assert events[-1].get("done") is True
             assert not any(
-                m.memory == "用户喜欢寿司"
+                m.content == "用户喜欢寿司"
                 for m in repo.list_by_user("default-user")
             )
     finally:
@@ -76,7 +76,7 @@ def test_memory_roundtrip_across_turns(db_session_factory, fake_llm):
             assert resp.status_code == 200
             assert wait_until(
                 lambda: any(
-                    m.memory == "用户喜欢西瓜"
+                    m.content == "用户喜欢西瓜"
                     for m in repo.list_by_user("default-user")
                 )
             )

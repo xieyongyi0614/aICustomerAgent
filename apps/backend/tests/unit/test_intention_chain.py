@@ -4,7 +4,7 @@ from app.chains import intention_chain
 from app.models.character_state import CharacterState
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.goal import GoalRecord
-from app.models.memory import UserMemoryV4
+from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
 from app.services.goal_service import SelectedGoal
 
@@ -12,7 +12,7 @@ NOW = datetime(2026, 8, 29, 12, 0, 0)
 
 
 def _state() -> ConversationState:
-    memory = UserMemoryV4(
+    memory = UserMemory(
         id="m1",
         user_id="u1",
         character_id="asuna",

@@ -62,8 +62,8 @@ class Memory(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
-    memory: Mapped[str] = mapped_column(Text, nullable=False)
-    memory_type: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
     importance: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
     character_id: Mapped[str] = mapped_column(
         String, nullable=False, default="*", server_default="*"
@@ -85,9 +85,8 @@ class Memory(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "memory_type IN ('preference', 'fact', 'goal', 'experience', 'relationship',"
-            " 'user_preference', 'user_fact', 'important_event', 'relationship_event')",
-            name="ck_memories_memory_type",
+            "type IN ('user_preference', 'user_fact', 'important_event', 'relationship_event')",
+            name="ck_memories_type",
         ),
         Index("idx_memories_user", "user_id"),
         Index(

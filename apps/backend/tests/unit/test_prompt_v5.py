@@ -171,11 +171,11 @@ class TestContextTotalBudget:
 
     def test_memories_trimmed_before_summary(self, monkeypatch):
         monkeypatch.setattr(get_settings(), "context_total_char_budget", 700)
-        from app.models.memory import UserMemoryV4
+        from app.models.memory import UserMemory
 
         now = datetime(2026, 8, 29, tzinfo=timezone.utc)
         memories = [
-            UserMemoryV4(
+            UserMemory(
                 id=f"m{i}",
                 user_id="u1",
                 character_id="asuna",

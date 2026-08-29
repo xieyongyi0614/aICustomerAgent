@@ -142,7 +142,7 @@ async def test_state_persistence_failure_does_not_break_summary_and_memory(
     assert summary_repository.get_summary("s-be7-4").summary == "好耶"
     assert await _wait_background(
         lambda: any(
-            m.memory == "用户喜欢寿司"
+            m.content == "用户喜欢寿司"
             for m in memory_repository.list_by_user(USER)
         )
     )

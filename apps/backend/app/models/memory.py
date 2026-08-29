@@ -3,9 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-MemoryType = Literal["preference", "fact", "goal", "experience", "relationship"]
-
-MemoryTypeV4 = Literal["user_preference", "user_fact", "important_event", "relationship_event"]
+MemoryType = Literal["user_preference", "user_fact", "important_event", "relationship_event"]
 
 MemorySource = Literal["user_stated", "user_derived", "ai_inferred"]
 
@@ -15,30 +13,29 @@ MemoryRelation = Literal["refine", "replace", "negate"]
 
 MemoryStatus = Literal["active", "superseded", "invalidated"]
 
-LEGACY_MEMORY_TYPE_MAP = {
-    "preference": "user_preference",
-    "fact": "user_fact",
-    "goal": "user_fact",
-    "experience": "important_event",
-    "relationship": "relationship_event",
-}
-
 TARGETED_ACTIONS = ("update", "invalidate")
 
 
 class UserMemory(BaseModel):
     id: str
     user_id: str
-    memory: str
-    memory_type: MemoryType
+    character_id: str
+    type: MemoryType
+    content: str
     importance: float
+    confidence: float = 0.0
+    source: MemorySource = "ai_inferred"
+    status: MemoryStatus = "active"
+    superseded_by: str | None = None
     created_at: datetime
     updated_at: datetime
+    last_accessed_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class MemoryCandidate(BaseModel):
     action: MemoryAction = "none"
-    type: MemoryTypeV4
+    type: MemoryType
     content: str | None = None
     importance: float = Field(default=0.0, ge=0.0, le=1.0)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -61,20 +58,3 @@ class MemoryCandidate(BaseModel):
 
 class MemoryExtraction(BaseModel):
     candidates: list[MemoryCandidate] = Field(default_factory=list)
-
-
-class UserMemoryV4(BaseModel):
-    id: str
-    user_id: str
-    character_id: str
-    type: MemoryTypeV4
-    content: str
-    importance: float
-    confidence: float = 0.0
-    source: MemorySource = "ai_inferred"
-    status: MemoryStatus = "active"
-    superseded_by: str | None = None
-    created_at: datetime
-    updated_at: datetime
-    last_accessed_at: datetime | None = None
-    expires_at: datetime | None = None

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.models.memory import MemoryCandidate, UserMemoryV4
+from app.models.memory import MemoryCandidate, UserMemory
 from app.services.memory_conflict import (
     ACTION_DISCARD_PAIR,
     ACTION_INVALIDATE,
@@ -43,7 +43,7 @@ def make_memory(id: str, content: str, type: str = "user_preference", **override
         "updated_at": NOW,
     }
     payload.update(overrides)
-    return UserMemoryV4(**payload)
+    return UserMemory(**payload)
 
 
 class TestSameTopic:

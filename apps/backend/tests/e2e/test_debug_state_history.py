@@ -136,7 +136,7 @@ def test_memories_isolated_by_user_after_roundtrip(client):
     assert resp.status_code == 200
     assert wait_until(
         lambda: any(
-            m.memory == "用户喜欢寿司"
+            m.content == "用户喜欢寿司"
             for m in memory_repository.list_by_user("default-user")
         )
     )
@@ -155,7 +155,7 @@ def test_memories_endpoint_exposes_v4_lifecycle_fields(client):
     assert resp.status_code == 200
     assert wait_until(
         lambda: any(
-            m.memory == "用户喜欢寿司"
+            m.content == "用户喜欢寿司"
             for m in memory_repository.list_by_user("default-user")
         )
     )

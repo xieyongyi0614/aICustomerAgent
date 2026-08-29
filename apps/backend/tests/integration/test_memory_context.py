@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models.conversation import ChatMessage, ConversationState
-from app.models.memory import UserMemoryV4
+from app.models.memory import UserMemory
 from app.prompts.builder import PromptBuilder
 from app.services import memory_service
 from app.services.context_builder import build as build_context
@@ -24,7 +24,7 @@ def make_v4_memory(id: str, content: str, type: str = "user_preference", **overr
         "updated_at": now,
     }
     payload.update(overrides)
-    return UserMemoryV4(**payload)
+    return UserMemory(**payload)
 
 
 def make_state(memories) -> ConversationState:
@@ -115,13 +115,13 @@ class TestContextBuilderIntegration:
     async def test_build_recalls_v4_memories(self, db_session_factory):
         from app.repositories import memory_repository as repo
 
-        repo.create_memory_v4("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
-        repo.create_memory_v4("u1", "asuna", "旧偏好", "user_preference", 0.9, 0.9)
-        rows = repo.list_active_v4("u1", "asuna")
+        repo.create_memory("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
+        repo.create_memory("u1", "asuna", "旧偏好", "user_preference", 0.9, 0.9)
+        rows = repo.list_active("u1", "asuna")
         old_row = next(r for r in rows if r.content == "旧偏好")
         repo.supersede_memory(old_row.id, next(r.id for r in rows if r.content == "用户喜欢西瓜"))
         state = await build_context("s1", "u1", "我喜欢吃西瓜")
-        assert all(isinstance(m, UserMemoryV4) for m in state.memories)
+        assert all(isinstance(m, UserMemory) for m in state.memories)
         assert [m.content for m in state.memories] == ["用户喜欢西瓜"]
 
     @pytest.mark.asyncio
@@ -133,11 +133,11 @@ class TestContextBuilderIntegration:
     async def test_build_memory_failure_degrades(self, db_session_factory, monkeypatch):
         from app.repositories import memory_repository as repo
 
-        repo.create_memory_v4("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
+        repo.create_memory("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
 
         def boom(*args, **kwargs):
             raise RuntimeError("db down")
 
-        monkeypatch.setattr(memory_service, "retrieve_v4", boom)
+        monkeypatch.setattr(memory_service, "retrieve", boom)
         state = await build_context("s1", "u1", "我喜欢吃西瓜")
         assert state.memories == []

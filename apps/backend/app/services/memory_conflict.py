@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.core.settings import get_settings
-from app.models.memory import MemoryCandidate, UserMemoryV4
+from app.models.memory import MemoryCandidate, UserMemory
 
 ACTION_SAVE = "save"
 ACTION_UPDATE = "update"
@@ -49,8 +49,8 @@ def same_topic(left: str, right: str, threshold: float | None = None) -> bool:
 
 
 def _find_matches(
-    candidate: MemoryCandidate, active_memories: list[UserMemoryV4]
-) -> list[UserMemoryV4]:
+    candidate: MemoryCandidate, active_memories: list[UserMemory]
+) -> list[UserMemory]:
     content = candidate.content or ""
     return [
         memory
@@ -62,8 +62,8 @@ def _find_matches(
 
 
 def _best_match(
-    candidate: MemoryCandidate, matches: list[UserMemoryV4]
-) -> UserMemoryV4:
+    candidate: MemoryCandidate, matches: list[UserMemory]
+) -> UserMemory:
     content = candidate.content or ""
     return max(
         matches,
@@ -76,7 +76,7 @@ def _best_match(
 
 def resolve_candidate(
     candidate: MemoryCandidate,
-    active_memories: list[UserMemoryV4],
+    active_memories: list[UserMemory],
     threshold: float | None = None,
 ) -> ConflictOutcome:
     if candidate.action == "invalidate":
@@ -116,7 +116,7 @@ def resolve_candidate(
 
 def resolve_batch(
     candidates: list[MemoryCandidate],
-    active_memories: list[UserMemoryV4],
+    active_memories: list[UserMemory],
     threshold: float | None = None,
 ) -> list[ConflictOutcome]:
     outcomes: list[ConflictOutcome] = []
