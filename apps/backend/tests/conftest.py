@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault(
     "LLM_PROFILES_JSON",
     '[{"id":"longcat","label":"LongCat (test)","base_url":"https://example.invalid/v1","model":"fake","api_key":"test"}]',

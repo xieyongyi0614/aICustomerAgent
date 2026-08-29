@@ -5,25 +5,34 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
+from app.application import autonomy_worker
+from app.core.settings import get_settings
 from app.services import memory_service
 
 logging.basicConfig(level=logging.INFO)
 
 _reclaim_task: asyncio.Task | None = None
+_autonomy_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    global _reclaim_task
+    global _reclaim_task, _autonomy_task
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
+    if get_settings().autonomy_enabled:
+        _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
+    else:
+        logging.getLogger(__name__).info("autonomy_enabled=false，Worker 未启动")
     yield
-    if _reclaim_task is not None:
-        _reclaim_task.cancel()
-        try:
-            await _reclaim_task
-        except asyncio.CancelledError:
-            pass
-        _reclaim_task = None
+    for task in (_reclaim_task, _autonomy_task):
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+    _reclaim_task = None
+    _autonomy_task = None
 
 
 def create_app() -> FastAPI:

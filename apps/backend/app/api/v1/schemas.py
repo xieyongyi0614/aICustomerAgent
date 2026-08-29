@@ -138,3 +138,16 @@ class MemoryItemOut(BaseModel):
 class MemoriesOut(BaseModel):
     user_id: str
     memories: list[MemoryItemOut]
+
+
+class ProactiveActionOut(BaseModel):
+    id: str
+    intention: str
+    reason: str = ""
+    text: str
+    session_id: str
+    delivered_at: datetime | None = None
+
+
+class ProactivePendingOut(BaseModel):
+    actions: list[ProactiveActionOut] = []
