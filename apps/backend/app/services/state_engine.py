@@ -75,6 +75,17 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def build_relationship_impact(event_type: str, magnitude: str) -> RelationshipDelta:
+    base = RELATIONSHIP_EVENT_DELTAS[event_type]
+    coefficient = MAGNITUDE_COEFFICIENTS[magnitude]
+    return RelationshipDelta(
+        intimacy=round(base.intimacy * coefficient, 6),
+        trust=round(base.trust * coefficient, 6),
+        familiarity=round(base.familiarity * coefficient, 6),
+        tension=round(base.tension * coefficient, 6),
+    )
+
+
 def update_emotion(
     state: CharacterState, event: EmotionEvent, now: datetime
 ) -> CharacterState:

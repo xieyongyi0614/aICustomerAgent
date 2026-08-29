@@ -99,6 +99,40 @@ class Memory(Base):
     )
 
 
+class RelationshipEventRow(Base):
+    __tablename__ = "relationship_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    magnitude: Mapped[str] = mapped_column(String, nullable=False)
+    impact_intimacy: Mapped[float] = mapped_column(Float, nullable=False)
+    impact_trust: Mapped[float] = mapped_column(Float, nullable=False)
+    impact_familiarity: Mapped[float] = mapped_column(Float, nullable=False)
+    impact_tension: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    source: Mapped[str] = mapped_column(
+        String, nullable=False, default="conversation", server_default="conversation"
+    )
+    cause: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('user_care', 'user_help', 'intimate_moment', 'long_interaction',"
+            " 'praise', 'criticized', 'conflict', 'boundary_violation', 'none')",
+            name="ck_relationship_events_type",
+        ),
+        CheckConstraint(
+            "magnitude IN ('weak', 'normal', 'strong')",
+            name="ck_relationship_events_magnitude",
+        ),
+        Index("idx_relationship_events_user", "user_id", "created_at"),
+    )
+
+
 class CharacterStateRow(Base):
     __tablename__ = "character_state"
 

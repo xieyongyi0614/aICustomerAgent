@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Literal
 
@@ -39,3 +40,17 @@ class RelationshipDelta(BaseModel):
     trust: float = 0.0
     familiarity: float = 0.0
     tension: float = 0.0
+
+
+class RelationshipEvent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    character_id: str = "asuna"
+    session_id: str
+    type: RelationshipEventType
+    magnitude: Literal["weak", "normal", "strong"]
+    impact: RelationshipDelta
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source: Literal["conversation", "memory_replay"] = "conversation"
+    cause: str = Field(default="", max_length=50)
+    created_at: datetime

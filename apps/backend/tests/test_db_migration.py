@@ -14,6 +14,7 @@ from app.main import app
 from app.repositories import (
     character_state_repository,
     conversation_repository,
+    relationship_event_repository,
     emotion_history_repository,
     memory_repository,
     relationship_repository,
@@ -119,6 +120,7 @@ def test_http_lifecycle_on_postgres(postgres_url, fake_llm):
     monkey.setattr(memory_repository, "SessionLocal", pg_session)
     monkey.setattr(character_state_repository, "SessionLocal", pg_session)
     monkey.setattr(relationship_repository, "SessionLocal", pg_session)
+    monkey.setattr(relationship_event_repository, "SessionLocal", pg_session)
     monkey.setattr(emotion_history_repository, "SessionLocal", pg_session)
     monkey.setattr(scene_state_repository, "SessionLocal", pg_session)
 

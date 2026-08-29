@@ -29,6 +29,7 @@ from app.repositories import (
     conversation_repository,
     emotion_history_repository,
     memory_repository,
+    relationship_event_repository,
     relationship_repository,
     scene_state_repository,
     summary_repository,
@@ -136,6 +137,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(character_state_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(relationship_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(relationship_event_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(emotion_history_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(scene_state_repository, "SessionLocal", testing_session)
     yield testing_session
