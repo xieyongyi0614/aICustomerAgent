@@ -14,6 +14,17 @@ Mood = Literal[
     "angry",
 ]
 
+EmotionLabel = Mood
+
+EMOTION_CAUSE_MAX_LENGTH = 50
+
+
+class CharacterEmotion(BaseModel):
+    primary_emotion: EmotionLabel = "calm"
+    intensity: float = Field(default=0.3, ge=0.0, le=1.0)
+    cause: str = Field(default="", max_length=EMOTION_CAUSE_MAX_LENGTH)
+    updated_at: datetime | None = None
+
 
 class CharacterState(BaseModel):
     mood: Mood = "calm"

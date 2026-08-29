@@ -1,11 +1,29 @@
 from datetime import datetime
 
 from app.core.settings import get_settings
-from app.models.character_state import CharacterState, StateUpdateDecision
-from app.models.emotion import TurnAnalysis
+from app.models.character_state import CharacterState, EmotionLabel, StateUpdateDecision
+from app.models.emotion import EmotionEventType, TurnAnalysis
 from app.models.relationship import RelationshipDelta, RelationshipState
 
 STAGE_ORDER = ("stranger", "friend", "close_friend", "partner")
+
+EMOTION_EVENTS: dict[str, dict] = {
+    "praise": {"emotion": "happy", "delta": 0.3},
+    "comforted": {"emotion": "happy", "delta": 0.25},
+    "teased": {"emotion": "shy", "delta": 0.25},
+    "warm_moment": {"emotion": "happy", "delta": 0.2},
+    "funny_moment": {"emotion": "excited", "delta": 0.3},
+    "criticized": {"emotion": "sad", "delta": 0.3},
+    "conflict": {"emotion": "angry", "delta": 0.4},
+    "worrying_news": {"emotion": "worried", "delta": 0.35},
+    "reunion": {"emotion": "excited", "delta": 0.3},
+}
+
+MAGNITUDE_COEFFICIENTS: dict[str, float] = {
+    "weak": 0.6,
+    "normal": 1.0,
+    "strong": 1.4,
+}
 
 EVENT_DELTAS: dict[str, RelationshipDelta] = {
     "achievement": RelationshipDelta(intimacy=0.04, familiarity=0.02),

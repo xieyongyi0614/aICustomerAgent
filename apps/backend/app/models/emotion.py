@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.behavior import BehaviorDecision
 
@@ -32,6 +32,29 @@ EventCategory = Literal[
 class UserEmotion(BaseModel):
     emotion: UserEmotionLabel = "neutral"
     event: EventCategory = "daily"
+
+
+EmotionEventType = Literal[
+    "praise",
+    "comforted",
+    "criticized",
+    "teased",
+    "conflict",
+    "warm_moment",
+    "funny_moment",
+    "worrying_news",
+    "reunion",
+    "none",
+]
+
+EmotionMagnitude = Literal["weak", "normal", "strong"]
+
+
+class EmotionEvent(BaseModel):
+    type: EmotionEventType = "none"
+    magnitude: EmotionMagnitude = "normal"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    cause: str = Field(default="", max_length=50)
 
 
 class TurnAnalysis(BaseModel):
