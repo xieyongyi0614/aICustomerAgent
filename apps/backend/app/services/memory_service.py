@@ -96,6 +96,30 @@ async def extract_and_save(
     _trace_step(trace, "memory_conflict", started_conflict)
     for outcome in outcomes:
         await _execute_outcome(user_id, character_id, outcome)
+    _register_followups(user_id, saved)
+
+
+def _register_followups(user_id: str, saved) -> None:
+    """V7-010：带时间语义的事件记忆 → scheduled_followup 登记（内存，丢失可接受）。"""
+    from datetime import datetime, timedelta
+
+    from app.services import trigger_evaluator
+
+    now = datetime.now()
+    for memory in saved:
+        keyword = trigger_evaluator.find_followup_event(memory.content or "")
+        if keyword is None:
+            continue
+        due = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        if due <= now:
+            due += timedelta(days=1)
+        try:
+            trigger_evaluator.register_followup(
+                user_id, due, f"{keyword}近况跟进"
+            )
+            logger.info("scheduled_followup 登记：%s due=%s", keyword, due)
+        except Exception:
+            logger.exception("followup 登记失败，跳过")
 
 
 FORGET_MAX_ATTEMPTS = 2

@@ -1,10 +1,10 @@
-"""V7 TriggerEvaluator（trigger-model.md §2~3）。
+"""V7 TriggerEvaluator（trigger-model.md §2~4）。
 
-MVP 仅 conversation_inactivity；scheduled_followup 类型已在模型层预留（V7-010 P1 实现）。
-纯函数：会话末条消息信息 + episode 记账 → TriggerSignal | None。
+conversation_inactivity 纯函数判定；scheduled_followup 内存登记表（低频、重启丢失可接受）。
 """
 
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.core.settings import get_settings
@@ -19,6 +19,55 @@ class SessionTail:
     last_message_role: str | None = None
     last_user_message_at: datetime | None = None
     last_user_message_id: str | None = None
+
+
+FOLLOWUP_EVENT_KEYWORDS = ("面试", "考试", "会议", "答辩", "体检")
+
+_followup_registry: dict[str, dict] = {}
+_followup_lock = threading.Lock()
+
+
+def register_followup(
+    user_id: str, due_at: datetime, summary: str, dedupe_key: str | None = None
+) -> str:
+    key = dedupe_key or f"followup:{user_id}:{summary[:20]}:{due_at.date().isoformat()}"
+    with _followup_lock:
+        _followup_registry[key] = {
+            "user_id": user_id,
+            "due_at": due_at,
+            "summary": summary,
+        }
+    return key
+
+
+def find_followup_event(content: str) -> str | None:
+    """记忆内容含事件关键词时返回摘要（memory 管线登记点用）。"""
+    content = content or ""
+    for keyword in FOLLOWUP_EVENT_KEYWORDS:
+        if keyword in content:
+            return keyword
+    return None
+
+
+def poll_due_followup(user_id: str, now: datetime) -> TriggerSignal | None:
+    """tick 内惰性求值：due_at ≤ now 的登记项产出信号并出队。"""
+    due: str | None = None
+    with _followup_lock:
+        for key, item in _followup_registry.items():
+            if item["user_id"] == user_id and item["due_at"] <= now:
+                due = key
+                break
+        if due is not None:
+            item = _followup_registry.pop(due)
+        else:
+            return None
+    return TriggerSignal(
+        type="scheduled_followup",
+        user_id=user_id,
+        detected_at=now,
+        context={"summary": item["summary"], "due_at": item["due_at"].isoformat()},
+        dedupe_key=due,
+    )
 
 
 def evaluate_inactivity(

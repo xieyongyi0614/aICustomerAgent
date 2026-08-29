@@ -118,12 +118,16 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         user_id,
         episode_start=tail.last_user_message_at or _DATETIME_MIN,
     )
-    signal: TriggerSignal | None = trigger_evaluator.evaluate_inactivity(
-        tail,
-        user_id,
-        episode_attempts=attempts,
-        now=now,
-    )
+    followup = trigger_evaluator.poll_due_followup(user_id, now)
+    if followup is not None:
+        signal: TriggerSignal | None = followup
+    else:
+        signal = trigger_evaluator.evaluate_inactivity(
+            tail,
+            user_id,
+            episode_attempts=attempts,
+            now=now,
+        )
     if signal is None:
         return None
 
