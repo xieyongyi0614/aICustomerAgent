@@ -142,6 +142,19 @@ class Settings(BaseSettings):
     mode_idle_reset_seconds: int = 7200
     habit_extra_json: str = "[]"
 
+    autonomy_enabled: bool = True
+    autonomy_tick_seconds: int = 60
+    autonomy_inactivity_minutes: int = 30
+    autonomy_min_interval_minutes: int = 240
+    autonomy_min_interval_floor_minutes: int = 60
+    autonomy_max_attempts_per_episode: int = 2
+    autonomy_backoff_multiplier: float = 2.0
+    autonomy_quiet_hours_start: str = "23:00"
+    autonomy_quiet_hours_end: str = "08:00"
+    autonomy_max_retries: int = 2
+    autonomy_poll_seconds: int = 30
+    autonomy_min_user_reply_gap_minutes: int = 2
+
     @model_validator(mode="after")
     def validate_profiles(self):
         if not self.llm_profiles_json:

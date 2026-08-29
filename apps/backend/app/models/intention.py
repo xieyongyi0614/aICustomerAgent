@@ -15,6 +15,7 @@ IntentionType = Literal[
     "ask_followup",
     "share_own_feeling",
     "lighten_mood",
+    "check_in",
 ]
 
 INTENTION_REASON_MAX_LENGTH = 60

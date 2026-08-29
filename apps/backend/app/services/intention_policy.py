@@ -96,7 +96,12 @@ _ALWAYS_VALID = (
     "ask_followup",
     "share_own_feeling",
     "lighten_mood",
+    "check_in",
 )
+
+
+def is_valid(intention: str, state: ConversationState, analysis, now: datetime) -> bool:
+    return _is_valid(intention, state, analysis, now)
 
 
 def _is_valid(intention: str, state: ConversationState, analysis, now: datetime) -> bool:
