@@ -39,5 +39,18 @@ def save_turn(
     return ai_message.id
 
 
+def save_proactive_turn(session_id: str, text: str) -> int:
+    message = repo.save_message(session_id, "ai", text, is_proactive=True)
+    repo.touch_conversation(session_id)
+    return message.id
+
+
+def reset_proactive_on_user_message(user_id: str) -> None:
+    """用户发言复位（cooldown.md §5）：delivered 未 acked → acked；candidate → discarded。"""
+    from app.repositories import proactive_repository
+
+    proactive_repository.reset_on_user_message(user_id)
+
+
 def message_count(session_id: str) -> int:
     return repo.count_messages(session_id)

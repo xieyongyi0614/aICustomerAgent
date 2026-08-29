@@ -18,7 +18,7 @@ PENDING_EXPIRE_HOURS = 24
 _TRANSITIONS: dict[str, frozenset[str]] = {
     "candidate": frozenset({"approved", "discarded"}),
     "approved": frozenset({"delivered", "failed", "discarded", "candidate"}),
-    "failed": frozenset({"delivered", "failed", "discarded"}),
+    "failed": frozenset({"approved", "delivered", "failed", "discarded"}),
     "delivered": frozenset({"acked", "expired"}),
 }
 
@@ -97,7 +97,7 @@ def enqueue(action: ProactiveAction) -> bool:
 
 
 def get_active(user_id: str, now: datetime | None = None) -> ProactiveAction | None:
-    """可执行的非终态行：candidate/approved，或重试到期的 failed。"""
+    """可执行的非终态行：candidate/approved，或重试到期的 failed（终态 failed 无 next_retry_at，不取）。"""
     now = now or datetime.now()
     with SessionLocal() as session:
         rows = (

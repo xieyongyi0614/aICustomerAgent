@@ -1,0 +1,176 @@
+"""V7 Proactive Executor（action-queue.md §2 / concurrency.md L1~L3 / failure-handling.md）。
+
+approved 状态的 ProactiveAction → 锁内二次校验 → 生成文本 → save_proactive_turn → delivered。
+主动消息不是对话轮：不触发 V5 状态更新 / goal_review / memory 提取。
+"""
+
+import logging
+import time
+from datetime import datetime, timedelta
+
+from app.application.post_process import get_user_write_lock
+from app.chains import proactive_chain
+from app.core.settings import get_settings
+from app.models.autonomy import ProactiveAction
+from app.repositories import goal_repository, proactive_repository
+from app.services import conversation_service, trigger_evaluator
+from app.services.autonomy_policy import in_quiet_hours
+from app.services.trace_collector import TurnTraceSession
+
+logger = logging.getLogger(__name__)
+
+
+def _recheck_failed_reason(
+    action: ProactiveAction, user_id: str, session_id: str, now: datetime
+) -> str | None:
+    from app.application.chat_pipeline import active_generations
+
+    settings = get_settings()
+    if active_generations.get(user_id):
+        return "generating"
+    if in_quiet_hours(
+        now, settings.autonomy_quiet_hours_start, settings.autonomy_quiet_hours_end
+    ):
+        return "quiet_hours"
+    recent = conversation_service.load_window(session_id, max_messages=1)
+    if recent:
+        last = recent[-1]
+        if (
+            last.role == "human"
+            and (now - last.created_at).total_seconds() / 60
+            < settings.autonomy_min_user_reply_gap_minutes
+        ):
+            return "user_active"
+    return None
+
+
+def _backoff_seconds(attempt: int) -> float:
+    settings = get_settings()
+    return settings.autonomy_tick_seconds * (
+        settings.autonomy_backoff_multiplier**attempt
+    )
+
+
+async def _fail_for_retry(
+    action: ProactiveAction,
+    trace: TurnTraceSession | None,
+    error: str,
+    now: datetime,
+) -> ProactiveAction:
+    settings = get_settings()
+    attempt = action.attempt + 1
+    if attempt >= settings.autonomy_max_retries:
+        updated = proactive_repository.transition(
+            action.id, "failed", now=now, attempt=attempt, next_retry_at=None
+        )
+        logger.error("主动消息重试耗尽：%s（终态 failed）", action.id)
+    else:
+        updated = proactive_repository.transition(
+            action.id,
+            "failed",
+            now=now,
+            attempt=attempt,
+            next_retry_at=now + timedelta(seconds=_backoff_seconds(attempt)),
+        )
+    if trace is not None:
+        trace.record("proactive_deliver", 0.0, "error", error=error)
+    return updated if updated is not None else action
+
+
+def _goal_description(action: ProactiveAction) -> str | None:
+    """动机消失（目标被 review 完成/取消）→ None，视同生成失败（failure-handling.md §2）。"""
+    if action.goal_id is None:
+        return action.reason or None
+    try:
+        goal = goal_repository.get_goal(action.goal_id)
+    except Exception:
+        logger.exception("主动目标读取失败：%s", action.goal_id)
+        return None
+    if goal is None or goal.status != "active":
+        return None
+    return goal.description
+
+
+async def execute(
+    action: ProactiveAction,
+    llm=None,
+    trace: TurnTraceSession | None = None,
+    now: datetime | None = None,
+) -> ProactiveAction | None:
+    started = time.perf_counter()
+    settings = get_settings()
+    now = now or datetime.now()
+    approved = proactive_repository.transition(action.id, "approved", now=now)
+    if approved is None:
+        return None
+
+    lock = get_user_write_lock(action.user_id)
+    async with lock:
+        reason = _recheck_failed_reason(action, action.user_id, action.session_id, now)
+        if reason == "generating":
+            rolled_back = proactive_repository.transition(
+                action.id, "candidate", now=now
+            )
+            if trace is not None:
+                trace.record("proactive_deliver", 0.0, "degraded", error=reason)
+            return rolled_back
+        if reason is not None:
+            discarded = proactive_repository.transition(
+                action.id, "discarded", now=now
+            )
+            if trace is not None:
+                trace.record("proactive_deliver", 0.0, "degraded", error=reason)
+            return discarded
+
+        goal_description = _goal_description(action)
+        if goal_description is None:
+            return await _fail_for_retry(action, trace, "goal_vanished", now)
+        text = await proactive_chain.generate(
+            goal_description,
+            action.intention,
+            _recent_context(action.session_id),
+            llm=llm,
+            trace=trace,
+        )
+        if not text:
+            return await _fail_for_retry(action, trace, "generate_failed", now)
+
+        try:
+            message_id = conversation_service.save_proactive_turn(
+                action.session_id, text
+            )
+        except Exception:
+            logger.exception("主动消息落库失败，action 停留 approved 下 tick 重试")
+            proactive_repository.transition(action.id, "candidate")
+            if trace is not None:
+                trace.record("proactive_deliver", 0.0, "error", error="persist_failed")
+            return None
+
+        delivered = proactive_repository.transition(
+            action.id,
+            "delivered",
+            delivered_at=now,
+            message_id=str(message_id),
+            payload_text=text,
+        )
+        if trace is not None:
+            trace.record(
+                "proactive_deliver",
+                (time.perf_counter() - started) * 1000,
+            )
+        logger.info(
+            "主动消息已投递：action=%s message=%s 预览=%s",
+            action.id,
+            message_id,
+            text[: settings.log_content_preview_chars or 12],
+        )
+        return delivered
+
+
+def _recent_context(session_id: str, turns: int = 2) -> str:
+    messages = conversation_service.load_window(session_id, max_messages=turns * 2)
+    lines = [
+        f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
+        for m in messages[-turns * 2 :]
+    ]
+    return "\n".join(lines)

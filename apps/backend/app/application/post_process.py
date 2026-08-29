@@ -202,12 +202,17 @@ STEP_HANDLERS = (
 _user_write_locks: dict[str, asyncio.Lock] = {}
 
 
+def get_user_write_lock(user_id: str) -> asyncio.Lock:
+    """per-user 写锁公共入口（REF-010）；V7 Executor 复用同一把锁。"""
+    return _user_write_locks.setdefault(user_id, asyncio.Lock())
+
+
 def reset_user_write_locks() -> None:
     _user_write_locks.clear()
 
 
 async def run_post_process(ctx: PostProcessContext) -> None:
-    lock = _user_write_locks.setdefault(ctx.user_id, asyncio.Lock())
+    lock = get_user_write_lock(ctx.user_id)
     async with lock:
         for handler in STEP_HANDLERS:
             await handler(ctx)

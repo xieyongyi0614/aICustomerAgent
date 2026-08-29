@@ -41,6 +41,8 @@ from app.services.intention_policy import enforce as enforce_intention
 
 logger = logging.getLogger(__name__)
 
+active_generations: dict[str, bool] = {}
+
 
 class EmptyLLMResponseError(Exception):
     pass
@@ -302,6 +304,7 @@ async def run_chat_pipeline(
     llm_started = time.perf_counter()
     first_token_ms = None
     goal_ctx = GoalContext(selected_goal=selected_goal, intention=validated_intention)
+    active_generations[user_id] = True
     try:
         async for token in answer_chain.astream(
             mode_decision.effective,
@@ -338,6 +341,8 @@ async def run_chat_pipeline(
         )
         logger.exception("回答流式输出失败")
         raise
+    finally:
+        active_generations.pop(user_id, None)
 
     trace.record(
         "llm",
@@ -357,6 +362,10 @@ async def run_chat_pipeline(
         reply,
         mode_write_back=mode_decision.effective if mode_decision.write_back else None,
     )
+    try:
+        conversation_service.reset_proactive_on_user_message(user_id)
+    except Exception:
+        logger.exception("主动行为复位失败，不影响本轮对话")
     schedule_post_process(
         session_id,
         user_id,

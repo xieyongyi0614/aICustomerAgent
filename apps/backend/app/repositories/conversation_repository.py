@@ -32,7 +32,15 @@ def get_latest_for_user(user_id: str) -> Conversation | None:
         )
 
 
-def save_message(conv_id: str, role: str, content: str) -> Message:
+def list_user_ids() -> list[str]:
+    with SessionLocal() as session:
+        rows = session.query(Conversation.user_id).distinct().all()
+        return [row.user_id for row in rows]
+
+
+def save_message(
+    conv_id: str, role: str, content: str, is_proactive: bool = False
+) -> Message:
     if role not in ("human", "ai"):
         raise ValueError(f"非法 role: {role}")
     with SessionLocal() as session:
@@ -40,6 +48,7 @@ def save_message(conv_id: str, role: str, content: str) -> Message:
             conversation_id=conv_id,
             role=role,
             content=content,
+            is_proactive=is_proactive,
             created_at=datetime.now(),
         )
         session.add(message)
