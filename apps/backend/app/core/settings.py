@@ -127,6 +127,16 @@ class Settings(BaseSettings):
     state_history_limit: int = 20
     scene_pending_max_turns: int = 5
 
+    goal_default_ttl_turns: int = 20
+    goal_rest_complete_turns: int = 5
+    goal_companion_complete_intensity: float = 0.4
+    goal_repair_complete_tension: float = 0.3
+    goal_repair_min_tension: float = 0.3
+    goal_tease_familiarity: float = 0.4
+    goal_tease_max_tension: float = 0.3
+    goal_late_night_start: int = 23
+    goal_late_night_end: int = 6
+
     @model_validator(mode="after")
     def validate_profiles(self):
         if not self.llm_profiles_json:
