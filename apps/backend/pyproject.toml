@@ -22,6 +22,7 @@ dev = [
     "pytest-asyncio>=0.25.0",
     "pylint>=3.3",
     "httpx>=0.28.1",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.pylint.main]
@@ -31,3 +32,4 @@ init-hook = "import sys, os; cwd = os.getcwd(); candidates = [os.path.join(cwd, 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "-n auto --dist loadscope"
