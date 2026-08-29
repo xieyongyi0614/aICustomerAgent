@@ -22,12 +22,6 @@ from app.services.memory_policy import apply_policy
 
 logger = logging.getLogger(__name__)
 
-WEIGHT_LEXICAL = 0.45
-WEIGHT_IMPORTANCE = 0.25
-WEIGHT_RECENCY = 0.20
-WEIGHT_TYPE_AFFINITY = 0.10
-RECENCY_HALF_LIFE_DAYS = 30.0
-
 TYPE_AFFINITY_KEYWORDS = {
     "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢", "讨厌"),
     "user_fact": ("在哪", "工作", "住", "养", "做什么", "是谁"),
@@ -233,25 +227,27 @@ def _lexical_overlap(user_input: str, content: str) -> float:
 
 
 def _recency(memory: UserMemoryV4, now: datetime) -> float:
+    settings = get_settings()
     reference = memory.last_accessed_at or memory.created_at
     reference = reference.replace(tzinfo=None) if reference.tzinfo else reference
     days = max((now - reference).total_seconds() / 86400, 0)
-    return 0.5 ** (days / RECENCY_HALF_LIFE_DAYS)
+    return 0.5 ** (days / settings.memory_recency_half_life_days)
 
 
 def _score_memory(
     memory: UserMemoryV4, user_input: str, query_types: set[str], now: datetime
 ) -> float:
+    settings = get_settings()
     affinity = (
         0.5
         if not query_types
         else (1.0 if memory.type in query_types else 0.0)
     )
     return (
-        WEIGHT_LEXICAL * _lexical_overlap(user_input, memory.content)
-        + WEIGHT_IMPORTANCE * memory.importance
-        + WEIGHT_RECENCY * _recency(memory, now)
-        + WEIGHT_TYPE_AFFINITY * affinity
+        settings.memory_weight_lexical * _lexical_overlap(user_input, memory.content)
+        + settings.memory_weight_importance * memory.importance
+        + settings.memory_weight_recency * _recency(memory, now)
+        + settings.memory_weight_type_affinity * affinity
     )
 
 
@@ -269,7 +265,9 @@ def retrieve_v4(
     limit = top_k or settings.memory_top_k
     now = datetime.now()
     try:
-        candidates = repo.list_active_v4(user_id, character_id, limit=200)
+        candidates = repo.list_active_v4(
+            user_id, character_id, limit=settings.memory_candidate_pool_limit
+        )
     except (ValueError, OSError, RuntimeError):
         logger.exception("记忆检索失败，降级为空列表")
         return []
@@ -307,7 +305,9 @@ def _is_duplicate_content(content: str, seen: list[str]) -> bool:
 def reclaim_expired_memories(now: datetime | None = None) -> int:
     now = now or datetime.now()
     try:
-        expired = repo.list_expired_active(now, limit=500)
+        expired = repo.list_expired_active(
+            now, limit=get_settings().memory_reclaim_batch_limit
+        )
     except (ValueError, OSError, RuntimeError):
         logger.exception("过期记忆读取失败，本轮回收跳过")
         return 0
@@ -338,9 +338,11 @@ async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
 def select_for_context(
     memories: list[UserMemoryV4],
     max_count: int | None = None,
-    max_chars: int = 400,
+    max_chars: int | None = None,
 ) -> list[UserMemoryV4]:
     settings = get_settings()
+    if max_chars is None:
+        max_chars = settings.memory_context_char_budget
     limit = max_count or settings.memory_top_k
     selected: list[UserMemoryV4] = []
     seen_contents: list[str] = []

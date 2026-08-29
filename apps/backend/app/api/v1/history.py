@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.settings import get_settings
+
 from app.api.v1.schemas import (
     ConversationMessagesOut,
     MemoriesOut,
@@ -10,7 +12,6 @@ from app.repositories import conversation_repository, memory_repository
 
 history_router = APIRouter()
 
-DEFAULT_USER = "default-user"
 DEFAULT_MESSAGES_LIMIT = 200
 MAX_MESSAGES_LIMIT = 500
 
@@ -46,7 +47,7 @@ def list_conversation_messages(
 
 @history_router.get("/memories", response_model=MemoriesOut)
 def list_memories(
-    user_id: str = Query(default=DEFAULT_USER),
+    user_id: str = Query(default=get_settings().default_user),
     conversation_id: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
 ):

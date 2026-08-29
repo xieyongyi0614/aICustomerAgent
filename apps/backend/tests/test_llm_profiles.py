@@ -124,6 +124,7 @@ def test_list_profiles_returns_public_view(monkeypatch):
 
 
 def test_profiles_endpoint(monkeypatch):
+    monkeypatch.setattr("app.api.v1.llm.get_settings", lambda: _make_settings())
     monkeypatch.setattr(llm_factory, "get_settings", lambda: _make_settings())
     with TestClient(app) as client:
         response = client.get("/api/v1/llm/profiles")

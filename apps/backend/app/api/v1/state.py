@@ -17,12 +17,10 @@ from app.repositories import (
 
 state_router = APIRouter()
 
-DEFAULT_USER = "default-user"
-
 
 @state_router.get("/state", response_model=StateSnapshotOut)
 def get_state_snapshot(
-    user_id: str = Query(default=DEFAULT_USER),
+    user_id: str = Query(default=get_settings().default_user),
     limit: int | None = Query(default=None, ge=1, le=100),
 ):
     settings = get_settings()

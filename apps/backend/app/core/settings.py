@@ -112,6 +112,17 @@ class Settings(BaseSettings):
     analysis_recent_messages: int = 6
     trace_capacity: int = 20
     log_content_preview_chars: int = 0
+
+    default_user: str = "default-user"
+    memory_recent_context_messages: int = 4
+    memory_weight_lexical: float = 0.45
+    memory_weight_importance: float = 0.25
+    memory_weight_recency: float = 0.20
+    memory_weight_type_affinity: float = 0.10
+    memory_recency_half_life_days: float = 30.0
+    memory_context_char_budget: int = 400
+    memory_candidate_pool_limit: int = 200
+    memory_reclaim_batch_limit: int = 500
     state_history_limit: int = 20
     scene_pending_max_turns: int = 5
 

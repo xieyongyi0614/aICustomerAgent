@@ -63,10 +63,6 @@ def _effective_role_mode(result) -> RoleMode:
     return result
 
 
-def _resolve_mode(result) -> str:
-    return _effective_role_mode(result).mode
-
-
 def _resolve_analysis(result) -> TurnAnalysis:
     if isinstance(result, BaseException):
         logger.error("轮次分析失败，使用默认分析", exc_info=result)
@@ -294,7 +290,7 @@ async def _post_process(
     except Exception:
         logger.exception("摘要更新失败，不影响本轮回答")
     started = time.perf_counter()
-    recent_turns = state.messages[-4:]
+    recent_turns = state.messages[-get_settings().memory_recent_context_messages :]
     recent_context = "\n".join(
         f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
         for m in recent_turns
