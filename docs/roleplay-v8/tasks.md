@@ -1,6 +1,6 @@
 # Roleplay V8 任务注册表
 
-> **状态（2026-08-31）**：设计完成，待实现。
+> **状态（2026-08-31）**：V8-001~014 全部完成（全量 1120+ 绿）；另按实现指令新增 **V8-015 World Consistency 评估规则**（用户新增集成需求）。
 > 执行策略：逐 Task 测试 + 全量回归（V1~V7.8 零回归）+ commit/push，连续执行，最后统一汇报。
 > 全局约束：World 是旁路——任何 Task 不得改变聊天 / 主动 / 评估链路的既有行为；**空世界时 prompt 字节不变（golden 守门）**；World 对 Character 状态零写回；一切开关与阈值进 `core/settings.py` world_* 组；世界失败只降级。
 
@@ -149,3 +149,29 @@
 - 每 Task 独立 commit + push，格式 `feat: V8-XXX <中文描述>`。
 - V8-007 是 P0 收口点：合并前必须全量回归零失败（既有 1050+ 测试 + 新增），golden 字节不变。
 - P0 链（001→007）完成后系统即具备"世界存在且进入上下文"的能力；P1 五项补齐演化与集成；014 最后执行。
+
+## 完成状态回写（2026-08-31，实现阶段）
+
+| Task | 提交 | 备注 |
+|---|---|---|
+| V8-001 | 819d8a3 | 域模型 + 17 项 world_* 配置 + home 布局/状态机/词表角色资产 |
+| V8-002 | baf727f + 8d53eb4 | 迁移 0017 四表 + 仓储 + WorldEngine + /debug/world |
+| V8-003 | 4fcccc1 | TimeProvider 三模式（story/simulated 显式 advance，rate 缩放） |
+| V8-004 | 295fbb1 | 地点装配/别名解析 + scene_state 零耦合断言 |
+| V8-005 | f6eb52c + 后续 fix | 物品全生命周期；food 状态机支持连续食用 |
+| V8-006 | eb6a6d1 | 确定性解释器 + post_process 第 8 步 + 指代回退（单实体）/问句守卫 |
+| V8-007 | e2e2dec | P0 收口：selector/render + world_ctx 可选参数链 + golden 不变 |
+| V8-008 | 079c2eb | 事件全生命周期 + lifespan 维护循环 + 保留清理 |
+| V8-009 | 6228a79 | 环境写回（interpreter/system/manual 三源）+ 情绪零写回断言 |
+| V8-010 | 9fe3680 | memory_bridge 单向投递 + materialized 幂等 |
+| V8-011 | b416110 | world_facts 进 PolicySnapshot + W1/W2/W3 修饰规则 |
+| V8-012 | ed51f4d | tests/v8/ 声明式三主线场景 + 五套件 + 性能护栏 |
+| V8-013 | ed793d1 | restore 整包回滚（恢复前自动留存）+ 历史查询端点 |
+| V8-014 | 本次提交 | regression-checklist.md 文档 |
+| V8-015 | bc7fa9c | 实现指令新增：World Consistency 评估规则（info 级，问句豁免） |
+
+实现期口径补充（与设计的差异）：
+- worlds.id 采用 `home:{user_id}`（设计文档的 id="home"+unique(user_id) 无法满足 PK 唯一）。
+- 解释器含"最近单实体指代回退 + 问句守卫"（口语代词省略的确定性解法）。
+- 记忆沉淀 source 落 user_derived（V4 仓储 source 白名单不含 world_event）。
+- V7.8 性能守门测试在 world_enabled=false 下运行（世界段含实时时间，避免字节对比抖动）。
