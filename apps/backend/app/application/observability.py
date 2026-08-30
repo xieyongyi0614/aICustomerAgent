@@ -9,6 +9,7 @@ from contextvars import ContextVar
 
 from app.core.settings import get_settings
 from app.models.observability import (
+    DecisionKind,
     DecisionRecord,
     LlmCallRecord,
     RuntimeTrace,
@@ -324,6 +325,90 @@ def on_decision(record: DecisionRecord) -> None:
     if not get_settings().observability_persist_enabled:
         return
     _spawn(_save_decision(record))
+
+
+def record_turn_decisions(
+    trace, user_id: str, session_id: str, selected_goal, intention, behavior
+) -> None:
+    """turn 级决策后置采集（decision-history.md §3）：只读结果对象，零控制流变更。"""
+    if not get_settings().observability_persist_enabled:
+        return
+    try:
+        max_chars = get_settings().observability_step_extra_max_chars
+        request_id = trace.request_id
+
+        goal = getattr(selected_goal, "goal", None)
+        goal_payload, _ = bound_extra(
+            {
+                "goal_id": getattr(goal, "id", None),
+                "suppressed": len(getattr(selected_goal, "suppressed", []) or []),
+            },
+            max_chars,
+        )
+        _spawn(
+            _save_decision(
+                DecisionRecord(
+                    kind=DecisionKind.TURN_GOAL,
+                    request_id=request_id,
+                    user_id=user_id,
+                    conversation_id=session_id,
+                    decision=getattr(goal, "type", None) or "none",
+                    reason=getattr(selected_goal, "reason", "") or "",
+                    input_snapshot=goal_payload,
+                )
+            )
+        )
+
+        intention_payload, _ = bound_extra(
+            {
+                "degraded": getattr(intention, "degraded", None),
+                "goal_id": getattr(intention, "goal_id", None),
+            },
+            max_chars,
+        )
+        _spawn(
+            _save_decision(
+                DecisionRecord(
+                    kind=DecisionKind.TURN_INTENTION,
+                    request_id=request_id,
+                    user_id=user_id,
+                    conversation_id=session_id,
+                    decision=getattr(intention, "intention", None) or "none",
+                    reason=getattr(intention, "reason", "") or "",
+                    input_snapshot=intention_payload,
+                )
+            )
+        )
+
+        strategy = getattr(behavior, "strategy", None)
+        budget = getattr(behavior, "budget", None)
+        behavior_payload, _ = bound_extra(
+            {
+                "base_strategy": getattr(strategy, "base_strategy", None),
+                "budget_max": getattr(budget, "max_action_desc", None),
+                "degraded": getattr(behavior, "degraded", None),
+                "matched_habits": [
+                    getattr(habit, "id", None)
+                    for habit in (getattr(behavior, "habits", None) or [])
+                ],
+            },
+            max_chars,
+        )
+        _spawn(
+            _save_decision(
+                DecisionRecord(
+                    kind=DecisionKind.TURN_BEHAVIOR,
+                    request_id=request_id,
+                    user_id=user_id,
+                    conversation_id=session_id,
+                    decision=getattr(strategy, "strategy", None) or "none",
+                    reason=getattr(strategy, "base_strategy", "") or "",
+                    input_snapshot=behavior_payload,
+                )
+            )
+        )
+    except Exception:
+        logger.exception("turn 级决策记录失败，已忽略")
 
 
 def mark_decision_outcome(action_id: str, outcome: str) -> None:

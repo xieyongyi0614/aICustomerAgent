@@ -392,6 +392,14 @@ async def run_chat_pipeline(
         session_id=session_id,
         post_process_task=post_process_task,
     )
+    observability.record_turn_decisions(
+        trace,
+        user_id=user_id,
+        session_id=session_id,
+        selected_goal=selected_goal,
+        intention=validated_intention,
+        behavior=behavior_ctx,
+    )
     yield {
         "kind": "done",
         "session_id": session_id,

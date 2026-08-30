@@ -80,6 +80,7 @@ async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_se
         assert body["evaluation"]["meta"]["request_id"] == request_id
         assert any(p["call_site"] == "answer" for p in body["prompts"])
         assert any(c["call_site"] == "answer" for c in body["llm_calls"])
+        assert any(d["kind"] == "turn_intention" for d in body["decisions"])
 
         missing = await client.get("/api/v1/debug/turns/no-such-turn/correlation")
         assert missing.status_code == 404
