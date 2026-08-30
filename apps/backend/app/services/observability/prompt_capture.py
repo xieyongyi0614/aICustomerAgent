@@ -176,3 +176,28 @@ def capture_judge_snapshot(call_site: CallSite, model=None) -> None:
         truncated=False,
     )
     observability.record_prompt_snapshot(snapshot)
+
+
+def diff_prompt_snapshots(snapshot_a, snapshot_b) -> dict:
+    """结构化 diff（prompt-debug.md §5）：模型切换 / 总量 / section 差异 / 消息数。"""
+    messages_a = snapshot_a.messages or []
+    messages_b = snapshot_b.messages or []
+    budget_a = snapshot_a.section_budget or {}
+    budget_b = snapshot_b.section_budget or {}
+    section_diff = {}
+    for key in sorted(set(budget_a) | set(budget_b)):
+        value_a, value_b = budget_a.get(key), budget_b.get(key)
+        if value_a != value_b:
+            section_diff[key] = {"a": value_a, "b": value_b}
+    return {
+        "model_changed": {"a": snapshot_a.model, "b": snapshot_b.model},
+        "profile_changed": {"a": snapshot_a.profile_id, "b": snapshot_b.profile_id},
+        "cross_call_site": snapshot_a.call_site != snapshot_b.call_site,
+        "total_chars": {
+            "a": sum(len(item.get("content") or "") for item in messages_a),
+            "b": sum(len(item.get("content") or "") for item in messages_b),
+        },
+        "section_diff": section_diff,
+        "messages_count": {"a": len(messages_a), "b": len(messages_b)},
+        "truncated": {"a": snapshot_a.truncated, "b": snapshot_b.truncated},
+    }
