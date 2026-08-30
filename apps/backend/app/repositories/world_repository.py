@@ -7,6 +7,7 @@ import logging
 import uuid
 from datetime import datetime
 
+from sqlalchemy import and_ as sa_and_, or_ as sa_or_
 from sqlalchemy.orm import Session as _Session  # noqa: F401
 
 from app.core.db import (
@@ -334,3 +335,45 @@ def new_event_id() -> str:
 
 def new_snapshot_id() -> str:
     return f"snap_{uuid.uuid4().hex[:12]}"
+
+
+def list_all_worlds() -> list[World]:
+    with SessionLocal() as session:
+        rows = session.query(WorldRow).all()
+        return [_to_world(row) for row in rows]
+
+
+def prune_events_before(world_id: str, cutoff: datetime) -> int:
+    with SessionLocal() as session:
+        deleted = (
+            session.query(WorldEventRow)
+            .filter(
+                WorldEventRow.world_id == world_id,
+                WorldEventRow.status.in_(["completed", "cancelled", "expired"]),
+                sa_or_(
+                    WorldEventRow.completed_at < cutoff,
+                    sa_and_(
+                        WorldEventRow.completed_at.is_(None),
+                        WorldEventRow.updated_at < cutoff,
+                    ),
+                ),
+            )
+            .delete()
+        )
+        session.commit()
+        return deleted
+
+
+def prune_snapshots(world_id: str, keep: int) -> int:
+    with SessionLocal() as session:
+        rows = (
+            session.query(WorldSnapshotRow)
+            .filter(WorldSnapshotRow.world_id == world_id)
+            .order_by(WorldSnapshotRow.created_at.desc())
+            .all()
+        )
+        stale = rows[keep:]
+        for row in stale:
+            session.delete(row)
+        session.commit()
+        return len(stale)

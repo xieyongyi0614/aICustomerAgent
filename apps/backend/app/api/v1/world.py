@@ -1,7 +1,9 @@
 """V8 世界调试与运维端点（persistence.md §6 / testing.md §5）。
 
-GET 均只读；POST 为显式手动通道（播种实体 / 设定环境 / 迁移位置 / 快照）。
+GET 均只读；POST 为显式手动通道（播种实体 / 设定环境 / 迁移位置 / 快照 / 事件）。
 """
+
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -39,6 +41,14 @@ class LocationUpdate(BaseModel):
 class SnapshotCreate(BaseModel):
     user_id: str | None = None
     label: str | None = None
+
+
+class EventCreate(BaseModel):
+    user_id: str | None = None
+    type: str
+    title: str | None = None
+    importance: str = "normal"
+    due_at: datetime | None = None
 
 
 def _user(user_id: str | None) -> str:
@@ -90,6 +100,34 @@ def update_location(body: LocationUpdate):
     if world is None:
         raise HTTPException(status_code=404, detail="地点不存在")
     return {"current_location": world.current_location}
+
+
+@world_router.get("/debug/world/events")
+def list_world_events(user_id: str | None = None):
+    from app.repositories import world_repository
+
+    world = world_engine.get_world(_user(user_id))
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    return [
+        event.model_dump(mode="json")
+        for event in world_repository.list_events(world.world_id, limit=100)
+    ]
+
+
+@world_router.post("/debug/world/events")
+def create_world_event(body: EventCreate):
+    event = world_engine.create_event(
+        _user(body.user_id),
+        event_type=body.type,
+        title=body.title,
+        importance=body.importance,
+        due_at=body.due_at,
+        source="manual",
+    )
+    if event is None:
+        raise HTTPException(status_code=409, detail="事件创建失败（上限或参数非法）")
+    return event.model_dump(mode="json")
 
 
 @world_router.post("/debug/world/snapshots")

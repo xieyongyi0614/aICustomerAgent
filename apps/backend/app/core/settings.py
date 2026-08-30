@@ -218,6 +218,7 @@ class Settings(BaseSettings):
     world_event_retention_days: int = 90
     world_snapshot_retention_days: int = 30
     world_snapshot_max_per_world: int = 20
+    world_maintenance_interval_seconds: int = 60
 
     @model_validator(mode="after")
     def validate_profiles(self):

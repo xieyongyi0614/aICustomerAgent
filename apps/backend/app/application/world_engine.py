@@ -4,6 +4,7 @@
 聊天与主动链路永不因世界而失败。
 """
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timedelta
@@ -24,6 +25,7 @@ from app.models.world import (
     bounded_notes,
     object_default_portions,
     object_initial_state,
+    part_of_day,
 )
 from app.repositories import world_repository
 from app.services.world.locations import build_location_context
@@ -575,3 +577,73 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
         if trace is not None:
             trace.record("world_context", 0.0, "error", error="world context failed")
         return None
+
+
+def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
+    """自治只读事实包（autonomy-integration.md §1）：装配失败 → 空包。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return {}
+        now = (provider or _default_provider).now(world)
+        events = world_repository.list_events(
+            world.world_id, statuses=["scheduled", "active"], limit=5
+        )
+        facts = {
+            "part_of_day": part_of_day(now),
+            "location": world.current_location,
+            "weather": world.environment.weather,
+            "salient_events": [
+                event.brief(now)
+                for event in events
+                if event.status is EventStatus.ACTIVE
+                or event.importance is EventImportance.HIGH
+            ],
+        }
+        from app.models.observability import bound_extra
+
+        bounded, _ = bound_extra(facts, get_settings().observability_step_extra_max_chars)
+        return bounded
+    except Exception:
+        logger.exception("世界事实装配失败，降级为空包")
+        return {}
+
+
+def run_maintenance(user_id: str | None = None) -> int:
+    """世界维护单轮：到期触发 / 物品过期 / 宽限过期 / 保留清理。"""
+    settings = get_settings()
+    if not settings.world_enabled:
+        return 0
+    handled = 0
+    worlds = (
+        [get_world(user_id)]
+        if user_id is not None
+        else world_repository.list_all_worlds()
+    )
+    for world in worlds:
+        if world is None:
+            continue
+        now = _default_provider.now(world)
+        handled += trigger_due_events(world.user_id, now)
+        handled += expire_due_objects(world.user_id, now)
+        handled += expire_stale_events(world.user_id, now)
+        try:
+            cutoff = now - timedelta(days=settings.world_event_retention_days)
+            handled += world_repository.prune_events_before(world.world_id, cutoff)
+            handled += world_repository.prune_snapshots(
+                world.world_id, settings.world_snapshot_max_per_world
+            )
+        except Exception:
+            logger.exception("世界保留清理失败，下轮重试")
+    return handled
+
+
+async def run_world_maintenance_loop() -> None:
+    """lifespan 常驻低频维护循环（H6）。"""
+    interval = get_settings().world_maintenance_interval_seconds
+    while True:
+        try:
+            run_maintenance()
+        except Exception:
+            logger.exception("世界维护循环异常，下轮重试")
+        await asyncio.sleep(interval)
