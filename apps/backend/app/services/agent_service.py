@@ -10,6 +10,7 @@ from app.application.chat_pipeline import (
     background_tasks,
     run_chat_pipeline,
 )
+from app.application import observability
 from app.services import trace_collector
 
 __all__ = ["stream_chat", "EmptyLLMResponseError", "background_tasks"]
@@ -31,4 +32,5 @@ async def stream_chat(
             "error",
             error=exc.__class__.__name__,
         )
+        observability.on_turn_error(trace, user_id=user_id, session_id=session_id)
         raise

@@ -69,10 +69,13 @@ autonomy_tick  自治决策 tick（产生决策才记，与 M2 联动，008 落�
 持久化判定（Facade，turn 收尾后）：
 
 ```text
-status ∈ {error, degraded}   → 必存（出问题的运行永远值得留）
+status = error               → 必存（出错与中断的运行永远值得留）
 否则                          → request_id sha256 确定性采样（observability_trace_sample_rate，默认 1.0）
 开关关闭 / 写库失败           → 放弃本条，log，内存层不受影响
 ```
+
+> 实现修订（2026-08-30）：degraded 是常规降级路径（路由低置信、意图降级等高频出现），
+> 纳入必存会使采样失去体量意义——必存口径收敛为 error，degraded 参与采样。
 
 确定性采样沿用 `evaluation_engine.should_sample` 口径（request_id 哈希），**独立实现不共享代码**——两套采样率各自可调，互不耦合。
 

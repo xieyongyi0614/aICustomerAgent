@@ -128,7 +128,7 @@ CREATE INDEX idx_decision_records_action (action_id);
 
 ```text
 observability_persist_enabled            true    总开关（false = 回到 V7.5 行为）
-observability_trace_sample_rate          1.0     trace 落库采样（error/degraded 恒必存）
+observability_trace_sample_rate          1.0     trace 落库采样（error 恒必存）
 observability_prompt_capture_mode        sampled disabled / sampled / always
 observability_prompt_sample_rate         0.2
 observability_prompt_max_chars           20000

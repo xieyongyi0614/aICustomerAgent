@@ -39,6 +39,7 @@ from app.repositories import (
     relationship_repository,
     scene_state_repository,
     summary_repository,
+    trace_repository,
 )
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
@@ -48,6 +49,12 @@ def chat_post_process_tasks():
     from app.application import post_process
 
     return post_process.background_tasks
+
+
+def observability_tasks():
+    from app.application import observability
+
+    return observability.background_tasks
 
 
 def wait_until(predicate, timeout=None):
@@ -155,10 +162,11 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(goal_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(proactive_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(evaluation_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(trace_repository, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while (
-        (agent_service._background_tasks or chat_post_process_tasks())
+        (agent_service._background_tasks or chat_post_process_tasks() or observability_tasks())
         and time.time() < deadline
     ):
         time.sleep(0.02)

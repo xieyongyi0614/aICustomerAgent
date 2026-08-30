@@ -265,3 +265,4 @@ def schedule_post_process(
     task = asyncio.create_task(run_post_process(ctx))
     background_tasks.add(task)
     task.add_done_callback(background_tasks.discard)
+    return task

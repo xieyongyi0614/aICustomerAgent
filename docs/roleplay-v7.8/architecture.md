@@ -69,7 +69,7 @@ t1~tn 各步骤 trace.record()（现状）  steps / events / llm_calls / prompts
 tn+1 save_turn 落库（现状）
 tn+2 schedule_post_process（现状）   评估在后台执行（现状）
 tn+3 attach(trace, turn_id)（现状）  ← H1 在此之后追加：on_turn_finished(trace, turn_id, ...)
-       Facade 判定：持久化开关？trace 采样命中？（request_id sha256，error/degraded 必存）
+       Facade 判定：持久化开关？trace 采样命中？（request_id sha256，error 必存）
        → asyncio.create_task 批量写：runtime_traces 1 行 + llm_call_records N 行
          + prompt_snapshots M 行（采样判定各自的，互不耦合）
        后台任务失败 → log + 放弃，不重试不冒泡
@@ -91,7 +91,7 @@ settings `observability_*` 组（完整清单见 persistence.md §5）：
 | 开关 | 默认 | 作用 |
 |---|---|---|
 | `observability_persist_enabled` | true | 总开关：false 时全部持久化短路，回到 V7.5 现状（内存 trace 仍可用） |
-| `observability_trace_sample_rate` | 1.0 | trace 落库采样；error/degraded 恒必存 |
+| `observability_trace_sample_rate` | 1.0 | trace 落库采样；error 恒必存 |
 | `observability_prompt_capture_mode` | sampled | disabled / sampled / always |
 | `observability_prompt_sample_rate` | 0.2 | 快照采样率（满足"禁止默认保存全部生产 Prompt"） |
 | `observability_llm_cost_json` | {} | 模型单价表；空则 cost_estimate 为 null |

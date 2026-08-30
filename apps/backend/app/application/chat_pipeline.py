@@ -24,6 +24,7 @@ from app.models.emotion import TurnAnalysis
 from app.models.intention import IntentionDecision
 from app.models.router import RoleMode
 from app.models.scene import SceneContext, SceneIntentResult, SceneState
+from app.application import observability
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.services import (
@@ -366,7 +367,7 @@ async def run_chat_pipeline(
         conversation_service.reset_proactive_on_user_message(user_id)
     except Exception:
         logger.exception("主动行为复位失败，不影响本轮对话")
-    schedule_post_process(
+    post_process_task = schedule_post_process(
         session_id,
         user_id,
         content,
@@ -384,6 +385,13 @@ async def run_chat_pipeline(
     )
     collector = trace_collector.get_trace_collector()
     collector.attach(trace, str(ai_message_id))
+    observability.on_turn_finished(
+        trace,
+        turn_id=str(ai_message_id),
+        user_id=user_id,
+        session_id=session_id,
+        post_process_task=post_process_task,
+    )
     yield {
         "kind": "done",
         "session_id": session_id,

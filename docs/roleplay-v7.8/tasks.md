@@ -20,7 +20,7 @@
 - **目标**：迁移 0013 `runtime_traces` 表 + `TraceRepository`（save / get_by_turn / get_by_trace_id / list_by_conversation / prune_before）+ `ObservabilityFacade.on_turn_finished` write-behind 持久化 + 既有 `/debug/turns/{id}/trace` 端点内存 miss 后落库回退。
 - **范围**：`migrations/versions/0013_runtime_traces.py`、`app/repositories/trace_repository.py`、`app/application/observability.py`（Facade 骨架）、`app/application/chat_pipeline.py`（attach 处 +1 行挂载）、`app/api/v1/debug.py`、`app/services/trace_collector.py`（仅 snapshot→模型映射，不改收集行为）；不改 26 步骤注册表与任何 `trace.record` 调用点。
 - **依赖**：V7.8-001。
-- **实现要点**：runtime-trace.md §2/§4/§5；采样复用 request_id 确定性哈希口径（独立实现）；error/degraded 必存；事件回填（emotion_history / relationship_events 只读视角）；写库失败 log 不冒泡。
+- **实现要点**：runtime-trace.md §2/§4/§5；采样复用 request_id 确定性哈希口径（独立实现）；error 必存（degraded 属常规降级路径，参与采样）；事件回填（emotion_history / relationship_events 只读视角）；写库失败 log 不冒泡。
 - **验收标准**：全链 turn 落 1 行且 steps 顺序稳定；采样/必存矩阵通过；内存 miss → DB 回退 → 404 三段语义正确；Facade 异常不影响聊天（写函数注入 raise 的负向测试）；alembic 往返。
 - **测试**：`tests/unit/test_observability_sampling.py`、`tests/integration/test_observability_trace_repository.py`、`tests/v7.8/test_trace.py`、`tests/e2e/test_debug_trace_persist.py`。
 

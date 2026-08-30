@@ -4,6 +4,7 @@ import threading
 import uuid
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.core.settings import get_settings
 
@@ -74,6 +75,7 @@ class TurnTraceSession:
     turn_id: str | None = None
     steps: list[TraceStep] = field(default_factory=list)
     request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    created_at: datetime = field(default_factory=datetime.now)
     token_usage: dict = field(default_factory=dict)
     model_name: str | None = None
 

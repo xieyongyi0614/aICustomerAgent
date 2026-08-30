@@ -342,6 +342,36 @@ class ProactiveActionRow(Base):
     )
 
 
+class RuntimeTraceRow(Base):
+    __tablename__ = "runtime_traces"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    conversation_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    turn_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    action_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duration_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    token_usage: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    model_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('turn', 'proactive', 'autonomy_tick')",
+            name="ck_runtime_traces_kind",
+        ),
+        Index("idx_runtime_traces_turn", "turn_id"),
+        Index("idx_runtime_traces_user_time", "user_id", "created_at"),
+        Index("idx_runtime_traces_conversation", "conversation_id", "created_at"),
+    )
+
+
 class EvaluationReportRow(Base):
     __tablename__ = "evaluation_reports"
 
