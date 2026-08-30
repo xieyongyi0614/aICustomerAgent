@@ -517,6 +517,25 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
             notes.append("到点的日子到了")
         refreshed = get_world(user_id)
         if refreshed is not None:
+            from app.services.world.context_selector import (
+                environment_lighting_suggestion,
+            )
+
+            suggestion = environment_lighting_suggestion(now)
+            if (
+                suggestion
+                and not result.environment_updates.get("lighting")
+                and refreshed.environment.lighting is None
+                and refreshed.environment.updated_by in (None, "system")
+            ):
+                refreshed.environment = refreshed.environment.model_copy(
+                    update={
+                        "lighting": suggestion,
+                        "updated_by": "system",
+                        "updated_at": datetime.now(),
+                    }
+                )
+                applied += 1
             refreshed.notes = bounded_notes(
                 notes, max(64, settings.world_context_char_budget // 4)
             )
