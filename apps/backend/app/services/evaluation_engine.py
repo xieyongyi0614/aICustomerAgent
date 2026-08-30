@@ -32,6 +32,7 @@ from app.services import evaluation_rules
 from app.services.evaluation_context import (
     EvaluationContext,
     build_digest,
+    collect_proactive_context,
     collect_turn_context,
 )
 
@@ -68,7 +69,7 @@ def _merge_issues(rule_issues: list[Issue], judge_result) -> list[Issue]:
     issues = list(rule_issues)
     if judge_result is None:
         return issues
-    memory_judgement = judge_result.memory
+    memory_judgement = getattr(judge_result, "memory", None)
     if memory_judgement is not None:
         confirmed = any(
             code.value == IssueCode.MEMORY_FABRICATION.value
@@ -81,7 +82,7 @@ def _merge_issues(rule_issues: list[Issue], judge_result) -> list[Issue]:
                 issue.code == IssueCode.MEMORY_FABRICATION_CANDIDATE and confirmed
             )
         ]
-    emotion_judgement = judge_result.emotion
+    emotion_judgement = getattr(judge_result, "emotion", None)
     if emotion_judgement is not None:
         issues = [
             issue
@@ -89,9 +90,9 @@ def _merge_issues(rule_issues: list[Issue], judge_result) -> list[Issue]:
             if issue.code != IssueCode.EMOTION_TEXT_STATE_CONFLICT
         ]
     for judgement in (
-        judge_result.persona,
-        judge_result.emotion,
-        judge_result.memory,
+        getattr(judge_result, "persona", None),
+        emotion_judgement,
+        getattr(judge_result, "memory", None),
     ):
         if judgement is not None:
             issues.extend(_judge_issues(judgement))
@@ -106,9 +107,10 @@ def _merge_scores(
     judgements = []
     if judge_result is not None:
         judgements = [
-            (EvaluationDimension.PERSONA, judge_result.persona),
-            (EvaluationDimension.EMOTION, judge_result.emotion),
-            (EvaluationDimension.MEMORY, judge_result.memory),
+            (EvaluationDimension.AUTONOMY, getattr(judge_result, "autonomy", None)),
+            (EvaluationDimension.PERSONA, getattr(judge_result, "persona", None)),
+            (EvaluationDimension.EMOTION, getattr(judge_result, "emotion", None)),
+            (EvaluationDimension.MEMORY, getattr(judge_result, "memory", None)),
         ]
     for dimension, judgement in judgements:
         if judgement is None:
@@ -259,3 +261,47 @@ async def _judge_and_finalize(
 def _record(ctx, duration_ms: float, status: str, **extra) -> None:
     if ctx.trace is not None:
         ctx.trace.record("evaluation", duration_ms, status, **extra)
+
+
+def schedule_proactive_evaluation(action, llm=None) -> None:
+    """executor delivered 后 fire-and-forget（autonomy-evaluation.md §1，写锁外）。"""
+    settings = get_settings()
+    if not settings.evaluation_enabled or not settings.evaluation_autonomy_enabled:
+        return
+    from app.application import post_process
+
+    task = asyncio.create_task(_evaluate_proactive(action, llm))
+    post_process.background_tasks.add(task)
+    task.add_done_callback(post_process.background_tasks.discard)
+
+
+async def _evaluate_proactive(action, llm=None) -> None:
+    try:
+        context = collect_proactive_context(action)
+        if context is None:
+            return
+        settings = get_settings()
+        rule_issues = evaluation_rules.run_rules(context)
+        eligible = evaluation_rules.eligible_dimensions("proactive_action")
+        rule_scores = evaluation_rules.compute_rule_scores(
+            rule_issues, eligible, settings
+        )
+        sampled = should_sample(context.request_id, settings)
+        judge_result = None
+        if sampled:
+            judge_result = await evaluation_judge_chain.judge_proactive(
+                build_digest(context),
+                character_id=context.character_id,
+                llm=llm,
+            )
+        report = finalize_report(
+            EvaluationSubjectKind.PROACTIVE_ACTION,
+            context,
+            rule_issues,
+            rule_scores,
+            judge_result=judge_result,
+            judge_sampled=sampled,
+        )
+        evaluation_repository.save(report)
+    except Exception:
+        logger.exception("主动行为评估失败，仅记录不冒泡")

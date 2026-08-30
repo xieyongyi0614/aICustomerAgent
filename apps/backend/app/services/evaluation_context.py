@@ -74,6 +74,9 @@ class ProactiveSlice:
     reason: str = ""
     delivered_at: object | None = None
     payload_text: str = ""
+    previous_delivered_at: object | None = None
+    last_user_message_at: object | None = None
+    episode_attempts: int = 1
 
 
 @dataclass
@@ -282,6 +285,91 @@ def build_digest(context: EvaluationContext) -> dict:
             "emotion_expression": context.behavior.emotion_expression,
         }
     return _truncate_digest(digest, get_settings().evaluation_max_digest_chars)
+
+
+def collect_proactive_context(action) -> EvaluationContext | None:
+    """主动行为主体（autonomy-evaluation.md §1）：delivered 后由引擎调用，只读切片。"""
+    if getattr(action, "status", "") != "delivered" or not getattr(
+        action, "payload_text", None
+    ):
+        return None
+    settings = get_settings()
+    context = EvaluationContext(
+        subject="proactive_action",
+        subject_id=str(action.id),
+        session_id=action.session_id,
+        user_id=action.user_id,
+        user_message="",
+        reply=_clip(action.payload_text, DIGEST_REPLY_CHARS),
+        request_id=str(action.id),
+    )
+    context.proactive = _collect_proactive_facts(action, settings)
+    context.state = _collect_state(action.user_id, None)
+    context.recent_messages = _collect_proactive_recent(action.session_id)
+    return context
+
+
+def _collect_proactive_facts(action, settings) -> ProactiveSlice:
+    delivered_at = action.delivered_at
+    previous_delivered_at = None
+    episode_attempts = 1
+    last_user_message_at = None
+    try:
+        from app.repositories import proactive_repository
+
+        history = proactive_repository.list_delivered_history(action.user_id, limit=10)
+        earlier = [
+            row
+            for row in history
+            if row.id != action.id and row.delivered_at is not None
+        ]
+        if earlier and delivered_at is not None:
+            previous_delivered_at = earlier[0].delivered_at
+            window_minutes = settings.autonomy_min_interval_minutes * 2
+            episode_attempts = 1 + sum(
+                1
+                for row in earlier
+                if (delivered_at - row.delivered_at).total_seconds() / 60
+                <= window_minutes
+            )
+    except Exception:
+        logger.exception("主动历史切片读取失败，时机审计降级")
+    try:
+        from app.services import conversation_service
+
+        window = conversation_service.load_window(action.session_id, max_messages=10)
+        human_messages = [m for m in window if m.role == "human"]
+        if human_messages:
+            last_user_message_at = human_messages[-1].created_at
+    except Exception:
+        logger.exception("会话尾部切片读取失败，时机审计降级")
+    return ProactiveSlice(
+        action_id=str(action.id),
+        trigger_type=action.trigger_type,
+        intention=action.intention,
+        reason=action.reason,
+        delivered_at=delivered_at,
+        payload_text=_clip(action.payload_text or "", DIGEST_REPLY_CHARS),
+        previous_delivered_at=previous_delivered_at,
+        last_user_message_at=last_user_message_at,
+        episode_attempts=episode_attempts,
+    )
+
+
+def _collect_proactive_recent(session_id: str) -> list[RecentMessage]:
+    try:
+        from app.services import conversation_service
+
+        window = conversation_service.load_window(
+            session_id, max_messages=DIGEST_RECENT_MESSAGES
+        )
+    except Exception:
+        logger.exception("主动近期消息切片读取失败，digest 降级")
+        return []
+    return [
+        RecentMessage(role=m.role, content=_clip(m.content, DIGEST_RECENT_CHARS))
+        for m in window
+    ][-DIGEST_RECENT_MESSAGES:]
 
 
 def _proactive_digest(proactive: ProactiveSlice | None) -> dict | None:

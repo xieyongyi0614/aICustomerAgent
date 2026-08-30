@@ -239,3 +239,20 @@ def list_users_with_history() -> list[str]:
     with SessionLocal() as session:
         rows = session.query(ProactiveActionRow.user_id).distinct().all()
         return [row.user_id for row in rows]
+
+
+def list_delivered_history(user_id: str, limit: int = 10) -> list[ProactiveAction]:
+    """delivered/acked 历史（新→旧），供事后时机审计取前次投递与集期记账。"""
+    with SessionLocal() as session:
+        rows = (
+            session.query(ProactiveActionRow)
+            .filter(
+                ProactiveActionRow.user_id == user_id,
+                ProactiveActionRow.status.in_(["delivered", "acked"]),
+                ProactiveActionRow.delivered_at.isnot(None),
+            )
+            .order_by(ProactiveActionRow.delivered_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_model(row) for row in rows]

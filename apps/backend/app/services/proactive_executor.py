@@ -161,6 +161,7 @@ async def execute(
                 "proactive_deliver",
                 (time.perf_counter() - started) * 1000,
             )
+        _schedule_evaluation(delivered, llm)
         logger.info(
             "主动消息已投递：action=%s message=%s 预览=%s",
             action.id,
@@ -168,6 +169,17 @@ async def execute(
             text[: settings.log_content_preview_chars or 12],
         )
         return delivered
+
+
+def _schedule_evaluation(delivered, llm) -> None:
+    if delivered is None:
+        return
+    try:
+        from app.services.evaluation_engine import schedule_proactive_evaluation
+
+        schedule_proactive_evaluation(delivered, llm)
+    except Exception:
+        logger.exception("主动行为评估调度失败，不影响发送链路")
 
 
 def _recent_context(session_id: str, turns: int = 2) -> str:
