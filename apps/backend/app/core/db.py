@@ -342,6 +342,37 @@ class ProactiveActionRow(Base):
     )
 
 
+class LlmCallRecordRow(Base):
+    __tablename__ = "llm_call_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    request_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    turn_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    call_site: Mapped[str] = mapped_column(String, nullable=False)
+    profile_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    ttft_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ok', 'error')",
+            name="ck_llm_call_records_status",
+        ),
+        Index("idx_llm_calls_request", "request_id"),
+        Index("idx_llm_calls_turn", "turn_id"),
+        Index("idx_llm_calls_time", "created_at"),
+    )
+
+
 class RuntimeTraceRow(Base):
     __tablename__ = "runtime_traces"
 

@@ -55,3 +55,26 @@ def reset_llm() -> None:
 
 def list_llm_profiles() -> list[dict]:
     return [profile.to_public() for profile in get_settings().llm_profiles()]
+
+
+def profile_id_of(llm) -> str | None:
+    for profile_id, instance in _llm_cache.items():
+        if instance is llm:
+            return profile_id
+    return None
+
+
+def provider_of(llm) -> str | None:
+    from urllib.parse import urlparse
+
+    base_url = getattr(llm, "openai_api_base", None) or getattr(llm, "base_url", None)
+    target = str(base_url) if base_url else None
+    if target is None:
+        profile_id = profile_id_of(llm)
+        if profile_id is None:
+            return None
+        try:
+            target = get_settings().get_llm_profile(profile_id).base_url
+        except SettingsError:
+            return None
+    return urlparse(target).hostname

@@ -1,7 +1,10 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, HTTPException
 
 from app.models.evaluation import EvaluationSubjectKind
-from app.repositories import evaluation_repository, trace_repository
+from app.repositories import evaluation_repository, llm_call_repository, trace_repository
+from app.services.observability.metrics_aggregator import summarize_llm_records
 from app.services.trace_collector import get_trace_collector
 
 debug_router = APIRouter()
@@ -30,6 +33,36 @@ def get_trace_by_request_id(trace_id: str):
 def list_traces(conversation_id: str, limit: int = 20):
     traces = trace_repository.list_by_conversation(conversation_id, limit=max(1, min(limit, 100)))
     return [trace.api_dict() for trace in traces]
+
+
+@debug_router.get("/debug/llm-calls")
+def list_llm_calls(
+    request_id: str | None = None,
+    turn_id: str | None = None,
+    window_hours: float | None = None,
+    call_site: str | None = None,
+    model: str | None = None,
+    limit: int = 100,
+):
+    since = (
+        datetime.now() - timedelta(hours=window_hours) if window_hours is not None else None
+    )
+    records = llm_call_repository.search(
+        request_id=request_id,
+        turn_id=turn_id,
+        since=since,
+        call_site=call_site,
+        model=model,
+        limit=limit,
+    )
+    return [record.model_dump(mode="json") for record in records]
+
+
+@debug_router.get("/debug/llm-calls/summary")
+def summary_llm_calls(window_hours: float = 24):
+    since = datetime.now() - timedelta(hours=window_hours)
+    records = llm_call_repository.list_since(since)
+    return summarize_llm_records(records, window_hours).model_dump(mode="json")
 
 
 @debug_router.get("/debug/turns/{turn_id}/evaluation")

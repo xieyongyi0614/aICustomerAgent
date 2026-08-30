@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
 
 from app.core.llm_factory import get_llm
+from app.services.observability.llm_capture import observe_structured_chain
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 
@@ -38,4 +39,4 @@ def build_structured_chain(
         return schema.model_validate_json(_extract_json_text(str(text)))
 
     fallback = fallback_prompt | model | RunnableLambda(_parse)
-    return primary.with_fallbacks([fallback])
+    return observe_structured_chain(primary.with_fallbacks([fallback]), prompt, schema, model)

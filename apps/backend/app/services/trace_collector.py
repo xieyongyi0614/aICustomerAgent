@@ -78,6 +78,9 @@ class TurnTraceSession:
     created_at: datetime = field(default_factory=datetime.now)
     token_usage: dict = field(default_factory=dict)
     model_name: str | None = None
+    llm_calls: list = field(default_factory=list)
+    prompt_snapshots: list = field(default_factory=list)
+    obs_flushed: bool = False
 
     def add_token_usage(self, usage: dict) -> None:
         for key, value in usage.items():

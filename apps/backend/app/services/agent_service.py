@@ -22,6 +22,7 @@ async def stream_chat(
     session_id: str, user_id: str, content: str, llm=None
 ) -> AsyncIterator[dict]:
     trace = trace_collector.get_trace_collector().begin_trace()
+    observability_token = observability.current_trace.set(trace)
     try:
         async for event in run_chat_pipeline(session_id, user_id, content, llm, trace):
             yield event
@@ -34,3 +35,5 @@ async def stream_chat(
         )
         observability.on_turn_error(trace, user_id=user_id, session_id=session_id)
         raise
+    finally:
+        observability.current_trace.reset(observability_token)

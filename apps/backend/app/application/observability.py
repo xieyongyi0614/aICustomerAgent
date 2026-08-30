@@ -5,9 +5,11 @@
 
 import asyncio
 import logging
+from contextvars import ContextVar
 
 from app.core.settings import get_settings
 from app.models.observability import (
+    LlmCallRecord,
     RuntimeTrace,
     TraceEvent,
     TraceKind,
@@ -21,6 +23,8 @@ from app.repositories import trace_repository
 logger = logging.getLogger(__name__)
 
 background_tasks: set = set()
+
+current_trace: ContextVar = ContextVar("observability_current_trace", default=None)
 
 
 def _spawn(coro) -> None:
@@ -185,6 +189,7 @@ async def _flush_turn_trace(
     post_process_task,
 ) -> None:
     await _await_post_process(post_process_task)
+    trace.obs_flushed = True
     try:
         settings = get_settings()
         status = _derive_status(trace)
@@ -209,11 +214,112 @@ async def _flush_turn_trace(
         trace_repository.save(record)
     except Exception:
         logger.exception("runtime trace 持久化失败，已忽略")
+    finally:
+        _drain_llm_calls(trace, turn_id)
+        _drain_prompt_snapshots(trace, turn_id)
+
+
+def _drain_llm_calls(trace, turn_id: str | None) -> None:
+    try:
+        pending = list(getattr(trace, "llm_calls", []) or [])
+        if not pending:
+            return
+        trace.llm_calls.clear()
+        from app.repositories import llm_call_repository
+
+        for record in pending:
+            if record.turn_id is None and turn_id is not None:
+                record = record.model_copy(update={"turn_id": turn_id})
+            llm_call_repository.save(record)
+    except Exception:
+        logger.exception("LLM 调用记录落库失败，已忽略")
+
+
+def _drain_prompt_snapshots(trace, turn_id: str | None) -> None:
+    try:
+        pending = list(getattr(trace, "prompt_snapshots", []) or [])
+        if not pending:
+            return
+        trace.prompt_snapshots.clear()
+        from app.repositories import prompt_snapshot_repository
+
+        for snapshot in pending:
+            if snapshot.turn_id is None and turn_id is not None:
+                snapshot = snapshot.model_copy(update={"turn_id": turn_id})
+            prompt_snapshot_repository.save(snapshot)
+    except Exception:
+        logger.exception("prompt 快照落库失败，已忽略")
+
+
+def record_llm_call(record: LlmCallRecord) -> None:
+    """采集路由：有活跃 trace 则随行缓冲（flush 时落库），否则直接后台写。"""
+    trace = current_trace.get()
+    if trace is not None and hasattr(trace, "llm_calls"):
+        if record.request_id is None:
+            record = record.model_copy(
+                update={"request_id": trace.request_id, "turn_id": trace.turn_id}
+            )
+        if trace.obs_flushed:
+            _spawn(_save_llm_call(record))
+        else:
+            trace.llm_calls.append(record)
+        return
+    submit_llm_call(record)
+
+
+def submit_llm_call(record: LlmCallRecord) -> None:
+    if not get_settings().observability_persist_enabled:
+        return
+    _spawn(_save_llm_call(record))
+
+
+def record_prompt_snapshot(snapshot) -> None:
+    """采集路由（prompt-debug.md §2）：同 record_llm_call。"""
+    trace = current_trace.get()
+    if trace is not None and hasattr(trace, "prompt_snapshots"):
+        if snapshot.request_id is None:
+            snapshot = snapshot.model_copy(
+                update={"request_id": trace.request_id, "turn_id": trace.turn_id}
+            )
+        if trace.obs_flushed:
+            _spawn(_save_prompt_snapshot(snapshot))
+        else:
+            trace.prompt_snapshots.append(snapshot)
+        return
+    submit_prompt_snapshot(snapshot)
+
+
+def submit_prompt_snapshot(snapshot) -> None:
+    if not get_settings().observability_persist_enabled:
+        return
+    _spawn(_save_prompt_snapshot(snapshot))
+
+
+async def _save_llm_call(record: LlmCallRecord) -> None:
+    try:
+        from app.repositories import llm_call_repository
+
+        llm_call_repository.save(record)
+    except Exception:
+        logger.exception("LLM 调用记录落库失败，已忽略")
+
+
+async def _save_prompt_snapshot(snapshot) -> None:
+    try:
+        from app.repositories import prompt_snapshot_repository
+
+        prompt_snapshot_repository.save(snapshot)
+    except Exception:
+        logger.exception("prompt 快照落库失败，已忽略")
 
 
 async def _flush_error_trace(trace, user_id: str, session_id: str) -> None:
+    trace.obs_flushed = True
     try:
         record = _assemble_trace(trace, TraceKind.TURN, user_id, session_id)
         trace_repository.save(record)
     except Exception:
         logger.exception("error trace 持久化失败，已忽略")
+    finally:
+        _drain_llm_calls(trace, None)
+        _drain_prompt_snapshots(trace, None)
