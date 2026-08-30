@@ -151,14 +151,16 @@ def list_decisions(
     return [record.model_dump(mode="json") for record in records]
 
 
-@debug_router.get("/debug/turns/{turn_id}/correlation")
-def get_turn_correlation(turn_id: str):
+def _turn_trace_payload(turn_id: str):
     persisted = trace_repository.get_by_turn(turn_id)
     if persisted is not None:
-        trace_payload = persisted.api_dict()
-    else:
-        session = get_trace_collector().get(turn_id)
-        trace_payload = session.snapshot() if session is not None else None
+        return persisted.api_dict()
+    session = get_trace_collector().get(turn_id)
+    return session.snapshot() if session is not None else None
+
+
+def _turn_correlation_payload(turn_id: str) -> tuple[dict, bool]:
+    trace_payload = _turn_trace_payload(turn_id)
     evaluation = evaluation_repository.get_by_subject(
         EvaluationSubjectKind.TURN.value, turn_id
     )
@@ -168,15 +170,14 @@ def get_turn_correlation(turn_id: str):
     decisions = (
         decision_repository.search(request_id=request_id) if request_id else []
     )
-    if (
-        trace_payload is None
-        and evaluation is None
-        and not prompts
-        and not llm_calls
-        and not decisions
-    ):
-        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
-    return {
+    found = (
+        trace_payload is not None
+        or evaluation is not None
+        or bool(prompts)
+        or bool(llm_calls)
+        or bool(decisions)
+    )
+    payload = {
         "turn_id": turn_id,
         "request_id": request_id,
         "trace": trace_payload,
@@ -185,20 +186,13 @@ def get_turn_correlation(turn_id: str):
         "llm_calls": [record.model_dump(mode="json") for record in llm_calls],
         "decisions": [record.model_dump(mode="json") for record in decisions],
     }
+    return payload, found
 
 
-@debug_router.get("/debug/proactive/{action_id}/correlation")
-def get_proactive_correlation(action_id: str):
+def _proactive_correlation_payload(action_id: str) -> tuple[dict, bool]:
     action = proactive_repository.get_by_id(action_id)
     message_id = action.message_id if action is not None else None
-    trace_payload = None
-    if message_id is not None:
-        persisted = trace_repository.get_by_turn(message_id)
-        if persisted is not None:
-            trace_payload = persisted.api_dict()
-        else:
-            session = get_trace_collector().get(message_id)
-            trace_payload = session.snapshot() if session is not None else None
+    trace_payload = _turn_trace_payload(message_id) if message_id is not None else None
     evaluation = evaluation_repository.get_by_subject(
         EvaluationSubjectKind.PROACTIVE_ACTION.value, action_id
     )
@@ -206,14 +200,13 @@ def get_proactive_correlation(action_id: str):
         llm_call_repository.get_by_turn(message_id) if message_id is not None else []
     )
     decisions = decision_repository.search(action_id=action_id)
-    if (
-        trace_payload is None
-        and evaluation is None
-        and not llm_calls
-        and not decisions
-    ):
-        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
-    return {
+    found = (
+        trace_payload is not None
+        or evaluation is not None
+        or bool(llm_calls)
+        or bool(decisions)
+    )
+    payload = {
         "action_id": action_id,
         "turn_id": message_id,
         "trace": trace_payload,
@@ -222,6 +215,74 @@ def get_proactive_correlation(action_id: str):
         "llm_calls": [record.model_dump(mode="json") for record in llm_calls],
         "decisions": [record.model_dump(mode="json") for record in decisions],
     }
+    return payload, found
+
+
+@debug_router.get("/debug/evaluations")
+def search_evaluations(
+    verdict: str | None = None,
+    dimension: str | None = None,
+    issue_code: str | None = None,
+    window_hours: float = 168,
+    limit: int = 20,
+    include: str | None = None,
+):
+    since = datetime.now() - timedelta(hours=max(window_hours, 0.001))
+    reports = evaluation_repository.list_since(since, verdict=verdict)
+
+    def _match(report) -> bool:
+        if dimension is not None and dimension not in report.scores:
+            return False
+        if issue_code is not None and not any(
+            issue.code.value == issue_code for issue in report.issues
+        ):
+            return False
+        return True
+
+    matched = [report for report in reports if _match(report)][
+        : max(1, min(limit, 100))
+    ]
+    rows = []
+    for report in matched:
+        item = {
+            "subject": report.subject.value,
+            "subject_id": report.subject_id,
+            "session_id": report.session_id,
+            "user_id": report.user_id,
+            "overall_score": report.overall_score,
+            "verdict": report.verdict,
+            "scores": {
+                (dimension.value if hasattr(dimension, "value") else str(dimension)): score.model_dump()
+                for dimension, score in report.scores.items()
+            },
+            "issue_codes": [issue.code.value for issue in report.issues],
+            "meta": report.meta.model_dump(mode="json"),
+            "created_at": report.created_at.isoformat(),
+        }
+        if include == "correlation":
+            if report.subject == EvaluationSubjectKind.TURN:
+                payload, _ = _turn_correlation_payload(report.subject_id)
+            else:
+                payload, _ = _proactive_correlation_payload(report.subject_id)
+            item["correlation"] = payload
+        rows.append(item)
+    return rows
+
+
+@debug_router.get("/debug/turns/{turn_id}/correlation")
+def get_turn_correlation(turn_id: str):
+    payload, found = _turn_correlation_payload(turn_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
+    return payload
+
+
+@debug_router.get("/debug/proactive/{action_id}/correlation")
+def get_proactive_correlation(action_id: str):
+    payload, found = _proactive_correlation_payload(action_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
+    return payload
 
 
 @debug_router.get("/debug/turns/{turn_id}/evaluation")
