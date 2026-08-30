@@ -9,6 +9,7 @@ from contextvars import ContextVar
 
 from app.core.settings import get_settings
 from app.models.observability import (
+    DecisionRecord,
     LlmCallRecord,
     RuntimeTrace,
     TraceEvent,
@@ -311,6 +312,37 @@ async def _save_prompt_snapshot(snapshot) -> None:
         prompt_snapshot_repository.save(snapshot)
     except Exception:
         logger.exception("prompt 快照落库失败，已忽略")
+
+
+def on_decision(record: DecisionRecord) -> None:
+    """决策记录入口（decision-history.md §3）：自治 tick 无 trace 上下文，直接后台写。"""
+    if not get_settings().observability_persist_enabled:
+        return
+    _spawn(_save_decision(record))
+
+
+def mark_decision_outcome(action_id: str, outcome: str) -> None:
+    if not get_settings().observability_persist_enabled:
+        return
+    _spawn(_mark_decision_outcome(action_id, outcome))
+
+
+async def _save_decision(record: DecisionRecord) -> None:
+    try:
+        from app.repositories import decision_repository
+
+        decision_repository.save(record)
+    except Exception:
+        logger.exception("决策记录落库失败，已忽略")
+
+
+async def _mark_decision_outcome(action_id: str, outcome: str) -> None:
+    try:
+        from app.repositories import decision_repository
+
+        decision_repository.mark_outcome(action_id, outcome)
+    except Exception:
+        logger.exception("决策 outcome 补写失败，已忽略")
 
 
 async def _flush_error_trace(trace, user_id: str, session_id: str) -> None:

@@ -10,7 +10,9 @@ import uuid
 from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
+from app.application import observability
 from app.models.autonomy import ProactiveAction, TriggerSignal
+from app.models.observability import DecisionKind, DecisionRecord, bound_extra
 from app.repositories import (
     conversation_repository,
     goal_repository,
@@ -108,6 +110,46 @@ def reset_episode(user_id: str) -> None:
     """用户发言开启新 episode；预留钩子位（dedupe 幂等由 repository 兜底）。"""
 
 
+def _decision_record(
+    verdict, signal, snapshot, user_id: str, session_id: str, action_id=None, outcome=None
+) -> DecisionRecord:
+    payload, _ = bound_extra(
+        {
+            "generating": snapshot.generating,
+            "has_active_action": snapshot.has_active_action,
+            "last_proactive_at": (
+                str(snapshot.last_proactive_at) if snapshot.last_proactive_at else None
+            ),
+            "attempt_count": snapshot.attempt_count,
+            "intimacy": snapshot.intimacy,
+            "tension": snapshot.tension,
+            "mood": snapshot.mood,
+            "current_activity": snapshot.current_activity,
+            "selected_goal_type": snapshot.selected_goal_type,
+            "goal_degraded": snapshot.goal_degraded,
+            "goal_id": snapshot.extra_flags.get("goal_id"),
+        },
+        get_settings().observability_step_extra_max_chars,
+    )
+    return DecisionRecord(
+        kind=DecisionKind.PROACTIVE_AUTONOMY,
+        user_id=user_id,
+        conversation_id=session_id,
+        action_id=action_id,
+        trigger=signal.type,
+        input_snapshot=payload,
+        decision=verdict.decision,
+        reason=verdict.reason,
+    )
+
+
+def _record_decision(**kwargs) -> None:
+    try:
+        observability.on_decision(_decision_record(**kwargs))
+    except Exception:
+        logger.exception("主动决策记录失败，已忽略")
+
+
 async def _process_user(user_id: str, llm, now: datetime) -> str | None:
     conversation = conversation_repository.get_latest_for_user(user_id)
     if conversation is None:
@@ -155,10 +197,27 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         verdict.reason,
     )
     if verdict.decision != "act" or verdict.goal_id is None:
+        _record_decision(
+            verdict=verdict,
+            signal=signal,
+            snapshot=snapshot,
+            user_id=user_id,
+            session_id=conversation.id,
+        )
         return None
 
     action = _build_action(verdict, conversation.id, now)
-    if not proactive_repository.enqueue(action):
+    enqueued = proactive_repository.enqueue(action)
+    _record_decision(
+        verdict=verdict,
+        signal=signal,
+        snapshot=snapshot,
+        user_id=user_id,
+        session_id=conversation.id,
+        action_id=action.id,
+        outcome=None if enqueued else "enqueue_failed",
+    )
+    if not enqueued:
         return None
     active = proactive_repository.get_active(user_id, now)
     if active is None or active.id != action.id:

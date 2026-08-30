@@ -39,4 +39,11 @@ def ack(action_id: str):
     updated = proactive_repository.transition(
         action_id, "acked", acked_at=datetime.now()
     )
+    if get_settings().observability_persist_enabled:
+        try:
+            from app.repositories import decision_repository
+
+            decision_repository.mark_outcome(action_id, "acked")
+        except Exception:
+            pass
     return {"id": action_id, "status": updated.status if updated else "acked"}

@@ -1,0 +1,131 @@
+"""V7.8 decision_records 仓储（decision-history.md §2）。
+
+outcome 幂等补写（仅写空值）；retention 惰性清理在 save 路径顺带执行。
+"""
+
+import logging
+import uuid
+from datetime import datetime, timedelta
+
+from app.core.db import DecisionRecordRow, SessionLocal
+from app.core.settings import get_settings
+from app.models.observability import DecisionKind, DecisionRecord
+
+logger = logging.getLogger(__name__)
+
+
+def _to_model(row: DecisionRecordRow) -> DecisionRecord:
+    return DecisionRecord(
+        id=row.id,
+        kind=DecisionKind(row.kind),
+        request_id=row.request_id,
+        user_id=row.user_id,
+        conversation_id=row.conversation_id,
+        action_id=row.action_id,
+        trigger=row.trigger,
+        input_snapshot=row.input_snapshot or {},
+        decision=row.decision,
+        reason=row.reason or "",
+        confidence=row.confidence,
+        outcome=row.outcome,
+        created_at=row.created_at,
+    )
+
+
+def _from_model(record: DecisionRecord, created_at: datetime) -> DecisionRecordRow:
+    return DecisionRecordRow(
+        id=record.id,
+        kind=record.kind.value if hasattr(record.kind, "value") else str(record.kind),
+        request_id=record.request_id,
+        user_id=record.user_id,
+        conversation_id=record.conversation_id,
+        action_id=record.action_id,
+        trigger=record.trigger,
+        input_snapshot=record.input_snapshot,
+        decision=record.decision,
+        reason=record.reason,
+        confidence=record.confidence,
+        outcome=record.outcome,
+        created_at=created_at,
+    )
+
+
+def save(record: DecisionRecord) -> None:
+    now = datetime.now()
+    try:
+        with SessionLocal() as session:
+            session.merge(_from_model(record, now))
+            session.commit()
+    except Exception:
+        logger.exception("决策记录落库失败，已忽略")
+        return
+    prune_before(now - timedelta(days=get_settings().observability_decision_retention_days))
+
+
+def mark_outcome(action_id: str, outcome: str) -> int:
+    try:
+        with SessionLocal() as session:
+            updated = (
+                session.query(DecisionRecordRow)
+                .filter(
+                    DecisionRecordRow.action_id == action_id,
+                    DecisionRecordRow.outcome.is_(None),
+                )
+                .update({"outcome": outcome})
+            )
+            session.commit()
+            return updated
+    except Exception:
+        logger.exception("决策 outcome 补写失败，已忽略")
+        return 0
+
+
+def get_by_action(action_id: str) -> list[DecisionRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(DecisionRecordRow)
+            .filter(DecisionRecordRow.action_id == action_id)
+            .order_by(DecisionRecordRow.created_at.asc())
+            .all()
+        )
+        return [_to_model(row) for row in rows]
+
+
+def search(
+    user_id: str | None = None,
+    kind: str | None = None,
+    since: datetime | None = None,
+    action_id: str | None = None,
+    limit: int = 50,
+) -> list[DecisionRecord]:
+    with SessionLocal() as session:
+        query = session.query(DecisionRecordRow)
+        if user_id is not None:
+            query = query.filter(DecisionRecordRow.user_id == user_id)
+        if kind is not None:
+            query = query.filter(DecisionRecordRow.kind == kind)
+        if since is not None:
+            query = query.filter(DecisionRecordRow.created_at >= since)
+        if action_id is not None:
+            query = query.filter(DecisionRecordRow.action_id == action_id)
+        rows = (
+            query.order_by(DecisionRecordRow.created_at.desc())
+            .limit(max(1, min(limit, 200)))
+            .all()
+        )
+        return [_to_model(row) for row in rows]
+
+
+def prune_before(cutoff: datetime) -> int:
+    with SessionLocal() as session:
+        deleted = (
+            session.query(DecisionRecordRow)
+            .filter(DecisionRecordRow.created_at < cutoff)
+            .delete()
+        )
+        session.commit()
+        return deleted
+
+
+def new_decision_id() -> str:
+    return uuid.uuid4().hex

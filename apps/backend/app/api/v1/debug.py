@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.models.evaluation import EvaluationSubjectKind
 from app.repositories import (
+    decision_repository,
     evaluation_repository,
     llm_call_repository,
     prompt_snapshot_repository,
@@ -84,6 +85,27 @@ def get_prompt_snapshot(snapshot_id: str):
     if snapshot is None:
         raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
     return snapshot.model_dump(mode="json")
+
+
+@debug_router.get("/debug/decisions")
+def list_decisions(
+    user_id: str | None = None,
+    kind: str | None = None,
+    action_id: str | None = None,
+    window_hours: float | None = None,
+    limit: int = 50,
+):
+    since = (
+        datetime.now() - timedelta(hours=window_hours) if window_hours is not None else None
+    )
+    records = decision_repository.search(
+        user_id=user_id,
+        kind=kind,
+        action_id=action_id,
+        since=since,
+        limit=limit,
+    )
+    return [record.model_dump(mode="json") for record in records]
 
 
 @debug_router.get("/debug/turns/{turn_id}/evaluation")

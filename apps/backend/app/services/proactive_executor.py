@@ -8,6 +8,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 
+from app.application import observability
 from app.application.post_process import get_user_write_lock
 from app.chains import proactive_chain
 from app.core.settings import get_settings
@@ -18,6 +19,13 @@ from app.services.autonomy_policy import in_quiet_hours
 from app.services.trace_collector import TurnTraceSession
 
 logger = logging.getLogger(__name__)
+
+
+def _mark_outcome(action_id: str, outcome: str) -> None:
+    try:
+        observability.mark_decision_outcome(action_id, outcome)
+    except Exception:
+        logger.exception("主动决策 outcome 补写失败，已忽略")
 
 
 def _recheck_failed_reason(
@@ -64,6 +72,7 @@ async def _fail_for_retry(
             action.id, "failed", now=now, attempt=attempt, next_retry_at=None
         )
         logger.error("主动消息重试耗尽：%s（终态 failed）", action.id)
+        _mark_outcome(action.id, "failed")
     else:
         updated = proactive_repository.transition(
             action.id,
@@ -123,6 +132,7 @@ async def execute(
             )
             if trace is not None:
                 trace.record("proactive_deliver", 0.0, "degraded", error=reason)
+            _mark_outcome(action.id, "discarded")
             return discarded
 
         goal_description = _goal_description(action)
@@ -161,6 +171,7 @@ async def execute(
                 "proactive_deliver",
                 (time.perf_counter() - started) * 1000,
             )
+        _mark_outcome(action.id, "delivered")
         _schedule_evaluation(delivered, llm)
         logger.info(
             "主动消息已投递：action=%s message=%s 预览=%s",

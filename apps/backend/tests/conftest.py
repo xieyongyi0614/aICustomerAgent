@@ -30,6 +30,7 @@ from app.main import app
 from app.repositories import (
     character_state_repository,
     conversation_repository,
+    decision_repository,
     emotion_history_repository,
     evaluation_repository,
     goal_repository,
@@ -167,6 +168,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(trace_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(llm_call_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(prompt_snapshot_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(decision_repository, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while (

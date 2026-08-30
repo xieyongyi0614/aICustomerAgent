@@ -394,6 +394,33 @@ class LlmCallRecordRow(Base):
     )
 
 
+class DecisionRecordRow(Base):
+    __tablename__ = "decision_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    conversation_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    action_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    trigger: Mapped[str | None] = mapped_column(String, nullable=True)
+    input_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    decision: Mapped[str] = mapped_column(String, nullable=False)
+    reason: Mapped[str] = mapped_column(String, nullable=False, default="")
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('proactive_autonomy', 'turn_goal', 'turn_intention', 'turn_behavior')",
+            name="ck_decision_records_kind",
+        ),
+        Index("idx_decision_records_user_time", "user_id", "kind", "created_at"),
+        Index("idx_decision_records_action", "action_id"),
+    )
+
+
 class RuntimeTraceRow(Base):
     __tablename__ = "runtime_traces"
 
