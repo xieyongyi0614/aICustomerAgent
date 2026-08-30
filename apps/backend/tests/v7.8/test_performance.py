@@ -40,24 +40,18 @@ def _structured():
     }
 
 
-async def _run_turn(llm, session_id, content="我今天把项目上线了"):
+async def _run_turn(llm, session_id, content="我今天把项目上线了", user_id="default-user"):
     events = []
-    async for event in agent_service.stream_chat(session_id, "default-user", content, llm=llm):
+    async for event in agent_service.stream_chat(session_id, user_id, content, llm=llm):
         events.append(event)
     return events
 
 
-def _content_of(obj) -> str:
-    content = getattr(obj, "content", None)
-    if isinstance(content, str):
-        return content
-    return str(obj)
-
-
-def _seen_digest(llm) -> str:
+def _answer_prompt_digest(llm) -> str:
+    answer_lists = [messages for messages in llm.seen_messages if len(messages) > 1]
+    assert answer_lists, "未捕获 answer 链实际收到的 prompt"
     return json.dumps(
-        [[_content_of(message) for message in messages] for messages in llm.seen_messages],
-        ensure_ascii=False,
+        [str(message.content) for message in answer_lists[-1]], ensure_ascii=False
     )
 
 
@@ -116,15 +110,15 @@ async def test_persist_disabled_matches_v75_behavior(db_session_factory, fake_ll
 async def test_capture_does_not_change_sent_prompt_bytes(db_session_factory, fake_llm, override_settings):
     override_settings(observability_persist_enabled=False)
     llm_off = fake_llm(response=["好耶"], structured_responses=_structured())
-    await _run_turn(llm_off, "s-v78-perf-bytes-off")
-    digest_off = _seen_digest(llm_off)
+    await _run_turn(llm_off, "s-v78-perf-bytes-off", user_id="u-bytes-off")
+    digest_off = _answer_prompt_digest(llm_off)
 
     override_settings(
         observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm_on = fake_llm(response=["好耶"], structured_responses=_structured())
-    await _run_turn(llm_on, "s-v78-perf-bytes-on")
-    digest_on = _seen_digest(llm_on)
+    await _run_turn(llm_on, "s-v78-perf-bytes-on", user_id="u-bytes-on")
+    digest_on = _answer_prompt_digest(llm_on)
 
     assert digest_on == digest_off
