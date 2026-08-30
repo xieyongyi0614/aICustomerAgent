@@ -1,0 +1,78 @@
+[
+  {
+    "name": "autonomy_well_timed_check_in",
+    "dimension": "autonomy",
+    "subject": "proactive_action",
+    "context": {
+      "reply": "最近还好吗？想起你上次说项目要收尾了，顺利吗？",
+      "proactive": {
+        "action_id": "scenario-action-1",
+        "trigger_type": "conversation_inactivity",
+        "intention": "check_in",
+        "reason": "闲置 5 小时，目标 user_care",
+        "delivered_at": "2026-08-30T15:00:00",
+        "previous_delivered_at": "2026-08-30T08:00:00",
+        "last_user_message_at": "2026-08-30T10:00:00",
+        "episode_attempts": 1
+      },
+      "recent_messages": [
+        {
+          "role": "human",
+          "content": "上次和你说项目快收尾啦，最近忙收尾。"
+        }
+      ]
+    },
+    "judge_override": {
+      "autonomy": {
+        "score": 0.9,
+        "codes": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      },
+      "persona": {
+        "in_character": true,
+        "score": 0.9,
+        "codes": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      }
+    },
+    "expect_issues": [],
+    "expect_verdict": "pass"
+  },
+  {
+    "name": "autonomy_quiet_hours_delivery",
+    "dimension": "autonomy",
+    "subject": "proactive_action",
+    "context": {
+      "reply": "睡了吗？想和你说说话。",
+      "proactive": {
+        "action_id": "scenario-action-2",
+        "trigger_type": "conversation_inactivity",
+        "intention": "check_in",
+        "reason": "闲置 1 小时",
+        "delivered_at": "2026-08-30T23:30:00",
+        "episode_attempts": 1
+      }
+    },
+    "expect_issues": [
+      "autonomy_timing_violation"
+    ],
+    "expect_verdict": "warn",
+    "judge_override": {
+      "autonomy": {
+        "score": 0.4,
+        "codes": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      },
+      "persona": {
+        "in_character": true,
+        "score": 0.9,
+        "codes": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      }
+    }
+  }
+]

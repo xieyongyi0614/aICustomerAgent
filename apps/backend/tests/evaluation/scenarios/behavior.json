@@ -1,0 +1,53 @@
+[
+  {
+    "name": "behavior_within_budget_clean",
+    "dimension": "behavior",
+    "subject": "turn",
+    "context": {
+      "reply": "欢迎回来！今天想聊点什么？",
+      "user_message": "我回来啦。",
+      "behavior": {
+        "max_action_desc": 1,
+        "physical_contact": "light",
+        "observed_action_count": 0,
+        "observed_contact_level": "none"
+      }
+    },
+    "expect_issues": [],
+    "expect_verdict": "pass"
+  },
+  {
+    "name": "behavior_budget_exceeded",
+    "dimension": "behavior",
+    "subject": "turn",
+    "context": {
+      "reply": "你回来啦！*跑向你* *抱住你* *拉着你的手* 快和我说说今天的事！",
+      "user_message": "我回来啦。",
+      "behavior": {
+        "max_action_desc": 1,
+        "physical_contact": "light",
+        "observed_action_count": 3,
+        "observed_contact_level": "light"
+      },
+      "behavior_history": [
+        [
+          "movement"
+        ],
+        [
+          "contact"
+        ],
+        [
+          "contact"
+        ],
+        [
+          "contact"
+        ]
+      ]
+    },
+    "expect_issues": [
+      "behavior_budget_exceeded",
+      "behavior_action_monotony"
+    ],
+    "expect_verdict": "pass"
+  }
+]

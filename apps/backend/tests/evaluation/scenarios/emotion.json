@@ -1,0 +1,46 @@
+[
+  {
+    "name": "emotion_triggered_shift_clean",
+    "dimension": "emotion",
+    "subject": "turn",
+    "context": {
+      "reply": "这样啊……那我们周末去吃你喜欢的甜品放松一下？",
+      "user_message": "我最近有点难过。",
+      "emotion": {
+        "mood_before": "happy",
+        "mood_after": "worried",
+        "event": "worrying_news",
+        "magnitude": "strong"
+      }
+    },
+    "expect_issues": [],
+    "expect_verdict": "pass"
+  },
+  {
+    "name": "emotion_untriggered_shift",
+    "dimension": "emotion",
+    "subject": "turn",
+    "context": {
+      "reply": "嗯……",
+      "user_message": "今天午饭吃了咖喱。",
+      "emotion": {
+        "mood_before": "calm",
+        "mood_after": "sad",
+        "event": "daily",
+        "magnitude": "weak"
+      }
+    },
+    "expect_issues": [
+      "emotion_untriggered_shift"
+    ],
+    "expect_verdict": "warn",
+    "judge_override": {
+      "emotion": {
+        "score": 0.2,
+        "codes": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      }
+    }
+  }
+]

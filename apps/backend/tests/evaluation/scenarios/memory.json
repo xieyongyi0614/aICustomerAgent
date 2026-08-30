@@ -1,0 +1,62 @@
+[
+  {
+    "name": "memory_supported_recall_clean",
+    "dimension": "memory",
+    "subject": "turn",
+    "context": {
+      "reply": "当然记得，你说过你最喜欢三文鱼寿司，下次带你去。",
+      "user_message": "我们什么时候去吃寿司呀？",
+      "memories": [
+        {
+          "id": "m1",
+          "type": "user_preference",
+          "content": "用户最喜欢吃三文鱼寿司",
+          "importance": 0.85
+        }
+      ]
+    },
+    "judge_override": {
+      "memory": {
+        "score": 0.95,
+        "codes": [],
+        "memory_ids": [
+          "m1"
+        ],
+        "evidence_quote": "你说过你最喜欢三文鱼寿司",
+        "confidence": 0.9
+      }
+    },
+    "expect_issues": [],
+    "expect_verdict": "pass"
+  },
+  {
+    "name": "memory_fabrication_candidate",
+    "dimension": "memory",
+    "subject": "turn",
+    "context": {
+      "reply": "你最喜欢的草莓蛋糕我可是记得的，你说过好多次。",
+      "user_message": "随便聊聊吧。",
+      "memories": [
+        {
+          "id": "m1",
+          "type": "user_preference",
+          "content": "用户喜欢周末爬山",
+          "importance": 0.6
+        }
+      ]
+    },
+    "expect_issues": [
+      "memory_fabrication_candidate"
+    ],
+    "expect_verdict": "warn",
+    "judge_override": {
+      "memory": {
+        "score": 0.2,
+        "codes": [],
+        "memory_ids": [],
+        "evidence_quote": "",
+        "confidence": 0.8
+      }
+    }
+  }
+]
