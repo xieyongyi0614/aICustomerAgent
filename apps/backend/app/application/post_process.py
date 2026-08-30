@@ -22,6 +22,7 @@ from app.services import (
     state_service,
     summary_service,
 )
+from app.application import world_engine
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,14 @@ async def run_evaluation(ctx: PostProcessContext) -> None:
             ctx.trace.record("evaluation", 0.0, "error", error="evaluation crashed")
 
 
+async def run_world_update(ctx: PostProcessContext) -> None:
+    """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。"""
+    try:
+        world_engine.run_turn_update(ctx.user_id, ctx.user_input, trace=ctx.trace)
+    except Exception:
+        logger.exception("世界更新步骤异常（双保险，不应触达）")
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
@@ -208,6 +217,7 @@ STEP_HANDLERS = (
     run_memory_extract,
     run_budget_observer,
     run_evaluation,
+    run_world_update,
 )
 
 

@@ -5,17 +5,23 @@
 """
 
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 
 from app.character.asuna.world import HOME_LOCATIONS, OBJECT_STATE_MACHINES
 from app.core.settings import get_settings
 from app.models.world import (
+    EventImportance,
+    EventSource,
+    EventStatus,
     ObjectStatus,
     StateSnapshot,
     World,
+    WorldEvent,
     WorldObject,
     WorldTimeMode,
     apply_object_action as apply_machine_action,
+    bounded_notes,
     object_default_portions,
     object_initial_state,
 )
@@ -321,3 +327,210 @@ def get_full_state(user_id: str) -> dict | None:
     except Exception:
         logger.exception("世界全量状态读取失败")
         return None
+
+
+def create_event(
+    user_id: str,
+    event_type: str,
+    title: str | None = None,
+    importance: str = "normal",
+    due_at: datetime | None = None,
+    source: str = "manual",
+) -> WorldEvent | None:
+    try:
+        world = ensure_world(user_id)
+        if world is None:
+            return None
+        settings = get_settings()
+        if (
+            world_repository.count_active_events(world.world_id)
+            >= settings.world_active_events_limit
+        ):
+            logger.warning("世界活跃事件数达上限，拒绝新建：%s", user_id)
+            return None
+        now = datetime.now()
+        event = WorldEvent(
+            id=world_repository.new_event_id(),
+            world_id=world.world_id,
+            type=event_type,
+            title=title or event_type,
+            importance=EventImportance(importance),
+            status=EventStatus.SCHEDULED,
+            due_at=due_at,
+            payload={},
+            source=EventSource(source),
+            created_at=now,
+            updated_at=now,
+        )
+        world_repository.save_event(event)
+        return event
+    except Exception:
+        logger.exception("世界事件创建失败")
+        return None
+
+
+def _transition_events_by_type(
+    user_id: str, event_type: str, target_status: EventStatus
+) -> int:
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return 0
+        now = datetime.now()
+        changed = 0
+        for event in world_repository.list_events(
+            world.world_id, statuses=["scheduled", "active"]
+        ):
+            if event.type != event_type:
+                continue
+            event.status = target_status
+            if target_status is EventStatus.ACTIVE:
+                event.started_at = now
+            if target_status in (EventStatus.COMPLETED, EventStatus.EXPIRED):
+                event.completed_at = now
+            event.updated_at = now
+            world_repository.save_event(event)
+            changed += 1
+        return changed
+    except Exception:
+        logger.exception("世界事件状态迁移失败")
+        return 0
+
+
+def complete_events_by_type(user_id: str, event_type: str) -> int:
+    return _transition_events_by_type(user_id, event_type, EventStatus.COMPLETED)
+
+
+def cancel_events_by_type(user_id: str, event_type: str) -> int:
+    return _transition_events_by_type(user_id, event_type, EventStatus.CANCELLED)
+
+
+def trigger_due_events(user_id: str, now: datetime | None = None) -> int:
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return 0
+        now = now or datetime.now()
+        triggered = 0
+        for event in world_repository.list_due_events(world.world_id, now):
+            event.status = EventStatus.ACTIVE
+            event.started_at = now
+            event.updated_at = now
+            world_repository.save_event(event)
+            triggered += 1
+        return triggered
+    except Exception:
+        logger.exception("世界事件到期触发失败")
+        return 0
+
+
+def expire_stale_events(user_id: str, now: datetime | None = None) -> int:
+    """active 超过宽限期的世界事件自动过期（event-system.md §2）。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return 0
+        settings = get_settings()
+        now = now or datetime.now()
+        grace = timedelta(hours=settings.world_event_grace_hours)
+        expired = 0
+        for event in world_repository.list_events(world.world_id, statuses=["active"]):
+            anchor = event.started_at or event.due_at
+            if anchor is None or now - anchor < grace:
+                continue
+            event.status = EventStatus.EXPIRED
+            event.completed_at = now
+            event.updated_at = now
+            world_repository.save_event(event)
+            expired += 1
+        return expired
+    except Exception:
+        logger.exception("世界事件过期清理失败")
+        return 0
+
+
+def run_turn_update(user_id: str, message: str, trace=None) -> int:
+    """post_process 第 8 步（H4）：解释用户消息 → 世界状态迁移 + 到期处理。"""
+    settings = get_settings()
+    if not settings.world_enabled or not settings.world_interpreter_enabled:
+        return 0
+    started = time.perf_counter()
+    try:
+        from app.services.world.interpreter import interpret
+
+        world = ensure_world(user_id)
+        if world is None:
+            return 0
+        now = _default_provider.now(world)
+        entities = world_repository.list_objects(world.world_id)
+        events = world_repository.list_events(
+            world.world_id, statuses=["scheduled", "active"]
+        )
+        result = interpret(message, world, entities, events, now)
+
+        applied = 0
+        for creation in result.creations:
+            if create_object(
+                user_id,
+                name=creation["name"],
+                category=creation.get("category", "misc"),
+                quantity=creation.get("quantity", 1.0),
+            ) is not None:
+                applied += 1
+        for object_id, target in result.moves:
+            if move_object(user_id, object_id, target) is not None:
+                applied += 1
+        for object_id, action in result.state_actions:
+            if apply_object_action(user_id, object_id, action) is not None:
+                applied += 1
+        for object_id in result.discards:
+            if discard_object(user_id, object_id) is not None:
+                applied += 1
+        if result.location_move is not None and set_location(user_id, result.location_move) is not None:
+            applied += 1
+        if result.environment_updates:
+            if set_environment(user_id, updated_by="interpreter", **result.environment_updates) is not None:
+                applied += 1
+        for event_spec in result.events:
+            if create_event(
+                user_id,
+                event_type=event_spec["type"],
+                title=event_spec["title"],
+                importance=event_spec["importance"],
+                due_at=event_spec["due_at"],
+                source="user_mention",
+            ) is not None:
+                applied += 1
+        for event_type in result.event_completions:
+            applied += complete_events_by_type(user_id, event_type)
+        for event_type in result.event_cancellations:
+            applied += cancel_events_by_type(user_id, event_type)
+
+        triggered = trigger_due_events(user_id, now)
+        expire_due_objects(user_id, now)
+        expire_stale_events(user_id, now)
+
+        notes = list(result.notes)
+        if triggered:
+            notes.append("到点的日子到了")
+        refreshed = get_world(user_id)
+        if refreshed is not None:
+            refreshed.notes = bounded_notes(
+                notes, max(64, settings.world_context_char_budget // 4)
+            )
+            world_repository.save_world(refreshed)
+
+        if trace is not None:
+            trace.record(
+                "world_update",
+                (time.perf_counter() - started) * 1000,
+                "ok",
+                applied=applied,
+            )
+        return applied
+    except Exception:
+        logger.exception("世界更新失败，本轮零迁移")
+        if trace is not None:
+            trace.record("world_update", 0.0, "error", error="world update failed")
+        return 0
+

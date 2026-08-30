@@ -36,6 +36,8 @@ TRACE_STEP_NAMES = (
     "memory_conflict",
     "evaluation",
     "evaluation_judge",
+    "world_context",
+    "world_update",
 )
 
 _BACKGROUND_STEPS = (

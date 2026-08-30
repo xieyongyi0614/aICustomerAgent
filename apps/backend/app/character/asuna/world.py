@@ -140,3 +140,13 @@ EVENT_TYPE_TITLES = {
     "birthday": "生日",
     "meeting": "会议",
 }
+
+OBJECT_CREATION_HINTS = {
+    "西瓜": "food",
+    "蛋糕": "food",
+    "披萨": "food",
+    "面包": "food",
+    "可乐": "drink",
+    "果汁": "drink",
+    "咖啡豆": "drink",
+}
