@@ -18,11 +18,23 @@ from app.models.world import (
     object_initial_state,
 )
 from app.repositories import world_repository
+from app.services.world.locations import build_location_context
 from app.services.world.time_provider import TimeProvider
 
 logger = logging.getLogger(__name__)
 
 _default_provider = TimeProvider()
+
+
+def get_location_context(user_id: str):
+    try:
+        world = ensure_world(user_id)
+        if world is None:
+            return None
+        return build_location_context(world)
+    except Exception:
+        logger.exception("世界位置上下文装配失败")
+        return None
 
 
 def build_time_context(user_id: str, provider: TimeProvider | None = None):
