@@ -84,14 +84,6 @@ def list_turn_prompts(turn_id: str):
     return [snapshot.model_dump(mode="json") for snapshot in snapshots]
 
 
-@debug_router.get("/debug/prompts/{snapshot_id}")
-def get_prompt_snapshot(snapshot_id: str):
-    snapshot = prompt_snapshot_repository.get_by_id(snapshot_id)
-    if snapshot is None:
-        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
-    return snapshot.model_dump(mode="json")
-
-
 @debug_router.get("/debug/prompts/compare")
 def compare_prompt_snapshots(a: str, b: str):
     from app.services.observability.prompt_capture import diff_prompt_snapshots
@@ -101,6 +93,14 @@ def compare_prompt_snapshots(a: str, b: str):
     if snapshot_a is None or snapshot_b is None:
         raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
     return diff_prompt_snapshots(snapshot_a, snapshot_b)
+
+
+@debug_router.get("/debug/prompts/{snapshot_id}")
+def get_prompt_snapshot(snapshot_id: str):
+    snapshot = prompt_snapshot_repository.get_by_id(snapshot_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return snapshot.model_dump(mode="json")
 
 
 @debug_router.get("/debug/metrics")
