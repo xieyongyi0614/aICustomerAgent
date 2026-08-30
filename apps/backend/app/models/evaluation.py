@@ -131,6 +131,7 @@ class EvaluationMeta(BaseModel):
     context_fidelity: CONTEXT_FIDELITY = "live"
     rule_codes_fired: list[IssueCode] = []
     duration_ms: float = 0.0
+    request_id: str | None = None
 
 
 class EvaluationReport(BaseModel):

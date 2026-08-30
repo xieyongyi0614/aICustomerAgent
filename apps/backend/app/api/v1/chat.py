@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from app.api.v1.deps import get_chat_llm
 from app.core.settings import get_settings
 from app.api.v1.schemas import ChatRequest
-from app.services import agent_service
+from app.services import agent_service, trace_collector
 from app.services.agent_service import EmptyLLMResponseError
 
 chat_router = APIRouter()
@@ -48,7 +48,7 @@ async def chat_message(
         turn_id = None
         try:
             async for event in agent_service.stream_chat(
-                session_id, get_settings().default_user, body.content, llm=llm
+                session_id, get_settings().default_user, body.content, llm=llm, trace=trace
             ):
                 kind = event.get("kind")
                 if kind == "turn_meta":
@@ -93,7 +93,8 @@ async def chat_message(
             final["turn_id"] = turn_id
         yield _stream_json(final)
 
-    headers = {"X-Session-Id": session_id}
+    trace = trace_collector.get_trace_collector().begin_trace()
+    headers = {"X-Session-Id": session_id, "X-Request-Id": trace.request_id}
     if new_session:
         headers["X-Session-New"] = "true"
     if profile_id:

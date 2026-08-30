@@ -216,6 +216,8 @@ def override_settings(monkeypatch):
             "observability_prompt_retention_days": "OBSERVABILITY_PROMPT_RETENTION_DAYS",
             "observability_decision_retention_days": "OBSERVABILITY_DECISION_RETENTION_DAYS",
             "observability_llm_call_retention_days": "OBSERVABILITY_LLM_CALL_RETENTION_DAYS",
+            "evaluation_enabled": "EVALUATION_ENABLED",
+            "evaluation_llm_judge_sample_rate": "EVALUATION_LLM_JUDGE_SAMPLE_RATE",
         }
         for key, env in env_map.items():
             if key in kwargs:

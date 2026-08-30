@@ -19,9 +19,10 @@ _background_tasks = background_tasks
 
 
 async def stream_chat(
-    session_id: str, user_id: str, content: str, llm=None
+    session_id: str, user_id: str, content: str, llm=None, trace=None
 ) -> AsyncIterator[dict]:
-    trace = trace_collector.get_trace_collector().begin_trace()
+    if trace is None:
+        trace = trace_collector.get_trace_collector().begin_trace()
     observability_token = observability.current_trace.set(trace)
     try:
         async for event in run_chat_pipeline(session_id, user_id, content, llm, trace):

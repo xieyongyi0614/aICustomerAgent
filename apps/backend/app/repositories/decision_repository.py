@@ -96,6 +96,7 @@ def search(
     kind: str | None = None,
     since: datetime | None = None,
     action_id: str | None = None,
+    request_id: str | None = None,
     limit: int = 50,
 ) -> list[DecisionRecord]:
     with SessionLocal() as session:
@@ -108,6 +109,8 @@ def search(
             query = query.filter(DecisionRecordRow.created_at >= since)
         if action_id is not None:
             query = query.filter(DecisionRecordRow.action_id == action_id)
+        if request_id is not None:
+            query = query.filter(DecisionRecordRow.request_id == request_id)
         rows = (
             query.order_by(DecisionRecordRow.created_at.desc())
             .limit(max(1, min(limit, 200)))

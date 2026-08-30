@@ -168,6 +168,7 @@ def finalize_report(
             context_fidelity="live" if context.fidelity == "live" else "reconstructed",
             rule_codes_fired=[issue.code for issue in rule_issues],
             duration_ms=round(duration_ms, 2),
+            request_id=context.request_id or None,
         ),
         created_at=datetime.now(),
     )
