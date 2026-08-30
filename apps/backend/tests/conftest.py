@@ -4,6 +4,7 @@ from typing import Any
 
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
+os.environ.setdefault("EVALUATION_ENABLED", "false")
 os.environ.setdefault(
     "LLM_PROFILES_JSON",
     '[{"id":"longcat","label":"LongCat (test)","base_url":"https://example.invalid/v1","model":"fake","api_key":"test"}]',
@@ -40,6 +41,12 @@ from app.repositories import (
 )
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
+
+
+def chat_post_process_tasks():
+    from app.application import post_process
+
+    return post_process.background_tasks
 
 
 def wait_until(predicate, timeout=None):
@@ -149,8 +156,12 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(evaluation_repository, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
-    while agent_service._background_tasks and time.time() < deadline:
+    while (
+        (agent_service._background_tasks or chat_post_process_tasks())
+        and time.time() < deadline
+    ):
         time.sleep(0.02)
+
     from app.application import post_process as chat_post_process
 
     chat_post_process.reset_user_write_locks()

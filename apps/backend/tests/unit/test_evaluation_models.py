@@ -125,15 +125,22 @@ def test_evaluation_report_construction():
     assert payload["subject"] == "turn"
 
 
-def test_settings_evaluation_defaults():
-    settings = get_settings()
-    assert settings.evaluation_enabled is True
-    assert settings.evaluation_llm_judge_sample_rate == 1.0
-    assert settings.evaluation_penalty_critical == 0.4
-    assert settings.evaluation_max_digest_chars == 2000
-    weights = settings.evaluation_overall_weights("turn")
-    assert weights["persona"] == pytest.approx(0.35)
-    assert settings.evaluation_overall_weights("proactive_action")["autonomy"] == pytest.approx(0.6)
+def test_settings_evaluation_defaults(monkeypatch):
+    monkeypatch.delenv("EVALUATION_ENABLED", raising=False)
+    monkeypatch.delenv("EVALUATION_LLM_JUDGE_SAMPLE_RATE", raising=False)
+    monkeypatch.delenv("EVALUATION_MAX_DIGEST_CHARS", raising=False)
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+        assert settings.evaluation_enabled is True
+        assert settings.evaluation_llm_judge_sample_rate == 1.0
+        assert settings.evaluation_penalty_critical == 0.4
+        assert settings.evaluation_max_digest_chars == 2000
+        weights = settings.evaluation_overall_weights("turn")
+        assert weights["persona"] == pytest.approx(0.35)
+        assert settings.evaluation_overall_weights("proactive_action")["autonomy"] == pytest.approx(0.6)
+    finally:
+        get_settings.cache_clear()
 
 
 def test_settings_evaluation_overrides(monkeypatch):

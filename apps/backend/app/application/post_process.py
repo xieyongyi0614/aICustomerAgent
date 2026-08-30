@@ -15,6 +15,7 @@ from app.models.emotion import TurnAnalysis
 from app.services import (
     behavior_engine,
     conversation_service,
+    evaluation_engine,
     goal_service,
     memory_service,
     scene_service,
@@ -189,6 +190,16 @@ async def run_budget_observer(ctx: PostProcessContext) -> None:
             )
 
 
+async def run_evaluation(ctx: PostProcessContext) -> None:
+    """V7.5 评估第 7 步：规则阶段锁内执行，judge 采样命中时引擎派发锁外任务。"""
+    try:
+        evaluation_engine.run_turn_evaluation(ctx)
+    except Exception:
+        logger.exception("评估步骤异常（双保险，不应触达）")
+        if ctx.trace is not None:
+            ctx.trace.record("evaluation", 0.0, "error", error="evaluation crashed")
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
@@ -196,6 +207,7 @@ STEP_HANDLERS = (
     run_summary,
     run_memory_extract,
     run_budget_observer,
+    run_evaluation,
 )
 
 

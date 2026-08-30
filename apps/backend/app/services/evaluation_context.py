@@ -7,7 +7,6 @@
 import logging
 from dataclasses import dataclass, field
 
-from app.application.post_process import PostProcessContext
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
 from app.services import behavior_engine
@@ -105,7 +104,7 @@ def _clip(text: str | None, limit: int) -> str:
     return text[:limit]
 
 
-def collect_turn_context(ctx: PostProcessContext) -> EvaluationContext:
+def collect_turn_context(ctx) -> EvaluationContext:
     settings = get_settings()
     context = EvaluationContext(
         subject="turn",
@@ -128,7 +127,7 @@ def collect_turn_context(ctx: PostProcessContext) -> EvaluationContext:
     return context
 
 
-def _collect_recent_messages(ctx: PostProcessContext) -> list[RecentMessage]:
+def _collect_recent_messages(ctx) -> list[RecentMessage]:
     try:
         from app.services import conversation_service
 
@@ -179,7 +178,7 @@ def _collect_injected_memories(state) -> list[MemoryRef]:
     return refs
 
 
-def _collect_emotion(ctx: PostProcessContext) -> EmotionSlice:
+def _collect_emotion(ctx) -> EmotionSlice:
     try:
         from app.repositories import character_state_repository, emotion_history_repository
 
@@ -217,7 +216,7 @@ def _collect_state(user_id: str, state) -> StateSlice:
     )
 
 
-def _collect_behavior(ctx: PostProcessContext) -> BehaviorSlice:
+def _collect_behavior(ctx) -> BehaviorSlice:
     directive = ctx.behavior
     budget: ActionBudget = directive.budget
     observation = behavior_engine.observe_budget(ctx.ai_reply, budget)

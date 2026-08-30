@@ -28,6 +28,7 @@ def test_post_process_registry_contains_v5_v6_v65_steps():
         "run_summary",
         "run_memory_extract",
         "run_budget_observer",
+        "run_evaluation",
     ]
 
 
