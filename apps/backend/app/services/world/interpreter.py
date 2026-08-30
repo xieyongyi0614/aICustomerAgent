@@ -55,6 +55,24 @@ def _match_entity(message: str, entities: list[WorldObject]) -> WorldObject | No
     return None
 
 
+QUESTION_HINTS = ("什么", "吗", "呢", "？", "?", "怎么", "哪")
+
+
+def _resolve_target(message: str, entities: list[WorldObject]) -> WorldObject | None:
+    """先按名称匹配；无名称时若恰好只有一个活跃实体，回退到它（指代消解）。
+
+    问句（吃什么/怎么办）不参与回退——宁缺毋滥。
+    """
+    obj = _match_entity(message, entities)
+    if obj is not None or not entities:
+        return obj
+    if any(hint in message for hint in QUESTION_HINTS):
+        return None
+    if any(verb in message for verb in CUT_VERBS + EAT_VERBS + DISCARD_VERBS) and len(entities) == 1:
+        return entities[0]
+    return None
+
+
 def _negated(message: str, keyword: str) -> bool:
     index = message.find(keyword)
     if index <= 0:
@@ -64,7 +82,7 @@ def _negated(message: str, keyword: str) -> bool:
 
 
 def _object_lines(message: str, entities: list[WorldObject], world: World, result: WorldUpdateResult) -> None:
-    obj = _match_entity(message, entities)
+    obj = _resolve_target(message, entities)
     if obj is None:
         for verb in BUY_VERBS:
             if verb in message:
