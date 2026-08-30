@@ -606,6 +606,8 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
 
 def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
     """自治只读事实包（autonomy-integration.md §1）：装配失败 → 空包。"""
+    if not get_settings().world_enabled:
+        return {}
     try:
         world = get_world(user_id)
         if world is None:

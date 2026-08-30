@@ -23,6 +23,8 @@ BUSY_ACTIVITY_KEYWORDS = ("睡觉", "睡眠", "午睡", "休息中", "忙碌", "
 
 _PROACTIVE_GOAL_TYPES = frozenset(PROACTIVE_INTENTION_MAP.keys())
 
+WORLD_PROACTIVE_EVENT_TYPES = frozenset({"interview", "exam"})
+
 
 @dataclass
 class PolicySnapshot:
@@ -37,6 +39,7 @@ class PolicySnapshot:
     selected_goal_type: str | None = None
     goal_degraded: bool = False
     extra_flags: dict = field(default_factory=dict)
+    world_facts: dict = field(default_factory=dict)
 
 
 def _parse_hhmm(value: str) -> dt_time | None:
@@ -89,7 +92,30 @@ def _activity_busy(activity: str | None) -> bool:
     return any(keyword in activity for keyword in BUSY_ACTIVITY_KEYWORDS)
 
 
-def evaluate(signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None) -> AutonomyVerdict:
+def _apply_world_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> AutonomyVerdict:
+    """W1/W2/W3（autonomy-integration.md §3）：world 只追加理由，绝不拆闸门。"""
+    facts = snapshot.world_facts or {}
+    if not facts:
+        return verdict
+    notes: list[str] = []
+    if facts.get("weather") == "rain":
+        notes.append("雨天不宜出门")
+    for event in facts.get("salient_events") or []:
+        if (
+            event.get("type") in WORLD_PROACTIVE_EVENT_TYPES
+            and event.get("importance") == "high"
+            and 0 <= (event.get("due_in_hours") or 24) <= 24
+        ):
+            notes.append(f"记得关心{event.get('title')}")
+    if not notes:
+        return verdict
+    reason = f"{verdict.reason}；{'；'.join(notes)}"[:60]
+    return verdict.model_copy(update={"reason": reason})
+
+
+def evaluate(
+    signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
+) -> AutonomyVerdict:
     config = config or get_settings()
     now = now or datetime.now()
 
@@ -116,10 +142,11 @@ def evaluate(signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: 
         return _verdict("ignore", "无主动动机")
 
     intention = PROACTIVE_INTENTION_MAP[snapshot.selected_goal_type]
-    return AutonomyVerdict(
+    verdict = AutonomyVerdict(
         decision="act",
         reason=f"触发 {signal.type}，存在 {snapshot.selected_goal_type} 目标",
         trigger=signal,
         goal_id=snapshot.extra_flags.get("goal_id"),
         intention=intention,
     )
+    return _apply_world_adjustments(verdict, snapshot)

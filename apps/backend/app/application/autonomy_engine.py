@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
-from app.application import observability
+from app.application import observability, world_engine
 from app.models.autonomy import ProactiveAction, TriggerSignal
 from app.models.observability import DecisionKind, DecisionRecord, TraceKind, bound_extra
 from app.repositories import (
@@ -86,6 +86,7 @@ def _snapshot_for(
         selected_goal_type=selected.goal.type if selected.goal is not None else None,
         goal_degraded=selected.goal is None,
         extra_flags={"goal_id": selected.goal.id if selected.goal is not None else None},
+        world_facts=world_engine.collect_facts(user_id),
     )
 
 
