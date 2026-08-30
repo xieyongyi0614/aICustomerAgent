@@ -5,6 +5,7 @@ from typing import Any
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
+os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
 os.environ.setdefault(
     "LLM_PROFILES_JSON",
     '[{"id":"longcat","label":"LongCat (test)","base_url":"https://example.invalid/v1","model":"fake","api_key":"test"}]',
@@ -189,6 +190,18 @@ def override_settings(monkeypatch):
         "trace_capacity": "TRACE_CAPACITY",
         "state_history_limit": "STATE_HISTORY_LIMIT",
             "stage_hysteresis": "STAGE_HYSTERESIS",
+            "observability_persist_enabled": "OBSERVABILITY_PERSIST_ENABLED",
+            "observability_trace_sample_rate": "OBSERVABILITY_TRACE_SAMPLE_RATE",
+            "observability_prompt_capture_mode": "OBSERVABILITY_PROMPT_CAPTURE_MODE",
+            "observability_prompt_sample_rate": "OBSERVABILITY_PROMPT_SAMPLE_RATE",
+            "observability_prompt_max_chars": "OBSERVABILITY_PROMPT_MAX_CHARS",
+            "observability_step_extra_max_chars": "OBSERVABILITY_STEP_EXTRA_MAX_CHARS",
+            "observability_prompt_redact": "OBSERVABILITY_PROMPT_REDACT",
+            "observability_llm_cost_json": "OBSERVABILITY_LLM_COST_JSON",
+            "observability_trace_retention_days": "OBSERVABILITY_TRACE_RETENTION_DAYS",
+            "observability_prompt_retention_days": "OBSERVABILITY_PROMPT_RETENTION_DAYS",
+            "observability_decision_retention_days": "OBSERVABILITY_DECISION_RETENTION_DAYS",
+            "observability_llm_call_retention_days": "OBSERVABILITY_LLM_CALL_RETENTION_DAYS",
         }
         for key, env in env_map.items():
             if key in kwargs:
