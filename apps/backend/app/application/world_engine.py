@@ -373,13 +373,13 @@ def create_event(
 
 def _transition_events_by_type(
     user_id: str, event_type: str, target_status: EventStatus
-) -> int:
+) -> list[WorldEvent]:
     try:
         world = get_world(user_id)
         if world is None:
-            return 0
+            return []
         now = datetime.now()
-        changed = 0
+        changed: list[WorldEvent] = []
         for event in world_repository.list_events(
             world.world_id, statuses=["scheduled", "active"]
         ):
@@ -392,15 +392,21 @@ def _transition_events_by_type(
                 event.completed_at = now
             event.updated_at = now
             world_repository.save_event(event)
-            changed += 1
+            changed.append(event)
         return changed
     except Exception:
         logger.exception("世界事件状态迁移失败")
-        return 0
+        return []
 
 
 def complete_events_by_type(user_id: str, event_type: str) -> int:
-    return _transition_events_by_type(user_id, event_type, EventStatus.COMPLETED)
+    changed = _transition_events_by_type(user_id, event_type, EventStatus.COMPLETED)
+    if get_settings().world_memory_bridge_enabled:
+        from app.services.world.memory_bridge import materialize_event_memory
+
+        for event in changed:
+            materialize_event_memory(event, user_id)
+    return len(changed)
 
 
 def cancel_events_by_type(user_id: str, event_type: str) -> int:
