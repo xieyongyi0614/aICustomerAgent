@@ -1,6 +1,6 @@
 """V7.8 低质量下钻：评估反向查询 + include=correlation。"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from httpx import ASGITransport, AsyncClient
 import pytest
@@ -55,10 +55,13 @@ def _seed():
         )
     )
     evaluation_repository.save(
-        _report("low-3", "7003", "fail", dimension=EvaluationDimension.MEMORY, with_issue=False, created_at=now)
+        _report(
+            "low-3", "7003", "fail", dimension=EvaluationDimension.MEMORY,
+            with_issue=False, created_at=now - timedelta(seconds=120),
+        )
     )
     evaluation_repository.save(
-        _report("low-2", "7002", "pass", with_issue=False, created_at=now)
+        _report("low-2", "7002", "pass", with_issue=False, created_at=now - timedelta(seconds=60))
     )
     evaluation_repository.save(_report("low-1", "7001", "fail", created_at=now))
 
