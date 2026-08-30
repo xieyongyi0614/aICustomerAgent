@@ -14,11 +14,40 @@ from app.models.world import (
     StateSnapshot,
     World,
     WorldObject,
+    WorldTimeMode,
     object_initial_state,
 )
 from app.repositories import world_repository
+from app.services.world.time_provider import TimeProvider
 
 logger = logging.getLogger(__name__)
+
+_default_provider = TimeProvider()
+
+
+def build_time_context(user_id: str, provider: TimeProvider | None = None):
+    try:
+        world = ensure_world(user_id)
+        if world is None:
+            return None
+        return (provider or _default_provider).context(world)
+    except Exception:
+        logger.exception("世界时间上下文装配失败")
+        return None
+
+
+def advance_time(user_id: str, delta, provider: TimeProvider | None = None) -> World | None:
+    """simulated/story 模式的显式时间推进；real_sync 为 no-op（世界时钟=真实时钟）。"""
+    try:
+        world = ensure_world(user_id)
+        if world is None or world.time_mode is WorldTimeMode.REAL_SYNC:
+            return world
+        world = (provider or _default_provider).advance(world, delta)
+        world_repository.save_world(world)
+        return world
+    except Exception:
+        logger.exception("世界时间推进失败")
+        return None
 
 
 def ensure_world(user_id: str) -> World | None:
