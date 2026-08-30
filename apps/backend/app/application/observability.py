@@ -6,6 +6,7 @@
 import asyncio
 import logging
 from contextvars import ContextVar
+from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.models.observability import (
@@ -20,13 +21,50 @@ from app.models.observability import (
     bound_text,
     deterministic_sample,
 )
-from app.repositories import trace_repository
+from app.repositories import (
+    decision_repository,
+    llm_call_repository,
+    prompt_snapshot_repository,
+    trace_repository,
+)
 
 logger = logging.getLogger(__name__)
 
 background_tasks: set = set()
 
 current_trace: ContextVar = ContextVar("observability_current_trace", default=None)
+
+
+def prune_all() -> int:
+    """保留策略统一清理（persistence.md §3）：按各自 TTL prune 四张观测表。"""
+    now = datetime.now()
+    settings = get_settings()
+    total = 0
+    total += trace_repository.prune_before(
+        now - timedelta(days=settings.observability_trace_retention_days)
+    )
+    total += prompt_snapshot_repository.prune_before(
+        now - timedelta(days=settings.observability_prompt_retention_days)
+    )
+    total += decision_repository.prune_before(
+        now - timedelta(days=settings.observability_decision_retention_days)
+    )
+    total += llm_call_repository.prune_before(
+        now - timedelta(days=settings.observability_llm_call_retention_days)
+    )
+    return total
+
+
+async def run_retention_loop() -> None:
+    """lifespan 常驻低频清理：失败仅 log，下轮再清（V7.8-010）。"""
+    while True:
+        try:
+            pruned = prune_all()
+            if pruned:
+                logger.info("观测数据保留清理：%d 行", pruned)
+        except Exception:
+            logger.exception("观测数据保留清理失败，下轮重试")
+        await asyncio.sleep(get_settings().observability_cleanup_interval_hours * 3600)
 
 
 def _spawn(coro) -> None:
