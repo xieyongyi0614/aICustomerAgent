@@ -92,6 +92,17 @@ def get_prompt_snapshot(snapshot_id: str):
     return snapshot.model_dump(mode="json")
 
 
+@debug_router.get("/debug/prompts/compare")
+def compare_prompt_snapshots(a: str, b: str):
+    from app.services.observability.prompt_capture import diff_prompt_snapshots
+
+    snapshot_a = prompt_snapshot_repository.get_by_id(a)
+    snapshot_b = prompt_snapshot_repository.get_by_id(b)
+    if snapshot_a is None or snapshot_b is None:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return diff_prompt_snapshots(snapshot_a, snapshot_b)
+
+
 @debug_router.get("/debug/metrics")
 def get_metrics(window_hours: float = 24, user_id: str | None = None):
     since = datetime.now() - timedelta(hours=max(window_hours, 0.001))
@@ -211,17 +222,6 @@ def get_proactive_correlation(action_id: str):
         "llm_calls": [record.model_dump(mode="json") for record in llm_calls],
         "decisions": [record.model_dump(mode="json") for record in decisions],
     }
-
-
-@debug_router.get("/debug/prompts/compare")
-def compare_prompt_snapshots(a: str, b: str):
-    from app.services.observability.prompt_capture import diff_prompt_snapshots
-
-    snapshot_a = prompt_snapshot_repository.get_by_id(a)
-    snapshot_b = prompt_snapshot_repository.get_by_id(b)
-    if snapshot_a is None or snapshot_b is None:
-        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
-    return diff_prompt_snapshots(snapshot_a, snapshot_b)
 
 
 @debug_router.get("/debug/turns/{turn_id}/evaluation")
