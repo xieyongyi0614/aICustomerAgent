@@ -107,7 +107,9 @@ def to_dimension_scores(
     }
 
 
-RULES: list[EvaluationRule] = []
+from app.services.evaluation_rules import behavior as _behavior  # noqa: E402
+
+RULES: list[EvaluationRule] = [*_behavior.RULES]
 
 __all__ = [
     "EvaluationRule",

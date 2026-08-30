@@ -175,6 +175,8 @@ class Settings(BaseSettings):
     )
     evaluation_behavior_monotony_window: int = 5
     evaluation_behavior_monotony_threshold: int = 3
+    evaluation_expression_density_low: float = 0.01
+    evaluation_expression_density_high: float = 0.10
     evaluation_memory_missed_min_importance: float = 0.7
     evaluation_memory_missed_min_overlap: float = 0.3
     evaluation_proactive_reply_window_hours: int = 24
