@@ -82,6 +82,21 @@ EXPRESSION_INTENSITY_WORDS: tuple[str, ...] = (
     "唉",
 )
 
+ABUSIVE_WORDS: tuple[str, ...] = (
+    "去死",
+    "滚蛋",
+    "滚开",
+    "废物",
+    "蠢货",
+    "白痴",
+    "智障",
+    "贱人",
+    "混蛋",
+    "闭嘴",
+    "猪脑子",
+    "脑残",
+)
+
 
 def classify_actions(text: str) -> list[str]:
     """按出现顺序返回动作类别（contact/expression/posture/movement），未归类动作忽略。"""
