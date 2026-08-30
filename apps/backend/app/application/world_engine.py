@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from app.character.asuna.world import HOME_LOCATIONS, OBJECT_STATE_MACHINES
 from app.core.settings import get_settings
 from app.models.world import (
+    WorldEnvironment as WorldEnvironmentModel,
     EventImportance,
     EventSource,
     EventStatus,
@@ -674,3 +675,37 @@ async def run_world_maintenance_loop() -> None:
         except Exception:
             logger.exception("世界维护循环异常，下轮重试")
         await asyncio.sleep(interval)
+
+
+def restore_snapshot(user_id: str, snapshot_id: str) -> World | None:
+    """整包恢复（persistence.md §3）：Character 状态不回滚；恢复前自动留存快照。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return None
+        target = world_repository.get_snapshot(world.world_id, snapshot_id)
+        if target is None:
+            return None
+        pre = snapshot(user_id, label="pre_restore")
+        if pre is None:
+            return None
+        state = target.state
+        world.sim_time = (
+            datetime.fromisoformat(state["sim_time"]) if state.get("sim_time") else None
+        )
+        world.current_location = state["current_location"]
+        world.environment = WorldEnvironmentModel(**(state.get("environment") or {}))
+        world.notes = []
+        world_repository.save_world(world)
+        world_repository.replace_entities(
+            world.world_id,
+            [WorldObject(**entity) for entity in state.get("entities", [])],
+        )
+        world_repository.replace_events(
+            world.world_id,
+            [WorldEvent(**event) for event in state.get("events", [])],
+        )
+        return get_world(user_id)
+    except Exception:
+        logger.exception("世界快照恢复失败")
+        return None

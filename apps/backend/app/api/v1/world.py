@@ -130,6 +130,27 @@ def create_world_event(body: EventCreate):
     return event.model_dump(mode="json")
 
 
+@world_router.get("/debug/world/snapshots/{snapshot_id}")
+def get_world_snapshot(snapshot_id: str, user_id: str | None = None):
+    from app.repositories import world_repository
+
+    world = world_engine.get_world(_user(user_id))
+    if world is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    snapshot = world_repository.get_snapshot(world.world_id, snapshot_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="快照不存在")
+    return snapshot.model_dump(mode="json")
+
+
+@world_router.post("/debug/world/snapshots/{snapshot_id}/restore")
+def restore_world_snapshot(snapshot_id: str, user_id: str | None = None):
+    world = world_engine.restore_snapshot(_user(user_id), snapshot_id)
+    if world is None:
+        raise HTTPException(status_code=404, detail="快照不存在或恢复失败")
+    return {"current_location": world.current_location, "restored": snapshot_id}
+
+
 @world_router.post("/debug/world/snapshots")
 def create_snapshot(body: SnapshotCreate):
     snapshot = world_engine.snapshot(_user(body.user_id), label=body.label)

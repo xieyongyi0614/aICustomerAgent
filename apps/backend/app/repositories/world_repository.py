@@ -377,3 +377,51 @@ def prune_snapshots(world_id: str, keep: int) -> int:
             session.delete(row)
         session.commit()
         return len(stale)
+
+
+def replace_entities(world_id: str, objects: list[WorldObject]) -> None:
+    with SessionLocal() as session:
+        session.query(WorldEntityRow).filter(WorldEntityRow.world_id == world_id).delete()
+        for obj in objects:
+            session.add(
+                WorldEntityRow(
+                    id=obj.id,
+                    world_id=obj.world_id,
+                    name=obj.name,
+                    aliases=obj.aliases,
+                    category=obj.category,
+                    location_id=obj.location_id,
+                    state=obj.state,
+                    quantity=obj.quantity,
+                    properties=obj.properties,
+                    status=obj.status.value,
+                    last_action_at=obj.last_action_at,
+                    created_at=obj.created_at or datetime.now(),
+                    updated_at=obj.updated_at or datetime.now(),
+                )
+            )
+        session.commit()
+
+
+def replace_events(world_id: str, events: list[WorldEvent]) -> None:
+    with SessionLocal() as session:
+        session.query(WorldEventRow).filter(WorldEventRow.world_id == world_id).delete()
+        for event in events:
+            session.add(
+                WorldEventRow(
+                    id=event.id,
+                    world_id=event.world_id,
+                    type=event.type,
+                    title=event.title,
+                    importance=event.importance.value,
+                    status=event.status.value,
+                    started_at=event.started_at,
+                    due_at=event.due_at,
+                    completed_at=event.completed_at,
+                    payload=event.payload,
+                    source=event.source.value,
+                    created_at=event.created_at or datetime.now(),
+                    updated_at=event.updated_at or datetime.now(),
+                )
+            )
+        session.commit()
