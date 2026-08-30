@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     create_engine,
@@ -338,4 +339,37 @@ class ProactiveActionRow(Base):
         ),
         Index("idx_proactive_actions_user_status", "user_id", "status"),
         Index("idx_proactive_actions_dedupe", "dedupe_key"),
+    )
+
+
+class EvaluationReportRow(Base):
+    __tablename__ = "evaluation_reports"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    subject: Mapped[str] = mapped_column(String, nullable=False)
+    subject_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="asuna", server_default="asuna"
+    )
+    overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    verdict: Mapped[str] = mapped_column(String, nullable=False)
+    scores: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    issues: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    context_digest: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "subject IN ('turn', 'proactive_action', 'offline_batch')",
+            name="ck_evaluation_reports_subject",
+        ),
+        CheckConstraint(
+            "verdict IN ('pass', 'warn', 'fail')",
+            name="ck_evaluation_reports_verdict",
+        ),
+        Index("idx_evaluation_user_time", "user_id", "created_at"),
+        Index("idx_evaluation_subject", "subject", "subject_id"),
     )
