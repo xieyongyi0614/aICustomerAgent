@@ -108,7 +108,7 @@ async def test_persist_disabled_matches_v75_behavior(db_session_factory, fake_ll
 
 @pytest.mark.asyncio
 async def test_capture_does_not_change_sent_prompt_bytes(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=False)
+    override_settings(observability_persist_enabled=False, world_enabled=False)
     llm_off = fake_llm(response=["好耶"], structured_responses=_structured())
     await _run_turn(llm_off, "s-v78-perf-bytes-off", user_id="u-bytes-off")
     digest_off = _answer_prompt_digest(llm_off)
@@ -116,6 +116,7 @@ async def test_capture_does_not_change_sent_prompt_bytes(db_session_factory, fak
     override_settings(
         observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
+        world_enabled=False,
     )
     llm_on = fake_llm(response=["好耶"], structured_responses=_structured())
     await _run_turn(llm_on, "s-v78-perf-bytes-on", user_id="u-bytes-on")

@@ -15,6 +15,7 @@ from app.character.asuna import (
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.core.settings import get_settings
+from app.services.world.context_selector import render_world_section
 
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",
@@ -158,7 +159,11 @@ class PromptBuilder:
         scene_ctx=None,
         goal_ctx=None,
         behavior_ctx=None,
+        world_ctx=None,
     ) -> ChatPromptTemplate:
+        world_text = render_world_section(
+            world_ctx, get_settings().world_context_char_budget
+        )
         identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
         state_sections: list[str] = []
         if analysis is not None:
@@ -167,9 +172,12 @@ class PromptBuilder:
                 _literal(PromptBuilder.build_character_state_section(state)),
                 _literal(PromptBuilder.build_relationship_section(state)),
             ]
-        tail_sections: list[str] = [
+        tail_sections: list[str] = []
+        if world_text:
+            tail_sections.append(_literal(world_text))
+        tail_sections.append(
             MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
-        ]
+        )
         behavior_section = None
         activity_section = None
         if analysis is not None and behavior_ctx is not None:

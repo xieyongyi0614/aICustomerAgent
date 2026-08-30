@@ -24,7 +24,7 @@ from app.models.emotion import TurnAnalysis
 from app.models.intention import IntentionDecision
 from app.models.router import RoleMode
 from app.models.scene import SceneContext, SceneIntentResult, SceneState
-from app.application import observability
+from app.application import observability, world_engine
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.services import (
@@ -163,6 +163,7 @@ async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
     started = time.perf_counter()
+    world_ctx = world_engine.build_context(user_id, session_id, trace=trace)
     state = await context_builder.build(session_id, user_id, content, trace=trace)
     trace.record("context_builder", (time.perf_counter() - started) * 1000)
 
@@ -316,6 +317,7 @@ async def run_chat_pipeline(
             scene_ctx=scene_ctx,
             goal_ctx=goal_ctx,
             behavior_ctx=behavior_ctx,
+            world_ctx=world_ctx,
         ):
             if first_token_ms is None:
                 first_token_ms = (time.perf_counter() - llm_started) * 1000

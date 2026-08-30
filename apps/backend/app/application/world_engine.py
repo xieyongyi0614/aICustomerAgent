@@ -534,3 +534,44 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
             trace.record("world_update", 0.0, "error", error="world update failed")
         return 0
 
+
+
+def build_context(user_id: str, session_id: str | None = None, trace=None):
+    """每 turn 一次的世界切片装配（H1）：只读、有界、失败降级 None。"""
+    if not get_settings().world_enabled:
+        return None
+    started = time.perf_counter()
+    try:
+        from app.services.world.context_selector import build_world_context
+
+        world = ensure_world(user_id)
+        if world is None:
+            return None
+        time_ctx = _default_provider.context(world)
+        entities = world_repository.list_objects(world.world_id)
+        events = world_repository.list_events(
+            world.world_id, statuses=["scheduled", "active", "completed"], limit=20
+        )
+        settings = get_settings()
+        context = build_world_context(
+            world,
+            entities,
+            events,
+            time_ctx,
+            nearby_limit=settings.world_nearby_objects_limit,
+            events_limit=settings.world_salient_events_limit,
+        )
+        if trace is not None:
+            trace.record(
+                "world_context",
+                (time.perf_counter() - started) * 1000,
+                "ok",
+                nearby=len(context.nearby_objects),
+                salient=len(context.salient_events),
+            )
+        return context
+    except Exception:
+        logger.exception("世界上下文装配失败，本轮无世界段")
+        if trace is not None:
+            trace.record("world_context", 0.0, "error", error="world context failed")
+        return None
