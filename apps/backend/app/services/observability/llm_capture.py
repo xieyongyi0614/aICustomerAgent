@@ -132,6 +132,7 @@ async def _run_observed(observed, input_data, config, kwargs, sync: bool):
     handler = UsageCallbackHandler()
     started = time.perf_counter()
     started_at = datetime.now()
+    _capture_structured_prompt(observed, input_data)
     try:
         if sync:
             result = observed._inner.invoke(
@@ -164,6 +165,21 @@ async def _run_observed(observed, input_data, config, kwargs, sync: bool):
     )
     observability.record_llm_call(record)
     return result
+
+
+def _capture_structured_prompt(observed, input_data) -> None:
+    from app.services.observability import prompt_capture
+
+    try:
+        if not prompt_capture.enabled():
+            return
+        if observed._call_site is CallSite.JUDGE:
+            prompt_capture.capture_judge_snapshot(observed._call_site, observed._model)
+            return
+        formatted = observed._prompt.format_messages(**(input_data or {}))
+        prompt_capture.capture_prompt_snapshot(observed._call_site, formatted, observed._model)
+    except Exception:
+        logger.exception("结构化链 prompt 快照采集失败，已忽略")
 
 
 def observe_structured_chain(inner, prompt, schema, model):

@@ -21,8 +21,10 @@ def build_chain(
     scene_ctx=None,
     goal_ctx=None,
     behavior_ctx=None,
+    prompt=None,
 ) -> Runnable:
-    prompt = PromptBuilder.build(mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx)
+    if prompt is None:
+        prompt = PromptBuilder.build(mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx)
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
 
@@ -56,12 +58,26 @@ async def astream(
     goal_ctx=None,
     behavior_ctx=None,
 ) -> AsyncIterator[str]:
+    from app.services.observability import prompt_capture
+
     started = time.perf_counter()
     started_at = datetime.now()
-    chain = build_chain(mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx)
+    prompt = PromptBuilder.build(mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx)
+    chain = build_chain(
+        mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx, prompt=prompt
+    )
     if trace is not None:
         trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
         trace.model_name = getattr(llm, "model_name", None) or "default"
+
+    if prompt_capture.enabled():
+        formatted = prompt.format_messages()
+        prompt_capture.capture_prompt_snapshot(
+            CallSite.ANSWER,
+            formatted,
+            llm,
+            section_budget=prompt_capture.section_budget_from_messages(formatted),
+        )
 
     capture = get_settings().observability_persist_enabled
     handler = UsageCallbackHandler() if capture else None

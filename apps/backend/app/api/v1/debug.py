@@ -3,7 +3,12 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 
 from app.models.evaluation import EvaluationSubjectKind
-from app.repositories import evaluation_repository, llm_call_repository, trace_repository
+from app.repositories import (
+    evaluation_repository,
+    llm_call_repository,
+    prompt_snapshot_repository,
+    trace_repository,
+)
 from app.services.observability.metrics_aggregator import summarize_llm_records
 from app.services.trace_collector import get_trace_collector
 
@@ -63,6 +68,22 @@ def summary_llm_calls(window_hours: float = 24):
     since = datetime.now() - timedelta(hours=window_hours)
     records = llm_call_repository.list_since(since)
     return summarize_llm_records(records, window_hours).model_dump(mode="json")
+
+
+@debug_router.get("/debug/turns/{turn_id}/prompts")
+def list_turn_prompts(turn_id: str):
+    snapshots = prompt_snapshot_repository.get_by_turn(turn_id)
+    if not snapshots:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return [snapshot.model_dump(mode="json") for snapshot in snapshots]
+
+
+@debug_router.get("/debug/prompts/{snapshot_id}")
+def get_prompt_snapshot(snapshot_id: str):
+    snapshot = prompt_snapshot_repository.get_by_id(snapshot_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return snapshot.model_dump(mode="json")
 
 
 @debug_router.get("/debug/turns/{turn_id}/evaluation")

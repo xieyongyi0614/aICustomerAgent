@@ -342,6 +342,27 @@ class ProactiveActionRow(Base):
     )
 
 
+class PromptSnapshotRow(Base):
+    __tablename__ = "prompt_snapshots"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String, nullable=False)
+    turn_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    call_site: Mapped[str] = mapped_column(String, nullable=False)
+    profile_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    messages: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    section_budget: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("idx_prompt_snapshots_turn", "turn_id"),
+        Index("idx_prompt_snapshots_request", "request_id"),
+        Index("idx_prompt_snapshots_time", "created_at"),
+    )
+
+
 class LlmCallRecordRow(Base):
     __tablename__ = "llm_call_records"
 
