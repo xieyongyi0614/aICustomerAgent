@@ -33,6 +33,8 @@ TRACE_STEP_NAMES = (
     "memory_policy",
     "memory_privacy",
     "memory_conflict",
+    "evaluation",
+    "evaluation_judge",
 )
 
 _BACKGROUND_STEPS = (
