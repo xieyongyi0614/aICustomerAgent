@@ -73,3 +73,49 @@ FABRICATION_CANDIDATE = FabricationCandidateRule()
 MISSED = MissedMemoryRule()
 
 RULES = [FABRICATION_CANDIDATE, MISSED]
+
+
+EXISTENCE_PATTERNS = ("有", "还剩", "还留着", "还放着")
+CONTRADICTED_STATES = ("expired", "empty", "destroyed", "eaten")
+
+
+class WorldConsistencyRule(EvaluationRule):
+    """V8 World Consistency（用户新增集成）：回复宣称存在的物品与 World 事实矛盾。
+
+    只对"已耗尽/过期/销毁"的实体触发，info 级信号；问句不判。
+    """
+
+    code = IssueCode.MEMORY_WORLD_INCONSISTENCY
+    dimension = EvaluationDimension.MEMORY
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        settings = get_settings()
+        if not getattr(settings, "evaluation_world_consistency_enabled", True):
+            return None
+        world = ctx.world
+        if not world:
+            return None
+        reply = ctx.reply
+        for obj in world.get("objects", []):
+            name = obj.get("name") or ""
+            if not name or name not in reply:
+                continue
+            if f"{name}吗" in reply or f"{name}？" in reply:
+                continue
+            exists_claimed = any(f"{pattern}{name}" in reply for pattern in EXISTENCE_PATTERNS)
+            contradicted = (
+                obj.get("status") != "active"
+                or (obj.get("quantity") or 0) <= 0
+                or obj.get("state") in CONTRADICTED_STATES
+            )
+            if exists_claimed and contradicted:
+                return build_issue(
+                    self.code,
+                    evidence_quote=f"{name}: state={obj.get('state')}, quantity={obj.get('quantity')}",
+                )
+        return None
+
+
+WORLD_CONSISTENCY = WorldConsistencyRule()
+
+RULES = [FABRICATION_CANDIDATE, MISSED, WORLD_CONSISTENCY]

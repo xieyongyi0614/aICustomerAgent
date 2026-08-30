@@ -185,6 +185,7 @@ class Settings(BaseSettings):
     evaluation_memory_support_min_overlap: float = 0.2
     evaluation_proactive_reply_window_hours: int = 24
     evaluation_retention_days: int = 30
+    evaluation_world_consistency_enabled: bool = True
     evaluation_max_digest_chars: int = 2000
 
     observability_persist_enabled: bool = True

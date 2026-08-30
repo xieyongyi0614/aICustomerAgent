@@ -52,6 +52,7 @@ class IssueCode(StrEnum):
     MEMORY_FABRICATION = "memory_fabrication"
     MEMORY_CONTRADICTION = "memory_contradiction"
     MEMORY_MISSED = "memory_missed"
+    MEMORY_WORLD_INCONSISTENCY = "memory_world_inconsistency"
     BEHAVIOR_BUDGET_EXCEEDED = "behavior_budget_exceeded"
     BEHAVIOR_CONTACT_VIOLATION = "behavior_contact_violation"
     BEHAVIOR_ACTION_MONOTONY = "behavior_action_monotony"
@@ -74,6 +75,7 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.MEMORY_FABRICATION: IssueSeverity.CRITICAL,
     IssueCode.MEMORY_CONTRADICTION: IssueSeverity.WARNING,
     IssueCode.MEMORY_MISSED: IssueSeverity.INFO,
+    IssueCode.MEMORY_WORLD_INCONSISTENCY: IssueSeverity.INFO,
     IssueCode.BEHAVIOR_BUDGET_EXCEEDED: IssueSeverity.WARNING,
     IssueCode.BEHAVIOR_CONTACT_VIOLATION: IssueSeverity.WARNING,
     IssueCode.BEHAVIOR_ACTION_MONOTONY: IssueSeverity.WARNING,
@@ -96,6 +98,7 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.MEMORY_FABRICATION: "虚构了用户从未提供过的信息",
     IssueCode.MEMORY_CONTRADICTION: "回复与既有记忆矛盾",
     IssueCode.MEMORY_MISSED: "高相关高重要度记忆未被使用",
+    IssueCode.MEMORY_WORLD_INCONSISTENCY: "回复宣称的世界物品状态与 World 事实矛盾",
     IssueCode.BEHAVIOR_BUDGET_EXCEEDED: "动作描写数量超出预算",
     IssueCode.BEHAVIOR_CONTACT_VIOLATION: "身体接触等级超出预算",
     IssueCode.BEHAVIOR_ACTION_MONOTONY: "近期窗口内同类动作连续堆砌",

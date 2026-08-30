@@ -99,6 +99,7 @@ class EvaluationContext:
     proactive: ProactiveSlice | None = None
     request_id: str = ""
     fidelity: str = "live"
+    world: dict | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:
@@ -127,7 +128,37 @@ def collect_turn_context(ctx) -> EvaluationContext:
     if ctx.behavior is not None:
         context.behavior = _collect_behavior(ctx)
         context.behavior_history = _collect_behavior_history(ctx.session_id, settings)
+    context.world = _collect_world(ctx.user_id)
     return context
+
+
+def _collect_world(user_id: str) -> dict | None:
+    """V8 世界事实切片（只读）：评估 World Consistency 规则用；缺席为 None。"""
+    try:
+        from app.core.settings import get_settings as _settings
+        from app.repositories import world_repository
+
+        if not _settings().world_enabled:
+            return None
+        world = world_repository.get_world(user_id)
+        if world is None:
+            return None
+        entities = world_repository.list_objects(world.world_id)
+        return {
+            "location": world.current_location,
+            "objects": [
+                {
+                    "name": obj.name,
+                    "state": obj.state,
+                    "quantity": obj.quantity,
+                    "status": obj.status.value,
+                }
+                for obj in entities
+            ],
+        }
+    except Exception:
+        logger.exception("世界切片读取失败，world 规则降级")
+        return None
 
 
 def _collect_recent_messages(ctx) -> list[RecentMessage]:
