@@ -218,6 +218,14 @@ def override_settings(monkeypatch):
             "observability_llm_call_retention_days": "OBSERVABILITY_LLM_CALL_RETENTION_DAYS",
             "evaluation_enabled": "EVALUATION_ENABLED",
             "evaluation_llm_judge_sample_rate": "EVALUATION_LLM_JUDGE_SAMPLE_RATE",
+            "world_enabled": "WORLD_ENABLED",
+            "world_time_mode": "WORLD_TIME_MODE",
+            "world_sim_rate": "WORLD_SIM_RATE",
+            "world_context_char_budget": "WORLD_CONTEXT_CHAR_BUDGET",
+            "world_interpreter_enabled": "WORLD_INTERPRETER_ENABLED",
+            "world_llm_assist_enabled": "WORLD_LLM_ASSIST_ENABLED",
+            "world_memory_bridge_enabled": "WORLD_MEMORY_BRIDGE_ENABLED",
+            "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
         }
         for key, env in env_map.items():
             if key in kwargs:
