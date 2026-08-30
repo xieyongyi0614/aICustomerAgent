@@ -24,7 +24,7 @@ def test_abusive_language_hits_critical():
 
 
 def test_abusive_language_ignores_negated_mention():
-    assert persona_rules.ABUSIVE_LANGUAGE.evaluate(make_ctx("请不要再说那种废物之类的词。")) is None
+    assert persona_rules.ABUSIVE_LANGUAGE.evaluate(make_ctx("别再废物了，振作点。")) is None
     assert persona_rules.ABUSIVE_LANGUAGE.evaluate(make_ctx("你就是个废物！")) is not None
 
 

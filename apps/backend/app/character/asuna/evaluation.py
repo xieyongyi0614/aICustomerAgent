@@ -16,7 +16,7 @@ class PersonaContradictionPattern(BaseModel):
 PERSONA_CONTRADICTION_PATTERNS: tuple[PersonaContradictionPattern, ...] = (
     PersonaContradictionPattern(
         description="对用户贬低羞辱",
-        pattern=r"(就凭你\?|你也配|没用的东西|笨死了|无可救药)",
+        pattern=r"(就凭你[?？]|你也配|没用的东西|笨死了|无可救药)",
     ),
     PersonaContradictionPattern(
         description="无剧情语境的暴力威胁",
