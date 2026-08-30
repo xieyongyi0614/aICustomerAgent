@@ -32,6 +32,12 @@ def _setup(db_session_factory, session_id="s1", content="我去忙了"):
     goal_repository.seed_goals(USER, PERSISTENT_GOALS)
     conversation_repository.get_or_create_conversation(session_id, USER)
     conversation_service.save_turn(session_id, content, "好的，去吧，我等你回来")
+    from app.core.db import Message
+
+    with conversation_repository.SessionLocal() as session:
+        for row in session.query(Message).all():
+            row.created_at = NOW - timedelta(minutes=40)
+        session.commit()
     return session_id
 
 
