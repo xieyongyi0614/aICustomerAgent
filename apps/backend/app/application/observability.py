@@ -137,12 +137,13 @@ def _backfill_events(user_id: str, started_at, max_extra: int) -> list[TraceEven
 
 def on_turn_finished(
     trace,
-    turn_id: str,
+    turn_id: str | None,
     user_id: str,
     session_id: str,
     post_process_task=None,
     kind: TraceKind = TraceKind.TURN,
     action_id: str | None = None,
+    drain_background: bool = True,
 ) -> None:
     """turn 收尾挂载点（H1）：调度 write-behind 持久化，热路径零 IO。"""
     if not get_settings().observability_persist_enabled:
@@ -156,6 +157,7 @@ def on_turn_finished(
             turn_id=turn_id,
             action_id=action_id,
             post_process_task=post_process_task,
+            drain_background=drain_background,
         )
     )
 
@@ -167,10 +169,12 @@ def on_turn_error(trace, user_id: str, session_id: str) -> None:
     _spawn(_flush_error_trace(trace, user_id, session_id))
 
 
-async def _await_post_process(post_process_task) -> None:
+async def _await_post_process(post_process_task, drain_background: bool = True) -> None:
     try:
         if post_process_task is not None:
             await asyncio.gather(post_process_task, return_exceptions=True)
+        if not drain_background:
+            return
         from app.application import post_process
 
         pending = [task for task in list(post_process.background_tasks) if not task.done()]
@@ -188,8 +192,9 @@ async def _flush_turn_trace(
     turn_id: str | None,
     action_id: str | None,
     post_process_task,
+    drain_background: bool = True,
 ) -> None:
-    await _await_post_process(post_process_task)
+    await _await_post_process(post_process_task, drain_background)
     trace.obs_flushed = True
     try:
         settings = get_settings()

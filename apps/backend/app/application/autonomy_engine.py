@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from app.core.settings import get_settings
 from app.application import observability
 from app.models.autonomy import ProactiveAction, TriggerSignal
-from app.models.observability import DecisionKind, DecisionRecord, bound_extra
+from app.models.observability import DecisionKind, DecisionRecord, TraceKind, bound_extra
 from app.repositories import (
     conversation_repository,
     goal_repository,
@@ -204,6 +204,14 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
             user_id=user_id,
             session_id=conversation.id,
         )
+        observability.on_turn_finished(
+            trace,
+            turn_id=None,
+            user_id=user_id,
+            session_id=conversation.id,
+            kind=TraceKind.AUTONOMY_TICK,
+            drain_background=False,
+        )
         return None
 
     action = _build_action(verdict, conversation.id, now)
@@ -222,13 +230,35 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
     active = proactive_repository.get_active(user_id, now)
     if active is None or active.id != action.id:
         return None
-    delivered = await proactive_executor.execute(
-        active, llm=llm, trace=trace, now=now
-    )
+    observability_token = observability.current_trace.set(trace)
+    try:
+        delivered = await proactive_executor.execute(
+            active, llm=llm, trace=trace, now=now
+        )
+    finally:
+        observability.current_trace.reset(observability_token)
     if delivered is not None and delivered.status == "delivered":
         collector = get_trace_collector()
         collector.attach(trace, str(delivered.message_id))
+        observability.on_turn_finished(
+            trace,
+            turn_id=str(delivered.message_id),
+            user_id=user_id,
+            session_id=conversation.id,
+            kind=TraceKind.PROACTIVE,
+            action_id=action.id,
+            drain_background=False,
+        )
         return delivered.message_id
+    observability.on_turn_finished(
+        trace,
+        turn_id=None,
+        user_id=user_id,
+        session_id=conversation.id,
+        kind=TraceKind.PROACTIVE,
+        action_id=action.id,
+        drain_background=False,
+    )
     return None
 
 

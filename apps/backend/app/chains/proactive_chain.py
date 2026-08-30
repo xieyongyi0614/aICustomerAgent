@@ -67,6 +67,12 @@ async def generate(
         chain = prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
         capture = get_settings().observability_persist_enabled
         handler = UsageCallbackHandler() if capture else None
+        from app.services.observability import prompt_capture
+
+        if prompt_capture.enabled():
+            prompt_capture.capture_prompt_snapshot(
+                CallSite.PROACTIVE, prompt.format_messages(), model
+            )
         try:
             message = await chain.ainvoke(
                 {}, config={"callbacks": [handler]} if capture else None

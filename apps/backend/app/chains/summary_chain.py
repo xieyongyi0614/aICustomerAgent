@@ -45,6 +45,14 @@ async def summarize(old_summary: str, new_messages: str, llm=None) -> str:
     handler = UsageCallbackHandler() if capture else None
     started = time.perf_counter()
     started_at = datetime.now()
+    from app.services.observability import prompt_capture
+
+    if prompt_capture.enabled():
+        prompt_capture.capture_prompt_snapshot(
+            CallSite.SUMMARY,
+            prompt.format_messages(old_summary=old_summary, new_messages=new_messages),
+            llm,
+        )
     try:
         result = await chain.ainvoke(
             {"old_summary": old_summary, "new_messages": new_messages},
