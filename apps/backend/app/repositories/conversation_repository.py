@@ -77,6 +77,19 @@ def count_messages(conv_id: str) -> int:
         )
 
 
+def list_messages_since(
+    cutoff: datetime, limit: int = 20000
+) -> list[tuple[str, str]]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(Message.conversation_id, Message.role)
+            .filter(Message.created_at >= cutoff)
+            .limit(limit)
+            .all()
+        )
+        return [(row.conversation_id, row.role) for row in rows]
+
+
 def touch_conversation(conv_id: str) -> None:
     with SessionLocal() as session:
         conversation = session.get(Conversation, conv_id)

@@ -4,13 +4,18 @@ from fastapi import APIRouter, HTTPException
 
 from app.models.evaluation import EvaluationSubjectKind
 from app.repositories import (
+    conversation_repository,
     decision_repository,
     evaluation_repository,
     llm_call_repository,
     prompt_snapshot_repository,
+    proactive_repository,
     trace_repository,
 )
-from app.services.observability.metrics_aggregator import summarize_llm_records
+from app.services.observability.metrics_aggregator import (
+    build_metric_report,
+    summarize_llm_records,
+)
 from app.services.trace_collector import get_trace_collector
 
 debug_router = APIRouter()
@@ -85,6 +90,33 @@ def get_prompt_snapshot(snapshot_id: str):
     if snapshot is None:
         raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
     return snapshot.model_dump(mode="json")
+
+
+@debug_router.get("/debug/metrics")
+def get_metrics(window_hours: float = 24, user_id: str | None = None):
+    since = datetime.now() - timedelta(hours=max(window_hours, 0.001))
+    traces = [
+        trace
+        for trace in trace_repository.list_since(since)
+        if user_id is None or trace.user_id == user_id
+    ]
+    reports = [
+        report
+        for report in evaluation_repository.list_since(since)
+        if user_id is None or report.user_id == user_id
+    ]
+    llm_records = llm_call_repository.list_since(since)
+    message_pairs = conversation_repository.list_messages_since(since)
+    proactive_actions = proactive_repository.list_since(since)
+    report = build_metric_report(
+        window_hours,
+        traces,
+        llm_records,
+        reports,
+        message_pairs,
+        proactive_actions,
+    )
+    return report.model_dump(mode="json")
 
 
 @debug_router.get("/debug/decisions")

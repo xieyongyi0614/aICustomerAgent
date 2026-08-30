@@ -89,6 +89,25 @@ def list_by_user(user_id: str, limit: int = 50, offset: int = 0) -> list[Evaluat
         return [_to_model(row) for row in rows]
 
 
+def list_since(
+    cutoff: datetime,
+    verdict: str | None = None,
+    limit: int = 2000,
+) -> list[EvaluationReport]:
+    with SessionLocal() as session:
+        query = session.query(EvaluationReportRow).filter(
+            EvaluationReportRow.created_at >= cutoff
+        )
+        if verdict is not None:
+            query = query.filter(EvaluationReportRow.verdict == verdict)
+        rows = (
+            query.order_by(EvaluationReportRow.created_at.desc())
+            .limit(max(1, min(limit, 5000)))
+            .all()
+        )
+        return [_to_model(row) for row in rows]
+
+
 def prune_before(cutoff: datetime) -> int:
     with SessionLocal() as session:
         deleted = (

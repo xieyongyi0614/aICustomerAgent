@@ -256,3 +256,15 @@ def list_delivered_history(user_id: str, limit: int = 10) -> list[ProactiveActio
             .all()
         )
         return [_to_model(row) for row in rows]
+
+
+def list_since(cutoff: datetime, limit: int = 5000) -> list[ProactiveAction]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(ProactiveActionRow)
+            .filter(ProactiveActionRow.created_at >= cutoff)
+            .order_by(ProactiveActionRow.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_model(row) for row in rows]
