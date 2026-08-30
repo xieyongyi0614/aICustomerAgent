@@ -5,8 +5,8 @@
 「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆、情感、目标与自主行为的 AI Agent（FastAPI + LangChain + PostgreSQL）。
 
 - 当前开发分支：`feat/v3`
-- 开发阶段：V1~V7.5 全部完成（V7.5 Character Evaluation 已实现，前端面板按边界跳过）；后端架构 Refactor 完成；**V7.8 Character Runtime Intelligence 设计完成、待实现**，任务入口 `docs/roleplay-v7.8/tasks.md`
-- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 已有清单）
+- 开发阶段：V1~V7.8 全部完成（V7.5 Character Evaluation、V7.8 Character Runtime Intelligence 已实现，前端面板按边界跳过；V7.8-014 Metrics 周期快照按设计留白）；后端架构 Refactor 完成
+- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 已有清单）
 
 ## 目录结构
 
@@ -18,7 +18,7 @@
 
 ## 文档导航
 
-- `docs/roleplay-v7.8/` — V7.8 Character Runtime Intelligence 设计（11 篇，待实现；当前任务入口）
+- `docs/roleplay-v7.8/` — V7.8 Character Runtime Intelligence 设计 + 任务注册表（已实现）+ regression-checklist
 - `docs/roleplay-v7.5/` — V7.5 Character Evaluation 设计 + 任务注册表（已实现）+ regression-checklist
 - `docs/roleplay-v7/` — V7 Autonomous Behavior 设计 + 任务注册表（已实现）+ regression-checklist
 - `docs/roleplay-v6.5/` — V6.5 Character Behavior Refinement 设计 + 任务注册表（已实现）
