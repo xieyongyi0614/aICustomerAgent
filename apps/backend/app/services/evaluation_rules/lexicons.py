@@ -97,6 +97,67 @@ ABUSIVE_WORDS: tuple[str, ...] = (
     "脑残",
 )
 
+NEGATIVE_EMOTION_SIGNALS: tuple[str, ...] = (
+    "难过",
+    "伤心",
+    "痛苦",
+    "绝望",
+    "崩溃",
+    "好累",
+    "委屈",
+    "想哭",
+    "害怕",
+    "恐惧",
+    "沮丧",
+    "悲痛",
+    "眼泪",
+)
+
+RECALL_MARKERS: tuple[str, ...] = (
+    "你最喜欢",
+    "你最讨厌",
+    "你说过",
+    "你提过",
+    "你之前",
+    "你上次",
+    "上次你",
+    "你一直",
+    "你曾经",
+    "你的习惯",
+)
+
+_CLAUSE_STOP_CHARS = "。，！？；…\n"
+
+
+def extract_recall_clause(reply: str) -> tuple[str, str] | None:
+    """返回 (marker, 引述片段)：marker 后到首个停顿符的内容，供支撑比对。"""
+    for marker in RECALL_MARKERS:
+        index = reply.find(marker)
+        if index == -1:
+            continue
+        rest = reply[index + len(marker) :]
+        end = len(rest)
+        for stop in _CLAUSE_STOP_CHARS:
+            stop_index = rest.find(stop)
+            if stop_index != -1:
+                end = min(end, stop_index)
+        clause = rest[:end].strip("，。！？、 ")
+        if clause:
+            return marker, clause[:40]
+    return None
+
+
+def bigram_overlap(a: str, b: str) -> float:
+    """字符二元组 Dice 系数：无参数化的中文词法重叠近似。"""
+    a, b = a or "", b or ""
+    if len(a) < 2 or len(b) < 2:
+        return 0.0
+    grams_a = {a[i : i + 2] for i in range(len(a) - 1)}
+    grams_b = {b[i : i + 2] for i in range(len(b) - 1)}
+    if not grams_a or not grams_b:
+        return 0.0
+    return 2.0 * len(grams_a & grams_b) / (len(grams_a) + len(grams_b))
+
 
 def classify_actions(text: str) -> list[str]:
     """按出现顺序返回动作类别（contact/expression/posture/movement），未归类动作忽略。"""

@@ -178,7 +178,8 @@ class Settings(BaseSettings):
     evaluation_expression_density_low: float = 0.01
     evaluation_expression_density_high: float = 0.10
     evaluation_memory_missed_min_importance: float = 0.7
-    evaluation_memory_missed_min_overlap: float = 0.3
+    evaluation_memory_missed_min_overlap: float = 0.15
+    evaluation_memory_support_min_overlap: float = 0.2
     evaluation_proactive_reply_window_hours: int = 24
     evaluation_retention_days: int = 30
     evaluation_max_digest_chars: int = 2000

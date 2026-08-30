@@ -64,6 +64,7 @@ class MemoryRef:
     id: str
     type: str
     content: str
+    importance: float = 0.0
 
 
 @dataclass
@@ -172,6 +173,7 @@ def _collect_injected_memories(state) -> list[MemoryRef]:
                 id=str(getattr(memory, "id", "")),
                 type=str(getattr(memory, "type", "")),
                 content=_clip(getattr(memory, "content", ""), DIGEST_MEMORY_CHARS),
+                importance=float(getattr(memory, "importance", 0.0) or 0.0),
             )
         )
     return refs
