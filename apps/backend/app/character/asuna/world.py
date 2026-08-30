@@ -77,7 +77,7 @@ OBJECT_STATE_MACHINES = {
         "default_portions": 5,
         "transitions": {
             "cut": {"from": ["whole"], "to": "cut"},
-            "eat": {"from": ["cut"], "to": "eaten"},
+            "eat": {"from": ["cut", "eaten"], "to": "eaten"},
             "expire": {"from": ["whole", "cut"], "to": "expired"},
             "discard": {"from": ["whole", "cut"], "to": "empty"},
         },

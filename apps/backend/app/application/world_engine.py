@@ -15,6 +15,8 @@ from app.models.world import (
     World,
     WorldObject,
     WorldTimeMode,
+    apply_object_action as apply_machine_action,
+    object_default_portions,
     object_initial_state,
 )
 from app.repositories import world_repository
@@ -24,6 +26,116 @@ from app.services.world.time_provider import TimeProvider
 logger = logging.getLogger(__name__)
 
 _default_provider = TimeProvider()
+
+CONSUME_ACTIONS = {"eat"}
+
+
+def find_object_by_name(user_id: str, name: str) -> WorldObject | None:
+    """按名称/别名匹配活跃实体；未命中返回 None（解释器宁缺毋滥）。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return None
+        for obj in world_repository.list_objects(world.world_id):
+            if obj.name == name or name in obj.aliases:
+                return obj
+        return None
+    except Exception:
+        logger.exception("世界实体查找失败")
+        return None
+
+
+def move_object(user_id: str, object_id: str, location_id: str) -> WorldObject | None:
+    try:
+        world = ensure_world(user_id)
+        if world is None or location_id not in HOME_LOCATIONS:
+            return None
+        obj = world_repository.get_object(world.world_id, object_id)
+        if obj is None or obj.status is not ObjectStatus.ACTIVE:
+            return None
+        obj.location_id = location_id
+        obj.last_action_at = datetime.now()
+        world_repository.save_object(obj)
+        return obj
+    except Exception:
+        logger.exception("世界实体移动失败")
+        return None
+
+
+def apply_object_action(
+    user_id: str, object_id: str, action: str, portions: float | None = None
+) -> WorldObject | None:
+    """Used/Changed：状态机迁移 + 消耗类动作扣减数量；非法迁移返回 None（不造事实）。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return None
+        obj = world_repository.get_object(world.world_id, object_id)
+        if obj is None or obj.status is not ObjectStatus.ACTIVE:
+            return None
+        new_state = apply_machine_action(
+            OBJECT_STATE_MACHINES, obj.category, obj.state, action
+        )
+        if new_state is None:
+            return None
+        obj.state = new_state
+        if action in CONSUME_ACTIONS:
+            portion = object_default_portions(OBJECT_STATE_MACHINES, obj.category)
+            amount = (portions or 1) / max(portion, 1)
+            obj.quantity = round(max(0.0, obj.quantity - amount), 2)
+        if obj.quantity <= 0:
+            obj.status = ObjectStatus.DESTROYED
+        obj.last_action_at = datetime.now()
+        world_repository.save_object(obj)
+        return obj
+    except Exception:
+        logger.exception("世界实体状态迁移失败")
+        return None
+
+
+def discard_object(user_id: str, object_id: str) -> WorldObject | None:
+    obj = apply_object_action(user_id, object_id, "discard")
+    if obj is not None:
+        obj.status = ObjectStatus.DESTROYED
+        try:
+            world_repository.save_object(obj)
+        except Exception:
+            logger.exception("世界实体丢弃落库失败")
+            return None
+    return obj
+
+
+def expire_due_objects(user_id: str, now: datetime | None = None) -> int:
+    """时间演化（Changed）：expiry_at 到期的活跃物品迁移到 expired，幂等。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return 0
+        now = now or datetime.now()
+        expired = 0
+        for obj in world_repository.list_objects(world.world_id):
+            expiry_at = obj.properties.get("expiry_at")
+            if not expiry_at:
+                continue
+            try:
+                deadline = datetime.fromisoformat(str(expiry_at))
+            except ValueError:
+                continue
+            if deadline > now:
+                continue
+            new_state = apply_machine_action(
+                OBJECT_STATE_MACHINES, obj.category, obj.state, "expire"
+            )
+            if new_state is None:
+                continue
+            obj.state = new_state
+            obj.last_action_at = now
+            world_repository.save_object(obj)
+            expired += 1
+        return expired
+    except Exception:
+        logger.exception("世界物品过期检查失败")
+        return 0
 
 
 def get_location_context(user_id: str):
