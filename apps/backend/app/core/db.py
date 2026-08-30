@@ -421,6 +421,108 @@ class DecisionRecordRow(Base):
     )
 
 
+class WorldRow(Base):
+    __tablename__ = "worlds"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, default="home", server_default="home")
+    time_mode: Mapped[str] = mapped_column(String, nullable=False, default="real_sync", server_default="real_sync")
+    sim_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sim_rate: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, server_default="1")
+    current_location: Mapped[str] = mapped_column(String, nullable=False)
+    environment: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    notes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "time_mode IN ('real_sync', 'simulated', 'story')",
+            name="ck_worlds_time_mode",
+        ),
+    )
+
+
+class WorldEntityRow(Base):
+    __tablename__ = "world_entities"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    world_id: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    aliases: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    location_id: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, server_default="1")
+    properties: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active", server_default="active")
+    last_action_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('food', 'drink', 'tool', 'furniture', 'clothing', 'device', 'misc')",
+            name="ck_world_entities_category",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'destroyed')",
+            name="ck_world_entities_status",
+        ),
+        Index("idx_world_entities_world_location", "world_id", "location_id"),
+        Index("idx_world_entities_world_status", "world_id", "status"),
+    )
+
+
+class WorldEventRow(Base):
+    __tablename__ = "world_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    world_id: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    importance: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    source: Mapped[str] = mapped_column(String, nullable=False, default="user_mention", server_default="user_mention")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "importance IN ('low', 'normal', 'high')",
+            name="ck_world_events_importance",
+        ),
+        CheckConstraint(
+            "status IN ('scheduled', 'active', 'completed', 'cancelled', 'expired')",
+            name="ck_world_events_status",
+        ),
+        CheckConstraint(
+            "source IN ('user_mention', 'manual', 'autonomy')",
+            name="ck_world_events_source",
+        ),
+        Index("idx_world_events_world_due", "world_id", "status", "due_at"),
+    )
+
+
+class WorldSnapshotRow(Base):
+    __tablename__ = "world_snapshots"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    world_id: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str | None] = mapped_column(String, nullable=True)
+    state: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("idx_world_snapshots_world_time", "world_id", "created_at"),
+    )
+
+
 class RuntimeTraceRow(Base):
     __tablename__ = "runtime_traces"
 

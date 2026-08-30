@@ -127,6 +127,22 @@ class WorldEnvironment(BaseModel):
     updated_at: datetime | None = None
 
 
+class World(BaseModel):
+    """世界聚合根读模型（world-model.md §2）。"""
+
+    world_id: str
+    user_id: str
+    name: str = "家"
+    time_mode: WorldTimeMode = WorldTimeMode.REAL_SYNC
+    sim_time: datetime | None = None
+    sim_rate: float = 1.0
+    current_location: str = "home.living_room"
+    environment: WorldEnvironment = Field(default_factory=WorldEnvironment)
+    notes: list[str] = []
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class WorldEvent(BaseModel):
     id: str
     world_id: str

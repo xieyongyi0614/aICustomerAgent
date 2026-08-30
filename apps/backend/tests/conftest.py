@@ -43,6 +43,7 @@ from app.repositories import (
     scene_state_repository,
     summary_repository,
     trace_repository,
+    world_repository,
 )
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
@@ -169,6 +170,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(llm_call_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(prompt_snapshot_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(decision_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(world_repository, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while (
