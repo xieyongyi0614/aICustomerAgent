@@ -121,7 +121,7 @@ def snapshot(user_id: str, label: str | None = None) -> StateSnapshot | None:
         state = {
             "sim_time": world.sim_time.isoformat() if world.sim_time else None,
             "current_location": world.current_location,
-            "environment": world.environment.model_dump(exclude_none=True),
+            "environment": world.environment.model_dump(mode="json", exclude_none=True),
             "entities": [
                 obj.model_dump(mode="json")
                 for obj in world_repository.list_objects(world.world_id)
