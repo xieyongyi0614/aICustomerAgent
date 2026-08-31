@@ -8,6 +8,7 @@ from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
+from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
 from app.models.relationship import RelationshipDelta, RelationshipEvent, RelationshipState
 from app.models.emotion import EmotionHistoryEntry
 from app.repositories import (
@@ -16,11 +17,18 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import state_engine
+from app.services import relationship_evolution, relationship_signal, state_engine
 
 logger = logging.getLogger(__name__)
 
 RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
+
+_reputation_audits: dict[str, dict] = {}
+
+
+def get_relationship_audit(user_id: str) -> dict | None:
+    """本轮演化审计（评估护栏消费；内存结构，缺席返回 None = 规则跳过）。"""
+    return _reputation_audits.get(user_id)
 
 REPLAY_TYPE_KEYWORDS = (
     (("安慰", "关心", "陪", "照顾"), "user_care"),
@@ -31,19 +39,20 @@ REPLAY_TYPE_KEYWORDS = (
 
 
 def _day_impact_totals(
-    user_id: str, now: datetime
+    user_id: str, now: datetime, events: list | None = None
 ) -> tuple[RelationshipDelta, RelationshipDelta]:
     positive = RelationshipDelta()
     negative = RelationshipDelta()
     try:
-        events = relationship_event_repository.list_events(user_id, limit=500)
+        if events is None:
+            events = relationship_event_repository.list_events(user_id, limit=500)
     except Exception:
         logger.exception("当日事件账本读取失败，日上限按零已用处理")
         return positive, negative
     for event in events:
         if event.created_at.date() != now.date():
             continue
-        for dim in RELATIONSHIP_DIMENSIONS:
+        for dim in RELATIONSHIP_DIMENSIONS_V85:
             value = getattr(event.impact, dim)
             if value > 0:
                 setattr(positive, dim, getattr(positive, dim) + value)
@@ -150,30 +159,91 @@ async def apply_and_save(
     relationship_started = time.perf_counter()
     new_relationship = state.relationship_state
     pending_events: list[RelationshipEvent] = []
+    recent_events: list = []
+    settings = get_settings()
     try:
-        event_type, magnitude, confidence, cause = _resolve_relationship_event(analysis)
-        day_positive, day_negative = _day_impact_totals(user_id, now)
-        new_relationship, applied = state_engine.apply_relationship_v5(
-            state.relationship_state,
-            event_type,
-            magnitude,
-            analysis.behavior.behavior,
-            day_positive,
-            day_negative,
+        recent_events = relationship_event_repository.list_events(user_id, limit=500)
+        day_positive, day_negative = _day_impact_totals(
+            user_id, now, events=recent_events
         )
-        if event_type != "none":
-            pending_events.append(
-                RelationshipEvent(
-                    user_id=user_id,
-                    session_id=session_id,
-                    type=event_type,
-                    magnitude=magnitude,
-                    impact=applied,
-                    confidence=confidence,
-                    cause=cause,
-                    created_at=now,
-                )
+        before = state.relationship_state
+        if settings.rel_evolution_enabled:
+            window = relationship_signal.EvidenceWindow.rebuild_from_events(
+                recent_events[: settings.rel_signal_evidence_window]
             )
+            signal = relationship_signal.analyze_interaction(
+                user_input, analysis, ai_reply
+            )
+            repeats_by_kind: dict[tuple[str, str], int] = {}
+            if signal is not None:
+                repeats_by_kind[(signal.kind, signal.quality)] = window.count(
+                    signal.kind, signal.quality
+                )
+                signal = relationship_signal.observe(window, signal)
+                event_type, magnitude = relationship_signal.map_signal_to_event(signal)
+                confidence, cause = signal.salience, signal.cause
+            else:
+                event_type, magnitude, confidence, cause = (
+                    _resolve_relationship_event(analysis)
+                )
+            new_relationship, outcome = relationship_evolution.evolve(
+                before,
+                event_type,
+                magnitude,
+                analysis.behavior.behavior,
+                signal,
+                repeats_by_kind,
+                day_positive,
+                day_negative,
+                now,
+                session_id=session_id,
+                user_id=user_id,
+                cause=cause,
+                confidence=confidence,
+                window=window.snapshot(),
+            )
+            if outcome.event is not None:
+                pending_events.append(outcome.event)
+            _reputation_audits[user_id] = {
+                "before": before,
+                "after": new_relationship,
+                "applied": outcome.applied_delta,
+                "truncated": outcome.truncated,
+                "day_positive": day_positive,
+                "day_negative": day_negative,
+                "events": list(pending_events),
+                "signal_present": signal is not None,
+                "signal_kind": signal.kind if signal is not None else "",
+                "event_type": event_type,
+                "comfort_drift": outcome.comfort_drift_applied,
+                "version_before": outcome.version_before,
+                "version_after": outcome.version_after,
+            }
+        else:
+            event_type, magnitude, confidence, cause = (
+                _resolve_relationship_event(analysis)
+            )
+            new_relationship, applied = state_engine.apply_relationship_v5(
+                state.relationship_state,
+                event_type,
+                magnitude,
+                analysis.behavior.behavior,
+                day_positive,
+                day_negative,
+            )
+            if event_type != "none":
+                pending_events.append(
+                    RelationshipEvent(
+                        user_id=user_id,
+                        session_id=session_id,
+                        type=event_type,
+                        magnitude=magnitude,
+                        impact=applied,
+                        confidence=confidence,
+                        cause=cause,
+                        created_at=now,
+                    )
+                )
         if trace is not None:
             trace.record(
                 "relationship_event",
@@ -207,6 +277,15 @@ async def apply_and_save(
         )
     except Exception:
         logger.exception("关系状态与事件账本落库失败，保持上一轮")
+
+    try:
+        _run_relationship_subsystems(
+            user_id, session_id, state, analysis, character,
+            new_relationship, pending_events, user_input, recent_events, now,
+        )
+    except Exception:
+        logger.exception("关系演化后处理失败，不影响本轮回答")
+
     emotion_history_repository.append(
         user_id=user_id,
         session_id=session_id,
@@ -218,6 +297,99 @@ async def apply_and_save(
         energy_after=character.energy,
         stage_after=new_relationship.stage,
     )
+
+
+def _run_relationship_subsystems(
+    user_id: str,
+    session_id: str,
+    state: ConversationState,
+    analysis: TurnAnalysis,
+    character: CharacterState,
+    new_relationship: RelationshipState,
+    turn_events: list[RelationshipEvent],
+    user_input: str,
+    recent_events: list,
+    now: datetime,
+) -> None:
+    """V8.5 演化后处理：冲突 → 里程碑 → 记忆投递（独立小事务，只降级）。"""
+    from app.repositories import relationship_conflict_repository
+    from app.services import relationship_conflict, relationship_memory, relationship_milestone
+
+    audit = _reputation_audits.get(user_id) or {}
+    before: RelationshipState = audit.get("before") or new_relationship
+    shared_activity = audit.get("signal_kind") == "shared_activity"
+
+    conflict_outcome = relationship_conflict.evaluate_conflict(
+        user_id, session_id, new_relationship,
+        relationship_conflict_repository.get_active_conflict(user_id),
+        turn_events, user_input, now,
+    )
+    updated = conflict_outcome.state
+    new_system_events: list[RelationshipEvent] = list(conflict_outcome.system_events)
+    if conflict_outcome.record is not None:
+        record = conflict_outcome.record
+        if _conflict_exists(record):
+            relationship_conflict_repository.update_status(record)
+        else:
+            relationship_conflict_repository.create_conflict(record)
+        updated = updated.model_copy(update={"conflict_status": record.status})
+
+    decay = relationship_conflict.decay_tension(
+        user_id, session_id, updated, conflict_outcome.record, now
+    )
+    if decay.system_events:
+        updated = decay.state
+        new_system_events.extend(decay.system_events)
+
+    stage_before = before.stage
+    milestone_ctx = relationship_milestone.MilestoneContext(
+        user_id=user_id,
+        event_type=audit.get("event_type", "none"),
+        state_before=before,
+        state_after=updated,
+        stage_before=stage_before,
+        stage_after=updated.stage,
+        ledger_empty_before=not recent_events,
+        shared_activity=shared_activity,
+        character_mood=character.mood,
+        character_intensity=character.intensity,
+        conflict_transition=conflict_outcome.transition,
+        first_interaction_month=(
+            recent_events[-1].created_at.strftime("%Y-%m") if recent_events else ""
+        ),
+        now=now,
+    )
+    updated, milestone_records = relationship_milestone.process_milestones(
+        milestone_ctx, updated
+    )
+
+    if updated != new_relationship or new_system_events:
+        relationship_repository.commit_relationship_update(
+            user_id, updated, new_system_events
+        )
+
+    memory_worthy_keys = {
+        spec.key for spec in relationship_milestone.MILESTONES if spec.memory_worthy
+    }
+    worthy = [m for m in milestone_records if m.milestone_key in memory_worthy_keys]
+    conversation_event = next(
+        (e for e in turn_events if e.source == "conversation" and e.type != "none"),
+        None,
+    )
+    candidates = relationship_memory.to_memory_candidates(
+        conversation_event, worthy, conflict_outcome.transition, now
+    )
+    if candidates:
+        relationship_memory.deliver_candidates(candidates, user_id)
+
+
+def _conflict_exists(record) -> bool:
+    from app.repositories import relationship_conflict_repository
+
+    try:
+        return any(c.id == record.id for c in relationship_conflict_repository.list_conflicts(record.user_id, limit=200))
+    except Exception:
+        return False
 
 
 def _replay_type_for(content: str) -> str:

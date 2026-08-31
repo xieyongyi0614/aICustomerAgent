@@ -22,7 +22,7 @@ from app.models.evaluation import (
 )
 from app.models.evaluation import DimensionScore
 
-ISSUE_CODE_COUNT = 20
+ISSUE_CODE_COUNT = 24
 
 
 def make_issue(code: IssueCode, severity: IssueSeverity | None = None) -> Issue:

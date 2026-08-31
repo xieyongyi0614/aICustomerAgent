@@ -80,6 +80,20 @@ class ProactiveSlice:
 
 
 @dataclass
+class RelationshipSlice:
+    before: dict | None = None
+    after: dict | None = None
+    applied: dict | None = None
+    truncated: dict | None = None
+    day_positive: dict | None = None
+    day_negative: dict | None = None
+    events: list = field(default_factory=list)
+    signal_present: bool = False
+    comfort_drift: float = 0.0
+    conflict_status: str = "none"
+
+
+@dataclass
 class EvaluationContext:
     subject: str
     subject_id: str
@@ -100,6 +114,7 @@ class EvaluationContext:
     request_id: str = ""
     fidelity: str = "live"
     world: dict | None = None
+    relationship: RelationshipSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:
@@ -129,7 +144,50 @@ def collect_turn_context(ctx) -> EvaluationContext:
         context.behavior = _collect_behavior(ctx)
         context.behavior_history = _collect_behavior_history(ctx.session_id, settings)
     context.world = _collect_world(ctx.user_id)
+    context.relationship = _collect_relationship(ctx.user_id)
     return context
+
+
+def _collect_relationship(user_id: str) -> RelationshipSlice | None:
+    """V8.5 关系演化审计切片（内存审计，缺席为 None = 规则跳过）。"""
+    try:
+        from app.services import state_service
+
+        audit = state_service.get_relationship_audit(user_id)
+    except Exception:
+        logger.exception("关系审计切片读取失败，relationship 规则降级")
+        return None
+    if not audit:
+        return None
+    return RelationshipSlice(
+        before=_state_dims(audit.get("before")),
+        after=_state_dims(audit.get("after")),
+        applied=_delta_dims(audit.get("applied")),
+        truncated=dict(audit.get("truncated") or {}),
+        day_positive=_delta_dims(audit.get("day_positive")),
+        day_negative=_delta_dims(audit.get("day_negative")),
+        events=list(audit.get("events") or []),
+        signal_present=bool(audit.get("signal_present")),
+        comfort_drift=float(audit.get("comfort_drift") or 0.0),
+        conflict_status=str(
+            getattr(audit.get("after"), "conflict_status", "none") or "none"
+        ),
+    )
+
+
+_RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
+
+
+def _state_dims(state) -> dict | None:
+    if state is None:
+        return None
+    return {dim: float(getattr(state, dim, 0.0)) for dim in _RELATIONSHIP_DIMENSIONS}
+
+
+def _delta_dims(delta) -> dict | None:
+    if delta is None:
+        return None
+    return {dim: float(getattr(delta, dim, 0.0)) for dim in _RELATIONSHIP_DIMENSIONS}
 
 
 def _collect_world(user_id: str) -> dict | None:

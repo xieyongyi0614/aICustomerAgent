@@ -4,6 +4,10 @@ from app.models.relationship import RelationshipDelta
 
 STAGE_ORDER = ("stranger", "friend", "close_friend", "partner")
 
+RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
+
+RELATIONSHIP_DIMENSIONS_V85 = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
+
 EMOTION_EVENTS: dict[str, dict] = {
     "praise": {"emotion": "happy", "delta": 0.3},
     "comforted": {"emotion": "happy", "delta": 0.25},
@@ -23,15 +27,17 @@ MAGNITUDE_COEFFICIENTS: dict[str, float] = {
 }
 
 RELATIONSHIP_EVENT_DELTAS: dict[str, RelationshipDelta] = {
-    "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, tension=-0.02),
-    "user_help": RelationshipDelta(trust=0.05, intimacy=0.03, familiarity=0.02),
-    "long_interaction": RelationshipDelta(intimacy=0.01, familiarity=0.02),
-    "intimate_moment": RelationshipDelta(trust=0.02, intimacy=0.06, familiarity=0.01, tension=-0.01),
-    "praise": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, tension=-0.01),
-    "warm_moment": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, tension=-0.01),
-    "criticized": RelationshipDelta(trust=-0.03, tension=0.05),
-    "conflict": RelationshipDelta(intimacy=-0.12, trust=-0.10, familiarity=-0.05, tension=0.20),
-    "boundary_violation": RelationshipDelta(trust=-0.08, intimacy=-0.05, tension=0.15),
+    "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, respect=0.01, comfort=0.03, tension=-0.02),
+    "user_help": RelationshipDelta(trust=0.05, intimacy=0.03, familiarity=0.02, respect=0.03, comfort=0.02),
+    "long_interaction": RelationshipDelta(intimacy=0.01, familiarity=0.02, comfort=0.01),
+    "intimate_moment": RelationshipDelta(trust=0.02, intimacy=0.06, familiarity=0.01, comfort=0.04, tension=-0.01),
+    "praise": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, respect=0.01, comfort=0.01, tension=-0.01),
+    "warm_moment": RelationshipDelta(trust=0.02, intimacy=0.02, familiarity=0.01, comfort=0.03, tension=-0.01),
+    "criticized": RelationshipDelta(trust=-0.03, respect=-0.02, comfort=-0.03, tension=0.05),
+    "conflict": RelationshipDelta(intimacy=-0.12, trust=-0.10, familiarity=-0.05, respect=-0.05, comfort=-0.12, tension=0.20),
+    "boundary_violation": RelationshipDelta(trust=-0.08, intimacy=-0.05, respect=-0.10, comfort=-0.10, tension=0.15),
+    "promise_kept": RelationshipDelta(trust=0.05, intimacy=0.01, familiarity=0.01, respect=0.02, comfort=0.02),
+    "promise_broken": RelationshipDelta(trust=-0.12, intimacy=-0.04, respect=-0.08, comfort=-0.08, tension=0.10),
     "none": RelationshipDelta(),
 }
 
@@ -48,10 +54,10 @@ EVENT_DELTAS: dict[str, RelationshipDelta] = {
 }
 
 BEHAVIOR_DELTAS: dict[str, RelationshipDelta] = {
-    "comfort": RelationshipDelta(intimacy=0.02),
-    "celebrate": RelationshipDelta(intimacy=0.02),
-    "encourage": RelationshipDelta(trust=0.01),
-    "recall_memory": RelationshipDelta(trust=0.02, familiarity=0.03),
+    "comfort": RelationshipDelta(intimacy=0.02, comfort=0.02),
+    "celebrate": RelationshipDelta(intimacy=0.02, comfort=0.02),
+    "encourage": RelationshipDelta(trust=0.01, comfort=0.01),
+    "recall_memory": RelationshipDelta(trust=0.02, familiarity=0.03, comfort=0.01),
 }
 
 ENERGY_EVENT_MODIFIERS: dict[str, float] = {

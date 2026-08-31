@@ -9,10 +9,31 @@ def _to_relationship(row: RelationshipStateRow) -> RelationshipState:
         intimacy=row.intimacy,
         trust=row.trust,
         familiarity=row.familiarity,
+        respect=row.respect,
+        comfort=row.comfort,
         tension=row.tension,
         stage=row.stage,
+        conflict_status=row.conflict_status,
+        neglect_active=row.neglect_active,
+        last_interaction_at=row.last_interaction_at,
+        version=row.version,
         updated_at=row.updated_at,
     )
+
+
+def _apply_relationship(row: RelationshipStateRow, relationship: RelationshipState, now: datetime) -> None:
+    row.intimacy = relationship.intimacy
+    row.trust = relationship.trust
+    row.familiarity = relationship.familiarity
+    row.respect = relationship.respect
+    row.comfort = relationship.comfort
+    row.tension = relationship.tension
+    row.stage = relationship.stage
+    row.conflict_status = relationship.conflict_status
+    row.neglect_active = relationship.neglect_active
+    row.last_interaction_at = relationship.last_interaction_at
+    row.version = relationship.version
+    row.updated_at = now
 
 
 def get_relationship(user_id: str) -> RelationshipState:
@@ -32,12 +53,7 @@ def upsert_relationship(
         if row is None:
             row = RelationshipStateRow(user_id=user_id, created_at=now, updated_at=now)
             session.add(row)
-        row.intimacy = relationship.intimacy
-        row.trust = relationship.trust
-        row.familiarity = relationship.familiarity
-        row.tension = relationship.tension
-        row.stage = relationship.stage
-        row.updated_at = now
+        _apply_relationship(row, relationship, now)
         session.commit()
         session.refresh(row)
         return _to_relationship(row)
@@ -53,12 +69,7 @@ def commit_relationship_update(
         if row is None:
             row = RelationshipStateRow(user_id=user_id, created_at=now, updated_at=now)
             session.add(row)
-        row.intimacy = relationship.intimacy
-        row.trust = relationship.trust
-        row.familiarity = relationship.familiarity
-        row.tension = relationship.tension
-        row.stage = relationship.stage
-        row.updated_at = now
+        _apply_relationship(row, relationship, now)
         for event in events:
             session.add(
                 RelationshipEventRow(
@@ -71,6 +82,8 @@ def commit_relationship_update(
                     impact_intimacy=event.impact.intimacy,
                     impact_trust=event.impact.trust,
                     impact_familiarity=event.impact.familiarity,
+                    impact_respect=event.impact.respect,
+                    impact_comfort=event.impact.comfort,
                     impact_tension=event.impact.tension,
                     confidence=event.confidence,
                     source=event.source,

@@ -50,6 +50,8 @@ class TestEventBuilder:
             "intimacy": 0.0,
             "trust": 0.0,
             "familiarity": 0.0,
+            "respect": 0.0,
+            "comfort": 0.0,
             "tension": 0.0,
         }
 

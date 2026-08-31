@@ -69,8 +69,11 @@ async def run_pipeline(analysis, state=None, llm=None, trace=None):
 class TestOrchestrationPipeline:
     @pytest.mark.asyncio
     async def test_emotion_and_relationship_applied_and_ledger_written(
-        self, db_session_factory
+        self, db_session_factory, monkeypatch
     ):
+        from app.core.settings import get_settings
+
+        monkeypatch.setattr(get_settings(), "rel_evolution_enabled", False)
         llm = FakeLLM(
             structured_responses={"StateUpdateDecision": DECISION},
         )
@@ -107,8 +110,11 @@ class TestOrchestrationPipeline:
 
     @pytest.mark.asyncio
     async def test_v2_event_fallback_creates_mapped_ledger_row(
-        self, db_session_factory
+        self, db_session_factory, monkeypatch
     ):
+        from app.core.settings import get_settings
+
+        monkeypatch.setattr(get_settings(), "rel_evolution_enabled", False)
         analysis = make_analysis(
             emotion_event={"type": "none", "magnitude": "normal", "confidence": 0.9},
             relationship_event={"type": "none", "magnitude": "normal", "confidence": 0.0},

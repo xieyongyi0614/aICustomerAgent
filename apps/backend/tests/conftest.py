@@ -38,7 +38,9 @@ from app.repositories import (
     memory_repository,
     proactive_repository,
     prompt_snapshot_repository,
+    relationship_conflict_repository,
     relationship_event_repository,
+    relationship_milestone_repository,
     relationship_repository,
     scene_state_repository,
     summary_repository,
@@ -171,6 +173,12 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr(prompt_snapshot_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(decision_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(world_repository, "SessionLocal", testing_session)
+    monkeypatch.setattr(
+        relationship_milestone_repository, "SessionLocal", testing_session
+    )
+    monkeypatch.setattr(
+        relationship_conflict_repository, "SessionLocal", testing_session
+    )
     yield testing_session
     deadline = time.time() + 2.0
     while (
@@ -220,6 +228,22 @@ def override_settings(monkeypatch):
             "observability_llm_call_retention_days": "OBSERVABILITY_LLM_CALL_RETENTION_DAYS",
             "evaluation_enabled": "EVALUATION_ENABLED",
             "evaluation_llm_judge_sample_rate": "EVALUATION_LLM_JUDGE_SAMPLE_RATE",
+            "rel_evolution_enabled": "REL_EVOLUTION_ENABLED",
+            "rel_repetition_decay": "REL_REPETITION_DECAY",
+            "rel_trust_negative_amp": "REL_TRUST_NEGATIVE_AMP",
+            "rel_comfort_drift": "REL_COMFORT_DRIFT",
+            "rel_comfort_baseline_json": "REL_COMFORT_BASELINE_JSON",
+            "rel_milestone_delta_cap": "REL_MILESTONE_DELTA_CAP",
+            "rel_signal_llm_enabled": "REL_SIGNAL_LLM_ENABLED",
+            "rel_signal_evidence_window": "REL_SIGNAL_EVIDENCE_WINDOW",
+            "rel_milestone_enabled": "REL_MILESTONE_ENABLED",
+            "rel_conflict_enabled": "REL_CONFLICT_ENABLED",
+            "rel_conflict_cold_hours": "REL_CONFLICT_COLD_HOURS",
+            "rel_conflict_max_cold_days": "REL_CONFLICT_MAX_COLD_DAYS",
+            "rel_conflict_recover_positive": "REL_CONFLICT_RECOVER_POSITIVE",
+            "rel_neglect_days_json": "REL_NEGLECT_DAYS_JSON",
+            "rel_tension_daily_decay": "REL_TENSION_DAILY_DECAY",
+            "evaluation_relationship_enabled": "EVALUATION_RELATIONSHIP_ENABLED",
             "world_enabled": "WORLD_ENABLED",
             "world_time_mode": "WORLD_TIME_MODE",
             "world_sim_rate": "WORLD_SIM_RATE",

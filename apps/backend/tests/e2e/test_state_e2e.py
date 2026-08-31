@@ -59,7 +59,10 @@ def test_comfort_path_adjusts_prompt_and_relationship(db_session_factory, fake_l
     assert state.energy == pytest.approx(0.9 - 0.05 - 0.05 - 0.05)
 
 
-def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake_llm):
+def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake_llm, override_settings):
+    override_settings(
+        rel_evolution_enabled=False, rel_milestone_enabled=False, rel_conflict_enabled=False
+    )
     llm = fake_llm(
         response=["好耶"],
         structured_responses=_structured(
@@ -91,7 +94,13 @@ def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake
 def test_stage_upgrade_after_share_goal_turns(
     db_session_factory, fake_llm, override_settings
 ):
-    override_settings(stage_close_intimacy=0.3, stage_close_trust=0.3)
+    override_settings(
+        stage_close_intimacy=0.3,
+        stage_close_trust=0.3,
+        rel_evolution_enabled=False,
+        rel_milestone_enabled=False,
+        rel_conflict_enabled=False,
+    )
     llm = fake_llm(
         response=["嗯"],
         structured_responses=_structured("share_goal", "normal_reply", "calm"),

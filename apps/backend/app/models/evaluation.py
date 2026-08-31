@@ -26,6 +26,7 @@ class EvaluationDimension(StrEnum):
     MEMORY = "memory"
     BEHAVIOR = "behavior"
     AUTONOMY = "autonomy"
+    RELATIONSHIP = "relationship"
 
 
 class EvaluationSubjectKind(StrEnum):
@@ -61,6 +62,10 @@ class IssueCode(StrEnum):
     AUTONOMY_REDUNDANT = "autonomy_redundant"
     AUTONOMY_UNNECESSARY = "autonomy_unnecessary"
     AUTONOMY_LOW_OUTCOME = "autonomy_low_outcome"
+    RELATIONSHIP_JUMP = "relationship_jump"
+    RELATIONSHIP_UNCAUSED_CHANGE = "relationship_uncaused_change"
+    RELATIONSHIP_RATE_VIOLATION = "relationship_rate_violation"
+    CONFLICT_STATE_INVALID = "conflict_state_invalid"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -84,6 +89,10 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.AUTONOMY_REDUNDANT: IssueSeverity.WARNING,
     IssueCode.AUTONOMY_UNNECESSARY: IssueSeverity.WARNING,
     IssueCode.AUTONOMY_LOW_OUTCOME: IssueSeverity.INFO,
+    IssueCode.RELATIONSHIP_JUMP: IssueSeverity.CRITICAL,
+    IssueCode.RELATIONSHIP_UNCAUSED_CHANGE: IssueSeverity.CRITICAL,
+    IssueCode.RELATIONSHIP_RATE_VIOLATION: IssueSeverity.WARNING,
+    IssueCode.CONFLICT_STATE_INVALID: IssueSeverity.CRITICAL,
 }
 
 ISSUE_MESSAGES: dict[IssueCode, str] = {
@@ -107,6 +116,10 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.AUTONOMY_REDUNDANT: "主动消息与近期对话重复，无信息增量",
     IssueCode.AUTONOMY_UNNECESSARY: "触发理由不足以支撑主动打扰",
     IssueCode.AUTONOMY_LOW_OUTCOME: "观察窗内无 ack 且无用户回复",
+    IssueCode.RELATIONSHIP_JUMP: "关系维度单轮变化量超出单轮上限",
+    IssueCode.RELATIONSHIP_UNCAUSED_CHANGE: "关系状态变化无法对账到账本/里程碑/结算",
+    IssueCode.RELATIONSHIP_RATE_VIOLATION: "关系维度当日累计超出日上限",
+    IssueCode.CONFLICT_STATE_INVALID: "冲突状态机出现非法迁移或状态行不一致",
 }
 
 
@@ -199,9 +212,13 @@ def build_issue(code: IssueCode, evidence_quote: str = "", source: ISSUE_SOURCE 
     )
 
 
-_DIMENSION_BY_CODE: dict[IssueCode, EvaluationDimension] = {
-    code: EvaluationDimension(code.value.split("_", 1)[0]) for code in IssueCode
-}
+_DIMENSION_BY_CODE: dict[IssueCode, EvaluationDimension] = {}
+for _code in IssueCode:
+    try:
+        _DIMENSION_BY_CODE[_code] = EvaluationDimension(_code.value.split("_", 1)[0])
+    except ValueError:
+        _DIMENSION_BY_CODE[_code] = EvaluationDimension.RELATIONSHIP
+_DIMENSION_BY_CODE[IssueCode.CONFLICT_STATE_INVALID] = EvaluationDimension.RELATIONSHIP
 
 
 def dimension_of(code: IssueCode) -> EvaluationDimension:

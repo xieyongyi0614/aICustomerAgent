@@ -12,6 +12,8 @@ class SettingsError(Exception):
 
 _OBSERVABILITY_PROMPT_MODES = ("disabled", "sampled", "always")
 
+STAGE_KEYS = ("stranger", "friend", "close_friend", "partner")
+
 
 class LlmProfile:
     def __init__(
@@ -99,6 +101,23 @@ class Settings(BaseSettings):
     rel_tension_freeze: float = 0.5
     rel_replay_discount: float = 0.5
     rel_replay_min_idle_hours: float = 24.0
+    rel_evolution_enabled: bool = True
+    rel_repetition_decay: float = 0.7
+    rel_trust_negative_amp: float = 1.5
+    rel_comfort_drift: float = 0.05
+    rel_comfort_baseline_json: str = (
+        '{"stranger": 0.45, "friend": 0.60, "close_friend": 0.70, "partner": 0.80}'
+    )
+    rel_milestone_delta_cap: float = 0.10
+    rel_signal_llm_enabled: bool = False
+    rel_signal_evidence_window: int = 20
+    rel_milestone_enabled: bool = True
+    rel_conflict_enabled: bool = True
+    rel_conflict_cold_hours: float = 12.0
+    rel_conflict_max_cold_days: float = 7.0
+    rel_conflict_recover_positive: int = 2
+    rel_neglect_days_json: str = '{"stranger": 7, "friend": 5, "close_friend": 3, "partner": 2}'
+    rel_tension_daily_decay: float = 0.02
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 
@@ -186,6 +205,7 @@ class Settings(BaseSettings):
     evaluation_proactive_reply_window_hours: int = 24
     evaluation_retention_days: int = 30
     evaluation_world_consistency_enabled: bool = True
+    evaluation_relationship_enabled: bool = True
     evaluation_max_digest_chars: int = 2000
 
     observability_persist_enabled: bool = True
@@ -322,6 +342,30 @@ class Settings(BaseSettings):
 
     def world_memory_importance(self) -> dict:
         return json.loads(self.world_memory_importance_json)
+
+    @model_validator(mode="after")
+    def validate_rel_config(self):
+        for name in ("rel_comfort_baseline_json", "rel_neglect_days_json"):
+            try:
+                table = json.loads(getattr(self, name))
+            except json.JSONDecodeError as exc:
+                raise SettingsError(f"{name} 解析失败: {exc}") from exc
+            if not isinstance(table, dict) or not table:
+                raise SettingsError(f"{name} 必须是非空对象")
+        for stage in STAGE_KEYS:
+            baselines = json.loads(self.rel_comfort_baseline_json)
+            if stage not in baselines:
+                raise SettingsError(f"rel_comfort_baseline_json 缺少阶段: {stage}")
+            thresholds = json.loads(self.rel_neglect_days_json)
+            if stage not in thresholds:
+                raise SettingsError(f"rel_neglect_days_json 缺少阶段: {stage}")
+        return self
+
+    def comfort_baselines(self) -> dict:
+        return json.loads(self.rel_comfort_baseline_json)
+
+    def neglect_thresholds(self) -> dict:
+        return json.loads(self.rel_neglect_days_json)
 
     def llm_profiles(self) -> list[LlmProfile]:
         raw = json.loads(self.llm_profiles_json)

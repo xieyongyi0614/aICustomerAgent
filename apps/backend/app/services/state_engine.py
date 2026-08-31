@@ -28,6 +28,8 @@ def build_relationship_impact(event_type: str, magnitude: str) -> RelationshipDe
         intimacy=round(base.intimacy * coefficient, 6),
         trust=round(base.trust * coefficient, 6),
         familiarity=round(base.familiarity * coefficient, 6),
+        respect=round(base.respect * coefficient, 6),
+        comfort=round(base.comfort * coefficient, 6),
         tension=round(base.tension * coefficient, 6),
     )
 

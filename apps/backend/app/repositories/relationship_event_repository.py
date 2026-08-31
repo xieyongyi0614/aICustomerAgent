@@ -1,5 +1,5 @@
 from app.core.db import RelationshipEventRow, SessionLocal
-from app.models.relationship import RelationshipEvent
+from app.models.relationship import RelationshipDelta, RelationshipEvent
 
 
 def _to_event(row: RelationshipEventRow) -> RelationshipEvent:
@@ -10,12 +10,14 @@ def _to_event(row: RelationshipEventRow) -> RelationshipEvent:
         session_id=row.session_id,
         type=row.type,
         magnitude=row.magnitude,
-        impact={
-            "intimacy": row.impact_intimacy,
-            "trust": row.impact_trust,
-            "familiarity": row.impact_familiarity,
-            "tension": row.impact_tension,
-        },
+        impact=RelationshipDelta(
+            intimacy=row.impact_intimacy,
+            trust=row.impact_trust,
+            familiarity=row.impact_familiarity,
+            respect=row.impact_respect,
+            comfort=row.impact_comfort,
+            tension=row.impact_tension,
+        ),
         confidence=row.confidence,
         source=row.source,
         cause=row.cause,
@@ -35,6 +37,8 @@ def create_event(event: RelationshipEvent) -> RelationshipEvent:
             impact_intimacy=event.impact.intimacy,
             impact_trust=event.impact.trust,
             impact_familiarity=event.impact.familiarity,
+            impact_respect=event.impact.respect,
+            impact_comfort=event.impact.comfort,
             impact_tension=event.impact.tension,
             confidence=event.confidence,
             source=event.source,

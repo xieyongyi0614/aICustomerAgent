@@ -11,6 +11,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     false,
 )
@@ -117,6 +118,54 @@ class Memory(Base):
     )
 
 
+class RelationshipMilestoneRow(Base):
+    __tablename__ = "relationship_milestones"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    milestone_key: Mapped[str] = mapped_column(String, nullable=False)
+    period_key: Mapped[str] = mapped_column(String, nullable=False, default="")
+    title: Mapped[str] = mapped_column(String, nullable=False, default="")
+    applied_bonus: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    unlocks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "milestone_key",
+            "period_key",
+            name="uq_relationship_milestones_user_key_period",
+        ),
+        Index("idx_relationship_milestones_user", "user_id", "created_at"),
+    )
+
+
+class RelationshipConflictRow(Base):
+    __tablename__ = "relationship_conflicts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    trigger_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_negative_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recovery_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolution: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('strain', 'conflict', 'cold', 'recovery', 'resolved')",
+            name="ck_relationship_conflicts_status",
+        ),
+        Index("idx_relationship_conflicts_user_status", "user_id", "status"),
+    )
+
+
 class RelationshipEventRow(Base):
     __tablename__ = "relationship_events"
 
@@ -129,6 +178,12 @@ class RelationshipEventRow(Base):
     impact_intimacy: Mapped[float] = mapped_column(Float, nullable=False)
     impact_trust: Mapped[float] = mapped_column(Float, nullable=False)
     impact_familiarity: Mapped[float] = mapped_column(Float, nullable=False)
+    impact_respect: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0, server_default="0"
+    )
+    impact_comfort: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0, server_default="0"
+    )
     impact_tension: Mapped[float] = mapped_column(Float, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     source: Mapped[str] = mapped_column(
@@ -140,12 +195,17 @@ class RelationshipEventRow(Base):
     __table_args__ = (
         CheckConstraint(
             "type IN ('user_care', 'user_help', 'intimate_moment', 'long_interaction',"
-            " 'praise', 'criticized', 'conflict', 'boundary_violation', 'none')",
+            " 'praise', 'warm_moment', 'criticized', 'conflict', 'boundary_violation',"
+            " 'promise_kept', 'promise_broken', 'none')",
             name="ck_relationship_events_type",
         ),
         CheckConstraint(
             "magnitude IN ('weak', 'normal', 'strong')",
             name="ck_relationship_events_magnitude",
+        ),
+        CheckConstraint(
+            "source IN ('conversation', 'memory_replay', 'system')",
+            name="ck_relationship_events_source",
         ),
         Index("idx_relationship_events_user", "user_id", "created_at"),
     )
@@ -184,10 +244,28 @@ class RelationshipStateRow(Base):
     intimacy: Mapped[float] = mapped_column(Float, nullable=False)
     trust: Mapped[float] = mapped_column(Float, nullable=False)
     familiarity: Mapped[float] = mapped_column(Float, nullable=False)
+    respect: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.6, server_default="0.6"
+    )
+    comfort: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.6, server_default="0.6"
+    )
     tension: Mapped[float] = mapped_column(
         Float, nullable=False, default=0.0, server_default="0"
     )
     stage: Mapped[str] = mapped_column(String, nullable=False)
+    conflict_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="none", server_default="none"
+    )
+    neglect_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    last_interaction_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -195,6 +273,11 @@ class RelationshipStateRow(Base):
         CheckConstraint(
             "stage IN ('stranger', 'friend', 'close_friend', 'partner')",
             name="ck_relationship_state_stage",
+        ),
+        CheckConstraint(
+            "conflict_status IN ('none', 'strain', 'conflict', 'cold', 'recovery',"
+            " 'resolved')",
+            name="ck_relationship_state_conflict_status",
         ),
     )
 

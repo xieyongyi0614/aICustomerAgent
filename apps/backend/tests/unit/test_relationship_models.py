@@ -36,10 +36,10 @@ class TestRelationshipStateTension:
 
 
 class TestRelationshipEventType:
-    def test_all_nine_types_valid(self):
+    def test_all_eleven_types_valid(self):
         expected = {
             "user_care", "user_help", "intimate_moment", "long_interaction",
-            "praise", "criticized", "conflict", "boundary_violation", "none",
+            "praise", "criticized", "conflict", "boundary_violation", "promise_kept", "promise_broken", "none",
         }
         assert set(get_args(RelationshipEventType)) == expected
 
@@ -79,6 +79,8 @@ class TestRelationshipEventDeltas:
             "intimacy": 0.0,
             "trust": 0.0,
             "familiarity": 0.0,
+            "respect": 0.0,
+            "comfort": 0.0,
             "tension": 0.0,
         }
 
