@@ -56,6 +56,24 @@ def has_unlock(user_id: str, unlock_key: str) -> bool:
         return any(unlock_key in (row.unlocks or []) for row in rows)
 
 
+def list_unlocks(user_id: str) -> tuple[str, ...]:
+    """聚合该用户所有里程碑解锁的 key 集合（去重有序）。"""
+    with SessionLocal() as session:
+        rows = session.scalars(
+            select(RelationshipMilestoneRow).where(
+                RelationshipMilestoneRow.user_id == user_id
+            )
+        ).all()
+    seen: set[str] = set()
+    result: list[str] = []
+    for row in rows:
+        for key in row.unlocks or []:
+            if key and key not in seen:
+                seen.add(key)
+                result.append(key)
+    return tuple(result)
+
+
 def create_milestone(
     user_id: str,
     milestone_key: str,

@@ -1,6 +1,7 @@
 """V7 AutonomyPolicy（autonomy-policy.md / cooldown.md）：纯函数裁决流水。
 
 (signal, snapshot, config, now) → AutonomyVerdict，八步按序短路，无 IO。
+V8.5 追加 R1~R5 门控（relationship 域规则，纯函数追加收紧/单点放行。
 """
 
 import logging
@@ -25,6 +26,8 @@ _PROACTIVE_GOAL_TYPES = frozenset(PROACTIVE_INTENTION_MAP.keys())
 
 WORLD_PROACTIVE_EVENT_TYPES = frozenset({"interview", "exam"})
 
+STAGE_RANK = {"stranger": 0, "friend": 1, "close_friend": 2, "partner": 3}
+
 
 @dataclass
 class PolicySnapshot:
@@ -40,6 +43,13 @@ class PolicySnapshot:
     goal_degraded: bool = False
     extra_flags: dict = field(default_factory=dict)
     world_facts: dict = field(default_factory=dict)
+    respect: float = 0.60
+    comfort: float = 0.60
+    conflict_status: str = "none"
+    neglect_active: bool = False
+    unlocks: tuple[str, ...] = ()
+    trust: float = 0.35
+    stage: str = "friend"
 
 
 def _parse_hhmm(value: str) -> dt_time | None:
@@ -73,6 +83,8 @@ def effective_interval_minutes(
         base *= 0.5
     elif snapshot.tension > 0.5 and snapshot.selected_goal_type == "relationship":
         base *= 0.5
+    if snapshot.comfort < 0.35:
+        base *= 1.5
     backoff = config.autonomy_backoff_multiplier ** max(snapshot.attempt_count - 1, 0)
     interval = base * backoff
     return max(interval, float(config.autonomy_min_interval_floor_minutes))
@@ -113,6 +125,70 @@ def _apply_world_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot)
     return verdict.model_copy(update={"reason": reason})
 
 
+def _reconciliation_already_used(snapshot: PolicySnapshot) -> bool:
+    """单冲突至多放行一次 reconciliation_check_in（幂等保护，内存 flag，默认关即视为未用）。"""
+    return bool(snapshot.extra_flags.get("reconciliation_attempted", False))
+
+
+def _apply_relationship_rules(
+    verdict: AutonomyVerdict, snapshot: PolicySnapshot, config
+) -> AutonomyVerdict:
+    """V8.5 R1~R5：八步闸门之后追加收紧；R5 放行优先级高于 R3。"""
+    if verdict.decision != "act":
+        return verdict
+    intention = verdict.intention or ""
+    reason = verdict.reason
+    conflict_status = snapshot.conflict_status or "none"
+    unlocks = snapshot.unlocks or ()
+    stage_rank = STAGE_RANK.get(snapshot.stage, 0)
+    friend_rank = STAGE_RANK["friend"]
+    trust = snapshot.trust
+
+    if conflict_status in ("conflict", "cold"):
+        if (
+            intention == "reconciliation_check_in"
+            and "conflict_recovery_available" in unlocks
+            and trust > 0.3
+            and not _reconciliation_already_used(snapshot)
+        ):
+            reason = f"{reason}；R1单和解放行"[:60]
+            return verdict.model_copy(update={"reason": reason})
+        return AutonomyVerdict(
+            decision="ignore",
+            reason=f"{reason}；R1冲突期克制"[:60],
+            trigger=verdict.trigger,
+        )
+
+    if (
+        intention in ("reminder", "followup")
+        and trust < float(config.rel_autonomy_trust_floor)
+    ):
+        if snapshot.neglect_active and stage_rank >= friend_rank:
+            reason = f"{reason}；R5疏远召回覆盖R3"[:60]
+            return verdict.model_copy(update={"reason": reason})
+        return AutonomyVerdict(
+            decision="ignore",
+            reason=f"{reason}；R3信任不足"[:60],
+            trigger=verdict.trigger,
+        )
+
+    from app.character.asuna.relationship_lexicon import INTENT_UNLOCK_REQUIREMENTS
+
+    required_unlock = INTENT_UNLOCK_REQUIREMENTS.get(intention)
+    if required_unlock is not None and required_unlock not in unlocks:
+        return AutonomyVerdict(
+            decision="ignore",
+            reason=f"{reason}；R4解锁未达成"[:60],
+            trigger=verdict.trigger,
+        )
+
+    if snapshot.neglect_active and stage_rank >= friend_rank and intention == "reconnect_check_in":
+        reason = f"{reason}；R5疏远召回"[:60]
+        return verdict.model_copy(update={"reason": reason})
+
+    return verdict
+
+
 def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
@@ -149,4 +225,5 @@ def evaluate(
         goal_id=snapshot.extra_flags.get("goal_id"),
         intention=intention,
     )
-    return _apply_world_adjustments(verdict, snapshot)
+    verdict = _apply_world_adjustments(verdict, snapshot)
+    return _apply_relationship_rules(verdict, snapshot, config)

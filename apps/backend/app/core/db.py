@@ -636,6 +636,44 @@ class RuntimeTraceRow(Base):
     )
 
 
+class RelationshipSnapshotRow(Base):
+    __tablename__ = "relationship_snapshots"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="asuna", server_default="asuna"
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    dimensions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    stage: Mapped[str] = mapped_column(String, nullable=False)
+    conflict_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="none", server_default="none"
+    )
+    trigger: Mapped[str] = mapped_column(
+        String, nullable=False, default="manual", server_default="manual"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('stranger', 'friend', 'close_friend', 'partner')",
+            name="ck_relationship_snapshots_stage",
+        ),
+        CheckConstraint(
+            "conflict_status IN ('none', 'strain', 'conflict', 'cold', 'recovery',"
+            " 'resolved')",
+            name="ck_relationship_snapshots_conflict_status",
+        ),
+        Index(
+            "idx_relationship_snapshots_user_version",
+            "user_id",
+            "version",
+            unique=False,
+        ),
+    )
+
+
 class EvaluationReportRow(Base):
     __tablename__ = "evaluation_reports"
 

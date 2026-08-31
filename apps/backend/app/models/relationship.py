@@ -135,3 +135,15 @@ class ConflictRecord(BaseModel):
     resolved_at: datetime | None = None
     resolution: ConflictResolution = ""
     created_at: datetime
+
+
+class RelationshipSnapshot(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    character_id: str = "asuna"
+    version: int = 0
+    dimensions: dict[str, float] = Field(default_factory=dict)
+    stage: RelationshipStage = "friend"
+    conflict_status: ConflictStatus = "none"
+    trigger: str = "manual"
+    created_at: datetime

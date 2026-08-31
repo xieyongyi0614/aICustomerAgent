@@ -303,3 +303,170 @@ def get_proactive_evaluation(action_id: str):
     if report is None:
         raise HTTPException(status_code=404, detail="评估报告不存在或已过期")
     return report.model_dump(mode="json")
+
+
+@debug_router.get("/debug/relationship/state")
+def get_relationship_state(user_id: str):
+    from datetime import datetime
+    from app.repositories import (
+        relationship_milestone_repository,
+        relationship_repository,
+    )
+    from app.services.relationship_evolution import distance_index
+
+    state = relationship_repository.get_relationship(user_id)
+    unlocks = relationship_milestone_repository.list_unlocks(user_id)
+    now = datetime.now()
+    distance = distance_index(state, now)
+    return {
+        "user_id": user_id,
+        "state": state.model_dump(mode="json"),
+        "unlocks": list(unlocks),
+        "derived": {
+            "distance_index": round(distance, 4),
+        },
+    }
+
+
+@debug_router.get("/debug/relationship/timeline")
+def get_relationship_timeline(user_id: str, limit: int = 50):
+    from app.repositories import (
+        relationship_conflict_repository,
+        relationship_event_repository,
+        relationship_milestone_repository,
+        relationship_snapshot_repository,
+    )
+
+    limit_clamped = max(1, min(limit, 200))
+    events = relationship_event_repository.list_events(user_id, limit=limit_clamped)
+    milestones = relationship_milestone_repository.list_milestones(user_id)[:limit_clamped]
+    conflicts = relationship_conflict_repository.list_conflicts(user_id, limit=limit_clamped)
+    snapshots = relationship_snapshot_repository.list_snapshots(user_id, limit=limit_clamped)
+
+    merged: list[dict] = []
+    for e in events:
+        merged.append(
+            {
+                "kind": "event",
+                "at": e.created_at.isoformat(),
+                "type": e.type,
+                "magnitude": e.magnitude,
+                "source": e.source,
+                "cause": e.cause,
+                "impact": e.impact.model_dump(mode="json"),
+                "id": e.id,
+            }
+        )
+    for m in milestones:
+        merged.append(
+            {
+                "kind": "milestone",
+                "at": m.created_at.isoformat(),
+                "key": m.milestone_key,
+                "period_key": m.period_key,
+                "title": m.title,
+                "unlocks": list(m.unlocks),
+                "bonus": m.applied_bonus.model_dump(mode="json"),
+                "id": m.id,
+            }
+        )
+    for c in conflicts:
+        merged.append(
+            {
+                "kind": "conflict",
+                "at": c.started_at.isoformat(),
+                "status": c.status,
+                "resolution": c.resolution,
+                "resolved_at": c.resolved_at.isoformat() if c.resolved_at else None,
+                "id": c.id,
+            }
+        )
+    for s in snapshots:
+        merged.append(
+            {
+                "kind": "snapshot",
+                "at": s.created_at.isoformat(),
+                "version": s.version,
+                "stage": s.stage,
+                "conflict_status": s.conflict_status,
+                "trigger": s.trigger,
+                "dimensions": s.dimensions,
+                "id": s.id,
+            }
+        )
+    merged.sort(key=lambda r: r["at"], reverse=True)
+    return {"user_id": user_id, "items": merged[:limit_clamped]}
+
+
+@debug_router.post("/debug/relationship/rollback")
+def rollback_relationship(user_id: str, target_version: int):
+    from datetime import datetime
+
+    from app.repositories import (
+        relationship_event_repository,
+        relationship_repository,
+        relationship_snapshot_repository,
+    )
+    from app.services import relationship_evolution
+
+    earliest = relationship_snapshot_repository.get_earliest_version(user_id)
+    if earliest is None:
+        raise HTTPException(status_code=404, detail="无可用关键帧，无法回滚")
+    if target_version < earliest:
+        raise HTTPException(
+            status_code=400,
+            detail=f"target_version 早于最早关键帧 {earliest}",
+        )
+    current = relationship_repository.get_relationship(user_id)
+    now = datetime.now()
+    try:
+        relationship_snapshot_repository.create_snapshot(
+            user_id,
+            current.version,
+            current,
+            trigger="manual_pre_rollback",
+            now=now,
+        )
+    except Exception:
+        pass
+    anchor = relationship_snapshot_repository.get_latest_before(user_id, target_version)
+    if anchor is None:
+        raise HTTPException(status_code=404, detail="无法定位 ≤ target_version 的关键帧")
+    from app.models.relationship import RelationshipState
+
+    base_state = RelationshipState(
+        intimacy=anchor.dimensions.get("intimacy", current.intimacy),
+        trust=anchor.dimensions.get("trust", current.trust),
+        familiarity=anchor.dimensions.get("familiarity", current.familiarity),
+        respect=anchor.dimensions.get("respect", current.respect),
+        comfort=anchor.dimensions.get("comfort", current.comfort),
+        tension=anchor.dimensions.get("tension", current.tension),
+        stage=anchor.stage,
+        conflict_status=anchor.conflict_status,
+        neglect_active=current.neglect_active,
+        last_interaction_at=current.last_interaction_at,
+        version=anchor.version,
+        updated_at=now,
+    )
+    all_events = relationship_event_repository.list_events(user_id, limit=2000)
+    anchor_time = anchor.created_at
+    replayable = [e for e in all_events if e.created_at > anchor_time]
+    rebuilt = relationship_evolution.replay(base_state, replayable)
+    final = rebuilt.model_copy(
+        update={"version": max(current.version, rebuilt.version) + 1, "updated_at": now}
+    )
+    persisted = relationship_repository.upsert_relationship(user_id, final)
+    relationship_snapshot_repository.create_snapshot(
+        user_id,
+        final.version,
+        final,
+        trigger="manual",
+        now=now,
+    )
+    return {
+        "user_id": user_id,
+        "target_version": target_version,
+        "anchor_version": anchor.version,
+        "replayed_events": len(replayable),
+        "final_state": persisted.model_dump(mode="json"),
+    }

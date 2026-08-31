@@ -7,6 +7,7 @@ observe_budget 为输出侧只读统计（V6.5-010），不阻塞不重写。
 
 import logging
 import re
+from dataclasses import dataclass
 
 from app.character.asuna.behavior_policy import BEHAVIOR_POLICY, STRATEGY_INSTRUCTIONS
 from app.models.behavior_strategy import (
@@ -67,6 +68,28 @@ HABIT_SAME_DIRECTION: dict[str, frozenset[str]] = {
 SCENE_ADVANCING_INTENTS = frozenset(
     {"request_action", "continue_scene", "correct_scene", "interrupt"}
 )
+
+SOCIAL_COMFORT_STRATEGIES = frozenset(
+    {
+        "affectionate_expression",
+        "warm_celebration",
+        "playful_tease",
+        "direct_support",
+        "curious_inquiry",
+        "self_disclosure",
+    }
+)
+
+STAGE_RANK = {"stranger": 0, "friend": 1, "close_friend": 2, "partner": 3}
+
+
+@dataclass
+class RelationshipBehaviorContext:
+    stage: str = "friend"
+    comfort: float = 0.6
+    respect: float = 0.6
+    conflict_status: str = "none"
+    unlocks: tuple[str, ...] = ()
 
 
 def classify_activity(scene_state) -> tuple[str, str | None]:
@@ -200,15 +223,62 @@ def _degraded_directive(analysis=None) -> BehaviorDirective:
     )
 
 
+def _apply_relationship_modifiers(
+    strategy: BehaviorStrategyType,
+    budget: ActionBudget,
+    rules: list[str],
+    ctx: RelationshipBehaviorContext | None,
+) -> tuple[BehaviorStrategyType, ActionBudget, list[str]]:
+    """B1~B5（behavior-integration.md §4）：relationship_ctx=None 时原样返回。"""
+    if ctx is None:
+        return strategy, budget, rules
+    updated_rules = list(rules)
+    max_desc = budget.max_action_desc
+    if ctx.conflict_status in ("conflict", "cold") and strategy in SOCIAL_COMFORT_STRATEGIES:
+        strategy = "reserved_distance"
+        max_desc = max_desc // 2
+        updated_rules.append("B1_conflict_restrained")
+    if ctx.comfort < 0.35:
+        max_desc = max(0, max_desc - 1)
+        updated_rules.append("B2_low_comfort")
+    if ctx.respect < 0.40 and strategy in (
+        "affectionate_expression",
+        "playful_tease",
+        "warm_celebration",
+    ):
+        strategy = "natural_continuation"
+        updated_rules.append("B3_low_respect")
+    if STAGE_RANK.get(ctx.stage, 0) >= STAGE_RANK["close_friend"] and ctx.comfort > 0.7:
+        max_desc = max_desc + 1
+        if strategy == "reserved_distance":
+            strategy = "natural_continuation"
+        updated_rules.append("B4_high_comfort")
+    if (
+        "deep_commitment_language" not in ctx.unlocks
+        and strategy == "affectionate_expression"
+        and ctx.stage == "partner"
+    ):
+        strategy = "natural_continuation"
+        updated_rules.append("B5_locked_commitment")
+    return (
+        strategy,
+        budget.model_copy(update={"max_action_desc": max_desc}),
+        updated_rules,
+    )
+
+
 def resolve(
     intention,
     state,
     scene_ctx: SceneContext | None,
     mode: str,
     analysis=None,
+    relationship_ctx: RelationshipBehaviorContext | None = None,
 ) -> BehaviorDirective:
     try:
-        return _resolve(intention, state, scene_ctx, mode, analysis)
+        return _resolve(
+            intention, state, scene_ctx, mode, analysis, relationship_ctx
+        )
     except Exception:
         logger.exception("behavior_engine 解析失败，降级默认 directive")
         return _degraded_directive(analysis)
@@ -220,6 +290,7 @@ def _resolve(
     scene_ctx: SceneContext | None,
     mode: str,
     analysis=None,
+    relationship_ctx: RelationshipBehaviorContext | None = None,
 ) -> BehaviorDirective:
     if intention is None or getattr(intention, "degraded", False):
         directive = _degraded_directive(analysis)
@@ -251,6 +322,9 @@ def _resolve(
         strategy_value,
         scene_ctx,
         character.intensity,
+    )
+    strategy_value, budget, rules = _apply_relationship_modifiers(
+        strategy_value, budget, rules, relationship_ctx
     )
     strategy = BehaviorStrategy(
         strategy=strategy_value,

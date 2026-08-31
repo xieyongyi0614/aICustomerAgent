@@ -382,6 +382,50 @@ def _run_relationship_subsystems(
     if candidates:
         relationship_memory.deliver_candidates(candidates, user_id)
 
+    _capture_snapshot_if_needed(
+        user_id,
+        state_before=before,
+        state_after=updated,
+        stage_before=stage_before,
+        conflict_transition=conflict_outcome.transition,
+        new_milestones=milestone_records,
+        now=now,
+    )
+
+
+def _capture_snapshot_if_needed(
+    user_id: str,
+    state_before,
+    state_after,
+    stage_before: str,
+    conflict_transition: tuple | None,
+    new_milestones: list,
+    now: datetime,
+) -> None:
+    """persistence.md §6：stage 跃迁 / 里程碑命中 / 冲突迁移 → 写关键帧，限频 20。"""
+    from app.repositories import relationship_snapshot_repository
+
+    trigger: str | None = None
+    if stage_before != state_after.stage:
+        trigger = f"stage_transition:{stage_before}→{state_after.stage}"
+    elif conflict_transition is not None:
+        old_status, new_status = conflict_transition
+        trigger = f"conflict:{old_status}→{new_status}"
+    elif new_milestones:
+        trigger = f"milestone:{new_milestones[0].milestone_key}"
+    if trigger is None:
+        return
+    try:
+        relationship_snapshot_repository.create_snapshot(
+            user_id,
+            version=state_after.version,
+            state=state_after,
+            trigger=trigger,
+            now=now,
+        )
+    except Exception:
+        pass
+
 
 def _conflict_exists(record) -> bool:
     from app.repositories import relationship_conflict_repository

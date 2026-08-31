@@ -118,6 +118,8 @@ class Settings(BaseSettings):
     rel_conflict_recover_positive: int = 2
     rel_neglect_days_json: str = '{"stranger": 7, "friend": 5, "close_friend": 3, "partner": 2}'
     rel_tension_daily_decay: float = 0.02
+    rel_autonomy_trust_floor: float = 0.45
+    rel_snapshot_keep: int = 20
     conversation_max_messages: int = 20
     conversation_max_chars: int = 8000
 

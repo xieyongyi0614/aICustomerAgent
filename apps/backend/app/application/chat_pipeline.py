@@ -263,8 +263,29 @@ async def run_chat_pipeline(
     )
 
     behavior_started = time.perf_counter()
+    relationship_ctx = None
+    try:
+        from app.repositories import relationship_milestone_repository
+        from app.services.behavior_engine import RelationshipBehaviorContext
+
+        unlocks = relationship_milestone_repository.list_unlocks(state.user_id)
+        rel = state.relationship_state
+        relationship_ctx = RelationshipBehaviorContext(
+            stage=rel.stage,
+            comfort=getattr(rel, "comfort", 0.6),
+            respect=getattr(rel, "respect", 0.6),
+            conflict_status=getattr(rel, "conflict_status", "none") or "none",
+            unlocks=unlocks,
+        )
+    except Exception:
+        relationship_ctx = None
     behavior_ctx = behavior_engine.resolve(
-        validated_intention, state, scene_ctx, mode_decision.effective, turn
+        validated_intention,
+        state,
+        scene_ctx,
+        mode_decision.effective,
+        turn,
+        relationship_ctx=relationship_ctx,
     )
     trace.record(
         "behavior_engine",

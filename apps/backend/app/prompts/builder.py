@@ -12,6 +12,14 @@ from app.character.asuna import (
     STAGE_LABELS,
     describe_level,
 )
+from app.character.asuna.relationship_lexicon import (
+    CONFLICT_DIRECTIVES,
+    DEFAULT_COMFORT,
+    DEFAULT_RESPECT,
+    NEGLECT_RETURN_NOTE,
+    describe_comfort,
+    describe_respect,
+)
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.core.settings import get_settings
@@ -38,10 +46,36 @@ EXPRESS_EMOTION_RULE = (
 
 TENSION_FREEZE_RULE = "最近气氛有些紧张，对话中保持一点距离感，直到氛围缓和。"
 
+_MID_BAND = (0.4, 0.7)
+
 
 def _literal(text: str) -> str:
     """转义花括号，使动态内容不被 ChatPromptTemplate 当作模板变量。"""
     return text.replace("{", "{{").replace("}", "}}")
+
+
+def _append_within_budget(section: str, lines: list[str], budget: int) -> str:
+    result = section
+    for line in lines:
+        candidate = f"{result}\n{line}"
+        if len(candidate) > budget:
+            break
+        result = candidate
+    return result
+
+
+def _safe_recent_milestone_title(user_id: str) -> str | None:
+    try:
+        from app.repositories import relationship_milestone_repository
+        from app.services.relationship_milestone import MILESTONES
+
+        worthy = {spec.key for spec in MILESTONES if spec.memory_worthy}
+        for record in relationship_milestone_repository.list_milestones(user_id):
+            if record.milestone_key in worthy and record.title:
+                return record.title[:30]
+    except Exception:
+        return None
+    return None
 
 
 class PromptBuilder:
@@ -94,7 +128,11 @@ class PromptBuilder:
         )
 
     @staticmethod
-    def build_relationship_section(state: ConversationState) -> str:
+    def build_relationship_section(
+        state: ConversationState,
+        *,
+        recent_milestone_title: str | None = None,
+    ) -> str:
         relationship = state.relationship_state
         label = STAGE_LABELS.get(relationship.stage, STAGE_LABELS["friend"])
         description = STAGE_DESCRIPTIONS.get(
@@ -114,9 +152,27 @@ class PromptBuilder:
             f"熟悉：{describe_level(relationship.familiarity)}\n"
             f"紧张度：{tension_tier}（{tension:.1f}）"
         )
-        if tension > 0.5:
+        conflict_status = getattr(relationship, "conflict_status", "none") or "none"
+        conflict_line = CONFLICT_DIRECTIVES.get(conflict_status)
+        show_freeze = tension > 0.5 and conflict_line is None
+        if show_freeze:
             section += f"\n{TENSION_FREEZE_RULE}"
-        return section
+
+        extras: list[str] = []
+        if conflict_line is not None:
+            extras.append(conflict_line)
+        if getattr(relationship, "neglect_active", False):
+            extras.append(NEGLECT_RETURN_NOTE)
+        if recent_milestone_title:
+            extras.append(f"你们最近一起经历了：{recent_milestone_title}")
+        respect = getattr(relationship, "respect", DEFAULT_RESPECT)
+        comfort = getattr(relationship, "comfort", DEFAULT_COMFORT)
+        low, high = _MID_BAND
+        if not (low <= respect <= high) or not (low <= comfort <= high):
+            extras.append(
+                f"尊重：{describe_respect(respect)}　自在：{describe_comfort(comfort)}"
+            )
+        return _append_within_budget(section, extras, RELATIONSHIP_BUDGET_CHARS)
 
     @staticmethod
     def build_behavior_section(analysis: TurnAnalysis) -> str:
@@ -167,10 +223,15 @@ class PromptBuilder:
         identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
         state_sections: list[str] = []
         if analysis is not None:
+            milestone_title = _safe_recent_milestone_title(state.user_id)
             state_sections = [
                 _literal(PromptBuilder.build_emotion_section(state)),
                 _literal(PromptBuilder.build_character_state_section(state)),
-                _literal(PromptBuilder.build_relationship_section(state)),
+                _literal(
+                    PromptBuilder.build_relationship_section(
+                        state, recent_milestone_title=milestone_title
+                    )
+                ),
             ]
         tail_sections: list[str] = []
         if world_text:

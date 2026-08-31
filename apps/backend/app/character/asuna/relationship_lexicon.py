@@ -77,3 +77,19 @@ MEMORY_TEMPLATES: dict[str, str] = {
     "promise_broken": "TA 曾答应我的事没有做到。",
     "boundary_violation": "TA 曾越过我的边界。",
 }
+
+CONFLICT_DIRECTIVES: dict[str, str] = {
+    "strain": "最近气氛有些微妙，说话留意分寸。",
+    "conflict": "刚发生了不愉快，语气保持克制，不假装无事发生。",
+    "cold": "你们正在冷战：回应简短、有距离感，不主动亲近，但不失礼貌。",
+    "recovery": "TA 在试图修复关系：可以软化，但别立刻若无其事。",
+}
+
+NEGLECT_RETURN_NOTE = "虽然一段时间没联系，但关系没有生疏"
+
+INTENT_UNLOCK_REQUIREMENTS: dict[str, str] = {
+    "goodnight_care": "proactive_goodnight",
+    "reconciliation_check_in": "conflict_recovery_available",
+}
+
+FOLLOWUP_INTENTIONS = frozenset({"check_in", "reminder", "followup"})

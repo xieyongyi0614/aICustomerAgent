@@ -52,6 +52,7 @@ def _snapshot_for(
     user_id: str, session_id: str, now: datetime, episode_start: datetime
 ):
     from app.application.chat_pipeline import active_generations
+    from app.repositories import relationship_milestone_repository
 
     character, relationship = state_service.load_states(user_id)
     scene_state = scene_service.load(session_id)
@@ -72,6 +73,10 @@ def _snapshot_for(
         user_id,
         episode_start=episode_start,
     )
+    try:
+        unlocks = relationship_milestone_repository.list_unlocks(user_id)
+    except Exception:
+        unlocks = ()
     return autonomy_policy.PolicySnapshot(
         generating=active_generations.get(user_id, False),
         has_active_action=proactive_repository.has_non_terminal(user_id),
@@ -87,6 +92,13 @@ def _snapshot_for(
         goal_degraded=selected.goal is None,
         extra_flags={"goal_id": selected.goal.id if selected.goal is not None else None},
         world_facts=world_engine.collect_facts(user_id),
+        respect=getattr(relationship, "respect", 0.6),
+        comfort=getattr(relationship, "comfort", 0.6),
+        conflict_status=getattr(relationship, "conflict_status", "none") or "none",
+        neglect_active=bool(getattr(relationship, "neglect_active", False)),
+        unlocks=unlocks,
+        trust=relationship.trust,
+        stage=relationship.stage,
     )
 
 
