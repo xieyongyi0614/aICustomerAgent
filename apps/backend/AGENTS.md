@@ -40,8 +40,12 @@ api → application（编排） → services → repositories → core
 
 ## 测试约定
 
-- `pytest` + `pytest-asyncio`，fixture 在 `tests/conftest.py`；全量约 858 项，目录分层 `unit / integration / e2e / golden`。
+- 完整规范见 `docs/TESTING.md`（marker、执行级别、AI Coding 测试规则）。
+- `pytest` + `pytest-asyncio`，fixture 在 `tests/conftest.py`；目录分层 `unit / integration / e2e / golden / evaluation / v7.8 / v8 / v8.5`。
+- **AI 修改代码后禁止默认执行全量 `pytest`**：必须先 Focused Test → Module Test → 必要时 Fast Test（`pytest -m "unit or api"`）。
+- marker（`unit / api / integration / e2e / golden / slow`）由 `tests/conftest.py::pytest_collection_modifyitems` 自动打标，新测试无需手写。
 - **测试禁止真实 LLM 调用**：用 `core/llm_factory.set_llm(mock)` 注入 FakeLLM（结构化输出按 schema 类名分发）。
 - 单元 / 集成 / e2e 测试 DB 用内存 SQLite（`sqlite:///:memory:`），每测试独立建表；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL。
 - golden prompt 快照回归：`tests/golden/` + `tests/unit/test_prompt_golden.py`，`UPDATE_GOLDEN=1` 重新生成。
+- 慢测试加入 `conftest.py` 的 `SLOW_TEST_FILES`（或 `@pytest.mark.slow`），日常开发用 `-m "not slow"` 排除。
 - 全量回归保持零失败后才可 commit。

@@ -33,3 +33,11 @@ init-hook = "import sys, os; cwd = os.getcwd(); candidates = [os.path.join(cwd, 
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-n auto --dist loadscope"
+markers = [
+  "unit: 纯逻辑单测（无 DB / 无 HTTP / 无网络，FakeLLM 允许）",
+  "api: FastAPI Router 层测试（httpx ASGITransport + FakeLLM + 内存 SQLite）",
+  "integration: 涉及 DB / 迁移 / 多模块协作（需真实 PG 的测试无实例时自动 skip）",
+  "e2e: 完整业务流程（HTTP 全链路）",
+  "golden: prompt 快照回归（UPDATE_GOLDEN=1 重新生成）",
+  "slow: 慢测试（本地 SSE server 线程 / 大量轮询），日常开发默认排除",
+]

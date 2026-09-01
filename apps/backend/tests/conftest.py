@@ -6,6 +6,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
 os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
+# 世界/lifespan 循环的 DB 访问已由 autouse _offline_repos 落到内存 SQLite，无需再关闭 world。
 os.environ.setdefault(
     "LLM_PROFILES_JSON",
     '[{"id":"longcat","label":"LongCat (test)","base_url":"https://example.invalid/v1","model":"fake","api_key":"test"}]',
@@ -49,6 +50,27 @@ from app.repositories import (
 )
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
+
+_REPO_MODULES = (
+    conversation_repository,
+    summary_repository,
+    memory_repository,
+    character_state_repository,
+    relationship_repository,
+    relationship_event_repository,
+    emotion_history_repository,
+    scene_state_repository,
+    goal_repository,
+    proactive_repository,
+    evaluation_repository,
+    trace_repository,
+    llm_call_repository,
+    prompt_snapshot_repository,
+    decision_repository,
+    world_repository,
+    relationship_milestone_repository,
+    relationship_conflict_repository,
+)
 
 
 def chat_post_process_tasks():
@@ -150,35 +172,23 @@ def llm_override():
     app.dependency_overrides.pop(get_chat_llm, None)
 
 
-@pytest.fixture
-def db_session_factory(monkeypatch):
+@pytest.fixture(autouse=True)
+def _offline_repos(monkeypatch):
+    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 的 SessionLocal 指向内存 SQLite。
+
+    修复根因B：PromptBuilder.build(analysis=...) 等“纯单测”隐含访问
+    relationship_milestone_repository.SessionLocal，若不替换则连真实 PostgreSQL(.env) 而挂起。
+    """
+    if os.environ.get("TEST_USE_POSTGRES") == "1":
+        yield None
+        return
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(engine)
-    monkeypatch.setattr(conversation_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(summary_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(character_state_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(relationship_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(relationship_event_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(emotion_history_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(scene_state_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(goal_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(proactive_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(evaluation_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(trace_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(llm_call_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(prompt_snapshot_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(decision_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(world_repository, "SessionLocal", testing_session)
-    monkeypatch.setattr(
-        relationship_milestone_repository, "SessionLocal", testing_session
-    )
-    monkeypatch.setattr(
-        relationship_conflict_repository, "SessionLocal", testing_session
-    )
+    for repo in _REPO_MODULES:
+        monkeypatch.setattr(repo, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while (
@@ -192,6 +202,11 @@ def db_session_factory(monkeypatch):
     chat_post_process.reset_user_write_locks()
     Base.metadata.drop_all(engine)
     engine.dispose()
+
+
+@pytest.fixture
+def db_session_factory(_offline_repos):
+    return _offline_repos
 
 
 @pytest.fixture
@@ -260,3 +275,60 @@ def override_settings(monkeypatch):
 
     yield _apply
     get_settings.cache_clear()
+
+
+SLOW_TEST_FILES = {
+    # 慢测试：本地 SSE server 线程 / 轮询等待。
+    "test_chat_http_integration.py",
+    "test_turn_meta_stream.py",
+    "test_goal_e2e.py",
+    # TestClient(app) 全应用 E2E / strict 需要真实 PostgreSQL 的迁移类。
+    # (旧疑 TestClient+lifespan 挂起，实为世界维护循环连真实 PG；已由 autouse _offline_repos 修复，非版本问题。)
+    "test_e2e.py",
+    "test_debug_decisions.py",
+    "test_debug_evaluation.py",
+    "test_debug_proactive_correlation.py",
+    "test_debug_state_history.py",
+    "test_log_redaction.py",
+    "test_memory_e2e.py",
+    "test_proactive_api.py",
+    "test_state_e2e.py",
+    "test_v65_matrix.py",
+    "test_activity_continuity.py",
+    "test_autonomy_matrix.py",
+    "test_behavior_pipeline.py",
+    "test_mode_persistence.py",
+    "test_db_migration.py",
+}
+GOLDEN_TEST_FILES = {"test_prompt_golden.py"}
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        path = item.path.as_posix().replace("\\", "/")
+        filename = item.path.name
+        fixtures = set(item.fixturenames or ())
+        if filename in GOLDEN_TEST_FILES:
+            item.add_marker(pytest.mark.golden)
+            item.add_marker(pytest.mark.unit)
+            continue
+        if "db_session_factory" in fixtures:
+            item.add_marker(pytest.mark.integration)
+        if "asgi_transport" in fixtures or "ASGITransport" in path or "/tests/e2e/" in path:
+            item.add_marker(pytest.mark.api)
+            if "/tests/e2e/" in path:
+                item.add_marker(pytest.mark.e2e)
+        own_markers = {
+            m.name
+            for m in item.iter_markers()
+            if m.name in {"unit", "api", "integration", "e2e", "golden"}
+        }
+        if not own_markers:
+            if "/tests/unit/" in path:
+                item.add_marker(pytest.mark.unit)
+            elif "/tests/integration/" in path:
+                item.add_marker(pytest.mark.integration)
+            else:
+                item.add_marker(pytest.mark.integration)
+        if filename in SLOW_TEST_FILES:
+            item.add_marker(pytest.mark.slow)
