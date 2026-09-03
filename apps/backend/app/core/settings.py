@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     action_llm_assist_sample_rate: float = 0.0
     action_plan_max_steps: int = 1
     action_plan_expires_minutes: int = 5
+    action_plan_expiry_hours: int = 24
     action_max_active_per_user: int = 5
     action_dedupe_window_hours: int = 24
     action_execution_timeout_seconds: int = 10
@@ -224,7 +225,8 @@ class Settings(BaseSettings):
     evaluation_fail_score: float = 0.6
     evaluation_warn_score: float = 0.85
     evaluation_overall_weights_json: str = (
-        '{"turn": {"persona": 0.35, "emotion": 0.20, "memory": 0.20, "behavior": 0.25},'
+        '{"turn": {"persona": 0.30, "emotion": 0.18, "memory": 0.18,'
+        ' "behavior": 0.24, "action": 0.10},'
         ' "proactive_action": {"autonomy": 0.60, "persona": 0.40}}'
     )
     evaluation_behavior_monotony_window: int = 5
@@ -238,6 +240,7 @@ class Settings(BaseSettings):
     evaluation_retention_days: int = 30
     evaluation_world_consistency_enabled: bool = True
     evaluation_relationship_enabled: bool = True
+    evaluation_action_enabled: bool = True
     evaluation_max_digest_chars: int = 2000
 
     observability_persist_enabled: bool = True

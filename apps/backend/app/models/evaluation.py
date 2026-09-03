@@ -27,6 +27,7 @@ class EvaluationDimension(StrEnum):
     BEHAVIOR = "behavior"
     AUTONOMY = "autonomy"
     RELATIONSHIP = "relationship"
+    ACTION = "action"
 
 
 class EvaluationSubjectKind(StrEnum):
@@ -66,6 +67,9 @@ class IssueCode(StrEnum):
     RELATIONSHIP_UNCAUSED_CHANGE = "relationship_uncaused_change"
     RELATIONSHIP_RATE_VIOLATION = "relationship_rate_violation"
     CONFLICT_STATE_INVALID = "conflict_state_invalid"
+    ACTION_OVERCLAIM = "action_overclaim"
+    ACTION_FAILED_UNREPORTED = "action_failed_unreported"
+    ACTION_PLAN_MISMATCH = "action_plan_mismatch"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -93,6 +97,9 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.RELATIONSHIP_UNCAUSED_CHANGE: IssueSeverity.CRITICAL,
     IssueCode.RELATIONSHIP_RATE_VIOLATION: IssueSeverity.WARNING,
     IssueCode.CONFLICT_STATE_INVALID: IssueSeverity.CRITICAL,
+    IssueCode.ACTION_OVERCLAIM: IssueSeverity.WARNING,
+    IssueCode.ACTION_FAILED_UNREPORTED: IssueSeverity.INFO,
+    IssueCode.ACTION_PLAN_MISMATCH: IssueSeverity.WARNING,
 }
 
 ISSUE_MESSAGES: dict[IssueCode, str] = {
@@ -120,6 +127,9 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.RELATIONSHIP_UNCAUSED_CHANGE: "关系状态变化无法对账到账本/里程碑/结算",
     IssueCode.RELATIONSHIP_RATE_VIOLATION: "关系维度当日累计超出日上限",
     IssueCode.CONFLICT_STATE_INVALID: "冲突状态机出现非法迁移或状态行不一致",
+    IssueCode.ACTION_OVERCLAIM: "回复宣称行动完成但缺少对应的 succeeded ActionRecord",
+    IssueCode.ACTION_FAILED_UNREPORTED: "近期存在失败且未补救的重要委托行动，本轮触及同主题但未闭环",
+    IssueCode.ACTION_PLAN_MISMATCH: "检出意图与回复语义无关或闸门频繁否决同型意图",
 }
 
 

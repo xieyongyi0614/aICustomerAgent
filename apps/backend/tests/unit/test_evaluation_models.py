@@ -22,7 +22,7 @@ from app.models.evaluation import (
 )
 from app.models.evaluation import DimensionScore
 
-ISSUE_CODE_COUNT = 24
+ISSUE_CODE_COUNT = 27
 
 
 def make_issue(code: IssueCode, severity: IssueSeverity | None = None) -> Issue:
@@ -137,7 +137,9 @@ def test_settings_evaluation_defaults(monkeypatch):
         assert settings.evaluation_penalty_critical == 0.4
         assert settings.evaluation_max_digest_chars == 2000
         weights = settings.evaluation_overall_weights("turn")
-        assert weights["persona"] == pytest.approx(0.35)
+        assert weights["persona"] == pytest.approx(0.30)
+        assert weights["action"] == pytest.approx(0.10)
+        assert sum(weights.values()) == pytest.approx(1.0)
         assert settings.evaluation_overall_weights("proactive_action")["autonomy"] == pytest.approx(0.6)
     finally:
         get_settings.cache_clear()

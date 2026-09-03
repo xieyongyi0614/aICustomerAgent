@@ -38,6 +38,9 @@ TRACE_STEP_NAMES = (
     "evaluation_judge",
     "world_context",
     "world_update",
+    "action_detect",
+    "action_execute",
+    "action_planning",
 )
 
 _BACKGROUND_STEPS = (

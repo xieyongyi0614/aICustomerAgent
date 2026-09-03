@@ -107,6 +107,7 @@ def to_dimension_scores(
     }
 
 
+from app.services.evaluation_rules import action as _action  # noqa: E402
 from app.services.evaluation_rules import autonomy as _autonomy  # noqa: E402
 from app.services.evaluation_rules import behavior as _behavior  # noqa: E402
 from app.services.evaluation_rules import emotion as _emotion  # noqa: E402
@@ -121,6 +122,7 @@ RULES: list[EvaluationRule] = [
     *_memory.RULES,
     *_autonomy.RULES,
     *_relationship.RULES,
+    *_action.RULES,
 ]
 
 __all__ = [

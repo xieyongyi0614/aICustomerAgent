@@ -45,6 +45,7 @@ class PostProcessContext:
     selected_goal: object | None = None
     intention: object | None = None
     behavior: object | None = None
+    action_intent: object | None = None
 
 
 async def run_scene_update(ctx: PostProcessContext) -> None:
@@ -209,6 +210,50 @@ async def run_world_update(ctx: PostProcessContext) -> None:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
 
 
+async def run_action_planning(ctx: PostProcessContext) -> None:
+    """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。"""
+    if not get_settings().action_enabled:
+        return
+    from app.models.action import ActionIntent
+
+    action_intent = ctx.action_intent
+    if action_intent is None:
+        return
+    if isinstance(action_intent, dict):
+        try:
+            action_intent = ActionIntent.model_validate(action_intent)
+        except Exception:
+            logger.exception("行动意图反序列化失败，跳过第 9 步")
+            return
+    started = time.perf_counter()
+    try:
+        from app.application.action_engine import run_action_planning as _run
+
+        selected_goal = ctx.selected_goal
+        goal_id = None
+        if selected_goal is not None:
+            goal = getattr(selected_goal, "goal", None)
+            if goal is not None:
+                goal_id = getattr(goal, "id", None)
+        await _run(
+            ctx.user_id,
+            action_intent,
+            session_id=ctx.session_id,
+            goal_id=goal_id,
+        )
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "action_planning",
+                (time.perf_counter() - started) * 1000,
+            )
+    except Exception:
+        logger.exception("行动规划步骤异常（双保险，不应触达）")
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "action_planning", 0.0, "error", error="action planning crashed"
+            )
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
@@ -218,6 +263,7 @@ STEP_HANDLERS = (
     run_budget_observer,
     run_evaluation,
     run_world_update,
+    run_action_planning,
 )
 
 
@@ -255,6 +301,7 @@ def schedule_post_process(
     selected_goal=None,
     intention=None,
     behavior=None,
+    action_intent=None,
 ) -> None:
     ctx = PostProcessContext(
         session_id=session_id,
@@ -271,6 +318,7 @@ def schedule_post_process(
         selected_goal=selected_goal,
         intention=intention,
         behavior=behavior,
+        action_intent=action_intent,
     )
     task = asyncio.create_task(run_post_process(ctx))
     background_tasks.add(task)

@@ -94,6 +94,20 @@ class RelationshipSlice:
 
 
 @dataclass
+class ActionSlice:
+    records: list = field(default_factory=list)
+    intent: dict | None = None
+
+    def has_succeeded(self, action_type: str, session_id: str | None = None) -> bool:
+        return any(
+            r.get("action_type") == action_type
+            and r.get("status") == "succeeded"
+            and (session_id is None or r.get("session_id") == session_id)
+            for r in self.records
+        )
+
+
+@dataclass
 class EvaluationContext:
     subject: str
     subject_id: str
@@ -115,6 +129,7 @@ class EvaluationContext:
     fidelity: str = "live"
     world: dict | None = None
     relationship: RelationshipSlice | None = None
+    action: ActionSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:
@@ -145,7 +160,26 @@ def collect_turn_context(ctx) -> EvaluationContext:
         context.behavior_history = _collect_behavior_history(ctx.session_id, settings)
     context.world = _collect_world(ctx.user_id)
     context.relationship = _collect_relationship(ctx.user_id)
+    context.action = _collect_action(ctx.user_id)
     return context
+
+
+def _collect_action(user_id: str) -> ActionSlice | None:
+    """V9 行动审计切片（只读）：缺席为 None = action 规则全部跳过。"""
+    try:
+        from app.repositories import action_repository
+
+        if not get_settings().action_enabled:
+            return None
+        records = action_repository.list_records(user_id, limit=20)
+        if not records:
+            return None
+        return ActionSlice(
+            records=[r.model_dump(mode="json") for r in records],
+        )
+    except Exception:
+        logger.exception("行动切片读取失败，action 规则降级")
+        return None
 
 
 def _collect_relationship(user_id: str) -> RelationshipSlice | None:

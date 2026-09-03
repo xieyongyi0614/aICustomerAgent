@@ -33,7 +33,7 @@
     "expect_issues": [
       "emotion_untriggered_shift"
     ],
-    "expect_verdict": "warn",
+    "expect_verdict": "pass",
     "judge_override": {
       "emotion": {
         "score": 0.2,

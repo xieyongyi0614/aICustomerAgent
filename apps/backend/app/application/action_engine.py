@@ -5,6 +5,7 @@ execute_plan → integrate_result。全部发生在 post_process 第 9 步（per
 或重试维护循环中。只做调度与容错，检出/闸门/执行逻辑在 services。
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -207,3 +208,110 @@ async def run_action_planning(
         record.updated_at = _now()
         action_repository.save_record(record)
     return record
+
+
+def collect_facts(user_id: str) -> dict:
+    """有界 action_facts 事实包（autonomy-integration.md §2，H-A5）。失败返回 {}。"""
+    try:
+        if not get_settings().action_enabled:
+            return {}
+        records = action_repository.list_records(user_id, limit=50)
+        active = [r for r in records if r.status in ACTIVE_STATUSES]
+        reminders = [
+            r
+            for r in records
+            if r.action_type == "create_reminder" and r.status == "succeeded"
+        ]
+        pending_reminders = []
+        now = _now()
+        for r in reminders:
+            due = r.params.get("due_at")
+            if not due:
+                continue
+            try:
+                due_at = datetime.fromisoformat(str(due))
+                due_in_hours = (due_at - now).total_seconds() / 3600
+            except ValueError:
+                continue
+            pending_reminders.append(
+                {"title": str(r.params.get("content", ""))[:20], "due_in_hours": round(due_in_hours, 1)}
+            )
+        recent_failures = [
+            {"action": r.action_type, "reason": (r.gate_reason or "执行失败")}
+            for r in records
+            if r.status == "failed"
+        ][:3]
+        return {
+            "active_plans": len(active),
+            "pending_reminders": pending_reminders[:5],
+            "recent_failures": recent_failures,
+            "last_action_at": (
+                records[0].updated_at.isoformat() if records and records[0].updated_at else None
+            ),
+        }
+    except Exception:
+        logger.exception("行动事实收集失败，返回空包")
+        return {}
+
+
+async def run_action_retry_loop():
+    """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划（action_enabled 门控）。"""
+    interval = get_settings().action_maintenance_interval_seconds
+    while True:
+        try:
+            if get_settings().action_enabled:
+                await _process_due_retries()
+                _expire_planned()
+        except Exception:
+            logger.exception("行动维护循环异常（双保险）")
+        await asyncio.sleep(interval)
+
+
+async def _process_due_retries():
+    try:
+        records = action_repository.list_retryable(_now(), limit=50)
+        settings = get_settings()
+        for record in records:
+            try:
+                record, plan = _rebuild_plan(record, settings)
+                if plan is None:
+                    continue
+                ctx = ExecutionContext(
+                    user_id=record.user_id, character_id=record.character_id,
+                    record_id=record.id, now=_now(), settings=settings,
+                )
+                result = await execute_plan(record, plan, ctx)
+                if record.status != "failed":
+                    integrate_result(record, result)
+            except Exception:
+                logger.exception("行动重试失败，保持执行中状态")
+    except Exception:
+        logger.exception("行动重试扫描失败")
+
+
+def _expire_planned():
+    try:
+        records = action_repository.list_planned(_now(), limit=50)
+        for record in records:
+            if record.scheduled_at is not None and record.scheduled_at <= _now() - timedelta(
+                hours=get_settings().action_plan_expiry_hours
+            ):
+                record.status = "cancelled"
+                record.gate_reason = "expired"
+                record.updated_at = _now()
+                action_repository.save_record(record)
+    except Exception:
+        logger.exception("行动过期扫描失败")
+
+
+def _rebuild_plan(record: ActionRecord, settings):
+    intent = ActionIntent.model_validate(record.intent)
+    snapshot = _build_snapshot(record.user_id, settings)
+    plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
+    if plan is None:
+        record.status = "failed"
+        record.gate_reason = "capability_unavailable"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return record, None
+    return record, plan

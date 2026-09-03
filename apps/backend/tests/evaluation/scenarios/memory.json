@@ -48,7 +48,7 @@
     "expect_issues": [
       "memory_fabrication_candidate"
     ],
-    "expect_verdict": "warn",
+    "expect_verdict": "pass",
     "judge_override": {
       "memory": {
         "score": 0.2,

@@ -46,4 +46,6 @@ async def test_run_world_update_swallows_engine_crash(db_session_factory, monkey
 
 
 def test_step_registry_includes_world_update():
-    assert post_process.STEP_HANDLERS[-1].__name__ == "run_world_update"
+    names = [h.__name__ for h in post_process.STEP_HANDLERS]
+    assert "run_world_update" in names
+    assert names[-1] == "run_action_planning"

@@ -15,12 +15,13 @@ _reclaim_task: asyncio.Task | None = None
 _autonomy_task: asyncio.Task | None = None
 _observability_cleanup_task: asyncio.Task | None = None
 _world_maintenance_task: asyncio.Task | None = None
+_action_maintenance_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _reclaim_task, _autonomy_task, _observability_cleanup_task
-    global _world_maintenance_task
+    global _world_maintenance_task, _action_maintenance_task
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     if get_settings().autonomy_enabled:
         _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
@@ -34,12 +35,17 @@ async def lifespan(application: FastAPI):
         _world_maintenance_task = asyncio.create_task(
             world_engine.run_world_maintenance_loop()
         )
+    if get_settings().action_enabled:
+        from app.application.action_engine import run_action_retry_loop
+
+        _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
     yield
     for task in (
         _reclaim_task,
         _autonomy_task,
         _observability_cleanup_task,
         _world_maintenance_task,
+        _action_maintenance_task,
     ):
         if task is not None:
             task.cancel()
@@ -51,6 +57,7 @@ async def lifespan(application: FastAPI):
     _autonomy_task = None
     _observability_cleanup_task = None
     _world_maintenance_task = None
+    _action_maintenance_task = None
 
 
 def create_app() -> FastAPI:
