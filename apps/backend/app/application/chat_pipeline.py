@@ -38,6 +38,7 @@ from app.services import (
     trace_collector,
 )
 from app.services.goal_service import SelectedGoal
+from app.services.action.detector import detect_action_intent
 from app.services.intention_policy import enforce as enforce_intention
 
 logger = logging.getLogger(__name__)
@@ -311,7 +312,15 @@ async def run_chat_pipeline(
     trace.behavior_meta = behavior_meta
     trace.mode_meta = mode_meta
 
-    yield {
+    detect_started = time.perf_counter()
+    action_intent = detect_action_intent(content, scene_state=resolved_state, world_ctx=world_ctx)
+    trace.record(
+        "action_detect",
+        (time.perf_counter() - detect_started) * 1000,
+        "skipped" if action_intent is None else "ok",
+    )
+
+    turn_meta = {
         "kind": "turn_meta",
         "role_mode": effective_mode,
         "analysis": turn,
@@ -322,6 +331,9 @@ async def run_chat_pipeline(
         "behavior": behavior_meta,
         "mode": mode_meta,
     }
+    if action_intent is not None:
+        turn_meta["action_intent"] = action_intent.model_dump(mode="json")
+    yield turn_meta
 
     full_reply = []
     llm_started = time.perf_counter()

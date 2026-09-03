@@ -199,6 +199,25 @@ def get_world(user_id: str) -> World | None:
         return None
 
 
+def list_active_objects(user_id: str) -> list[WorldObject]:
+    """只读辅助：活跃物品列表（V9 行动闸门 G6 快照用，V8 零修改）。"""
+    world = get_world(user_id)
+    if world is None:
+        return []
+    return world_repository.list_objects(world.world_id, status="active")
+
+
+def list_active_events(user_id: str) -> list[WorldEvent]:
+    """只读辅助：活跃事件列表（V9 行动闸门 G6 快照用，V8 零修改）。"""
+    world = get_world(user_id)
+    if world is None:
+        return []
+    return world_repository.list_events(
+        world.world_id,
+        statuses=["scheduled", "active"],
+    )
+
+
 def create_object(
     user_id: str,
     name: str,

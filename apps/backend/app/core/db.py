@@ -558,6 +558,45 @@ class WorldEntityRow(Base):
     )
 
 
+class ActionRecordRow(Base):
+    __tablename__ = "action_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False, default="conversation")
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    intent: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    goal_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_record_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String, nullable=False, default="")
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="created")
+    gate_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('created', 'planned', 'executing', 'succeeded', 'failed', 'cancelled')",
+            name="ck_action_records_status",
+        ),
+        CheckConstraint(
+            "source IN ('conversation', 'autonomy', 'cancel')",
+            name="ck_action_records_source",
+        ),
+        Index("idx_action_records_user_status", "user_id", "status"),
+        Index("idx_action_records_user_dedupe", "user_id", "dedupe_key"),
+    )
+
+
 class WorldEventRow(Base):
     __tablename__ = "world_events"
 

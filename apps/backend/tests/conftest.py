@@ -29,6 +29,7 @@ from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
 from app.repositories import (
+    action_repository,
     character_state_repository,
     conversation_repository,
     decision_repository,
@@ -52,6 +53,7 @@ from app.repositories import (
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
 
 _REPO_MODULES = (
+    action_repository,
     conversation_repository,
     summary_repository,
     memory_repository,
@@ -267,6 +269,26 @@ def override_settings(monkeypatch):
             "world_llm_assist_enabled": "WORLD_LLM_ASSIST_ENABLED",
             "world_memory_bridge_enabled": "WORLD_MEMORY_BRIDGE_ENABLED",
             "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
+            "action_enabled": "ACTION_ENABLED",
+            "action_detector_enabled": "ACTION_DETECTOR_ENABLED",
+            "action_llm_assist_enabled": "ACTION_LLM_ASSIST_ENABLED",
+            "action_llm_assist_sample_rate": "ACTION_LLM_ASSIST_SAMPLE_RATE",
+            "action_plan_max_steps": "ACTION_PLAN_MAX_STEPS",
+            "action_plan_expires_minutes": "ACTION_PLAN_EXPIRES_MINUTES",
+            "action_max_active_per_user": "ACTION_MAX_ACTIVE_PER_USER",
+            "action_dedupe_window_hours": "ACTION_DEDUPE_WINDOW_HOURS",
+            "action_execution_timeout_seconds": "ACTION_EXECUTION_TIMEOUT_SECONDS",
+            "action_retry_max_attempts": "ACTION_RETRY_MAX_ATTEMPTS",
+            "action_retry_backoff_seconds": "ACTION_RETRY_BACKOFF_SECONDS",
+            "action_maintenance_interval_seconds": "ACTION_MAINTENANCE_INTERVAL_SECONDS",
+            "action_context_char_budget": "ACTION_CONTEXT_CHAR_BUDGET",
+            "action_memory_policy_enabled": "ACTION_MEMORY_POLICY_ENABLED",
+            "action_memory_policy_json": "ACTION_MEMORY_POLICY_JSON",
+            "action_relationship_enabled": "ACTION_RELATIONSHIP_ENABLED",
+            "action_record_retention_days": "ACTION_RECORD_RETENTION_DAYS",
+            "autonomy_action_enabled": "AUTONOMY_ACTION_ENABLED",
+            "autonomy_action_daily_limit": "AUTONOMY_ACTION_DAILY_LIMIT",
+            "evaluation_action_enabled": "EVALUATION_ACTION_ENABLED",
         }
         for key, env in env_map.items():
             if key in kwargs:
