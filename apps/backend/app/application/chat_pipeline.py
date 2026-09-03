@@ -340,6 +340,11 @@ async def run_chat_pipeline(
     first_token_ms = None
     goal_ctx = GoalContext(selected_goal=selected_goal, intention=validated_intention)
     active_generations[user_id] = True
+    action_ctx = None
+    if get_settings().action_enabled:
+        from app.services.action.context import build_action_context
+
+        action_ctx = build_action_context(user_id, session_id)
     try:
         async for token in answer_chain.astream(
             mode_decision.effective,
@@ -350,6 +355,7 @@ async def run_chat_pipeline(
             scene_ctx=scene_ctx,
             goal_ctx=goal_ctx,
             behavior_ctx=behavior_ctx,
+            action_ctx=action_ctx,
             world_ctx=world_ctx,
         ):
             if first_token_ms is None:
@@ -417,6 +423,7 @@ async def run_chat_pipeline(
         selected_goal=selected_goal,
         intention=validated_intention,
         behavior=behavior_ctx,
+        action_intent=action_intent,
     )
     collector = trace_collector.get_trace_collector()
     collector.attach(trace, str(ai_message_id))

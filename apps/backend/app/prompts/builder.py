@@ -216,9 +216,15 @@ class PromptBuilder:
         goal_ctx=None,
         behavior_ctx=None,
         world_ctx=None,
+        action_ctx=None,
     ) -> ChatPromptTemplate:
         world_text = render_world_section(
             world_ctx, get_settings().world_context_char_budget
+        )
+        from app.services.action.context import render_action_section
+
+        action_text = render_action_section(
+            action_ctx, get_settings().action_context_char_budget
         )
         identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
         state_sections: list[str] = []
@@ -236,6 +242,8 @@ class PromptBuilder:
         tail_sections: list[str] = []
         if world_text:
             tail_sections.append(_literal(world_text))
+        if action_text:
+            tail_sections.append(_literal(action_text))
         tail_sections.append(
             MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
         )

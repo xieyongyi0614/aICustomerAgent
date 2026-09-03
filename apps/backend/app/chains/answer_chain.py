@@ -23,10 +23,11 @@ def build_chain(
     behavior_ctx=None,
     prompt=None,
     world_ctx=None,
+    action_ctx=None,
 ) -> Runnable:
     if prompt is None:
         prompt = PromptBuilder.build(
-            mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx
+            mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
         )
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
@@ -61,16 +62,17 @@ async def astream(
     goal_ctx=None,
     behavior_ctx=None,
     world_ctx=None,
+    action_ctx=None,
 ) -> AsyncIterator[str]:
     from app.services.observability import prompt_capture
 
     started = time.perf_counter()
     started_at = datetime.now()
     prompt = PromptBuilder.build(
-        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx
+        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
     )
     chain = build_chain(
-        mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx, prompt=prompt
+        mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx, prompt=prompt, action_ctx=action_ctx
     )
     if trace is not None:
         trace.record("prompt_builder", (time.perf_counter() - started) * 1000)
