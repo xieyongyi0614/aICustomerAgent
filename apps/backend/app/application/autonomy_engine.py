@@ -31,10 +31,72 @@ from app.services.trace_collector import TurnTraceSession, get_trace_collector
 logger = logging.getLogger(__name__)
 
 _DATETIME_MIN = datetime(1970, 1, 1)
+_ACTION_FACTS_CACHE: dict[str, dict] = {}
+
+
+def _collect_action_facts(user_id: str) -> dict:
+    from app.application.action_engine import collect_facts
+
+    if not get_settings().action_enabled:
+        _ACTION_FACTS_CACHE.pop(user_id, None)
+        return {}
+    try:
+        return collect_facts(user_id)
+    except Exception:
+        logger.exception("行动事实收集失败，返回空包")
+        return {}
 
 
 def reset_seen_keys() -> None:
     _seen_dedupe_keys.clear()
+
+
+def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
+    """自治产行动参数模板（autonomy-integration.md §4）；无模板返回空参。"""
+    if action_type == "create_reminder":
+        return {"content": "休息一下", "due_at": (now + timedelta(minutes=30)).isoformat()}
+    return {}
+
+
+def _autonomy_action_today(user_id: str, now: datetime) -> int:
+    from app.repositories import action_repository
+
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    records = action_repository.list_records(user_id, limit=200)
+    return sum(
+        1
+        for r in records
+        if r.source == "autonomy" and r.created_at is not None and r.created_at >= start
+    )
+
+
+async def _produce_autonomy_action(
+    verdict, user_id: str, session_id: str, now: datetime
+) -> bool:
+    """自治产行动分支（autonomy-integration.md §4）：默认关，仅命中开启才求值。"""
+    settings = get_settings()
+    if not settings.autonomy_action_enabled:
+        return False
+    from app.character.asuna.action import PROACTIVE_ACTION_MAP
+    from app.application.action_engine import run_action_planning
+    from app.models.action import ActionIntent
+
+    action_type = PROACTIVE_ACTION_MAP.get(verdict.intention or "")
+    if action_type is None:
+        return False
+    if _autonomy_action_today(user_id, now) >= settings.autonomy_action_daily_limit:
+        logger.info("自治产行动日额度已满：%s", user_id)
+        return False
+    intent = ActionIntent(
+        action_type=action_type,
+        confidence="confident",
+        params=_params_for_autonomy_action(action_type, now),
+        dedupe_key=f"autonomy:{action_type}:{now.date().isoformat()}",
+    )
+    record = await run_action_planning(
+        user_id, intent, session_id=session_id, source="autonomy"
+    )
+    return record is not None
 
 
 def _session_tail(messages, now: datetime) -> trigger_evaluator.SessionTail:
@@ -92,6 +154,7 @@ def _snapshot_for(
         goal_degraded=selected.goal is None,
         extra_flags={"goal_id": selected.goal.id if selected.goal is not None else None},
         world_facts=world_engine.collect_facts(user_id),
+        action_facts=_collect_action_facts(user_id),
         respect=getattr(relationship, "respect", 0.6),
         comfort=getattr(relationship, "comfort", 0.6),
         conflict_status=getattr(relationship, "conflict_status", "none") or "none",
@@ -173,16 +236,20 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         user_id,
         episode_start=tail.last_user_message_at or _DATETIME_MIN,
     )
-    followup = trigger_evaluator.poll_due_followup(user_id, now)
-    if followup is not None:
-        signal: TriggerSignal | None = followup
+    due_action = trigger_evaluator.poll_due_actions(user_id, now)
+    if due_action is not None:
+        signal: TriggerSignal | None = due_action
     else:
-        signal = trigger_evaluator.evaluate_inactivity(
-            tail,
-            user_id,
-            episode_attempts=attempts,
-            now=now,
-        )
+        followup = trigger_evaluator.poll_due_followup(user_id, now)
+        if followup is not None:
+            signal = followup
+        else:
+            signal = trigger_evaluator.evaluate_inactivity(
+                tail,
+                user_id,
+                episode_attempts=attempts,
+                now=now,
+            )
     if signal is None:
         return None
 
@@ -210,6 +277,25 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         verdict.reason,
     )
     if verdict.decision != "act" or verdict.goal_id is None:
+        _record_decision(
+            verdict=verdict,
+            signal=signal,
+            snapshot=snapshot,
+            user_id=user_id,
+            session_id=conversation.id,
+        )
+        observability.on_turn_finished(
+            trace,
+            turn_id=None,
+            user_id=user_id,
+            session_id=conversation.id,
+            kind=TraceKind.AUTONOMY_TICK,
+            drain_background=False,
+        )
+        return None
+
+    produced_action = await _produce_autonomy_action(verdict, user_id, conversation.id, now)
+    if produced_action:
         _record_decision(
             verdict=verdict,
             signal=signal,
@@ -262,6 +348,10 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
             action_id=action.id,
             drain_background=False,
         )
+        if signal.type == "action_due":
+            event_id = signal.context.get("event_id")
+            if event_id:
+                trigger_evaluator.mark_action_reported(user_id, event_id)
         return delivered.message_id
     observability.on_turn_finished(
         trace,

@@ -163,3 +163,9 @@ COMPLETION_CLAIM_PATTERNS: tuple[str, ...] = (
 
 # 查询维度（query_environment 参数细分）。
 ENVIRONMENT_QUERY_DIMENSIONS: tuple[str, ...] = ("weather", "temperature", "time", "lighting")
+
+# 自治产行动映射（autonomy-integration.md §4）：自治裁决意图 → 可执行 ActionType。
+# 分支由 autonomy_action_enabled 门控，默认关——开关开启且命中才求值，否则零路径。
+PROACTIVE_ACTION_MAP: dict[str, str] = {
+    "check_in": "create_reminder",
+}

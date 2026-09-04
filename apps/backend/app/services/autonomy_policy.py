@@ -43,6 +43,7 @@ class PolicySnapshot:
     goal_degraded: bool = False
     extra_flags: dict = field(default_factory=dict)
     world_facts: dict = field(default_factory=dict)
+    action_facts: dict = field(default_factory=dict)
     respect: float = 0.60
     comfort: float = 0.60
     conflict_status: str = "none"
@@ -189,6 +190,27 @@ def _apply_relationship_rules(
     return verdict
 
 
+def _apply_action_adjustments(
+    verdict: AutonomyVerdict, snapshot: PolicySnapshot
+) -> AutonomyVerdict:
+    """V9 A1/A2（autonomy-integration.md §2）：action_facts 只追加理由，不拆闸门。"""
+    facts = snapshot.action_facts or {}
+    if not facts:
+        return verdict
+    notes: list[str] = []
+    for reminder in facts.get("pending_reminders") or []:
+        due_in_hours = reminder.get("due_in_hours")
+        if due_in_hours is not None and 0 <= due_in_hours <= 24:
+            notes.append(f"提醒「{reminder.get('title')}」快到期，可跟进行动")
+            break
+    if facts.get("recent_failures"):
+        notes.append("有未闭环的委托，可补救性关怀")
+    if not notes:
+        return verdict
+    reason = f"{verdict.reason}；{'；'.join(notes)}"[:60]
+    return verdict.model_copy(update={"reason": reason})
+
+
 def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
@@ -226,4 +248,5 @@ def evaluate(
         intention=intention,
     )
     verdict = _apply_world_adjustments(verdict, snapshot)
+    verdict = _apply_action_adjustments(verdict, snapshot)
     return _apply_relationship_rules(verdict, snapshot, config)

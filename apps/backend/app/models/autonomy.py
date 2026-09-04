@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.models.intention import INTENTION_REASON_MAX_LENGTH
 
-TriggerType = Literal["conversation_inactivity", "scheduled_followup"]
+TriggerType = Literal["conversation_inactivity", "scheduled_followup", "action_due"]
 
 ProactiveActionType = Literal["send_message"]
 

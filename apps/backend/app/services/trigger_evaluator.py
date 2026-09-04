@@ -70,6 +70,70 @@ def poll_due_followup(user_id: str, now: datetime) -> TriggerSignal | None:
     )
 
 
+def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
+    """V9 due_action 触发器（autonomy-integration.md §3，H-A6）。
+
+    active 的 reminder/appointment 到期且未汇报（payload 无 reported_by_autonomy）→
+    产出 action_due 信号。只读查询，置位由 mark_action_reported 在投递成功后完成，
+    保证静音/冷却期间的到期提醒顺延到可汇报时。无行动或开关外时返回 None。
+    """
+    if not get_settings().action_enabled:
+        return None
+    from app.repositories import world_repository
+
+    try:
+        world = world_repository.get_world(user_id)
+        if world is None:
+            return None
+        for event in world_repository.list_events(
+            world.world_id, statuses=["active"], limit=50
+        ):
+            if event.type not in ("reminder", "appointment"):
+                continue
+            if event.due_at is None or event.due_at > now:
+                continue
+            if (event.payload or {}).get("reported_by_autonomy"):
+                continue
+            return TriggerSignal(
+                type="action_due",
+                user_id=user_id,
+                detected_at=now,
+                context={
+                    "event_id": event.id,
+                    "title": event.title,
+                    "due_at": event.due_at.isoformat(),
+                },
+                dedupe_key=f"action_due:{event.id}",
+            )
+    except Exception:
+        logger.exception("到期行动轮询失败，跳过")
+    return None
+
+
+def mark_action_reported(user_id: str, event_id: str) -> None:
+    """到期行动已由自治汇报过：置 world 事件 payload.reported_by_autonomy（幂等）。"""
+    if not get_settings().action_enabled:
+        return
+    from app.repositories import world_repository
+
+    try:
+        world = world_repository.get_world(user_id)
+        if world is None:
+            return
+        now = datetime.now()
+        for event in world_repository.list_events(
+            world.world_id, statuses=["active"], limit=50
+        ):
+            if event.id != event_id:
+                continue
+            event.payload = {**(event.payload or {}), "reported_by_autonomy": True}
+            event.updated_at = now
+            world_repository.save_event(event)
+            return
+    except Exception:
+        logger.exception("到期行动汇报标记失败")
+
+
 def evaluate_inactivity(
     tail: SessionTail,
     user_id: str,
