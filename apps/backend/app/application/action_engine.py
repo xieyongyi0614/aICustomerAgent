@@ -174,7 +174,6 @@ async def run_action_planning(
     if not settings.action_enabled or intent is None:
         return None
     record = new_record(intent, user_id, session_id, source)
-    action_repository.save_record(record)
 
     snapshot = _build_snapshot(user_id, settings)
     decision = evaluate_gates(intent, snapshot)
