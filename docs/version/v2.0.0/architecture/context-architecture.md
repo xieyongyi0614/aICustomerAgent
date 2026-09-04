@@ -13,7 +13,8 @@ Character Context（装配结果）
 ├── P1 World 切片           时间/地点/环境/待决事件（≤600 字符，v1 沿用）
 ├── P2 Working Memory       最近 N 条消息 + 本轮结构化信号
 ├── P2 Long-term Memory     检索结果（P1 Phase 上线后语义排序）
-├── P2 Development          高置信 Insight 摘要（≤100 字符，P3 后）
+│   ├── P2 高置信 Insight 摘要（REF-007 只读接口，P2 起可注入；与下行不冲突）
+├── P2 Development          高置信 Insight 摘要（≤100 字符，DEV-003 调制摘要，P3 后）
 └── P3 表现指令             BehaviorStrategy/ActionBudget/Mode（v6.5 沿用）
 ```
 
