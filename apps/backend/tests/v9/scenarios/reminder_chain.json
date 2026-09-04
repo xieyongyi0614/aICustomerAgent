@@ -1,0 +1,23 @@
+{
+  "id": "reminder_chain",
+  "title": "提醒全链",
+  "description": "明确时间委托 → create_reminder → WorldEvent(reminder, scheduled)；问句守卫不触发。",
+  "positive": [
+    {
+      "input": "明天早上8点提醒我开会",
+      "expect_action_type": "create_reminder",
+      "expect_terminal": "succeeded",
+      "expect_world_event": {"type": "reminder", "title_contains": "开会"}
+    }
+  ],
+  "negative": [
+    {
+      "input": "你能提醒我吗",
+      "expect_action_type": null
+    },
+    {
+      "input": "我昨天提醒过你要早睡",
+      "expect_action_type": null
+    }
+  ]
+}

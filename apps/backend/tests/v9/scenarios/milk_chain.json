@@ -1,0 +1,23 @@
+{
+  "id": "milk_chain",
+  "title": "牛奶全链",
+  "description": "委托买牛奶 → create_object → 世界出现牛奶实体；非行动消息不触发。",
+  "positive": [
+    {
+      "input": "帮我买牛奶",
+      "expect_action_type": "create_object",
+      "expect_terminal": "succeeded",
+      "expect_world_object": "牛奶"
+    }
+  ],
+  "negative": [
+    {
+      "input": "今天心情不错",
+      "expect_action_type": null
+    },
+    {
+      "input": "开个会说明一下",
+      "expect_action_type": null
+    }
+  ]
+}
