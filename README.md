@@ -22,9 +22,13 @@
 │   │   └── tests/         #   pytest 分层（unit / integration / e2e / golden；FakeLLM 注入）
 │   └── frontend/          # React 调试控制台（详见 apps/frontend/README.md）
 │       └── src/           #   api / app / components / features / hooks / stores / mocks
-├── docs/                  # 文档（各版本任务注册表、架构设计、回归清单）
-│   ├── roleplay-v7.5/     # V7.5 Character Evaluation 设计（待实现，当前任务入口）
-│   └── roleplay-v*/       # V1~V7 各版本设计与任务文档
+├── docs/                  # 文档（按版本归档，当前 V1.0.0 封版）
+│   └── version/
+│       └── v1.0.0/        # V1.0.0 全部文档
+│           ├── v7.5/      #   V7.5 Character Evaluation 设计（当前任务入口）
+│           ├── v*/        #   V1~V9 各版本文档
+│           ├── frontend/  #   前端调试控制台设计
+│           └── backend-refactor/  # 后端架构重构设计
 ├── docker-compose.yml     # Docker 唯一入口（postgres 开发库 + console 完整栈）
 └── Dockerfile             # 多阶段构建：node 构建前端 → python 托管后端 + dist
 ```
@@ -103,14 +107,14 @@ npm run lint        # eslint
 | `GET /llm/profiles` | 可用模型 profile 列表与默认项 |
 | `GET /debug/turns/{turn_id}/trace` | 单轮编排 trace（调试用） |
 
-完整请求 / 响应契约见 `apps/backend/README.md` 与 `docs/frontend/deploy.md`。
+完整请求 / 响应契约见 `apps/backend/README.md` 与 `docs/version/v1.0.0/frontend/deploy.md`。
 
 ## 文档导航
 
-- `docs/roleplay-v7.5/tasks.md` — V7.5 任务注册表（当前任务入口，待实现）
-- `docs/roleplay-v7/` ~ `docs/roleplay-v3/` — 各版本设计文档与任务注册表（V3~V7 已实现）
-- `docs/backend-refactor/target-architecture.md` — 后端目标架构与分层边界
-- `docs/frontend/deploy.md` — 前端部署指南（三种方案 + 冒烟清单）
+- `docs/version/v1.0.0/v7.5/tasks.md` — V7.5 任务注册表（当前任务入口，待实现）
+- `docs/version/v1.0.0/v7/` ~ `docs/version/v1.0.0/v3/` — 各版本设计文档与任务注册表（V3~V7 已实现）
+- `docs/version/v1.0.0/backend-refactor/target-architecture.md` — 后端目标架构与分层边界
+- `docs/version/v1.0.0/frontend/deploy.md` — 前端部署指南（三种方案 + 冒烟清单）
 - `AGENTS.md` / `apps/backend/AGENTS.md` — 仓库与后端开发约定（面向 Coding Agent）
 
 ## 开发约定（摘自 AGENTS.md）

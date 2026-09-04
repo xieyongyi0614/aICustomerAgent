@@ -12,7 +12,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 启动服务
 
 ## 任务入口
 
-开发前先读 `docs/roleplay-v7.5/tasks.md`（当前任务注册表），确认当前 Task 及其 Scope / 依赖；各版本设计文档在 `docs/roleplay-v*/`。后端分层与边界的权威描述见 `docs/backend-refactor/target-architecture.md`。
+开发前先读 `docs/version/v1.0.0/v7.5/tasks.md`（当前任务注册表），确认当前 Task 及其 Scope / 依赖；各版本设计文档在 `docs/version/v1.0.0/v*/`。后端分层与边界的权威描述见 `docs/version/v1.0.0/backend-refactor/target-architecture.md`。
 
 ## 架构约束
 

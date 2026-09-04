@@ -47,4 +47,4 @@ npm run dev        # http://localhost:2000，/api 代理到 http://localhost:800
 ## 部署
 
 - 本地开发代理由 `vite.config.ts` 的 `server.proxy` 配置；部署 `base` 路径用环境变量 `VITE_BASE` 调整。
-- 生产部署走根目录 Docker 多阶段构建（node 构建产物 → python 后端托管 dist），一键入口为根目录 `docker compose up -d --build`（访问 `http://localhost:8020`）；三种部署方案与冒烟清单见 `docs/frontend/deploy.md`。
+- 生产部署走根目录 Docker 多阶段构建（node 构建产物 → python 后端托管 dist），一键入口为根目录 `docker compose up -d --build`（访问 `http://localhost:8020`）；三种部署方案与冒烟清单见 `docs/version/v1.0.0/frontend/deploy.md`。
