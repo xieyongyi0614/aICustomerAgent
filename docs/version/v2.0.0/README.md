@@ -295,8 +295,12 @@ docs/version/v2.0.0/
 │   ├── context-architecture.md    ← Context 五策略
 │   ├── llm-orchestration.md       ← LLM 任务清单与分层
 │   ├── data-flow.md               ← 同步/异步边界 + 数据一致性
-│   ├── evaluation.md              ← Evaluation v2
-│   └── risk.md                    ← 风险登记册
+│   ├── evaluation.md              ← Evaluation v2（指标体系总纲）
+│   ├── risk.md                    ← 风险登记册
+│   └── self-review.md             ← 架构自审（18 问逐答）
+├── dependency-graph.md              ← Phase/Task/Runtime 依赖 + 数据/事件/LLM/跨域写入流
+├── version-boundary.md              ← v1↔v2 模块边界（Preserve/Extend/Replace/Deprecated）
+├── TASKS-AUDIT.md                   ← Tasks 全量审计与重构报告（2026-09）
 ├── phases/
 │   ├── phase-1-memory/            (README / architecture / design / tasks)
 │   ├── phase-2-reflection/        (README / architecture / tasks)

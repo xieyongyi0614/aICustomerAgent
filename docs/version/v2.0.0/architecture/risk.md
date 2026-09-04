@@ -1,6 +1,6 @@
 # v2.0.0 Architecture Risk Register
 
-> 格式：Risk / Cause / Impact / Mitigation。设计期识别，实现期每 Phase 复核。
+> 格式：Risk / Cause / Impact / Mitigation。设计期识别，实现期每 Phase 复核。逐问自审见 [self-review.md](self-review.md)。
 
 | # | Risk | Cause | Impact | Mitigation |
 |---|---|---|---|---|
@@ -19,3 +19,4 @@
 | R13 | **v1→v2 迁移破坏数据** | 改列义/硬删/一次性切换 | 历史记忆丢失 | 只增列不改义；迁移脚本 dry-run+回滚；Flag 灰度；双读窗口（见 migration/v1-to-v2.md） |
 | R14 | **单进程后台天花板** | asyncio 单进程既跑前台又跑周期 | 周期任务饿死前台 | Job 表协议化（P1）；量级触发重审阈值：日活>100 或周期任务 P95 延迟>30s 时抽离 Worker 进程（表协议不变） |
 | R15 | **概念债复发** | 新版本再造第五种「动作」 | 架构退回 v1 混乱 | domain-boundaries.md 概念债表为评审清单；新概念入域需更新该文档 |
+
