@@ -395,22 +395,27 @@ def _run_relationship_subsystems(
 
 def _capture_snapshot_if_needed(
     user_id: str,
-    state_before,
-    state_after,
+    state_before: RelationshipState,
+    state_after: RelationshipState,
     stage_before: str,
-    conflict_transition: tuple | None,
+    conflict_transition: str,
     new_milestones: list,
     now: datetime,
 ) -> None:
-    """persistence.md §6：stage 跃迁 / 里程碑命中 / 冲突迁移 → 写关键帧，限频 20。"""
+    """persistence.md §6：stage 跃迁 / 里程碑命中 / 冲突迁移 → 写关键帧，限频 20。
+
+    Args:
+        conflict_transition: 具名冲突迁移类型（conflict_started / reconciled /
+            recovery_started ...，见 relationship_conflict.evaluate_conflict）。
+            空串表示本轮无迁移，按真值判断跳过。
+    """
     from app.repositories import relationship_snapshot_repository
 
     trigger: str | None = None
     if stage_before != state_after.stage:
         trigger = f"stage_transition:{stage_before}→{state_after.stage}"
-    elif conflict_transition is not None:
-        old_status, new_status = conflict_transition
-        trigger = f"conflict:{old_status}→{new_status}"
+    elif conflict_transition:
+        trigger = f"conflict:{conflict_transition}"
     elif new_milestones:
         trigger = f"milestone:{new_milestones[0].milestone_key}"
     if trigger is None:
