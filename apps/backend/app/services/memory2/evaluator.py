@@ -22,6 +22,7 @@ from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
 from app.models.memory2 import EvaluationVerdict
 from app.prompts.memory2_evaluator import build_memory_evaluation_messages
+from app.services.memory2 import embeddings as memory_embeddings
 from app.services.memory_conflict import _lcs_length, same_topic
 from app.services.memory_service import TYPE_AFFINITY_KEYWORDS
 
@@ -258,6 +259,15 @@ def _promote(
         return memory_id
 
 
+def _enqueue_embedding(memory_id: str, candidate: MemoryCandidateRow) -> None:
+    if not get_settings().v2_memory_vector_enabled:
+        return
+    try:
+        memory_embeddings.enqueue(memory_id, candidate.content or "")
+    except Exception:
+        logger.exception("embedding 入队失败，留待 NULL 补扫：%s", memory_id)
+
+
 def _promote_or_defer(
     candidate: MemoryCandidateRow,
     *,
@@ -280,6 +290,7 @@ def _promote_or_defer(
             llm_used=llm_used,
             components=components or {},
         )
+    _enqueue_embedding(memory_id, candidate)
     return Decision(
         DECISION_APPROVE,
         reason,

@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 
@@ -223,3 +224,42 @@ def create_memory_and_supersede(
         session.commit()
         session.refresh(row)
         return _to_memory(row)
+
+
+def list_pending_embedding(limit: int = 100) -> list[UserMemory]:
+    """待回填向量的 active 记忆（embedding IS NULL），按创建时间升序。"""
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory)
+            .filter(Memory.status == "active", Memory.embedding.is_(None))
+            .order_by(Memory.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_memory(row) for row in rows]
+
+
+def update_embedding(memory_id: str, vector: list[float]) -> bool:
+    """条件回填单条向量：仅在 active 且 embedding 为空时写入。"""
+    encoded = json.dumps(vector)
+    with SessionLocal() as session:
+        row = session.get(Memory, memory_id)
+        if row is None or row.embedding is not None or row.status != "active":
+            return False
+        row.embedding = encoded
+        session.commit()
+        return True
+
+
+def update_embeddings_batch(items: list[tuple[str, list[float]]]) -> int:
+    """条件回填一批向量：单事务；已填或非 active 行跳过，幂等可重放。"""
+    updated = 0
+    with SessionLocal() as session:
+        for memory_id, vector in items:
+            row = session.get(Memory, memory_id)
+            if row is None or row.embedding is not None or row.status != "active":
+                continue
+            row.embedding = json.dumps(vector)
+            updated += 1
+        session.commit()
+    return updated

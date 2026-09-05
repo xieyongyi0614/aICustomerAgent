@@ -33,6 +33,7 @@ TRACE_STEP_NAMES = (
     "memory_extract",
     "memory_ingest",
     "memory_evaluate",
+    "memory_embed",
     "memory_policy",
     "memory_privacy",
     "memory_conflict",
