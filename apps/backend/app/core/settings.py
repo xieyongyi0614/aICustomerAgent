@@ -113,6 +113,10 @@ class Settings(BaseSettings):
     v2_embedding_dimensions: int = 768
     v2_embedding_max_input_chars: int = 2000
     v2_memory_retrieval_budget: int = 800
+    v2_job_poll_interval: int = 60
+    v2_job_max_attempts: int = 5
+    v2_job_running_timeout: int = 600
+    v2_job_retry_backoff_seconds: int = 60
     v2_memory_weight_semantic: float = 0.45
     v2_memory_weight_structured: float = 0.35
     v2_memory_weight_affinity: float = 0.20
