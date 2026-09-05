@@ -1,13 +1,14 @@
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
-from app.core.settings import LlmProfile, get_settings
+from app.core.settings import LlmProfile, SettingsError, get_settings
 
 
 _llm_cache: dict[str, BaseChatModel] = {}
 
 
 def _build_llm(profile: LlmProfile) -> ChatOpenAI:
+    settings = get_settings()
     return ChatOpenAI(
         model=profile.model,
         api_key=profile.api_key,
@@ -17,6 +18,8 @@ def _build_llm(profile: LlmProfile) -> ChatOpenAI:
         frequency_penalty=profile.frequency_penalty,
         presence_penalty=profile.presence_penalty,
         max_tokens=profile.max_tokens,
+        request_timeout=settings.llm_request_timeout_seconds,
+        max_retries=settings.llm_max_retries,
         extra_body=(
             profile.extra_body
             if profile.extra_body is not None

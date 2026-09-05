@@ -13,6 +13,8 @@ from sqlalchemy import create_engine, inspect, text
 
 from app.core.db import Base
 
+pytestmark = pytest.mark.xdist_group("migration")
+
 PG_TEST_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://asuna:asuna@127.0.0.1:5432/asuna_test"
 )
@@ -48,10 +50,13 @@ def postgres_url():
     yield url
 
 
-def _run_alembic(url: str, target: str) -> None:
+def _run_alembic(url: str, target: str, *, downgrade: bool = False) -> None:
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", url)
-    command.upgrade(alembic_cfg, target)
+    if downgrade:
+        command.downgrade(alembic_cfg, target)
+    else:
+        command.upgrade(alembic_cfg, target)
 
 
 def _legacy_relationship_state_row(engine):
@@ -92,7 +97,7 @@ def test_upgrade_adds_columns_with_defaults(postgres_url):
 
 
 def test_legacy_row_defaults_after_upgrade(postgres_url):
-    _run_alembic(postgres_url, "0017")
+    _run_alembic(postgres_url, "0017", downgrade=True)
     engine = create_engine(postgres_url)
     _legacy_relationship_state_row(engine)
     _run_alembic(postgres_url, "0018")
@@ -149,7 +154,7 @@ def test_event_new_enum_values_and_legacy_impact_defaults(postgres_url):
 
 
 def test_downgrade_roundtrip(postgres_url):
-    _run_alembic(postgres_url, "0017")
+    _run_alembic(postgres_url, "0017", downgrade=True)
     engine = create_engine(postgres_url)
     inspector = inspect(engine)
     state_columns = {column["name"] for column in inspector.get_columns("relationship_state")}

@@ -23,6 +23,7 @@ dev = [
     "pylint>=3.3",
     "httpx>=0.28.1",
     "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
 ]
 
 [tool.pylint.main]
@@ -32,7 +33,9 @@ init-hook = "import sys, os; cwd = os.getcwd(); candidates = [os.path.join(cwd, 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-n auto --dist loadscope"
+addopts = "-n auto --dist loadgroup"
+timeout = 120
+timeout_method = "thread"
 markers = [
   "unit: 纯逻辑单测（无 DB / 无 HTTP / 无网络，FakeLLM 允许）",
   "api: FastAPI Router 层测试（httpx ASGITransport + FakeLLM + 内存 SQLite）",

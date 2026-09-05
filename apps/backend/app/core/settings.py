@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     max_tokens: int = 512
     answer_max_tokens: int = 200
     extra_body_thinking: str = "disabled"
+    llm_request_timeout_seconds: int = 60
+    llm_max_retries: int = 1
 
     database_url: str = "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
     db_pool_size: int = 5
@@ -323,6 +325,10 @@ class Settings(BaseSettings):
             raise SettingsError(
                 f"DEFAULT_LLM_PROFILE 必须在 LLM_PROFILES_JSON 中: {self.default_llm_profile}"
             )
+        if self.llm_request_timeout_seconds <= 0:
+            raise SettingsError("LLM_REQUEST_TIMEOUT_SECONDS 必须大于 0")
+        if self.llm_max_retries < 0:
+            raise SettingsError("LLM_MAX_RETRIES 不能为负")
         return self
 
     @model_validator(mode="after")
