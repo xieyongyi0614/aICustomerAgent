@@ -104,7 +104,9 @@ class Settings(BaseSettings):
     v2_memory_reinforce_boost: float = 0.1
     v2_memory_decay_lambda_json: str = (
         '{"user_preference": 0.01, "user_fact": 0.01,'
-        ' "important_event": 0.03, "relationship_event": 0.03}'
+        ' "experience": 0.03, "relationship_fact": 0.03,'
+        ' "commitment": 0.04, "milestone_event": 0.01,'
+        ' "behavior_pattern": 0.05}'
     )
     v2_embedding_batch_size: int = 32
     v2_embedding_batch_window_seconds: int = 60

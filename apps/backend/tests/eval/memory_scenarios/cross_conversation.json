@@ -5,18 +5,133 @@
       "id": "cc-01",
       "description": "同内容跨会话重复注入只保留一条记忆",
       "steps": [
-        {"action": "seed", "ref": "first", "content": "用户在杭州西湖附近上班", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:a:1"},
-        {"action": "seed", "ref": "second", "content": "用户在杭州西湖附近上班", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:b:1", "expect": {"approved": false, "reason": "duplicate_exact"}},
-        {"action": "count_check", "expect_active_memories": 1}
+        {
+          "action": "seed",
+          "ref": "first",
+          "content": "用户在杭州西湖附近上班",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:a:1"
+        },
+        {
+          "action": "seed",
+          "ref": "second",
+          "content": "用户在杭州西湖附近上班",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:b:1",
+          "expect": {
+            "approved": false,
+            "reason": "duplicate_exact"
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 1
+        }
       ]
     },
     {
       "id": "cc-02",
       "description": "不同会话的不同事实互不干扰",
       "steps": [
-        {"action": "seed", "ref": "home", "content": "用户的家乡是成都", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:a:2"},
-        {"action": "seed", "ref": "work", "content": "用户的公司在北京", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:b:2"},
-        {"action": "probe", "query": "用户的家乡是哪里", "top_k": 1, "expect_top": "home"}
+        {
+          "action": "seed",
+          "ref": "home",
+          "content": "用户的家乡是成都",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:a:2"
+        },
+        {
+          "action": "seed",
+          "ref": "work",
+          "content": "用户的公司在北京",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:b:2"
+        },
+        {
+          "action": "probe",
+          "query": "用户的家乡是哪里",
+          "top_k": 1,
+          "expect_top": "home"
+        }
+      ]
+    },
+    {
+      "id": "cc-03",
+      "description": "跨会话重复内容幂等收敛",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "first",
+          "content": "用户的老家在西安",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:a:3"
+        },
+        {
+          "action": "seed",
+          "ref": "second",
+          "content": "用户的老家在西安",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:b:3",
+          "expect": {
+            "approved": false,
+            "reason": "duplicate_exact"
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 1
+        }
+      ]
+    },
+    {
+      "id": "cc-04",
+      "description": "三个会话各自事实互不覆盖",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "vinyl",
+          "content": "用户收藏黑胶唱片",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:a:4"
+        },
+        {
+          "action": "seed",
+          "ref": "tennis",
+          "content": "用户每周打两次网球",
+          "type": "important_event",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:b:4"
+        },
+        {
+          "action": "seed",
+          "ref": "baking",
+          "content": "用户在学做甜点",
+          "type": "important_event",
+          "source": "user_stated",
+          "salience": 0.8,
+          "source_id": "conv:c:4"
+        },
+        {
+          "action": "probe",
+          "query": "用户每周打几次网球",
+          "top_k": 1,
+          "expect_top": "tennis"
+        }
       ]
     }
   ]

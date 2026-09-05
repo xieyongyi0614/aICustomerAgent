@@ -259,12 +259,23 @@ class TestExplicitRemember:
         row = _candidate(
             "c1",
             "记住这个习惯",
-            proposed_type="milestone_event",
+            proposed_type="hobby",
             source="explicit_remember",
         )
         decision = await evaluator.evaluate_candidate(row, [])
         assert decision.action == "approve"
         assert _memories()[0].type == "user_fact"
+
+    async def test_v2_canonical_type_passthrough(self, eval_db, enabled):
+        row = _candidate(
+            "c1",
+            "记住我们的约定",
+            proposed_type="commitment",
+            source="explicit_remember",
+        )
+        decision = await evaluator.evaluate_candidate(row, [])
+        assert decision.action == "approve"
+        assert _memories()[0].type == "commitment"
 
 
 class TestHypothetical:

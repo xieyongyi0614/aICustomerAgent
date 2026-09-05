@@ -20,6 +20,7 @@ from sqlalchemy import or_
 
 from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
+from app.services.memory2 import types as memory2_types
 from app.services.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
@@ -89,8 +90,9 @@ def _similarity(left: str, right: str) -> float:
 
 def decay_lambda_for(memory_type: str) -> float:
     table = get_settings().v2_memory_decay_lambdas()
-    if memory_type in table:
-        return float(table[memory_type])
+    canonical = memory2_types.normalize_type(memory_type) or memory_type
+    if canonical in table:
+        return float(table[canonical])
     return max(float(value) for value in table.values())
 
 

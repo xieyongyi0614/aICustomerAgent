@@ -24,6 +24,7 @@ from app.models.memory2 import EvaluationVerdict
 from app.prompts.memory2_evaluator import build_memory_evaluation_messages
 from app.services.memory2 import embeddings as memory_embeddings
 from app.services.memory2 import lifecycle as memory_lifecycle
+from app.services.memory2 import types as memory2_types
 from app.services.memory_conflict import _lcs_length, same_topic
 from app.services.memory_service import TYPE_AFFINITY_KEYWORDS
 
@@ -40,15 +41,8 @@ DECISION_DEFER = "defer"
 SOURCE_WEIGHTS = {"user_stated": 1.0, "user_derived": 0.7, "ai_inferred": 0.4}
 UNKNOWN_SOURCE_WEIGHT = 0.4
 
-VALID_MEMORY_TYPES = (
-    "user_preference",
-    "user_fact",
-    "important_event",
-    "relationship_event",
-)
 VALID_MEMORY_SOURCES = ("user_stated", "user_derived", "ai_inferred")
 _MEMORY_SOURCE_OVERRIDES = {"explicit_remember": "user_stated"}
-DEFAULT_MEMORY_TYPE = "user_fact"
 
 _LLM_LITE_PROFILE_ID = "lite"
 _LLM_RETRY_ATTEMPTS = 3
@@ -182,11 +176,14 @@ def _related_contents(content: str, active_contents: list[str]) -> list[str]:
 
 
 def _final_type(proposed_type: str | None, llm_suggestion: str | None) -> str:
-    if proposed_type in VALID_MEMORY_TYPES:
-        return proposed_type
-    if llm_suggestion in VALID_MEMORY_TYPES:
-        return llm_suggestion
-    return DEFAULT_MEMORY_TYPE
+    """type 终值由代码映射决定：建议类型仅作参考，统一归一化为 v2 规范 7 类。"""
+    normalized = memory2_types.normalize_type(proposed_type)
+    if normalized is not None:
+        return normalized
+    normalized = memory2_types.normalize_type(llm_suggestion)
+    if normalized is not None:
+        return normalized
+    return memory2_types.DEFAULT_MEMORY_TYPE
 
 
 def _memory_source_of(candidate_source: str | None) -> str:

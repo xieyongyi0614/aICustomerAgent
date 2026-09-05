@@ -36,8 +36,13 @@ RELATION_CONTRADICTS = "contradicts"
 QUERY_TYPE_KEYWORDS = {
     "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢"),
     "user_fact": ("在哪", "工作", "住", "养", "做什么", "是谁"),
-    "important_event": ("面试", "经历", "发生过", "事件", "考试"),
-    "relationship_event": ("我们", "一起", "送过", "看过", "去过"),
+    "experience": ("面试", "经历", "发生过", "事件", "考试"),
+    "relationship_fact": ("我们", "一起", "送过", "看过", "去过"),
+}
+
+_AFFINITY_TYPE_ALIASES = {
+    "important_event": "experience",
+    "relationship_event": "relationship_fact",
 }
 
 _DEFAULT_SALIENCE = 0.5
@@ -101,7 +106,8 @@ def _structured_score(memory: UserMemory, salience: float | None, now: datetime)
 def _affinity_score(memory: UserMemory, query_types: set[str]) -> float:
     if not query_types:
         return 0.5
-    return 1.0 if memory.type in query_types else 0.0
+    memory_type = _AFFINITY_TYPE_ALIASES.get(memory.type, memory.type)
+    return 1.0 if memory_type in query_types else 0.0
 
 
 def _recently_rejected_contents(user_id: str, now: datetime) -> list[str]:

@@ -121,6 +121,27 @@ def test_check_constraints_state_machines(postgres_url):
     assert "ck_background_jobs_status" in job_checks
 
 
+def test_memories_type_constraint_widened(postgres_url):
+    engine = create_engine(postgres_url)
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
+                " WHERE conname = 'ck_memories_type'"
+            )
+        ).fetchall()
+    assert rows, "memories 缺少 ck_memories_type 约束"
+    definition = rows[0][0]
+    for value in (
+        "experience",
+        "relationship_fact",
+        "commitment",
+        "milestone_event",
+        "behavior_pattern",
+    ):
+        assert value in definition, f"约束缺少 v2 类型 {value}"
+
+
 def test_upgrade_downgrade_upgrade_round_trip(postgres_url):
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", postgres_url)

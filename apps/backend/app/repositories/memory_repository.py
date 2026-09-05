@@ -1,18 +1,14 @@
 import json
 import uuid
 from datetime import datetime
+from typing import get_args
 
 from sqlalchemy import text as sa_text
 
 from app.core.db import Memory, SessionLocal
-from app.models.memory import UserMemory
+from app.models.memory import MemoryType, UserMemory
 
-VALID_MEMORY_TYPES = (
-    "user_preference",
-    "user_fact",
-    "important_event",
-    "relationship_event",
-)
+VALID_MEMORY_TYPES = get_args(MemoryType)
 
 
 def _to_memory(row: Memory) -> UserMemory:
