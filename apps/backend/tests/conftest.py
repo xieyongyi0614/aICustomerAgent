@@ -28,6 +28,7 @@ from app.core import llm_factory
 from app.services import agent_service
 from app.services.memory2 import evaluator as memory2_evaluator
 from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
@@ -80,6 +81,7 @@ _REPO_MODULES = (
 _SERVICE_DB_MODULES = (
     memory2_evaluator,
     memory2_ingest,
+    memory2_lifecycle,
 )
 
 

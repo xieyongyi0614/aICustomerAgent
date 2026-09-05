@@ -139,6 +139,7 @@ def ingest_from_conversation(
             source_ref_extra={
                 "importance": candidate.importance,
                 "confidence": candidate.confidence,
+                "relation": candidate.relation,
             },
             created_at=created_at,
         )
