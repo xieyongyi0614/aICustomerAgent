@@ -26,6 +26,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
 from app.services import agent_service
+from app.services.memory2 import attribution as memory2_attribution
 from app.services.memory2 import commands as memory2_commands
 from app.services.memory2 import evaluator as memory2_evaluator
 from app.services.memory2 import ingest as memory2_ingest
@@ -81,6 +82,7 @@ _REPO_MODULES = (
 )
 
 _SERVICE_DB_MODULES = (
+    memory2_attribution,
     memory2_commands,
     memory2_evaluator,
     memory2_ingest,
