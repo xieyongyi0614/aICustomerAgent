@@ -87,6 +87,24 @@ class Settings(BaseSettings):
     memory_min_score: float = 0.15
     memory_reclaim_interval_seconds: int = 3600
 
+    v2_memory_enabled: bool = False
+    v2_memory_vector_enabled: bool = False
+    v2_memory_eval_threshold_high: float = 0.75
+    v2_memory_eval_threshold_low: float = 0.35
+    v2_memory_llm_fallback_rate_cap: float = 0.3
+    v2_memory_decay_batch_size: int = 200
+    v2_memory_forget_retention_days: int = 30
+    v2_embedding_batch_size: int = 32
+    v2_embedding_batch_window_seconds: int = 60
+    v2_memory_retrieval_budget: int = 800
+    v2_memory_ingest_max_per_turn: int = 10
+    v2_memory_hypothetical_triggers_json: str = (
+        '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
+    )
+    v2_memory_transient_triggers_json: str = (
+        '["帮我拿", "帮我递", "递给我", "放到", "放一下", "打开", "关一下", "取下"]'
+    )
+
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
     emotion_switch_min_confidence: float = 0.8
@@ -411,6 +429,12 @@ class Settings(BaseSettings):
 
     def world_memory_importance(self) -> dict:
         return json.loads(self.world_memory_importance_json)
+
+    def v2_memory_hypothetical_triggers(self) -> list[str]:
+        return json.loads(self.v2_memory_hypothetical_triggers_json)
+
+    def v2_memory_transient_triggers(self) -> list[str]:
+        return json.loads(self.v2_memory_transient_triggers_json)
 
     @model_validator(mode="after")
     def validate_rel_config(self):

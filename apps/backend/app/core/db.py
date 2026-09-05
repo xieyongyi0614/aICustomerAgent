@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
     false,
 )
+from sqlalchemy import types as sa_types
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from app.core.settings import get_settings
@@ -77,6 +78,23 @@ class ConversationSummary(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class VectorType(sa_types.UserDefinedType):
+    """pgvector 向量列类型；SQLite 下退化为 JSON 存储（仅保证迁移可跑，不启用向量检索）。"""
+
+    cache_ok = True
+
+    def get_col_spec(self, **kw) -> str:
+        return "VECTOR(768)"
+
+    def bind_processor(self, dialect):
+        if dialect.name == "sqlite":
+            return lambda value: value
+        return None
+
+    def result_processor(self, dialect, coltype):
+        return None
+
+
 class Memory(Base):
     __tablename__ = "memories"
 
@@ -102,6 +120,15 @@ class Memory(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    embedding: Mapped[object | None] = mapped_column(VectorType, nullable=True)
+    salience: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_reinforced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    merge_chain: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    source_ref: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    visibility: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -743,4 +770,78 @@ class EvaluationReportRow(Base):
         ),
         Index("idx_evaluation_user_time", "user_id", "created_at"),
         Index("idx_evaluation_subject", "subject", "subject_id"),
+    )
+
+
+class MemoryCandidateRow(Base):
+    __tablename__ = "memory_candidates"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="*", server_default="*"
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    proposed_type: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    source_ref: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    source_table: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    salience: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", server_default="pending"
+    )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    visibility: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'promoted')",
+            name="ck_memory_candidates_status",
+        ),
+        UniqueConstraint("source_table", "source_id", name="uq_memory_candidates_source"),
+        Index("idx_memory_candidates_user_status", "user_id", "status"),
+    )
+
+
+class MemoryLinkRow(Base):
+    __tablename__ = "memory_links"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    memory_id: Mapped[str] = mapped_column(String, nullable=False)
+    related_memory_id: Mapped[str] = mapped_column(String, nullable=False)
+    relation: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "relation IN ('supersedes', 'merges', 'contradicts')",
+            name="ck_memory_links_relation",
+        ),
+        Index("idx_memory_links_memory", "memory_id"),
+    )
+
+
+class BackgroundJobRow(Base):
+    __tablename__ = "background_jobs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    job_type: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", server_default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'running', 'done', 'failed')",
+            name="ck_background_jobs_status",
+        ),
+        Index("idx_background_jobs_status_run_at", "status", "run_at"),
     )
