@@ -137,6 +137,7 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
     try:
         if get_settings().v2_memory_enabled:
             await _run_memory_ingest_v2(ctx)
+            await _run_memory_evaluate_v2(ctx)
         else:
             recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
             recent_context = "\n".join(
@@ -212,6 +213,13 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
             memory_ingest.ingest_from_relationship_event(event, trace=ctx.trace)
         except Exception:
             logger.exception("RelationshipEvent 摄取失败（幂等安全）：%s", event.id)
+
+
+async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
+    """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。"""
+    from app.services.memory2 import evaluator as memory_evaluator
+
+    await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
 
 
 async def run_budget_observer(ctx: PostProcessContext) -> None:
