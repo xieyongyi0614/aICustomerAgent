@@ -134,20 +134,23 @@ async def run_summary(ctx: PostProcessContext) -> None:
 
 async def run_memory_extract(ctx: PostProcessContext) -> None:
     started = time.perf_counter()
-    recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
-    recent_context = "\n".join(
-        f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
-        for m in recent_turns
-    )
     try:
-        await memory_service.extract_and_save(
-            ctx.user_id,
-            ctx.user_input,
-            ctx.ai_reply,
-            llm=ctx.llm,
-            trace=ctx.trace,
-            recent_context=recent_context,
-        )
+        if get_settings().v2_memory_enabled:
+            await _run_memory_ingest_v2(ctx)
+        else:
+            recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
+            recent_context = "\n".join(
+                f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
+                for m in recent_turns
+            )
+            await memory_service.extract_and_save(
+                ctx.user_id,
+                ctx.user_input,
+                ctx.ai_reply,
+                llm=ctx.llm,
+                trace=ctx.trace,
+                recent_context=recent_context,
+            )
         if ctx.trace is not None:
             ctx.trace.record(
                 "memory_extractor", (time.perf_counter() - started) * 1000
@@ -159,8 +162,56 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
                 "memory_extractor",
                 (time.perf_counter() - started) * 1000,
                 "error",
-                error="extract_and_save failed",
+                error="memory ingest failed",
             )
+
+
+async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
+    """v2 摄取通道：复用 v1 extractor 产物（不新增 LLM），四源收敛到 memory_candidates。
+
+    ActionRecord/完结 WorldEvent/RelationshipEvent 在本轮后续步骤（world/action）才产生，
+    故来源候选由幂等键跨轮收敛——重复补扫不会重复产出。
+    """
+    from app.chains.extractor_chain import extract_candidates
+    from app.services.memory2 import ingest as memory_ingest
+    from app.services.memory2 import sources as memory_sources
+    from app.models.memory import MemoryExtraction
+
+    recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
+    recent_context = "\n".join(
+        f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
+        for m in recent_turns
+    )
+    extraction = await extract_candidates(
+        ctx.user_input,
+        ctx.ai_reply,
+        recent_context=recent_context,
+        llm=ctx.llm,
+    )
+    if not isinstance(extraction, MemoryExtraction):
+        extraction = MemoryExtraction.model_validate(extraction)
+    source_id_base = f"conv:{ctx.user_id}:{ctx.session_id}"
+    memory_ingest.ingest_from_conversation(
+        ctx.user_id,
+        extraction,
+        source_id_base=source_id_base,
+        trace=ctx.trace,
+    )
+    for record in memory_sources.fetch_action_records(ctx.user_id):
+        try:
+            memory_ingest.ingest_from_action_record(record, trace=ctx.trace)
+        except Exception:
+            logger.exception("ActionRecord 摄取失败（幂等安全）：%s", record.id)
+    for event in memory_sources.fetch_completed_world_events(ctx.user_id):
+        try:
+            memory_ingest.ingest_from_world_event(event, ctx.user_id, trace=ctx.trace)
+        except Exception:
+            logger.exception("WorldEvent 摄取失败（幂等安全）：%s", event.id)
+    for event in memory_sources.fetch_relationship_events(ctx.user_id):
+        try:
+            memory_ingest.ingest_from_relationship_event(event, trace=ctx.trace)
+        except Exception:
+            logger.exception("RelationshipEvent 摄取失败（幂等安全）：%s", event.id)
 
 
 async def run_budget_observer(ctx: PostProcessContext) -> None:
