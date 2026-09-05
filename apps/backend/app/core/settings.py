@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     v2_reflection_enabled: bool = False
     v2_reflection_min_confidence: float = 0.6
     v2_reflection_min_evidence: int = 3
+    v2_reflection_window_days: int = 30
+    v2_reflection_cluster_cosine: float = 0.82
+    v2_reflection_min_span_hours: float = 24.0
+    v2_reflection_min_coherence: float = 0.5
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
