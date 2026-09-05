@@ -2,6 +2,8 @@ import json
 import uuid
 from datetime import datetime
 
+from sqlalchemy import text as sa_text
+
 from app.core.db import Memory, SessionLocal
 from app.models.memory import UserMemory
 
@@ -263,3 +265,37 @@ def update_embeddings_batch(items: list[tuple[str, list[float]]]) -> int:
             updated += 1
         session.commit()
     return updated
+
+
+def search_by_vector(
+    user_id: str,
+    character_id: str,
+    query_vector: list[float],
+    limit: int = 20,
+) -> list[UserMemory]:
+    """pgvector 余弦近邻（<=>）召回候选；仅 active 非 hypothetical；非 PG 库返回空。"""
+    with SessionLocal() as session:
+        if session.bind.dialect.name != "postgresql":
+            return []
+        vector_literal = json.dumps(query_vector)
+        result = session.execute(
+            sa_text(
+                "SELECT id FROM memories WHERE user_id = :user_id AND status = 'active'"
+                " AND character_id IN (:character_id, '*')"
+                " AND (visibility IS NULL OR visibility != 'hypothetical')"
+                " AND embedding IS NOT NULL"
+                " ORDER BY embedding <=> :vector LIMIT :limit"
+            ),
+            {
+                "user_id": user_id,
+                "character_id": character_id,
+                "vector": vector_literal,
+                "limit": limit,
+            },
+        )
+        ids = [row[0] for row in result.fetchall()]
+        if not ids:
+            return []
+        rows = session.query(Memory).filter(Memory.id.in_(ids)).all()
+        by_id = {row.id: row for row in rows}
+        return [_to_memory(by_id[memory_id]) for memory_id in ids if memory_id in by_id]

@@ -29,6 +29,7 @@ from app.services import agent_service
 from app.services.memory2 import evaluator as memory2_evaluator
 from app.services.memory2 import ingest as memory2_ingest
 from app.services.memory2 import lifecycle as memory2_lifecycle
+from app.services.memory2 import retriever as memory2_retriever
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
@@ -82,6 +83,7 @@ _SERVICE_DB_MODULES = (
     memory2_evaluator,
     memory2_ingest,
     memory2_lifecycle,
+    memory2_retriever,
 )
 
 

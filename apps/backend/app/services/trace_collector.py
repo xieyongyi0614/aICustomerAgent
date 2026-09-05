@@ -19,6 +19,7 @@ TRACE_STEP_NAMES = (
     "scene_resolver",
     "scene_update",
     "memory_retrieval",
+    "memory_retrieve_v2",
     "context_builder",
     "prompt_builder",
     "mode_stabilize",
