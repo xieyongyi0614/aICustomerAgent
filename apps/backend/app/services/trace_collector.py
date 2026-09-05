@@ -31,6 +31,8 @@ TRACE_STEP_NAMES = (
     "budget_observer",
     "memory_extractor",
     "memory_extract",
+    "memory_ingest",
+    "memory_evaluate",
     "memory_policy",
     "memory_privacy",
     "memory_conflict",

@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     v2_memory_vector_enabled: bool = False
     v2_memory_eval_threshold_high: float = 0.75
     v2_memory_eval_threshold_low: float = 0.35
+    v2_memory_eval_weight_source: float = 0.35
+    v2_memory_eval_weight_novelty: float = 0.30
+    v2_memory_eval_weight_affinity: float = 0.20
+    v2_memory_eval_weight_salience: float = 0.15
     v2_memory_llm_fallback_rate_cap: float = 0.3
     v2_memory_decay_batch_size: int = 200
     v2_memory_forget_retention_days: int = 30
