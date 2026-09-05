@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState
@@ -23,6 +24,50 @@ def _load_states_with_fallback(user_id: str) -> tuple[CharacterState, Relationsh
         return CharacterState(), RelationshipState()
 
 
+def _working_window(messages):
+    recent = get_settings().memory_recent_context_messages
+    return messages[-recent:] if recent > 0 else []
+
+
+def _select_retrieval_segment(ranked) -> tuple[list, int, int]:
+    """检索段装配：Freshness 排序 + 合并预算（≤v2_memory_retrieval_budget）贪心装入。
+
+    Working 段（近期消息/信号/Scene）由既有分段承载；本函数只裁定长期检索段。
+    超预算的条目按 Freshness 丢弃并计数，明细随 context_assemble_v2 步骤进 trace。
+    """
+    settings = get_settings()
+    budget = settings.v2_memory_retrieval_budget
+    fresh_first = sorted(
+        ranked.items,
+        key=lambda item: (_freshness(item.memory), item.score),
+        reverse=True,
+    )
+    selected: list = []
+    seen: set[str] = set()
+    used = 0
+    dropped = 0
+    for item in fresh_first:
+        memory = item.memory
+        if memory.id in seen or not memory.content:
+            continue
+        if used + len(memory.content) > budget:
+            dropped += 1
+            continue
+        selected.append(memory)
+        seen.add(memory.id)
+        used += len(memory.content)
+    return selected, used, dropped
+
+
+def _freshness(memory) -> tuple:
+    reference = memory.last_accessed_at or memory.created_at
+    if reference is None:
+        return (datetime.min, 0.0)
+    if reference.tzinfo is not None:
+        reference = reference.replace(tzinfo=None)
+    return (reference, memory.importance)
+
+
 async def build(
     session_id: str,
     user_id: str,
@@ -36,10 +81,12 @@ async def build(
     current = summary_service.get_summary(session_id)
     summary = current.summary if current else None
     started = time.perf_counter()
+    retrieval_used = 0
+    dropped = 0
     try:
         if get_settings().v2_memory_enabled:
             ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
-            memories = memory_service.select_for_context(ranked.memories())
+            memories, retrieval_used, dropped = _select_retrieval_segment(ranked)
         else:
             recalled = memory_service.retrieve(user_id, current_input)
             memories = memory_service.select_for_context(recalled)
@@ -48,6 +95,19 @@ async def build(
         memories = []
     if trace is not None:
         trace.record("memory_retrieval", (time.perf_counter() - started) * 1000)
+    if get_settings().v2_memory_enabled and trace is not None:
+        recent_window = _working_window(messages)
+        trace.record(
+            "context_assemble_v2",
+            0.0,
+            "ok",
+            working_messages=len(recent_window),
+            working_chars=sum(len(m.content) for m in recent_window),
+            retrieval_budget=get_settings().v2_memory_retrieval_budget,
+            retrieval_used=retrieval_used,
+            retrieval_selected=len(memories),
+            retrieval_dropped=dropped,
+        )
     character_state, relationship_state = _load_states_with_fallback(user_id)
     goals = goal_service.load_active(user_id)
     mode = getattr(conversation_row, "mode", None) or "default"
