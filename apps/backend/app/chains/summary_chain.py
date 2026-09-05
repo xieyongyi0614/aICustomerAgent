@@ -13,14 +13,16 @@ from app.services.observability.llm_capture import (
 )
 
 
+_SUMMARY_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", summary_prompt),
+        ("user", "待摘要的新消息：\n{new_messages}"),
+    ]
+)
+
+
 def build_chain(llm=None):
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", summary_prompt),
-            ("user", "待摘要的新消息：\n{new_messages}"),
-        ]
-    )
-    return prompt | (llm or get_llm())
+    return _SUMMARY_PROMPT | (llm or get_llm())
 
 
 def _submit_record(llm, handler, started, started_at, status, error_kind):
@@ -50,7 +52,7 @@ async def summarize(old_summary: str, new_messages: str, llm=None) -> str:
     if prompt_capture.enabled():
         prompt_capture.capture_prompt_snapshot(
             CallSite.SUMMARY,
-            prompt.format_messages(old_summary=old_summary, new_messages=new_messages),
+            _SUMMARY_PROMPT.format_messages(old_summary=old_summary, new_messages=new_messages),
             llm,
         )
     try:
