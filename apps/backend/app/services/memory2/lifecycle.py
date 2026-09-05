@@ -108,26 +108,27 @@ def record_reinforce(memory_id: str) -> None:
     _reinforce_pending.append(memory_id)
 
 
-def flush_reinforce_buffer(trace=None) -> int:
+def flush_reinforce_buffer(trace=None) -> list[str]:
+    """批量落库强化缓冲；返回本次落库的 memory_id（REF-003 事件计数订阅该返回值）。"""
     if not _reinforce_pending:
-        return 0
+        return []
     batch = list(_reinforce_pending)
     try:
-        updated = _apply_reinforce(batch, trace=trace)
+        updated_ids = _apply_reinforce(batch, trace=trace)
     except Exception:
         logger.exception("reinforce 批量写失败，缓冲保留待下轮")
-        return 0
+        return []
     flushed = set(batch)
     _reinforce_pending[:] = [mid for mid in _reinforce_pending if mid not in flushed]
     _reinforce_seen.difference_update(flushed)
-    return updated
+    return updated_ids
 
 
-def _apply_reinforce(memory_ids: list[str], trace=None) -> int:
+def _apply_reinforce(memory_ids: list[str], trace=None) -> list[str]:
     started = time.perf_counter()
     now = datetime.now()
     boost = get_settings().v2_memory_reinforce_boost
-    updated = 0
+    updated_ids: list[str] = []
     with SessionLocal() as session:
         rows = session.query(Memory).filter(Memory.id.in_(memory_ids)).all()
         for row in rows:
@@ -138,16 +139,16 @@ def _apply_reinforce(memory_ids: list[str], trace=None) -> int:
             row.last_reinforced_at = now
             row.last_decayed_at = now
             row.last_accessed_at = now
-            updated += 1
+            updated_ids.append(row.id)
         session.commit()
     _trace(
         trace,
         started,
         event=EVENT_REINFORCE,
         memory_ids=list(memory_ids),
-        updated=updated,
+        updated=len(updated_ids),
     )
-    return updated
+    return updated_ids
 
 
 def _decay_reference(row: Memory) -> datetime:

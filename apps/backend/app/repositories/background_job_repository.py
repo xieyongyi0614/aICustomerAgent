@@ -51,6 +51,19 @@ def enqueue_job(
             return False
 
 
+def has_job(idempotency_key: str) -> bool:
+    """幂等键是否已占用（入队前预检用，只读不写）。"""
+    if not idempotency_key:
+        return False
+    with SessionLocal() as session:
+        return (
+            session.query(BackgroundJobRow.id)
+            .filter(BackgroundJobRow.idempotency_key == idempotency_key)
+            .first()
+            is not None
+        )
+
+
 def complete_jobs(job_type: str, idempotency_keys: list[str]) -> int:
     if not idempotency_keys:
         return 0

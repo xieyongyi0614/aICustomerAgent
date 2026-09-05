@@ -219,12 +219,12 @@ class TestReinforce:
         _memory("m1", "内容", salience=0.5, last_reinforced_at=now)
         lifecycle.record_reinforce("m1")
         lifecycle.record_reinforce("m1")
-        assert lifecycle.flush_reinforce_buffer() == 1
+        assert len(lifecycle.flush_reinforce_buffer()) == 1
         row = _row("m1")
         assert row.salience == pytest.approx(0.6)
         assert row.status == "active"
         assert row.last_reinforced_at is not None
-        assert lifecycle.flush_reinforce_buffer() == 0
+        assert lifecycle.flush_reinforce_buffer() == []
 
     def test_reinforce_revives_decayed(self, life_db):
         _memory("m1", "内容", status="decayed", salience=0.1)
@@ -239,7 +239,7 @@ class TestReinforce:
         _memory("m1", "内容", status="forgotten", forgotten_at=now,
                 last_reinforced_at=now)
         lifecycle.record_reinforce("m1")
-        assert lifecycle.flush_reinforce_buffer() == 0
+        assert lifecycle.flush_reinforce_buffer() == []
         assert _row("m1").status == "forgotten"
         assert lifecycle._reinforce_pending == []
 
@@ -253,10 +253,10 @@ class TestReinforce:
 
         original = lifecycle.SessionLocal
         monkeypatch.setattr(lifecycle, "SessionLocal", _Broken)
-        assert lifecycle.flush_reinforce_buffer() == 0
+        assert lifecycle.flush_reinforce_buffer() == []
         monkeypatch.setattr(lifecycle, "SessionLocal", original)
         assert lifecycle._reinforce_pending == ["m1"]
-        assert lifecycle.flush_reinforce_buffer() == 1
+        assert len(lifecycle.flush_reinforce_buffer()) == 1
         assert _row("m1").salience == pytest.approx(0.6)
 
 

@@ -221,10 +221,27 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
 
 
 async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
-    """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。"""
+    """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。
+
+    尾部接线 REF-003：flush 强化缓冲并把落库 id 喂给反思事件计数
+    （MEM-005 函数本体零修改；job_worker tick 抢先 flush 时本处拿到空列表，
+    该批不进事件计数，由每日周期调度兜底）。
+    """
     from app.services.memory2 import evaluator as memory_evaluator
 
     await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
+
+    if not get_settings().v2_reflection_enabled:
+        return
+    try:
+        from app.services.memory2 import lifecycle as memory_lifecycle
+        from app.services.reflection import triggers as reflection_triggers
+
+        flushed_ids = memory_lifecycle.flush_reinforce_buffer(trace=ctx.trace)
+        if flushed_ids:
+            reflection_triggers.observe_reinforce(ctx.user_id, flushed_ids, trace=ctx.trace)
+    except Exception:
+        logger.exception("反思事件接线失败，不影响记忆评估")
 
 
 async def run_budget_observer(ctx: PostProcessContext) -> None:

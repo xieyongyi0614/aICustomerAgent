@@ -268,7 +268,7 @@ class TestReinforceSignal:
         after = memory_repository.get_memory("m1")
         assert after.last_accessed_at == before.last_accessed_at
         assert lifecycle._reinforce_pending == ["m1"]
-        assert lifecycle.flush_reinforce_buffer() == 1
+        assert len(lifecycle.flush_reinforce_buffer()) == 1
 
 
 class TestTrace:
