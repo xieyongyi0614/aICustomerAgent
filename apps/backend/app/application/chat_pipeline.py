@@ -62,14 +62,17 @@ def _router_candidate(result) -> tuple[str, float]:
     return result.mode, result.confidence
 
 
+def _idle_seconds_since(moment: datetime) -> float:
+    now = datetime.now(moment.tzinfo) if moment.tzinfo is not None else datetime.now()
+    return max((now - moment).total_seconds(), 0.0)
+
+
 def _stabilize_mode(role_mode_result, state, session_id: str) -> mode_service.ModeDecision:
     candidate, confidence = _router_candidate(role_mode_result)
     confirmed = state.mode or "default"
     idle_seconds = 0.0
     if state.mode_entered_at is not None:
-        idle_seconds = max(
-            (datetime.now() - state.mode_entered_at).total_seconds(), 0.0
-        )
+        idle_seconds = _idle_seconds_since(state.mode_entered_at)
     decision = mode_service.stabilize(
         confirmed_mode=confirmed,
         candidate=candidate,

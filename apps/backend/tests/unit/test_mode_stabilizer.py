@@ -1,7 +1,15 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 
+from app.application.chat_pipeline import _idle_seconds_since, _stabilize_mode
 from app.services import mode_service
 from app.services.mode_service import stabilize
+
+
+class _StateStub:
+    def __init__(self, mode, mode_entered_at):
+        self.mode = mode
+        self.mode_entered_at = mode_entered_at
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +83,42 @@ def test_sessions_counted_independently():
     assert d.rule == "R3"
     d = stabilize("default", "immersive", 0.9, "s1", 0)
     assert d.rule == "R2"
+
+
+def test_idle_seconds_handles_aware_utc_moment():
+    moment = datetime.now(timezone.utc) - timedelta(minutes=10)
+    assert 599 <= _idle_seconds_since(moment) <= 601
+
+
+def test_idle_seconds_handles_aware_non_utc_offset():
+    tz = timezone(timedelta(hours=8))
+    moment = datetime.now(tz) - timedelta(minutes=10)
+    assert 599 <= _idle_seconds_since(moment) <= 601
+
+
+def test_idle_seconds_handles_naive_moment():
+    moment = datetime.now() - timedelta(minutes=10)
+    assert 599 <= _idle_seconds_since(moment) <= 601
+
+
+def test_idle_seconds_future_moment_clamped_to_zero():
+    moment = datetime.now(timezone.utc) + timedelta(minutes=1)
+    assert _idle_seconds_since(moment) == 0.0
+
+
+def test_stabilize_mode_with_aware_mode_entered_at_no_typeerror():
+    state = _StateStub("immersive", datetime.now(timezone.utc) - timedelta(hours=3))
+    d = _stabilize_mode(None, state, "s-tz")
+    assert (d.effective, d.rule) == ("default", "R4")
+
+
+def test_stabilize_mode_with_naive_mode_entered_at_recent_keeps_confirmed():
+    state = _StateStub("immersive", datetime.now() - timedelta(minutes=1))
+    d = _stabilize_mode(None, state, "s-naive")
+    assert (d.effective, d.rule) == ("immersive", "R5")
+
+
+def test_stabilize_mode_with_none_mode_entered_at():
+    state = _StateStub("immersive", None)
+    d = _stabilize_mode(None, state, "s-none")
+    assert (d.effective, d.rule) == ("immersive", "R5")
