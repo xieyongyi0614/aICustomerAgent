@@ -1,0 +1,22 @@
+{
+  "kind": "explicit_forget",
+  "scenarios": [
+    {
+      "id": "ef-01",
+      "description": "唯一高匹配忘掉 → 三通道 0 命中",
+      "steps": [
+        {"action": "seed", "ref": "target", "content": "用户喜欢收集邮票", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "forget", "message": "忘掉用户喜欢收集邮票", "expect": {"outcome": "forgot", "deleted_refs": ["target"]}},
+        {"action": "forget_check", "ref": "target", "probe_query": "用户喜欢收集邮票吗"}
+      ]
+    },
+    {
+      "id": "ef-02",
+      "description": "模糊指令（无高匹配目标）→ 不删除任何记忆",
+      "steps": [
+        {"action": "seed", "ref": "stamp", "content": "用户喜欢收集邮票", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "forget", "message": "忘掉那件童年的事情", "expect": {"outcome": "miss", "intact_refs": ["stamp"]}}
+      ]
+    }
+  ]
+}

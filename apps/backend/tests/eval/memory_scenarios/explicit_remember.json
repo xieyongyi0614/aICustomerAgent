@@ -1,0 +1,22 @@
+{
+  "kind": "explicit_remember",
+  "scenarios": [
+    {
+      "id": "er-01",
+      "description": "记住X → 0 次 LLM 立即转正 salience=1.0",
+      "steps": [
+        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "osmanthus", "expect": {"outcome": "remember_promoted", "salience": 1.0, "llm_used": 0}},
+        {"action": "probe", "query": "我最喜欢什么花", "top_k": 1, "expect_top": "osmanthus"}
+      ]
+    },
+    {
+      "id": "er-02",
+      "description": "重复记住同主题 → reinforce 而非新建",
+      "steps": [
+        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "first", "expect": {"outcome": "remember_promoted"}},
+        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "second", "expect": {"outcome": "remember_reinforced"}},
+        {"action": "count_check", "expect_active_memories": 1}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "kind": "user_correction",
+  "scenarios": [
+    {
+      "id": "uc-01",
+      "description": "用户改口（吃辣→不吃辣）→ 旧记忆 superseded 且链可溯",
+      "steps": [
+        {"action": "seed", "ref": "old", "content": "用户喜欢吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "new", "content": "用户不吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "supersede_check", "new_ref": "new", "superseded_refs": ["old"], "relation": "supersedes"}
+      ]
+    },
+    {
+      "id": "uc-02",
+      "description": "部分修正（内容包含旧条目）→ merge 链",
+      "steps": [
+        {"action": "seed", "ref": "old", "content": "用户喜欢吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "new", "content": "用户喜欢吃辣尤其是川菜", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "supersede_check", "new_ref": "new", "superseded_refs": ["old"], "relation": "merges"}
+      ]
+    }
+  ]
+}

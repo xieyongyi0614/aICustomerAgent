@@ -1,0 +1,31 @@
+{
+  "kind": "paraphrase_recall",
+  "scenarios": [
+    {
+      "id": "pr-01",
+      "description": "同义改述查询（语义通道）命中原记忆",
+      "steps": [
+        {"action": "seed", "ref": "watermelon", "content": "用户喜欢吃西瓜", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "probe", "query": "最爱吃的水果是西瓜呀", "top_k": 1, "expect_top": "watermelon", "via": "semantic"}
+      ]
+    },
+    {
+      "id": "pr-02",
+      "description": "改述提问工作地点（语义通道）区分干扰记忆",
+      "steps": [
+        {"action": "seed", "ref": "work", "content": "用户在杭州的互联网公司上班", "type": "user_fact", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "distract", "content": "用户喜欢杭州的西湖醋鱼", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "probe", "query": "他在哪里工作呀", "top_k": 1, "expect_top": "work", "via": "semantic"}
+      ]
+    },
+    {
+      "id": "pr-03",
+      "description": "改述查询宠物名字（语义通道）",
+      "steps": [
+        {"action": "seed", "ref": "pet", "content": "用户养的猫叫团子", "type": "user_fact", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "other", "content": "用户的姐姐住在上海", "type": "user_fact", "source": "user_stated", "salience": 0.8},
+        {"action": "probe", "query": "那只猫的名字是什么来着", "top_k": 1, "expect_top": "pet", "via": "semantic"}
+      ]
+    }
+  ]
+}
