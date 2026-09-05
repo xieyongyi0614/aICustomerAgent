@@ -35,11 +35,13 @@ from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import retriever as memory2_retriever
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import lifecycle as reflection_lifecycle
+from app.services.reflection import triggers as reflection_triggers
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
 from app.repositories import (
     action_repository,
+    background_job_repository,
     character_state_repository,
     conversation_repository,
     decision_repository,
@@ -64,6 +66,7 @@ WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
 
 _REPO_MODULES = (
     action_repository,
+    background_job_repository,
     conversation_repository,
     summary_repository,
     memory_repository,
@@ -94,6 +97,7 @@ _SERVICE_DB_MODULES = (
     memory2_retriever,
     reflection_evidence,
     reflection_lifecycle,
+    reflection_triggers,
 )
 
 
@@ -316,6 +320,9 @@ def override_settings(monkeypatch):
         for key, env in env_map.items():
             if key in kwargs:
                 monkeypatch.setenv(env, str(kwargs[key]))
+        for key, value in kwargs.items():
+            if key not in env_map:
+                monkeypatch.setenv(key.upper(), str(value))
         get_settings.cache_clear()
 
     yield _apply

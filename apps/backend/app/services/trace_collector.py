@@ -48,6 +48,7 @@ TRACE_STEP_NAMES = (
     "action_execute",
     "action_planning",
     "reflection_evidence",
+    "reflection_trigger",
 )
 
 _BACKGROUND_STEPS = (

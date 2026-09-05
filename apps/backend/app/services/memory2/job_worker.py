@@ -33,12 +33,19 @@ _JOB_HANDLERS = {
     JOB_TYPE_EMBEDDING_BACKFILL: memory_embeddings.backfill_scan,
 }
 
+_TICK_HOOKS: list = []
+
 _CLAIM_BATCH_LIMIT = 20
 
 
 def register_job_type(job_type: str, handler) -> None:
     """新处理器一行注册；处理器必须幂等（P5 Life Loop 复用同一协议）。"""
     _JOB_HANDLERS[job_type] = handler
+
+
+def register_tick_hook(hook) -> None:
+    """周期 tick 挂靠点（每轮 run_job_tick 末尾调用，异常隔离）；REF-003 周期触发入口。"""
+    _TICK_HOOKS.append(hook)
 
 
 async def run_job_worker_loop() -> None:
@@ -62,6 +69,11 @@ def run_job_tick(trace=None) -> dict:
     }
     memory_lifecycle.flush_reinforce_buffer()
     memory_embeddings.flush_if_due()
+    for hook in _TICK_HOOKS:
+        try:
+            hook(now)
+        except Exception:
+            logger.exception("tick hook 异常，继续下一轮")
     stats["done"], stats["retried"], stats["failed"] = _claim_and_execute(now)
     _trace(trace, started, **stats)
     return stats
