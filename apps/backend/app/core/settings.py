@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     v2_memory_llm_fallback_rate_cap: float = 0.3
     v2_memory_decay_batch_size: int = 200
     v2_memory_forget_retention_days: int = 30
+    v2_memory_salience_floor: float = 0.1
+    v2_memory_reinforce_boost: float = 0.1
+    v2_memory_decay_lambda_json: str = (
+        '{"user_preference": 0.01, "user_fact": 0.01,'
+        ' "important_event": 0.03, "relationship_event": 0.03}'
+    )
     v2_embedding_batch_size: int = 32
     v2_embedding_batch_window_seconds: int = 60
     v2_embedding_profile: str = ""
@@ -449,6 +455,9 @@ class Settings(BaseSettings):
 
     def v2_memory_transient_triggers(self) -> list[str]:
         return json.loads(self.v2_memory_transient_triggers_json)
+
+    def v2_memory_decay_lambdas(self) -> dict:
+        return json.loads(self.v2_memory_decay_lambda_json)
 
     @model_validator(mode="after")
     def validate_rel_config(self):

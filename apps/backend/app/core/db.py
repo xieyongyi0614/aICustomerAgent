@@ -126,6 +126,12 @@ class Memory(Base):
     last_reinforced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    last_decayed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    forgotten_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     merge_chain: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     source_ref: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     visibility: Mapped[str | None] = mapped_column(String, nullable=True)

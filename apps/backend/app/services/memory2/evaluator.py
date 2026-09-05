@@ -23,6 +23,7 @@ from app.core.settings import SettingsError, get_settings
 from app.models.memory2 import EvaluationVerdict
 from app.prompts.memory2_evaluator import build_memory_evaluation_messages
 from app.services.memory2 import embeddings as memory_embeddings
+from app.services.memory2 import lifecycle as memory_lifecycle
 from app.services.memory_conflict import _lcs_length, same_topic
 from app.services.memory_service import TYPE_AFFINITY_KEYWORDS
 
@@ -268,6 +269,19 @@ def _enqueue_embedding(memory_id: str, candidate: MemoryCandidateRow) -> None:
         logger.exception("embedding 入队失败，留待 NULL 补扫：%s", memory_id)
 
 
+def _after_promotion(
+    memory_id: str, candidate: MemoryCandidateRow, trace=None
+) -> None:
+    source_ref = candidate.source_ref or {}
+    try:
+        memory_lifecycle.on_promoted(
+            memory_id, relation=source_ref.get("relation"), trace=trace
+        )
+    except Exception:
+        logger.exception("转正冲突检测失败，留待补扫：%s", memory_id)
+    _enqueue_embedding(memory_id, candidate)
+
+
 def _promote_or_defer(
     candidate: MemoryCandidateRow,
     *,
@@ -277,6 +291,7 @@ def _promote_or_defer(
     score: float,
     components: dict | None = None,
     llm_used: bool = False,
+    trace=None,
 ) -> Decision:
     try:
         memory_id = _promote(
@@ -290,7 +305,7 @@ def _promote_or_defer(
             llm_used=llm_used,
             components=components or {},
         )
-    _enqueue_embedding(memory_id, candidate)
+    _after_promotion(memory_id, candidate, trace=trace)
     return Decision(
         DECISION_APPROVE,
         reason,
@@ -317,6 +332,7 @@ async def _decide_gray_zone(
     score: float,
     components: dict,
     llm=None,
+    trace=None,
 ) -> Decision:
     if not _fallback_budget_available():
         _fallback_window.append(False)
@@ -351,6 +367,7 @@ async def _decide_gray_zone(
             score=score,
             components=components,
             llm_used=True,
+            trace=trace,
         )
     _mark_rejected(candidate.id, reason)
     return Decision(
@@ -359,7 +376,7 @@ async def _decide_gray_zone(
 
 
 async def _decide(
-    candidate: MemoryCandidateRow, active_contents: list[str], llm=None
+    candidate: MemoryCandidateRow, active_contents: list[str], llm=None, trace=None
 ) -> Decision:
     if candidate.status != "pending":
         return Decision(DECISION_DEFER, "not_pending", 0.0)
@@ -377,6 +394,7 @@ async def _decide(
             salience=1.0,
             reason="explicit_remember",
             score=1.0,
+            trace=trace,
         )
     if _is_exact_duplicate(content, active_contents):
         _mark_rejected(candidate.id, "duplicate_exact")
@@ -399,7 +417,7 @@ async def _decide(
             DECISION_REJECT, f"low_score:{score:.2f}", score, components=components
         )
     return await _decide_gray_zone(
-        candidate, content, active_contents, score, components, llm
+        candidate, content, active_contents, score, components, llm, trace
     )
 
 
@@ -429,7 +447,7 @@ async def evaluate_candidate(
     llm=None,
 ) -> Decision:
     started = time.perf_counter()
-    decision = await _decide(candidate, active_contents, llm)
+    decision = await _decide(candidate, active_contents, llm, trace)
     _trace_decision(trace, started, decision, candidate)
     return decision
 
