@@ -5,18 +5,174 @@
       "id": "sd-01",
       "description": "基本事实注入后按查询召回",
       "steps": [
-        {"action": "seed", "ref": "fruit", "content": "用户最喜欢的水果是西瓜", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "seed", "ref": "job", "content": "用户在深圳做程序员", "type": "user_fact", "source": "user_stated", "salience": 0.8},
-        {"action": "probe", "query": "用户最喜欢什么水果", "top_k": 1, "expect_top": "fruit"}
+        {
+          "action": "seed",
+          "ref": "fruit",
+          "content": "用户最喜欢的水果是西瓜",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "job",
+          "content": "用户在深圳做程序员",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "probe",
+          "query": "用户最喜欢什么水果",
+          "top_k": 1,
+          "expect_top": "fruit"
+        }
       ]
     },
     {
       "id": "sd-02",
       "description": "宠物事实注入后召回且不含无关记忆",
       "steps": [
-        {"action": "seed", "ref": "cat", "content": "用户养了一只叫团子的猫", "type": "user_fact", "source": "user_stated", "salience": 0.8},
-        {"action": "seed", "ref": "hobby", "content": "用户周末喜欢爬山", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "probe", "query": "用户养的宠物是什么", "top_k": 1, "expect_top": "cat", "expect_not_ids": ["hobby"]}
+        {
+          "action": "seed",
+          "ref": "cat",
+          "content": "用户养了一只叫团子的猫",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "hobby",
+          "content": "用户周末喜欢爬山",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "probe",
+          "query": "用户养的宠物是什么",
+          "top_k": 1,
+          "expect_top": "cat",
+          "expect_not_ids": [
+            "hobby"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sd-03",
+      "description": "运动偏好与家乡事实互不干扰",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "sport",
+          "content": "用户最喜欢的运动是游泳",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "hometown",
+          "content": "用户的家乡是苏州",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "probe",
+          "query": "用户最喜欢什么运动",
+          "top_k": 1,
+          "expect_top": "sport",
+          "expect_not_ids": [
+            "hometown"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sd-04",
+      "description": "过敏事实召回",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "peanut",
+          "content": "用户不能吃花生",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "rock",
+          "content": "用户喜欢摇滚乐",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "probe",
+          "query": "用户吃花生会过敏吗",
+          "top_k": 1,
+          "expect_top": "peanut"
+        }
+      ]
+    },
+    {
+      "id": "sd-05",
+      "description": "晨跑习惯召回",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "running",
+          "content": "用户每天早上跑步半小时",
+          "type": "important_event",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "reading",
+          "content": "用户晚上喜欢读书",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.7
+        },
+        {
+          "action": "probe",
+          "query": "用户早上做什么运动",
+          "top_k": 1,
+          "expect_top": "running"
+        }
+      ]
+    },
+    {
+      "id": "sd-06",
+      "description": "生日事实召回",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "birthday",
+          "content": "用户的生日在十一月",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "bird",
+          "content": "用户养了一只画眉鸟",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.7
+        },
+        {
+          "action": "probe",
+          "query": "用户生日是什么时候",
+          "top_k": 1,
+          "expect_top": "birthday"
+        }
       ]
     }
   ]

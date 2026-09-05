@@ -5,18 +5,120 @@
       "id": "uc-01",
       "description": "用户改口（吃辣→不吃辣）→ 旧记忆 superseded 且链可溯",
       "steps": [
-        {"action": "seed", "ref": "old", "content": "用户喜欢吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "seed", "ref": "new", "content": "用户不吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "supersede_check", "new_ref": "new", "superseded_refs": ["old"], "relation": "supersedes"}
+        {
+          "action": "seed",
+          "ref": "old",
+          "content": "用户喜欢吃辣",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "new",
+          "content": "用户不吃辣",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "supersede_check",
+          "new_ref": "new",
+          "superseded_refs": [
+            "old"
+          ],
+          "relation": "supersedes"
+        }
       ]
     },
     {
       "id": "uc-02",
       "description": "部分修正（内容包含旧条目）→ merge 链",
       "steps": [
-        {"action": "seed", "ref": "old", "content": "用户喜欢吃辣", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "seed", "ref": "new", "content": "用户喜欢吃辣尤其是川菜", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "supersede_check", "new_ref": "new", "superseded_refs": ["old"], "relation": "merges"}
+        {
+          "action": "seed",
+          "ref": "old",
+          "content": "用户喜欢吃辣",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "new",
+          "content": "用户喜欢吃辣尤其是川菜",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "supersede_check",
+          "new_ref": "new",
+          "superseded_refs": [
+            "old"
+          ],
+          "relation": "merges"
+        }
+      ]
+    },
+    {
+      "id": "uc-03",
+      "description": "改口停喝可乐 → 旧偏好 superseded",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "old",
+          "content": "用户喜欢喝可乐",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "new",
+          "content": "用户不喝可乐了",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "supersede_check",
+          "new_ref": "new",
+          "superseded_refs": [
+            "old"
+          ],
+          "relation": "supersedes"
+        }
+      ]
+    },
+    {
+      "id": "uc-04",
+      "description": "工作信息精化 → merge 链",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "old",
+          "content": "用户在深圳工作",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed",
+          "ref": "new",
+          "content": "用户在深圳工作，公司做科技产品",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "supersede_check",
+          "new_ref": "new",
+          "superseded_refs": [
+            "old"
+          ],
+          "relation": "merges"
+        }
       ]
     }
   ]

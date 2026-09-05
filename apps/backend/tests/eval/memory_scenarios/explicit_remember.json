@@ -5,17 +5,91 @@
       "id": "er-01",
       "description": "记住X → 0 次 LLM 立即转正 salience=1.0",
       "steps": [
-        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "osmanthus", "expect": {"outcome": "remember_promoted", "salience": 1.0, "llm_used": 0}},
-        {"action": "probe", "query": "我最喜欢什么花", "top_k": 1, "expect_top": "osmanthus"}
+        {
+          "action": "remember",
+          "message": "记住我最喜欢桂花",
+          "ref": "osmanthus",
+          "expect": {
+            "outcome": "remember_promoted",
+            "salience": 1.0,
+            "llm_used": 0
+          }
+        },
+        {
+          "action": "probe",
+          "query": "我最喜欢什么花",
+          "top_k": 1,
+          "expect_top": "osmanthus"
+        }
       ]
     },
     {
       "id": "er-02",
       "description": "重复记住同主题 → reinforce 而非新建",
       "steps": [
-        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "first", "expect": {"outcome": "remember_promoted"}},
-        {"action": "remember", "message": "记住我最喜欢桂花", "ref": "second", "expect": {"outcome": "remember_reinforced"}},
-        {"action": "count_check", "expect_active_memories": 1}
+        {
+          "action": "remember",
+          "message": "记住我最喜欢桂花",
+          "ref": "first",
+          "expect": {
+            "outcome": "remember_promoted"
+          }
+        },
+        {
+          "action": "remember",
+          "message": "记住我最喜欢桂花",
+          "ref": "second",
+          "expect": {
+            "outcome": "remember_reinforced"
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 1
+        }
+      ]
+    },
+    {
+      "id": "er-03",
+      "description": "记住复诊安排 → 立即可召回",
+      "steps": [
+        {
+          "action": "remember",
+          "message": "记住我周三要去医院复查",
+          "ref": "clinic",
+          "expect": {
+            "outcome": "remember_promoted",
+            "salience": 1.0,
+            "llm_used": 0
+          }
+        },
+        {
+          "action": "probe",
+          "query": "我周三有什么安排",
+          "top_k": 1,
+          "expect_top": "clinic"
+        }
+      ]
+    },
+    {
+      "id": "er-04",
+      "description": "记住住址 → user_fact 映射",
+      "steps": [
+        {
+          "action": "remember",
+          "message": "记住我家住在重庆",
+          "ref": "home",
+          "expect": {
+            "outcome": "remember_promoted",
+            "salience": 1.0
+          }
+        },
+        {
+          "action": "probe",
+          "query": "我家在哪个城市",
+          "top_k": 1,
+          "expect_top": "home"
+        }
       ]
     }
   ]

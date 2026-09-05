@@ -4,18 +4,95 @@
     {
       "id": "mi-01",
       "description": "AI 推测的可疑断言 → 灰区 LLM 拒绝 → 不入库",
-      "llm_reject_contents": ["地球其实是方形的"],
+      "llm_reject_contents": [
+        "地球其实是方形的"
+      ],
       "steps": [
-        {"action": "seed", "ref": "bad", "content": "地球其实是方形的", "type": "user_fact", "source": "ai_inferred", "salience": 0.8, "expect": {"approved": false, "llm_used": 1}},
-        {"action": "count_check", "expect_active_memories": 0}
+        {
+          "action": "seed",
+          "ref": "bad",
+          "content": "地球其实是方形的",
+          "type": "user_fact",
+          "source": "ai_inferred",
+          "salience": 0.8,
+          "expect": {
+            "approved": false,
+            "llm_used": 1
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 0
+        }
       ]
     },
     {
       "id": "mi-02",
       "description": "AI 推测被兜底批准 → 标低置信（confidence ≤0.4）",
       "steps": [
-        {"action": "seed", "ref": "guess", "content": "用户可能喜欢爬山", "type": "user_preference", "source": "ai_inferred", "salience": 0.8, "expect": {"approved": true, "confidence_max": 0.4}},
-        {"action": "count_check", "expect_active_memories": 1}
+        {
+          "action": "seed",
+          "ref": "guess",
+          "content": "用户可能喜欢爬山",
+          "type": "user_preference",
+          "source": "ai_inferred",
+          "salience": 0.8,
+          "expect": {
+            "approved": true,
+            "confidence_max": 0.4
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 1
+        }
+      ]
+    },
+    {
+      "id": "mi-03",
+      "description": "荒谬断言被兜底拒绝 → 不入库",
+      "llm_reject_contents": [
+        "用户其实是机器人假扮的人类"
+      ],
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "bad",
+          "content": "用户其实是机器人假扮的人类",
+          "type": "user_fact",
+          "source": "ai_inferred",
+          "salience": 0.8,
+          "expect": {
+            "approved": false,
+            "llm_used": 1
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 0
+        }
+      ]
+    },
+    {
+      "id": "mi-04",
+      "description": "低置信推测被兜底批准 → 标低置信",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "guess",
+          "content": "用户大概养着一只乌龟",
+          "type": "user_preference",
+          "source": "ai_inferred",
+          "salience": 0.8,
+          "expect": {
+            "approved": true,
+            "confidence_max": 0.4
+          }
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 1
+        }
       ]
     }
   ]

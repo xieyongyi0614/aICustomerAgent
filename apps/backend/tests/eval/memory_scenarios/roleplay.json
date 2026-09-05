@@ -5,17 +5,56 @@
       "id": "rp-01",
       "description": "假装场景 → 候选 hypothetical 标记且不入长期记忆",
       "steps": [
-        {"action": "seed_hypothetical", "ref": "rp", "content": "假装我是国王"},
-        {"action": "count_check", "expect_active_memories": 0}
+        {
+          "action": "seed_hypothetical",
+          "ref": "rp",
+          "content": "假装我是国王"
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 0
+        }
       ]
     },
     {
       "id": "rp-02",
       "description": "假设内容即使存在也不进检索结果",
       "steps": [
-        {"action": "seed", "ref": "real", "content": "用户真实职业是教师", "type": "user_fact", "source": "user_stated", "salience": 0.8},
-        {"action": "seed_hypothetical", "ref": "rp", "content": "如果我是宇航员就好了"},
-        {"action": "probe", "query": "用户的职业是什么", "top_k": 5, "expect_top": "real", "expect_no_hypothetical": true}
+        {
+          "action": "seed",
+          "ref": "real",
+          "content": "用户真实职业是教师",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "seed_hypothetical",
+          "ref": "rp",
+          "content": "如果我是宇航员就好了"
+        },
+        {
+          "action": "probe",
+          "query": "用户的职业是什么",
+          "top_k": 5,
+          "expect_top": "real",
+          "expect_no_hypothetical": true
+        }
+      ]
+    },
+    {
+      "id": "rp-03",
+      "description": "假如场景 → 拦截且无长期记忆",
+      "steps": [
+        {
+          "action": "seed_hypothetical",
+          "ref": "rp",
+          "content": "假如我是赛车手"
+        },
+        {
+          "action": "count_check",
+          "expect_active_memories": 0
+        }
       ]
     }
   ]

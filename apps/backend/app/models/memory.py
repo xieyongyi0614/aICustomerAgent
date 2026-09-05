@@ -3,7 +3,17 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-MemoryType = Literal["user_preference", "user_fact", "important_event", "relationship_event"]
+MemoryType = Literal[
+    "user_preference",
+    "user_fact",
+    "important_event",
+    "relationship_event",
+    "experience",
+    "relationship_fact",
+    "commitment",
+    "milestone_event",
+    "behavior_pattern",
+]
 
 MemorySource = Literal["user_stated", "user_derived", "ai_inferred"]
 

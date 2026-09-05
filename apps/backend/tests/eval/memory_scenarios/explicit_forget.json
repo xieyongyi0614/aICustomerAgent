@@ -5,17 +5,106 @@
       "id": "ef-01",
       "description": "唯一高匹配忘掉 → 三通道 0 命中",
       "steps": [
-        {"action": "seed", "ref": "target", "content": "用户喜欢收集邮票", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "forget", "message": "忘掉用户喜欢收集邮票", "expect": {"outcome": "forgot", "deleted_refs": ["target"]}},
-        {"action": "forget_check", "ref": "target", "probe_query": "用户喜欢收集邮票吗"}
+        {
+          "action": "seed",
+          "ref": "target",
+          "content": "用户喜欢收集邮票",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "forget",
+          "message": "忘掉用户喜欢收集邮票",
+          "expect": {
+            "outcome": "forgot",
+            "deleted_refs": [
+              "target"
+            ]
+          }
+        },
+        {
+          "action": "forget_check",
+          "ref": "target",
+          "probe_query": "用户喜欢收集邮票吗"
+        }
       ]
     },
     {
       "id": "ef-02",
       "description": "模糊指令（无高匹配目标）→ 不删除任何记忆",
       "steps": [
-        {"action": "seed", "ref": "stamp", "content": "用户喜欢收集邮票", "type": "user_preference", "source": "user_stated", "salience": 0.8},
-        {"action": "forget", "message": "忘掉那件童年的事情", "expect": {"outcome": "miss", "intact_refs": ["stamp"]}}
+        {
+          "action": "seed",
+          "ref": "stamp",
+          "content": "用户喜欢收集邮票",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "forget",
+          "message": "忘掉那件童年的事情",
+          "expect": {
+            "outcome": "miss",
+            "intact_refs": [
+              "stamp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ef-03",
+      "description": "忘掉潜水计划 → 三通道 0 命中",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "diving",
+          "content": "用户在学潜水",
+          "type": "important_event",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "forget",
+          "message": "忘掉用户在学潜水",
+          "expect": {
+            "outcome": "forgot",
+            "deleted_refs": [
+              "diving"
+            ]
+          }
+        },
+        {
+          "action": "forget_check",
+          "ref": "diving",
+          "probe_query": "用户还在学潜水吗"
+        }
+      ]
+    },
+    {
+      "id": "ef-04",
+      "description": "模糊目标无匹配 → 原记忆完好",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "boss",
+          "content": "用户的老板姓王",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.8
+        },
+        {
+          "action": "forget",
+          "message": "忘掉那件工作上的事",
+          "expect": {
+            "outcome": "miss",
+            "intact_refs": [
+              "boss"
+            ]
+          }
+        }
       ]
     }
   ]

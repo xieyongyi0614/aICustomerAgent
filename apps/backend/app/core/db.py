@@ -138,7 +138,9 @@ class Memory(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type IN ('user_preference', 'user_fact', 'important_event', 'relationship_event')",
+            "type IN ('user_preference', 'user_fact', 'important_event',"
+            " 'relationship_event', 'experience', 'relationship_fact',"
+            " 'commitment', 'milestone_event', 'behavior_pattern')",
             name="ck_memories_type",
         ),
         Index("idx_memories_user", "user_id"),

@@ -69,6 +69,8 @@ stateDiagram-v2
 - **遗忘**：显式 forget → 立即全通道不可见（状态置 forgotten + embedding 清空）→ 30 天物理删除；低 salience 自动遗忘仅 Decayed 状态。
 - **冲突处理**：contradicts 链 + 保守原则——无法判定时两者并存并标 pending，由下次反思/用户澄清解决（禁止单跳双向丢弃，修 v4 遗留）。
 
+> 实现裁决（D1~D5，含 hypothetical 候选按本状态机直接 Rejected、v2 类型 7+2 收口）：见 [decisions.md](decisions.md)。
+
 ## 5. 什么成为 Memory（评估规则优先序）
 
 | 信号 | 处理 |
