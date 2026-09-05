@@ -146,11 +146,13 @@ def ingest_from_conversation(
         rows.append(row)
     if trace is not None:
         trace.record(
-            "memory_ingest", 0.0,
+            "memory_ingest",
+            0.0,
             extra={
                 "source": SOURCE_CONVERSATION,
                 "created": len(rows),
                 "blocked": blocked,
+                "candidate_ids": [row.id for row in rows],
             },
         )
     return rows
@@ -185,7 +187,11 @@ def ingest_from_action_record(
         },
     )
     if trace is not None:
-        trace.record("memory_ingest", 0.0, extra={"source": SOURCE_ACTION, "created": 1})
+        trace.record(
+            "memory_ingest",
+            0.0,
+            extra={"source": SOURCE_ACTION, "created": 1, "candidate_ids": [row.id]},
+        )
     return row
 
 
@@ -217,7 +223,15 @@ def ingest_from_world_event(event, user_id: str, trace=None) -> MemoryCandidateR
         },
     )
     if trace is not None:
-        trace.record("memory_ingest", 0.0, extra={"source": SOURCE_WORLD, "created": 1})
+        trace.record(
+            "memory_ingest",
+            0.0,
+            extra={
+                "source": SOURCE_WORLD,
+                "created": 1,
+                "candidate_ids": [row.id] if row else [],
+            },
+        )
     return row
 
 
@@ -242,7 +256,12 @@ def ingest_from_relationship_event(event, trace=None) -> MemoryCandidateRow | No
     )
     if trace is not None:
         trace.record(
-            "memory_ingest", 0.0,
-            extra={"source": SOURCE_RELATIONSHIP, "created": 1},
+            "memory_ingest",
+            0.0,
+            extra={
+                "source": SOURCE_RELATIONSHIP,
+                "created": 1,
+                "candidate_ids": [row.id],
+            },
         )
     return row

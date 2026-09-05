@@ -138,7 +138,13 @@ def _apply_reinforce(memory_ids: list[str], trace=None) -> int:
             row.last_accessed_at = now
             updated += 1
         session.commit()
-    _trace(trace, started, event=EVENT_REINFORCE, updated=updated)
+    _trace(
+        trace,
+        started,
+        event=EVENT_REINFORCE,
+        memory_ids=list(memory_ids),
+        updated=updated,
+    )
     return updated
 
 

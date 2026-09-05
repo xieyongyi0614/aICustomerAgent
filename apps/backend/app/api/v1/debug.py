@@ -16,9 +16,26 @@ from app.services.observability.metrics_aggregator import (
     build_metric_report,
     summarize_llm_records,
 )
+from app.services.memory2 import attribution as memory2_attribution
 from app.services.trace_collector import get_trace_collector
 
 debug_router = APIRouter()
+
+
+@debug_router.get("/debug/memory/{memory_id}/attribution")
+def get_memory_attribution(memory_id: str):
+    view = memory2_attribution.memory_attribution(memory_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="memory 不存在")
+    return view
+
+
+@debug_router.get("/debug/candidate/{candidate_id}/attribution")
+def get_candidate_attribution(candidate_id: str):
+    view = memory2_attribution.candidate_attribution(candidate_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="candidate 不存在")
+    return view
 
 
 @debug_router.get("/debug/turns/{turn_id}/trace")
