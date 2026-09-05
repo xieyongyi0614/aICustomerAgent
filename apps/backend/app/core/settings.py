@@ -134,6 +134,10 @@ class Settings(BaseSettings):
         '["帮我拿", "帮我递", "递给我", "放到", "放一下", "打开", "关一下", "取下"]'
     )
 
+    v2_reflection_enabled: bool = False
+    v2_reflection_min_confidence: float = 0.6
+    v2_reflection_min_evidence: int = 3
+
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
     emotion_switch_min_confidence: float = 0.8
