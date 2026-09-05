@@ -41,13 +41,13 @@ Marker 由 `tests/conftest.py::pytest_collection_modifyitems` **自动打标**�
 |---|---|---|
 | Focused | `pytest tests/unit/test_state_engine.py::test_xxx` | 改完代码第一优先级 |
 | Module | `pytest tests/unit/`、`pytest tests/e2e/` | 当前模块相关测试 |
-| Fast | `pytest -m "unit or api" -m "not slow"` | 日常开发最大范围，无真实外部依赖 |
+| Fast | `pytest -m "(unit or api) and not slow"` | 日常开发最大范围，无真实外部依赖 |
 | Integration | `pytest -m integration` | 改 DB / 迁移 / 跨模块时 |
 | E2E | `pytest -m e2e` | 全链路回归 |
 | Full | `pytest` | **禁止作为日常默认动作**，仅阶段完成 / PR / 发布 / CI |
 
-> Fast Test 实际为 `pytest -m "unit or api"`；若想更保守可加 `and not slow`。
-> 全量默认已启用 `pytest-xdist`（`-n auto --dist loadscope`，见 pyproject addopts），并行安全：每测试独立内存 SQLite、无共享外部状态、无 Redis。
+> Fast Test 即 `-m "(unit or api) and not slow"`。**多个 `-m` 连用只有最后一个生效**（如 `-m "unit or api" -m "not slow"` 实际等价于只写 `-m "not slow"`，会放进全部 integration），必须写进单个表达式。
+> 全量默认已启用 `pytest-xdist`（`-n auto --dist loadgroup`，见 pyproject addopts），并行安全：每测试独立内存 SQLite、无共享外部状态、无 Redis；需要真实 PostgreSQL 的迁移测试文件用 `xdist_group("migration")` 钉入同一 worker 顺序执行，避免并发升降级同一 `asuna_test` 库互踩。
 
 ## 4. AI Coding 测试执行规则（必须遵守）
 
@@ -91,6 +91,8 @@ AI 修改代码后**不允许直接执行 `pytest`（Full Test）**。默认流�
 - 后台任务等待统一用 `conftest.wait_until`（有 deadline 的谓词轮询），禁止新增裸 `sleep(5)` 掩盖竞态。
 - 时间冻结用注入 TimeProvider（不 monkeypatch `datetime.now`）。
 - 迁移类测试依赖本机 PostgreSQL 时自动 skip，属预期行为，不算失败。
+- **超时兜底**：pytest-timeout 全局启用（`timeout = 120`、thread 方法，见 `pyproject.toml`），任何用例卡死 120s 后被强制失败并 dump 全线程栈，不再无限等待；等待一律用 `conftest.wait_until` 等有界机制，禁止无界轮询。
+- **新模块接入 offline 保护**：services / application 层新增模块级 `SessionLocal`（`from app.core.db import SessionLocal`）的模块，必须同步加入 `tests/conftest.py::_SERVICE_DB_MODULES`（autouse `_offline_repos` 默认只覆盖 `repositories/*`），否则测试会连真实 PostgreSQL（`.env`）挂起——根因B 模式，MEM-003 评估器/摄取模块曾复发。
 
 ## 7. CI 策略
 

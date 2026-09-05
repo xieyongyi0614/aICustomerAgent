@@ -5,6 +5,7 @@ from typing import Any
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
+os.environ.setdefault("V2_MEMORY_ENABLED", "false")
 os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
 # 世界/lifespan 循环的 DB 访问已由 autouse _offline_repos 落到内存 SQLite，无需再关闭 world。
 os.environ.setdefault(
@@ -25,6 +26,8 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
 from app.services import agent_service
+from app.services.memory2 import evaluator as memory2_evaluator
+from app.services.memory2 import ingest as memory2_ingest
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
@@ -72,6 +75,11 @@ _REPO_MODULES = (
     world_repository,
     relationship_milestone_repository,
     relationship_conflict_repository,
+)
+
+_SERVICE_DB_MODULES = (
+    memory2_evaluator,
+    memory2_ingest,
 )
 
 
@@ -176,10 +184,11 @@ def llm_override():
 
 @pytest.fixture(autouse=True)
 def _offline_repos(monkeypatch):
-    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 的 SessionLocal 指向内存 SQLite。
+    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory2 服务的 SessionLocal 指向内存 SQLite。
 
     修复根因B：PromptBuilder.build(analysis=...) 等“纯单测”隐含访问
     relationship_milestone_repository.SessionLocal，若不替换则连真实 PostgreSQL(.env) 而挂起。
+    services 层新增模块级 SessionLocal 的模块必须同步加入 _SERVICE_DB_MODULES。
     """
     if os.environ.get("TEST_USE_POSTGRES") == "1":
         yield None
@@ -189,8 +198,8 @@ def _offline_repos(monkeypatch):
     )
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(engine)
-    for repo in _REPO_MODULES:
-        monkeypatch.setattr(repo, "SessionLocal", testing_session)
+    for module in (*_REPO_MODULES, *_SERVICE_DB_MODULES):
+        monkeypatch.setattr(module, "SessionLocal", testing_session)
     yield testing_session
     deadline = time.time() + 2.0
     while (

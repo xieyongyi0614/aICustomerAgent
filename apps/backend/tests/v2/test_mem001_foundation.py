@@ -7,6 +7,8 @@ from sqlalchemy import create_engine, inspect, text
 
 from app.core.db import Base
 
+pytestmark = pytest.mark.xdist_group("migration")
+
 PG_TEST_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://asuna:asuna@127.0.0.1:5432/asuna_test"
 )
