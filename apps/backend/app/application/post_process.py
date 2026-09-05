@@ -168,11 +168,16 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
 
 
 async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
-    """v2 摄取通道：复用 v1 extractor 产物（不新增 LLM），四源收敛到 memory_candidates。
+    """v2 摄取通道：显式命令优先，未命中再走四源收敛到 memory_candidates。
 
     ActionRecord/完结 WorldEvent/RelationshipEvent 在本轮后续步骤（world/action）才产生，
     故来源候选由幂等键跨轮收敛——重复补扫不会重复产出。
     """
+    from app.services.memory2 import commands as memory_commands
+
+    outcome = await memory_commands.handle(ctx.user_id, ctx.user_input, trace=ctx.trace)
+    if outcome != memory_commands.OUTCOME_MISS:
+        return
     from app.chains.extractor_chain import extract_candidates
     from app.services.memory2 import ingest as memory_ingest
     from app.services.memory2 import sources as memory_sources
