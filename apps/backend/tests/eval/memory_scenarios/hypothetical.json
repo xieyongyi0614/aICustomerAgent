@@ -1,0 +1,22 @@
+{
+  "kind": "hypothetical",
+  "scenarios": [
+    {
+      "id": "hy-01",
+      "description": "如果/要是触发词 → hypothetical 拦截",
+      "steps": [
+        {"action": "seed_hypothetical", "ref": "h1", "content": "如果我能飞就好了"},
+        {"action": "seed_hypothetical", "ref": "h2", "content": "要是当年去学画画就好了"}
+      ]
+    },
+    {
+      "id": "hy-02",
+      "description": "假设性偏好不污染真实偏好检索",
+      "steps": [
+        {"action": "seed", "ref": "real", "content": "用户喜欢喝绿茶", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "seed_hypothetical", "ref": "hyp", "content": "假如我喜欢喝咖啡"},
+        {"action": "probe", "query": "用户喜欢喝什么茶", "top_k": 3, "expect_top": "real", "expect_no_hypothetical": true}
+      ]
+    }
+  ]
+}

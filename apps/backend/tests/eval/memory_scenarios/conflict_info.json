@@ -1,0 +1,24 @@
+{
+  "kind": "conflict_info",
+  "scenarios": [
+    {
+      "id": "ci-01",
+      "description": "negate 信号矛盾 → 保守并存 + contradicts 链",
+      "steps": [
+        {"action": "seed", "ref": "old", "content": "用户喜欢住在城市", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "neg", "content": "用户不喜欢住在城市", "type": "user_preference", "source": "user_stated", "salience": 0.8, "relation": "negate", "expect": {"approved": true}},
+        {"action": "contradicts_check", "a_ref": "neg", "b_ref": "old", "expect_both_active": true}
+      ]
+    },
+    {
+      "id": "ci-02",
+      "description": "矛盾对侧被处置后 → 幸存方 24h 冷却期内不出现在检索",
+      "steps": [
+        {"action": "seed", "ref": "survivor", "content": "用户喜欢住在城市", "type": "user_preference", "source": "user_stated", "salience": 0.8},
+        {"action": "seed", "ref": "neg", "content": "用户不喜欢住在城市", "type": "user_preference", "source": "user_stated", "salience": 0.8, "relation": "negate", "expect": {"approved": true}},
+        {"action": "resolve_contradicts", "dead_ref": "neg"},
+        {"action": "probe", "query": "用户喜欢住在哪里", "top_k": 5, "expect_not_ids": ["survivor"], "expect_cooldown_filtered": "survivor"}
+      ]
+    }
+  ]
+}

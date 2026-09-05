@@ -28,3 +28,17 @@
 4. 迁移 up/down 往返 + 数据逐行对比
 5. 结果记录至本文件附录（日期/环境/结论）
 ```
+
+## 可执行入口（MEM-010）
+
+| Gate | 命令 | 判定 |
+|---|---|---|
+| Eval Gate（Flag ON 影子态，确定性 stub） | `pytest tests/eval/test_memory_eval_gate.py` | E-MEM-01~06 达 evaluation.md 门槛，报告落 `apps/backend/tests/eval/reports/mem-{date}.json` |
+| Regression Gate（Flag OFF golden 字节级） | `pytest tests/golden` | diff 为空 |
+| 分级测试 | Focused（tests/v2）→ Module（tests/unit + tests/golden）→ Fast（`-m "(unit or api) and not slow"`） | 全绿 |
+| 迁移往返 | `pytest tests/v2/test_mem001_foundation.py`（head=0023） | upgrade→downgrade→upgrade 数据逐行相等 |
+| v1 全量 pytest | `pytest`（阶段收口先汇报规模） | 无新增失败 |
+
+## 附录：执行记录
+
+- 2026-09-06（feat/v2.0.0，MEM-010 合入）：Eval Gate 首跑 21 场景/10 类全过（E-MEM-01 1.0、02 1.0、03 1.0、04 1.0、05 1.0、06 1.0，probes 12 次零违例）；场景集为确定性种子集，标注规模随 Phase 累积（目标每类 ≥10）。本地环境注意：全量 e2e 存在与本 Phase 无关的时序敏感基线失败（已在 Phase 1 报告记录），分级测试口径全绿。

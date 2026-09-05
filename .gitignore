@@ -2,3 +2,9 @@
 .vite
 .pytest_tmp
 .workbuddy
+
+# Local databases
+*.db
+
+# Eval gate 报告产物（每次运行重新生成）
+apps/backend/tests/eval/reports/mem-*.json

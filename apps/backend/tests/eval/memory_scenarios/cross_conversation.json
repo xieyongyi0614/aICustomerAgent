@@ -1,0 +1,23 @@
+{
+  "kind": "cross_conversation",
+  "scenarios": [
+    {
+      "id": "cc-01",
+      "description": "同内容跨会话重复注入只保留一条记忆",
+      "steps": [
+        {"action": "seed", "ref": "first", "content": "用户在杭州西湖附近上班", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:a:1"},
+        {"action": "seed", "ref": "second", "content": "用户在杭州西湖附近上班", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:b:1", "expect": {"approved": false, "reason": "duplicate_exact"}},
+        {"action": "count_check", "expect_active_memories": 1}
+      ]
+    },
+    {
+      "id": "cc-02",
+      "description": "不同会话的不同事实互不干扰",
+      "steps": [
+        {"action": "seed", "ref": "home", "content": "用户的家乡是成都", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:a:2"},
+        {"action": "seed", "ref": "work", "content": "用户的公司在北京", "type": "user_fact", "source": "user_stated", "salience": 0.8, "source_id": "conv:b:2"},
+        {"action": "probe", "query": "用户的家乡是哪里", "top_k": 1, "expect_top": "home"}
+      ]
+    }
+  ]
+}

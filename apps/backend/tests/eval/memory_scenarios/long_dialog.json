@@ -1,0 +1,28 @@
+{
+  "kind": "long_dialog",
+  "scenarios": [
+    {
+      "id": "ld-01",
+      "description": "多条噪声记忆淹没下目标事实仍可召回",
+      "steps": [
+        {"action": "seed", "ref": "noise-1", "content": "用户今天早上吃了包子", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "noise-2", "content": "用户昨天看了电影", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "noise-3", "content": "用户上周去了公园", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "noise-4", "content": "用户最近在学吉他", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "noise-5", "content": "用户下午喝了咖啡", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "noise-6", "content": "用户晚上散步半小时", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "seed", "ref": "target", "content": "用户对芒果过敏", "type": "user_fact", "source": "user_stated", "salience": 0.9},
+        {"action": "probe", "query": "用户对什么食物过敏", "top_k": 1, "expect_top": "target"}
+      ]
+    },
+    {
+      "id": "ld-02",
+      "description": "50+ 轮对话规模的记忆池中检索段仍受预算约束",
+      "steps": [
+        {"action": "seed", "ref": "target", "content": "用户的妹妹叫小雨", "type": "user_fact", "source": "user_stated", "salience": 0.9},
+        {"action": "seed_many", "count": 12, "template": "用户记录了第{i}次晨跑打卡", "type": "important_event", "source": "user_stated", "salience": 0.6},
+        {"action": "probe", "query": "用户的妹妹叫什么名字", "top_k": 5, "expect_top": "target", "max_results": 5}
+      ]
+    }
+  ]
+}
