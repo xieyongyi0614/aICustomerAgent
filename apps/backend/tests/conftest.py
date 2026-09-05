@@ -30,6 +30,7 @@ from app.services.memory2 import attribution as memory2_attribution
 from app.services.memory2 import commands as memory2_commands
 from app.services.memory2 import evaluator as memory2_evaluator
 from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory2 import job_worker as memory2_job_worker
 from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import retriever as memory2_retriever
 from app.core.db import Base
@@ -86,6 +87,7 @@ _SERVICE_DB_MODULES = (
     memory2_commands,
     memory2_evaluator,
     memory2_ingest,
+    memory2_job_worker,
     memory2_lifecycle,
     memory2_retriever,
 )
