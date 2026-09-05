@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     v2_memory_forget_retention_days: int = 30
     v2_embedding_batch_size: int = 32
     v2_embedding_batch_window_seconds: int = 60
+    v2_embedding_profile: str = ""
+    v2_embedding_model: str = ""
+    v2_embedding_dimensions: int = 768
+    v2_embedding_max_input_chars: int = 2000
     v2_memory_retrieval_budget: int = 800
     v2_memory_ingest_max_per_turn: int = 10
     v2_memory_hypothetical_triggers_json: str = (
