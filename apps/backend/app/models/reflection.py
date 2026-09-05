@@ -2,8 +2,10 @@
 
 Insight / ReflectionRun 服务层投影；状态与枚举是生命周期状态机的事实源。
 类型终值由代码校准与复检决定（LLM 自报值仅作提案）。
+EvidenceMember / EvidenceWindow（REF-002）为证据聚合的计算结构。
 """
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
@@ -52,6 +54,41 @@ class ReflectionRunStatusEnum(StrEnum):
 class ReflectionTriggerEnum(StrEnum):
     SCHEDULED = "scheduled"
     EVENT = "event"
+
+
+@dataclass
+class EvidenceMember:
+    memory_id: str
+    content: str
+    created_at: datetime
+    source: str
+    source_ref: str
+    salience: float
+    weight: float
+    semantic_sim: float = 0.0
+    topic_sim: float = 0.0
+
+
+@dataclass
+class WindowStats:
+    member_count: int
+    span_hours: float
+    distinct_source_refs: int
+    source_type_mix: dict = field(default_factory=dict)
+    coherence: float = 0.0
+
+
+@dataclass
+class EvidenceWindow:
+    topic_digest: str
+    members: list[EvidenceMember] = field(default_factory=list)
+    stats: WindowStats | None = None
+    gate_reasons: list[str] = field(default_factory=list)
+    degraded: str | None = None
+
+    @property
+    def passes_gate(self) -> bool:
+        return not self.gate_reasons
 
 
 class Insight(BaseModel):
