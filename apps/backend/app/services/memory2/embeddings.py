@@ -200,6 +200,20 @@ def _trace_batch(
     )
 
 
+def embed_query(text: str) -> list[float] | None:
+    """单条查询向量化；未配置或端点异常返回 None（检索侧降级纯结构化）。"""
+    if not (text or "").strip():
+        return None
+    client = get_embedding_client()
+    if client is None:
+        return None
+    try:
+        return _embed_batch([_truncate(text)])[0]
+    except Exception as exc:
+        logger.warning("query 向量化失败，降级结构化检索：%s", exc.__class__.__name__)
+        return None
+
+
 def reset_queue() -> None:
     """清空内存队列（测试与运维复位用；持久恢复依赖 NULL 补扫，不依赖内存态）。"""
     _queue.clear()

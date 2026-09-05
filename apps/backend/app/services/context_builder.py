@@ -1,6 +1,7 @@
 import logging
 import time
 
+from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.relationship import RelationshipState
@@ -9,6 +10,7 @@ from app.services import goal_service
 from app.services import memory_service
 from app.services import state_service
 from app.services import summary_service
+from app.services.memory2 import retriever as memory2_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +37,12 @@ async def build(
     summary = current.summary if current else None
     started = time.perf_counter()
     try:
-        recalled = memory_service.retrieve(user_id, current_input)
-        memories = memory_service.select_for_context(recalled)
+        if get_settings().v2_memory_enabled:
+            ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
+            memories = memory_service.select_for_context(ranked.memories())
+        else:
+            recalled = memory_service.retrieve(user_id, current_input)
+            memories = memory_service.select_for_context(recalled)
     except Exception:
         logger.exception("记忆检索失败，降级为空记忆")
         memories = []

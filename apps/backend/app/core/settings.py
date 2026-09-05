@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     v2_embedding_dimensions: int = 768
     v2_embedding_max_input_chars: int = 2000
     v2_memory_retrieval_budget: int = 800
+    v2_memory_weight_semantic: float = 0.45
+    v2_memory_weight_structured: float = 0.35
+    v2_memory_weight_affinity: float = 0.20
+    v2_memory_penalty_rejected: float = 0.2
+    v2_memory_penalty_contradicts: float = 0.2
+    v2_memory_rejected_cooldown_hours: float = 24.0
+    v2_memory_vector_recall_k: int = 20
     v2_memory_ingest_max_per_turn: int = 10
     v2_memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
