@@ -148,3 +148,22 @@ Flag OFF: 步骤 4/5 整体 skip（LIFE-002 skip 条件），全链 v1 逐字节
 - 快查不走向量检索（embedding 依赖与成本）；不触 reinforce 写回（读路径零写）。
 - digest 预算硬顶（600 字符）且挤占申报为零（不进 Context Architect 800 合并预算——它是 proactive 生成上下文，不是对话 Context 段；核对记录 20）。
 - 不提前设计 Phase 6：检索不做 goal 相关性排序、不做 Planning 输入组装（AUT-002）；反思不接 goal 证据（P6 范围）。
+
+## 缺口补充设计（评审决策材料，随登记缺口收口补充）
+
+### 补 1：salience 查询索引备案 DDL（核对记录 5）
+
+本 Task 取「既有索引过滤 + 小集合排序」口径的规模触发阈值与备好 DDL（**本期不建**）：
+
+- 触发条件：单用户 active 记忆数 > 2000（P1 candidate pool 上限 500 的 4 倍冗余余量）或快查 P95 > 50ms（loop_memory trace 观测）；
+- 备案 DDL：`CREATE INDEX CONCURRENTLY idx_memories_user_salience ON memories (user_id, character_id, status, salience DESC)`（含 character_id 与过滤列全对齐，排序零 filesort；`visibility != 'hypothetical'` 由回表过滤，不进索引键）；
+- 迁移方式：独立小迁移（ alembic op.create_index，PG 专用 CONCURRENTLY 在 SQLite 测试环境退化为普通建索引）。
+
+### 补 2：「记忆参与触发判定」的红线解锁决策材料（核对记录 17）
+
+若评审认为高显著度记忆（如未兑现嘱托）应参与「是否主动」判定，所需的**最小架构变更形状**如下（供红线解除裁决用，本期不实施）：
+
+- 变更点 1（Extend，无争议）：`PolicySnapshot` 追加可选字段 `salient_memory_keys: tuple[str, ...] = ()`（对齐 REL-003 relationship_patterns 先例），Controller 组装处注入快查结果；
+- 变更点 2（**红线触碰点**）：`autonomy_policy.evaluate` 八步短路中新增一条规则（如「存在 commitment 类显著记忆且超期未兑现 → 覆盖 quiet hours/intimacy 闸门」）——纯函数本体改动，需 tasks.md 红线条款修订（AutonomyPolicy 零改动 → 允许白名单式扩展）；
+- 配套：decision trace 附命中记忆 keys（溯源）；评估规则补「触发有依据」对记忆触发源的检查；V7 checklist 需确认新规则在 OFF 路径不生效（Flag 门控在组装处，OFF 时字段恒空 → 规则自然短路，golden 不变可行）；
+- 影响估计：代码 ~30 行 + 红线条款修订 + V7 回归重跑；建议作为独立评审项与 P6 AUT 闸门调制一并裁决（P6 本就计划消费 Autonomy 阈值调制，避免两次触碰红线）。

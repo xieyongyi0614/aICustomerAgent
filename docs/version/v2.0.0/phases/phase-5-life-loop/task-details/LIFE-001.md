@@ -43,10 +43,10 @@ v1 触发信号分三类，其中两类完全无持久化（`app/services/trigge
 | 同文件 `poll_due_followup` L52-70 | 内存扫描 + pop 出队 | Flag ON：表 claim（pending 且 due_at≤now 且 cooldown_until≤now → due，SKIP LOCKED）；无 due 返回 None |
 | 同文件 `evaluate_inactivity` L137-177 | 纯函数即时判定，命中即返回信号 | **函数本体零改动**；命中后 Flag ON 追加一步 `register`（upsert，已存在非 pending 行 → 返回 None，跨重启幂等取代 seen_keys） |
 | 同文件 `poll_due_actions` L73-110 / `mark_action_reported` L113-134 | 现场扫 world_events + payload 置位 | 轮询逻辑不变；Flag ON 命中后经 register 领取；`mark_action_reported` 追加 trigger done 推进（幂等） |
-| 同文件 L109 / L134 | **缺陷：引用未定义的 `logger`**（模块无 `import logging`），异常路径二次 NameError | 本 Task 实施时顺手补 `logger = logging.getLogger(__name__)`（两行修复，零行为变化；详见 README 核对记录 6） |
+| 同文件 L109 / L134 | 缺陷：引用未定义的 `logger`（模块无 `import logging`），异常路径二次 NameError | **已修复**（Phase 5 补充提交：补 `import logging` + logger 定义，异常路径恢复正常吞错；见 README 核对记录 6） |
 | `app/services/memory_service.py` L99-102 `_register_followups` | 登记点（记忆保存后调用） | 零改动（`register_followup` 内部自迁移） |
 | `app/application/autonomy_engine.py` L249-262 | 信号优先级：action_due → followup → inactivity | 零改动（poll 函数内部自迁移）；L361-364 delivered 后 `mark_action_reported` 调用点零改动 |
-| 同文件 L50-51 `reset_seen_keys` | **缺陷：引用从未定义的 `_seen_dedupe_keys`**（调用即 NameError；当前无调用方，死代码） | 本 Task 不动（死代码清理另行确认；登记 README 核对记录 6） |
+| 同文件 L50-51 `reset_seen_keys` | 缺陷：引用从未定义的 `_seen_dedupe_keys`（调用即 NameError；全仓引用面为零，死代码） | **已删除**（Phase 5 补充提交：函数无任何调用方，删除即修复；inactivity 跨重启幂等由本 Task 的 registry 唯一键承接，见 README 核对记录 6） |
 | `app/repositories/` | 无 trigger 仓储 | 新增 `trigger_registry_repository.py`（register/claim_due/complete/cancel/fail_for_retry/has_due/recover_stale） |
 | `app/core/db.py` | 无 trigger_registry 模型 | 新增 `TriggerRegistryRow`（风格对齐 BackgroundJobRow） |
 | `migrations/versions/` | head=0027 | 新增 `0028_trigger_registry.py` |
@@ -172,7 +172,7 @@ kill -9 演练: register 落表 → kill -9 → 重启 → claim_due 命中同�
 
 - **AutonomyPolicy 纯函数本体零改动**（evaluate / effective_interval_minutes / in_quiet_hours——tasks.md 红线）；本 Task 只动 TriggerEvaluator 的存储通道，三类信号的判定条件、context 字段、dedupe_key 形状全部保持 v1。
 - autonomy_engine / autonomy_worker / proactive_executor 本体零改动（LIFE-002 才归并调度）；`mark_action_reported` 内追加一行 done 推进是唯一引擎文件触点（幂等、Flag 门控、OFF 逐字节）。
-- trigger_evaluator 的 `logger` 缺失修复（L109/L134）随本 Task 实施（两行）；`autonomy_engine.reset_seen_keys` 死代码不动。
+- trigger_evaluator 的 `logger` 缺失与 `autonomy_engine.reset_seen_keys` 死代码两处 NameError 缺陷**已在 Phase 5 补充提交中修复**（本 Task 实施时无需重复处理；修复经 tests/unit/test_trigger_*、test_autonomy_* 52 例回归验证）。
 - 迁移 0028 只增表，零列变更零数据迁移（纯新表，downgrade drop）。
 - LLM Usage = NONE（全程规则与 SQL）。
 - 周期任务时间基准用数据库时间（data-flow.md §3）；不新增 `datetime.now()` 散点。

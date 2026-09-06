@@ -187,3 +187,40 @@ Flag ON:
 - 时间基准用数据库时间（next_retry_at 比较在 SQL 内）。
 - `action_enabled` 默认值不改（False）；outbox 端到端灰度依赖 v9 默认启用评审（核对记录 15），本 Task 测试以显式开启 action 的环境执行。
 - 不提前设计 Phase 6：event_type 扩展（goal 事件等）仅列保留，不实现。
+
+## 缺口补充设计（评审决策材料，随登记缺口收口补充）
+
+### 补 1：世界写延迟化的方案 A/B 完整对比（核对记录 3 的评审材料）
+
+评审只需二选一，两案均已设计到可实施粒度：
+
+| 维度 | **方案 A：世界写延迟化（推荐，正文设计）** | **方案 B：能力保留直写，outbox 仅覆盖 memory/relationship** |
+|---|---|---|
+| 分叉点 | 能力内跨域写调用点（reminder._create 等）返回 world_ops 描述符 | 无分叉——能力执行期照旧直写 world |
+| 消费器职责 | world 段落库（调同名引擎函数）+ 指纹幂等 + CAS | 仅 relationship 段 + memory 收口；world 段为空转 |
+| E-LIFE-04「world_event 恒 1」 | outbox 幂等键 + 指纹护栏保证（重放 ×N 恒 1） | **不覆盖**——world 写在行动事务语义内，重放靠能力侧既有 payload 位，验收口径需改为「memory/candidate 恒 1」 |
+| 崩溃窗口 | 任意点可恢复（outbox 重放） | 能力成功后、action_records 提交前的孤儿 world 事件依旧存在（v1 缺口保留） |
+| 语义变化 | 「世界写失败=行动失败」→ 最终一致（死信可查） | 零语义变化 |
+| 触碰面 | 能力函数 2~3 处写调用点 Flag 分叉（Replace 认定） | 零触碰（红线争议消解） |
+| 适用场景 | 评审接受 Replace 边界认定 | 评审否决 Replace 认定时的降级方案 |
+
+裁决建议：取 A（data-flow.md §2.1 的完整落地，E-LIFE-04 全链验收成立）；B 仅作为红线认定被否决时的备案，其验收口径变化需同步修订 evaluation.md 的 E-LIFE-04 测法。
+
+### 补 2：action memory 双通道收口设计（核对记录 4）
+
+`memory_bridge.deliver_action_memory`（v1 直写）与 P1 摄取补扫并存的收口，对齐 REL-001 旁路关停先例：
+
+- **门控**：`integrate_result` L153 处改为 `if not settings.v2_memory_enabled: memory_bridge.deliver_action_memory(...)`——`v2_memory_enabled` ON 时 v1 直写跳过（replacement 通道 = P1 补扫已在同 Flag 门内，两 Flag 语义对齐）；OFF 时逐字节 v1。
+- **过渡期兜底**：切换窗口内 evaluator `duplicate_exact` 对同模板内容拦截（既有），无双记忆风险。
+- **范围说明**：该门控属 LIFE-004 的 memory 通道收口的一部分（outbox 模式下本就不调该函数；此门控把非 outbox 模式下的双通道一并收口），不改 P1 任何代码。
+- **遗留**：v1 直写模块保留（Flag OFF 回退面），删除属 3.0 清理。
+
+### 补 3：v9 action 默认启用的评审材料（核对记录 15）
+
+M4 验收前需对该前置项出结论，决策材料如下：
+
+- **启用内容**：`action_enabled: True`（settings.py:228）——chat_pipeline action_detect 与 autonomy 自治产行动两条入口生效（`autonomy_action_enabled` 另有独立开关维持 False 不变）；
+- **行为影响面**：V9 action 全链（六闸门→能力执行→world 写）对前台对话开放；outbox（本 Task）随之有真实流量；
+- **回滚**：settings 单项回退 False，无数据迁移、无状态残留（outbox 行随消费自然收敛）；
+- **建议结论**：P5 灰度期维持 False，E-LIFE-04 幂等重放验收在测试环境显式开启完成；`v2_life_loop_enabled` 全量灰度（M4 Gate 通过）时同步评审开启 action_enabled，两 Flag 解耦推进；
+- **依赖确认**：V9 regression checklist（tests/v9）在开启前置条件下全量重跑。

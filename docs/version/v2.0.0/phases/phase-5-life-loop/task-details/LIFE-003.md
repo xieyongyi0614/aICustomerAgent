@@ -149,3 +149,28 @@ v1 的成本控制只有三处局部限额，没有全局视图：
 - 不新增 llm_call_records 列（无 user_id 的全局口径足够，核对记录 1）。
 - LLM Usage：本 Task 自身 0 LLM；它约束的是其他步骤的 LLM。
 - 不提前设计 Phase 6：预算不区分任务类型/模型档位的差异化配额（属 P6 若有需要另行设计）。
+
+## 缺口补充设计（评审决策材料，随登记缺口收口补充）
+
+### 补 1：per-user 日配额的 schema 备案方案（核对记录 1）
+
+本 Task 取全局配额口径的前提是 `llm_call_records` 无 user_id 列。若灰度后评审要求 per-user 公平性，备案方案（**本期不实施**）：
+
+- 迁移：`llm_call_records` 追加 nullable `user_id varchar` 列（只增列不改义，R13 口径）；
+- 写入：`llm_call_repository.save` 从 `observability` 请求上下文（request_id → turn → user）回填，新增调用即有值；
+- 存量回填：一次性脚本按 `request_id/turn_id` join conversations 回填（join 不上的留 NULL，计入全局桶）；
+- 聚合：`aggregate_usage_since(cutoff, user_id=None)` 增加可选分组参数；`check_daily_budget` 增加 per-user 桶（全局桶为硬闸、per-user 桶为软闸的两层结构）；
+- 兼容：user_id 为 NULL 的行只计入全局桶，行为不回退。
+
+### 补 2：P1/P2 熔断接线备案（核对记录 11）
+
+`check_daily_budget` 已按公共基础件交付，未来接线的两个最小触点（各一处门控，均不改动已交付域的限额语义）：
+
+- P1 评估兜底：`memory2/evaluator.py` `_decide_gray_zone`（L325）调用 `_ask_llm_with_retry` 前追加 `if budget_degraded: return defer`（灰区样本留 pending，下一轮配额恢复时再评——与既有 fallback rate cap 留 pending 语义同形）；
+- P2 反思执行：`reflection/reflector.py` `execute_run`（L86）LLM 调用前追加检查，degraded → 该 run 记 failed(reason=budget_circuit)（run 行留痕，日额度不占用——失败不占额度是 REF-003 既有口径）。
+
+两处接线各自的回归面（evaluator/reflector 既有测试）在实施时补跑；本 Phase 仅交付基础件与本文案，不触碰两域。
+
+### 补 3：Idle 轮留痕的采样开关备案（核对记录 13）
+
+若评审要求空转可观测（而非「无 run 行 + has_due=false」组合推断），备案最小方案：新增 `v2_life_loop_idle_trace_seconds: int = 0`（0=关闭）——Idle 连续超过该间隔时落一行 `kind=idle_heartbeat` 的 loop_runs（steps 固定 `[{"step":"idle","status":"skipped"}]`，0 LLM）。默认关闭保持零写放大。
