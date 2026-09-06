@@ -4,6 +4,7 @@
 """
 
 from app.application import world_engine
+from app.core.settings import get_settings
 from app.character.asuna.action import infer_object_category
 from app.models.action import ActionSchema, CapabilityResult
 from app.services.action.registry import ExecutionContext
@@ -49,6 +50,23 @@ class WorldActionCapability:
         name = str(params["object"]).strip()
         location_id = resolve_location_alias(str(params.get("location", "") or "")) if params.get("location") else None
         quantity = float(params.get("quantity", 1) or 1)
+        if get_settings().v2_action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "create_object",
+                        "args": [
+                            ctx.user_id,
+                            name,
+                            infer_object_category(name),
+                            location_id,
+                            quantity,
+                        ],
+                    },
+                    "failure_kind": None,
+                },
+            )
         obj = world_engine.create_object(
             ctx.user_id,
             name=name,
@@ -70,6 +88,17 @@ class WorldActionCapability:
         obj = world_engine.find_object_by_name(ctx.user_id, str(params["object"]))
         if obj is None:
             return _failure("没有这个东西")
+        if get_settings().v2_action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "move_object",
+                        "args": [ctx.user_id, obj.id, location_id],
+                    },
+                    "failure_kind": None,
+                },
+            )
         moved = world_engine.move_object(ctx.user_id, obj.id, location_id)
         if moved is None:
             return _failure("移动失败（地点不符或物品不可用）")
@@ -83,6 +112,17 @@ class WorldActionCapability:
         if obj is None:
             return _failure("没有这个东西")
         verb = str(params.get("action", "use"))
+        if get_settings().v2_action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "apply_object_action",
+                        "args": [ctx.user_id, obj.id, verb, None],
+                    },
+                    "failure_kind": None,
+                },
+            )
         used = world_engine.apply_object_action(ctx.user_id, obj.id, verb, None)
         if used is None:
             return _failure("使用动作不合法或物品不可用")

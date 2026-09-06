@@ -989,6 +989,33 @@ class TriggerRegistryRow(Base):
     )
 
 
+class OutboxEventRow(Base):
+    __tablename__ = "outbox_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    event_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="action_result", server_default="action_result"
+    )
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", server_default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'consumed', 'failed')",
+            name="ck_outbox_events_status",
+        ),
+        Index("idx_outbox_events_status_next_retry", "status", "next_retry_at"),
+    )
+
+
 class LoopRunRow(Base):
     __tablename__ = "loop_runs"
 

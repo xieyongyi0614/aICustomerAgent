@@ -38,7 +38,23 @@ def get_action(record_id: str):
     record = action_repository.get_record(record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="action record 不存在")
-    return record.model_dump(mode="json")
+    data = record.model_dump(mode="json")
+    from app.repositories import outbox_repository
+
+    outbox = outbox_repository.get(record_id)
+    data["outbox"] = (
+        {
+            "status": outbox.status,
+            "attempts": outbox.attempts,
+            "next_retry_at": (
+                outbox.next_retry_at.isoformat() if outbox.next_retry_at else None
+            ),
+            "last_error": outbox.last_error,
+        }
+        if outbox is not None
+        else None
+    )
+    return data
 
 
 @action_router.post("/debug/actions/{record_id}/retry")
