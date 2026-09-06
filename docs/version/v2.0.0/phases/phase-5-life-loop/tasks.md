@@ -179,3 +179,20 @@ M3 Integration: LIFE-005（等 P1+P2）
 M4 Acceptance:  LIFE-006 → Eval Gate + Regression Gate（含 V7 checklist 与 7 天空跑演练）→ 申请开启 v2_life_loop_enabled
 ```
 
+
+---
+
+## 实现状态（2026-09-07 起，逐 Task 回写）
+
+```text
+LIFE-001 已实现（迁移 0028 trigger_registry 五态状态机 + trigger_key 唯一 +
+priority 编码 v1 信号优先级 + (status,due_at)/(user_id,status) 双索引；
+trigger_registry_repository：register upsert 幂等（终态复活）/register_and_claim
+重检型单事务领取/claim_due_followups 原子交接（状态守卫防双领）/mark_fired/
+complete/fail_for_retry 指数退避+死信/cancel/has_due（include_types 供 Idle 排除
+inactivity）/recover_stale 对账；trigger_evaluator Flag ON 表通道优先 + 内存路径
+兜底迁移窗口 drain：register_followup 双写+消费同步 pop、poll_due_followup 一次性
+消费（对齐 v1 pop 语义）、evaluate_inactivity/poll_due_actions register_and_claim
+领取门、mark_action_reported 补 done；两处 v1 NameError 缺陷已随 fix c7f5768 修复；
+18 测试绿 + V7/V9 回归 51 例绿）。
+```

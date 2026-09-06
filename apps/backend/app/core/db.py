@@ -953,6 +953,42 @@ class BackgroundJobRow(Base):
     )
 
 
+class TriggerRegistryRow(Base):
+    __tablename__ = "trigger_registry"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="asuna", server_default="asuna"
+    )
+    trigger_type: Mapped[str] = mapped_column(String, nullable=False)
+    trigger_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", server_default="pending"
+    )
+    due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "trigger_type IN ('conversation_inactivity', 'scheduled_followup', 'action_due')",
+            name="ck_trigger_registry_type",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'due', 'fired', 'done', 'cancelled')",
+            name="ck_trigger_registry_status",
+        ),
+        Index("idx_trigger_registry_status_due_at", "status", "due_at"),
+        Index("idx_trigger_registry_user_status", "user_id", "status"),
+    )
+
+
 class DevelopmentStateRow(Base):
     __tablename__ = "development_state"
 
