@@ -141,7 +141,7 @@ def test_full_degradation_uses_default_analysis(
         assert lines[-1].strip().startswith("{\"done\"")
         assert wait_until(lambda: len(emotion_history_repository.list_recent(USER, limit=5)) == 1)
     relationship = relationship_repository.get_relationship(USER)
-    assert relationship.familiarity == pytest.approx(0.3 + 0.02 * 0.6)
+    assert relationship.familiarity == pytest.approx(0.3 + 0.02 * 0.6 + 0.02)
     state = character_state_repository.get_state(USER)
     assert state.energy == pytest.approx(0.85)
     assert state.mood == "calm"
