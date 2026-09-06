@@ -144,6 +144,16 @@ class Settings(BaseSettings):
     v2_reflection_schedule_hour: int = 4
     v2_reflection_event_threshold: int = 3
     v2_reflection_event_cooldown_hours: float = 24.0
+    v2_reflection_llm_profile: str = ""
+    v2_reflection_evidence_max_members: int = 12
+    v2_reflection_evidence_content_chars: int = 200
+    v2_reflection_max_insights_per_run: int = 3
+    v2_reflection_confidence_count_curve_json: str = (
+        '{"3": 0.65, "4": 0.75, "5": 0.85, "6": 0.95}'
+    )
+    v2_reflection_ai_inferred_cap: float = 0.5
+    v2_reflection_run_timeout_minutes: int = 10
+    v2_reflection_statement_max_chars: int = 200
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

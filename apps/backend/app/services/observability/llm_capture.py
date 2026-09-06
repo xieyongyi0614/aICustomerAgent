@@ -115,18 +115,63 @@ class _ObservedChain:
         return getattr(self._inner, name)
 
     def invoke(self, input_data, config=None, **kwargs):
-        return _run_observed(self, input_data, config, kwargs, sync=True)
+        return _run_observed_sync(self, input_data, config, kwargs)
 
     async def ainvoke(self, input_data, config=None, **kwargs):
         return await _run_observed(self, input_data, config, kwargs, sync=False)
+
+
+def _observed_invoke(observed, input_data, config, kwargs, run):
+    from app.application import observability
+
+    if not get_settings().observability_persist_enabled:
+        return run(observed, input_data, config, kwargs)
+
+    handler = UsageCallbackHandler()
+    started = time.perf_counter()
+    started_at = datetime.now()
+    _capture_structured_prompt(observed, input_data)
+    try:
+        result = run(observed, input_data, _with_callbacks(config, handler), kwargs)
+    except Exception as exc:
+        record = build_llm_record(
+            observed._call_site,
+            observed._model,
+            handler,
+            started,
+            started_at,
+            status=LLM_CALL_ERROR,
+            error_kind=exc.__class__.__name__,
+        )
+        observability.record_llm_call(record)
+        raise
+    record = build_llm_record(
+        observed._call_site,
+        observed._model,
+        handler,
+        started,
+        started_at,
+        request_id=None,
+        turn_id=None,
+    )
+    observability.record_llm_call(record)
+    return result
+
+
+def _run_observed_sync(observed, input_data, config, kwargs):
+    return _observed_invoke(
+        observed,
+        input_data,
+        config,
+        kwargs,
+        lambda o, data, cfg, kw: o._inner.invoke(data, config=cfg, **kw),
+    )
 
 
 async def _run_observed(observed, input_data, config, kwargs, sync: bool):
     from app.application import observability
 
     if not get_settings().observability_persist_enabled:
-        if sync:
-            return observed._inner.invoke(input_data, config=config, **kwargs)
         return await observed._inner.ainvoke(input_data, config=config, **kwargs)
 
     handler = UsageCallbackHandler()
@@ -134,14 +179,9 @@ async def _run_observed(observed, input_data, config, kwargs, sync: bool):
     started_at = datetime.now()
     _capture_structured_prompt(observed, input_data)
     try:
-        if sync:
-            result = observed._inner.invoke(
-                input_data, config=_with_callbacks(config, handler), **kwargs
-            )
-        else:
-            result = await observed._inner.ainvoke(
-                input_data, config=_with_callbacks(config, handler), **kwargs
-            )
+        result = await observed._inner.ainvoke(
+            input_data, config=_with_callbacks(config, handler), **kwargs
+        )
     except Exception as exc:
         record = build_llm_record(
             observed._call_site,
