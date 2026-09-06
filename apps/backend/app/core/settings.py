@@ -325,6 +325,10 @@ class Settings(BaseSettings):
     v2_action_outbox_enabled: bool = False
     v2_life_loop_outbox_max_attempts: int = 5
     v2_life_loop_outbox_backoff_seconds: int = 30
+    v2_life_loop_memory_min_salience: float = 0.8
+    v2_life_loop_memory_limit: int = 5
+    v2_life_loop_memory_digest_chars: int = 600
+    v2_life_loop_reflection_check_interval_minutes: int = 240
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True

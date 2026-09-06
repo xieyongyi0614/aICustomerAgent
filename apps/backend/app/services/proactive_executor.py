@@ -12,6 +12,7 @@ from app.application import observability
 from app.application.post_process import get_user_write_lock
 from app.chains import proactive_chain
 from app.core.settings import get_settings
+from app.application.life_loop_context import memory_digest_var
 from app.models.autonomy import ProactiveAction
 from app.repositories import goal_repository, proactive_repository
 from app.services import conversation_service, trigger_evaluator
@@ -138,10 +139,14 @@ async def execute(
         goal_description = _goal_description(action)
         if goal_description is None:
             return await _fail_for_retry(action, trace, "goal_vanished", now)
+        recent = _recent_context(action.session_id)
+        digest = memory_digest_var.get()
+        if digest:
+            recent = f"{recent}\n{digest}" if recent else digest
         text = await proactive_chain.generate(
             goal_description,
             action.intention,
-            _recent_context(action.session_id),
+            recent,
             llm=llm,
             trace=trace,
         )
