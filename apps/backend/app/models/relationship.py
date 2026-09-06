@@ -120,6 +120,7 @@ class MilestoneRecord(BaseModel):
     title: str = ""
     applied_bonus: RelationshipDelta = Field(default_factory=RelationshipDelta)
     unlocks: tuple[str, ...] = ()
+    meta: dict = Field(default_factory=dict)
     created_at: datetime
 
 

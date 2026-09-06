@@ -137,6 +137,29 @@ class DevelopmentSlice:
 
 
 @dataclass
+class NarrativeFactRef:
+    id: str
+    type: str
+    source_ref: dict | None = None
+
+
+@dataclass
+class NarrativeMilestoneRef:
+    id: str
+    milestone_key: str
+    meta: dict | None = None
+
+
+@dataclass
+class NarrativeSlice:
+    """REL-004 叙事事实审计切片（只读）；缺席为 None = 规则跳过。"""
+
+    facts: list[NarrativeFactRef] = field(default_factory=list)
+    narrative_milestones: list[NarrativeMilestoneRef] = field(default_factory=list)
+    insight_ids: set[str] = field(default_factory=set)
+
+
+@dataclass
 class ActionSlice:
     records: list = field(default_factory=list)
     intent: dict | None = None
@@ -175,6 +198,7 @@ class EvaluationContext:
     action: ActionSlice | None = None
     reflection: ReflectionSlice | None = None
     development: DevelopmentSlice | None = None
+    narrative: NarrativeSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:

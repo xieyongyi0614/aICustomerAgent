@@ -194,6 +194,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
         "proactive_stats": proactive_stats,
         "reflection": _reflection_stats(settings),
         "development": _development_stats(settings),
+        "relationship": _relationship_stats(settings),
         "context_fidelity": "reconstructed",
     }
 
@@ -217,6 +218,17 @@ def _development_stats(settings) -> dict:
         return build_db_report()
     except Exception:
         logger.exception("development 小节统计失败，降级为空")
+        return {}
+
+
+def _relationship_stats(settings) -> dict:
+    """REL-004：relationship 小节（只读 DB 统计；Flag OFF 为空）。"""
+    try:
+        from app.services.relationship_evaluation import build_db_report
+
+        return build_db_report()
+    except Exception:
+        logger.exception("relationship 小节统计失败，降级为空")
         return {}
 
 
