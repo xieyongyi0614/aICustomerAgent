@@ -1,10 +1,20 @@
 import uuid
 from datetime import datetime
 
-from app.core.db import GoalRow, SessionLocal
-from app.models.goal import GoalRecord, GoalSeed
+from app.core.db import GoalPlanRow, GoalRow, SessionLocal
+from app.models.goal import (
+    DOMAIN_VALUES,
+    GOAL_DESCRIPTION_MAX_LENGTH,
+    GoalPlanRecord,
+    GoalRecord,
+    GoalSeed,
+    HIERARCHICAL_TYPE_MAP,
+    LAYER_VALUES,
+    SubGoalSpec,
+)
 
 _TERMINAL_STATUS = ("completed", "expired", "cancelled")
+_HIERARCHICAL_HORIZON = "persistent"
 
 
 def _to_record(row: GoalRow) -> GoalRecord:
@@ -22,6 +32,10 @@ def _to_record(row: GoalRow) -> GoalRecord:
         expires_at_turn=row.expires_at_turn,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        parent_goal_id=row.parent_goal_id,
+        layer=row.layer,
+        domain=row.domain,
+        failure_reason=row.failure_reason,
     )
 
 
@@ -40,6 +54,23 @@ def _to_row(record: GoalRecord) -> GoalRow:
         expires_at_turn=record.expires_at_turn,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        parent_goal_id=record.parent_goal_id,
+        layer=record.layer,
+        domain=record.domain,
+        failure_reason=record.failure_reason,
+    )
+
+
+def _to_plan_record(row: GoalPlanRow) -> GoalPlanRecord:
+    return GoalPlanRecord(
+        id=row.id,
+        goal_id=row.goal_id,
+        version=row.version,
+        status=row.status,
+        sub_goals=[SubGoalSpec.model_validate(item) for item in row.sub_goals or []],
+        rejection_reason=row.rejection_reason,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
     )
 
 
@@ -139,3 +170,225 @@ def expire_goal(goal_id: str) -> GoalRecord | None:
 
 def cancel_goal(goal_id: str) -> GoalRecord | None:
     return finish_goal(goal_id, "cancelled")
+
+
+def create_hierarchical_goal(
+    user_id: str,
+    layer: str,
+    domain: str,
+    description: str,
+    priority: int,
+    character_id: str = "asuna",
+    parent_id: str | None = None,
+    horizon: str | None = None,
+    source: str = "policy",
+) -> GoalRecord:
+    if layer not in LAYER_VALUES:
+        raise ValueError(f"非法 layer：{layer!r}")
+    if domain not in DOMAIN_VALUES:
+        raise ValueError(f"非法 domain：{domain!r}")
+    if len(description) > GOAL_DESCRIPTION_MAX_LENGTH:
+        raise ValueError("描述超长")
+    resolved_horizon = _HIERARCHICAL_HORIZON
+    if layer == "short_term" and horizon == "current":
+        resolved_horizon = "current"
+    with SessionLocal() as session:
+        if parent_id is not None:
+            parent = session.get(GoalRow, parent_id)
+            if parent is None:
+                raise ValueError("父目标不存在")
+            if parent.layer is None:
+                raise ValueError("v1 目标不可作父级")
+        now = datetime.now()
+        row = GoalRow(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            character_id=character_id,
+            type=HIERARCHICAL_TYPE_MAP[domain],
+            description=description,
+            priority=priority,
+            status="active",
+            horizon=resolved_horizon,
+            source=source,
+            created_turn=0,
+            expires_at_turn=None,
+            created_at=now,
+            updated_at=now,
+            parent_goal_id=parent_id,
+            layer=layer,
+            domain=domain,
+            failure_reason=None,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _to_record(row)
+
+
+def list_children(goal_id: str) -> list[GoalRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(GoalRow.parent_goal_id == goal_id)
+            .order_by(GoalRow.created_at.asc(), GoalRow.id.asc())
+            .all()
+        )
+        return [_to_record(row) for row in rows]
+
+
+def list_tree(user_id: str, root_goal_id: str) -> list[dict]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalRow.layer.isnot(None),
+            )
+            .order_by(GoalRow.created_at.asc(), GoalRow.id.asc())
+            .all()
+        )
+        records = [_to_record(row) for row in rows]
+    roots: list[dict] = []
+    by_parent: dict[str, list[GoalRecord]] = {}
+    for record in records:
+        by_parent.setdefault(record.parent_goal_id or "", []).append(record)
+    root = next((r for r in records if r.id == root_goal_id), None)
+    if root is None:
+        return roots
+
+    def _node(record: GoalRecord) -> dict:
+        children = by_parent.get(record.id, [])
+        return {
+            "goal": record,
+            "children": [_node(child) for child in children],
+        }
+
+    roots.append(_node(root))
+    return roots
+
+
+def list_layered_active(
+    user_id: str,
+    layer: str | None = None,
+    domain: str | None = None,
+    character_id: str = "asuna",
+) -> list[GoalRecord]:
+    with SessionLocal() as session:
+        query = session.query(GoalRow).filter(
+            GoalRow.user_id == user_id,
+            GoalRow.character_id == character_id,
+            GoalRow.status == "active",
+            GoalRow.layer.isnot(None),
+        )
+        if layer is not None:
+            query = query.filter(GoalRow.layer == layer)
+        if domain is not None:
+            query = query.filter(GoalRow.domain == domain)
+        rows = query.order_by(GoalRow.created_at.asc(), GoalRow.id.asc()).all()
+        return [_to_record(row) for row in rows]
+
+
+def list_top_level_layered_active(user_id: str) -> list[GoalRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalRow.status == "active",
+                GoalRow.layer.isnot(None),
+                GoalRow.parent_goal_id.is_(None),
+            )
+            .order_by(GoalRow.created_at.asc(), GoalRow.id.asc())
+            .all()
+        )
+        return [_to_record(row) for row in rows]
+
+
+def create_plan(record: GoalPlanRecord) -> GoalPlanRecord:
+    with SessionLocal() as session:
+        row = GoalPlanRow(
+            id=record.id,
+            goal_id=record.goal_id,
+            version=record.version,
+            status=record.status,
+            sub_goals=[item.model_dump(mode="json") for item in record.sub_goals],
+            rejection_reason=record.rejection_reason,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _to_plan_record(row)
+
+
+def get_plan(plan_id: str) -> GoalPlanRecord | None:
+    with SessionLocal() as session:
+        row = session.get(GoalPlanRow, plan_id)
+        return _to_plan_record(row) if row is not None else None
+
+
+def list_plans(goal_id: str) -> list[GoalPlanRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalPlanRow)
+            .filter(GoalPlanRow.goal_id == goal_id)
+            .order_by(GoalPlanRow.version.desc())
+            .all()
+        )
+        return [_to_plan_record(row) for row in rows]
+
+
+def get_latest_plan(goal_id: str) -> GoalPlanRecord | None:
+    plans = list_plans(goal_id)
+    return plans[0] if plans else None
+
+
+def count_plans(goal_id: str) -> int:
+    with SessionLocal() as session:
+        return (
+            session.query(GoalPlanRow)
+            .filter(GoalPlanRow.goal_id == goal_id)
+            .count()
+        )
+
+
+def set_plan_status(plan_id: str, status: str) -> GoalPlanRecord | None:
+    with SessionLocal() as session:
+        row = session.get(GoalPlanRow, plan_id)
+        if row is None:
+            return None
+        row.status = status
+        row.updated_at = datetime.now()
+        session.commit()
+        session.refresh(row)
+        return _to_plan_record(row)
+
+
+def set_plan_rejection(plan_id: str, reason: str) -> GoalPlanRecord | None:
+    with SessionLocal() as session:
+        row = session.get(GoalPlanRow, plan_id)
+        if row is None:
+            return None
+        row.status = "rejected"
+        row.rejection_reason = reason
+        row.updated_at = datetime.now()
+        session.commit()
+        session.refresh(row)
+        return _to_plan_record(row)
+
+
+def list_active_plans(user_id: str) -> list[tuple[GoalRecord, GoalPlanRecord]]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalPlanRow, GoalRow)
+            .join(GoalRow, GoalRow.id == GoalPlanRow.goal_id)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalRow.status == "active",
+                GoalPlanRow.status == "active",
+            )
+            .order_by(GoalPlanRow.updated_at.asc(), GoalPlanRow.id.asc())
+            .all()
+        )
+        return [(_to_record(goal_row), _to_plan_record(plan_row)) for plan_row, goal_row in rows]
