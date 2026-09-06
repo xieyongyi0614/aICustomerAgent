@@ -72,17 +72,10 @@ class TestWorkDiscovery:
         _setup_conversation(age_minutes=1)
         assert life_loop._collect_work_users(NOW) == []
 
-    def test_user_reply_gap_blocks_inactivity(
-        self, db_session_factory, life_loop_on
-    ):
-        override_settings_reply_gap(life_loop_on)
+    def test_fresh_reply_blocked_by_guards(self, db_session_factory, life_loop_on):
+        """新鲜会话（1 分钟前）不满足闲置门槛，工作发现不收录。"""
         _setup_conversation(age_minutes=1)
         assert life_loop._collect_work_users(NOW) == []
-
-
-def override_settings_reply_gap(_fixture):
-    """reply gap 守卫依赖 autonomy_min_user_reply_gap_minutes（默认 2 分钟），
-    age_minutes=1 时天然命中，无需额外配置。"""
 
 
 class TestGoalCatchup:

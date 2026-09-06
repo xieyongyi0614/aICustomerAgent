@@ -21,11 +21,12 @@ from app.application.post_process import get_user_write_lock
 from app.repositories import (
     conversation_repository,
     goal_repository,
+    llm_call_repository,
     loop_run_repository,
     proactive_repository,
     trigger_registry_repository,
 )
-from app.services import state_service
+from app.services import life_loop_budget, state_service
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,12 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
     now = now or datetime.now()
     stats: dict = {"user_cycles": 0, "maintenance": 0, "aborted": 0, "idle": False}
     work_users = _collect_work_users(now)
+    maintenance_pending = _maintenance_pending(settings)
+    if not work_users and not maintenance_pending:
+        # Idle 短路（LIFE-003）：无 due trigger、无 goal 补扫、无维护到期
+        # → 整轮跳过：0 LLM、0 run 行、仅时钟检查。
+        stats["idle"] = True
+        return stats
     for user_id in work_users:
         try:
             result = await _run_user_cycle(user_id, llm=llm, now=now)
@@ -134,11 +141,15 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
     """单用户周期：持 per-user 写锁串行执行步骤管线，loop_runs 全程记账。
 
     返回 run 终态（done|aborted）；critical 步骤（decision）失败 → aborted。
+    decision 前置两道预算闸（LIFE-003）：全局日配额熔断 degraded → skip；
+    周期步骤 LLM 预算耗尽 → skip（触发器留 pending，配额恢复后自然重试）。
     """
+    settings = get_settings()
     run = loop_run_repository.create_run(
         user_id=user_id, kind="autonomy", reason=_cycle_reason(user_id, now), now=now
     )
     steps: list[dict] = []
+    budget = life_loop_budget.check_daily_budget(now=now)
     status = "done"
     try:
         async with get_user_write_lock(user_id):
@@ -151,11 +162,32 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(
                 run.id, steps, "reflection_check", _step_reflection_check, user_id, now
             )
-            await _record_step_async(
-                run.id, steps, "decision",
-                lambda: autonomy_engine.tick(user_ids=[user_id], llm=llm, now=now),
-                critical=True,
-            )
+            if budget.status == life_loop_budget._STATUS_DEGRADED:
+                _append_step(
+                    run.id,
+                    steps,
+                    {
+                        "step": "decision",
+                        "status": "skipped",
+                        "skip_reason": "quota_circuit_open",
+                    },
+                )
+            elif _cycle_llm_budget_exhausted(steps, settings):
+                _append_step(
+                    run.id,
+                    steps,
+                    {
+                        "step": "decision",
+                        "status": "skipped",
+                        "skip_reason": "step_budget",
+                    },
+                )
+            else:
+                await _record_step_async(
+                    run.id, steps, "decision",
+                    lambda: _step_decision(user_id, llm, now),
+                    critical=True,
+                )
             _record_step(
                 run.id, steps, "world_experience", _step_world_experience, user_id, now
             )
@@ -165,8 +197,47 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
         steps.append(
             {"step": "abort", "status": "error", "error": exc.__class__.__name__}
         )
-    loop_run_repository.finish_run(run.id, status=status, steps=steps, now=now)
+    finished_at = datetime.now()
+    try:
+        llm_count = (
+            llm_call_repository.count_calls_between(run.started_at, finished_at)
+            if finished_at >= run.started_at
+            else 0
+        )
+    except Exception:
+        logger.exception("run 窗口 LLM 计数失败，按 0 记账")
+        llm_count = 0
+    loop_run_repository.finish_run(
+        run.id,
+        status=status,
+        steps=steps,
+        llm_call_count=llm_count,
+        budget_state=budget.as_dict(),
+        now=finished_at,
+    )
     return status
+
+
+def _append_step(run_id: str, steps: list[dict], entry: dict) -> None:
+    entry.setdefault("duration_ms", 0.0)
+    steps.append(entry)
+    loop_run_repository.mark_step(run_id, entry)
+
+
+def _cycle_llm_budget_exhausted(steps: list[dict], settings) -> bool:
+    """周期步骤 LLM 预算（结构上限）：已执行的 LLM capable 步骤数达上限。"""
+    used = sum(
+        1
+        for s in steps
+        if s.get("llm_capable") and s.get("status") == "ok"
+    )
+    return used >= max(settings.v2_life_loop_cycle_llm_budget, 0)
+
+
+async def _step_decision(user_id: str, llm, now: datetime) -> dict:
+    """Decision+Action 步骤：v1 决策管线原样复用（周期内唯一 LLM capable 步骤）。"""
+    await autonomy_engine.tick(user_ids=[user_id], llm=llm, now=now)
+    return {"llm_capable": True}
 
 
 def _cycle_reason(user_id: str, now: datetime) -> str:
@@ -344,6 +415,19 @@ async def _run_maintenance(now: datetime) -> int:
 def _maintenance_due(kind: str, interval: int) -> bool:
     last = _maintenance_last.get(kind)
     return last is None or (time.monotonic() - last) >= interval
+
+
+def _maintenance_pending(settings) -> bool:
+    """是否有维护步骤到期（Idle 判定项；不产生标记副作用）。"""
+    if settings.world_enabled and _maintenance_due(
+        "world_maintenance", settings.world_maintenance_interval_seconds
+    ):
+        return True
+    if settings.action_enabled and _maintenance_due(
+        "action_retry", settings.action_maintenance_interval_seconds
+    ):
+        return True
+    return _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS)
 
 
 def _mark_maintenance(kind: str) -> None:

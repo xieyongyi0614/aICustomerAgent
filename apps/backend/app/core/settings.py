@@ -317,6 +317,11 @@ class Settings(BaseSettings):
     v2_life_loop_tick_seconds: int = 60
     v2_life_loop_trigger_max_attempts: int = 3
     v2_life_loop_trigger_backoff_seconds: int = 300
+    v2_life_loop_daily_llm_call_budget: int = 200
+    v2_life_loop_daily_llm_token_budget: int = 0
+    v2_life_loop_budget_cache_seconds: int = 60
+    v2_life_loop_cycle_llm_budget: int = 1
+    v2_life_loop_degraded_usage_ratio: float = 0.8
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True

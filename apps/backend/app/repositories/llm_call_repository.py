@@ -7,6 +7,8 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
+
 from app.core.db import LlmCallRecordRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import CallSite, LlmCallRecord
@@ -153,3 +155,37 @@ def prune_before(cutoff: datetime) -> int:
         )
         session.commit()
         return deleted
+
+
+def aggregate_usage_since(cutoff: datetime) -> dict:
+    """日配额聚合（LIFE-003）：调用次数 + 总 token，走 idx_llm_calls_time。"""
+    with SessionLocal() as session:
+        calls, tokens = (
+            session.query(
+                func.count(LlmCallRecordRow.id),
+                func.coalesce(
+                    func.sum(
+                        func.coalesce(LlmCallRecordRow.input_tokens, 0)
+                        + func.coalesce(LlmCallRecordRow.output_tokens, 0)
+                    ),
+                    0,
+                ),
+            )
+            .filter(LlmCallRecordRow.created_at >= cutoff)
+            .one()
+        )
+        return {"calls": int(calls), "tokens": int(tokens)}
+
+
+def count_calls_between(start: datetime, end: datetime) -> int:
+    """run 窗口内 LLM 调用计数（loop_runs llm_call_count 记账用）。"""
+    with SessionLocal() as session:
+        return int(
+            session.query(func.count(LlmCallRecordRow.id))
+            .filter(
+                LlmCallRecordRow.created_at >= start,
+                LlmCallRecordRow.created_at <= end,
+            )
+            .scalar()
+            or 0
+        )

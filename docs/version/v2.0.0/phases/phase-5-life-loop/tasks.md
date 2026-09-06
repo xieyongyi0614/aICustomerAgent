@@ -208,4 +208,14 @@ recover_stale now 透传）、critical decision 失败 aborted 且单步错误�
 main.py Flag ON 单 task 接管三循环 OFF 逐字节；trace 步骤名注册 9 项；
 conversation_repository.count_human_messages（current_turn 口径）；15 测试绿 +
 V7/V9/orchestration 回归 97 例绿）。
+LIFE-003 已实现（life_loop_budget.py：check_daily_budget 全局日配额现算+按日
+TTL 缓存+查询失败保守模式（used 按 limit 记+限额×0.8 留痕→degraded）+跨日自动
+恢复；llm_call_repository.aggregate_usage_since（COUNT+SUM 走时间索引）与
+count_calls_between（run 窗口记账）；life_loop Idle 短路（无 due trigger∪goal
+补扫∪维护到期→整轮跳过 0 LLM 0 run 行）、decision 前置双预算闸（degraded→
+skip=quota_circuit_open、周期步骤预算→skip=step_budget，触发器留 pending 配额
+恢复自然重试）、run 收口记 llm_call_count（窗口计数）+budget_state；v2_life_loop
+_daily_llm_call_budget=200/_daily_llm_token_budget=0/_budget_cache_seconds=60/
+_cycle_llm_budget=1/_degraded_usage_ratio=0.8；前台路径零引用 BudgetState；
+13 测试绿 + tests/v2 全量 534 例绿）。
 ```
