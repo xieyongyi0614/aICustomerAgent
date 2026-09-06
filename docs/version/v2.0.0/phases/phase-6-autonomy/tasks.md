@@ -154,3 +154,30 @@ M3 Integration: AUT-004
 M4 Acceptance:  AUT-005 → Eval Gate + Regression Gate（含跨会话剧情）→ 申请开启 v2_autonomy_advanced_enabled → v2.0.0 全量
 ```
 
+---
+
+## 实现状态（2026-09-09 起，逐 Task 回写）
+
+```text
+AUT-001 已实现（迁移 0031：character_goals 扩 4 列 parent_goal_id/layer/domain/
+failure_reason + layer/domain CHECK（SQLite 走 batch_alter_table）+ parent 与
+(layer,domain) 索引；goal_plans 表 (goal_id,version) 唯一 + status 五态 CHECK +
+(goal_id,status) 索引；models/goal.py 扩 GoalLayer/GoalDomain/GoalPlanStatus/
+SubGoalStatus + 判据白名单常量（action_succeeded/field_equals/threshold_reached/
+all_of/any_of + 事实源/指标路径/算子白名单）+ SubGoalSpec.validate_criteria/
+validate_sub_goals（序号连续/依赖前向拒绝/嵌套≤2 层）+ GoalPlanRecord；
+GoalRecord 4 可空字段默认 None 既有构造零改动；goal_repository 层级查询
+list_children/list_tree/list_layered_active/list_top_level_layered_active +
+create_hierarchical_goal（layer/domain 守卫+v1 父拒绝+long_term 强制 persistent+
+domain→v1 type 映射 personal→user_care/relationship→relationship/world→
+conversation 保 GOAL_TIER 安全）+ plan 存储壳 create/get/list_plans/get_latest/
+count/set_plan_status/set_plan_rejection/list_active_plans 联查；goal_service
+list_layered_active/list_children/list_tree/list_active_plans 降级封装；
+settings v2_autonomy_advanced_enabled 定义；24 测试绿（含迁移往返 up→down→up
+结构一致+v1 数据保留）+ tests/v2 全量 565 绿 + goal/autonomy 回归 79 绿。
+Detail 修正登记：character_goals.status 实有 CHECK 约束（db.py
+ck_character_goals_status），AUT-004 扩状态值需迁移重建该约束——修正已落
+AUT-004 实施与 Detail 回写，v1 语义不变）。
+```
+
+

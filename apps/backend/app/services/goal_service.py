@@ -14,7 +14,12 @@ from app.character.asuna import PERSISTENT_GOALS
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.emotion import TurnAnalysis
-from app.models.goal import GOAL_DESCRIPTION_MAX_LENGTH, GOAL_TIER, GoalRecord
+from app.models.goal import (
+    GOAL_DESCRIPTION_MAX_LENGTH,
+    GOAL_TIER,
+    GoalPlanRecord,
+    GoalRecord,
+)
 from app.models.relationship import RelationshipState
 from app.models.scene import SceneState
 from app.repositories import goal_repository
@@ -235,6 +240,45 @@ def changes_to_trace(changes: GoalChanges) -> dict:
         "expired": [g.id for g in changes.expired],
         "cancelled": [g.id for g in changes.cancelled],
     }
+
+
+def list_layered_active(
+    user_id: str,
+    layer: str | None = None,
+    domain: str | None = None,
+    character_id: str = "asuna",
+) -> list[GoalRecord]:
+    try:
+        return goal_repository.list_layered_active(
+            user_id, layer=layer, domain=domain, character_id=character_id
+        )
+    except Exception:
+        logger.exception("层级 active 目标读取失败，降级为空目标集")
+        return []
+
+
+def list_children(goal_id: str) -> list[GoalRecord]:
+    try:
+        return goal_repository.list_children(goal_id)
+    except Exception:
+        logger.exception("层级子目标读取失败，降级为空集")
+        return []
+
+
+def list_tree(user_id: str, root_goal_id: str) -> list[dict]:
+    try:
+        return goal_repository.list_tree(user_id, root_goal_id)
+    except Exception:
+        logger.exception("目标树读取失败，降级为空树")
+        return []
+
+
+def list_active_plans(user_id: str) -> list[tuple[GoalRecord, GoalPlanRecord]]:
+    try:
+        return goal_repository.list_active_plans(user_id)
+    except Exception:
+        logger.exception("活跃计划联查失败，降级为空集")
+        return []
 
 
 def _effective_tier(goal: GoalRecord, signals: dict) -> float:

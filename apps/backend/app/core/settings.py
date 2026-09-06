@@ -331,6 +331,8 @@ class Settings(BaseSettings):
     v2_life_loop_reflection_check_interval_minutes: int = 240
     v2_life_loop_storm_daily_limit: int = 3
 
+    v2_autonomy_advanced_enabled: bool = False
+
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True
     evaluation_emotion_enabled: bool = True

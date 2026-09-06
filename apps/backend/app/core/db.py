@@ -351,6 +351,10 @@ class GoalRow(Base):
     expires_at_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    parent_goal_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    layer: Mapped[str | None] = mapped_column(String, nullable=True)
+    domain: Mapped[str | None] = mapped_column(String, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -369,8 +373,42 @@ class GoalRow(Base):
             "source IN ('definition', 'policy', 'scene')",
             name="ck_character_goals_source",
         ),
+        CheckConstraint(
+            "layer IN ('short_term', 'long_term') OR layer IS NULL",
+            name="ck_character_goals_layer",
+        ),
+        CheckConstraint(
+            "domain IN ('personal', 'relationship', 'world') OR domain IS NULL",
+            name="ck_character_goals_domain",
+        ),
         CheckConstraint("priority BETWEEN 1 AND 5", name="ck_character_goals_priority"),
         Index("idx_character_goals_user_status", "user_id", "status"),
+        Index("idx_character_goals_parent", "parent_goal_id"),
+        Index("idx_character_goals_layer_domain", "layer", "domain"),
+    )
+
+
+class GoalPlanRow(Base):
+    __tablename__ = "goal_plans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    goal_id: Mapped[str] = mapped_column(String, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="draft", server_default="draft"
+    )
+    sub_goals: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("goal_id", "version", name="uq_goal_plans_goal_version"),
+        CheckConstraint(
+            "status IN ('draft', 'validated', 'active', 'rejected', 'superseded')",
+            name="ck_goal_plans_status",
+        ),
+        Index("idx_goal_plans_goal_status", "goal_id", "status"),
     )
 
 
