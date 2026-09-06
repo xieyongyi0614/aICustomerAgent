@@ -59,6 +59,15 @@ TRACE_STEP_NAMES = (
     "relationship_milestone",
     "relationship_shared",
     "relationship_pattern",
+    "life_loop_run",
+    "life_loop_perception",
+    "life_loop_state_update",
+    "life_loop_goal_check",
+    "life_loop_memory_retrieval",
+    "life_loop_reflection_check",
+    "life_loop_budget",
+    "outbox_consume",
+    "trigger_claim",
 )
 
 _BACKGROUND_STEPS = (

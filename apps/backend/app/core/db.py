@@ -989,6 +989,42 @@ class TriggerRegistryRow(Base):
     )
 
 
+class LoopRunRow(Base):
+    __tablename__ = "loop_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    trigger_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    trigger_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    reason: Mapped[str] = mapped_column(String, nullable=False, default="")
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="running", server_default="running"
+    )
+    current_step: Mapped[str | None] = mapped_column(String, nullable=True)
+    steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    llm_call_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    token_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    budget_state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('autonomy', 'world_maintenance', 'action_retry', "
+            "'outbox_consume', 'trigger_reconcile')",
+            name="ck_loop_runs_kind",
+        ),
+        CheckConstraint(
+            "status IN ('running', 'done', 'aborted')",
+            name="ck_loop_runs_status",
+        ),
+        Index("idx_loop_runs_status_started_at", "status", "started_at"),
+        Index("idx_loop_runs_user_started_at", "user_id", "started_at"),
+    )
+
+
 class DevelopmentStateRow(Base):
     __tablename__ = "development_state"
 
