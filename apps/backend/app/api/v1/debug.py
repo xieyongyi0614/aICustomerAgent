@@ -17,6 +17,7 @@ from app.services.observability.metrics_aggregator import (
     summarize_llm_records,
 )
 from app.services.memory2 import attribution as memory2_attribution
+from app.services.reflection import attribution as reflection_attribution
 from app.services.trace_collector import get_trace_collector
 
 debug_router = APIRouter()
@@ -36,6 +37,19 @@ def get_candidate_attribution(candidate_id: str):
     if view is None:
         raise HTTPException(status_code=404, detail="candidate 不存在")
     return view
+
+
+@debug_router.get("/debug/insights/{insight_id}/attribution")
+def get_insight_attribution(insight_id: str):
+    view = reflection_attribution.insight_attribution(insight_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="insight 不存在")
+    return view
+
+
+@debug_router.get("/debug/reflection-runs")
+def list_reflection_runs(user_id: str | None = None, limit: int = 50):
+    return reflection_attribution.list_reflection_runs(user_id, limit=limit)
 
 
 @debug_router.get("/debug/turns/{turn_id}/trace")

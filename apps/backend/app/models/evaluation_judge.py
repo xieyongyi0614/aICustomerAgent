@@ -71,4 +71,13 @@ class ProactiveJudgeResult(BaseModel):
     persona: PersonaJudgement
 
 
+class ReflectionJudgeResult(BaseModel):
+    """Reflection Judge（REF-006）：结论不超证据范围 / 引用真实支撑结论。"""
+
+    passed: bool = True
+    codes: list[str] = []
+    reason: str = ""
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
 JUDGE_SOURCE: Literal["llm"] = "llm"

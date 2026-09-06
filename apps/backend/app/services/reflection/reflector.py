@@ -189,6 +189,15 @@ def calibrate_confidence(
     return round(final, 4)
 
 
+def confidence_ceiling(evidence_count: int, settings=None) -> float:
+    """给定证据数的 confidence 折算上限（coherence=1.0；REF-006 校准复核规则复用）。"""
+    settings = settings or get_settings()
+    factor = _count_factor(
+        evidence_count, settings.v2_reflection_confidence_count_curve_json
+    )
+    return round(min(factor, _CONFIDENCE_CEILING), 4)
+
+
 def _count_factor(count: int, curve_json: str) -> float:
     curve = json.loads(curve_json)
     keys = sorted(int(key) for key in curve)

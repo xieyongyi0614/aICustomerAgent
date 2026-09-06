@@ -33,7 +33,9 @@ from app.services.memory2 import ingest as memory2_ingest
 from app.services.memory2 import job_worker as memory2_job_worker
 from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import retriever as memory2_retriever
+from app.services.reflection import attribution as reflection_attribution
 from app.services.reflection import evidence as reflection_evidence
+from app.services.reflection import evaluation as reflection_evaluation
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector as reflection_reflector
 from app.services.reflection import triggers as reflection_triggers
@@ -96,7 +98,9 @@ _SERVICE_DB_MODULES = (
     memory2_job_worker,
     memory2_lifecycle,
     memory2_retriever,
+    reflection_attribution,
     reflection_evidence,
+    reflection_evaluation,
     reflection_lifecycle,
     reflection_reflector,
     reflection_triggers,

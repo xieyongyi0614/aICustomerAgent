@@ -192,8 +192,20 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
         "verdict_distribution": verdict_distribution,
         "issue_histogram": issue_histogram,
         "proactive_stats": proactive_stats,
+        "reflection": _reflection_stats(settings),
         "context_fidelity": "reconstructed",
     }
+
+
+def _reflection_stats(settings) -> dict:
+    """REF-006：reflection 小节（只读 DB 统计；Flag OFF 为空）。"""
+    try:
+        from app.services.reflection.evaluation import build_db_report
+
+        return build_db_report()
+    except Exception:
+        logger.exception("reflection 小节统计失败，降级为空")
+        return {}
 
 
 def _proactive_outcome_stats(user_id: str, settings) -> dict:
