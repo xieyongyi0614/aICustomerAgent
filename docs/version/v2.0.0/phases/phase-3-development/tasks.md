@@ -179,7 +179,7 @@ M3 Integration: DEV-003 / DEV-004
 M4 Acceptance:  DEV-005 + DEV-006 → Eval Gate + Regression Gate → 申请开启 v2_development_enabled
 ```
 
-## 实现状态（进行中）
+## 实现状态（2026-09-06 完成）
 
 ```text
 DEV-001 已实现（迁移 0026_development_foundation + aggregate 读写服务 + 14 测试绿；
@@ -203,6 +203,14 @@ tests/eval/test_development_growth_loop.py E-DEV-01~04 全量 Gate 通过 + 报�
 reports/ + 6 测试绿。全部 P3 验收达成本目录 evaluation.md 门槛）。
 注：tests/integration/test_evaluation_pipeline.py 在本机因真实 LLM 端点网络退化而
 缓慢/挂起——基线 d6d3f8b 复现同现象（60s 仅 5 例），属既有环境问题与 Phase3 无关。
+DEV-001~006 全部实现并逐 Task 提交（8482705 → 1fb191d）。离线 Eval Gate
+（E-DEV-01~04）在 tests/eval/test_development_growth_loop.py 确定性执行并全部通过
+（报告归档 tests/eval/reports/dev-growth-20260906.json）。
+v2_development_enabled 保持 default=false：灰度推进与真实模型人工回归待执行
+（regression-checklist.md）。
+全量回归口径：unit/v2/eval/golden 1258 绿 + integration 314 绿；xdist 并行在本机
+存在与 Phase3 无关的既有 flake（localhost-HTTP/LLM 网络类用例，基线 d6d3f8b 复现
+同组失败 + worker crash），串行 -n0 为准。
 ```
 
 
