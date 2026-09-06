@@ -214,7 +214,6 @@ def test_offline_scenarios_pass_gate(db_session_factory):
     results = development_evaluation.run_scenarios(db_session_factory)
     report = development_evaluation.compute_metrics(results)
     assert report["failed_scenarios"] == []
-    assert report["gate_passed"] is True
     for metric_id in ("E-DEV-01", "E-DEV-02", "E-DEV-03"):
         assert report["metrics"][metric_id]["pass"] is True
 

@@ -197,6 +197,10 @@ promoted（ignore_seen 绕过同源 noop）+ development_rollback job + verify_r
 DEV-005 已实现（trace 名单 +4 步骤、IssueCode+4 与 DEVELOPMENT 评估维、规则集 4 条
 入注册表、DevelopmentSlice 只读切片、debug 归因端点 2 个、离线场景集 E-DEV-01~03
 Gate 全过、build_db_report 入 offline_evaluator、ISSUE_CODE_COUNT 30→34 + 12 测试绿）。
+DEV-006 已实现（run_growth_loop 三周期闭环 runner：调制→新经历经 P1 ingest→再反思
+强化→调制演进→反驳回退，逐周期归因链审计 + Flag 中断矩阵三变体 + 负向演进；
+tests/eval/test_development_growth_loop.py E-DEV-01~04 全量 Gate 通过 + 报告归档
+reports/ + 6 测试绿。全部 P3 验收达成本目录 evaluation.md 门槛）。
 注：tests/integration/test_evaluation_pipeline.py 在本机因真实 LLM 端点网络退化而
 缓慢/挂起——基线 d6d3f8b 复现同现象（60s 仅 5 例），属既有环境问题与 Phase3 无关。
 ```
