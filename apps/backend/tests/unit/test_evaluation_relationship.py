@@ -124,4 +124,6 @@ def test_signal_accounting_passes_with_signal_or_cause():
 def test_rules_registered():
     codes = [rule.code for rule in rel_rules.RULES]
     assert IssueCode.RELATIONSHIP_JUMP in codes
-    assert len(rel_rules.RULES) == 4
+    assert IssueCode.RELATIONSHIP_NARRATIVE_ORPHAN in codes
+    assert IssueCode.RELATIONSHIP_MILESTONE_UNPROVENANCED in codes
+    assert len(rel_rules.RULES) == 6
