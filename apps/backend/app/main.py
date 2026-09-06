@@ -39,9 +39,11 @@ async def lifespan(application: FastAPI):
         register_with_job_worker()
         register_executor()
     if get_settings().v2_development_enabled:
+        from app.services.development.audit import register_rollback_listener
         from app.services.development.policy import register_runtime
 
         register_runtime()
+        register_rollback_listener()
     if get_settings().autonomy_enabled:
         _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
     else:

@@ -191,6 +191,9 @@ goal_service 有界 tier 调制/answer_chain 按轮长度偏移 + Context 调制
 development_apply trace + 11 测试绿；行为/goal/golden 回归串行全绿。
 注：xdist 并行在本机存在与 Phase3 无关的既有 flake——基线 d6d3f8b 复现同组失败
 + INTERNALERROR worker crash，串行 -n0 全绿为准）。
+DEV-004 已实现（audit.py 回退=先撤后晋：失效 Insight 的调制 retire、次优胜者
+promoted（ignore_seen 绕过同源 noop）+ development_rollback job + verify_replay
+只读校验/rebuild 重建 + scripts/replay_development.py + 11 测试绿；P2/P3 回归 84 绿）。
 ```
 
 
