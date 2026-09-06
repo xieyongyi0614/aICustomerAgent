@@ -42,6 +42,7 @@ from app.services.memory2 import evaluator as memory2_evaluator
 from app.services.memory2 import ingest as memory2_ingest
 from app.services.memory2 import job_worker as memory2_job_worker
 from app.services.memory2 import lifecycle as memory2_lifecycle
+from app.services.memory2 import migration as memory2_migration
 from app.services.memory2 import retriever as memory2_retriever
 from app.services.development import aggregate as development_aggregate
 from app.services.development import audit as development_audit
@@ -114,6 +115,7 @@ _SERVICE_DB_MODULES = (
     memory2_ingest,
     memory2_job_worker,
     memory2_lifecycle,
+    memory2_migration,
     memory2_retriever,
     reflection_attribution,
     reflection_evidence,

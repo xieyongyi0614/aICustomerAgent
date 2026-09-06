@@ -100,6 +100,31 @@ def list_active(
         return [_to_memory(row) for row in rows]
 
 
+def list_active_by_types(
+    user_id: str,
+    character_id: str,
+    types: list[str],
+    limit: int = 200,
+) -> list[UserMemory]:
+    """按类型批量取 active 记忆（Relationship 域只读投影/审计用）。"""
+    if not types:
+        return []
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory)
+            .filter(
+                Memory.user_id == user_id,
+                Memory.status == "active",
+                Memory.character_id.in_([character_id, "*"]),
+                Memory.type.in_(list(types)),
+            )
+            .order_by(Memory.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_memory(row) for row in rows]
+
+
 def list_expired_active(now: datetime, limit: int = 500) -> list[UserMemory]:
     with SessionLocal() as session:
         rows = (

@@ -27,3 +27,10 @@ def fetch_completed_world_events(user_id: str, limit: int = 20) -> list:
 def fetch_relationship_events(user_id: str, limit: int = 50) -> list:
     """最近 RelationshipEvent（读事件表投影，不看 state 数值）。"""
     return relationship_event_repository.list_events(user_id, limit=limit)
+
+
+def fetch_recent_relationship_milestones(user_id: str, limit: int = 10) -> list:
+    """最近 RelationshipMilestone（读里程碑表投影，不看 state 数值）。"""
+    from app.repositories import relationship_milestone_repository
+
+    return relationship_milestone_repository.list_milestones(user_id)[:limit]
