@@ -205,6 +205,7 @@ def _to_insight(row: InsightRow) -> Insight:
 
 
 _invalidation_listeners: list = []
+_insight_created_listeners: list = []
 
 
 def register_invalidation_listener(fn) -> None:
@@ -225,6 +226,26 @@ def notify_invalidation_listeners(user_id: str, changed: list[dict]) -> None:
             listener(user_id, changed)
         except Exception:
             logger.exception("失效事件监听器异常，已忽略")
+
+
+def register_insight_created_listener(fn) -> None:
+    """创建事件订阅点（P3 DEV-002 编译触发接线）；无注册方即零行为。"""
+    _insight_created_listeners.append(fn)
+
+
+def reset_insight_created_listeners() -> None:
+    _insight_created_listeners.clear()
+
+
+def notify_insight_created_listeners(user_id: str, created: list[dict]) -> None:
+    """新 active Insight 落库后广播；监听器异常尽力而为，不影响已完成的落库。"""
+    if not _insight_created_listeners or not created:
+        return
+    for listener in list(_insight_created_listeners):
+        try:
+            listener(user_id, created)
+        except Exception:
+            logger.exception("Insight 创建事件监听器异常，已忽略")
 
 
 def statement_similarity(left: str, right: str) -> float:

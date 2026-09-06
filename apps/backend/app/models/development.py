@@ -63,3 +63,14 @@ class DevelopmentChange(BaseModel):
     insight_id: str
     reason: ChangeReason = "compiled"
     created_at: datetime
+
+
+class ModulationProposal(BaseModel):
+    """DevPolicy 编译输出单元（DEV-002）：一个调制槽位的提案，仲裁前非真相。"""
+
+    kind: DevelopmentKind
+    key: str
+    value: dict
+    strength: float
+    insight_id: str
+    insight_created_at: datetime | None = None

@@ -34,6 +34,7 @@ from app.services.memory2 import job_worker as memory2_job_worker
 from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import retriever as memory2_retriever
 from app.services.development import aggregate as development_aggregate
+from app.services.development import policy as development_policy
 from app.services.reflection import attribution as reflection_attribution
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import evaluation as reflection_evaluation
@@ -106,6 +107,7 @@ _SERVICE_DB_MODULES = (
     reflection_reflector,
     reflection_triggers,
     development_aggregate,
+    development_policy,
 )
 
 
