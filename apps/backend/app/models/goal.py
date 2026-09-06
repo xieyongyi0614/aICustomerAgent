@@ -6,7 +6,15 @@ from pydantic import BaseModel, Field
 
 GoalType = Literal["user_care", "relationship", "conversation", "scene"]
 
-GoalStatus = Literal["active", "completed", "expired", "cancelled"]
+GoalStatus = Literal[
+    "active",
+    "completed",
+    "expired",
+    "cancelled",
+    "failed",
+    "suspended",
+    "abandoned",
+]
 
 GoalSource = Literal["definition", "policy", "scene"]
 
@@ -103,6 +111,7 @@ class SubGoalSpec(BaseModel):
     status: SubGoalStatus = "pending"
     attempt_count: int = 0
     last_observed_at: datetime | None = None
+    last_attempt_at: datetime | None = None
     failure_note: str | None = None
 
     @staticmethod

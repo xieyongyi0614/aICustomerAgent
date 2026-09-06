@@ -199,6 +199,34 @@ goal_supply skipped 步骤——设计内扩展同 LIFE-005 先例）。
 登记：memory 无 world_event 源标记（MemorySource 仅 user_stated/user_derived/
 ai_inferred），world 域供给以「编排投影 salient_events + 显著度
 experience/milestone_event 记忆」双代理实现，语义等价（GAP-AUT-02 口径）。
+AUT-003 已实现（app/services/goal_observation.py：evaluate_criteria 白名单
+谓词求值三态（达成/未达成/不可判定——异常跳过不计数）；advance_goal 封顶
+（plan.updated_at 起算超 max_active_hours→failed exec_period_exceeded）→
+完成（全 done→completed+ingest_from_goal_completion experience 候选经 P1
+通道）→失败计数（同周期幂等 last_observed_at 恒等）→阈值 sub_goal failed→
+调整三分支（有可并行步→order_skip；预算未尽→enqueue goal_blocked；预算
+耗尽→failed replan_exhausted）；current=None 分支（全终态非全 done→预算
+未尽 replan 否则 failed+单次 goal_replan）；advance_user_goals 全量推进；
+app/services/goal_execution.py attempt_current_step：cooldown/静音时段
+（send_notification，autonomy_policy.in_quiet_hours 复用）/action_enabled
+门控→ActionIntent(dedupe_key=goal:{goal_id}:{plan.version}:{index})→
+run_action_planning(source=autonomy, goal_id=) 原样；V9 闸门拒绝（None）
+不计失败仅 last_attempt_at 留痕；life_loop goal_advance async 步骤
+（goal_supply 后插入）+ _observation_facts 编排投影（action 窗口/world/
+state/memory 四源）+ goal_observation trace 落 runtime_traces + 工作发现
+第四来源 _goal_work_due（Idle 口径同步）+ _cycle_reason goal_work；
+plan_goal 前置闸登记例外：failed goal 单次重规划（trigger=goal_replan 且
+attempts==max 放行一次，幂等键保证至多发出一次，成功后 reactivate_goal
+failed→active）；GAP-AUT-04 落地：context_builder/autonomy_engine 两处
+select 调用点入参过滤 layer IS NOT NULL（select 本体零改动）；repository
+fail_goal/reactivate_goal/update_plan_progress/finish_goal 带 failure_reason
+（_TERMINAL_STATUS+failed）；models GoalStatus 扩 7 值+SubGoalSpec
+last_attempt_at；db.py ck_character_goals_status 同步 7 值（0032 迁移将在
+AUT-004 重建约束）；settings +4；TRACE_STEP_NAMES +goal_observation（59）；
+26 测试绿 + tests/v2 全量 616 绿 + action/goal 回归 51 绿。
+登记：ingest.py 新增 SOURCE_GOAL 公共摄取入口（新增函数，P1 既有路径零
+改动——Goal 完成语义的合法 Ingest 通道）；sub-goal 执行依赖
+action_enabled=true（v9 总闸，灰度联动项）。
 ```
 
 

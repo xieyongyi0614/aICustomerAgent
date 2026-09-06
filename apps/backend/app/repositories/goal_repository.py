@@ -13,7 +13,7 @@ from app.models.goal import (
     SubGoalSpec,
 )
 
-_TERMINAL_STATUS = ("completed", "expired", "cancelled")
+_TERMINAL_STATUS = ("completed", "expired", "cancelled", "failed")
 _HIERARCHICAL_HORIZON = "persistent"
 
 
@@ -146,7 +146,9 @@ def create_goal(record: GoalRecord) -> GoalRecord:
         return _to_record(row)
 
 
-def finish_goal(goal_id: str, status: str) -> GoalRecord | None:
+def finish_goal(
+    goal_id: str, status: str, failure_reason: str | None = None
+) -> GoalRecord | None:
     if status not in _TERMINAL_STATUS:
         raise ValueError(f"非法终态：{status}")
     with SessionLocal() as session:
@@ -154,6 +156,8 @@ def finish_goal(goal_id: str, status: str) -> GoalRecord | None:
         if row is None or row.status != "active":
             return _to_record(row) if row is not None else None
         row.status = status
+        if failure_reason is not None:
+            row.failure_reason = failure_reason
         row.updated_at = datetime.now()
         session.commit()
         session.refresh(row)
@@ -170,6 +174,35 @@ def expire_goal(goal_id: str) -> GoalRecord | None:
 
 def cancel_goal(goal_id: str) -> GoalRecord | None:
     return finish_goal(goal_id, "cancelled")
+
+
+def fail_goal(goal_id: str, failure_reason: str) -> GoalRecord | None:
+    return finish_goal(goal_id, "failed", failure_reason=failure_reason)
+
+
+def reactivate_goal(goal_id: str) -> GoalRecord | None:
+    """failed→active（失败后单次重规划成功；AUT-004 状态机收口前的前置边）。"""
+    with SessionLocal() as session:
+        row = session.get(GoalRow, goal_id)
+        if row is None or row.status != "failed":
+            return _to_record(row) if row is not None else None
+        row.status = "active"
+        row.updated_at = datetime.now()
+        session.commit()
+        session.refresh(row)
+        return _to_record(row)
+
+
+def update_plan_progress(plan_id: str, sub_goals: list[SubGoalSpec]) -> GoalPlanRecord | None:
+    with SessionLocal() as session:
+        row = session.get(GoalPlanRow, plan_id)
+        if row is None:
+            return None
+        row.sub_goals = [item.model_dump(mode="json") for item in sub_goals]
+        row.updated_at = datetime.now()
+        session.commit()
+        session.refresh(row)
+        return _to_plan_record(row)
 
 
 def create_hierarchical_goal(

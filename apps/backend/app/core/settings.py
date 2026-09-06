@@ -344,6 +344,10 @@ class Settings(BaseSettings):
         '{"personal": "在用户在意的话题上更进一步",'
         ' "relationship": "让彼此的陪伴更近一步"}'
     )
+    v2_autonomy_subgoal_failure_threshold: int = 3
+    v2_autonomy_goal_max_active_hours: int = 168
+    v2_autonomy_subgoal_execute_cooldown_minutes: int = 30
+    v2_autonomy_observation_window_minutes: int = 120
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True
