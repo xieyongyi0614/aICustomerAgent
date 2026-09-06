@@ -186,6 +186,20 @@ def _load_shared_experiences(
     return _select_shared_entries(collected, trace=trace)
 
 
+def _load_relationship_patterns(user_id: str, trace=None) -> tuple[list, dict]:
+    """REL-003：关系模式读取（双闸 Flag 在服务内）+ trace；异常降级为空。"""
+    try:
+        from app.services import relationship_patterns
+
+        patterns, payload = relationship_patterns.read_relationship_patterns(user_id)
+    except Exception:
+        logger.exception("关系模式读取失败，本轮回退无注入")
+        return [], {"reasons": {}, "selected": []}
+    if trace is not None:
+        trace.record("relationship_pattern", 0.0, "ok", **payload)
+    return patterns, payload
+
+
 async def build(
     session_id: str,
     user_id: str,
@@ -244,6 +258,9 @@ async def build(
     shared_experiences: list = []
     if get_settings().v2_relationship_evolved_enabled:
         shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
+        relationship_patterns, _ = _load_relationship_patterns(user_id, trace=trace)
+    else:
+        relationship_patterns: list = []
     mode = getattr(conversation_row, "mode", None) or "default"
     mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(
@@ -259,6 +276,7 @@ async def build(
         insights=insights,
         development_overlay=development_overlay,
         shared_experiences=shared_experiences,
+        relationship_patterns=relationship_patterns,
         mode=mode,
         mode_entered_at=mode_entered_at,
     )
