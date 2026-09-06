@@ -31,10 +31,15 @@ async def lifespan(application: FastAPI):
         or get_settings().v2_reflection_enabled
         or get_settings().v2_development_enabled
         or get_settings().v2_relationship_evolved_enabled
+        or get_settings().v2_autonomy_advanced_enabled
     ):
         from app.services.memory2.job_worker import run_job_worker_loop
 
         _v2_job_worker_task = asyncio.create_task(run_job_worker_loop())
+    if get_settings().v2_autonomy_advanced_enabled:
+        from app.services.goal_planning import register_runtime
+
+        register_runtime()
     if get_settings().v2_reflection_enabled:
         from app.services.reflection.reflector import register_executor
         from app.services.reflection.triggers import register_with_job_worker

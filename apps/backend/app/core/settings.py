@@ -332,6 +332,18 @@ class Settings(BaseSettings):
     v2_life_loop_storm_daily_limit: int = 3
 
     v2_autonomy_advanced_enabled: bool = False
+    v2_autonomy_planning_llm_profile: str = ""
+    v2_autonomy_planning_max_attempts: int = 3
+    v2_autonomy_subgoal_max_count: int = 5
+    v2_autonomy_subgoal_max_depth: int = 2
+    v2_autonomy_supply_interval_minutes: int = 720
+    v2_autonomy_supply_personal_min_weight: float = 0.3
+    v2_autonomy_supply_relationship_min_strength: float = 0.6
+    v2_autonomy_supply_world_min_salience: float = 0.85
+    v2_autonomy_supply_templates_json: str = (
+        '{"personal": "在用户在意的话题上更进一步",'
+        ' "relationship": "让彼此的陪伴更近一步"}'
+    )
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True
