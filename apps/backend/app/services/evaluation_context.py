@@ -94,6 +94,21 @@ class RelationshipSlice:
 
 
 @dataclass
+class InsightRef:
+    id: str
+    statement: str
+    status: str
+    confidence: float = 0.0
+    evidence_count: int = 0
+
+
+@dataclass
+class ReflectionSlice:
+    insights: list[InsightRef] = field(default_factory=list)
+    injected_insight_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ActionSlice:
     records: list = field(default_factory=list)
     intent: dict | None = None
@@ -130,6 +145,7 @@ class EvaluationContext:
     world: dict | None = None
     relationship: RelationshipSlice | None = None
     action: ActionSlice | None = None
+    reflection: ReflectionSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:

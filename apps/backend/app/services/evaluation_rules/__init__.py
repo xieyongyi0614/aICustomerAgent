@@ -113,6 +113,7 @@ from app.services.evaluation_rules import behavior as _behavior  # noqa: E402
 from app.services.evaluation_rules import emotion as _emotion  # noqa: E402
 from app.services.evaluation_rules import memory as _memory  # noqa: E402
 from app.services.evaluation_rules import persona as _persona  # noqa: E402
+from app.services.evaluation_rules import reflection as _reflection  # noqa: E402
 from app.services.evaluation_rules import relationship as _relationship  # noqa: E402
 
 RULES: list[EvaluationRule] = [
@@ -123,6 +124,7 @@ RULES: list[EvaluationRule] = [
     *_autonomy.RULES,
     *_relationship.RULES,
     *_action.RULES,
+    *_reflection.RULES,
 ]
 
 __all__ = [

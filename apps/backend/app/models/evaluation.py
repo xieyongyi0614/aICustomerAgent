@@ -28,6 +28,7 @@ class EvaluationDimension(StrEnum):
     AUTONOMY = "autonomy"
     RELATIONSHIP = "relationship"
     ACTION = "action"
+    REFLECTION = "reflection"
 
 
 class EvaluationSubjectKind(StrEnum):
@@ -70,6 +71,9 @@ class IssueCode(StrEnum):
     ACTION_OVERCLAIM = "action_overclaim"
     ACTION_FAILED_UNREPORTED = "action_failed_unreported"
     ACTION_PLAN_MISMATCH = "action_plan_mismatch"
+    REFLECTION_NO_EVIDENCE_LINK = "reflection_no_evidence_link"
+    REFLECTION_STALE_INJECTED = "reflection_stale_injected"
+    REFLECTION_CONFIDENCE_OVER_CALIBRATED = "reflection_confidence_over_calibrated"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -100,6 +104,9 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.ACTION_OVERCLAIM: IssueSeverity.WARNING,
     IssueCode.ACTION_FAILED_UNREPORTED: IssueSeverity.INFO,
     IssueCode.ACTION_PLAN_MISMATCH: IssueSeverity.WARNING,
+    IssueCode.REFLECTION_NO_EVIDENCE_LINK: IssueSeverity.CRITICAL,
+    IssueCode.REFLECTION_STALE_INJECTED: IssueSeverity.CRITICAL,
+    IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: IssueSeverity.WARNING,
 }
 
 ISSUE_MESSAGES: dict[IssueCode, str] = {
@@ -130,6 +137,9 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.ACTION_OVERCLAIM: "回复宣称行动完成但缺少对应的 succeeded ActionRecord",
     IssueCode.ACTION_FAILED_UNREPORTED: "近期存在失败且未补救的重要委托行动，本轮触及同主题但未闭环",
     IssueCode.ACTION_PLAN_MISMATCH: "检出意图与回复语义无关或闸门频繁否决同型意图",
+    IssueCode.REFLECTION_NO_EVIDENCE_LINK: "active Insight 缺少任何证据引用（无证据不出 Insight）",
+    IssueCode.REFLECTION_STALE_INJECTED: "Context insight 段出现了非 active 状态的 Insight",
+    IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: "Insight confidence 超出按证据数折算的校准上限",
 }
 
 

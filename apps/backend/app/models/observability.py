@@ -53,6 +53,7 @@ SCHEMA_CALL_SITES: dict[str, CallSite] = {
     "TurnJudgeResult": CallSite.JUDGE,
     "ProactiveJudgeResult": CallSite.JUDGE,
     "ReflectionProposal": CallSite.REFLECTION,
+    "ReflectionJudgeResult": CallSite.JUDGE,
 }
 
 CAPTURE_MODES = ("disabled", "sampled", "always")

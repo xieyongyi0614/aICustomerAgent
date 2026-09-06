@@ -155,6 +155,7 @@ class Settings(BaseSettings):
     v2_reflection_run_timeout_minutes: int = 10
     v2_reflection_statement_max_chars: int = 200
     v2_reflection_invalidate_match_threshold: float = 0.7
+    v2_reflection_judge_sample_rate: float = 1.0
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
@@ -308,6 +309,7 @@ class Settings(BaseSettings):
     evaluation_proactive_reply_window_hours: int = 24
     evaluation_retention_days: int = 30
     evaluation_world_consistency_enabled: bool = True
+    evaluation_reflection_enabled: bool = True
     evaluation_relationship_enabled: bool = True
     evaluation_action_enabled: bool = True
     evaluation_max_digest_chars: int = 2000
