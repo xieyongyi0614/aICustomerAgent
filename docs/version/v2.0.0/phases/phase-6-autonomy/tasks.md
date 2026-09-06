@@ -248,6 +248,25 @@ goal_advance 前段接仲裁（观察前）+_observation_facts 补 action_histor
 TRACE_STEP_NAMES +goal_arbitration（60）；settings +3；23 测试绿（含迁移
 0032 往返）+ tests/v2 全量 639 绿 + 回归 45 绿（AUT-001 终态测试改用
 fail_goal——层级行 cancelled 出口已按 Persistence 语义关闭，预期变化）。
+AUT-005 已实现（models/evaluation.py EvaluationDimension.GOAL+6 码
+GOAL_INCONSISTENT_STATE/INVALID_TERMINATION/ARBITRATION_MISSING/PLANNING
+_BUDGET_EXCEEDED/EXECUTION_CAP_EXCEEDED/SUPPLY_MALFORMED（prefix goal→GOAL
+维度自动映射），ISSUE_CODE_COUNT 40→46 第五次收口（unit+LIFE-006 断言双
+收口）；evaluation_context.py GoalRef/GoalPlanRef/GoalLifecycleRef/
+GoalSlice+collect_goal_slice（character_goals/goal_plans/decision_records
+goal_lifecycle 三面只读）+EvaluationContext.goal 字段；evaluation_rules/
+goal.py 六规则纯函数（subjects=("goal",)）注册 RULES；offline_evaluator
+_goal_stats 小节；goal_observation 完成与三处失败路径补 lifecycle 归因
+（goal_arbitration.record_goal_lifecycle 公共入口——终态归因完整是
+GoalConsistencyRule 前提）；tests/eval/test_autonomy_eval_gate.py 剧情族
+4 例：完成分支（供给→规划→跨 3 会话推进→completed+experience 候选）、
+失败分支（阈值→重规划 v2/v3→耗尽→failed+第 4 次请求 attempt_cap）、
+放弃分支（双信号置信 abandoned）、冲突剧情（同域互斥 suspended 留痕→
+keeper 终态复活）+每分支 GoalSlice 六规则零违例=E-AUT-01~04 Gate 全过；
+regression-checklist.md 结果附录回写（离线部分已执行+真实模型待人工清单）；
+14+4 测试绿；全量 2195 passed/16 skipped 全绿（xdist 26s）。
+Judge 采样（规划质量 LLM 评审）预留 settings v2_autonomy_judge_sample_rate，
+真实模型人工回归时启用（离线 Gate 用固定桩，登记为覆盖边界）。
 ```
 
 

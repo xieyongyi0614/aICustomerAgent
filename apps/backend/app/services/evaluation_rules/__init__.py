@@ -116,6 +116,7 @@ from app.services.evaluation_rules import memory as _memory  # noqa: E402
 from app.services.evaluation_rules import persona as _persona  # noqa: E402
 from app.services.evaluation_rules import reflection as _reflection  # noqa: E402
 from app.services.evaluation_rules import relationship as _relationship  # noqa: E402
+from app.services.evaluation_rules import goal as _goal  # noqa: E402
 
 RULES: list[EvaluationRule] = [
     *_behavior.RULES,
@@ -127,6 +128,7 @@ RULES: list[EvaluationRule] = [
     *_action.RULES,
     *_reflection.RULES,
     *_development.RULES,
+    *_goal.RULES,
 ]
 
 __all__ = [

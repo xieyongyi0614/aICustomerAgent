@@ -30,6 +30,7 @@ class EvaluationDimension(StrEnum):
     ACTION = "action"
     REFLECTION = "reflection"
     DEVELOPMENT = "development"
+    GOAL = "goal"
 
 
 class EvaluationSubjectKind(StrEnum):
@@ -85,6 +86,12 @@ class IssueCode(StrEnum):
     LIFE_LOOP_BUDGET_OVERRUN = "life_loop_budget_overrun"
     TRIGGER_REGISTRY_ORPHAN = "trigger_registry_orphan"
     AUTONOMY_TRIGGER_UNPROVENANCED = "autonomy_trigger_unprovenanced"
+    GOAL_INCONSISTENT_STATE = "goal_inconsistent_state"
+    GOAL_INVALID_TERMINATION = "goal_invalid_termination"
+    GOAL_ARBITRATION_MISSING = "goal_arbitration_missing"
+    GOAL_PLANNING_BUDGET_EXCEEDED = "goal_planning_budget_exceeded"
+    GOAL_EXECUTION_CAP_EXCEEDED = "goal_execution_cap_exceeded"
+    GOAL_SUPPLY_MALFORMED = "goal_supply_malformed"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -125,6 +132,12 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.LIFE_LOOP_BUDGET_OVERRUN: IssueSeverity.CRITICAL,
     IssueCode.TRIGGER_REGISTRY_ORPHAN: IssueSeverity.WARNING,
     IssueCode.AUTONOMY_TRIGGER_UNPROVENANCED: IssueSeverity.CRITICAL,
+    IssueCode.GOAL_INCONSISTENT_STATE: IssueSeverity.CRITICAL,
+    IssueCode.GOAL_INVALID_TERMINATION: IssueSeverity.CRITICAL,
+    IssueCode.GOAL_ARBITRATION_MISSING: IssueSeverity.WARNING,
+    IssueCode.GOAL_PLANNING_BUDGET_EXCEEDED: IssueSeverity.WARNING,
+    IssueCode.GOAL_EXECUTION_CAP_EXCEEDED: IssueSeverity.WARNING,
+    IssueCode.GOAL_SUPPLY_MALFORMED: IssueSeverity.WARNING,
     IssueCode.REFLECTION_NO_EVIDENCE_LINK: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_STALE_INJECTED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: IssueSeverity.WARNING,
@@ -171,6 +184,12 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.LIFE_LOOP_BUDGET_OVERRUN: "Life Loop 预算违规（降级期间调用/日总量超配额）",
     IssueCode.TRIGGER_REGISTRY_ORPHAN: "触发器滞留无终态或取消无原因（孤儿）",
     IssueCode.AUTONOMY_TRIGGER_UNPROVENANCED: "主动投递无触发溯源记录",
+    IssueCode.GOAL_INCONSISTENT_STATE: "目标终态化缺少 lifecycle 归因记录（不无故消失/翻转被破坏）",
+    IssueCode.GOAL_INVALID_TERMINATION: "目标完成/失败/放弃语义不成立（缺判据/缺原因/缺置信依据）",
+    IssueCode.GOAL_ARBITRATION_MISSING: "挂起目标缺少仲裁留痕或同域多 active 并存",
+    IssueCode.GOAL_PLANNING_BUDGET_EXCEEDED: "规划 attempt 超出每 goal 生命周期封顶或产物超深度/数量/能力白名单",
+    IssueCode.GOAL_EXECUTION_CAP_EXCEEDED: "单 goal 执行周期超出封顶仍未终态化",
+    IssueCode.GOAL_SUPPLY_MALFORMED: "供给创建的层级 goal 形状非法（layer/domain/类型映射缺失）",
 }
 
 

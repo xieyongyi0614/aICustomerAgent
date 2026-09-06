@@ -78,7 +78,7 @@ def _run(
 
 class TestIssueCodeTable:
     def test_four_new_codes_with_severity(self):
-        assert len(IssueCode) == 40
+        assert len(IssueCode) == 46
         assert (
             DEFAULT_SEVERITY[IssueCode.LIFE_LOOP_RUN_INCOMPLETE]
             is not None

@@ -222,6 +222,22 @@ def set_status(
         return _to_record(row)
 
 
+def list_layered(user_id: str, character_id: str = "asuna") -> list[GoalRecord]:
+    """层级 goal 全状态列表（评估切片/审计面专用）。"""
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalRow.character_id == character_id,
+                GoalRow.layer.isnot(None),
+            )
+            .order_by(GoalRow.created_at.asc(), GoalRow.id.asc())
+            .all()
+        )
+        return [_to_record(row) for row in rows]
+
+
 def list_top_level_layered(
     user_id: str, statuses: tuple[str, ...] = ("active",)
 ) -> list[GoalRecord]:
