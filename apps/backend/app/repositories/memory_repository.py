@@ -121,6 +121,19 @@ def get_memory(memory_id: str) -> UserMemory | None:
         return _to_memory(row) if row else None
 
 
+def get_source_refs(memory_ids: list[str]) -> dict[str, dict]:
+    """批量读取 source_ref（REF-005 编排层识别 negate 信号用；只读）。"""
+    if not memory_ids:
+        return {}
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory.id, Memory.source_ref)
+            .filter(Memory.id.in_(memory_ids))
+            .all()
+        )
+        return {row_id: (source_ref or {}) for row_id, source_ref in rows}
+
+
 def update_memory_content(
     memory_id: str, content: str, importance: float | None = None
 ) -> UserMemory | None:

@@ -20,8 +20,8 @@ from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
 from app.models.reflection import ReflectionProposal
 from app.prompts.reflection import build_evidence_block, build_reflection_messages
-from app.services.memory_conflict import same_topic
 from app.services.reflection import evidence as reflection_evidence
+from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection.lifecycle import (
     EVENT_SUPERSEDE,
     STATUS_ACTIVE,
@@ -270,6 +270,7 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
     top = accepted[: settings.v2_reflection_max_insights_per_run]
     insight_ids = [f"ins:{uuid.uuid4().hex}" for _ in top]
     weights = {member.memory_id: member.weight for member in provided}
+    superseded: list[dict] = []
     with SessionLocal() as session:
         run_row = session.get(ReflectionRunRow, run.id)
         if run_row is None or run_row.status != RUN_RUNNING:
@@ -302,35 +303,54 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
                         created_at=now,
                     )
                 )
-        _supersede_conflicts(session, run, top, insight_ids, now)
+            superseded.extend(
+                _supersede_conflicts(session, run, draft, insight_id, insight_ids, now)
+            )
         run_row.status = RUN_DONE
         run_row.outcome = OUTCOME_INSIGHTS
         run_row.insight_ids = insight_ids
         run_row.updated_at = now
         session.commit()
+    if superseded:
+        reflection_lifecycle.notify_invalidation_listeners(run.user_id, superseded)
     return insight_ids
 
 
-def _supersede_conflicts(session, run, top, insight_ids, now) -> None:
-    for (draft, _resolved, _final), insight_id in zip(top, insight_ids):
-        actives = (
-            session.query(InsightRow)
-            .filter(
-                InsightRow.user_id == run.user_id,
-                InsightRow.status == STATUS_ACTIVE,
-                InsightRow.scope == draft.scope,
-                InsightRow.type == draft.type,
-            )
-            .all()
+def _supersede_conflicts(
+    session, run, draft, insight_id: str, own_ids: list[str], now: datetime
+) -> list[dict]:
+    """替代半边：同 scope+type 且相似度达阈值的旧 active Insight → superseded（同事务）。"""
+    actives = (
+        session.query(InsightRow)
+        .filter(
+            InsightRow.user_id == run.user_id,
+            InsightRow.status == STATUS_ACTIVE,
+            InsightRow.scope == draft.scope,
+            InsightRow.type == draft.type,
         )
-        for old in actives:
-            if old.id in insight_ids:
-                continue
-            if not same_topic(draft.statement, old.statement):
-                continue
-            old.status = transition(old.status, EVENT_SUPERSEDE)
-            old.superseded_by = insight_id
-            old.updated_at = now
+        .all()
+    )
+    candidates = [
+        reflection_lifecycle._to_insight(row)
+        for row in actives
+        if row.id not in own_ids
+    ]
+    matched_ids = set(
+        reflection_lifecycle.find_superseded_insights(
+            draft.statement, draft.scope, draft.type, candidates
+        )
+    )
+    changed: list[dict] = []
+    for row in actives:
+        if row.id not in matched_ids:
+            continue
+        row.status = transition(row.status, EVENT_SUPERSEDE)
+        row.superseded_by = insight_id
+        row.updated_at = now
+        changed.append(
+            {"insight_id": row.id, "status": "superseded", "superseded_by": insight_id}
+        )
+    return changed
 
 
 def _ask_llm_with_retry(window) -> ReflectionProposal:

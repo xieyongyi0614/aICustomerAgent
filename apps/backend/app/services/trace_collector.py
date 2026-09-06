@@ -50,6 +50,7 @@ TRACE_STEP_NAMES = (
     "reflection_evidence",
     "reflection_trigger",
     "reflection_run",
+    "reflection_invalidate",
 )
 
 _BACKGROUND_STEPS = (
