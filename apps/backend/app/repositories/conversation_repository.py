@@ -77,6 +77,16 @@ def count_messages(conv_id: str) -> int:
         )
 
 
+def count_human_messages(conv_id: str) -> int:
+    """用户轮次计数（对齐 chat_pipeline current_turn 口径：human 消息数）。"""
+    with SessionLocal() as session:
+        return (
+            session.query(Message)
+            .filter(Message.conversation_id == conv_id, Message.role == "human")
+            .count()
+        )
+
+
 def list_messages_since(
     cutoff: datetime, limit: int = 20000
 ) -> list[tuple[str, str]]:

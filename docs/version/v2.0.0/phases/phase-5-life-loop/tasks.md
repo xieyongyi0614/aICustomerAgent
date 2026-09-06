@@ -195,4 +195,17 @@ inactivity）/recover_stale 对账；trigger_evaluator Flag ON 表通道优先 +
 消费（对齐 v1 pop 语义）、evaluate_inactivity/poll_due_actions register_and_claim
 领取门、mark_action_reported 补 done；两处 v1 NameError 缺陷已随 fix c7f5768 修复；
 18 测试绿 + V7/V9 回归 51 例绿）。
+LIFE-002 已实现（迁移 0029 loop_runs 五 kind×三态+steps JSON+LIFE-003 记账列
+一次到位；loop_run_repository create/mark_step 逐步落账/finish/list_recent；
+app/application/life_loop.py：run_life_loop_worker 先 sleep 后 tick（对齐 v1 节奏）、
+工作发现三来源（due trigger 排除重检型 inactivity / 闲置 Eligible 廉价前置判定 /
+goal 到期补扫 turn 基准规则同 goal_service.review）、单用户周期持 per-user 写锁
+七步管线（perception/state_update 读即衰减/goal_check 补扫/memory_retrieval 与
+reflection_check 为 LIFE-005 接入位 skip=life005_pending/decision 复用
+autonomy_engine.tick 原样/world_experience 复用 run_maintenance）、维护步骤归并
+world maintenance/action retry/trigger reconcile（引擎函数原样调用+间隔记账 +
+recover_stale now 透传）、critical decision 失败 aborted 且单步错误不阻塞；
+main.py Flag ON 单 task 接管三循环 OFF 逐字节；trace 步骤名注册 9 项；
+conversation_repository.count_human_messages（current_turn 口径）；15 测试绿 +
+V7/V9/orchestration 回归 97 例绿）。
 ```

@@ -17,12 +17,14 @@ _observability_cleanup_task: asyncio.Task | None = None
 _world_maintenance_task: asyncio.Task | None = None
 _action_maintenance_task: asyncio.Task | None = None
 _v2_job_worker_task: asyncio.Task | None = None
+_life_loop_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _reclaim_task, _autonomy_task, _observability_cleanup_task
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
+    global _life_loop_task
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     if (
         get_settings().v2_memory_enabled
@@ -49,22 +51,28 @@ async def lifespan(application: FastAPI):
         from app.services.relationship_narrative import register_narrative_listener
 
         register_narrative_listener()
-    if get_settings().autonomy_enabled:
-        _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
+    if get_settings().v2_life_loop_enabled:
+        from app.application.life_loop import run_life_loop_worker
+
+        _life_loop_task = asyncio.create_task(run_life_loop_worker())
+        logging.getLogger(__name__).info("v2 life loop 已接管周期调度（归并 autonomy/world/action 三循环）")
     else:
-        logging.getLogger(__name__).info("autonomy_enabled=false，Worker 未启动")
+        if get_settings().autonomy_enabled:
+            _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
+        else:
+            logging.getLogger(__name__).info("autonomy_enabled=false，Worker 未启动")
+        if get_settings().world_enabled:
+            _world_maintenance_task = asyncio.create_task(
+                world_engine.run_world_maintenance_loop()
+            )
+        if get_settings().action_enabled:
+            from app.application.action_engine import run_action_retry_loop
+
+            _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
     if get_settings().observability_persist_enabled:
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()
         )
-    if get_settings().world_enabled:
-        _world_maintenance_task = asyncio.create_task(
-            world_engine.run_world_maintenance_loop()
-        )
-    if get_settings().action_enabled:
-        from app.application.action_engine import run_action_retry_loop
-
-        _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
     yield
     for task in (
         _reclaim_task,
@@ -73,6 +81,7 @@ async def lifespan(application: FastAPI):
         _world_maintenance_task,
         _action_maintenance_task,
         _v2_job_worker_task,
+        _life_loop_task,
     ):
         if task is not None:
             task.cancel()
@@ -86,6 +95,7 @@ async def lifespan(application: FastAPI):
     _world_maintenance_task = None
     _action_maintenance_task = None
     _v2_job_worker_task = None
+    _life_loop_task = None
 
 
 def create_app() -> FastAPI:

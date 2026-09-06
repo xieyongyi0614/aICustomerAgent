@@ -314,6 +314,7 @@ class Settings(BaseSettings):
     autonomy_min_user_reply_gap_minutes: int = 2
 
     v2_life_loop_enabled: bool = False
+    v2_life_loop_tick_seconds: int = 60
     v2_life_loop_trigger_max_attempts: int = 3
     v2_life_loop_trigger_backoff_seconds: int = 300
 
