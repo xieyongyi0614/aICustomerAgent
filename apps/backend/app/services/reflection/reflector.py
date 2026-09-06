@@ -280,6 +280,7 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
     insight_ids = [f"ins:{uuid.uuid4().hex}" for _ in top]
     weights = {member.memory_id: member.weight for member in provided}
     superseded: list[dict] = []
+    created: list[dict] = []
     with SessionLocal() as session:
         run_row = session.get(ReflectionRunRow, run.id)
         if run_row is None or run_row.status != RUN_RUNNING:
@@ -302,6 +303,15 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
                     updated_at=now,
                 )
             )
+            created.append(
+                {
+                    "insight_id": insight_id,
+                    "type": draft.type,
+                    "scope": draft.scope,
+                    "confidence": final,
+                    "statement": draft.statement.strip(),
+                }
+            )
             for memory_id in dict.fromkeys(resolved_ids):
                 session.add(
                     EvidenceLinkRow(
@@ -322,6 +332,7 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
         session.commit()
     if superseded:
         reflection_lifecycle.notify_invalidation_listeners(run.user_id, superseded)
+    reflection_lifecycle.notify_insight_created_listeners(run.user_id, created)
     return insight_ids
 
 

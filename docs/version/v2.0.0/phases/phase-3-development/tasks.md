@@ -184,6 +184,8 @@ M4 Acceptance:  DEV-005 + DEV-006 → Eval Gate + Regression Gate → 申请开�
 ```text
 DEV-001 已实现（迁移 0026_development_foundation + aggregate 读写服务 + 14 测试绿；
 upsert 仲裁比较器入参注入，DEV-002 注入同 strength 取新 Insight 的完整比较器）。
+DEV-002 已实现（policy.py 纯函数编译 + 规则表 settings 化 + 创建事件钩子接线
+reflection/lifecycle+reflector + development_compile job + 15 测试绿；P2 回归 69 绿）。
 ```
 
 

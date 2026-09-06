@@ -161,6 +161,18 @@ class Settings(BaseSettings):
     v2_reflection_context_statement_chars: int = 120
 
     v2_development_enabled: bool = False
+    v2_development_preference_max_token_delta: int = 200
+    v2_development_preference_tone_rules_json: str = '{"简短": "更简练、直给，不绕弯子"}'
+    v2_development_belief_topic_rules_json: str = (
+        '{"加班": "工作压力", "压力": "工作压力", "熬夜": "睡眠", "累": "休息"}'
+    )
+    v2_development_belief_habit_templates_json: str = (
+        '{"加班": {"id": "dev_habit_late_care", "domain": "relate", "priority": 3,'
+        ' "instruction": "深夜时段主动问一句他的休息状况"},'
+        ' "熬夜": {"id": "dev_habit_late_care", "domain": "relate", "priority": 3,'
+        ' "instruction": "深夜时段主动问一句他的休息状况"}}'
+    )
+    v2_development_pattern_goal_tier_delta_max: float = 0.5
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

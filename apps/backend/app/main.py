@@ -24,7 +24,11 @@ async def lifespan(application: FastAPI):
     global _reclaim_task, _autonomy_task, _observability_cleanup_task
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
-    if get_settings().v2_memory_enabled or get_settings().v2_reflection_enabled:
+    if (
+        get_settings().v2_memory_enabled
+        or get_settings().v2_reflection_enabled
+        or get_settings().v2_development_enabled
+    ):
         from app.services.memory2.job_worker import run_job_worker_loop
 
         _v2_job_worker_task = asyncio.create_task(run_job_worker_loop())
@@ -34,6 +38,10 @@ async def lifespan(application: FastAPI):
 
         register_with_job_worker()
         register_executor()
+    if get_settings().v2_development_enabled:
+        from app.services.development.policy import register_runtime
+
+        register_runtime()
     if get_settings().autonomy_enabled:
         _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
     else:
