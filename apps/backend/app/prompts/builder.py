@@ -32,6 +32,12 @@ MEMORY_TYPE_LABELS = {
     "relationship_event": "关系事件",
 }
 
+INSIGHT_TYPE_LABELS = {
+    "belief": "看法",
+    "preference": "偏好",
+    "pattern": "模式",
+}
+
 EMOTION_BUDGET_CHARS = 120
 RELATIONSHIP_BUDGET_CHARS = 150
 
@@ -321,6 +327,20 @@ class PromptBuilder:
                     "【你记得关于用户的事】\n"
                     f"{_literal(memory_lines)}\n"
                     "（仅在自然相关时引用，不要主动罗列；已提到过的事不要复述，除非用户问起）",
+                )
+            )
+
+        if state.insights:
+            insight_lines = "\n".join(
+                f"- ({INSIGHT_TYPE_LABELS.get(i.type, i.type)}) {i.statement}"
+                for i in state.insights
+            )
+            messages.append(
+                (
+                    "system",
+                    "【你确信的认知】\n"
+                    f"{_literal(insight_lines)}\n"
+                    "（这是你基于相处形成的看法，仅在自然相关时体现，不要罗列或直接引用条目）",
                 )
             )
 
