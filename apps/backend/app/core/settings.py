@@ -173,6 +173,7 @@ class Settings(BaseSettings):
         ' "instruction": "深夜时段主动问一句他的休息状况"}}'
     )
     v2_development_pattern_goal_tier_delta_max: float = 0.5
+    v2_development_answer_min_tokens: int = 300
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

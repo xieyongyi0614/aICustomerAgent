@@ -186,6 +186,11 @@ DEV-001 已实现（迁移 0026_development_foundation + aggregate 读写服务 
 upsert 仲裁比较器入参注入，DEV-002 注入同 strength 取新 Insight 的完整比较器）。
 DEV-002 已实现（policy.py 纯函数编译 + 规则表 settings 化 + 创建事件钩子接线
 reflection/lifecycle+reflector + development_compile job + 15 测试绿；P2 回归 69 绿）。
+DEV-003 已实现（read_overlay 叠加层 + 三消费点接线：behavior_engine 追加式修饰/
+goal_service 有界 tier 调制/answer_chain 按轮长度偏移 + Context 调制摘要段 +
+development_apply trace + 11 测试绿；行为/goal/golden 回归串行全绿。
+注：xdist 并行在本机存在与 Phase3 无关的既有 flake——基线 d6d3f8b 复现同组失败
++ INTERNALERROR worker crash，串行 -n0 全绿为准）。
 ```
 
 

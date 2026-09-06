@@ -194,13 +194,27 @@ def compute_budget(
     )
 
 
-def match_habits(strategy: BehaviorStrategyType) -> list[HabitRule]:
+def match_habits(
+    strategy: BehaviorStrategyType, extra_candidates: list[HabitRule] | None = None
+) -> list[HabitRule]:
     domains = HABIT_APPLICABILITY.get(strategy, set())
     effective = habit_runtime.load_effective_habits()
     candidates = [habit for habit in effective if habit.domain in domains]
-    candidates.sort(key=lambda h: (h.priority, effective.index(h)))
+    if extra_candidates:
+        known_ids = {habit.id for habit in effective}
+        for habit in extra_candidates:
+            if habit.id in known_ids or habit.domain not in domains:
+                continue
+            known_ids.add(habit.id)
+            candidates.append(habit)
+    ordered = [
+        habit
+        for _, habit in sorted(
+            enumerate(candidates), key=lambda item: (item[1].priority, item[0])
+        )
+    ]
     same_direction = HABIT_SAME_DIRECTION.get(strategy, frozenset())
-    return [h for h in candidates if h.id not in same_direction][:HABIT_MAX_COUNT]
+    return [h for h in ordered if h.id not in same_direction][:HABIT_MAX_COUNT]
 
 
 def _degraded_directive(analysis=None) -> BehaviorDirective:
@@ -274,10 +288,17 @@ def resolve(
     mode: str,
     analysis=None,
     relationship_ctx: RelationshipBehaviorContext | None = None,
+    development_overlay=None,
 ) -> BehaviorDirective:
     try:
         return _resolve(
-            intention, state, scene_ctx, mode, analysis, relationship_ctx
+            intention,
+            state,
+            scene_ctx,
+            mode,
+            analysis,
+            relationship_ctx,
+            development_overlay,
         )
     except Exception:
         logger.exception("behavior_engine 解析失败，降级默认 directive")
@@ -291,6 +312,7 @@ def _resolve(
     mode: str,
     analysis=None,
     relationship_ctx: RelationshipBehaviorContext | None = None,
+    development_overlay=None,
 ) -> BehaviorDirective:
     if intention is None or getattr(intention, "degraded", False):
         directive = _degraded_directive(analysis)
@@ -337,9 +359,28 @@ def _resolve(
     directive = BehaviorDirective(
         strategy=strategy,
         budget=budget,
-        habits=match_habits(strategy_value),
+        habits=match_habits(
+            strategy_value,
+            extra_candidates=_overlay_habit_candidates(development_overlay),
+        ),
     )
+    if development_overlay is not None:
+        directive.development_care_hint = development_overlay.care_hint or ""
+        directive.development_style = development_overlay.style
     return _attach_activity(directive, scene_ctx)
+
+
+def _overlay_habit_candidates(development_overlay) -> list[HabitRule] | None:
+    """overlay 候选 dict → HabitRule（非法形状丢弃，不进生效集资产）。"""
+    if development_overlay is None or not development_overlay.habit_candidates:
+        return None
+    candidates: list[HabitRule] = []
+    for candidate in development_overlay.habit_candidates:
+        try:
+            candidates.append(HabitRule(**candidate))
+        except Exception:
+            logger.warning("development habit 候选非法，丢弃：%s", candidate)
+    return candidates or None
 
 
 def _mode_budget(state, scene_ctx: SceneContext | None, mode: str) -> ActionBudget:

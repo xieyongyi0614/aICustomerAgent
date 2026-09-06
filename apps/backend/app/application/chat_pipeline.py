@@ -157,10 +157,56 @@ def _select_goal(
             character_intensity=state.character_state.intensity,
             scene_pending=_is_pending(scene_state),
             late_night=late_night,
+            development_weights=_development_weights(state),
         )
     except Exception:
         logger.exception("目标选择失败，动机层降级")
         return SelectedGoal(goal=None, reason="目标选择失败，动机层降级", suppressed=[])
+
+
+def _development_weights(state: ConversationState) -> dict[str, float] | None:
+    overlay = getattr(state, "development_overlay", None)
+    if overlay is None or not overlay.goal_weights:
+        return None
+    return dict(overlay.goal_weights)
+
+
+def _record_development_apply(trace, state: ConversationState, behavior_ctx) -> None:
+    """DEV-003：development_apply trace——调制 key/before/after/insight 溯源。"""
+    if trace is None:
+        return
+    overlay = getattr(state, "development_overlay", None)
+    if overlay is None:
+        return
+    applied: dict[str, dict] = {}
+    if overlay.style is not None and overlay.style.max_tokens_delta < 0:
+        from app.chains.answer_chain import answer_max_tokens
+
+        applied["response_style.length"] = {
+            "before": get_settings().answer_max_tokens,
+            "after": answer_max_tokens(state),
+        }
+    if overlay.style is not None and overlay.style.tone_hint:
+        applied["response_style.tone"] = {"before": "", "after": overlay.style.tone_hint}
+    if overlay.care_hint:
+        applied["behavior.care_topics"] = {"before": "", "after": overlay.care_hint}
+    if overlay.habit_candidates:
+        applied["behavior.habit_candidates"] = {
+            "before": [],
+            "after": [habit.id for habit in behavior_ctx.habits],
+        }
+    if overlay.goal_weights:
+        applied["goal.user_care.weight"] = {
+            "before": {},
+            "after": dict(overlay.goal_weights),
+        }
+    trace.record(
+        "development_apply",
+        0.0,
+        "ok",
+        applied=applied,
+        sources=dict(overlay.sources),
+    )
 
 
 async def run_chat_pipeline(
@@ -290,7 +336,9 @@ async def run_chat_pipeline(
         mode_decision.effective,
         turn,
         relationship_ctx=relationship_ctx,
+        development_overlay=getattr(state, "development_overlay", None),
     )
+    _record_development_apply(trace, state, behavior_ctx)
     trace.record(
         "behavior_engine",
         (time.perf_counter() - behavior_started) * 1000,

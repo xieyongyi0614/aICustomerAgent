@@ -42,6 +42,10 @@ def build_behavior_section(directive: BehaviorDirective | None) -> str | None:
     mood_tone = directive.strategy.mood_tone
     if mood_tone:
         lines.append(f"语气方向：{mood_tone}")
+    if directive.development_style is not None and directive.development_style.tone_hint:
+        lines.append(f"风格调整：{directive.development_style.tone_hint}")
+    if directive.development_care_hint:
+        lines.append(f"此刻的在意：{directive.development_care_hint}")
     for habit in directive.habits[:2]:
         lines.append(f"表达习惯：{habit.instruction}")
     budget_line = _budget_line(directive)

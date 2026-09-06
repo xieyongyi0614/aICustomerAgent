@@ -30,7 +30,21 @@ def build_chain(
             mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
         )
     model = llm if llm is not None else get_llm()
-    return prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
+    return prompt | model.bind(max_tokens=answer_max_tokens(state))
+
+
+def answer_max_tokens(state: ConversationState) -> int:
+    """DEV-003：development overlay 携带长度偏移时按轮下调（下限不抬高基线）。"""
+    settings = get_settings()
+    base = settings.answer_max_tokens
+    overlay = getattr(state, "development_overlay", None)
+    if overlay is None or overlay.style is None:
+        return base
+    delta = overlay.style.max_tokens_delta
+    if delta >= 0:
+        return base
+    floor = min(base, settings.v2_development_answer_min_tokens)
+    return max(floor, base + delta)
 
 
 def _record_answer_call(llm, trace, handler, started, started_at, first_token_ms, status, error_kind):

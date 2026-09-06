@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.models.development import DevelopmentStyleParams
+
 BEHAVIOR_STRATEGY_TYPES = [
     "focused_assistance",
     "natural_continuation",
@@ -130,6 +132,8 @@ class BehaviorDirective(BaseModel):
     activity: ActivityPresence = "idle"
     activity_text: str | None = None
     fallback_v2: str | None = None
+    development_style: DevelopmentStyleParams | None = None
+    development_care_hint: str = ""
 
     @property
     def degraded(self) -> bool:
