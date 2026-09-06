@@ -223,13 +223,13 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
 async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
     """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。
 
-    尾部接线 REF-003：flush 强化缓冲并把落库 id 喂给反思事件计数
-    （MEM-005 函数本体零修改；job_worker tick 抢先 flush 时本处拿到空列表，
-    该批不进事件计数，由每日周期调度兜底）。
+    尾部接线 REF-003：flush 强化缓冲并把落库 id 喂给反思事件计数；
+    接线 REF-005：对本轮 approve 且 source_ref.relation=negate 的转正记忆触发
+    Insight 失效匹配（MEM-005/Memory 侧 contradicts 并存语义零修改）。
     """
     from app.services.memory2 import evaluator as memory_evaluator
 
-    await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
+    decisions = await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
 
     if not get_settings().v2_reflection_enabled:
         return
@@ -242,6 +242,29 @@ async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
             reflection_triggers.observe_reinforce(ctx.user_id, flushed_ids, trace=ctx.trace)
     except Exception:
         logger.exception("反思事件接线失败，不影响记忆评估")
+    try:
+        _observe_negations(ctx, decisions)
+    except Exception:
+        logger.exception("反思失效通道接线失败，不影响记忆评估")
+
+
+def _observe_negations(ctx: PostProcessContext, decisions) -> None:
+    from app.repositories import memory_repository
+    from app.services.reflection.lifecycle import observe_negation
+
+    approved_ids = [
+        decision.memory_id
+        for decision in decisions
+        if decision.action == "approve" and decision.memory_id
+    ]
+    source_refs = memory_repository.get_source_refs(approved_ids)
+    for memory_id, source_ref in source_refs.items():
+        if source_ref.get("relation") != "negate":
+            continue
+        memory = memory_repository.get_memory(memory_id)
+        if memory is None:
+            continue
+        observe_negation(ctx.user_id, memory_id, memory.content, trace=ctx.trace)
 
 
 async def run_budget_observer(ctx: PostProcessContext) -> None:

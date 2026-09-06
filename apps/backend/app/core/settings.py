@@ -154,6 +154,7 @@ class Settings(BaseSettings):
     v2_reflection_ai_inferred_cap: float = 0.5
     v2_reflection_run_timeout_minutes: int = 10
     v2_reflection_statement_max_chars: int = 200
+    v2_reflection_invalidate_match_threshold: float = 0.7
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
