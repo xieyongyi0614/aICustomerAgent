@@ -47,10 +47,6 @@ def _collect_action_facts(user_id: str) -> dict:
         return {}
 
 
-def reset_seen_keys() -> None:
-    _seen_dedupe_keys.clear()
-
-
 def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
     """自治产行动参数模板（autonomy-integration.md §4）；无模板返回空参。"""
     if action_type == "create_reminder":

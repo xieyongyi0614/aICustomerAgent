@@ -3,12 +3,15 @@
 conversation_inactivity 纯函数判定；scheduled_followup 内存登记表（低频、重启丢失可接受）。
 """
 
+import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.autonomy import TriggerSignal
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
