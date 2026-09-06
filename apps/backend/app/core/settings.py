@@ -348,6 +348,9 @@ class Settings(BaseSettings):
     v2_autonomy_goal_max_active_hours: int = 168
     v2_autonomy_subgoal_execute_cooldown_minutes: int = 30
     v2_autonomy_observation_window_minutes: int = 120
+    v2_autonomy_abandon_min_progress_days: int = 14
+    v2_autonomy_arbitration_interval_minutes: int = 60
+    v2_autonomy_priority_layer_weight_long: float = 1.0
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True

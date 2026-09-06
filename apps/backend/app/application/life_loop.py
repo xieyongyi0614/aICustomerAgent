@@ -425,9 +425,21 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
             for record in records
             if record.created_at is not None and record.created_at >= window_start
         ]
+        history_start = now - timedelta(
+            days=settings.v2_autonomy_abandon_min_progress_days
+        )
+        facts["action_history"] = [
+            {
+                "capability": record.action_type,
+                "created_at": record.created_at,
+            }
+            for record in records
+            if record.created_at is not None and record.created_at >= history_start
+        ]
     except Exception:
         logger.exception("行动事实采集失败，判据按不可判定处理")
         facts["action_results"] = []
+        facts["action_history"] = []
     try:
         facts["world"] = (
             world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
@@ -454,15 +466,16 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
                 limit=settings.v2_life_loop_memory_limit,
             )
             facts["memory"] = {"salient_memory_count": len(salient)}
+            facts["salient_memories"] = salient
         except Exception:
             logger.exception("记忆事实采集失败，判据按不可判定处理")
     return facts
 
 
 async def _step_goal_advance(user_id: str, now: datetime) -> dict:
-    """AUT-003 观察与调整（0 LLM）+ Sub-Goal 执行尝试（V9 闸门原样）。
-    观察 → 封顶/完成/失败/重规划裁决 → 活跃 plan 执行窗尝试。"""
-    from app.services import goal_execution, goal_observation
+    """AUT-004 仲裁（复活/冲突/放弃）→ AUT-003 观察调整 → Sub-Goal 执行尝试。
+    仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。"""
+    from app.services import goal_arbitration, goal_execution, goal_observation
     from app.services.trace_collector import TurnTraceSession
 
     settings = get_settings()
@@ -473,6 +486,7 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
         return {"status": "ok", "goals": 0, "observations": 0, "executions": 0}
     started = time.perf_counter()
     facts = _observation_facts(user_id, now)
+    arbitration = goal_arbitration.run_user_arbitration(user_id, facts, now)
     advance = goal_observation.advance_user_goals(user_id, facts, now)
     executions: list[dict] = []
     for goal, plan in goal_repository.list_active_plans(user_id):
@@ -485,6 +499,8 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
         goals=advance.get("goals", 0),
         results=advance.get("results", []),
         executions=executions,
+        arbitration_changes=arbitration.get("arbitration_changes", []),
+        abandoned=arbitration.get("abandoned", []),
     )
     _persist_goal_trace(trace, user_id)
     return {
@@ -496,6 +512,8 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
             if isinstance(item, dict) and item.get("observations")
         ),
         "executions": len(executions),
+        "arbitration_changes": len(arbitration.get("arbitration_changes", [])),
+        "abandoned": len(arbitration.get("abandoned", [])),
     }
 
 

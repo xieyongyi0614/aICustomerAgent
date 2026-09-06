@@ -219,7 +219,7 @@ class TestPlanStorage:
         )
         plan = goal_repository.create_plan(self._plan(goal.id, 1))
         goal_repository.set_plan_status(plan.id, "active")
-        goal_repository.cancel_goal(goal.id)
+        goal_repository.fail_goal(goal.id, "exec_period_exceeded")
         assert goal_repository.list_active_plans(USER) == []
 
 

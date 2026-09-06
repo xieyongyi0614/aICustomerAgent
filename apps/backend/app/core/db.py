@@ -355,6 +355,7 @@ class GoalRow(Base):
     layer: Mapped[str | None] = mapped_column(String, nullable=True)
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    arbitration_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -571,7 +572,8 @@ class DecisionRecordRow(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('proactive_autonomy', 'turn_goal', 'turn_intention', 'turn_behavior')",
+            "kind IN ('proactive_autonomy', 'turn_goal', 'turn_intention',"
+            " 'turn_behavior', 'goal_lifecycle')",
             name="ck_decision_records_kind",
         ),
         Index("idx_decision_records_user_time", "user_id", "kind", "created_at"),

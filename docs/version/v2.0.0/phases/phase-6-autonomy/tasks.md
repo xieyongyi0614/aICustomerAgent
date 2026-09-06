@@ -227,6 +227,27 @@ AUT-004 重建约束）；settings +4；TRACE_STEP_NAMES +goal_observation（59�
 登记：ingest.py 新增 SOURCE_GOAL 公共摄取入口（新增函数，P1 既有路径零
 改动——Goal 完成语义的合法 Ingest 通道）；sub-goal 执行依赖
 action_enabled=true（v9 总闸，灰度联动项）。
+AUT-004 已实现（迁移 0032：character_goals +arbitration_state JSON+
+ck_character_goals_status 重建七值+ck_decision_records_kind 重建五值（batch
+往返含 P6 状态行清理）；models/goal.py GOAL_TRANSITIONS+goal_transitions()
+（v1 行 layer NULL 保既有三出口；层级行 active→completed/failed/abandoned/
+suspended、suspended→active/abandoned、failed→active 重规划边、终态封闭）
++IllegalGoalTransition+GoalRecord arbitration_state；goal_repository
+set_status 唯一状态入口（转换表守卫+仲裁留痕原子写）+finish_goal 收口
+同守卫（v1 终态重复调用幂等 no-op 语义保留）+reactivate_goal 守卫化+
+list_top_level_layered(statuses)/list_children_by_status；goal_arbitration.py
+compute_priority（显式 priority+long_term 层权+overlay.goal_weights 域键
+缺省 0+tension 越限 relationship 加分+conflict 期全域降权，破平确定性）+
+arbitrate_user（复活先行→同 (layer,domain) 顶层组互斥 suspended 留痕
+arbitration_state{conflict_with,score_basis,decided_at}）+check_abandonment
+（long_term 顶层 active；双信号=描述 bigram 与显著记忆零相交+执行窗零
+action；单信号 confidence 封顶 0.5<0.6 双信号才可达阈值；级联子目标）+
+run_user_arbitration（abandonment 60min 节流）+goal_lifecycle
+decision_records（DecisionKind.GOAL_LIFECYCLE，不变量 2）；life_loop
+goal_advance 前段接仲裁（观察前）+_observation_facts 补 action_history/salient_memories；
+TRACE_STEP_NAMES +goal_arbitration（60）；settings +3；23 测试绿（含迁移
+0032 往返）+ tests/v2 全量 639 绿 + 回归 45 绿（AUT-001 终态测试改用
+fail_goal——层级行 cancelled 出口已按 Persistence 语义关闭，预期变化）。
 ```
 
 

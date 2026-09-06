@@ -25,6 +25,7 @@ class DecisionKind(StrEnum):
     TURN_GOAL = "turn_goal"
     TURN_INTENTION = "turn_intention"
     TURN_BEHAVIOR = "turn_behavior"
+    GOAL_LIFECYCLE = "goal_lifecycle"
 
 
 class CallSite(StrEnum):
