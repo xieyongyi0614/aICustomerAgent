@@ -137,6 +137,55 @@ def _load_context_insights(
     return selected, trace_payload
 
 
+def _select_shared_entries(collected: list, trace=None) -> tuple[list, dict]:
+    """共同经历选材：Freshness（最新优先）选材 + 预算贪心装入，渲染保持时间序。"""
+    from app.prompts.builder import SHARED_EXPERIENCE_HEADER, SHARED_EXPERIENCE_NOTE
+
+    settings = get_settings()
+    budget = settings.v2_relationship_shared_budget_chars
+    reserve = len(SHARED_EXPERIENCE_HEADER) + len(SHARED_EXPERIENCE_NOTE) + 1
+    limit = settings.v2_relationship_shared_limit
+    fresh_first = sorted(collected, key=lambda entry: entry.occurred_at, reverse=True)
+    selected: list = []
+    reasons: dict[str, str] = {}
+    used = reserve
+    for entry in fresh_first:
+        if len(selected) >= limit:
+            reasons[entry.entry_id] = "over_limit"
+            continue
+        line_len = len(entry.title) + 2
+        if used + line_len > budget:
+            reasons[entry.entry_id] = "budget"
+            continue
+        selected.append(entry)
+        used += line_len
+        reasons[entry.entry_id] = "in"
+    selected.sort(key=lambda entry: entry.occurred_at)
+    payload = {
+        "budget": budget,
+        "used": used,
+        "selected": [entry.entry_id for entry in selected],
+        "reasons": reasons,
+    }
+    if trace is not None:
+        trace.record("relationship_shared", 0.0, "ok", **payload)
+    return selected, payload
+
+
+def _load_shared_experiences(
+    user_id: str, trace=None
+) -> tuple[list, dict]:
+    """REL-002：共同经历投影 → 选材；投影异常一律降级为空段（fail-safe）。"""
+    try:
+        from app.services import relationship_shared
+
+        collected = relationship_shared.collect_shared_experiences(user_id)
+    except Exception:
+        logger.exception("共同经历投影失败，段降级为空")
+        return [], {}
+    return _select_shared_entries(collected, trace=trace)
+
+
 async def build(
     session_id: str,
     user_id: str,
@@ -192,6 +241,9 @@ async def build(
         from app.services.development import aggregate as development_aggregate
 
         development_overlay = development_aggregate.read_overlay(user_id)
+    shared_experiences: list = []
+    if get_settings().v2_relationship_evolved_enabled:
+        shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
     mode = getattr(conversation_row, "mode", None) or "default"
     mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(
@@ -206,6 +258,7 @@ async def build(
         goals=goals,
         insights=insights,
         development_overlay=development_overlay,
+        shared_experiences=shared_experiences,
         mode=mode,
         mode_entered_at=mode_entered_at,
     )

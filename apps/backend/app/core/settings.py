@@ -176,6 +176,10 @@ class Settings(BaseSettings):
     v2_development_answer_min_tokens: int = 300
 
     v2_relationship_evolved_enabled: bool = False
+    v2_relationship_shared_budget_chars: int = 200
+    v2_relationship_shared_limit: int = 3
+    v2_relationship_shared_min_salience: float = 0.6
+    v2_relationship_shared_cache_ttl_seconds: int = 0
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
