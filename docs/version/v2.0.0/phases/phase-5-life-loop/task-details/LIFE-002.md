@@ -191,3 +191,13 @@ Flag ON（单 task，60s 节拍）:
 - LLM Usage：Controller 本体 0 LLM；周期内 LLM 仅出现于步骤 6 内部既有链（proactive 命中时），受 LIFE-003 预算约束。
 - 不实现 Idle 判定细节与配额熔断（LIFE-003）、周期检索与反思检查内容（LIFE-005）、outbox 消费器本体（LIFE-004）——本 Task 交付步骤位、skip 条件与记账骨架。
 - 不提前设计 Phase 6：goal 不新增 due_at/层级语义（AUT-001），decision 不接 Planning（AUT-002），goal check 不做 Sub-Goal 判据检查（AUT-003）。
+
+## 缺口补充设计（评审决策材料，随登记缺口收口补充）
+
+### 补 1：多进程维护协调的升级备案（核对记录 10）
+
+R14 阈值触发（日活>100 或周期任务 P95>30s）抽离 Worker 进程时，内存维护时间戳的替换方案备案（**本期不实施**）：
+
+- 方案 a（推荐）：维护「上次执行时刻」从内存态升级为 `loop_runs` 查询——`SELECT MAX(finished_at) FROM loop_runs WHERE kind=:kind AND status='done'`（走 (status, started_at) 索引，每 tick 一次廉价查询），零新表零新列，崩溃天然恢复；
+- 方案 b：独立 `maintenance_heartbeats` 小表（kind + last_run_at，UPSERT），语义更直白但多一张表；
+- 正确性前提不变：维护步骤本身幂等（扫表重入无害），多执行器下最坏重复执行一次维护，SKIP LOCKED 已覆盖 trigger/outbox 的强一致部分。
