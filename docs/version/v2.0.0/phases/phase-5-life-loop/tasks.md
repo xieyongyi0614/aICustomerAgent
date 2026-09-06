@@ -234,4 +234,15 @@ outbox_action_id 指纹+relationship 既有 bridge+applied_ops 崩溃续走+单�
 _maintenance_pending 收录；debug /actions/{id} 附 outbox 状态；语义变化登记：
 世界侧失败从行动 failed 变最终一致死信（Flag OFF 保留 v1）；10 测试绿 +
 V9/V8/v2 全量 616 例绿）。
+LIFE-005 已实现（memory_repository.list_top_salience：active 非 hypothetical
++salience 降序快查（NULL visibility 容错）；life_loop_context.py 独立
+contextvar 载体（避免 executor↔life_loop 循环导入，默认 None 前台零漂移）；
+life_loop memory_retrieval 步骤实体化（v2_memory_enabled 门控→快查→digest
+≤600 字符→contextvar set+token 周期收口 reset，skip=memory_disabled/
+no_salient_memory）；reflection_check 步骤实体化（v2_reflection_enabled 门控+
+240min 频控→REF-003 trigger_for_user(trigger=event) 全链委托，skip=
+reflection_disabled/throttled，outcome 记账）；proactive_executor recent_context
+追加 digest（_recent_context 既有段保留）；settings min_salience=0.8/limit=5/
+digest_chars=600/reflection_check_interval=240；10 测试绿 + v2/v9/proactive
+回归 612 例绿）。
 ```

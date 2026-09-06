@@ -137,8 +137,8 @@ class TestUserCycle:
             "world_experience",
         ]
         skipped = {s["step"]: s for s in run.steps if s["status"] == "skipped"}
-        assert skipped["memory_retrieval"]["skip_reason"] == "life005_pending"
-        assert skipped["reflection_check"]["skip_reason"] == "life005_pending"
+        assert skipped["memory_retrieval"]["skip_reason"] == "memory_disabled"
+        assert skipped["reflection_check"]["skip_reason"] == "reflection_disabled"
         rows = trigger_repo.list_recent(USER)
         assert len(rows) == 1 and rows[0].status == "pending"
 

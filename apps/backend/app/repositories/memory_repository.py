@@ -100,6 +100,31 @@ def list_active(
         return [_to_memory(row) for row in rows]
 
 
+def list_top_salience(
+    user_id: str,
+    character_id: str = "asuna",
+    min_salience: float = 0.8,
+    limit: int = 5,
+) -> list[UserMemory]:
+    """高显著度快查（LIFE-005 周期检索）：active 非 hypothetical，salience 降序。"""
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory)
+            .filter(
+                Memory.user_id == user_id,
+                Memory.character_id.in_([character_id, "*"]),
+                Memory.status == "active",
+                (Memory.visibility.is_(None)) | (Memory.visibility != "hypothetical"),
+                Memory.salience.isnot(None),
+                Memory.salience >= min_salience,
+            )
+            .order_by(Memory.salience.desc(), Memory.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_memory(row) for row in rows]
+
+
 def list_active_by_types(
     user_id: str,
     character_id: str,

@@ -26,12 +26,14 @@ from app.repositories import (
     proactive_repository,
     trigger_registry_repository,
 )
+from app.application.life_loop_context import memory_digest_var
 from app.services import life_loop_budget, state_service
 
 logger = logging.getLogger(__name__)
 
 _RECONCILE_INTERVAL_SECONDS = 300
 _maintenance_last: dict[str, float] = {}
+_reflection_check_last: dict[str, datetime] = {}
 
 
 async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> None:
@@ -149,6 +151,7 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
         user_id=user_id, kind="autonomy", reason=_cycle_reason(user_id, now), now=now
     )
     steps: list[dict] = []
+    cycle_ctx: dict = {}
     budget = life_loop_budget.check_daily_budget(now=now)
     status = "done"
     try:
@@ -157,7 +160,8 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(run.id, steps, "state_update", _step_state_update, user_id, now)
             _record_step(run.id, steps, "goal_check", _step_goal_check, user_id, now)
             _record_step(
-                run.id, steps, "memory_retrieval", _step_memory_retrieval, user_id, now
+                run.id, steps, "memory_retrieval",
+                _step_memory_retrieval, user_id, now, cycle_ctx,
             )
             _record_step(
                 run.id, steps, "reflection_check", _step_reflection_check, user_id, now
@@ -197,6 +201,9 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
         steps.append(
             {"step": "abort", "status": "error", "error": exc.__class__.__name__}
         )
+    digest_token = cycle_ctx.get("digest_token")
+    if digest_token is not None:
+        memory_digest_var.reset(digest_token)
     finished_at = datetime.now()
     try:
         llm_count = (
@@ -338,14 +345,50 @@ def _expire_due_goals(user_id: str) -> list:
     return expired
 
 
-def _step_memory_retrieval(user_id: str, now: datetime) -> dict:
-    """LIFE-005 接入位：周期记忆快查（显著度门槛）→ Decision 输入可见面。"""
-    return {"status": "skipped", "skip_reason": "life005_pending"}
+def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:
+    """LIFE-005 周期记忆快查（显著度门槛，0 LLM）：digest 进 trace 并经
+    contextvar 注入 proactive 生成上下文（recent_context 追加段）。"""
+    from app.repositories import memory_repository
+
+    settings = get_settings()
+    if not settings.v2_memory_enabled:
+        return {"status": "skipped", "skip_reason": "memory_disabled"}
+    rows = memory_repository.list_top_salience(
+        user_id,
+        min_salience=settings.v2_life_loop_memory_min_salience,
+        limit=settings.v2_life_loop_memory_limit,
+    )
+    if not rows:
+        return {"status": "skipped", "skip_reason": "no_salient_memory", "count": 0}
+    digest = _build_memory_digest(rows, settings.v2_life_loop_memory_digest_chars)
+    cycle_ctx["digest_token"] = memory_digest_var.set(digest)
+    return {
+        "status": "ok",
+        "count": len(rows),
+        "memory_ids": [row.id for row in rows],
+    }
+
+
+def _build_memory_digest(rows, budget_chars: int) -> str:
+    lines = [f"- [{row.type}] {row.content[:120]}" for row in rows]
+    return ("与当前状态相关的重要记忆：\n" + "\n".join(lines))[:budget_chars]
 
 
 def _step_reflection_check(user_id: str, now: datetime) -> dict:
-    """LIFE-005 接入位：反思触发检查（复用 REF-003 门槛与额度）。"""
-    return {"status": "skipped", "skip_reason": "life005_pending"}
+    """LIFE-005 反思检查：复用 REF-003 触发器全链（证据门槛→额度→日桶幂等），
+    本步骤只做频控调用；同周期/同日不重复入队由 REF-003 日桶键保证。"""
+    from app.services.reflection import triggers as reflection_triggers
+
+    settings = get_settings()
+    if not settings.v2_reflection_enabled:
+        return {"status": "skipped", "skip_reason": "reflection_disabled"}
+    interval_minutes = settings.v2_life_loop_reflection_check_interval_minutes
+    last = _reflection_check_last.get(user_id)
+    if last is not None and (now - last).total_seconds() < interval_minutes * 60:
+        return {"status": "skipped", "skip_reason": "throttled"}
+    _reflection_check_last[user_id] = now
+    outcome = reflection_triggers.trigger_for_user(user_id, trigger="event", now=now)
+    return {"status": "ok", "outcome": outcome}
 
 
 def _step_world_experience(user_id: str, now: datetime) -> dict:
