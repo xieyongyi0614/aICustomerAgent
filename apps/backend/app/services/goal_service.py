@@ -282,6 +282,7 @@ def select(
     character_intensity: float,
     scene_pending: bool,
     late_night: bool,
+    development_weights: dict[str, float] | None = None,
 ) -> SelectedGoal:
     if not goals:
         return SelectedGoal(goal=None, reason="目标集为空，动机层降级", suppressed=[])
@@ -304,8 +305,13 @@ def select(
             if goal.description in TIER_DESCRIPTION_ORDER
             else len(TIER_DESCRIPTION_ORDER)
         )
+        tier = _effective_tier(goal, signals)
+        if development_weights:
+            delta = float(development_weights.get(goal.type) or 0.0)
+            cap = settings.v2_development_pattern_goal_tier_delta_max
+            tier -= max(-cap, min(cap, delta))
         return (
-            _effective_tier(goal, signals),
+            tier,
             -goal.priority,
             -goal.created_at.timestamp(),
             description_rank,
@@ -318,6 +324,10 @@ def select(
     background = ranked[1].description if len(ranked) > 1 else None
 
     reason = _selection_reason(selected, signals, settings)
+    if development_weights and float(
+        development_weights.get(selected.type) or 0.0
+    ) != 0.0:
+        reason = f"{reason}；development 调制生效"
     if scene_pending and selected.type != "scene":
         reason = f"存在未完成场景承诺；{reason}"
     return SelectedGoal(

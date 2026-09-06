@@ -18,7 +18,13 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow, SessionLocal
-from app.models.development import DevelopmentChange, DevelopmentState
+from app.core.settings import get_settings
+from app.models.development import (
+    DevelopmentChange,
+    DevelopmentOverlay,
+    DevelopmentState,
+    DevelopmentStyleParams,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +233,85 @@ def get_state_history(state_id: str) -> list[DevelopmentChange]:
             .all()
         )
         return [_to_change(row) for row in rows]
+
+
+SUMMARY_MAX_CHARS = 100
+
+_SUMMARY_LABELS = {
+    "response_style.length": "回复更简短",
+    "response_style.tone": "语气按他的偏好调整",
+    "behavior.care_topics": None,
+    "behavior.habit_candidates": None,
+    "goal.user_care.weight": "更主动地关心他",
+    "autonomy.time_preference": None,
+}
+
+
+def read_overlay(user_id: str, character_id: str = "asuna") -> DevelopmentOverlay | None:
+    """DEV-003 叠加层读取：Flag OFF / 无 active / 读取失败 → None（fail-safe 到 v1）。"""
+    if not get_settings().v2_development_enabled:
+        return None
+    try:
+        rows = list_active_modulations(user_id, character_id)
+    except Exception:
+        logger.exception("development 叠加层读取失败，本轮回退 v1 行为")
+        return None
+    if not rows:
+        return None
+    overlay = DevelopmentOverlay()
+    summary_parts: list[str] = []
+    for row in rows:
+        value = row.value or {}
+        try:
+            _apply_row(overlay, row, value, summary_parts)
+        except Exception:
+            logger.exception("development 调制行解析失败，跳过该行：%s", row.key)
+            continue
+    if overlay == DevelopmentOverlay():
+        return None
+    overlay.modulation_summary = "、".join(summary_parts)[:SUMMARY_MAX_CHARS]
+    return overlay
+
+
+def _apply_row(overlay: DevelopmentOverlay, row, value: dict, summary_parts: list) -> None:
+    overlay.sources[row.key] = row.source_insight_id
+    key = row.key
+    if key == "response_style.length":
+        delta = int(value.get("max_tokens_delta") or 0)
+        style = overlay.style or DevelopmentStyleParams()
+        style.max_tokens_delta += delta
+        overlay.style = style
+        if delta < 0:
+            summary_parts.append(_SUMMARY_LABELS[key])
+    elif key == "response_style.tone":
+        tone = str(value.get("tone_hint") or "")
+        if tone:
+            style = overlay.style or DevelopmentStyleParams()
+            style.tone_hint = tone
+            overlay.style = style
+            summary_parts.append(tone)
+    elif key == "behavior.care_topics":
+        hint = str(value.get("care_hint") or "")
+        if hint:
+            overlay.care_hint = hint
+            summary_parts.append(hint)
+    elif key == "behavior.habit_candidates":
+        known = {candidate.get("id") for candidate in overlay.habit_candidates}
+        for candidate in value.get("candidates") or []:
+            if not isinstance(candidate, dict):
+                continue
+            cid = candidate.get("id")
+            if not isinstance(cid, str) or not cid or cid in known:
+                continue
+            known.add(cid)
+            overlay.habit_candidates.append(candidate)
+    elif key == "goal.user_care.weight":
+        delta = float(value.get("tier_delta") or 0.0)
+        if delta:
+            overlay.goal_weights["user_care"] = (
+                overlay.goal_weights.get("user_care", 0.0) + delta
+            )
+            summary_parts.append(_SUMMARY_LABELS[key])
 
 
 def _insert(session, user_id, character_id, proposal: dict, status: str, now: datetime):

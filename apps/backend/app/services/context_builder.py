@@ -187,6 +187,11 @@ async def build(
         )
     character_state, relationship_state = _load_states_with_fallback(user_id)
     goals = goal_service.load_active(user_id)
+    development_overlay = None
+    if get_settings().v2_development_enabled:
+        from app.services.development import aggregate as development_aggregate
+
+        development_overlay = development_aggregate.read_overlay(user_id)
     mode = getattr(conversation_row, "mode", None) or "default"
     mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(
@@ -200,6 +205,7 @@ async def build(
         relationship_state=relationship_state,
         goals=goals,
         insights=insights,
+        development_overlay=development_overlay,
         mode=mode,
         mode_entered_at=mode_entered_at,
     )

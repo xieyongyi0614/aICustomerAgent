@@ -74,3 +74,25 @@ class ModulationProposal(BaseModel):
     strength: float
     insight_id: str
     insight_created_at: datetime | None = None
+
+
+class DevelopmentStyleParams(BaseModel):
+    """ResponseStyle 调制参数（DEV-003）：长度偏移 + 语气提示。"""
+
+    max_tokens_delta: int = 0
+    tone_hint: str | None = None
+
+
+class DevelopmentOverlay(BaseModel):
+    """development_state active 行的读取侧投影（DEV-003）；行为域只读消费。
+
+    habit_candidates 为 HabitRule 形状的原始 dict（HabitRule 形状校验在行为域
+    消费点执行，避免 models 层循环依赖）。
+    """
+
+    style: DevelopmentStyleParams | None = None
+    care_hint: str | None = None
+    habit_candidates: list[dict] = []
+    goal_weights: dict[str, float] = {}
+    modulation_summary: str = ""
+    sources: dict[str, str] = {}

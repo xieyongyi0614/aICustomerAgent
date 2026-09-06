@@ -344,6 +344,17 @@ class PromptBuilder:
                 )
             )
 
+        overlay = getattr(state, "development_overlay", None)
+        if overlay is not None and overlay.modulation_summary:
+            messages.append(
+                (
+                    "system",
+                    "【你因经历而改变】\n"
+                    f"{_literal(overlay.modulation_summary)}\n"
+                    "（这是相处带来的自然变化，融入表达即可，不要直接引用说明）",
+                )
+            )
+
         if summary:
             messages.append(("system", _literal(f"【对话摘要】\n{summary}")))
 
