@@ -82,6 +82,7 @@ from app.repositories import (
     scene_state_repository,
     summary_repository,
     trace_repository,
+    trigger_registry_repository,
     world_repository,
 )
 
@@ -102,6 +103,7 @@ _REPO_MODULES = (
     proactive_repository,
     evaluation_repository,
     trace_repository,
+    trigger_registry_repository,
     llm_call_repository,
     prompt_snapshot_repository,
     decision_repository,
