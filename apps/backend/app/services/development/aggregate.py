@@ -90,18 +90,26 @@ def upsert_modulation(
     *,
     source_insight_created_at: datetime | None = None,
     comparator=default_comparator,
+    change_reason: str | None = None,
+    ignore_seen: bool = False,
     character_id: str = "asuna",
     now: datetime | None = None,
     trace=None,
 ) -> UpsertOutcome:
     """调制提案落库：无 active 新建；仲裁胜出替换（旧王 superseded）；落败留痕。
 
-    同 (user, key, insight) 已有行 → noop（编译幂等的存储侧表达）。
+    同 (user, key, insight) 已有行 → noop（编译幂等的存储侧表达）；
+    ignore_seen 供回退晋升绕过（被撤 Insight 的次优重新上岗是新行，非复活终态）。
+    change_reason 覆盖 changes 行语义标注（回退驱动=rolled_back、重放=replayed），
+    缺省按操作类型 compiled/arbitrated/arbitrated_lost。
     """
     started = time.perf_counter()
     if not 0.0 <= strength <= 1.0:
         raise ValueError(f"strength 越界: {strength}")
     now = now or datetime.now()
+    reason_created = change_reason or REASON_COMPILED
+    reason_arbitrated = change_reason or REASON_ARBITRATED
+    reason_lost = change_reason or REASON_ARBITRATED_LOST
     proposal = {
         "kind": kind,
         "key": key,
@@ -111,19 +119,20 @@ def upsert_modulation(
         "source_insight_created_at": source_insight_created_at,
     }
     with SessionLocal() as session:
-        seen = (
-            session.query(DevelopmentStateRow)
-            .filter(
-                DevelopmentStateRow.user_id == user_id,
-                DevelopmentStateRow.key == key,
-                DevelopmentStateRow.source_insight_id == source_insight_id,
+        if not ignore_seen:
+            seen = (
+                session.query(DevelopmentStateRow)
+                .filter(
+                    DevelopmentStateRow.user_id == user_id,
+                    DevelopmentStateRow.key == key,
+                    DevelopmentStateRow.source_insight_id == source_insight_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if seen is not None:
-            outcome = UpsertOutcome(OUTCOME_NOOP, _to_state(seen))
-            _trace(trace, started, key=key, op="noop", insight_id=source_insight_id)
-            return outcome
+            if seen is not None:
+                outcome = UpsertOutcome(OUTCOME_NOOP, _to_state(seen))
+                _trace(trace, started, key=key, op="noop", insight_id=source_insight_id)
+                return outcome
         active = (
             session.query(DevelopmentStateRow)
             .filter(
@@ -137,7 +146,7 @@ def upsert_modulation(
         if active is None:
             row = _insert(session, user_id, character_id, proposal, STATUS_ACTIVE, now)
             _record_change(
-                session, row.id, None, value, source_insight_id, REASON_COMPILED, now
+                session, row.id, None, value, source_insight_id, reason_created, now
             )
             session.commit()
             result = UpsertOutcome(OUTCOME_CREATED, _to_state(row))
@@ -153,7 +162,7 @@ def upsert_modulation(
                 active.value,
                 value,
                 source_insight_id,
-                REASON_ARBITRATED,
+                reason_arbitrated,
                 now,
             )
             session.commit()
@@ -162,7 +171,7 @@ def upsert_modulation(
             return result
         row = _insert(session, user_id, character_id, proposal, STATUS_SUPERSEDED, now)
         _record_change(
-            session, row.id, None, value, source_insight_id, REASON_ARBITRATED_LOST, now
+            session, row.id, None, value, source_insight_id, reason_lost, now
         )
         session.commit()
         result = UpsertOutcome(OUTCOME_LOST, _to_state(row))
@@ -233,6 +242,21 @@ def get_state_history(state_id: str) -> list[DevelopmentChange]:
             .all()
         )
         return [_to_change(row) for row in rows]
+
+
+def list_states_by_source_insight(
+    user_id: str, insight_id: str, status: str = STATUS_ACTIVE
+) -> list[DevelopmentState]:
+    """按源 Insight 定位 state 行（DEV-004 回退入口；缺省只查 active）。"""
+    with SessionLocal() as session:
+        query = session.query(DevelopmentStateRow).filter(
+            DevelopmentStateRow.user_id == user_id,
+            DevelopmentStateRow.source_insight_id == insight_id,
+        )
+        if status is not None:
+            query = query.filter(DevelopmentStateRow.status == status)
+        rows = query.order_by(DevelopmentStateRow.key.asc()).all()
+        return [_to_state(row) for row in rows]
 
 
 SUMMARY_MAX_CHARS = 100
