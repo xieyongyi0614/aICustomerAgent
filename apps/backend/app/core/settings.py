@@ -351,6 +351,7 @@ class Settings(BaseSettings):
     v2_autonomy_abandon_min_progress_days: int = 14
     v2_autonomy_arbitration_interval_minutes: int = 60
     v2_autonomy_priority_layer_weight_long: float = 1.0
+    v2_autonomy_judge_sample_rate: float = 1.0
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True
@@ -358,6 +359,7 @@ class Settings(BaseSettings):
     evaluation_memory_enabled: bool = True
     evaluation_behavior_enabled: bool = True
     evaluation_autonomy_enabled: bool = True
+    evaluation_goal_enabled: bool = True
     evaluation_llm_judge_enabled: bool = True
     evaluation_llm_judge_sample_rate: float = 1.0
     evaluation_judge_profile: str = ""

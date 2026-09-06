@@ -25,3 +25,22 @@
 4. 全量验收 → v2.0.0 全量发布评审
 5. 结果记录附录
 ```
+
+## 结果记录附录（AUT-005 回写，2026-09-09）
+
+### 离线部分（已执行，确定性 stub）
+
+| 项 | 结果 |
+|---|---|
+| 步骤 1 Flag OFF 旧 goal 行为快照 | tests/v2 全量 Flag OFF 用例绿（v1 review/select/到期路径逐字节；goal_supply/goal_advance 步骤 skipped 记账） |
+| 步骤 2 V6/V7 checklist 对应单测/集成面 | goal/autonomy/action 单测与矩阵回归绿 |
+| 步骤 3 跨会话剧情集（ON 态） | tests/eval/test_autonomy_eval_gate.py 4 例全过：完成分支（跨 3 会话）/失败分支（阈值→重规划→耗尽→failed）/放弃分支（双信号置信）/冲突+复活+第 4 次规划拒绝 |
+| E-AUT-01~04 Gate | 全过（规划产物 100% 过闸、封顶断言、推进/失败语义、一致性规则零违例、剧情通过） |
+| 全量回归 | 见 tasks.md 实现状态回写（阶段收口数字） |
+
+### 待人工执行（真实模型）
+
+- V6 goal checklist / V7 autonomy checklist 真实模型重跑（E-AUT 规划质量 Judge 真实采样）
+- 规划质量 Judge 真实 LLM 采样评审（离线为固定桩）
+- Flag ON/OFF 双态真实对话对比与灰度推进（`v2_autonomy_advanced_enabled` 申请材料已齐备）
+- 前置灰度项：`v2_life_loop_enabled`、`action_enabled`（Sub-Goal 执行依赖 v9 总闸）需先于/同步开启

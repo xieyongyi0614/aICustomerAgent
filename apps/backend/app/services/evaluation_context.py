@@ -315,6 +315,116 @@ class ActionSlice:
 
 
 @dataclass
+@dataclass
+class GoalRef:
+    goal_id: str
+    layer: str
+    domain: str
+    status: str
+    horizon: str = ""
+    parent_goal_id: str | None = None
+    failure_reason: str | None = None
+    arbitration_state: dict | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class GoalPlanRef:
+    goal_id: str
+    version: int
+    status: str
+    sub_goal_statuses: list[str] = field(default_factory=list)
+    sub_goal_attempt_counts: list[int] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    rejection_reason: str | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class GoalLifecycleRef:
+    goal_id: str
+    decision: str
+    reason: str = ""
+    created_at: datetime | None = None
+
+
+@dataclass
+class GoalSlice:
+    """AUT-005 Goal 审计切片（只读）；缺席为 None = 规则跳过。"""
+
+    goals: list[GoalRef] = field(default_factory=list)
+    plans: list[GoalPlanRef] = field(default_factory=list)
+    lifecycles: list[GoalLifecycleRef] = field(default_factory=list)
+
+
+def collect_goal_slice(
+    user_id: str | None = None,
+    now: datetime | None = None,
+    window_hours: float = 24 * 30.0,
+) -> GoalSlice:
+    """从 character_goals / goal_plans / decision_records 汇集 Goal 审计切片（纯只读）。"""
+    from datetime import timedelta
+
+    from app.repositories import decision_repository, goal_repository
+
+    slice_ = GoalSlice()
+    try:
+        goals = (
+            goal_repository.list_layered(user_id)
+            if user_id is not None
+            else []
+        )
+    except Exception:
+        logger.exception("goal 切片读取失败，按空集处理")
+        return slice_
+    for goal in goals:
+        slice_.goals.append(
+            GoalRef(
+                goal_id=goal.id,
+                layer=goal.layer or "",
+                domain=goal.domain or "",
+                status=goal.status,
+                horizon=goal.horizon,
+                parent_goal_id=goal.parent_goal_id,
+                failure_reason=goal.failure_reason,
+                arbitration_state=goal.arbitration_state,
+                created_at=goal.created_at,
+                updated_at=goal.updated_at,
+            )
+        )
+        for plan in goal_repository.list_plans(goal.id):
+            slice_.plans.append(
+                GoalPlanRef(
+                    goal_id=goal.id,
+                    version=plan.version,
+                    status=plan.status,
+                    sub_goal_statuses=[spec.status for spec in plan.sub_goals],
+                    sub_goal_attempt_counts=[spec.attempt_count for spec in plan.sub_goals],
+                    capabilities=sorted({spec.capability for spec in plan.sub_goals}),
+                    rejection_reason=plan.rejection_reason,
+                    updated_at=plan.updated_at,
+                )
+            )
+    try:
+        cutoff = (now or datetime.now()) - timedelta(hours=window_hours)
+        for record in decision_repository.search(
+            user_id=user_id, kind="goal_lifecycle", since=cutoff, limit=500
+        ):
+            slice_.lifecycles.append(
+                GoalLifecycleRef(
+                    goal_id=(record.input_snapshot or {}).get("goal_id", ""),
+                    decision=record.decision,
+                    reason=record.reason,
+                    created_at=record.created_at,
+                )
+            )
+    except Exception:
+        logger.exception("goal lifecycle 记录读取失败，按空集处理")
+    return slice_
+
+
+@dataclass
 class EvaluationContext:
     subject: str
     subject_id: str
@@ -341,6 +451,7 @@ class EvaluationContext:
     development: DevelopmentSlice | None = None
     narrative: NarrativeSlice | None = None
     life_loop: LifeLoopSlice | None = None
+    goal: GoalSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:

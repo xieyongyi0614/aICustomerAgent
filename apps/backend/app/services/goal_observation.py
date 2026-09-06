@@ -116,8 +116,21 @@ def _save_progress(plan_id: str, specs: list[SubGoalSpec], now: datetime) -> Non
     goal_repository.update_plan_progress(plan_id, specs)
 
 
+def _record_lifecycle(record, decision: str, reason: str, goal_id: str) -> None:
+    """终态/挂起转换的 lifecycle 归因（不变量 2；委托仲裁器公共入口）。"""
+    from app.services import goal_arbitration
+
+    try:
+        goal_arbitration.record_goal_lifecycle(
+            record, decision, reason, {"goal_id": goal_id}
+        )
+    except Exception:
+        logger.exception("goal lifecycle 归因失败（goal=%s）", goal_id)
+
+
 def _complete(goal) -> dict:
     record = goal_repository.complete_goal(goal.id)
+    _record_lifecycle(record or goal, "completed", "计划步骤全部完成", goal.id)
     from app.services.memory2 import ingest as memory_ingest
 
     try:
@@ -142,6 +155,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
     max_hours = settings.v2_autonomy_goal_max_active_hours
     if active_start is not None and now - active_start > timedelta(hours=max_hours):
         record = goal_repository.fail_goal(goal.id, REASON_PERIOD_EXCEEDED)
+        _record_lifecycle(record or goal, "failed", REASON_PERIOD_EXCEEDED, goal.id)
         detail["outcome"] = "failed"
         detail["reason"] = REASON_PERIOD_EXCEEDED
         detail["goal_status"] = record.status if record else None
@@ -163,6 +177,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
             )
             return detail
         record = goal_repository.fail_goal(goal.id, REASON_THRESHOLD_EXCEEDED)
+        _record_lifecycle(record or goal, "failed", REASON_THRESHOLD_EXCEEDED, goal.id)
         enqueued = goal_planning.enqueue_planning(
             goal.user_id, goal.id, goal_planning.TRIGGER_REPLAN
         )
@@ -224,6 +239,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
         )
         return detail
     record = goal_repository.fail_goal(goal.id, REASON_REPLAN_EXHAUSTED)
+    _record_lifecycle(record or goal, "failed", REASON_REPLAN_EXHAUSTED, goal.id)
     detail["outcome"] = "failed"
     detail["reason"] = REASON_REPLAN_EXHAUSTED
     detail["goal_status"] = record.status if record else None

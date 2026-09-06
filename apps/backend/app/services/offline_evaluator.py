@@ -196,6 +196,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
         "development": _development_stats(settings),
         "relationship": _relationship_stats(settings),
         "life_loop": _life_loop_stats(user_id),
+        "goal": _goal_stats(user_id),
         "context_fidelity": "reconstructed",
     }
 
@@ -330,4 +331,41 @@ def _life_loop_stats(user_id: str) -> dict:
         }
     except Exception:
         logger.exception("life_loop 小节统计失败，降级为空")
+        return {}
+
+
+def _goal_stats(user_id: str) -> dict:
+    """AUT-005：goal 小节（只读 DB 统计；E-AUT-01~03 汇总面）。"""
+    try:
+        from datetime import datetime as _dt
+
+        from app.services.evaluation_context import collect_goal_slice
+
+        slice_ = collect_goal_slice(user_id, now=_dt.now())
+        terminal = [g for g in slice_.goals if g.status != "active"]
+        attributed = {
+            (ref.goal_id, ref.decision) for ref in slice_.lifecycles
+        }
+        consistent = sum(
+            1
+            for g in terminal
+            if (g.goal_id, g.status) in attributed
+        )
+        plans_by_status = {}
+        for plan in slice_.plans:
+            plans_by_status[plan.status] = plans_by_status.get(plan.status, 0) + 1
+        return {
+            "goals_total": len(slice_.goals),
+            "goals_terminal": len(terminal),
+            "terminal_attributed": consistent,
+            "terminal_attribution_rate": (
+                round(consistent / len(terminal), 4) if terminal else None
+            ),
+            "plans_total": len(slice_.plans),
+            "plans_active": plans_by_status.get("active", 0),
+            "plans_rejected": plans_by_status.get("rejected", 0),
+            "lifecycle_records": len(slice_.lifecycles),
+        }
+    except Exception:
+        logger.exception("goal 小节统计失败，降级为空")
         return {}

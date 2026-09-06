@@ -54,6 +54,11 @@ def _rank(group, overlay, relationship_params, settings):
     return sorted(group, key=_key)
 
 
+def record_goal_lifecycle(record, decision: str, reason: str, snapshot: dict) -> None:
+    """lifecycle 归因公共入口（goal_observation 终态转换复用）。"""
+    _record_lifecycle(record, decision, reason, snapshot)
+
+
 def _record_lifecycle(record, decision: str, reason: str, snapshot: dict) -> None:
     from app.application import observability
 
