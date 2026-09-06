@@ -205,3 +205,12 @@ M3 Integration: REF-005 / REF-007
 M4 Acceptance:  REF-006 → Eval Gate + Regression Gate → 申请开启 v2_reflection_enabled
 ```
 
+## 实现状态（2026-09-06）
+
+```text
+REF-001~007 已全部实现并逐 Task 提交（Foundation 2f795e4 → REF-007 fedb190）。
+迁移落地为 0025_reflection_foundation（Task Detail 原定 0024，因 Phase 1 收口类型扩列已占用 0024，详见 task-details README 口径）。
+离线 Eval Gate（E-REF-01~04）在 tests/v2/test_ref006_trace_evaluation.py 内确定性执行并全部通过。
+v2_reflection_enabled 保持 default=false：灰度推进与真实模型人工回归待执行（regression-checklist.md）。
+```
+
