@@ -246,3 +246,19 @@ reflection_disabled/throttled，outcome 记账）；proactive_executor recent_co
 digest_chars=600/reflection_check_interval=240；10 测试绿 + v2/v9/proactive
 回归 612 例绿）。
 ```
+LIFE-006 已实现（IssueCode 36→40：LIFE_LOOP_RUN_INCOMPLETE/LIFE_LOOP
+_BUDGET_OVERRUN/TRIGGER_REGISTRY_ORPHAN/AUTONOMY_TRIGGER_UNPROVENANCED，
+dimension 前缀别名 life/trigger→AUTONOMY；evaluation_context LifeLoopSlice
+（runs/triggers/delivered_proactive/day_llm/outbox_dead_letters）+
+collect_life_loop_slice 只读采集（stale=2×job timeout、溯源=decision_records
+PROACTIVE_AUTONOMY 行经 get_by_action）；5 规则：RunCompleteness/Budget
+Compliance/TriggerLifecycle/TriggerProvenance/StormAndRepeat（复用
+AUTONOMY_REDUNDANT，阈值 v2_life_loop_storm_daily_limit=3）；offline_evaluator
+_life_loop_stats 小节（完整率/终态率/溯源率/日 LLM vs 配额/死信）；
+TRACE_STEP_NAMES 收口核对（LIFE-002 已注册 9 项全）；tests/unit 计数断言
+36→40 第四次收口；20 测试绿，全量 2079 passed + 16 skipped）。
+
+Phase 5 收口（2026-09-07）：LIFE-001~006 全部实现，迁移链 0028~0030，
+v2_life_loop_enabled 总闸 OFF=逐字节 v1（V7/V8/V9 checklist 回归全绿）。
+Flag 灰度推进与真实模型人工回归（regression-checklist：kill -9 演练/
+7 天空跑/幂等重放）待执行。

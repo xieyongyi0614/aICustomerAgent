@@ -195,6 +195,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
         "reflection": _reflection_stats(settings),
         "development": _development_stats(settings),
         "relationship": _relationship_stats(settings),
+        "life_loop": _life_loop_stats(user_id),
         "context_fidelity": "reconstructed",
     }
 
@@ -279,3 +280,54 @@ def _persist_run(session_id: str, user_id: str, aggregate: dict) -> None:
         evaluation_repository.save(report)
     except Exception:
         logger.exception("离线评估运行记录落库失败，仅返回聚合")
+
+
+def _life_loop_stats(user_id: str) -> dict:
+    """LIFE-006：life_loop 小节（只读 DB 统计；E-LIFE-02/03/05 汇总面）。"""
+    try:
+        from datetime import datetime as _dt
+
+        from app.services.evaluation_context import collect_life_loop_slice
+
+        slice_ = collect_life_loop_slice(user_id, now=_dt.now(), window_hours=24.0)
+        autonomy_runs = [r for r in slice_.runs if r.kind == "autonomy"]
+        complete = sum(
+            1
+            for r in autonomy_runs
+            if r.status == "done" and "decision" in r.step_names
+        )
+        terminal_triggers = [
+            t for t in slice_.triggers if t.status in ("done", "cancelled")
+        ]
+        provenanced = sum(
+            1 for p in slice_.delivered_proactive if p.provenanced
+        )
+        return {
+            "runs_total": len(autonomy_runs),
+            "runs_complete": complete,
+            "runs_complete_rate": (
+                round(complete / len(autonomy_runs), 4) if autonomy_runs else None
+            ),
+            "runs_aborted": sum(
+                1 for r in autonomy_runs if r.status == "aborted"
+            ),
+            "triggers_total": len(slice_.triggers),
+            "triggers_terminal_rate": (
+                round(len(terminal_triggers) / len(slice_.triggers), 4)
+                if slice_.triggers
+                else None
+            ),
+            "trigger_orphans": sum(1 for t in slice_.triggers if t.stale),
+            "proactive_delivered": len(slice_.delivered_proactive),
+            "proactive_provenance_rate": (
+                round(provenanced / len(slice_.delivered_proactive), 4)
+                if slice_.delivered_proactive
+                else None
+            ),
+            "day_llm_calls": slice_.day_llm_calls,
+            "day_llm_call_limit": slice_.day_llm_call_limit,
+            "outbox_dead_letters": slice_.outbox_dead_letters,
+        }
+    except Exception:
+        logger.exception("life_loop 小节统计失败，降级为空")
+        return {}

@@ -6,6 +6,7 @@
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
@@ -160,6 +161,146 @@ class NarrativeSlice:
 
 
 @dataclass
+class LifeLoopRunRef:
+    """LIFE-006 周期 run 审计引用（只读摘要）。"""
+
+    run_id: str
+    kind: str
+    status: str
+    reason: str = ""
+    step_names: list[str] = field(default_factory=list)
+    llm_call_count: int = 0
+    budget_degraded: bool = False
+    aborted_with_reason: bool = True
+
+
+@dataclass
+class LifeLoopTriggerRef:
+    trigger_key: str
+    trigger_type: str
+    status: str
+    attempt_count: int = 0
+    stale: bool = False
+    cancelled_without_reason: bool = False
+
+
+@dataclass
+class LifeLoopProactiveRef:
+    action_id: str
+    trigger_type: str = ""
+    provenanced: bool = True
+
+
+@dataclass
+class LifeLoopSlice:
+    """LIFE-006 Life Loop 审计切片（只读）；缺席为 None = 规则跳过。"""
+
+    runs: list[LifeLoopRunRef] = field(default_factory=list)
+    triggers: list[LifeLoopTriggerRef] = field(default_factory=list)
+    delivered_proactive: list[LifeLoopProactiveRef] = field(default_factory=list)
+    day_llm_calls: int = 0
+    day_llm_call_limit: int = 0
+    outbox_dead_letters: int = 0
+
+
+def collect_life_loop_slice(
+    user_id: str | None = None,
+    now: datetime | None = None,
+    window_hours: float = 24.0,
+) -> LifeLoopSlice:
+    """从 loop_runs / trigger_registry / proactive_actions / llm_call_records /
+    outbox_events 汇集审计切片（纯只读）；stale/溯源判定在此计算，规则保持纯函数。"""
+    from datetime import timedelta
+
+    from app.repositories import (
+        decision_repository,
+        llm_call_repository,
+        loop_run_repository,
+        outbox_repository,
+        proactive_repository,
+        trigger_registry_repository,
+    )
+
+    now = now or datetime.now()
+    settings = get_settings()
+    cutoff = now - timedelta(hours=window_hours)
+    stale_cutoff = now - timedelta(
+        seconds=2 * settings.v2_job_running_timeout
+    )
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    runs = []
+    for run in loop_run_repository.list_recent(user_id=user_id, limit=200):
+        if run.started_at is not None and run.started_at < cutoff:
+            continue
+        steps = run.steps or []
+        aborted_with_reason = any(
+            s.get("step") == "abort" or s.get("error")
+            for s in steps
+            if s.get("status") == "error"
+        )
+        runs.append(
+            LifeLoopRunRef(
+                run_id=run.id,
+                kind=run.kind,
+                status=run.status,
+                reason=run.reason or "",
+                step_names=[s.get("step", "") for s in steps],
+                llm_call_count=run.llm_call_count or 0,
+                budget_degraded=(run.budget_state or {}).get("status") == "degraded",
+                aborted_with_reason=aborted_with_reason or run.status != "aborted",
+            )
+        )
+
+    triggers = []
+    for trigger in trigger_registry_repository.list_recent(user_id=user_id, limit=200):
+        triggers.append(
+            LifeLoopTriggerRef(
+                trigger_key=trigger.trigger_key,
+                trigger_type=trigger.trigger_type,
+                status=trigger.status,
+                attempt_count=trigger.attempt_count,
+                stale=(
+                    trigger.status in ("due", "fired")
+                    and trigger.updated_at is not None
+                    and trigger.updated_at <= stale_cutoff
+                ),
+                cancelled_without_reason=(
+                    trigger.status == "cancelled" and not trigger.last_error
+                ),
+            )
+        )
+
+    delivered = []
+    for row in proactive_repository.list_since(cutoff):
+        if row.user_id != user_id or row.status != "delivered":
+            continue
+        # 溯源 = decision_records 存在该 action 的 PROACTIVE_AUTONOMY 决策行
+        decisions = decision_repository.get_by_action(row.id)
+        provenanced = any(d.kind == "proactive_autonomy" for d in decisions)
+        delivered.append(
+            LifeLoopProactiveRef(
+                action_id=row.id,
+                trigger_type=row.trigger_type or "",
+                provenanced=provenanced,
+            )
+        )
+
+    usage = llm_call_repository.aggregate_usage_since(day_start)
+    dead_letters = [
+        r for r in outbox_repository.list_recent(status="failed", limit=100)
+    ]
+    return LifeLoopSlice(
+        runs=runs,
+        triggers=triggers,
+        delivered_proactive=delivered,
+        day_llm_calls=usage["calls"],
+        day_llm_call_limit=settings.v2_life_loop_daily_llm_call_budget,
+        outbox_dead_letters=len(dead_letters),
+    )
+
+
+@dataclass
 class ActionSlice:
     records: list = field(default_factory=list)
     intent: dict | None = None
@@ -199,6 +340,7 @@ class EvaluationContext:
     reflection: ReflectionSlice | None = None
     development: DevelopmentSlice | None = None
     narrative: NarrativeSlice | None = None
+    life_loop: LifeLoopSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:
