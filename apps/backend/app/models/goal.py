@@ -147,14 +147,14 @@ class SubGoalSpec(BaseModel):
             SubGoalSpec.validate_criteria(child, depth + 1)
 
 
-def validate_sub_goals(sub_goals: list[dict]) -> list["SubGoalSpec"]:
+def validate_sub_goals(sub_goals: list[dict], max_depth: int = 2) -> list["SubGoalSpec"]:
     """Planning 产物形状校验：判据白名单 + 序号连续 + 依赖/父子引用合法。
 
-    深度 ≤2（parent 的 parent 必须为顶层）与数量封顶由 AUT-002 闸门以
-    settings 预算裁决，此处只拒结构性非法（引用缺失/前向/越级嵌套）。
+    深度封顶（默认 2：顶层 + 一层子步）与数量封顶由 AUT-002 闸门以 settings
+    预算裁决，此处拒结构性非法（引用缺失/前向/超深嵌套）。
     """
     specs: list[SubGoalSpec] = []
-    top_level_indexes: set[int] = set()
+    depth_by_index: dict[int, int] = {}
     for raw in sub_goals:
         if not isinstance(raw, dict):
             raise ValueError("Sub-Goal 必须为对象")
@@ -168,13 +168,18 @@ def validate_sub_goals(sub_goals: list[dict]) -> list["SubGoalSpec"]:
         for ref in spec.depends_on:
             if ref >= spec.index:
                 raise ValueError(f"Sub-Goal {spec.index} 依赖前向引用 {ref}")
-        if spec.parent_index is not None:
-            if spec.parent_index >= spec.index:
-                raise ValueError(f"Sub-Goal {spec.index} 父引用前向 {spec.parent_index}")
-            if spec.parent_index in top_level_indexes:
-                raise ValueError(f"Sub-Goal {spec.index} 嵌套超过两层")
+        if spec.parent_index is None:
+            depth = 1
         else:
-            top_level_indexes.add(spec.index)
+            parent_depth = depth_by_index.get(spec.parent_index)
+            if parent_depth is None:
+                raise ValueError(
+                    f"Sub-Goal {spec.index} 父引用缺失或前向：{spec.parent_index}"
+                )
+            depth = parent_depth + 1
+        if depth > max_depth:
+            raise ValueError(f"Sub-Goal {spec.index} 嵌套超过 {max_depth} 层")
+        depth_by_index[spec.index] = depth
         specs.append(spec)
     return specs
 

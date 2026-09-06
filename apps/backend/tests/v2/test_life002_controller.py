@@ -131,12 +131,14 @@ class TestUserCycle:
             "perception",
             "state_update",
             "goal_check",
+            "goal_supply",
             "memory_retrieval",
             "reflection_check",
             "decision",
             "world_experience",
         ]
         skipped = {s["step"]: s for s in run.steps if s["status"] == "skipped"}
+        assert skipped["goal_supply"]["skip_reason"] == "flag_disabled"
         assert skipped["memory_retrieval"]["skip_reason"] == "memory_disabled"
         assert skipped["reflection_check"]["skip_reason"] == "reflection_disabled"
         rows = trigger_repo.list_recent(USER)

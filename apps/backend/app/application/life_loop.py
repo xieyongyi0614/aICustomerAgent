@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 _RECONCILE_INTERVAL_SECONDS = 300
 _maintenance_last: dict[str, float] = {}
 _reflection_check_last: dict[str, datetime] = {}
+_supply_last: dict[str, datetime] = {}
 
 
 async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> None:
@@ -159,6 +160,9 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(run.id, steps, "perception", _step_perception, user_id, now)
             _record_step(run.id, steps, "state_update", _step_state_update, user_id, now)
             _record_step(run.id, steps, "goal_check", _step_goal_check, user_id, now)
+            _record_step(
+                run.id, steps, "goal_supply", _step_goal_supply, user_id, now
+            )
             _record_step(
                 run.id, steps, "memory_retrieval",
                 _step_memory_retrieval, user_id, now, cycle_ctx,
@@ -343,6 +347,29 @@ def _expire_due_goals(user_id: str) -> list:
             if record is not None:
                 expired.append(record)
     return expired
+
+
+def _step_goal_supply(user_id: str, now: datetime) -> dict:
+    """AUT-002 供给装配（纯规则 0 LLM）：三来源候选→层级 goal→规划 job 入队。
+    World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。"""
+    from app.services import goal_planning
+
+    settings = get_settings()
+    if not settings.v2_autonomy_advanced_enabled:
+        return {"status": "skipped", "skip_reason": "flag_disabled"}
+    budget = life_loop_budget.check_daily_budget(now=now)
+    if budget.status == life_loop_budget._STATUS_DEGRADED:
+        return {"status": "skipped", "skip_reason": "quota_circuit_open"}
+    interval_minutes = settings.v2_autonomy_supply_interval_minutes
+    last = _supply_last.get(user_id)
+    if last is not None and (now - last).total_seconds() < interval_minutes * 60:
+        return {"status": "skipped", "skip_reason": "throttled"}
+    _supply_last[user_id] = now
+    world_facts = (
+        world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
+    )
+    result = goal_planning.materialize(user_id, world_facts=world_facts, now=now)
+    return {"status": result.get("status", "ok"), **result}
 
 
 def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:

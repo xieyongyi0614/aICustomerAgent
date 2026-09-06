@@ -68,6 +68,7 @@ TRACE_STEP_NAMES = (
     "life_loop_budget",
     "outbox_consume",
     "trigger_claim",
+    "goal_planning",
 )
 
 _BACKGROUND_STEPS = (

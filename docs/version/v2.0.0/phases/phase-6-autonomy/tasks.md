@@ -178,6 +178,27 @@ settings v2_autonomy_advanced_enabled 定义；24 测试绿（含迁移往返 up
 Detail 修正登记：character_goals.status 实有 CHECK 约束（db.py
 ck_character_goals_status），AUT-004 扩状态值需迁移重建该约束——修正已落
 AUT-004 实施与 Detail 回写，v1 语义不变）。
+AUT-002 已实现（app/services/goal_planning.py：供给装配 collect_candidates
+三来源——development read_overlay goal_weights 达阈值/relationship patterns
+达强度/编排投影 world salient_events 高重要事件+list_top_salience 显著记忆
+（experience/milestone_event 投影），_append 去重；materialize 落库——
+long_term (layer,domain) 活跃唯一+short_term (domain,description) 内容唯一，
+创建经 create_hierarchical_goal 后 enqueue goal_planning job（幂等键
+goal_planning:{goal_id}:{trigger}:{version_hint}）；plan_goal 前置闸
+（attempt 封顶 count_plans≥3 拒绝不调 LLM/created 触发在途 plan 跳过）→
+main 档结构化规划（_ask_llm_with_retry 重试 1 次同 reflector 模式）→
+结构闸（validate_sub_goals 白名单+max_count 封顶+capability∈ACTION_TYPES）→
+[validated→active+旧 active superseded | rejected 落行留 reason | llm_failed
+零行]；trace goal_planning 经 TurnTraceSession+on_turn_finished(autonomy_tick)
+落库；run_planning_jobs 走 background_job_repository.list_jobs（服务模块零
+SessionLocal 直连）；life_loop goal_supply 步骤（goal_check 后插入，Flag/
+degraded/720min 节流门控，world facts 编排采集传入）；main.py Flag ON 注册
+job handler+job worker 启动条件并入；TRACE_STEP_NAMES +goal_planning（58）；
+settings 10 项；25 测试绿 + tests/v2 全量 590 绿（LIFE-002 管线断言纳入
+goal_supply skipped 步骤——设计内扩展同 LIFE-005 先例）。
+登记：memory 无 world_event 源标记（MemorySource 仅 user_stated/user_derived/
+ai_inferred），world 域供给以「编排投影 salient_events + 显著度
+experience/milestone_event 记忆」双代理实现，语义等价（GAP-AUT-02 口径）。
 ```
 
 
