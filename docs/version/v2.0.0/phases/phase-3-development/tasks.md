@@ -194,6 +194,11 @@ development_apply trace + 11 测试绿；行为/goal/golden 回归串行全绿�
 DEV-004 已实现（audit.py 回退=先撤后晋：失效 Insight 的调制 retire、次优胜者
 promoted（ignore_seen 绕过同源 noop）+ development_rollback job + verify_replay
 只读校验/rebuild 重建 + scripts/replay_development.py + 11 测试绿；P2/P3 回归 84 绿）。
+DEV-005 已实现（trace 名单 +4 步骤、IssueCode+4 与 DEVELOPMENT 评估维、规则集 4 条
+入注册表、DevelopmentSlice 只读切片、debug 归因端点 2 个、离线场景集 E-DEV-01~03
+Gate 全过、build_db_report 入 offline_evaluator、ISSUE_CODE_COUNT 30→34 + 12 测试绿）。
+注：tests/integration/test_evaluation_pipeline.py 在本机因真实 LLM 端点网络退化而
+缓慢/挂起——基线 d6d3f8b 复现同现象（60s 仅 5 例），属既有环境问题与 Phase3 无关。
 ```
 
 
