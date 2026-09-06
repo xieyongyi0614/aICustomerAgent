@@ -156,6 +156,9 @@ class Settings(BaseSettings):
     v2_reflection_statement_max_chars: int = 200
     v2_reflection_invalidate_match_threshold: float = 0.7
     v2_reflection_judge_sample_rate: float = 1.0
+    v2_reflection_context_scopes_json: str = '["user", "relationship"]'
+    v2_reflection_context_max_items: int = 5
+    v2_reflection_context_statement_chars: int = 120
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

@@ -51,6 +51,7 @@ TRACE_STEP_NAMES = (
     "reflection_trigger",
     "reflection_run",
     "reflection_invalidate",
+    "context_insight",
 )
 
 _BACKGROUND_STEPS = (

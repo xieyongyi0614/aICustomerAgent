@@ -119,6 +119,15 @@ class InsightDraft(BaseModel):
     self_confidence: float = 0.0
 
 
+class InsightSummary(BaseModel):
+    """prompt 投影（REF-007）：insight 段渲染用的最小只读摘要。"""
+
+    insight_id: str
+    statement: str
+    type: InsightType
+    confidence: float
+
+
 class ReflectionProposal(BaseModel):
     """反思 LLM 结构化输出：仅提案，confidence 终值由代码按证据强度校准。"""
 
