@@ -249,7 +249,11 @@ async def build(
             insight_selected=len(insights),
         )
     character_state, relationship_state = _load_states_with_fallback(user_id)
-    goals = goal_service.load_active(user_id)
+    goals = [
+        goal
+        for goal in goal_service.load_active(user_id)
+        if goal.layer is None
+    ]
     development_overlay = None
     if get_settings().v2_development_enabled:
         from app.services.development import aggregate as development_aggregate

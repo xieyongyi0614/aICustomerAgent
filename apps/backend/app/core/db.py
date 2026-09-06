@@ -362,7 +362,8 @@ class GoalRow(Base):
             name="ck_character_goals_type",
         ),
         CheckConstraint(
-            "status IN ('active', 'completed', 'expired', 'cancelled')",
+            "status IN ('active', 'completed', 'expired', 'cancelled',"
+            " 'failed', 'suspended', 'abandoned')",
             name="ck_character_goals_status",
         ),
         CheckConstraint(

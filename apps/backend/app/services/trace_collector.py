@@ -69,6 +69,7 @@ TRACE_STEP_NAMES = (
     "outbox_consume",
     "trigger_claim",
     "goal_planning",
+    "goal_observation",
 )
 
 _BACKGROUND_STEPS = (

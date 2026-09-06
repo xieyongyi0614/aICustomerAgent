@@ -13,7 +13,7 @@ trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅�
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.application import autonomy_engine, world_engine
@@ -78,7 +78,7 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
 
 
 def _collect_work_users(now: datetime) -> list[str]:
-    """工作发现：due 触发（排除重检型 inactivity）∪ 闲置 Eligible ∪ goal 补扫。"""
+    """工作发现：due 触发（排除重检型 inactivity）∪ goal 追求 ∪ 闲置 Eligible ∪ goal 补扫。"""
     users: set[str] = set()
     for user_id in conversation_repository.list_user_ids():
         if trigger_registry_repository.has_due(
@@ -86,9 +86,33 @@ def _collect_work_users(now: datetime) -> list[str]:
         ):
             users.add(user_id)
             continue
-        if _inactivity_eligible(user_id, now) or _goal_catchup_due(user_id):
+        if _goal_work_due(user_id, now) or _inactivity_eligible(
+            user_id, now
+        ) or _goal_catchup_due(user_id):
             users.add(user_id)
     return sorted(users)
+
+
+def _goal_work_due(user_id: str, now: datetime) -> bool:
+    """AUT-003 第四来源：active plan 存在待推进 Sub-Goal 且执行窗已到。"""
+    settings = get_settings()
+    try:
+        pairs = goal_repository.list_active_plans(user_id)
+    except Exception:
+        logger.exception("active plans 读取失败，goal 追求来源跳过")
+        return False
+    for _goal, plan in pairs:
+        for spec in plan.sub_goals:
+            if spec.status not in ("pending", "in_progress"):
+                continue
+            last = spec.last_attempt_at or spec.last_observed_at
+            if last is None:
+                return True
+            if (now - last).total_seconds() >= (
+                settings.v2_autonomy_subgoal_execute_cooldown_minutes * 60
+            ):
+                return True
+    return False
 
 
 def _inactivity_eligible(user_id: str, now: datetime) -> bool:
@@ -162,6 +186,12 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(run.id, steps, "goal_check", _step_goal_check, user_id, now)
             _record_step(
                 run.id, steps, "goal_supply", _step_goal_supply, user_id, now
+            )
+            await _record_step_async(
+                run.id,
+                steps,
+                "goal_advance",
+                lambda: _step_goal_advance(user_id, now),
             )
             _record_step(
                 run.id, steps, "memory_retrieval",
@@ -256,6 +286,8 @@ def _cycle_reason(user_id: str, now: datetime) -> str:
         user_id, now=now, include_types=("scheduled_followup", "action_due")
     ):
         return "due_trigger"
+    if _goal_work_due(user_id, now):
+        return "goal_work"
     if _goal_catchup_due(user_id):
         return "goal_catchup"
     return "inactivity_eligible"
@@ -370,6 +402,118 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     )
     result = goal_planning.materialize(user_id, world_facts=world_facts, now=now)
     return {"status": result.get("status", "ok"), **result}
+
+
+def _observation_facts(user_id: str, now: datetime) -> dict:
+    """AUT-003 观察事实编排投影（GAP-AUT-02）：action 窗口/world/state/memory。"""
+    from app.repositories import action_repository
+    from app.services import state_service
+
+    settings = get_settings()
+    facts: dict = {"now": now, "world": {}, "state": {}, "memory": {}}
+    try:
+        window_start = now - timedelta(
+            minutes=settings.v2_autonomy_observation_window_minutes
+        )
+        records = action_repository.list_records(user_id, limit=50)
+        facts["action_results"] = [
+            {
+                "capability": record.action_type,
+                "status": record.status,
+                "created_at": record.created_at,
+            }
+            for record in records
+            if record.created_at is not None and record.created_at >= window_start
+        ]
+    except Exception:
+        logger.exception("行动事实采集失败，判据按不可判定处理")
+        facts["action_results"] = []
+    try:
+        facts["world"] = (
+            world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
+        )
+    except Exception:
+        logger.exception("world 事实采集失败，判据按不可判定处理")
+    try:
+        character, relationship = state_service.load_states(user_id)
+        facts["state"] = {
+            "tension": relationship.tension,
+            "intimacy": relationship.intimacy,
+            "mood": character.mood,
+            "intensity": character.intensity,
+        }
+    except Exception:
+        logger.exception("状态事实采集失败，判据按不可判定处理")
+    if settings.v2_memory_enabled:
+        from app.repositories import memory_repository
+
+        try:
+            salient = memory_repository.list_top_salience(
+                user_id,
+                min_salience=settings.v2_life_loop_memory_min_salience,
+                limit=settings.v2_life_loop_memory_limit,
+            )
+            facts["memory"] = {"salient_memory_count": len(salient)}
+        except Exception:
+            logger.exception("记忆事实采集失败，判据按不可判定处理")
+    return facts
+
+
+async def _step_goal_advance(user_id: str, now: datetime) -> dict:
+    """AUT-003 观察与调整（0 LLM）+ Sub-Goal 执行尝试（V9 闸门原样）。
+    观察 → 封顶/完成/失败/重规划裁决 → 活跃 plan 执行窗尝试。"""
+    from app.services import goal_execution, goal_observation
+    from app.services.trace_collector import TurnTraceSession
+
+    settings = get_settings()
+    if not settings.v2_autonomy_advanced_enabled:
+        return {"status": "skipped", "skip_reason": "flag_disabled"}
+    pairs = goal_repository.list_active_plans(user_id)
+    if not pairs:
+        return {"status": "ok", "goals": 0, "observations": 0, "executions": 0}
+    started = time.perf_counter()
+    facts = _observation_facts(user_id, now)
+    advance = goal_observation.advance_user_goals(user_id, facts, now)
+    executions: list[dict] = []
+    for goal, plan in goal_repository.list_active_plans(user_id):
+        executions.append(await goal_execution.attempt_current_step(goal, plan, now))
+    trace = TurnTraceSession()
+    trace.record(
+        "goal_observation",
+        (time.perf_counter() - started) * 1000,
+        "ok",
+        goals=advance.get("goals", 0),
+        results=advance.get("results", []),
+        executions=executions,
+    )
+    _persist_goal_trace(trace, user_id)
+    return {
+        "status": "ok",
+        "goals": advance.get("goals", 0),
+        "observations": sum(
+            1
+            for item in advance.get("results", [])
+            if isinstance(item, dict) and item.get("observations")
+        ),
+        "executions": len(executions),
+    }
+
+
+def _persist_goal_trace(trace, user_id: str) -> None:
+    from app.application import observability
+    from app.models.observability import TraceKind
+
+    try:
+        observability.on_turn_finished(
+            trace,
+            turn_id=None,
+            user_id=user_id,
+            session_id=None,
+            kind=TraceKind.AUTONOMY_TICK,
+            drain_background=False,
+        )
+    except Exception:
+        logger.exception("goal 观察 trace 落库失败，已忽略")
 
 
 def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:

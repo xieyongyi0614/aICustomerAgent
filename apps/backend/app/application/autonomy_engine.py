@@ -114,7 +114,11 @@ def _snapshot_for(
 
     character, relationship = state_service.load_states(user_id)
     scene_state = scene_service.load(session_id)
-    goals = goal_repository.list_active(user_id)
+    goals = [
+        goal
+        for goal in goal_repository.list_active(user_id)
+        if goal.layer is None
+    ]
     late_night_start = get_settings().goal_late_night_start
     late_night_end = get_settings().goal_late_night_end
     late_night = now.hour >= late_night_start or now.hour < late_night_end

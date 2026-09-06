@@ -320,17 +320,28 @@ def _persist_trace(trace, user_id: str) -> None:
 
 
 def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> dict:
-    """单 goal 规划：前置闸 → LLM → 结构闸 → [validated→active | rejected]。"""
+    """单 goal 规划：前置闸 → LLM → 结构闸 → [validated→active | rejected]。
+
+    attempt 封顶的唯一例外：failed goal 的单次重规划（trigger=goal_replan 且
+    attempts==max 时放行一次；幂等键保证该请求至多发出一次）。重规划成功后
+    failed→active 复活（AUT-004 状态机的 failed→active 边）。
+    """
     from app.services.trace_collector import TurnTraceSession
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:
         return {"status": "skipped", "skip_reason": "flag_disabled"}
     goal = goal_repository.get_goal(goal_id)
-    if goal is None or goal.status != "active" or goal.layer is None:
+    if goal is None or goal.layer is None:
+        return {"status": "skipped", "skip_reason": "goal_not_plannable"}
+    if goal.status not in ("active", "failed"):
         return {"status": "skipped", "skip_reason": "goal_not_plannable"}
     attempts = goal_repository.count_plans(goal_id)
-    if attempts >= settings.v2_autonomy_planning_max_attempts:
+    failure_replan = trigger == TRIGGER_REPLAN and goal.status == "failed"
+    if attempts > settings.v2_autonomy_planning_max_attempts or (
+        attempts >= settings.v2_autonomy_planning_max_attempts
+        and not failure_replan
+    ):
         trace = TurnTraceSession()
         trace.record(
             STEP_NAME,
@@ -342,7 +353,7 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         )
         _persist_trace(trace, goal.user_id)
         return {"status": "rejected", "reason": REASON_ATTEMPT_CAP}
-    if trigger == TRIGGER_CREATED:
+    if trigger == TRIGGER_CREATED and goal.status == "active":
         in_flight = any(
             plan.status in ("draft", "validated", "active")
             for plan in goal_repository.list_plans(goal_id)
@@ -408,6 +419,8 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         if existing.id != plan.id and existing.status == "active":
             goal_repository.set_plan_status(existing.id, "superseded")
     goal_repository.set_plan_status(plan.id, "active")
+    if failure_replan:
+        goal_repository.reactivate_goal(goal_id)
     trace.record(
         STEP_NAME,
         (time.perf_counter() - started) * 1000,

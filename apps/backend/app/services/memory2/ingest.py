@@ -21,6 +21,7 @@ SOURCE_ACTION = "action_records"
 SOURCE_WORLD = "world_events"
 SOURCE_RELATIONSHIP = "relationship_events"
 SOURCE_RELATIONSHIP_MILESTONE = "relationship_milestones"
+SOURCE_GOAL = "character_goals"
 
 NARRATIVE_MILESTONE_PREFIX = "narrative:"
 MILESTONE_SALIENCE_MEMORY_WORTHY = 0.90
@@ -318,3 +319,17 @@ def ingest_from_relationship_milestone(
             },
         )
     return row
+
+def ingest_from_goal_completion(user_id: str, goal_id: str, description: str) -> MemoryCandidateRow | None:
+    """AUT-003 goal 完成语义：experience 候选经 P1 通道（Goal 域不直写 memories）。"""
+    return _create_candidate(
+        user_id=user_id,
+        character_id="asuna",
+        source_table=SOURCE_GOAL,
+        source_id=f"{goal_id}:completed",
+        content=f"完成了目标：{description}",
+        proposed_type="experience",
+        source_kind="ai_inferred",
+        salience_init=0.75,
+        source_ref_extra={"goal_id": goal_id, "outcome": "completed"},
+    )
