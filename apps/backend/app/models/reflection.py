@@ -108,6 +108,23 @@ class Insight(BaseModel):
     superseded_by: str | None = None
 
 
+class InsightDraft(BaseModel):
+    """LLM 反思提案单元：counter_evidence 必填（无反例写「无」），缺字段即整体不合规。"""
+
+    statement: str
+    type: InsightType
+    scope: InsightScope
+    evidence_ids: list[str]
+    counter_evidence: str
+    self_confidence: float = 0.0
+
+
+class ReflectionProposal(BaseModel):
+    """反思 LLM 结构化输出：仅提案，confidence 终值由代码按证据强度校准。"""
+
+    insights: list[InsightDraft] = []
+
+
 class ReflectionRun(BaseModel):
     id: str
     user_id: str

@@ -39,6 +39,7 @@ class CallSite(StrEnum):
     SUMMARY = "summary"
     PROACTIVE = "proactive"
     JUDGE = "judge"
+    REFLECTION = "reflection"
 
 
 SCHEMA_CALL_SITES: dict[str, CallSite] = {
@@ -51,6 +52,7 @@ SCHEMA_CALL_SITES: dict[str, CallSite] = {
     "MemoryExtraction": CallSite.EXTRACTOR,
     "TurnJudgeResult": CallSite.JUDGE,
     "ProactiveJudgeResult": CallSite.JUDGE,
+    "ReflectionProposal": CallSite.REFLECTION,
 }
 
 CAPTURE_MODES = ("disabled", "sampled", "always")
