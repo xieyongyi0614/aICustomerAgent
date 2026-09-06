@@ -35,6 +35,8 @@ from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import retriever as memory2_retriever
 from app.services.development import aggregate as development_aggregate
 from app.services.development import audit as development_audit
+from app.services.development import attribution as development_attribution
+from app.services.development import evaluation as development_evaluation
 from app.services.development import policy as development_policy
 from app.services.reflection import attribution as reflection_attribution
 from app.services.reflection import evidence as reflection_evidence
@@ -110,6 +112,8 @@ _SERVICE_DB_MODULES = (
     development_aggregate,
     development_policy,
     development_audit,
+    development_attribution,
+    development_evaluation,
 )
 
 

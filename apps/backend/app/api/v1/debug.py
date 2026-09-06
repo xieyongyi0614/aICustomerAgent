@@ -47,6 +47,23 @@ def get_insight_attribution(insight_id: str):
     return view
 
 
+@debug_router.get("/debug/development/states/{state_id}")
+def get_development_state_attribution(state_id: str):
+    from app.services.development import attribution as development_attribution
+
+    view = development_attribution.development_state_attribution(state_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="development state 不存在")
+    return view
+
+
+@debug_router.get("/debug/development/users/{user_id}")
+def list_user_development(user_id: str, limit: int = 50):
+    from app.services.development import attribution as development_attribution
+
+    return development_attribution.list_user_development(user_id, limit=limit)
+
+
 @debug_router.get("/debug/reflection-runs")
 def list_reflection_runs(user_id: str | None = None, limit: int = 50):
     return reflection_attribution.list_reflection_runs(user_id, limit=limit)

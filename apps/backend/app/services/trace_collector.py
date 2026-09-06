@@ -52,6 +52,10 @@ TRACE_STEP_NAMES = (
     "reflection_run",
     "reflection_invalidate",
     "context_insight",
+    "development_state",
+    "development_compile",
+    "development_apply",
+    "development_rollback",
 )
 
 _BACKGROUND_STEPS = (

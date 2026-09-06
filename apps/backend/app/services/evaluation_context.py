@@ -109,6 +109,34 @@ class ReflectionSlice:
 
 
 @dataclass
+class DevelopmentStateRef:
+    id: str
+    key: str
+    kind: str
+    status: str
+    strength: float = 0.0
+    value: dict = field(default_factory=dict)
+    source_insight_id: str = ""
+
+
+@dataclass
+class DevelopmentChangeRef:
+    id: str
+    state_id: str
+    insight_id: str
+    reason: str = ""
+    before: dict | None = None
+    after: dict | None = None
+
+
+@dataclass
+class DevelopmentSlice:
+    active_states: list[DevelopmentStateRef] = field(default_factory=list)
+    changes: list[DevelopmentChangeRef] = field(default_factory=list)
+    insight_statuses: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class ActionSlice:
     records: list = field(default_factory=list)
     intent: dict | None = None
@@ -146,6 +174,7 @@ class EvaluationContext:
     relationship: RelationshipSlice | None = None
     action: ActionSlice | None = None
     reflection: ReflectionSlice | None = None
+    development: DevelopmentSlice | None = None
 
 
 def _clip(text: str | None, limit: int) -> str:

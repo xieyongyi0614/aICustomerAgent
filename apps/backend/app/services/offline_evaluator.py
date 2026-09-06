@@ -193,6 +193,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
         "issue_histogram": issue_histogram,
         "proactive_stats": proactive_stats,
         "reflection": _reflection_stats(settings),
+        "development": _development_stats(settings),
         "context_fidelity": "reconstructed",
     }
 
@@ -205,6 +206,17 @@ def _reflection_stats(settings) -> dict:
         return build_db_report()
     except Exception:
         logger.exception("reflection 小节统计失败，降级为空")
+        return {}
+
+
+def _development_stats(settings) -> dict:
+    """DEV-005：development 小节（只读 DB 统计；Flag OFF 为空）。"""
+    try:
+        from app.services.development.evaluation import build_db_report
+
+        return build_db_report()
+    except Exception:
+        logger.exception("development 小节统计失败，降级为空")
         return {}
 
 

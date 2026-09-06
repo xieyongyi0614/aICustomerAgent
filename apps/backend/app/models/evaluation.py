@@ -29,6 +29,7 @@ class EvaluationDimension(StrEnum):
     RELATIONSHIP = "relationship"
     ACTION = "action"
     REFLECTION = "reflection"
+    DEVELOPMENT = "development"
 
 
 class EvaluationSubjectKind(StrEnum):
@@ -74,6 +75,10 @@ class IssueCode(StrEnum):
     REFLECTION_NO_EVIDENCE_LINK = "reflection_no_evidence_link"
     REFLECTION_STALE_INJECTED = "reflection_stale_injected"
     REFLECTION_CONFIDENCE_OVER_CALIBRATED = "reflection_confidence_over_calibrated"
+    DEVELOPMENT_CHANGE_UNATTRIBUTED = "development_change_unattributed"
+    DEVELOPMENT_CONCURRENT_ACTIVE = "development_concurrent_active"
+    DEVELOPMENT_OVER_CAP = "development_over_cap"
+    DEVELOPMENT_STALE_ACTIVE = "development_stale_active"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -104,6 +109,10 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.ACTION_OVERCLAIM: IssueSeverity.WARNING,
     IssueCode.ACTION_FAILED_UNREPORTED: IssueSeverity.INFO,
     IssueCode.ACTION_PLAN_MISMATCH: IssueSeverity.WARNING,
+    IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED: IssueSeverity.CRITICAL,
+    IssueCode.DEVELOPMENT_CONCURRENT_ACTIVE: IssueSeverity.CRITICAL,
+    IssueCode.DEVELOPMENT_OVER_CAP: IssueSeverity.WARNING,
+    IssueCode.DEVELOPMENT_STALE_ACTIVE: IssueSeverity.WARNING,
     IssueCode.REFLECTION_NO_EVIDENCE_LINK: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_STALE_INJECTED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: IssueSeverity.WARNING,
@@ -140,6 +149,10 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.REFLECTION_NO_EVIDENCE_LINK: "active Insight 缺少任何证据引用（无证据不出 Insight）",
     IssueCode.REFLECTION_STALE_INJECTED: "Context insight 段出现了非 active 状态的 Insight",
     IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: "Insight confidence 超出按证据数折算的校准上限",
+    IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED: "development_changes 行缺失或悬空 insight_id（归因链断裂）",
+    IssueCode.DEVELOPMENT_CONCURRENT_ACTIVE: "同一 (user, key) 存在多条 active 调制（矛盾并存生效）",
+    IssueCode.DEVELOPMENT_OVER_CAP: "调制幅度超出 strength × 预设封顶（过度调制）",
+    IssueCode.DEVELOPMENT_STALE_ACTIVE: "active 调制的源 Insight 已失效/被替代（回退滞后）",
 }
 
 
