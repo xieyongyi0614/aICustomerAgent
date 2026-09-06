@@ -118,6 +118,49 @@ Integration: REL-003 Patterns 接入 / REL-004 叙事里程碑与评估
 
 ---
 
+## 实现状态（2026-09-06 完成）
+
+```text
+REL-001 已实现（v2_relationship_evolved_enabled 总闸 settings 化；Flag ON 关停
+state_service v1 直写旁路（冲突/里程碑/快照子系统不动）；里程碑转写通道
+ingest_from_relationship_milestone（milestone_event 类型 + salience 三档映射 +
+source_ref 回指 + meta.insight_id 透传）+ post_process 接线；迁移脚本
+scripts/migrate_relationship_memory_types.py（dry-run 默认/--apply 分批幂等/
+verification 别名三项校验/回放源影响面报告）；debug timeline 每行附
+narrative_memory_ids 账本↔记忆互溯 + 14 测试绿；V8.5 回归 170 绿）。
+REL-002 已实现（relationship_shared 三源只读投影：账本 conversation/system 非
+none 行 + memories(experience/relationship_fact) source_ref 去重合并 + 完结
+world_events 双人参与项（completed ∧ user_mention ∧ 非 low）；时间序 +
+Freshness 选材 limit=3 + 独立预算 200 字符【共同经历】Context 段（dev overlay
+之后）；relationship_shared trace + 15 测试绿；golden 与 world/context 回归全绿）。
+REL-003 已实现（relationship_patterns 消费侧 join insights 过滤
+scope=relationship + strength≥0.6 门槛 + top-2 + 逐条落选原因；【关系模式】段
+（共同经历段之前，预算 120）；PolicySnapshot.relationship_patterns 参考注入 +
+决策 trace 附带（R1~R5 零改动，interval 不变性断言）；双闸 Flag 矩阵 +
+13 测试绿；v8.5 autonomy 全量回归原样通过）。
+REL-004 已实现（relationship_narrative：insight_created listener → job
+（幂等键 relationship_narrative:{insight_id}）→ 白名单关键词全规则匹配 +
+单日 cap → create_milestone（V8.5 唯一写点：零 bonus/零 unlocks/meta 溯源）；
+迁移 0027 milestones.meta nullable JSON（数值行零影响）；评估规则 +2
+（RELATIONSHIP_NARRATIVE_ORPHAN / RELATIONSHIP_MILESTONE_UNPROVENANCED，
+IssueCode 34→36 收口）；NarrativeSlice 只读切片；relationship_evaluation 场景集
+E-REL-01/02/04 Gate 全过 + 报告归档 reports/rel-20260906.json；
+scripts/replay_relationship.py 快照锚点+账本重放只读对账（偏差分可解释
+comfort_drift/milestone_bonus 与不可解释两栏）+ 18 测试绿；eval 全量 11 绿）。
+REL-001~004 全部实现并逐 Task 提交（ec72294 → 006148f）。离线 Eval Gate
+（E-REL-01/02/04）在 tests/eval/test_relationship_eval_gate.py 确定性执行并全部
+通过（报告归档 tests/eval/reports/rel-20260906.json）；E-REL-03 由
+scripts/replay_relationship.py 与 tests/v8.5/test_relationship_replay.py 承担。
+v2_relationship_evolved_enabled 保持 default=false：Enablement 串行链位于
+v2_development 之后，灰度推进与真实模型人工回归待执行（regression-checklist.md，
+V8.5 checklist 全量重跑是硬门）。
+全量回归：**1992 passed / 16 skipped / 0 failed**（xdist 19.8s 与串行 82.4s
+双模式一致）。V8.5 unit 计数断言 test_rules_registered 4→6 收口（REL-004
+新增 2 规则，同 ISSUE_CODE_COUNT 收口惯例）。
+```
+
+---
+
 ## Phase 4 Milestone（交付序）
 
 ```text
