@@ -20,6 +20,12 @@ SOURCE_CONVERSATION = "conversation"
 SOURCE_ACTION = "action_records"
 SOURCE_WORLD = "world_events"
 SOURCE_RELATIONSHIP = "relationship_events"
+SOURCE_RELATIONSHIP_MILESTONE = "relationship_milestones"
+
+NARRATIVE_MILESTONE_PREFIX = "narrative:"
+MILESTONE_SALIENCE_MEMORY_WORTHY = 0.90
+MILESTONE_SALIENCE_NARRATIVE = 0.85
+MILESTONE_SALIENCE_DEFAULT = 0.70
 
 VISIBILITY_PRIVATE = "private"
 VISIBILITY_HYPOTHETICAL = "hypothetical"
@@ -260,6 +266,53 @@ def ingest_from_relationship_event(event, trace=None) -> MemoryCandidateRow | No
             0.0,
             extra={
                 "source": SOURCE_RELATIONSHIP,
+                "created": 1,
+                "candidate_ids": [row.id],
+            },
+        )
+    return row
+
+
+def _milestone_salience(milestone_key: str) -> float:
+    if milestone_key.startswith(NARRATIVE_MILESTONE_PREFIX):
+        return MILESTONE_SALIENCE_NARRATIVE
+    from app.services.relationship_milestone import MILESTONES
+
+    worthy = {spec.key for spec in MILESTONES if spec.memory_worthy}
+    if milestone_key in worthy:
+        return MILESTONE_SALIENCE_MEMORY_WORTHY
+    return MILESTONE_SALIENCE_DEFAULT
+
+
+def ingest_from_relationship_milestone(
+    milestone, trace=None
+) -> MemoryCandidateRow | None:
+    """relationship 里程碑 → milestone_event 叙事候选；只读里程碑行，不读/不写数值。"""
+    source_ref_extra: dict = {
+        "milestone_key": milestone.milestone_key,
+        "period_key": milestone.period_key,
+    }
+    meta = getattr(milestone, "meta", None) or {}
+    insight_id = meta.get("insight_id")
+    if insight_id:
+        source_ref_extra["insight_id"] = insight_id
+    row = _create_candidate(
+        user_id=milestone.user_id,
+        character_id="asuna",
+        source_table=SOURCE_RELATIONSHIP_MILESTONE,
+        source_id=milestone.id,
+        content=milestone.title or milestone.milestone_key,
+        proposed_type="milestone_event",
+        source_kind="user_derived",
+        salience_init=_milestone_salience(milestone.milestone_key),
+        source_ref_extra=source_ref_extra,
+    )
+    if trace is not None:
+        trace.record(
+            "memory_ingest",
+            0.0,
+            extra={
+                "source": SOURCE_RELATIONSHIP_MILESTONE,
                 "created": 1,
                 "candidate_ids": [row.id],
             },

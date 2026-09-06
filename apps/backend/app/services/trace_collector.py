@@ -56,6 +56,9 @@ TRACE_STEP_NAMES = (
     "development_compile",
     "development_apply",
     "development_rollback",
+    "relationship_milestone",
+    "relationship_shared",
+    "relationship_pattern",
 )
 
 _BACKGROUND_STEPS = (

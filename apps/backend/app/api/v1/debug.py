@@ -379,6 +379,7 @@ def get_relationship_state(user_id: str):
 @debug_router.get("/debug/relationship/timeline")
 def get_relationship_timeline(user_id: str, limit: int = 50):
     from app.repositories import (
+        memory_repository,
         relationship_conflict_repository,
         relationship_event_repository,
         relationship_milestone_repository,
@@ -390,6 +391,21 @@ def get_relationship_timeline(user_id: str, limit: int = 50):
     milestones = relationship_milestone_repository.list_milestones(user_id)[:limit_clamped]
     conflicts = relationship_conflict_repository.list_conflicts(user_id, limit=limit_clamped)
     snapshots = relationship_snapshot_repository.list_snapshots(user_id, limit=limit_clamped)
+
+    narrative_rows = memory_repository.list_active_by_types(
+        user_id,
+        "asuna",
+        ["relationship_fact", "milestone_event"],
+        limit=500,
+    )
+    source_refs = memory_repository.get_source_refs([m.id for m in narrative_rows])
+    narrative_by_source: dict[tuple[str, str], list[str]] = {}
+    for row in narrative_rows:
+        ref = source_refs.get(row.id) or {}
+        table = ref.get("table")
+        target_id = ref.get("id")
+        if table and target_id:
+            narrative_by_source.setdefault((table, target_id), []).append(row.id)
 
     merged: list[dict] = []
     for e in events:
@@ -403,6 +419,9 @@ def get_relationship_timeline(user_id: str, limit: int = 50):
                 "cause": e.cause,
                 "impact": e.impact.model_dump(mode="json"),
                 "id": e.id,
+                "narrative_memory_ids": narrative_by_source.get(
+                    ("relationship_events", e.id), []
+                ),
             }
         )
     for m in milestones:
@@ -416,6 +435,9 @@ def get_relationship_timeline(user_id: str, limit: int = 50):
                 "unlocks": list(m.unlocks),
                 "bonus": m.applied_bonus.model_dump(mode="json"),
                 "id": m.id,
+                "narrative_memory_ids": narrative_by_source.get(
+                    ("relationship_milestones", m.id), []
+                ),
             }
         )
     for c in conflicts:

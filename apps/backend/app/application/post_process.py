@@ -218,6 +218,15 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
             memory_ingest.ingest_from_relationship_event(event, trace=ctx.trace)
         except Exception:
             logger.exception("RelationshipEvent 摄取失败（幂等安全）：%s", event.id)
+    for milestone in memory_sources.fetch_recent_relationship_milestones(ctx.user_id):
+        try:
+            memory_ingest.ingest_from_relationship_milestone(
+                milestone, trace=ctx.trace
+            )
+        except Exception:
+            logger.exception(
+                "RelationshipMilestone 摄取失败（幂等安全）：%s", milestone.id
+            )
 
 
 async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:

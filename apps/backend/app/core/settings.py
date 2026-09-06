@@ -175,6 +175,8 @@ class Settings(BaseSettings):
     v2_development_pattern_goal_tier_delta_max: float = 0.5
     v2_development_answer_min_tokens: int = 300
 
+    v2_relationship_evolved_enabled: bool = False
+
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
     emotion_switch_min_confidence: float = 0.8
