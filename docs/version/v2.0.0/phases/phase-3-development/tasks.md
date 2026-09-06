@@ -201,16 +201,35 @@ DEV-006 已实现（run_growth_loop 三周期闭环 runner：调制→新经历�
 强化→调制演进→反驳回退，逐周期归因链审计 + Flag 中断矩阵三变体 + 负向演进；
 tests/eval/test_development_growth_loop.py E-DEV-01~04 全量 Gate 通过 + 报告归档
 reports/ + 6 测试绿。全部 P3 验收达成本目录 evaluation.md 门槛）。
-注：tests/integration/test_evaluation_pipeline.py 在本机因真实 LLM 端点网络退化而
-缓慢/挂起——基线 d6d3f8b 复现同现象（60s 仅 5 例），属既有环境问题与 Phase3 无关。
 DEV-001~006 全部实现并逐 Task 提交（8482705 → 1fb191d）。离线 Eval Gate
 （E-DEV-01~04）在 tests/eval/test_development_growth_loop.py 确定性执行并全部通过
 （报告归档 tests/eval/reports/dev-growth-20260906.json）。
 v2_development_enabled 保持 default=false：灰度推进与真实模型人工回归待执行
 （regression-checklist.md）。
-全量回归口径：unit/v2/eval/golden 1258 绿 + integration 314 绿；xdist 并行在本机
-存在与 Phase3 无关的既有 flake（localhost-HTTP/LLM 网络类用例，基线 d6d3f8b 复现
-同组失败 + worker crash），串行 -n0 为准。
+全量回归：**1928 passed / 16 skipped / 0 failed**（xdist 18.6s 与串行 79.8s 双模式
+一致）。初期观察到的「xdist 既有 flake / worker crash / 用例挂起」已定位并修复根因
+（测试基础设施，与本 Phase 业务代码无关，见下一节）。
+
+### 测试基础设施修复（2026-09-06）
+
+此前全量回归出现的挂起与 xdist worker 崩溃（INTERNALERROR）经排查为四个独立
+根因叠加，全部修复后双模式全绿：
+
+1. **Windows 注册表系统代理（127.0.0.1:7897）劫持一切 httpx 请求**（env 不可见）：
+   代理客户端未运行时 LLM 调用与 localhost HTTP 全部 TLS/连接黑洞。修复：
+   tests/conftest.py 进程级 NO_PROXY=* + 清除代理 env（仅测试进程，不影响运行环境）。
+2. **conftest 离线名单缺 relationship_snapshot_repository**（V8.5-020 漏登记）：
+   快照写入连真实 PostgreSQL（本机 5432 SYN 黑洞）无限等待。已补入 _REPO_MODULES。
+3. **module 级 uvicorn server fixture 先于 autouse 离线 DB 替换执行**：
+   lifespan 内 world 维护循环连真实库阻塞事件循环，server.started 永不置位。
+   修复：test_goal_e2e / test_chat_http_integration / test_turn_meta_stream 三处
+   server fixture 降为 function 级。
+4. **时间炸弹测试**（硬编码 NOW=2026-08-30，2026-08-31 起必失败）：24h 惰性过期
+   用真实时钟对比历史 delivered_at → pending 恒空。修复：case14 /
+   test_debug_proactive_correlation / test_proactive_api 三处在测试内冻结
+   proactive_repository 时钟到模拟时间。
+5. **test_state_e2e 过期断言**：V8.5 first_interaction 里程碑 bonus 直写状态
+   （不进账本，design 明确）未计入，期望 0.312 → 0.332。
 ```
 
 

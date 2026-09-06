@@ -2,6 +2,16 @@ import os
 import time
 from typing import Any
 
+# 测试进程强制离线：系统代理（Windows 注册表层，env 不可见）会把 LLM 调用与
+# localhost HTTP 一起路由进代理客户端，代理未运行时全部挂起（TLS 黑洞）。
+# NO_PROXY=* 使 urllib/httpx 忽略注册表代理；测试 profile 本就指向不可达假端点，
+# 期望快速连接失败而非挂起。仅影响 pytest 进程，不改变开发/运行环境的代理行为。
+os.environ["NO_PROXY"] = "*"
+os.environ["no_proxy"] = "*"
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("http_proxy", None)
+os.environ.pop("HTTPS_PROXY", None)
+os.environ.pop("https_proxy", None)
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
@@ -64,6 +74,7 @@ from app.repositories import (
     relationship_event_repository,
     relationship_milestone_repository,
     relationship_repository,
+    relationship_snapshot_repository,
     scene_state_repository,
     summary_repository,
     trace_repository,
@@ -93,6 +104,7 @@ _REPO_MODULES = (
     world_repository,
     relationship_milestone_repository,
     relationship_conflict_repository,
+    relationship_snapshot_repository,
 )
 
 _SERVICE_DB_MODULES = (

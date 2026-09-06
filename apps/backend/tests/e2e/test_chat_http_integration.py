@@ -46,7 +46,7 @@ class _ServerThread:
         return f"http://127.0.0.1:{self.port}"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def http_server():
     server = _ServerThread(_free_port())
     server.start()

@@ -83,8 +83,16 @@ def test_case13_concurrent_executor_and_chat_turn(db_session_factory, fake_llm):
     assert len(messages) == (5 if proactive_count == 1 else 4)
 
 
-def test_case14_scenario_full_chain(db_session_factory, fake_llm):
+def test_case14_scenario_full_chain(db_session_factory, fake_llm, monkeypatch):
     """S1：我去忙了 → 闲置 → ACT(check_in) → 主动消息 → pending → ack。"""
+    from app.repositories import proactive_repository
+
+    class _SimClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW + timedelta(minutes=40)
+
+    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
     session_id = _setup(db_session_factory)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
     llm_factory.set_llm(llm)

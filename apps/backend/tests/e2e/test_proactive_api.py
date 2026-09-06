@@ -38,7 +38,15 @@ def test_pending_empty_by_default(db_session_factory):
         assert resp.json() == {"actions": []}
 
 
-def test_pending_lists_delivered_and_ack_transitions(db_session_factory):
+def test_pending_lists_delivered_and_ack_transitions(
+    db_session_factory, monkeypatch
+):
+    class _SimClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW + timedelta(minutes=1)
+
+    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
     proactive_repository.enqueue(_action())
     proactive_repository.transition("api-a1", "approved", now=NOW)
     proactive_repository.transition(
