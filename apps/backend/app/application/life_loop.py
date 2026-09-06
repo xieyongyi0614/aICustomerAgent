@@ -396,6 +396,19 @@ async def _run_maintenance(now: datetime) -> int:
         )
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
+    if settings.v2_action_outbox_enabled:
+        from app.application import outbox_consumer
+        from app.repositories import outbox_repository
+
+        pending = outbox_repository.list_pending(now=now, limit=1)
+        if pending:
+            stats = outbox_consumer.consume_pending(now=now)
+            _record_maintenance_run(
+                "outbox_consume",
+                [{"step": "outbox_consume", "status": "ok", **stats}],
+                now,
+            )
+            executed += 1
     if _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS):
         _mark_maintenance("trigger_reconcile")
         recovered = trigger_registry_repository.recover_stale(
@@ -427,6 +440,11 @@ def _maintenance_pending(settings) -> bool:
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         return True
+    if settings.v2_action_outbox_enabled:
+        from app.repositories import outbox_repository
+
+        if outbox_repository.list_pending(limit=1):
+            return True
     return _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS)
 
 

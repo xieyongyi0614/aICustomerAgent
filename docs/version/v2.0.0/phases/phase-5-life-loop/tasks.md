@@ -218,4 +218,20 @@ skip=quota_circuit_open、周期步骤预算→skip=step_budget，触发器留 p
 _daily_llm_call_budget=200/_daily_llm_token_budget=0/_budget_cache_seconds=60/
 _cycle_llm_budget=1/_degraded_usage_ratio=0.8；前台路径零引用 BudgetState；
 13 测试绿 + tests/v2 全量 534 例绿）。
+LIFE-004 已实现（迁移 0030 outbox_events pending→consumed|failed+幂等键
+action_id 唯一+(status,next_retry_at) 索引；outbox_repository list_pending/
+insert/mark_consumed CAS/advance_progress 进度标记/mark_relationship_done/
+fail_for_retry 指数退避 max5 死信/requeue；action_repository.
+save_record_with_outbox 同事务落库（IntegrityError 幂等吞掉）；action_engine
+integrate_result v2_action_outbox_enabled 分支 _integrate_via_outbox（steps 收集
+deferred_world_op + record 全量入 payload，不再调 memory_bridge 直写——记忆沉淀
+由 P1 补扫收敛，remember_fact 能力直写保留登记为遗留）；能力 deferral：
+reminder create/cancel + world_action create/move/use 执行期跨域写调用点
+Flag 分叉返回 deferred_world_op（args ISO 序列化，消费端 datetime 还原）；
+outbox_consumer 三段事务消费器（world op 引擎原样+create_event 打
+outbox_action_id 指纹+relationship 既有 bridge+applied_ops 崩溃续走+单行异常
+隔离退避死信）；life_loop 维护步骤接 outbox_consume（有 pending 即消费）+
+_maintenance_pending 收录；debug /actions/{id} 附 outbox 状态；语义变化登记：
+世界侧失败从行动 failed 变最终一致死信（Flag OFF 保留 v1）；10 测试绿 +
+V9/V8/v2 全量 616 例绿）。
 ```

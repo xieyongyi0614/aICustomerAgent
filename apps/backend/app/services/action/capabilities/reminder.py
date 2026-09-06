@@ -5,6 +5,7 @@
 """
 
 from app.application import world_engine
+from app.core.settings import get_settings
 from app.models.action import ActionSchema, CapabilityResult
 from app.services.action.registry import ExecutionContext
 
@@ -56,6 +57,24 @@ class ReminderCapability:
         due_at = _parse_due(params.get("due_at"))
         if due_at is None:
             return CapabilityResult(status="failed", error="due_at 无法解析", payload={"failure_kind": "permanent"})
+        if get_settings().v2_action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "create_event",
+                        "args": [
+                            ctx.user_id,
+                            "reminder",
+                            str(params.get("content", ""))[:40],
+                            str(params.get("importance", "high")),
+                            due_at.isoformat(),
+                            "autonomy",
+                        ],
+                    },
+                    "failure_kind": None,
+                },
+            )
         event = world_engine.create_event(
             ctx.user_id,
             event_type="reminder",
@@ -80,6 +99,17 @@ class ReminderCapability:
         )
 
     async def _cancel(self, params: dict, ctx: ExecutionContext) -> CapabilityResult:
+        if get_settings().v2_action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "cancel_events_by_type",
+                        "args": [ctx.user_id, "reminder"],
+                    },
+                    "failure_kind": None,
+                },
+            )
         cancelled = world_engine.cancel_events_by_type(ctx.user_id, "reminder")
         count = len(cancelled) if isinstance(cancelled, list) else int(cancelled or 0)
         if count == 0:

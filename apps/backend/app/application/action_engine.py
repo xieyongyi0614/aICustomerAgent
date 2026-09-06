@@ -149,6 +149,10 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
         status=result.status, effects=effects, error=result.error, failure_kind=result.failure_kind
     ).model_dump(mode="json")
 
+    if settings.v2_action_outbox_enabled:
+        _integrate_via_outbox(record)
+        return
+
     if settings.action_enabled:
         memory_payload = memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
         if memory_payload:
@@ -157,6 +161,29 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
 
     record.updated_at = _now()
     action_repository.save_record(record)
+
+
+def _integrate_via_outbox(record: ActionRecord) -> None:
+    """Outbox 模式（LIFE-004）：跨域投递延迟化——行动终态与 outbox 登记同事务
+    落库（幂等键 = action_id），世界/关系效果由消费器经既有引擎函数落库；
+    记忆沉淀由 P1 摄取补扫按幂等键收敛（本路径不再调 memory_bridge 直写）。
+    """
+    from app.repositories import action_repository as action_repo
+
+    world_ops = []
+    for step in record.steps:
+        payload = (step.get("result") or {}).get("payload", {}) or {}
+        op = payload.get("deferred_world_op")
+        if op:
+            world_ops.append(op)
+    payload = {
+        "action_id": record.id,
+        "user_id": record.user_id,
+        "record": record.model_dump(mode="json"),
+        "world_ops": world_ops,
+    }
+    record.updated_at = _now()
+    action_repo.save_record_with_outbox(record, payload, idempotency_key=record.id)
 
 
 def _detail_for(record: ActionRecord) -> str:

@@ -5,8 +5,9 @@ import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from app.core.db import ActionRecordRow, SessionLocal
+from app.core.db import ActionRecordRow, OutboxEventRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 
@@ -179,3 +180,75 @@ def retain_cleanup() -> int:
     if removed:
         logger.info("行动记录保留清理：删除 %d 条", removed)
     return removed
+
+
+def save_record_with_outbox(
+    record: ActionRecord, outbox_payload: dict, idempotency_key: str
+) -> ActionRecord:
+    """行动终态迁移与 outbox 登记同事务落库（LIFE-004；v2_action_outbox_enabled）。
+
+    幂等键 = action_id；同键重放（IntegrityError）按已登记处理不报错。
+    """
+    now = datetime.now()
+    with SessionLocal() as session:
+        row = session.get(ActionRecordRow, record.id)
+        if row is None:
+            row = ActionRecordRow(
+                id=record.id,
+                user_id=record.user_id,
+                character_id=record.character_id,
+                session_id=record.session_id,
+                source=record.source,
+                action_type=record.action_type,
+                intent=record.intent,
+                goal_id=record.goal_id,
+                target_record_id=record.target_record_id,
+                dedupe_key=record.dedupe_key,
+                params=record.params,
+                status=record.status,
+                gate_reason=record.gate_reason,
+                steps=record.steps,
+                result=record.result,
+                attempt=record.attempt,
+                next_retry_at=record.next_retry_at,
+                scheduled_at=record.scheduled_at,
+                created_at=record.created_at or now,
+                updated_at=record.updated_at or now,
+                executed_at=record.executed_at,
+            )
+            session.add(row)
+        else:
+            for field in (
+                "status",
+                "gate_reason",
+                "steps",
+                "result",
+                "attempt",
+                "next_retry_at",
+                "scheduled_at",
+                "params",
+                "goal_id",
+                "executed_at",
+            ):
+                setattr(row, field, getattr(record, field))
+            row.updated_at = record.updated_at or now
+        session.add(
+            OutboxEventRow(
+                id=str(uuid.uuid4()),
+                event_type="action_result",
+                payload=outbox_payload,
+                idempotency_key=idempotency_key,
+                status="pending",
+                attempts=0,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        try:
+            session.commit()
+        except IntegrityError:
+            # 同 action_id 重放：outbox 已登记，按幂等吞掉（行动终态照常持久化）
+            session.rollback()
+            return get_record(record.id)
+        session.refresh(row)
+        return _to_record(row)
