@@ -19,6 +19,7 @@ def _to_record(row: RelationshipMilestoneRow) -> MilestoneRecord:
         title=row.title,
         applied_bonus=RelationshipDelta(**(row.applied_bonus or {})),
         unlocks=tuple(row.unlocks or ()),
+        meta=dict(row.meta or {}),
         created_at=row.created_at,
     )
 
@@ -81,6 +82,7 @@ def create_milestone(
     period_key: str = "",
     applied_bonus: RelationshipDelta | None = None,
     unlocks: tuple[str, ...] = (),
+    meta: dict | None = None,
     now: datetime | None = None,
 ) -> MilestoneRecord | None:
     """写入里程碑；unique 冲突（重复检测）返回 None，不抛。"""
@@ -103,9 +105,24 @@ def create_milestone(
             title=title,
             applied_bonus=(applied_bonus or RelationshipDelta()).model_dump(),
             unlocks=list(unlocks),
+            meta=meta,
             created_at=now or datetime.now(),
         )
         session.add(row)
         session.commit()
         session.refresh(row)
         return _to_record(row)
+
+
+def count_keys_since(user_id: str, key_prefix: str, since: datetime) -> int:
+    """指定前缀的里程碑自 since 起的计数（叙事里程碑频控用）。"""
+    with SessionLocal() as session:
+        rows = session.scalars(
+            select(RelationshipMilestoneRow).where(
+                RelationshipMilestoneRow.user_id == user_id,
+                RelationshipMilestoneRow.created_at >= since,
+            )
+        ).all()
+        return sum(
+            1 for row in rows if (row.milestone_key or "").startswith(key_prefix)
+        )

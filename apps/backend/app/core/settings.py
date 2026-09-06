@@ -183,6 +183,12 @@ class Settings(BaseSettings):
     v2_relationship_pattern_min_strength: float = 0.6
     v2_relationship_pattern_budget_chars: int = 120
     v2_relationship_pattern_max_items: int = 2
+    v2_relationship_narrative_min_confidence: float = 0.75
+    v2_relationship_narrative_whitelist_json: str = (
+        '{"narrative:all_nighter": {"title": "第一次一起熬夜赶工",'
+        ' "keywords": ["熬夜", "一起"], "all": true}}'
+    )
+    v2_relationship_narrative_daily_cap: int = 1
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

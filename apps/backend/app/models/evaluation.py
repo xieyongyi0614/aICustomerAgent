@@ -79,6 +79,8 @@ class IssueCode(StrEnum):
     DEVELOPMENT_CONCURRENT_ACTIVE = "development_concurrent_active"
     DEVELOPMENT_OVER_CAP = "development_over_cap"
     DEVELOPMENT_STALE_ACTIVE = "development_stale_active"
+    RELATIONSHIP_NARRATIVE_ORPHAN = "relationship_narrative_orphan"
+    RELATIONSHIP_MILESTONE_UNPROVENANCED = "relationship_milestone_unprovenanced"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -113,6 +115,8 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.DEVELOPMENT_CONCURRENT_ACTIVE: IssueSeverity.CRITICAL,
     IssueCode.DEVELOPMENT_OVER_CAP: IssueSeverity.WARNING,
     IssueCode.DEVELOPMENT_STALE_ACTIVE: IssueSeverity.WARNING,
+    IssueCode.RELATIONSHIP_NARRATIVE_ORPHAN: IssueSeverity.CRITICAL,
+    IssueCode.RELATIONSHIP_MILESTONE_UNPROVENANCED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_NO_EVIDENCE_LINK: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_STALE_INJECTED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: IssueSeverity.WARNING,
@@ -153,6 +157,8 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.DEVELOPMENT_CONCURRENT_ACTIVE: "同一 (user, key) 存在多条 active 调制（矛盾并存生效）",
     IssueCode.DEVELOPMENT_OVER_CAP: "调制幅度超出 strength × 预设封顶（过度调制）",
     IssueCode.DEVELOPMENT_STALE_ACTIVE: "active 调制的源 Insight 已失效/被替代（回退滞后）",
+    IssueCode.RELATIONSHIP_NARRATIVE_ORPHAN: "叙事事实记忆缺少账本 source_ref（真相源审计断裂）",
+    IssueCode.RELATIONSHIP_MILESTONE_UNPROVENANCED: "叙事里程碑缺少 Insight 溯源/悬空/白名单外",
 }
 
 

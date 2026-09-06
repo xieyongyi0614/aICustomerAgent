@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-09-06T19:06:10",
+  "metrics": {
+    "E-REL-01": {
+      "metric": "narrative_provenance_rate",
+      "score": 1.0,
+      "threshold": 1.0,
+      "n": 2,
+      "pass": true
+    },
+    "E-REL-02": {
+      "metric": "shared_experience_consistency",
+      "score": 1.0,
+      "threshold": 1.0,
+      "n": 2,
+      "pass": true
+    },
+    "E-REL-04": {
+      "metric": "narrative_milestone_compliance",
+      "score": 1.0,
+      "threshold": 1.0,
+      "n": 2,
+      "pass": true
+    }
+  },
+  "gate_passed": true,
+  "failed_scenarios": []
+}

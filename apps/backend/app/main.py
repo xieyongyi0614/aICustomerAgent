@@ -28,6 +28,7 @@ async def lifespan(application: FastAPI):
         get_settings().v2_memory_enabled
         or get_settings().v2_reflection_enabled
         or get_settings().v2_development_enabled
+        or get_settings().v2_relationship_evolved_enabled
     ):
         from app.services.memory2.job_worker import run_job_worker_loop
 
@@ -44,6 +45,10 @@ async def lifespan(application: FastAPI):
 
         register_runtime()
         register_rollback_listener()
+    if get_settings().v2_relationship_evolved_enabled:
+        from app.services.relationship_narrative import register_narrative_listener
+
+        register_narrative_listener()
     if get_settings().autonomy_enabled:
         _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
     else:

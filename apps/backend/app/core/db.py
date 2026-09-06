@@ -164,6 +164,7 @@ class RelationshipMilestoneRow(Base):
     title: Mapped[str] = mapped_column(String, nullable=False, default="")
     applied_bonus: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     unlocks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (
