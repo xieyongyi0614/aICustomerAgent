@@ -160,6 +160,8 @@ class Settings(BaseSettings):
     v2_reflection_context_max_items: int = 5
     v2_reflection_context_statement_chars: int = 120
 
+    v2_development_enabled: bool = False
+
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6
     emotion_switch_min_confidence: float = 0.8

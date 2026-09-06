@@ -179,3 +179,11 @@ M3 Integration: DEV-003 / DEV-004
 M4 Acceptance:  DEV-005 + DEV-006 → Eval Gate + Regression Gate → 申请开启 v2_development_enabled
 ```
 
+## 实现状态（进行中）
+
+```text
+DEV-001 已实现（迁移 0026_development_foundation + aggregate 读写服务 + 14 测试绿；
+upsert 仲裁比较器入参注入，DEV-002 注入同 strength 取新 Insight 的完整比较器）。
+```
+
+
