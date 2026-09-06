@@ -36,6 +36,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
 from app.services import agent_service
+from app.services import relationship_patterns as relationship_patterns_service
 from app.services.memory2 import attribution as memory2_attribution
 from app.services.memory2 import commands as memory2_commands
 from app.services.memory2 import evaluator as memory2_evaluator
@@ -116,6 +117,7 @@ _SERVICE_DB_MODULES = (
     memory2_job_worker,
     memory2_lifecycle,
     memory2_migration,
+    relationship_patterns_service,
     memory2_retriever,
     reflection_attribution,
     reflection_evidence,

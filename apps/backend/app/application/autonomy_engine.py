@@ -139,6 +139,14 @@ def _snapshot_for(
         unlocks = relationship_milestone_repository.list_unlocks(user_id)
     except Exception:
         unlocks = ()
+    relationship_patterns: tuple[str, ...] = ()
+    try:
+        from app.services import relationship_patterns as relationship_pattern_service
+
+        patterns, _ = relationship_pattern_service.read_relationship_patterns(user_id)
+        relationship_patterns = tuple(pattern.key for pattern in patterns)
+    except Exception:
+        logger.exception("关系模式读取失败，闸门参考为空")
     return autonomy_policy.PolicySnapshot(
         generating=active_generations.get(user_id, False),
         has_active_action=proactive_repository.has_non_terminal(user_id),
@@ -162,6 +170,7 @@ def _snapshot_for(
         unlocks=unlocks,
         trust=relationship.trust,
         stage=relationship.stage,
+        relationship_patterns=relationship_patterns,
     )
 
 
@@ -204,6 +213,7 @@ def _decision_record(
             "selected_goal_type": snapshot.selected_goal_type,
             "goal_degraded": snapshot.goal_degraded,
             "goal_id": snapshot.extra_flags.get("goal_id"),
+            "relationship_patterns": list(snapshot.relationship_patterns),
         },
         get_settings().observability_step_extra_max_chars,
     )

@@ -51,6 +51,7 @@ class PolicySnapshot:
     unlocks: tuple[str, ...] = ()
     trust: float = 0.35
     stage: str = "friend"
+    relationship_patterns: tuple[str, ...] = ()
 
 
 def _parse_hhmm(value: str) -> dt_time | None:

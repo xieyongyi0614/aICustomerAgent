@@ -96,3 +96,14 @@ class DevelopmentOverlay(BaseModel):
     goal_weights: dict[str, float] = {}
     modulation_summary: str = ""
     sources: dict[str, str] = {}
+
+
+class RelationshipPattern(BaseModel):
+    """关系模式（REL-003）：active pattern 且源 Insight scope=relationship 的
+    消费侧只读投影；Development 域表结构零改动。"""
+
+    key: str
+    value: dict
+    strength: float
+    statement: str
+    source_insight_id: str

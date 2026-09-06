@@ -44,6 +44,10 @@ RELATIONSHIP_BUDGET_CHARS = 150
 SHARED_EXPERIENCE_HEADER = "【共同经历】"
 SHARED_EXPERIENCE_NOTE = "（这是你们一起经历过的事，仅自然相关时提起，不要罗列）"
 
+RELATIONSHIP_PATTERN_HEADER = "【关系模式】"
+RELATIONSHIP_PATTERN_NOTE = "（这是你们相处中形成的模式，融入互动即可，不要直接引用）"
+RELATIONSHIP_PATTERN_STATEMENT_CHARS = 60
+
 PERSONALITY_FIRST_CONSTRAINT = (
     "情绪叠加在你的人格之上：无论此刻情绪如何，你说话的方式、价值观和性格底色不变。"
     "温柔的角色生气时是“温柔地生气”，不是变成另一个人。"
@@ -199,6 +203,29 @@ class PromptBuilder:
             lines.append(line)
             used += len(line)
         lines.append(SHARED_EXPERIENCE_NOTE)
+        return "\n".join(lines)
+
+    @staticmethod
+    def build_relationship_pattern_section(state: ConversationState) -> str | None:
+        patterns = getattr(state, "relationship_patterns", None) or []
+        if not patterns:
+            return None
+        settings = get_settings()
+        budget = settings.v2_relationship_pattern_budget_chars
+        lines = [RELATIONSHIP_PATTERN_HEADER]
+        used = len(RELATIONSHIP_PATTERN_HEADER)
+        for pattern in patterns:
+            statement = pattern.statement.strip()
+            if len(statement) > RELATIONSHIP_PATTERN_STATEMENT_CHARS:
+                statement = (
+                    statement[:RELATIONSHIP_PATTERN_STATEMENT_CHARS] + "…"
+                )
+            line = f"· {statement}"
+            if used + len(line) > budget:
+                break
+            lines.append(line)
+            used += len(line)
+        lines.append(RELATIONSHIP_PATTERN_NOTE)
         return "\n".join(lines)
 
     @staticmethod
@@ -375,6 +402,10 @@ class PromptBuilder:
                     "（这是相处带来的自然变化，融入表达即可，不要直接引用说明）",
                 )
             )
+
+        pattern_section = PromptBuilder.build_relationship_pattern_section(state)
+        if pattern_section:
+            messages.append(("system", _literal(pattern_section)))
 
         shared_section = PromptBuilder.build_shared_experience_section(state)
         if shared_section:
