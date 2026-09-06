@@ -81,6 +81,10 @@ class IssueCode(StrEnum):
     DEVELOPMENT_STALE_ACTIVE = "development_stale_active"
     RELATIONSHIP_NARRATIVE_ORPHAN = "relationship_narrative_orphan"
     RELATIONSHIP_MILESTONE_UNPROVENANCED = "relationship_milestone_unprovenanced"
+    LIFE_LOOP_RUN_INCOMPLETE = "life_loop_run_incomplete"
+    LIFE_LOOP_BUDGET_OVERRUN = "life_loop_budget_overrun"
+    TRIGGER_REGISTRY_ORPHAN = "trigger_registry_orphan"
+    AUTONOMY_TRIGGER_UNPROVENANCED = "autonomy_trigger_unprovenanced"
 
 
 DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
@@ -117,6 +121,10 @@ DEFAULT_SEVERITY: dict[IssueCode, IssueSeverity] = {
     IssueCode.DEVELOPMENT_STALE_ACTIVE: IssueSeverity.WARNING,
     IssueCode.RELATIONSHIP_NARRATIVE_ORPHAN: IssueSeverity.CRITICAL,
     IssueCode.RELATIONSHIP_MILESTONE_UNPROVENANCED: IssueSeverity.CRITICAL,
+    IssueCode.LIFE_LOOP_RUN_INCOMPLETE: IssueSeverity.WARNING,
+    IssueCode.LIFE_LOOP_BUDGET_OVERRUN: IssueSeverity.CRITICAL,
+    IssueCode.TRIGGER_REGISTRY_ORPHAN: IssueSeverity.WARNING,
+    IssueCode.AUTONOMY_TRIGGER_UNPROVENANCED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_NO_EVIDENCE_LINK: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_STALE_INJECTED: IssueSeverity.CRITICAL,
     IssueCode.REFLECTION_CONFIDENCE_OVER_CALIBRATED: IssueSeverity.WARNING,
@@ -159,6 +167,10 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.DEVELOPMENT_STALE_ACTIVE: "active 调制的源 Insight 已失效/被替代（回退滞后）",
     IssueCode.RELATIONSHIP_NARRATIVE_ORPHAN: "叙事事实记忆缺少账本 source_ref（真相源审计断裂）",
     IssueCode.RELATIONSHIP_MILESTONE_UNPROVENANCED: "叙事里程碑缺少 Insight 溯源/悬空/白名单外",
+    IssueCode.LIFE_LOOP_RUN_INCOMPLETE: "Life Loop 周期记账不完整（缺关键步骤/aborted 无原因）",
+    IssueCode.LIFE_LOOP_BUDGET_OVERRUN: "Life Loop 预算违规（降级期间调用/日总量超配额）",
+    IssueCode.TRIGGER_REGISTRY_ORPHAN: "触发器滞留无终态或取消无原因（孤儿）",
+    IssueCode.AUTONOMY_TRIGGER_UNPROVENANCED: "主动投递无触发溯源记录",
 }
 
 
@@ -251,8 +263,17 @@ def build_issue(code: IssueCode, evidence_quote: str = "", source: ISSUE_SOURCE 
     )
 
 
+_DIMENSION_PREFIX_ALIASES = {
+    "life": EvaluationDimension.AUTONOMY,
+    "trigger": EvaluationDimension.AUTONOMY,
+}
+
 _DIMENSION_BY_CODE: dict[IssueCode, EvaluationDimension] = {}
 for _code in IssueCode:
+    _prefix = _code.value.split("_", 1)[0]
+    if _prefix in _DIMENSION_PREFIX_ALIASES:
+        _DIMENSION_BY_CODE[_code] = _DIMENSION_PREFIX_ALIASES[_prefix]
+        continue
     try:
         _DIMENSION_BY_CODE[_code] = EvaluationDimension(_code.value.split("_", 1)[0])
     except ValueError:

@@ -70,6 +70,145 @@ class TimingViolationRule(EvaluationRule):
         return None
 
 
-TIMING_VIOLATION = TimingViolationRule()
+class LifeLoopRunCompletenessRule(EvaluationRule):
+    """LIFE-006：done 的用户周期必含 decision 步骤；aborted 必有原因。"""
 
-RULES = [TIMING_VIOLATION]
+    code = IssueCode.LIFE_LOOP_RUN_INCOMPLETE
+    dimension = EvaluationDimension.AUTONOMY
+    subjects = ("life_loop",)
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        loop = ctx.life_loop
+        if loop is None:
+            return None
+        for run in loop.runs:
+            if run.kind != "autonomy":
+                continue
+            if run.status == "done" and "decision" not in run.step_names:
+                return build_issue(
+                    self.code,
+                    evidence_quote=f"run {run.run_id} done 缺 decision 步骤",
+                )
+            if run.status == "aborted" and not run.aborted_with_reason:
+                return build_issue(
+                    self.code,
+                    evidence_quote=f"run {run.run_id} aborted 无原因记录",
+                )
+        return None
+
+
+class LifeLoopBudgetComplianceRule(EvaluationRule):
+    """LIFE-006：degraded 期间禁止 LLM 调用；日总量不超配额。"""
+
+    code = IssueCode.LIFE_LOOP_BUDGET_OVERRUN
+    dimension = EvaluationDimension.AUTONOMY
+    subjects = ("life_loop",)
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        loop = ctx.life_loop
+        if loop is None:
+            return None
+        for run in loop.runs:
+            if run.budget_degraded and run.llm_call_count > 0:
+                return build_issue(
+                    self.code,
+                    evidence_quote=(
+                        f"run {run.run_id} 熔断降级期间仍有 "
+                        f"{run.llm_call_count} 次 LLM 调用"
+                    ),
+                )
+        if loop.day_llm_call_limit > 0 and loop.day_llm_calls > loop.day_llm_call_limit:
+            return build_issue(
+                self.code,
+                evidence_quote=(
+                    f"日 LLM 调用 {loop.day_llm_calls} 超配额 {loop.day_llm_call_limit}"
+                ),
+            )
+        return None
+
+
+class TriggerLifecycleRule(EvaluationRule):
+    """LIFE-006：trigger 滞留 due/fired 超时或 cancelled 无 reason = 孤儿。"""
+
+    code = IssueCode.TRIGGER_REGISTRY_ORPHAN
+    dimension = EvaluationDimension.AUTONOMY
+    subjects = ("life_loop",)
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        loop = ctx.life_loop
+        if loop is None:
+            return None
+        for trigger in loop.triggers:
+            if trigger.stale:
+                return build_issue(
+                    self.code,
+                    evidence_quote=(
+                        f"{trigger.trigger_key} 滞留 {trigger.status} 超时未终态"
+                    ),
+                )
+            if trigger.cancelled_without_reason:
+                return build_issue(
+                    self.code,
+                    evidence_quote=f"{trigger.trigger_key} cancelled 无 reason 留痕",
+                )
+        return None
+
+
+class TriggerProvenanceRule(EvaluationRule):
+    """LIFE-006：delivered 的 proactive 必有 PROACTIVE_AUTONOMY 决策行溯源。"""
+
+    code = IssueCode.AUTONOMY_TRIGGER_UNPROVENANCED
+    dimension = EvaluationDimension.AUTONOMY
+    subjects = ("life_loop",)
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        loop = ctx.life_loop
+        if loop is None:
+            return None
+        for proactive in loop.delivered_proactive:
+            if not proactive.provenanced:
+                return build_issue(
+                    self.code,
+                    evidence_quote=(
+                        f"proactive {proactive.action_id} 投递无触发溯源记录"
+                    ),
+                )
+        return None
+
+
+class StormAndRepeatRule(EvaluationRule):
+    """LIFE-006：同用户日投递超风暴阈值（复用 AUTONOMY_REDUNDANT 码）。"""
+
+    code = IssueCode.AUTONOMY_REDUNDANT
+    dimension = EvaluationDimension.AUTONOMY
+    subjects = ("life_loop",)
+
+    def evaluate(self, ctx: EvaluationContext) -> Issue | None:
+        loop = ctx.life_loop
+        if loop is None:
+            return None
+        delivered = len(loop.delivered_proactive)
+        limit = get_settings().v2_life_loop_storm_daily_limit
+        if delivered > limit:
+            return build_issue(
+                self.code,
+                evidence_quote=f"日投递 {delivered} 次超过风暴阈值 {limit}",
+            )
+        return None
+
+
+TIMING_VIOLATION = TimingViolationRule()
+RUN_COMPLETENESS = LifeLoopRunCompletenessRule()
+BUDGET_COMPLIANCE = LifeLoopBudgetComplianceRule()
+TRIGGER_LIFECYCLE = TriggerLifecycleRule()
+TRIGGER_PROVENANCE = TriggerProvenanceRule()
+STORM_AND_REPEAT = StormAndRepeatRule()
+
+RULES = [
+    TIMING_VIOLATION,
+    RUN_COMPLETENESS,
+    BUDGET_COMPLIANCE,
+    TRIGGER_LIFECYCLE,
+    TRIGGER_PROVENANCE,
+    STORM_AND_REPEAT,
+]

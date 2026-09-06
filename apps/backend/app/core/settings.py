@@ -329,6 +329,7 @@ class Settings(BaseSettings):
     v2_life_loop_memory_limit: int = 5
     v2_life_loop_memory_digest_chars: int = 600
     v2_life_loop_reflection_check_interval_minutes: int = 240
+    v2_life_loop_storm_daily_limit: int = 3
 
     evaluation_enabled: bool = True
     evaluation_persona_enabled: bool = True
