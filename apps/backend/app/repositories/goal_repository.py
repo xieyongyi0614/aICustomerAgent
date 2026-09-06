@@ -11,9 +11,9 @@ from app.models.goal import (
     HIERARCHICAL_TYPE_MAP,
     LAYER_VALUES,
     SubGoalSpec,
+    goal_transitions,
 )
 
-_TERMINAL_STATUS = ("completed", "expired", "cancelled", "failed")
 _HIERARCHICAL_HORIZON = "persistent"
 
 
@@ -36,6 +36,7 @@ def _to_record(row: GoalRow) -> GoalRecord:
         layer=row.layer,
         domain=row.domain,
         failure_reason=row.failure_reason,
+        arbitration_state=row.arbitration_state,
     )
 
 
@@ -58,6 +59,7 @@ def _to_row(record: GoalRecord) -> GoalRow:
         layer=record.layer,
         domain=record.domain,
         failure_reason=record.failure_reason,
+        arbitration_state=record.arbitration_state,
     )
 
 
@@ -149,12 +151,14 @@ def create_goal(record: GoalRecord) -> GoalRecord:
 def finish_goal(
     goal_id: str, status: str, failure_reason: str | None = None
 ) -> GoalRecord | None:
-    if status not in _TERMINAL_STATUS:
-        raise ValueError(f"非法终态：{status}")
     with SessionLocal() as session:
         row = session.get(GoalRow, goal_id)
-        if row is None or row.status != "active":
-            return _to_record(row) if row is not None else None
+        if row is None:
+            return None
+        if row.status != "active":
+            return _to_record(row)
+        if status not in goal_transitions(row.layer, row.status):
+            raise ValueError(f"非法状态转换：{row.status} → {status}")
         row.status = status
         if failure_reason is not None:
             row.failure_reason = failure_reason
@@ -181,16 +185,74 @@ def fail_goal(goal_id: str, failure_reason: str) -> GoalRecord | None:
 
 
 def reactivate_goal(goal_id: str) -> GoalRecord | None:
-    """failed→active（失败后单次重规划成功；AUT-004 状态机收口前的前置边）。"""
+    """failed→active（失败后单次重规划成功；AUT-004 状态机的 failed→active 边）。"""
     with SessionLocal() as session:
         row = session.get(GoalRow, goal_id)
         if row is None or row.status != "failed":
             return _to_record(row) if row is not None else None
+        if "active" not in goal_transitions(row.layer, row.status):
+            raise ValueError(f"非法状态转换：{row.status} → active")
         row.status = "active"
         row.updated_at = datetime.now()
         session.commit()
         session.refresh(row)
         return _to_record(row)
+
+
+def set_status(
+    goal_id: str,
+    target: str,
+    arbitration_state: dict | None = None,
+) -> GoalRecord | None:
+    """状态变更唯一入口（层级行）：转换表守卫 + 仲裁留痕原子写入。"""
+    with SessionLocal() as session:
+        row = session.get(GoalRow, goal_id)
+        if row is None:
+            return None
+        if target == row.status:
+            return _to_record(row)
+        if target not in goal_transitions(row.layer, row.status):
+            raise ValueError(f"非法状态转换：{row.status} → {target}")
+        row.status = target
+        if arbitration_state is not None:
+            row.arbitration_state = arbitration_state
+        row.updated_at = datetime.now()
+        session.commit()
+        session.refresh(row)
+        return _to_record(row)
+
+
+def list_top_level_layered(
+    user_id: str, statuses: tuple[str, ...] = ("active",)
+) -> list[GoalRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalRow.layer.isnot(None),
+                GoalRow.parent_goal_id.is_(None),
+                GoalRow.status.in_(statuses),
+            )
+            .order_by(GoalRow.created_at.asc(), GoalRow.id.asc())
+            .all()
+        )
+        return [_to_record(row) for row in rows]
+
+
+def list_children_by_status(
+    parent_goal_id: str, statuses: tuple[str, ...]
+) -> list[GoalRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalRow)
+            .filter(
+                GoalRow.parent_goal_id == parent_goal_id,
+                GoalRow.status.in_(statuses),
+            )
+            .all()
+        )
+        return [_to_record(row) for row in rows]
 
 
 def update_plan_progress(plan_id: str, sub_goals: list[SubGoalSpec]) -> GoalPlanRecord | None:

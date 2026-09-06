@@ -70,6 +70,7 @@ TRACE_STEP_NAMES = (
     "trigger_claim",
     "goal_planning",
     "goal_observation",
+    "goal_arbitration",
 )
 
 _BACKGROUND_STEPS = (
