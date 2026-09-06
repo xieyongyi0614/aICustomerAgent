@@ -8,7 +8,7 @@ from app.models.development import DevelopmentOverlay
 from app.models.goal import GoalRecord
 from app.models.memory import UserMemory
 from app.models.reflection import InsightSummary
-from app.models.relationship import RelationshipState
+from app.models.relationship import RelationshipState, SharedExperience
 
 
 class ChatMessage(BaseModel):
@@ -28,5 +28,6 @@ class ConversationState(BaseModel):
     goals: list[GoalRecord] = []
     insights: list[InsightSummary] = []
     development_overlay: DevelopmentOverlay | None = None
+    shared_experiences: list[SharedExperience] = []
     mode: str = "default"
     mode_entered_at: datetime | None = None

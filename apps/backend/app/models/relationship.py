@@ -147,3 +147,20 @@ class RelationshipSnapshot(BaseModel):
     conflict_status: ConflictStatus = "none"
     trigger: str = "manual"
     created_at: datetime
+
+
+SharedExperienceKind = Literal[
+    "relationship_event", "relationship_fact", "experience", "world_event"
+]
+
+
+class SharedExperience(BaseModel):
+    """共同经历投影条目（REL-002，只读可重算；source_ref 可回指唯一源行）。"""
+
+    entry_id: str
+    kind: SharedExperienceKind
+    title: str
+    occurred_at: datetime
+    source_ref: dict = Field(default_factory=dict)
+    ledger_event_id: str | None = None
+    salience: float = 0.0

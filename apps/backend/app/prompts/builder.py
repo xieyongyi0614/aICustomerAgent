@@ -41,6 +41,9 @@ INSIGHT_TYPE_LABELS = {
 EMOTION_BUDGET_CHARS = 120
 RELATIONSHIP_BUDGET_CHARS = 150
 
+SHARED_EXPERIENCE_HEADER = "【共同经历】"
+SHARED_EXPERIENCE_NOTE = "（这是你们一起经历过的事，仅自然相关时提起，不要罗列）"
+
 PERSONALITY_FIRST_CONSTRAINT = (
     "情绪叠加在你的人格之上：无论此刻情绪如何，你说话的方式、价值观和性格底色不变。"
     "温柔的角色生气时是“温柔地生气”，不是变成另一个人。"
@@ -179,6 +182,24 @@ class PromptBuilder:
                 f"尊重：{describe_respect(respect)}　自在：{describe_comfort(comfort)}"
             )
         return _append_within_budget(section, extras, RELATIONSHIP_BUDGET_CHARS)
+
+    @staticmethod
+    def build_shared_experience_section(state: ConversationState) -> str | None:
+        entries = getattr(state, "shared_experiences", None) or []
+        if not entries:
+            return None
+        settings = get_settings()
+        budget = settings.v2_relationship_shared_budget_chars
+        lines = [SHARED_EXPERIENCE_HEADER]
+        used = len(SHARED_EXPERIENCE_HEADER)
+        for entry in entries:
+            line = f"· {entry.title}"
+            if used + len(line) > budget:
+                break
+            lines.append(line)
+            used += len(line)
+        lines.append(SHARED_EXPERIENCE_NOTE)
+        return "\n".join(lines)
 
     @staticmethod
     def build_behavior_section(analysis: TurnAnalysis) -> str:
@@ -354,6 +375,10 @@ class PromptBuilder:
                     "（这是相处带来的自然变化，融入表达即可，不要直接引用说明）",
                 )
             )
+
+        shared_section = PromptBuilder.build_shared_experience_section(state)
+        if shared_section:
+            messages.append(("system", _literal(shared_section)))
 
         if summary:
             messages.append(("system", _literal(f"【对话摘要】\n{summary}")))
