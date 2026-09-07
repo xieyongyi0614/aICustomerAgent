@@ -7,7 +7,7 @@
 ```powershell
 uv run pytest tests/ -v        # 测试
 uv run pylint app tests        # 代码检查
-uv run uvicorn app.main:app --reload --port 8000   # 启动服务
+uv run uvicorn app.main:app --reload --port 8020   # 启动服务
 ```
 
 ## 任务入口
