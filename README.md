@@ -58,12 +58,12 @@ cd apps/backend
 cp .env.example .env        # 并填入 LLM_PROFILES_JSON 的 API Key
 uv sync
 uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8020
 
 # 3. 前端（apps/frontend/ 下）：启动开发服务器
 cd apps/frontend
 npm install
-npm run dev                 # http://localhost:2000，/api 代理到 :8000
+npm run dev                 # http://localhost:2000，/api 代理到 :8020（VITE_PROXY_TARGET 可配置）
 ```
 
 > 环境变量说明见 `apps/backend/README.md` 的配置项表；模型通过 `LLM_PROFILES_JSON`（OpenAI 兼容服务商数组）配置。

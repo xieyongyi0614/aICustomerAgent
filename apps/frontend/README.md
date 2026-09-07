@@ -28,7 +28,7 @@ src/
 
 ```bash
 npm install
-npm run dev        # http://localhost:2000，/api 代理到 http://localhost:8000
+npm run dev        # http://localhost:2000，/api 代理到 http://localhost:8020（VITE_PROXY_TARGET 可配置）
 ```
 
 需先启动后端（见 `apps/backend/README.md`）；无后端时可用 msw mock 模式开发（`src/api/api-mode.ts` 切换）。

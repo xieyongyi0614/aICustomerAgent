@@ -45,10 +45,10 @@ uv sync
 uv run alembic upgrade head
 
 # 4. 启动服务
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8020
 
 # 5. 健康检查
-curl http://localhost:8000/health
+curl http://localhost:8020/health
 ```
 
 `app/main.py` lifespan 启动两个后台循环：记忆回收（memory reclaim）与自主行为 Worker（`AUTONOMY_ENABLED` 门控）。

@@ -55,7 +55,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:8020;
         proxy_buffering off;             # NDJSON 流式必须关闭缓冲
         proxy_read_timeout 300s;
     }
