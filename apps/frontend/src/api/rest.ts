@@ -1,4 +1,4 @@
-import { requestJson, resolveApiBase, toApiErrorFromResponse } from "@/api/http"
+import { requestJson } from "@/api/http"
 import type { RoleMode } from "@/types/domain/chat-meta"
 import type {
   ChatHistoryMessage,
@@ -171,12 +171,8 @@ export function traceHasRouterDegradation(trace: TurnTrace | undefined): boolean
 }
 
 export async function fetchTurnTrace(turnId: string): Promise<TurnTrace> {
-  const response = await fetch(
-    `${resolveApiBase()}/api/v1/debug/turns/${encodeURIComponent(turnId)}/trace`,
+  const dto = await requestJson<TurnTraceDto>(
+    `/api/v1/debug/turns/${encodeURIComponent(turnId)}/trace`,
   )
-  if (!response.ok) {
-    throw await toApiErrorFromResponse(response)
-  }
-  const dto = (await response.json()) as TurnTraceDto
   return mapTurnTrace(dto, turnId)
 }

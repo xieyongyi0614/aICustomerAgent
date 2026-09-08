@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query"
 import { ApiError } from "@/api/http"
 import { qk } from "@/api/query-keys"
 import {
-  fetchConversationMessages,
   fetchMemories,
   fetchState,
   fetchTurnTrace,
@@ -29,15 +28,6 @@ export function useMemories(userId = "default-user") {
     queryKey: qk.memories(userId),
     queryFn: () => fetchMemories(userId),
     staleTime: MEMORIES_STALE_MS,
-  })
-}
-
-export function useConversationMessages(sessionId: string | null) {
-  return useQuery({
-    queryKey: qk.messages(sessionId ?? "__none__"),
-    queryFn: () => fetchConversationMessages(sessionId as string),
-    enabled: sessionId !== null,
-    staleTime: 60_000,
   })
 }
 

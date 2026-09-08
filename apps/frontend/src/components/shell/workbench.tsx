@@ -1,6 +1,4 @@
-﻿import { useState } from "react"
-
-import { useEffect } from "react"
+﻿import { useEffect, useState } from "react"
 
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { ChatScrollRegion } from "@/components/chat/chat-scroll-region"
@@ -48,7 +46,7 @@ function Workbench() {
         data-testid="mobile-banner"
         className="hidden max-md:block px-4 py-1.5 text-center font-mono text-xs text-status-warn"
       >
-        璇蜂娇鐢ㄦ闈㈢鑾峰緱瀹屾暣璋冭瘯浣撻獙
+        请使用桌面端获得完整调试体验
       </p>
 
       <div className="flex min-h-0 flex-1">

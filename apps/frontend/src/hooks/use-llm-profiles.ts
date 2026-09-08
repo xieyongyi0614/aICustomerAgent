@@ -12,7 +12,6 @@ export function useLlmProfiles() {
     queryFn: fetchLlmProfiles,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    refetchOnWindowFocus: true,
   })
 
   const [override, setOverride] = useState<string | null | undefined>(undefined)
