@@ -55,6 +55,7 @@ async def run_job_worker_loop() -> None:
         "memory job worker",
         run_job_tick,
         get_settings().v2_job_poll_interval,
+        offload=True,
     )
 
 

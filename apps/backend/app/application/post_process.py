@@ -306,7 +306,7 @@ async def run_budget_observer(ctx: PostProcessContext) -> None:
 
 
 async def run_evaluation(ctx: PostProcessContext) -> None:
-    """V7.5 评估第 7 步：规则阶段锁内执行，judge 采样命中时引擎派发锁外任务。"""
+    """V7.5 评估第 7 步：规则阶段锁内执行，judge 采样命中时引擎派发后台任务。"""
     try:
         evaluation_engine.run_turn_evaluation(ctx)
     except Exception:

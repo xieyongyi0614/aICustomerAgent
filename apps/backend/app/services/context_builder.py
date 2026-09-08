@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -208,6 +209,17 @@ async def build(
 ) -> ConversationState:
     if not current_input:
         raise ValueError("current_input 必填")
+    return await asyncio.to_thread(
+        _build_sync, session_id, user_id, current_input, trace
+    )
+
+
+def _build_sync(
+    session_id: str,
+    user_id: str,
+    current_input: str,
+    trace=None,
+) -> ConversationState:
     conversation_row = conversation_service.ensure_conversation(session_id, user_id)
     messages = conversation_service.load_window(session_id)
     current = summary_service.get_summary(session_id)

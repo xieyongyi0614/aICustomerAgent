@@ -27,6 +27,7 @@ async def lifespan(application: FastAPI):
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
     global _life_loop_task
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
+    observability.set_main_loop(asyncio.get_running_loop())
     if (
         get_settings().v2_memory_enabled
         or get_settings().v2_reflection_enabled

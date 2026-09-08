@@ -334,7 +334,9 @@ async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
         if interval_seconds is not None
         else get_settings().memory_reclaim_interval_seconds
     )
-    await run_worker_loop("memory reclaim loop", reclaim_expired_memories, interval)
+    await run_worker_loop(
+        "memory reclaim loop", reclaim_expired_memories, interval, offload=True
+    )
 
 
 def select_for_context(

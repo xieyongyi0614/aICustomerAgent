@@ -214,15 +214,17 @@ async def run_chat_pipeline(
 ) -> AsyncIterator[dict]:
     started = time.perf_counter()
     trace.user_id = user_id
-    world_ctx = world_engine.build_context(user_id, session_id, trace=trace)
+    world_ctx = await asyncio.to_thread(
+        world_engine.build_context, user_id, session_id, trace=trace
+    )
     state = await context_builder.build(session_id, user_id, content, trace=trace)
     trace.record("context_builder", (time.perf_counter() - started) * 1000)
 
-    scene_state = scene_service.load(session_id)
+    scene_state = await asyncio.to_thread(scene_service.load, session_id)
     current_turn = sum(1 for m in state.messages if m.role == "human") + 1
 
     goal_started = time.perf_counter()
-    selected_goal = _select_goal(state, scene_state, user_id)
+    selected_goal = await asyncio.to_thread(_select_goal, state, scene_state, user_id)
     trace.record("goal_selection", (time.perf_counter() - goal_started) * 1000)
 
     async def _timed(name: str, coro):
@@ -319,7 +321,9 @@ async def run_chat_pipeline(
         from app.repositories import relationship_milestone_repository
         from app.services.behavior_engine import RelationshipBehaviorContext
 
-        unlocks = relationship_milestone_repository.list_unlocks(state.user_id)
+        unlocks = await asyncio.to_thread(
+            relationship_milestone_repository.list_unlocks, state.user_id
+        )
         rel = state.relationship_state
         relationship_ctx = RelationshipBehaviorContext(
             stage=rel.stage,
@@ -396,7 +400,7 @@ async def run_chat_pipeline(
     if get_settings().action_enabled:
         from app.services.action.context import build_action_context
 
-        action_ctx = build_action_context(user_id, session_id)
+        action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
     try:
         async for token in answer_chain.astream(
             mode_decision.effective,
@@ -450,14 +454,19 @@ async def run_chat_pipeline(
         logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))
     else:
         logger.warning("模型输出为空")
-    ai_message_id = conversation_service.save_turn(
+    ai_message_id = await asyncio.to_thread(
+        conversation_service.save_turn,
         session_id,
         content,
         reply,
-        mode_write_back=mode_decision.effective if mode_decision.write_back else None,
+        mode_write_back=(
+            mode_decision.effective if mode_decision.write_back else None
+        ),
     )
     try:
-        conversation_service.reset_proactive_on_user_message(user_id)
+        await asyncio.to_thread(
+            conversation_service.reset_proactive_on_user_message, user_id
+        )
     except Exception:
         logger.exception("主动行为复位失败，不影响本轮对话")
     post_process_task = schedule_post_process(
