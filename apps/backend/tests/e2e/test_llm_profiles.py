@@ -86,6 +86,81 @@ def test_settings_rejects_duplicate_ids():
         Settings(llm_profiles_json=raw, default_llm_profile="dup")
 
 
+def test_settings_loads_profiles_from_file(tmp_path):
+    profiles_file = tmp_path / "profiles.json"
+    profiles_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "file-a",
+                    "label": "A",
+                    "base_url": "https://a.example/v1",
+                    "model": "m",
+                    "api_key": "k",
+                },
+                {
+                    "id": "file-b",
+                    "label": "B",
+                    "base_url": "https://b.example/v1",
+                    "model": "m",
+                    "api_key": "k",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        llm_profiles_json="",
+        llm_profiles_file=str(profiles_file),
+        default_llm_profile="file-a",
+    )
+    assert [p.id for p in settings.llm_profiles()] == ["file-a", "file-b"]
+    assert settings.get_llm_profile(None).id == "file-a"
+
+
+def test_llm_profiles_json_takes_priority_over_file(tmp_path):
+    profiles_file = tmp_path / "profiles.json"
+    profiles_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "file-a",
+                    "label": "A",
+                    "base_url": "https://a.example/v1",
+                    "model": "m",
+                    "api_key": "k",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        llm_profiles_json=json.dumps(
+            [
+                {
+                    "id": "inline",
+                    "label": "Inline",
+                    "base_url": "https://i.example/v1",
+                    "model": "m",
+                    "api_key": "k",
+                }
+            ]
+        ),
+        llm_profiles_file=str(profiles_file),
+        default_llm_profile="inline",
+    )
+    assert [p.id for p in settings.llm_profiles()] == ["inline"]
+
+
+def test_settings_rejects_missing_profiles_file(tmp_path):
+    with pytest.raises(SettingsError, match="不存在"):
+        Settings(
+            llm_profiles_json="",
+            llm_profiles_file=str(tmp_path / "missing.json"),
+            default_llm_profile="file-a",
+        )
+
+
 def test_get_llm_profile_lookup():
     settings = _make_settings()
     assert settings.get_llm_profile(None).id == "alpha"
