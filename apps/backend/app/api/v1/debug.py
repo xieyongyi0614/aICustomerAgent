@@ -1,8 +1,10 @@
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 
 from app.models.evaluation import EvaluationSubjectKind
+from app.models.relationship import RelationshipState
 from app.repositories import (
     conversation_repository,
     decision_repository,
@@ -19,6 +21,8 @@ from app.services.observability.metrics_aggregator import (
 from app.services.memory2 import attribution as memory2_attribution
 from app.services.reflection import attribution as reflection_attribution
 from app.services.trace_collector import get_trace_collector
+
+logger = logging.getLogger(__name__)
 
 debug_router = APIRouter()
 
@@ -498,12 +502,10 @@ def rollback_relationship(user_id: str, target_version: int):
             now=now,
         )
     except Exception:
-        pass
+        logger.exception("回滚前快照创建失败：%s", user_id)
     anchor = relationship_snapshot_repository.get_latest_before(user_id, target_version)
     if anchor is None:
         raise HTTPException(status_code=404, detail="无法定位 ≤ target_version 的关键帧")
-    from app.models.relationship import RelationshipState
-
     base_state = RelationshipState(
         intimacy=anchor.dimensions.get("intimacy", current.intimacy),
         trust=anchor.dimensions.get("trust", current.trust),

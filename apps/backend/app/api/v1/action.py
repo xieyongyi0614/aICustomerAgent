@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 
 from app.models.action import transition_action
-from app.repositories import action_repository
+from app.repositories import action_repository, outbox_repository
 
 action_router = APIRouter()
 
@@ -39,8 +39,6 @@ def get_action(record_id: str):
     if record is None:
         raise HTTPException(status_code=404, detail="action record 不存在")
     data = record.model_dump(mode="json")
-    from app.repositories import outbox_repository
-
     outbox = outbox_repository.get(record_id)
     data["outbox"] = (
         {
@@ -72,8 +70,6 @@ def retry_action(record_id: str):
         next_status = "executing"
     record.status = next_status
     record.attempt += 1
-    from datetime import timedelta
-
     record.next_retry_at = datetime.now() + timedelta(seconds=5)
     record.updated_at = datetime.now()
     action_repository.save_record(record)

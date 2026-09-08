@@ -17,6 +17,7 @@ from app.core.db import Memory, MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory2 import evaluator as memory_evaluator
 from app.services.memory2 import lifecycle as memory_lifecycle
+from app.services.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -187,18 +188,11 @@ def _active_contents(user_id: str) -> list[str]:
 
 
 def _same_topic(left: str, right: str) -> bool:
-    from app.services.memory_conflict import same_topic
-
     return same_topic(left, right)
 
 
 def _similarity(left: str, right: str) -> float:
-    from app.services.memory_conflict import _lcs_length
-
-    longer = max(len(left), len(right))
-    if longer == 0:
-        return 0.0
-    return _lcs_length(left, right) / longer
+    return _lcs_length(left, right) / max(len(left), len(right))
 
 
 def _create_command_candidate(user_id: str, *, action: str, object_text: str):

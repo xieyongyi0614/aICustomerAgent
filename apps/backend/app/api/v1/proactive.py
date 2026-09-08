@@ -1,12 +1,15 @@
 """V7 前端投递（action-queue.md §3）：Outbox + 轮询，ack 语义是"已展示"。"""
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.v1.schemas import ProactiveActionOut, ProactivePendingOut
 from app.core.settings import get_settings
-from app.repositories import proactive_repository
+from app.repositories import decision_repository, proactive_repository
+
+logger = logging.getLogger(__name__)
 
 proactive_router = APIRouter()
 
@@ -41,9 +44,7 @@ def ack(action_id: str):
     )
     if get_settings().observability_persist_enabled:
         try:
-            from app.repositories import decision_repository
-
             decision_repository.mark_outcome(action_id, "acked")
         except Exception:
-            pass
+            logger.exception("决策结果回写失败：%s", action_id)
     return {"id": action_id, "status": updated.status if updated else "acked"}

@@ -11,7 +11,7 @@ from sqlalchemy import func
 
 from app.core.db import LlmCallRecordRow, SessionLocal
 from app.core.settings import get_settings
-from app.models.observability import CallSite, LlmCallRecord
+from app.models.observability import CallSite, LlmCallRecord, estimate_cost
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,6 @@ def _from_model(record: LlmCallRecord, created_at: datetime) -> LlmCallRecordRow
 def _finalize_cost(record: LlmCallRecord) -> LlmCallRecord:
     if record.cost_estimate is not None:
         return record
-    from app.models.observability import estimate_cost
-
     cost = estimate_cost(record.model, record.input_tokens, record.output_tokens, get_settings().observability_llm_cost_table())
     if cost is None:
         return record
