@@ -687,13 +687,13 @@ def run_maintenance(user_id: str | None = None) -> int:
 
 async def run_world_maintenance_loop() -> None:
     """lifespan 常驻低频维护循环（H6）。"""
-    interval = get_settings().world_maintenance_interval_seconds
-    while True:
-        try:
-            run_maintenance()
-        except Exception:
-            logger.exception("世界维护循环异常，下轮重试")
-        await asyncio.sleep(interval)
+    from app.application.worker_loop import run_worker_loop
+
+    await run_worker_loop(
+        "world maintenance loop",
+        run_maintenance,
+        get_settings().world_maintenance_interval_seconds,
+    )
 
 
 def restore_snapshot(user_id: str, snapshot_id: str) -> World | None:

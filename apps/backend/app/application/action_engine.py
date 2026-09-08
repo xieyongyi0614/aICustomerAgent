@@ -282,15 +282,18 @@ def collect_facts(user_id: str) -> dict:
 
 async def run_action_retry_loop():
     """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划（action_enabled 门控）。"""
-    interval = get_settings().action_maintenance_interval_seconds
-    while True:
-        try:
-            if get_settings().action_enabled:
-                await _process_due_retries()
-                _expire_planned()
-        except Exception:
-            logger.exception("行动维护循环异常（双保险）")
-        await asyncio.sleep(interval)
+    from app.application.worker_loop import run_worker_loop
+
+    async def _tick():
+        if get_settings().action_enabled:
+            await _process_due_retries()
+            _expire_planned()
+
+    await run_worker_loop(
+        "action retry loop",
+        _tick,
+        get_settings().action_maintenance_interval_seconds,
+    )
 
 
 async def _process_due_retries():

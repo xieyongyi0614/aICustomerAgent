@@ -39,13 +39,16 @@ _supply_last: dict[str, datetime] = {}
 
 async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> None:
     """常驻循环：先 sleep 后 tick（对齐 v1 循环节奏），异常吞掉下轮继续。"""
-    interval = tick_seconds or get_settings().v2_life_loop_tick_seconds
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            await run_life_loop_tick(llm=llm)
-        except Exception:
-            logger.exception("life loop tick 异常，下轮继续")
+    from app.application.worker_loop import run_worker_loop
+
+    async def _tick():
+        await run_life_loop_tick(llm=llm)
+
+    await run_worker_loop(
+        "life loop worker",
+        _tick,
+        tick_seconds or get_settings().v2_life_loop_tick_seconds,
+    )
 
 
 async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:

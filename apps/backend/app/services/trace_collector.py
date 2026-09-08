@@ -103,6 +103,7 @@ class TraceStep:
 
 @dataclass
 class TurnTraceSession:
+    user_id: str | None = None
     role_mode: object | None = None
     analysis: object | None = None
     behavior_meta: dict | None = None
@@ -239,6 +240,14 @@ class TraceCollector:
                 return None
             turn_id = next(reversed(self._finished))
             return self._finished[turn_id]
+
+    def latest_for_user(self, user_id: str) -> TurnTraceSession | None:
+        with self._lock:
+            for turn_id in reversed(self._finished):
+                session = self._finished[turn_id]
+                if session.user_id == user_id:
+                    return session
+        return None
 
 
 _collector: TraceCollector | None = None

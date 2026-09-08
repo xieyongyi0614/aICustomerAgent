@@ -57,14 +57,18 @@ def prune_all() -> int:
 
 async def run_retention_loop() -> None:
     """lifespan 常驻低频清理：失败仅 log，下轮再清（V7.8-010）。"""
-    while True:
-        try:
-            pruned = prune_all()
-            if pruned:
-                logger.info("观测数据保留清理：%d 行", pruned)
-        except Exception:
-            logger.exception("观测数据保留清理失败，下轮重试")
-        await asyncio.sleep(get_settings().observability_cleanup_interval_hours * 3600)
+    from app.application.worker_loop import run_worker_loop
+
+    async def _tick():
+        pruned = prune_all()
+        if pruned:
+            logger.info("观测数据保留清理：%d 行", pruned)
+
+    await run_worker_loop(
+        "observability retention loop",
+        _tick,
+        get_settings().observability_cleanup_interval_hours * 3600,
+    )
 
 
 def _spawn(coro) -> None:

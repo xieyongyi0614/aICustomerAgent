@@ -213,6 +213,7 @@ async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
     started = time.perf_counter()
+    trace.user_id = user_id
     world_ctx = world_engine.build_context(user_id, session_id, trace=trace)
     state = await context_builder.build(session_id, user_id, content, trace=trace)
     trace.record("context_builder", (time.perf_counter() - started) * 1000)
@@ -228,7 +229,7 @@ async def run_chat_pipeline(
         step_started = time.perf_counter()
         try:
             result = await coro
-        except BaseException as exc:
+        except Exception as exc:
             trace.record(
                 name,
                 (time.perf_counter() - step_started) * 1000,
@@ -414,7 +415,7 @@ async def run_chat_pipeline(
             full_reply.append(token)
             yield {"kind": "token", "text": token}
     except ValueError as exc:
-        if "No generation chunks were returned" in str(exc):
+        if not full_reply:
             trace.record(
                 "llm",
                 (time.perf_counter() - llm_started) * 1000,

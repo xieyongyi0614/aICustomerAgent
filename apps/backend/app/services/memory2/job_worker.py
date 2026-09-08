@@ -49,12 +49,13 @@ def register_tick_hook(hook) -> None:
 
 
 async def run_job_worker_loop() -> None:
-    while True:
-        await asyncio.sleep(get_settings().v2_job_poll_interval)
-        try:
-            run_job_tick()
-        except Exception:
-            logger.exception("background job 轮次异常，继续下一轮")
+    from app.application.worker_loop import run_worker_loop
+
+    await run_worker_loop(
+        "memory job worker",
+        run_job_tick,
+        get_settings().v2_job_poll_interval,
+    )
 
 
 def run_job_tick(trace=None) -> dict:

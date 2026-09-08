@@ -27,7 +27,7 @@ async def stream_chat(
     try:
         async for event in run_chat_pipeline(session_id, user_id, content, llm, trace):
             yield event
-    except BaseException as exc:
+    except Exception as exc:
         trace.record(
             "llm",
             0.0,

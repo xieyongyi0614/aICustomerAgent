@@ -329,10 +329,13 @@ class TestFivePointTrace:
 
 class TestOfflineStats:
     def test_life_loop_stats_section(self, db_session_factory):
+        from datetime import datetime as _dt
+
         from app.services.offline_evaluator import _life_loop_stats
 
+        created_at = _dt.now()
         run = loop_run_repository.create_run(
-            user_id=USER, kind="autonomy", reason="due_trigger", now=NOW
+            user_id=USER, kind="autonomy", reason="due_trigger", now=created_at
         )
         loop_run_repository.finish_run(
             run.id,
@@ -340,7 +343,7 @@ class TestOfflineStats:
             steps=[{"step": "perception", "status": "ok"}, {"step": "decision", "status": "ok"}],
             llm_call_count=1,
             budget_state={"status": "ok"},
-            now=NOW,
+            now=created_at,
         )
         stats = _life_loop_stats(USER)
         assert stats["runs_total"] == 1
