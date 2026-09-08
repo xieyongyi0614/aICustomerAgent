@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
 from app.application import autonomy_worker, observability, world_engine
 from app.core.settings import get_settings
@@ -110,6 +111,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(api_router, prefix="/api/v1")
+    application.middleware("http")(chat_rate_limit_middleware)
     return application
 
 

@@ -7,6 +7,7 @@ import asyncio
 import logging
 
 from app.application import autonomy_engine
+from app.application.worker_loop import run_worker_loop
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,10 @@ async def run_autonomy_worker(tick_seconds: int | None = None, llm=None) -> None
     interval = (
         settings.autonomy_tick_seconds if tick_seconds is None else tick_seconds
     )
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            delivered = await autonomy_engine.tick(llm=llm)
-            if delivered:
-                logger.info("本轮主动消息：%d 条", len(delivered))
-        except Exception:
-            logger.exception("autonomy tick 失败，跳过本轮")
+
+    async def _tick():
+        delivered = await autonomy_engine.tick(llm=llm)
+        if delivered:
+            logger.info("本轮主动消息：%d 条", len(delivered))
+
+    await run_worker_loop("autonomy worker", _tick, interval)

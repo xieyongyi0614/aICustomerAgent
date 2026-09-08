@@ -327,17 +327,14 @@ def reclaim_expired_memories(now: datetime | None = None) -> int:
 
 
 async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
+    from app.application.worker_loop import run_worker_loop
+
     interval = (
         interval_seconds
         if interval_seconds is not None
         else get_settings().memory_reclaim_interval_seconds
     )
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            reclaim_expired_memories()
-        except Exception:
-            logger.exception("过期记忆回收循环异常，继续下一轮")
+    await run_worker_loop("memory reclaim loop", reclaim_expired_memories, interval)
 
 
 def select_for_context(

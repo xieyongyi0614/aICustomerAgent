@@ -256,7 +256,7 @@ async for token in answer_chain.astream(
 2. `prompt | model.bind(max_tokens=answer_max_tokens≈200)`
 3. 流式产出文本；记录 `prompt_builder` step；首 token 前记录 `first_token_ms`。
 4. 可观测：`prompt_capture` 采样快照（V7.8 M3）、`UsageCallbackHandler` 记录 tokens/usages、`llm` step 记耗时与状态。
-5. 空输出检测：`ValueError("No generation chunks were returned")` → 抛 `EmptyLLMResponseError`（返回明确错误提示）。
+5. 空输出检测：回答流零 token 产出（含 langchain `ValueError("No generation chunks were returned")`）→ 抛 `EmptyLLMResponseError`（返回明确错误提示）。
 
 回答完成后清空 `active_generations` 标记。
 

@@ -16,13 +16,13 @@ from app.services import history_service, state_service, trace_collector
 state_router = APIRouter()
 
 
-def _latest_mode() -> str | None:
-    conversation = history_service.find_latest_conversation(get_settings().default_user)
+def _latest_mode(user_id: str) -> str | None:
+    conversation = history_service.find_latest_conversation(user_id)
     return getattr(conversation, "mode", None)
 
 
-def _last_behavior_out() -> LastBehaviorOut | None:
-    session = trace_collector.get_trace_collector().latest()
+def _last_behavior_out(user_id: str) -> LastBehaviorOut | None:
+    session = trace_collector.get_trace_collector().latest_for_user(user_id)
     meta = session.behavior_meta if session is not None else None
     if not meta:
         return None
@@ -107,6 +107,6 @@ def get_state_snapshot(
             )
             for event in snapshot.relationship_events
         ],
-        mode=_latest_mode(),
-        last_behavior=_last_behavior_out(),
+        mode=_latest_mode(user_id),
+        last_behavior=_last_behavior_out(user_id),
     )
