@@ -13,7 +13,6 @@ from app.core.settings import get_settings
 from app.models.action import ActionIntent
 from app.repositories import conversation_repository, goal_repository
 from app.services import goal_observation, autonomy_policy
-from app.application.action_engine import run_action_planning
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +55,8 @@ async def attempt_current_step(goal, plan, now: datetime) -> dict:
     )
 
     try:
+        from app.application.action_engine import run_action_planning
+
         record = await run_action_planning(
             goal.user_id,
             intent,

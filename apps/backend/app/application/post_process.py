@@ -23,8 +23,6 @@ from app.services import (
     summary_service,
 )
 from app.application import world_engine
-from app.application.action_engine import run_action_planning as _run
-from app.chains.extractor_chain import extract_candidates
 from app.models.action import ActionIntent
 from app.models.memory import MemoryExtraction
 from app.repositories import memory_repository
@@ -197,6 +195,8 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
         f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
         for m in recent_turns
     )
+    from app.chains.extractor_chain import extract_candidates
+
     extraction = await extract_candidates(
         ctx.user_input,
         ctx.ai_reply,
@@ -341,6 +341,8 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             return
     started = time.perf_counter()
     try:
+        from app.application.action_engine import run_action_planning as _run
+
         selected_goal = ctx.selected_goal
         goal_id = None
         if selected_goal is not None:
