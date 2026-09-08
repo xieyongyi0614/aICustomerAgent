@@ -15,7 +15,7 @@ export const TRACE_POLL_MAX_FETCHES = 6
 const STATE_STALE_MS = 5_000
 const MEMORIES_STALE_MS = 10_000
 
-export function useCharacterState(userId = "default-user") {
+export function useCharacterState(userId: string) {
   return useQuery({
     queryKey: qk.state(userId),
     queryFn: () => fetchState(userId),
@@ -23,7 +23,7 @@ export function useCharacterState(userId = "default-user") {
   })
 }
 
-export function useMemories(userId = "default-user") {
+export function useMemories(userId: string) {
   return useQuery({
     queryKey: qk.memories(userId),
     queryFn: () => fetchMemories(userId),
