@@ -13,7 +13,6 @@ import type {
 } from '@/types/backend/chat-meta'
 import type {
   BehaviorDecision,
-  RoleMode,
   SceneIntentResult,
   SceneState,
   TurnAnalysis,
@@ -39,10 +38,6 @@ function asId(value: unknown): string | undefined {
   if (typeof value === 'string') return value
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   return undefined
-}
-
-export function toRoleMode(dto: RoleModeDto): RoleMode {
-  return dto
 }
 
 export function toTurnAnalysis(dto: TurnAnalysisDto): TurnAnalysis {
@@ -110,7 +105,7 @@ function parseTypedEvent(record: Record<string, unknown>): StreamEvent | null {
           : undefined
       return {
         type: 'turn_meta',
-        roleMode: toRoleMode(roleMode),
+        roleMode,
         analysis: toTurnAnalysis(analysis),
         sceneIntent,
         sceneState,

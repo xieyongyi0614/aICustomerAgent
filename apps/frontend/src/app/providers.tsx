@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 
 import { ensureMockRest, disableMockRest } from "@/mocks/mock-rest-bootstrap"
 import { getActiveApiMode } from "@/api/api-mode"
@@ -18,11 +18,13 @@ function createQueryClient() {
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createQueryClient)
 
-  if (getActiveApiMode() === "mock") {
-    void ensureMockRest()
-  } else {
-    void disableMockRest()
-  }
+  useEffect(() => {
+    if (getActiveApiMode() === "mock") {
+      void ensureMockRest()
+    } else {
+      void disableMockRest()
+    }
+  }, [])
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }

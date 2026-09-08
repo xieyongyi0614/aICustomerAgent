@@ -33,7 +33,6 @@ beforeEach(() => {
   useUiStore.setState({
     activeTab: "overview",
     selectedTurnId: null,
-    selectedStepName: null,
     highlightMessageId: null,
   })
   window.localStorage.clear()
