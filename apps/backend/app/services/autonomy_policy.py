@@ -14,6 +14,7 @@ from app.models.autonomy import (
     AutonomyVerdict,
     TriggerSignal,
 )
+from app.character.asuna.relationship_lexicon import INTENT_UNLOCK_REQUIREMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +175,6 @@ def _apply_relationship_rules(
             trigger=verdict.trigger,
         )
 
-    from app.character.asuna.relationship_lexicon import INTENT_UNLOCK_REQUIREMENTS
 
     required_unlock = INTENT_UNLOCK_REQUIREMENTS.get(intention)
     if required_unlock is not None and required_unlock not in unlocks:

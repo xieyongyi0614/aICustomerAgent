@@ -11,6 +11,7 @@ from app.models.observability import (
     StepLatencyStats,
     TraceKind,
 )
+from app.models.observability import MetricReport
 
 
 def percentile(values: list[float], ratio: float) -> float:
@@ -152,8 +153,6 @@ def build_metric_report(
     message_pairs,
     proactive_actions,
 ):
-    from app.models.observability import MetricReport
-
     return MetricReport(
         window_hours=window_hours,
         pipeline=build_pipeline_metrics(traces),

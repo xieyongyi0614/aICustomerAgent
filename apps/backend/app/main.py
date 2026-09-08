@@ -9,6 +9,17 @@ from app.api.v1.router import api_router
 from app.application import autonomy_worker, observability, world_engine
 from app.core.settings import get_settings
 from app.services import memory_service
+from app.application.action_engine import run_action_retry_loop
+from app.application.life_loop import run_life_loop_worker
+from app.services.development.audit import register_rollback_listener
+from app.services.development.policy import (
+    register_runtime as register_development_runtime,
+)
+from app.services.goal_planning import register_runtime as register_goal_runtime
+from app.services.memory2.job_worker import run_job_worker_loop
+from app.services.reflection.reflector import register_executor
+from app.services.reflection.triggers import register_with_job_worker
+from app.services.relationship_narrative import register_narrative_listener
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,32 +46,18 @@ async def lifespan(application: FastAPI):
         or get_settings().v2_relationship_evolved_enabled
         or get_settings().v2_autonomy_advanced_enabled
     ):
-        from app.services.memory2.job_worker import run_job_worker_loop
-
         _v2_job_worker_task = asyncio.create_task(run_job_worker_loop())
     if get_settings().v2_autonomy_advanced_enabled:
-        from app.services.goal_planning import register_runtime
-
-        register_runtime()
+        register_goal_runtime()
     if get_settings().v2_reflection_enabled:
-        from app.services.reflection.reflector import register_executor
-        from app.services.reflection.triggers import register_with_job_worker
-
         register_with_job_worker()
         register_executor()
     if get_settings().v2_development_enabled:
-        from app.services.development.audit import register_rollback_listener
-        from app.services.development.policy import register_runtime
-
-        register_runtime()
+        register_development_runtime()
         register_rollback_listener()
     if get_settings().v2_relationship_evolved_enabled:
-        from app.services.relationship_narrative import register_narrative_listener
-
         register_narrative_listener()
     if get_settings().v2_life_loop_enabled:
-        from app.application.life_loop import run_life_loop_worker
-
         _life_loop_task = asyncio.create_task(run_life_loop_worker())
         logging.getLogger(__name__).info("v2 life loop 已接管周期调度（归并 autonomy/world/action 三循环）")
     else:
@@ -73,8 +70,6 @@ async def lifespan(application: FastAPI):
                 world_engine.run_world_maintenance_loop()
             )
         if get_settings().action_enabled:
-            from app.application.action_engine import run_action_retry_loop
-
             _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
     if get_settings().observability_persist_enabled:
         _observability_cleanup_task = asyncio.create_task(
@@ -106,7 +101,6 @@ async def lifespan(application: FastAPI):
 
 
 def create_app() -> FastAPI:
-
     application = FastAPI(
         title="AI Customer Service Agent",
         lifespan=lifespan,

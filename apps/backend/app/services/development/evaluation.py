@@ -27,6 +27,13 @@ from app.services.evaluation_context import (
     DevelopmentSlice,
     DevelopmentStateRef,
 )
+from app.core.db import Memory, ReflectionRunRow, EvidenceLinkRow
+from app.models.memory import MemoryCandidate, MemoryExtraction
+from app.services.memory2 import evaluator as memory_evaluator, ingest as memory_ingest
+from app.services.reflection import (
+    lifecycle as reflection_lifecycle,
+    reflector as reflection_reflector,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +218,6 @@ def _seed_insight(
 
 def _compile_apply(user_id: str, insight_id: str) -> list[str]:
     """编译 + 仲裁落库；返回逐 key outcome（无提案为空表）。"""
-    from app.services.reflection import lifecycle as reflection_lifecycle
 
     insight = reflection_lifecycle.get_insight(insight_id)
     outcomes = []
@@ -243,7 +249,6 @@ def _run_compile_idempotent(session_factory, now) -> dict:
         confidence=0.8,
         created_at=now,
     )
-    from app.services.reflection import lifecycle as reflection_lifecycle
 
     insight = reflection_lifecycle.get_insight("ins-idem")
     compiled_first = development_policy.compile_insight(insight)
@@ -333,7 +338,6 @@ def _run_rebuttal_rollback(session_factory, now) -> dict:
     scenario_id = SCENARIO_REBUTTAL_ROLLBACK
     user_id = f"eval-{scenario_id}"
     failures: list[str] = []
-    from app.services.reflection import lifecycle as reflection_lifecycle
 
     _seed_insight(
         session_factory,
@@ -525,7 +529,6 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
         failures.append("周期 2 调制幅度未演化")
     failures.extend(_audit_chain(session_factory, user_id, insight2))
 
-    from app.services.reflection import lifecycle as reflection_lifecycle
 
     invalidated = reflection_lifecycle.observe_negation(
         user_id, "mem-rebuttal", REBUTTAL_CONTENT
@@ -548,7 +551,6 @@ def _seed_cluster(session_factory, user_id, contents, now):
     """确定性伪语义簇：全部成员共享同一向量（单簇聚类）+ 时间跨度满足证据门槛。"""
     import json as _json
 
-    from app.core.db import Memory
 
     with session_factory() as session:
         for index, content in enumerate(contents):
@@ -586,9 +588,6 @@ def _fake_vector(text: str) -> list[float]:
 
 
 def _grow_reflect_once(session_factory, user_id, now, statement) -> str | None:
-    from app.core.db import InsightRow, ReflectionRunRow
-    from app.services.reflection import reflector as reflection_reflector
-
     run_id = f"run-{user_id}-{int(now.timestamp())}-{len(statement)}"
     with session_factory() as session:
         session.add(
@@ -627,9 +626,6 @@ def _grow_new_experience(session_factory, user_id, now):
     import asyncio
     import json as _json
 
-    from app.models.memory import MemoryCandidate, MemoryExtraction
-    from app.services.memory2 import evaluator as memory_evaluator
-    from app.services.memory2 import ingest as memory_ingest
 
     extraction = MemoryExtraction(
         candidates=[
@@ -656,8 +652,6 @@ def _grow_new_experience(session_factory, user_id, now):
     if missing:
         return
     with session_factory() as session:
-        from app.core.db import Memory
-
         rows = session.query(Memory).filter(Memory.user_id == user_id).all()
         for row in rows:
             if row.embedding is None:
@@ -666,8 +660,6 @@ def _grow_new_experience(session_factory, user_id, now):
 
 
 def _active_memory_contents(session_factory, user_id) -> list[str]:
-    from app.core.db import Memory
-
     with session_factory() as session:
         rows = (
             session.query(Memory)
@@ -679,7 +671,6 @@ def _active_memory_contents(session_factory, user_id) -> list[str]:
 
 def _audit_chain(session_factory, user_id, insight_id) -> list[str]:
     """归因链审计：memory→evidence_links→insight→development_changes→state。"""
-    from app.core.db import EvidenceLinkRow, Memory
 
     failures: list[str] = []
     with session_factory() as session:
@@ -721,8 +712,6 @@ def _audit_chain(session_factory, user_id, insight_id) -> list[str]:
 
 
 def _insight_confidences(session_factory, insight_ids) -> tuple:
-    from app.core.db import InsightRow
-
     with session_factory() as session:
         rows = session.query(InsightRow).filter(InsightRow.id.in_(list(insight_ids))).all()
         by_id = {row.id: row.confidence for row in rows}
@@ -730,8 +719,6 @@ def _insight_confidences(session_factory, insight_ids) -> tuple:
 
 
 def _insight_superseded_by(session_factory, insight_id) -> str | None:
-    from app.core.db import InsightRow
-
     with session_factory() as session:
         row = session.get(InsightRow, insight_id)
         return row.superseded_by if row is not None else None

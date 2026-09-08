@@ -5,12 +5,16 @@ relationship_state 数值（domain-boundaries §3）。各源返回的实体交�
 幂等键（source_table+source_id）天然安全，重复补扫不会重复产出候选。
 """
 
-from app.repositories import relationship_event_repository, world_repository
+from app.repositories import (
+    relationship_event_repository,
+    world_repository,
+    action_repository,
+    relationship_milestone_repository,
+)
 
 
 def fetch_action_records(user_id: str, limit: int = 20) -> list:
     """最近终态（succeeded/failed）ActionRecord；deposit 判定由 ingest 层负责。"""
-    from app.repositories import action_repository
 
     records = action_repository.list_records(user_id, limit=limit)
     return [r for r in records if r.status in ("succeeded", "failed")]
@@ -31,6 +35,5 @@ def fetch_relationship_events(user_id: str, limit: int = 50) -> list:
 
 def fetch_recent_relationship_milestones(user_id: str, limit: int = 10) -> list:
     """最近 RelationshipMilestone（读里程碑表投影，不看 state 数值）。"""
-    from app.repositories import relationship_milestone_repository
 
     return relationship_milestone_repository.list_milestones(user_id)[:limit]

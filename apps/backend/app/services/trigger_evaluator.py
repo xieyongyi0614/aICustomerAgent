@@ -10,6 +10,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.autonomy import TriggerSignal
+from app.repositories import trigger_registry_repository, world_repository
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,6 @@ def register_followup(
             "summary": summary,
         }
     if get_settings().v2_life_loop_enabled:
-        from app.repositories import trigger_registry_repository
-
         try:
             trigger_registry_repository.register(
                 user_id=user_id,
@@ -67,7 +66,6 @@ def find_followup_event(content: str) -> str | None:
 
 def _poll_due_followup_registry(user_id: str, now: datetime) -> TriggerSignal | None:
     """LIFE-001 表通道：领取到期 followup（pending→due→fired→done 一次性消费）。"""
-    from app.repositories import trigger_registry_repository
 
     rows = trigger_registry_repository.claim_due_followups(user_id, now=now)
     if not rows:
@@ -132,7 +130,6 @@ def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
     """
     if not get_settings().action_enabled:
         return None
-    from app.repositories import world_repository
 
     try:
         world = world_repository.get_world(user_id)
@@ -148,8 +145,6 @@ def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
             if (event.payload or {}).get("reported_by_autonomy"):
                 continue
             if get_settings().v2_life_loop_enabled:
-                from app.repositories import trigger_registry_repository
-
                 try:
                     claimed = trigger_registry_repository.register_and_claim(
                         user_id=user_id,
@@ -188,7 +183,6 @@ def mark_action_reported(user_id: str, event_id: str) -> None:
     """到期行动已由自治汇报过：置 world 事件 payload.reported_by_autonomy（幂等）。"""
     if not get_settings().action_enabled:
         return
-    from app.repositories import world_repository
 
     try:
         world = world_repository.get_world(user_id)
@@ -204,8 +198,6 @@ def mark_action_reported(user_id: str, event_id: str) -> None:
             event.updated_at = now
             world_repository.save_event(event)
             if get_settings().v2_life_loop_enabled:
-                from app.repositories import trigger_registry_repository
-
                 try:
                     trigger_registry_repository.complete(
                         f"action_due:{event_id}", now=now
@@ -249,8 +241,6 @@ def evaluate_inactivity(
     if dedupe_key in seen_keys:
         return None
     if get_settings().v2_life_loop_enabled:
-        from app.repositories import trigger_registry_repository
-
         try:
             claimed = trigger_registry_repository.register_and_claim(
                 user_id=user_id,

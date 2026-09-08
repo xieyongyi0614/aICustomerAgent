@@ -10,6 +10,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.action import TERMINAL_STATUSES
+from app.repositories import action_repository
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +98,6 @@ def build_action_context(user_id: str, session_id: str | None = None) -> ActionC
     if not settings.action_enabled:
         return None
     try:
-        from app.repositories import action_repository
-
         records = action_repository.list_records(user_id, limit=20)
         if not records:
             return None

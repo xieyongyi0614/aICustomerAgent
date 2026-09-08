@@ -22,6 +22,7 @@ from app.models.behavior_strategy import (
 )
 from app.models.scene import SceneContext
 from app.services import habit_runtime
+from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +222,6 @@ def _degraded_directive(analysis=None) -> BehaviorDirective:
     fallback = None
     if analysis is not None:
         behavior = getattr(getattr(analysis, "behavior", None), "behavior", "normal_reply")
-        from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
 
         fallback = BEHAVIOR_INSTRUCTIONS.get(
             behavior, BEHAVIOR_INSTRUCTIONS["normal_reply"]
@@ -477,5 +477,3 @@ def observe_budget(reply: str, budget) -> dict:
         "contact_violated": contact_violated,
         "violated": action_violated or contact_violated,
     }
-
-

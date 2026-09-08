@@ -21,7 +21,11 @@ from app.repositories import (
     relationship_event_repository,
     relationship_milestone_repository,
 )
-from app.services import relationship_narrative, relationship_shared
+from app.services import (
+    relationship_narrative,
+    relationship_shared,
+    relationship_patterns,
+)
 from app.services.context_builder import _select_shared_entries
 from app.services.evaluation_context import (
     EvaluationContext,
@@ -34,6 +38,9 @@ from app.services.evaluation_rules.relationship import (
     NarrativeMilestoneProvenanceRule,
 )
 from app.services.memory2 import ingest
+from app.core.db import BackgroundJobRow, MemoryCandidateRow
+from app.models.conversation import ConversationState
+from app.services.development import aggregate
 
 NARRATIVE_PREFIX = "narrative:"
 
@@ -182,7 +189,6 @@ def build_db_report() -> dict:
 
 def _claim_pending_jobs() -> None:
     """模拟 job_worker 认领：pending → running（handler 只处理 running 载荷）。"""
-    from app.core.db import BackgroundJobRow
 
     with SessionLocal() as session:
         rows = (
@@ -247,8 +253,6 @@ def _seed_event(
 
 
 def _run_provenance_complete(now: datetime) -> dict:
-    from app.core.db import MemoryCandidateRow
-
     user = "rel-eval-prov"
     _seed_insight("ins-eval-prov", user, "我们熬夜一起赶工了一个通宵", now)
     relationship_narrative.on_insight_created(
@@ -382,7 +386,6 @@ def _run_pattern_injection_ablation(now: datetime) -> dict:
     user_with = "rel-eval-pat-a"
     user_without = "rel-eval-pat-b"
     _seed_insight("ins-eval-pat", user_with, "他更愿意在深夜向我倾诉", now)
-    from app.services.development import aggregate
 
     aggregate.upsert_modulation(
         user_id=user_with,
@@ -434,14 +437,10 @@ def _run_milestone_flood(now: datetime) -> dict:
 
 
 def relationship_patterns_read(user_id: str):
-    from app.services import relationship_patterns
-
     return relationship_patterns.read_relationship_patterns(user_id)
 
 
 def _state_with(entries=None, patterns=None):
-    from app.models.conversation import ConversationState
-
     return ConversationState(
         session_id="s",
         user_id="u",

@@ -14,6 +14,7 @@ from app.models.observability import (
     deterministic_sample,
     new_record_id,
 )
+from app.core.logutils import content_preview
 
 SECTION_MARKERS: tuple[tuple[str, str], ...] = (
     ("emotion", "【角色当前情绪】"),
@@ -54,8 +55,6 @@ def _role_of(message) -> str:
 
 
 def _redact(content: str) -> str:
-    from app.core.logutils import content_preview
-
     if not get_settings().observability_prompt_redact:
         return content
     if not content:

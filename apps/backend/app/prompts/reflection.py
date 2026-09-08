@@ -5,6 +5,8 @@
 LLM 无权：决定 confidence 终值（代码按证据强度折算）、直写其他域、修改证据。
 """
 
+from app.core.settings import get_settings
+
 REFLECTION_SYSTEM_PROMPT = """你是角色的反思引擎：从一组已沉淀的记忆证据中形成关于用户的认知（Insight）。
 
 判定原则：
@@ -43,8 +45,6 @@ def build_evidence_block(window, max_members: int, content_chars: int) -> tuple[
 
 
 def build_reflection_messages(window) -> list[tuple[str, str]]:
-    from app.core.settings import get_settings
-
     settings = get_settings()
     evidence_block, _provided = build_evidence_block(
         window,

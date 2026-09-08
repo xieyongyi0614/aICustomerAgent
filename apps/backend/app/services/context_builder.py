@@ -10,12 +10,18 @@ from app.models.conversation import ConversationState
 from app.models.reflection import InsightSummary
 from app.models.relationship import RelationshipState
 from app.prompts.builder import SHARED_EXPERIENCE_HEADER, SHARED_EXPERIENCE_NOTE
-from app.services import conversation_service
+from app.services import (
+    conversation_service,
+    relationship_shared,
+    relationship_patterns,
+)
 from app.services import goal_service
 from app.services import memory_service
 from app.services import state_service
 from app.services import summary_service
 from app.services.memory2 import retriever as memory2_retriever
+from app.services.development import aggregate as development_aggregate
+from app.services.reflection import lifecycle as reflection_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +90,6 @@ def _load_context_insights(
     if not settings.v2_reflection_enabled:
         return [], {}
     try:
-        from app.services.reflection import lifecycle as reflection_lifecycle
-
         candidates = reflection_lifecycle.list_active_insights(
             user_id,
             "asuna",
@@ -177,8 +181,6 @@ def _load_shared_experiences(
 ) -> tuple[list, dict]:
     """REL-002：共同经历投影 → 选材；投影异常一律降级为空段（fail-safe）。"""
     try:
-        from app.services import relationship_shared
-
         collected = relationship_shared.collect_shared_experiences(user_id)
     except Exception:
         logger.exception("共同经历投影失败，段降级为空")
@@ -189,8 +191,6 @@ def _load_shared_experiences(
 def _load_relationship_patterns(user_id: str, trace=None) -> tuple[list, dict]:
     """REL-003：关系模式读取（双闸 Flag 在服务内）+ trace；异常降级为空。"""
     try:
-        from app.services import relationship_patterns
-
         patterns, payload = relationship_patterns.read_relationship_patterns(user_id)
     except Exception:
         logger.exception("关系模式读取失败，本轮回退无注入")
@@ -267,15 +267,13 @@ def _build_sync(
     ]
     development_overlay = None
     if get_settings().v2_development_enabled:
-        from app.services.development import aggregate as development_aggregate
-
         development_overlay = development_aggregate.read_overlay(user_id)
     shared_experiences: list = []
     if get_settings().v2_relationship_evolved_enabled:
         shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
-        relationship_patterns, _ = _load_relationship_patterns(user_id, trace=trace)
+        relationship_pattern_list, _ = _load_relationship_patterns(user_id, trace=trace)
     else:
-        relationship_patterns: list = []
+        relationship_pattern_list: list = []
     mode = getattr(conversation_row, "mode", None) or "default"
     mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(
@@ -291,7 +289,7 @@ def _build_sync(
         insights=insights,
         development_overlay=development_overlay,
         shared_experiences=shared_experiences,
-        relationship_patterns=relationship_patterns,
+        relationship_patterns=relationship_pattern_list,
         mode=mode,
         mode_entered_at=mode_entered_at,
     )

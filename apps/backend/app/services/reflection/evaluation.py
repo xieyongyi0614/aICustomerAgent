@@ -12,11 +12,18 @@
 import logging
 from datetime import datetime, timedelta
 
-from app.core.db import EvidenceLinkRow, InsightRow, Memory, ReflectionRunRow, SessionLocal
+from app.core.db import (
+    EvidenceLinkRow,
+    InsightRow,
+    Memory,
+    ReflectionRunRow,
+    SessionLocal,
+)
 from app.core.settings import get_settings
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector as reflection_reflector
 from app.services.reflection import triggers as reflection_triggers
+from app.models.reflection import InsightDraft, ReflectionProposal
 
 logger = logging.getLogger(__name__)
 
@@ -324,8 +331,6 @@ def _result(scenario_id: str, failures: list[str], stats: dict) -> dict:
 
 
 def _active_memory_ids(session_factory, user_id) -> list[tuple[str]]:
-    from app.core.db import Memory
-
     with session_factory() as session:
         rows = (
             session.query(Memory.id)
@@ -409,8 +414,6 @@ def _judge_one(insight: dict, session_factory, judge_stub) -> float:
 
 
 def _fatigue_proposal():
-    from app.models.reflection import InsightDraft, ReflectionProposal
-
     return ReflectionProposal(
         insights=[
             InsightDraft(
@@ -426,8 +429,6 @@ def _fatigue_proposal():
 
 
 def _under_referenced_proposal():
-    from app.models.reflection import InsightDraft, ReflectionProposal
-
     return ReflectionProposal(
         insights=[
             InsightDraft(

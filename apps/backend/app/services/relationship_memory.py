@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from app.character.asuna.relationship_lexicon import MEMORY_TEMPLATES
 from app.models.relationship import MilestoneRecord
+from app.repositories import memory_repository
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,6 @@ def to_memory_candidates(
 
 def deliver_candidates(candidates: list[MemoryCandidate], user_id: str) -> int:
     """投递既有 memory 仓储；失败不回滚演化（只降级）。"""
-    from app.repositories import memory_repository
 
     delivered = 0
     for candidate in candidates:

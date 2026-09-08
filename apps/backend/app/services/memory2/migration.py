@@ -11,6 +11,8 @@ from datetime import datetime
 
 from app.core.db import Memory, SessionLocal
 from app.services.memory2.types import LEGACY_TYPE_ALIASES
+from app.services import memory_service
+from app.services.memory2 import retriever
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +48,6 @@ def collect_report() -> dict:
 
 
 def _verify() -> dict:
-    from app.services import memory_service
-    from app.services.memory2 import retriever
-
     return {
         "remaining_rows": collect_report()["pending_rows"],
         "alias_mapping_ok": LEGACY_TYPE_ALIASES.get(LEGACY_TYPE) == TARGET_TYPE,

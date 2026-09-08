@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS_V85, BEHAVIOR_DELTAS
 from app.core.settings import get_settings
 from app.models.relationship import (
     InteractionSignal,
@@ -16,6 +16,7 @@ from app.models.relationship import (
     RelationshipEvent,
     RelationshipState,
 )
+from app.services.state_engine import build_relationship_impact, next_stage
 
 DEFAULT_CONFLICT_BASELINE_PENALTY = 0.10
 
@@ -203,8 +204,6 @@ def evolve(
     window: tuple[tuple[str, str], ...] = (),
 ) -> tuple[RelationshipState, EvolutionOutcome]:
     """信号 → 事件 → 动力学 → 限速 → clamp（纯函数）；同事务落库由调用方完成。"""
-    from app.core.constants import BEHAVIOR_DELTAS
-    from app.services.state_engine import build_relationship_impact, next_stage
 
     event_delta = build_relationship_impact(event_type, magnitude)
     behavior_delta = BEHAVIOR_DELTAS.get(behavior, RelationshipDelta())
@@ -281,7 +280,6 @@ def replay(state: RelationshipState, events: list[Any]) -> RelationshipState:
 
     事件 impact 为实际生效值（含 system 结算），直接前向应用。
     """
-    from app.services.state_engine import next_stage
 
     current = state
     for event in events:

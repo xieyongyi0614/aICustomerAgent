@@ -12,6 +12,7 @@ from app.models.evaluation import (
 )
 from app.services.evaluation_context import EvaluationContext
 from app.services.evaluation_rules import EvaluationRule
+from app.services.reflection.reflector import confidence_ceiling
 
 
 class NoEvidenceLinkRule(EvaluationRule):
@@ -64,7 +65,6 @@ class ConfidenceOverCalibratedRule(EvaluationRule):
     def evaluate(self, ctx: EvaluationContext) -> Issue | None:
         if ctx.reflection is None:
             return None
-        from app.services.reflection.reflector import confidence_ceiling
 
         for insight in ctx.reflection.insights:
             if insight.status != "active" or insight.evidence_count <= 0:

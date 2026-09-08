@@ -18,6 +18,8 @@ from app.services.memory_conflict import (
     resolve_batch,
 )
 from app.services.memory_policy import apply_policy
+from app.application.worker_loop import run_worker_loop
+from app.services import trigger_evaluator
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +105,6 @@ def _register_followups(user_id: str, saved) -> None:
     """V7-010：带时间语义的事件记忆 → scheduled_followup 登记（内存，丢失可接受）。"""
     from datetime import datetime, timedelta
 
-    from app.services import trigger_evaluator
 
     now = datetime.now()
     for memory in saved:
@@ -327,8 +328,6 @@ def reclaim_expired_memories(now: datetime | None = None) -> int:
 
 
 async def run_memory_reclaim_loop(interval_seconds: int | None = None) -> None:
-    from app.application.worker_loop import run_worker_loop
-
     interval = (
         interval_seconds
         if interval_seconds is not None

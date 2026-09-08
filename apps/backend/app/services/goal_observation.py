@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from app.core.settings import get_settings
 from app.models.goal import SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services import goal_planning, goal_arbitration
+from app.services.memory2 import ingest as memory_ingest
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,6 @@ def _save_progress(plan_id: str, specs: list[SubGoalSpec], now: datetime) -> Non
 
 def _record_lifecycle(record, decision: str, reason: str, goal_id: str) -> None:
     """终态/挂起转换的 lifecycle 归因（不变量 2；委托仲裁器公共入口）。"""
-    from app.services import goal_arbitration
 
     try:
         goal_arbitration.record_goal_lifecycle(
@@ -131,7 +131,6 @@ def _record_lifecycle(record, decision: str, reason: str, goal_id: str) -> None:
 def _complete(goal) -> dict:
     record = goal_repository.complete_goal(goal.id)
     _record_lifecycle(record or goal, "completed", "计划步骤全部完成", goal.id)
-    from app.services.memory2 import ingest as memory_ingest
 
     try:
         memory_ingest.ingest_from_goal_completion(

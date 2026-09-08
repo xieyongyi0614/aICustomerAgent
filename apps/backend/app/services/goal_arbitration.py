@@ -15,6 +15,8 @@ from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
 from app.repositories import goal_repository
 from app.services.development import aggregate as development_aggregate
+from app.application import observability
+from app.services import state_service
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +62,6 @@ def record_goal_lifecycle(record, decision: str, reason: str, snapshot: dict) ->
 
 
 def _record_lifecycle(record, decision: str, reason: str, snapshot: dict) -> None:
-    from app.application import observability
-
     try:
         observability.on_decision(
             DecisionRecord(
@@ -176,8 +176,6 @@ def arbitrate_user(user_id: str, now: datetime) -> dict:
 
 def _relationship_params(user_id: str) -> dict:
     try:
-        from app.services import state_service
-
         character, relationship = state_service.load_states(user_id)
         return {
             "tension": relationship.tension,

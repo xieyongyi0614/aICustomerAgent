@@ -23,6 +23,20 @@ from app.services import (
     summary_service,
 )
 from app.application import world_engine
+from app.application.action_engine import run_action_planning as _run
+from app.chains.extractor_chain import extract_candidates
+from app.models.action import ActionIntent
+from app.models.memory import MemoryExtraction
+from app.repositories import memory_repository
+from app.services.memory2 import (
+    commands as memory_commands,
+    ingest as memory_ingest,
+    sources as memory_sources,
+    evaluator as memory_evaluator,
+    lifecycle as memory_lifecycle,
+)
+from app.services.reflection import triggers as reflection_triggers
+from app.services.reflection.lifecycle import observe_negation
 
 logger = logging.getLogger(__name__)
 
@@ -173,15 +187,10 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
     ActionRecord/完结 WorldEvent/RelationshipEvent 在本轮后续步骤（world/action）才产生，
     故来源候选由幂等键跨轮收敛——重复补扫不会重复产出。
     """
-    from app.services.memory2 import commands as memory_commands
 
     outcome = await memory_commands.handle(ctx.user_id, ctx.user_input, trace=ctx.trace)
     if outcome != memory_commands.OUTCOME_MISS:
         return
-    from app.chains.extractor_chain import extract_candidates
-    from app.services.memory2 import ingest as memory_ingest
-    from app.services.memory2 import sources as memory_sources
-    from app.models.memory import MemoryExtraction
 
     recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
     recent_context = "\n".join(
@@ -236,16 +245,12 @@ async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
     接线 REF-005：对本轮 approve 且 source_ref.relation=negate 的转正记忆触发
     Insight 失效匹配（MEM-005/Memory 侧 contradicts 并存语义零修改）。
     """
-    from app.services.memory2 import evaluator as memory_evaluator
 
     decisions = await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
 
     if not get_settings().v2_reflection_enabled:
         return
     try:
-        from app.services.memory2 import lifecycle as memory_lifecycle
-        from app.services.reflection import triggers as reflection_triggers
-
         flushed_ids = memory_lifecycle.flush_reinforce_buffer(trace=ctx.trace)
         if flushed_ids:
             reflection_triggers.observe_reinforce(ctx.user_id, flushed_ids, trace=ctx.trace)
@@ -258,9 +263,6 @@ async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
 
 
 def _observe_negations(ctx: PostProcessContext, decisions) -> None:
-    from app.repositories import memory_repository
-    from app.services.reflection.lifecycle import observe_negation
-
     approved_ids = [
         decision.memory_id
         for decision in decisions
@@ -327,7 +329,6 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
     """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。"""
     if not get_settings().action_enabled:
         return
-    from app.models.action import ActionIntent
 
     action_intent = ctx.action_intent
     if action_intent is None:
@@ -340,8 +341,6 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             return
     started = time.perf_counter()
     try:
-        from app.application.action_engine import run_action_planning as _run
-
         selected_goal = ctx.selected_goal
         goal_id = None
         if selected_goal is not None:

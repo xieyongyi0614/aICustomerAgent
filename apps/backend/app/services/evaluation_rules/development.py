@@ -12,6 +12,7 @@ from app.models.evaluation import (
 )
 from app.services.evaluation_context import EvaluationContext
 from app.services.evaluation_rules import EvaluationRule
+from app.core.settings import get_settings
 
 
 class ChangeUnattributedRule(EvaluationRule):
@@ -72,7 +73,6 @@ class OverCapRule(EvaluationRule):
     def evaluate(self, ctx: EvaluationContext) -> Issue | None:
         if ctx.development is None:
             return None
-        from app.core.settings import get_settings
 
         settings = get_settings()
         for state in ctx.development.active_states:

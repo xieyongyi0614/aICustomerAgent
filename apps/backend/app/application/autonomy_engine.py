@@ -12,7 +12,12 @@ from datetime import datetime, timedelta
 from app.core.settings import get_settings
 from app.application import observability, world_engine
 from app.models.autonomy import ProactiveAction, TriggerSignal
-from app.models.observability import DecisionKind, DecisionRecord, TraceKind, bound_extra
+from app.models.observability import (
+    DecisionKind,
+    DecisionRecord,
+    TraceKind,
+    bound_extra,
+)
 from app.repositories import (
     conversation_repository,
     goal_repository,
@@ -27,6 +32,12 @@ from app.services import (
     trigger_evaluator,
 )
 from app.services.trace_collector import TurnTraceSession, get_trace_collector
+from app.application.action_engine import collect_facts, run_action_planning
+from app.application.chat_pipeline import active_generations
+from app.character.asuna.action import PROACTIVE_ACTION_MAP
+from app.models.action import ActionIntent
+from app.repositories import action_repository, relationship_milestone_repository
+from app.services import relationship_patterns as relationship_pattern_service
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +46,6 @@ _ACTION_FACTS_CACHE: dict[str, dict] = {}
 
 
 def _collect_action_facts(user_id: str) -> dict:
-    from app.application.action_engine import collect_facts
-
     if not get_settings().action_enabled:
         _ACTION_FACTS_CACHE.pop(user_id, None)
         return {}
@@ -55,8 +64,6 @@ def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
 
 
 def _autonomy_action_today(user_id: str, now: datetime) -> int:
-    from app.repositories import action_repository
-
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     records = action_repository.list_records(user_id, limit=200)
     return sum(
@@ -73,9 +80,6 @@ async def _produce_autonomy_action(
     settings = get_settings()
     if not settings.autonomy_action_enabled:
         return False
-    from app.character.asuna.action import PROACTIVE_ACTION_MAP
-    from app.application.action_engine import run_action_planning
-    from app.models.action import ActionIntent
 
     action_type = PROACTIVE_ACTION_MAP.get(verdict.intention or "")
     if action_type is None:
@@ -109,9 +113,6 @@ def _session_tail(messages, now: datetime) -> trigger_evaluator.SessionTail:
 def _snapshot_for(
     user_id: str, session_id: str, now: datetime, episode_start: datetime
 ):
-    from app.application.chat_pipeline import active_generations
-    from app.repositories import relationship_milestone_repository
-
     character, relationship = state_service.load_states(user_id)
     scene_state = scene_service.load(session_id)
     goals = [
@@ -141,8 +142,6 @@ def _snapshot_for(
         unlocks = ()
     relationship_patterns: tuple[str, ...] = ()
     try:
-        from app.services import relationship_patterns as relationship_pattern_service
-
         patterns, _ = relationship_pattern_service.read_relationship_patterns(user_id)
         relationship_patterns = tuple(pattern.key for pattern in patterns)
     except Exception:

@@ -36,6 +36,11 @@ from app.repositories import (
     memory_repository,
 )
 from app.services.development import aggregate as development_aggregate
+from app.application import observability
+from app.models.observability import TraceKind
+from app.services import relationship_patterns as relationship_pattern_service
+from app.services.memory2 import job_worker
+from app.services.trace_collector import TurnTraceSession
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +113,6 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
             )
 
     try:
-        from app.services import relationship_patterns as relationship_pattern_service
-
         patterns, _ = relationship_pattern_service.read_relationship_patterns(user_id)
     except Exception:
         logger.exception("关系模式读取失败，供给来源跳过")
@@ -231,7 +234,6 @@ def run_planning_jobs() -> int:
 
 def register_runtime() -> None:
     """Flag ON 编排层注册：job handler（规划本体）。"""
-    from app.services.memory2 import job_worker
 
     job_worker.register_job_type(JOB_TYPE_PLANNING, run_planning_jobs)
 
@@ -303,9 +305,6 @@ def _ask_llm_with_retry(messages: list[tuple], settings) -> PlanningProposal:
 
 
 def _persist_trace(trace, user_id: str) -> None:
-    from app.application import observability
-    from app.models.observability import TraceKind
-
     try:
         observability.on_turn_finished(
             trace,
@@ -326,7 +325,6 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
     attempts==max 时放行一次；幂等键保证该请求至多发出一次）。重规划成功后
     failed→active 复活（AUT-004 状态机的 failed→active 边）。
     """
-    from app.services.trace_collector import TurnTraceSession
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:

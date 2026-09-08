@@ -27,6 +27,7 @@ from app.services.reflection.lifecycle import (
     STATUS_ACTIVE,
     transition,
 )
+from app.services.memory2 import job_worker as memory2_job_worker
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,6 @@ _REVIEW_BELOW_CONFIDENCE = "below_min_confidence"
 
 def register_executor() -> None:
     """reflection_run 任务执行 handler 注册（main lifespan Flag ON 时调用）。"""
-    from app.services.memory2 import job_worker as memory2_job_worker
 
     memory2_job_worker.register_job_type("reflection_run", run_queued_reflections)
 

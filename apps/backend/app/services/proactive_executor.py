@@ -18,6 +18,8 @@ from app.repositories import goal_repository, proactive_repository
 from app.services import conversation_service, trigger_evaluator
 from app.services.autonomy_policy import in_quiet_hours
 from app.services.trace_collector import TurnTraceSession
+from app.application.chat_pipeline import active_generations
+from app.services.evaluation_engine import schedule_proactive_evaluation
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +34,6 @@ def _mark_outcome(action_id: str, outcome: str) -> None:
 def _recheck_failed_reason(
     action: ProactiveAction, user_id: str, session_id: str, now: datetime
 ) -> str | None:
-    from app.application.chat_pipeline import active_generations
-
     settings = get_settings()
     if active_generations.get(user_id):
         return "generating"
@@ -191,8 +191,6 @@ def _schedule_evaluation(delivered, llm) -> None:
     if delivered is None:
         return
     try:
-        from app.services.evaluation_engine import schedule_proactive_evaluation
-
         schedule_proactive_evaluation(delivered, llm)
     except Exception:
         logger.exception("主动行为评估调度失败，不影响发送链路")
