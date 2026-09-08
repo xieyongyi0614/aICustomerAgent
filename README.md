@@ -71,7 +71,7 @@ npm run dev                 # http://localhost:2000，/api 代理到 :8020（VIT
 ## 测试
 
 ```bash
-# 后端（apps/backend/ 下；全量约 858 项，无本地 PG 实例时迁移一致性用例自动 skip）
+# 后端（apps/backend/ 下；全量 2195 项 / 16 skipped，无本地 PG 实例时迁移一致性用例自动 skip）
 uv run pytest
 uv run pylint app tests
 
