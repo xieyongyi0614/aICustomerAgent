@@ -217,15 +217,16 @@ def _dispatch_judge_task(
     rule_scores: dict,
     rules_duration_ms: float,
 ) -> None:
-    from app.application import post_process
+    from app.application import observability
 
-    task = asyncio.create_task(
-        _judge_and_finalize(
+    def _spawn_judge():
+        return _judge_and_finalize(
             ctx, context, rule_issues, rule_scores, rules_duration_ms
         )
-    )
-    post_process.background_tasks.add(task)
-    task.add_done_callback(post_process.background_tasks.discard)
+
+    if observability.spawn_background(_spawn_judge()):
+        return
+    asyncio.run(_spawn_judge())
 
 
 async def _judge_and_finalize(
@@ -269,11 +270,10 @@ def schedule_proactive_evaluation(action, llm=None) -> None:
     settings = get_settings()
     if not settings.evaluation_enabled or not settings.evaluation_autonomy_enabled:
         return
-    from app.application import post_process
+    from app.application import observability
 
-    task = asyncio.create_task(_evaluate_proactive(action, llm))
-    post_process.background_tasks.add(task)
-    task.add_done_callback(post_process.background_tasks.discard)
+    if not observability.spawn_background(_evaluate_proactive(action, llm)):
+        asyncio.run(_evaluate_proactive(action, llm))
 
 
 async def _evaluate_proactive(action, llm=None) -> None:

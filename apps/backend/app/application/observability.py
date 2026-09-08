@@ -68,13 +68,45 @@ async def run_retention_loop() -> None:
         "observability retention loop",
         _tick,
         get_settings().observability_cleanup_interval_hours * 3600,
+        offload=True,
     )
 
 
 def _spawn(coro) -> None:
-    task = asyncio.create_task(coro)
-    background_tasks.add(task)
-    task.add_done_callback(background_tasks.discard)
+    spawn_background(coro)
+
+
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_main_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """lifespan 注册主事件循环；供工作线程把 fire-and-forget 任务投回主循环。"""
+    global _main_loop
+    _main_loop = loop
+
+
+def spawn_background(coro) -> bool:
+    """调度 fire-and-forget 后台任务：主循环内 create_task；工作线程内投回主循环。
+
+    判定基准是主循环（set_main_loop 注册）而非"是否存在 running loop"——
+    线程下放的代码段运行在线程自己的 asyncio.run loop 上，任务必须回到
+    主循环才能存活。返回是否成功调度（无可调度 loop 时关闭协程避免告警）。
+    """
+    main = _main_loop
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if main is not None and main.is_running() and loop is not main:
+        asyncio.run_coroutine_threadsafe(coro, main)
+        return True
+    if loop is not None:
+        task = loop.create_task(coro)
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        return True
+    coro.close()
+    return False
 
 
 def _derive_status(trace) -> str:
