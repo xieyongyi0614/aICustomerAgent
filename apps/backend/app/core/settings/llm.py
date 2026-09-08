@@ -1,6 +1,7 @@
 """LLM Profile 域设置：采样参数、profile 表与校验。"""
 
 import json
+from pathlib import Path
 
 from pydantic import model_validator
 
@@ -51,6 +52,7 @@ class LlmSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
     llm_profiles_json: str = ""
+    llm_profiles_file: str = ""
     default_llm_profile: str = "longcat"
     temperature: float = 0.9
     top_p: float = 0.92
@@ -62,12 +64,26 @@ class LlmSettings(BaseSettings):
     llm_request_timeout_seconds: int = 60
     llm_max_retries: int = 1
 
+    def _profiles_raw(self) -> str:
+        if self.llm_profiles_json:
+            return self.llm_profiles_json
+        if self.llm_profiles_file:
+            file_path = Path(self.llm_profiles_file)
+            if not file_path.is_file():
+                raise SettingsError(f"LLM_PROFILES_FILE 不存在: {file_path}")
+            try:
+                return file_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise SettingsError(f"LLM_PROFILES_FILE 读取失败: {exc}") from exc
+        return ""
+
     @model_validator(mode="after")
     def validate_profiles(self):
-        if not self.llm_profiles_json:
-            raise SettingsError("请在 .env 配置 LLM_PROFILES_JSON")
+        raw = self._profiles_raw()
+        if not raw:
+            raise SettingsError("请在 .env 配置 LLM_PROFILES_JSON 或 LLM_PROFILES_FILE")
         try:
-            parsed = json.loads(self.llm_profiles_json)
+            parsed = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SettingsError(f"LLM_PROFILES_JSON 解析失败: {exc}") from exc
         if not isinstance(parsed, list) or len(parsed) == 0:
@@ -94,7 +110,7 @@ class LlmSettings(BaseSettings):
         return self
 
     def llm_profiles(self) -> list[LlmProfile]:
-        raw = json.loads(self.llm_profiles_json)
+        raw = json.loads(self._profiles_raw())
         profiles: list[LlmProfile] = []
         for item in raw:
             profiles.append(

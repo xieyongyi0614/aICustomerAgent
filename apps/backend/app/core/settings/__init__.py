@@ -9,7 +9,7 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings
 
-from app.core.settings._shared import STAGE_KEYS, SettingsError
+from app.core.settings._shared import DOMAIN_MODEL_CONFIG, STAGE_KEYS, SettingsError
 from app.core.settings.action import ActionSettings
 from app.core.settings.autonomy import AutonomySettings
 from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
@@ -51,7 +51,7 @@ class Settings(
     WorldSettings,
     BaseSettings,
 ):
-    pass
+    model_config = DOMAIN_MODEL_CONFIG
 
 
 __all__ = [

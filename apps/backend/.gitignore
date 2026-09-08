@@ -11,6 +11,8 @@ wheels/
 
 # Environment
 .env
+.env.bak
+llm_profiles.json
 
 # Local databases
 *.db
