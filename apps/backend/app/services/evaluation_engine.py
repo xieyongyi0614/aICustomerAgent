@@ -35,6 +35,7 @@ from app.services.evaluation_context import (
     collect_proactive_context,
     collect_turn_context,
 )
+from app.application import observability
 
 logger = logging.getLogger(__name__)
 
@@ -217,8 +218,6 @@ def _dispatch_judge_task(
     rule_scores: dict,
     rules_duration_ms: float,
 ) -> None:
-    from app.application import observability
-
     def _spawn_judge():
         return _judge_and_finalize(
             ctx, context, rule_issues, rule_scores, rules_duration_ms
@@ -270,7 +269,6 @@ def schedule_proactive_evaluation(action, llm=None) -> None:
     settings = get_settings()
     if not settings.evaluation_enabled or not settings.evaluation_autonomy_enabled:
         return
-    from app.application import observability
 
     if not observability.spawn_background(_evaluate_proactive(action, llm)):
         asyncio.run(_evaluate_proactive(action, llm))

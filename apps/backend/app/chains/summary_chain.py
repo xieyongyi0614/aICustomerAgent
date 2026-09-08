@@ -11,6 +11,8 @@ from app.services.observability.llm_capture import (
     UsageCallbackHandler,
     build_llm_record,
 )
+from app.application import observability
+from app.services.observability import prompt_capture
 
 
 _SUMMARY_PROMPT = ChatPromptTemplate.from_messages(
@@ -26,8 +28,6 @@ def build_chain(llm=None):
 
 
 def _submit_record(llm, handler, started, started_at, status, error_kind):
-    from app.application import observability
-
     observability.submit_llm_call(
         build_llm_record(
             CallSite.SUMMARY,
@@ -47,7 +47,6 @@ async def summarize(old_summary: str, new_messages: str, llm=None) -> str:
     handler = UsageCallbackHandler() if capture else None
     started = time.perf_counter()
     started_at = datetime.now()
-    from app.services.observability import prompt_capture
 
     if prompt_capture.enabled():
         prompt_capture.capture_prompt_snapshot(

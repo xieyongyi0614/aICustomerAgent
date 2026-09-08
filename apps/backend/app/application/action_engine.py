@@ -22,6 +22,9 @@ from app.repositories import action_repository
 from app.services.action.executor import CapabilityExecutor
 from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_gates
 from app.services.action.registry import ExecutionContext, get_capability_registry
+from app.application import world_engine
+from app.application.worker_loop import run_worker_loop
+from app.services.action import memory_bridge, relationship_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +61,6 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
     ]
     snapshot.active_count = sum(1 for r in snapshot.records if r["status"] in ACTIVE_STATUSES)
     try:
-        from app.application import world_engine
-
         world = world_engine.get_world(user_id)
         if world is not None:
             snapshot.world_available = getattr(settings, "world_enabled", True)
@@ -130,7 +131,6 @@ def _append_effect(record: ActionRecord, kind: str, ref: str, detail: str) -> No
 def integrate_result(record: ActionRecord, result: ActionResult) -> None:
     """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。"""
     settings = get_settings()
-    from app.services.action import memory_bridge, relationship_bridge
 
     effects = list(result.effects)
     if record.status == "succeeded":
@@ -168,7 +168,6 @@ def _integrate_via_outbox(record: ActionRecord) -> None:
     落库（幂等键 = action_id），世界/关系效果由消费器经既有引擎函数落库；
     记忆沉淀由 P1 摄取补扫按幂等键收敛（本路径不再调 memory_bridge 直写）。
     """
-    from app.repositories import action_repository as action_repo
 
     world_ops = []
     for step in record.steps:
@@ -183,7 +182,7 @@ def _integrate_via_outbox(record: ActionRecord) -> None:
         "world_ops": world_ops,
     }
     record.updated_at = _now()
-    action_repo.save_record_with_outbox(record, payload, idempotency_key=record.id)
+    action_repository.save_record_with_outbox(record, payload, idempotency_key=record.id)
 
 
 def _detail_for(record: ActionRecord) -> str:
@@ -282,7 +281,6 @@ def collect_facts(user_id: str) -> dict:
 
 async def run_action_retry_loop():
     """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划（action_enabled 门控）。"""
-    from app.application.worker_loop import run_worker_loop
 
     async def _tick():
         if get_settings().action_enabled:

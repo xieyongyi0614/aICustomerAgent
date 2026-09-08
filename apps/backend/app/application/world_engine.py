@@ -31,6 +31,14 @@ from app.models.world import (
 from app.repositories import world_repository
 from app.services.world.locations import build_location_context
 from app.services.world.time_provider import TimeProvider
+from app.application.worker_loop import run_worker_loop
+from app.models.observability import bound_extra
+from app.services.world.context_selector import (
+    environment_lighting_suggestion,
+    build_world_context,
+)
+from app.services.world.interpreter import interpret
+from app.services.world.memory_bridge import materialize_event_memory
 
 logger = logging.getLogger(__name__)
 
@@ -422,8 +430,6 @@ def _transition_events_by_type(
 def complete_events_by_type(user_id: str, event_type: str) -> int:
     changed = _transition_events_by_type(user_id, event_type, EventStatus.COMPLETED)
     if get_settings().world_memory_bridge_enabled:
-        from app.services.world.memory_bridge import materialize_event_memory
-
         for event in changed:
             materialize_event_memory(event, user_id)
     return len(changed)
@@ -484,8 +490,6 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
         return 0
     started = time.perf_counter()
     try:
-        from app.services.world.interpreter import interpret
-
         world = ensure_world(user_id)
         if world is None:
             return 0
@@ -543,10 +547,6 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
             notes.append("到点的日子到了")
         refreshed = get_world(user_id)
         if refreshed is not None:
-            from app.services.world.context_selector import (
-                environment_lighting_suggestion,
-            )
-
             suggestion = environment_lighting_suggestion(now)
             if (
                 suggestion
@@ -589,8 +589,6 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
         return None
     started = time.perf_counter()
     try:
-        from app.services.world.context_selector import build_world_context
-
         world = ensure_world(user_id)
         if world is None:
             return None
@@ -647,7 +645,6 @@ def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
                 or event.importance is EventImportance.HIGH
             ],
         }
-        from app.models.observability import bound_extra
 
         bounded, _ = bound_extra(facts, get_settings().observability_step_extra_max_chars)
         return bounded
@@ -687,7 +684,6 @@ def run_maintenance(user_id: str | None = None) -> int:
 
 async def run_world_maintenance_loop() -> None:
     """lifespan 常驻低频维护循环（H6）。"""
-    from app.application.worker_loop import run_worker_loop
 
     await run_worker_loop(
         "world maintenance loop",

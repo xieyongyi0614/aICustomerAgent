@@ -23,6 +23,8 @@ from app.models.development import ModulationProposal
 from app.models.reflection import Insight
 from app.services.development import aggregate
 from app.repositories import background_job_repository
+from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.reflection import lifecycle as reflection_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -173,8 +175,6 @@ def compile_insight_by_id(insight_id: str, trace=None) -> bool:
 
 def register_runtime() -> None:
     """Flag ON 编排层注册：job handler + 创建事件订阅（Reflection 不感知消费方）。"""
-    from app.services.memory2 import job_worker as memory2_job_worker
-    from app.services.reflection import lifecycle as reflection_lifecycle
 
     memory2_job_worker.register_job_type(JOB_TYPE_COMPILE, run_compile_jobs)
     reflection_lifecycle.register_insight_created_listener(on_insight_created)

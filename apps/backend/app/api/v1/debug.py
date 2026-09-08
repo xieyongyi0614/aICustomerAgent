@@ -21,6 +21,18 @@ from app.services.observability.metrics_aggregator import (
 from app.services.memory2 import attribution as memory2_attribution
 from app.services.reflection import attribution as reflection_attribution
 from app.services.trace_collector import get_trace_collector
+from app.repositories import (
+    relationship_milestone_repository,
+    relationship_repository,
+    memory_repository,
+    relationship_conflict_repository,
+    relationship_event_repository,
+    relationship_snapshot_repository,
+)
+from app.services import relationship_evolution
+from app.services.development import attribution as development_attribution
+from app.services.observability.prompt_capture import diff_prompt_snapshots
+from app.services.relationship_evolution import distance_index
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +65,6 @@ def get_insight_attribution(insight_id: str):
 
 @debug_router.get("/debug/development/states/{state_id}")
 def get_development_state_attribution(state_id: str):
-    from app.services.development import attribution as development_attribution
-
     view = development_attribution.development_state_attribution(state_id)
     if view is None:
         raise HTTPException(status_code=404, detail="development state 不存在")
@@ -63,8 +73,6 @@ def get_development_state_attribution(state_id: str):
 
 @debug_router.get("/debug/development/users/{user_id}")
 def list_user_development(user_id: str, limit: int = 50):
-    from app.services.development import attribution as development_attribution
-
     return development_attribution.list_user_development(user_id, limit=limit)
 
 
@@ -138,8 +146,6 @@ def list_turn_prompts(turn_id: str):
 
 @debug_router.get("/debug/prompts/compare")
 def compare_prompt_snapshots(a: str, b: str):
-    from app.services.observability.prompt_capture import diff_prompt_snapshots
-
     snapshot_a = prompt_snapshot_repository.get_by_id(a)
     snapshot_b = prompt_snapshot_repository.get_by_id(b)
     if snapshot_a is None or snapshot_b is None:
@@ -360,11 +366,6 @@ def get_proactive_evaluation(action_id: str):
 @debug_router.get("/debug/relationship/state")
 def get_relationship_state(user_id: str):
     from datetime import datetime
-    from app.repositories import (
-        relationship_milestone_repository,
-        relationship_repository,
-    )
-    from app.services.relationship_evolution import distance_index
 
     state = relationship_repository.get_relationship(user_id)
     unlocks = relationship_milestone_repository.list_unlocks(user_id)
@@ -382,14 +383,6 @@ def get_relationship_state(user_id: str):
 
 @debug_router.get("/debug/relationship/timeline")
 def get_relationship_timeline(user_id: str, limit: int = 50):
-    from app.repositories import (
-        memory_repository,
-        relationship_conflict_repository,
-        relationship_event_repository,
-        relationship_milestone_repository,
-        relationship_snapshot_repository,
-    )
-
     limit_clamped = max(1, min(limit, 200))
     events = relationship_event_repository.list_events(user_id, limit=limit_clamped)
     milestones = relationship_milestone_repository.list_milestones(user_id)[:limit_clamped]
@@ -476,12 +469,6 @@ def get_relationship_timeline(user_id: str, limit: int = 50):
 def rollback_relationship(user_id: str, target_version: int):
     from datetime import datetime
 
-    from app.repositories import (
-        relationship_event_repository,
-        relationship_repository,
-        relationship_snapshot_repository,
-    )
-    from app.services import relationship_evolution
 
     earliest = relationship_snapshot_repository.get_earliest_version(user_id)
     if earliest is None:

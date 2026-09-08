@@ -20,6 +20,7 @@ from app.models.observability import (
     SCHEMA_CALL_SITES,
     CallSite,
 )
+from app.services.observability import prompt_capture
 
 logger = logging.getLogger(__name__)
 
@@ -208,8 +209,6 @@ async def _run_observed(observed, input_data, config, kwargs, sync: bool):
 
 
 def _capture_structured_prompt(observed, input_data) -> None:
-    from app.services.observability import prompt_capture
-
     try:
         if not prompt_capture.enabled():
             return

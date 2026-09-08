@@ -11,6 +11,7 @@ from app.core.db import (
     InsightRow,
     SessionLocal,
 )
+from app.services.reflection import attribution as reflection_attribution
 
 _TRACE_STEPS = (
     "development_state",
@@ -34,8 +35,6 @@ def development_state_attribution(state_id: str) -> dict | None:
         )
         source_insight = _insight_view(session.get(InsightRow, row.source_insight_id))
         if source_insight is not None:
-            from app.services.reflection import attribution as reflection_attribution
-
             chain = reflection_attribution.insight_attribution(row.source_insight_id)
         else:
             chain = None

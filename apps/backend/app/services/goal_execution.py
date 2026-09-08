@@ -12,7 +12,8 @@ from datetime import datetime
 from app.core.settings import get_settings
 from app.models.action import ActionIntent
 from app.repositories import conversation_repository, goal_repository
-from app.services import goal_observation
+from app.services import goal_observation, autonomy_policy
+from app.application.action_engine import run_action_planning
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,6 @@ _USER_FACING_CAPABILITIES = frozenset({"send_notification"})
 
 
 def _in_quiet_hours(now: datetime) -> bool:
-    from app.services import autonomy_policy
-
     settings = get_settings()
     return autonomy_policy.in_quiet_hours(
         now,
@@ -55,7 +54,6 @@ async def attempt_current_step(goal, plan, now: datetime) -> dict:
         params=dict(current.params or {}),
         dedupe_key=f"goal:{goal.id}:{plan.version}:{current.index}",
     )
-    from app.application.action_engine import run_action_planning
 
     try:
         record = await run_action_planning(

@@ -13,6 +13,8 @@ from datetime import datetime
 from app.core.db import MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
+from app.services.action.memory_bridge import to_memory_candidates
+from app.services.relationship_milestone import MILESTONES
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +171,6 @@ def ingest_from_action_record(
     record, character_id: str = "asuna", trace=None
 ) -> MemoryCandidateRow | None:
     """仅取 action_memory_policy deposit=true 的类型（内容/类型沿用 v9 边界表）。"""
-    from app.services.action.memory_bridge import to_memory_candidates
 
     if record.status not in ("succeeded", "failed"):
         return None
@@ -277,7 +278,6 @@ def ingest_from_relationship_event(event, trace=None) -> MemoryCandidateRow | No
 def _milestone_salience(milestone_key: str) -> float:
     if milestone_key.startswith(NARRATIVE_MILESTONE_PREFIX):
         return MILESTONE_SALIENCE_NARRATIVE
-    from app.services.relationship_milestone import MILESTONES
 
     worthy = {spec.key for spec in MILESTONES if spec.memory_worthy}
     if milestone_key in worthy:

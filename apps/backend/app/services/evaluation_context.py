@@ -10,7 +10,21 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
-from app.services import behavior_engine
+from app.services import behavior_engine, state_service, conversation_service
+from app.repositories import (
+    decision_repository,
+    llm_call_repository,
+    loop_run_repository,
+    outbox_repository,
+    proactive_repository,
+    trigger_registry_repository,
+    goal_repository,
+    action_repository,
+    world_repository,
+    emotion_history_repository,
+    character_state_repository,
+    relationship_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,14 +226,6 @@ def collect_life_loop_slice(
     outbox_events 汇集审计切片（纯只读）；stale/溯源判定在此计算，规则保持纯函数。"""
     from datetime import timedelta
 
-    from app.repositories import (
-        decision_repository,
-        llm_call_repository,
-        loop_run_repository,
-        outbox_repository,
-        proactive_repository,
-        trigger_registry_repository,
-    )
 
     now = now or datetime.now()
     settings = get_settings()
@@ -366,7 +372,6 @@ def collect_goal_slice(
     """从 character_goals / goal_plans / decision_records 汇集 Goal 审计切片（纯只读）。"""
     from datetime import timedelta
 
-    from app.repositories import decision_repository, goal_repository
 
     slice_ = GoalSlice()
     try:
@@ -489,8 +494,6 @@ def collect_turn_context(ctx) -> EvaluationContext:
 def _collect_action(user_id: str) -> ActionSlice | None:
     """V9 行动审计切片（只读）：缺席为 None = action 规则全部跳过。"""
     try:
-        from app.repositories import action_repository
-
         if not get_settings().action_enabled:
             return None
         records = action_repository.list_records(user_id, limit=20)
@@ -507,8 +510,6 @@ def _collect_action(user_id: str) -> ActionSlice | None:
 def _collect_relationship(user_id: str) -> RelationshipSlice | None:
     """V8.5 关系演化审计切片（内存审计，缺席为 None = 规则跳过）。"""
     try:
-        from app.services import state_service
-
         audit = state_service.get_relationship_audit(user_id)
     except Exception:
         logger.exception("关系审计切片读取失败，relationship 规则降级")
@@ -549,10 +550,7 @@ def _delta_dims(delta) -> dict | None:
 def _collect_world(user_id: str) -> dict | None:
     """V8 世界事实切片（只读）：评估 World Consistency 规则用；缺席为 None。"""
     try:
-        from app.core.settings import get_settings as _settings
-        from app.repositories import world_repository
-
-        if not _settings().world_enabled:
+        if not get_settings().world_enabled:
             return None
         world = world_repository.get_world(user_id)
         if world is None:
@@ -577,16 +575,12 @@ def _collect_world(user_id: str) -> dict | None:
 
 def _collect_recent_messages(ctx) -> list[RecentMessage]:
     try:
-        from app.services import conversation_service
-
         history = conversation_service.load_window(ctx.session_id)
     except Exception:
         logger.exception("近期消息切片读取失败，digest 降级")
         return []
     emotion_rows = []
     try:
-        from app.repositories import emotion_history_repository
-
         emotion_rows = emotion_history_repository.list_recent(ctx.user_id, limit=RECENT_TURNS_FOR_WINDOW)
     except Exception:
         logger.exception("情绪史切片读取失败，mood 配对降级")
@@ -628,8 +622,6 @@ def _collect_injected_memories(state) -> list[MemoryRef]:
 
 def _collect_emotion(ctx) -> EmotionSlice:
     try:
-        from app.repositories import character_state_repository, emotion_history_repository
-
         rows = emotion_history_repository.list_recent(ctx.user_id, limit=1)
         state = character_state_repository.get_state(ctx.user_id)
         latest = rows[0] if rows else None
@@ -649,8 +641,6 @@ def _collect_emotion(ctx) -> EmotionSlice:
 
 def _collect_state(user_id: str, state) -> StateSlice:
     try:
-        from app.repositories import relationship_repository
-
         relationship = relationship_repository.get_relationship(user_id)
     except Exception:
         logger.exception("关系切片读取失败，digest 降级")
@@ -681,7 +671,6 @@ def _collect_behavior(ctx) -> BehaviorSlice:
 def _collect_behavior_history(session_id: str, settings) -> list[list[str]]:
     """近窗每轮动作类别（behavior-evaluation.md §3.3 轻量重放，仅计数不重跑管线）。"""
     try:
-        from app.services import conversation_service
         from app.services.evaluation_rules import lexicons
 
         history = conversation_service.load_window(session_id)
@@ -760,8 +749,6 @@ def _collect_proactive_facts(action, settings) -> ProactiveSlice:
     episode_attempts = 1
     last_user_message_at = None
     try:
-        from app.repositories import proactive_repository
-
         history = proactive_repository.list_delivered_history(action.user_id, limit=10)
         earlier = [
             row
@@ -780,8 +767,6 @@ def _collect_proactive_facts(action, settings) -> ProactiveSlice:
     except Exception:
         logger.exception("主动历史切片读取失败，时机审计降级")
     try:
-        from app.services import conversation_service
-
         window = conversation_service.load_window(action.session_id, max_messages=10)
         human_messages = [m for m in window if m.role == "human"]
         if human_messages:
@@ -803,8 +788,6 @@ def _collect_proactive_facts(action, settings) -> ProactiveSlice:
 
 def _collect_proactive_recent(session_id: str) -> list[RecentMessage]:
     try:
-        from app.services import conversation_service
-
         window = conversation_service.load_window(
             session_id, max_messages=DIGEST_RECENT_MESSAGES
         )

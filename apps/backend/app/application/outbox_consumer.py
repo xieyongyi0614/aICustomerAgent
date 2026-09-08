@@ -13,6 +13,8 @@ from datetime import datetime
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.repositories import outbox_repository, world_repository
+from app.application import world_engine
+from app.services.action import relationship_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -51,21 +53,17 @@ def consume_pending(limit: int = 50, now: datetime | None = None) -> dict:
 
 
 def _apply_outbox_row(row) -> None:
-    from app.application import world_engine
-
     payload = row.payload or {}
     ops = payload.get("world_ops") or []
     applied = int(payload.get("applied_ops", 0))
     for op in ops[applied:]:
-        _apply_world_op(row.idempotency_key, op, world_engine)
+        _apply_world_op(row.idempotency_key, op)
         applied += 1
         outbox_repository.advance_progress(row.idempotency_key, applied)
 
     if not payload.get("relationship_done"):
         record_payload = payload.get("record")
         if record_payload:
-            from app.services.action import relationship_bridge
-
             record = ActionRecord(**record_payload)
             relationship_bridge.deliver_action_signal(record, record.user_id)
         outbox_repository.mark_relationship_done(row.idempotency_key)
@@ -88,7 +86,7 @@ def _restore_datetimes(args: list) -> list:
     return [_convert(arg) for arg in args]
 
 
-def _apply_world_op(action_id: str, op: dict, world_engine) -> None:
+def _apply_world_op(action_id: str, op: dict) -> None:
     """单 world op 落库（引擎函数原样）；create_event 成功后打 outbox_action_id
     指纹（重放幂等护栏）；引擎返回 None = 世界侧失败 → 抛错进入重试/死信。"""
     op_name = str(op.get("op", ""))

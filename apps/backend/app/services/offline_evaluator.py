@@ -31,6 +31,18 @@ from app.services.evaluation_context import (
     build_digest,
 )
 from app.services.evaluation_rules import lexicons
+from app.chains import evaluation_judge_chain
+from app.repositories import character_state_repository, relationship_repository
+from app.services.development.evaluation import (
+    build_db_report as build_development_db_report,
+)
+from app.services.evaluation_context import collect_life_loop_slice, collect_goal_slice
+from app.services.reflection.evaluation import (
+    build_db_report as build_reflection_db_report,
+)
+from app.services.relationship_evaluation import (
+    build_db_report as build_relationship_db_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +88,6 @@ async def evaluate_session(session_id: str, llm=None) -> dict:
         rule_scores = evaluation_rules.compute_rule_scores(rule_issues, eligible, settings)
         judge_result = None
         if llm is not None and evaluation_engine.should_sample(context.request_id, settings):
-            from app.chains import evaluation_judge_chain
-
             judge_result = await evaluation_judge_chain.judge_turn(
                 build_digest(context), character_id=context.character_id, llm=llm
             )
@@ -106,8 +116,6 @@ async def evaluate_session(session_id: str, llm=None) -> dict:
 
 def _state_slice(user_id: str) -> StateSlice:
     try:
-        from app.repositories import character_state_repository, relationship_repository
-
         character = character_state_repository.get_state(user_id)
         relationship = relationship_repository.get_relationship(user_id)
         return StateSlice(
@@ -204,9 +212,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
 def _reflection_stats(settings) -> dict:
     """REF-006：reflection 小节（只读 DB 统计；Flag OFF 为空）。"""
     try:
-        from app.services.reflection.evaluation import build_db_report
-
-        return build_db_report()
+        return build_reflection_db_report()
     except Exception:
         logger.exception("reflection 小节统计失败，降级为空")
         return {}
@@ -215,9 +221,7 @@ def _reflection_stats(settings) -> dict:
 def _development_stats(settings) -> dict:
     """DEV-005：development 小节（只读 DB 统计；Flag OFF 为空）。"""
     try:
-        from app.services.development.evaluation import build_db_report
-
-        return build_db_report()
+        return build_development_db_report()
     except Exception:
         logger.exception("development 小节统计失败，降级为空")
         return {}
@@ -226,9 +230,7 @@ def _development_stats(settings) -> dict:
 def _relationship_stats(settings) -> dict:
     """REL-004：relationship 小节（只读 DB 统计；Flag OFF 为空）。"""
     try:
-        from app.services.relationship_evaluation import build_db_report
-
-        return build_db_report()
+        return build_relationship_db_report()
     except Exception:
         logger.exception("relationship 小节统计失败，降级为空")
         return {}
@@ -288,7 +290,6 @@ def _life_loop_stats(user_id: str) -> dict:
     try:
         from datetime import datetime as _dt
 
-        from app.services.evaluation_context import collect_life_loop_slice
 
         slice_ = collect_life_loop_slice(user_id, now=_dt.now(), window_hours=24.0)
         autonomy_runs = [r for r in slice_.runs if r.kind == "autonomy"]
@@ -339,7 +340,6 @@ def _goal_stats(user_id: str) -> dict:
     try:
         from datetime import datetime as _dt
 
-        from app.services.evaluation_context import collect_goal_slice
 
         slice_ = collect_goal_slice(user_id, now=_dt.now())
         terminal = [g for g in slice_.goals if g.status != "active"]

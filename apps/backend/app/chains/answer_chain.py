@@ -10,7 +10,12 @@ from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.observability import LLM_CALL_ERROR, LLM_CALL_OK, CallSite
 from app.prompts.builder import PromptBuilder
-from app.services.observability.llm_capture import UsageCallbackHandler, build_llm_record
+from app.services.observability.llm_capture import (
+    UsageCallbackHandler,
+    build_llm_record,
+)
+from app.application import observability
+from app.services.observability import prompt_capture
 
 
 def build_chain(
@@ -48,8 +53,6 @@ def answer_max_tokens(state: ConversationState) -> int:
 
 
 def _record_answer_call(llm, trace, handler, started, started_at, first_token_ms, status, error_kind):
-    from app.application import observability
-
     observability.record_llm_call(
         build_llm_record(
             CallSite.ANSWER,
@@ -78,8 +81,6 @@ async def astream(
     world_ctx=None,
     action_ctx=None,
 ) -> AsyncIterator[str]:
-    from app.services.observability import prompt_capture
-
     started = time.perf_counter()
     started_at = datetime.now()
     prompt = PromptBuilder.build(

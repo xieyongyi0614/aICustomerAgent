@@ -16,7 +16,13 @@ import time
 from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
-from app.application import autonomy_engine, world_engine
+from app.application import (
+    autonomy_engine,
+    world_engine,
+    action_engine,
+    observability,
+    outbox_consumer,
+)
 from app.application.post_process import get_user_write_lock
 from app.repositories import (
     conversation_repository,
@@ -27,7 +33,19 @@ from app.repositories import (
     trigger_registry_repository,
 )
 from app.application.life_loop_context import memory_digest_var
-from app.services import life_loop_budget, state_service
+from app.services import (
+    life_loop_budget,
+    state_service,
+    goal_planning,
+    goal_arbitration,
+    goal_execution,
+    goal_observation,
+)
+from app.application.worker_loop import run_worker_loop
+from app.models.observability import TraceKind
+from app.repositories import action_repository, memory_repository, outbox_repository
+from app.services.reflection import triggers as reflection_triggers
+from app.services.trace_collector import TurnTraceSession
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +57,6 @@ _supply_last: dict[str, datetime] = {}
 
 async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> None:
     """常驻循环：先 sleep 后 tick（对齐 v1 循环节奏），异常吞掉下轮继续。"""
-    from app.application.worker_loop import run_worker_loop
 
     async def _tick():
         await run_life_loop_tick(llm=llm)
@@ -332,8 +349,6 @@ async def _record_step_async(run_id, steps, name, coro_factory, critical=False) 
 
 
 def _step_perception(user_id: str, now: datetime) -> dict:
-    from app.application import action_engine
-
     world_facts = world_engine.collect_facts(user_id)
     action_facts: dict = {}
     if get_settings().action_enabled:
@@ -387,7 +402,6 @@ def _expire_due_goals(user_id: str) -> list:
 def _step_goal_supply(user_id: str, now: datetime) -> dict:
     """AUT-002 供给装配（纯规则 0 LLM）：三来源候选→层级 goal→规划 job 入队。
     World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。"""
-    from app.services import goal_planning
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:
@@ -409,8 +423,6 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
 
 def _observation_facts(user_id: str, now: datetime) -> dict:
     """AUT-003 观察事实编排投影（GAP-AUT-02）：action 窗口/world/state/memory。"""
-    from app.repositories import action_repository
-    from app.services import state_service
 
     settings = get_settings()
     facts: dict = {"now": now, "world": {}, "state": {}, "memory": {}}
@@ -460,8 +472,6 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
     except Exception:
         logger.exception("状态事实采集失败，判据按不可判定处理")
     if settings.v2_memory_enabled:
-        from app.repositories import memory_repository
-
         try:
             salient = memory_repository.list_top_salience(
                 user_id,
@@ -478,8 +488,6 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
 async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     """AUT-004 仲裁（复活/冲突/放弃）→ AUT-003 观察调整 → Sub-Goal 执行尝试。
     仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。"""
-    from app.services import goal_arbitration, goal_execution, goal_observation
-    from app.services.trace_collector import TurnTraceSession
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:
@@ -521,9 +529,6 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
 
 
 def _persist_goal_trace(trace, user_id: str) -> None:
-    from app.application import observability
-    from app.models.observability import TraceKind
-
     try:
         observability.on_turn_finished(
             trace,
@@ -540,7 +545,6 @@ def _persist_goal_trace(trace, user_id: str) -> None:
 def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:
     """LIFE-005 周期记忆快查（显著度门槛，0 LLM）：digest 进 trace 并经
     contextvar 注入 proactive 生成上下文（recent_context 追加段）。"""
-    from app.repositories import memory_repository
 
     settings = get_settings()
     if not settings.v2_memory_enabled:
@@ -569,7 +573,6 @@ def _build_memory_digest(rows, budget_chars: int) -> str:
 def _step_reflection_check(user_id: str, now: datetime) -> dict:
     """LIFE-005 反思检查：复用 REF-003 触发器全链（证据门槛→额度→日桶幂等），
     本步骤只做频控调用；同周期/同日不重复入队由 REF-003 日桶键保证。"""
-    from app.services.reflection import triggers as reflection_triggers
 
     settings = get_settings()
     if not settings.v2_reflection_enabled:
@@ -605,7 +608,6 @@ async def _run_maintenance(now: datetime) -> int:
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         _mark_maintenance("action_retry")
-        from app.application import action_engine
 
         entries: list[dict] = []
         try:
@@ -632,9 +634,6 @@ async def _run_maintenance(now: datetime) -> int:
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
     if settings.v2_action_outbox_enabled:
-        from app.application import outbox_consumer
-        from app.repositories import outbox_repository
-
         pending = outbox_repository.list_pending(now=now, limit=1)
         if pending:
             stats = outbox_consumer.consume_pending(now=now)
@@ -676,8 +675,6 @@ def _maintenance_pending(settings) -> bool:
     ):
         return True
     if settings.v2_action_outbox_enabled:
-        from app.repositories import outbox_repository
-
         if outbox_repository.list_pending(limit=1):
             return True
     return _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS)

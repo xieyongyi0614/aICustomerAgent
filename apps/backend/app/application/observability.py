@@ -27,6 +27,9 @@ from app.repositories import (
     prompt_snapshot_repository,
     trace_repository,
 )
+from app.application import post_process
+from app.application.worker_loop import run_worker_loop
+from app.repositories import emotion_history_repository, relationship_event_repository
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +60,6 @@ def prune_all() -> int:
 
 async def run_retention_loop() -> None:
     """lifespan 常驻低频清理：失败仅 log，下轮再清（V7.8-010）。"""
-    from app.application.worker_loop import run_worker_loop
 
     async def _tick():
         pruned = prune_all()
@@ -179,8 +181,6 @@ def _backfill_events(user_id: str, started_at, max_extra: int) -> list[TraceEven
     """落库视角回填（runtime-trace.md §4）：情绪/关系事件从既有表只读补齐，零业务写入。"""
     events: list[TraceEvent] = []
     try:
-        from app.repositories import emotion_history_repository
-
         for entry in emotion_history_repository.list_recent(user_id, limit=10):
             if not _in_window(getattr(entry, "created_at", None), started_at):
                 continue
@@ -196,8 +196,6 @@ def _backfill_events(user_id: str, started_at, max_extra: int) -> list[TraceEven
     except Exception:
         logger.exception("情绪事件回填失败，跳过")
     try:
-        from app.repositories import relationship_event_repository
-
         for item in relationship_event_repository.list_events(user_id, limit=10):
             if not _in_window(getattr(item, "created_at", None), started_at):
                 continue
@@ -250,7 +248,6 @@ async def _await_post_process(post_process_task, drain_background: bool = True) 
             await asyncio.gather(post_process_task, return_exceptions=True)
         if not drain_background:
             return
-        from app.application import post_process
 
         pending = [task for task in list(post_process.background_tasks) if not task.done()]
         if pending:
@@ -306,7 +303,6 @@ def _drain_llm_calls(trace, turn_id: str | None) -> None:
         if not pending:
             return
         trace.llm_calls.clear()
-        from app.repositories import llm_call_repository
 
         for record in pending:
             if record.turn_id is None and turn_id is not None:
@@ -322,7 +318,6 @@ def _drain_prompt_snapshots(trace, turn_id: str | None) -> None:
         if not pending:
             return
         trace.prompt_snapshots.clear()
-        from app.repositories import prompt_snapshot_repository
 
         for snapshot in pending:
             if snapshot.turn_id is None and turn_id is not None:
@@ -378,8 +373,6 @@ def submit_prompt_snapshot(snapshot) -> None:
 
 async def _save_llm_call(record: LlmCallRecord) -> None:
     try:
-        from app.repositories import llm_call_repository
-
         llm_call_repository.save(record)
     except Exception:
         logger.exception("LLM 调用记录落库失败，已忽略")
@@ -387,8 +380,6 @@ async def _save_llm_call(record: LlmCallRecord) -> None:
 
 async def _save_prompt_snapshot(snapshot) -> None:
     try:
-        from app.repositories import prompt_snapshot_repository
-
         prompt_snapshot_repository.save(snapshot)
     except Exception:
         logger.exception("prompt 快照落库失败，已忽略")
@@ -493,8 +484,6 @@ def mark_decision_outcome(action_id: str, outcome: str) -> None:
 
 async def _save_decision(record: DecisionRecord) -> None:
     try:
-        from app.repositories import decision_repository
-
         decision_repository.save(record)
     except Exception:
         logger.exception("决策记录落库失败，已忽略")
@@ -502,8 +491,6 @@ async def _save_decision(record: DecisionRecord) -> None:
 
 async def _mark_decision_outcome(action_id: str, outcome: str) -> None:
     try:
-        from app.repositories import decision_repository
-
         decision_repository.mark_outcome(action_id, outcome)
     except Exception:
         logger.exception("决策 outcome 补写失败，已忽略")

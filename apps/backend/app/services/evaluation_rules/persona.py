@@ -13,6 +13,7 @@ from app.models.evaluation import (
 )
 from app.services.evaluation_context import EvaluationContext
 from app.services.evaluation_rules import EvaluationRule, lexicons
+from app.character.asuna.evaluation import PERSONA_CONTRADICTION_PATTERNS
 
 _PERSONA_PATTERNS: dict[str, tuple] = {}
 
@@ -20,8 +21,6 @@ _PERSONA_PATTERNS: dict[str, tuple] = {}
 def _persona_patterns(character_id: str) -> tuple:
     if character_id not in _PERSONA_PATTERNS:
         if character_id == "asuna":
-            from app.character.asuna.evaluation import PERSONA_CONTRADICTION_PATTERNS
-
             _PERSONA_PATTERNS[character_id] = PERSONA_CONTRADICTION_PATTERNS
         else:
             _PERSONA_PATTERNS[character_id] = ()

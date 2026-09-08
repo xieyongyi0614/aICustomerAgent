@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.world import EventImportance, WorldEvent
+from app.repositories import memory_repository, world_repository
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,6 @@ def materialize_event_memory(event: WorldEvent, user_id: str, character_id: str 
     if event.payload.get("memory_materialized"):
         return False
     try:
-        from app.repositories import memory_repository, world_repository
-
         candidates = to_memory_candidates(event)
         written = False
         for candidate in candidates:

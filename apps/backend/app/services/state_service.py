@@ -9,7 +9,11 @@ from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
-from app.models.relationship import RelationshipDelta, RelationshipEvent, RelationshipState
+from app.models.relationship import (
+    RelationshipDelta,
+    RelationshipEvent,
+    RelationshipState,
+)
 from app.models.emotion import EmotionHistoryEntry
 from app.repositories import (
     character_state_repository,
@@ -17,7 +21,18 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import relationship_evolution, relationship_signal, state_engine
+from app.services import (
+    relationship_evolution,
+    relationship_signal,
+    state_engine,
+    relationship_conflict,
+    relationship_memory,
+    relationship_milestone,
+)
+from app.repositories import (
+    relationship_conflict_repository,
+    relationship_snapshot_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +327,6 @@ def _run_relationship_subsystems(
     now: datetime,
 ) -> None:
     """V8.5 演化后处理：冲突 → 里程碑 → 记忆投递（独立小事务，只降级）。"""
-    from app.repositories import relationship_conflict_repository
-    from app.services import relationship_conflict, relationship_memory, relationship_milestone
 
     audit = _reputation_audits.get(user_id) or {}
     before: RelationshipState = audit.get("before") or new_relationship
@@ -410,7 +423,6 @@ def _capture_snapshot_if_needed(
             recovery_started ...，见 relationship_conflict.evaluate_conflict）。
             空串表示本轮无迁移，按真值判断跳过。
     """
-    from app.repositories import relationship_snapshot_repository
 
     trigger: str | None = None
     if stage_before != state_after.stage:
@@ -434,8 +446,6 @@ def _capture_snapshot_if_needed(
 
 
 def _conflict_exists(record) -> bool:
-    from app.repositories import relationship_conflict_repository
-
     try:
         return any(c.id == record.id for c in relationship_conflict_repository.list_conflicts(record.user_id, limit=200))
     except Exception:

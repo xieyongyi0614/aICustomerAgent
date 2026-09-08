@@ -40,6 +40,10 @@ from app.services import (
 from app.services.goal_service import SelectedGoal
 from app.services.action.detector import detect_action_intent
 from app.services.intention_policy import enforce as enforce_intention
+from app.chains.answer_chain import answer_max_tokens
+from app.repositories import relationship_milestone_repository
+from app.services.action.context import build_action_context
+from app.services.behavior_engine import RelationshipBehaviorContext
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +184,6 @@ def _record_development_apply(trace, state: ConversationState, behavior_ctx) -> 
         return
     applied: dict[str, dict] = {}
     if overlay.style is not None and overlay.style.max_tokens_delta < 0:
-        from app.chains.answer_chain import answer_max_tokens
-
         applied["response_style.length"] = {
             "before": get_settings().answer_max_tokens,
             "after": answer_max_tokens(state),
@@ -318,9 +320,6 @@ async def run_chat_pipeline(
     behavior_started = time.perf_counter()
     relationship_ctx = None
     try:
-        from app.repositories import relationship_milestone_repository
-        from app.services.behavior_engine import RelationshipBehaviorContext
-
         unlocks = await asyncio.to_thread(
             relationship_milestone_repository.list_unlocks, state.user_id
         )
@@ -398,8 +397,6 @@ async def run_chat_pipeline(
     active_generations[user_id] = True
     action_ctx = None
     if get_settings().action_enabled:
-        from app.services.action.context import build_action_context
-
         action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
     try:
         async for token in answer_chain.astream(
@@ -509,4 +506,3 @@ async def run_chat_pipeline(
         "turn_id": str(ai_message_id),
         "request_id": trace.request_id,
     }
-

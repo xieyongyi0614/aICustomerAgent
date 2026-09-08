@@ -17,6 +17,8 @@ from app.services.observability.llm_capture import (
     UsageCallbackHandler,
     build_llm_record,
 )
+from app.application import observability
+from app.services.observability import prompt_capture
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +35,6 @@ def _validate_text(text: str) -> str | None:
 
 
 def _record_call(trace, model, handler, started, started_at, status, error_kind):
-    from app.application import observability
-
     observability.record_llm_call(
         build_llm_record(
             CallSite.PROACTIVE,
@@ -67,7 +67,6 @@ async def generate(
         chain = prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
         capture = get_settings().observability_persist_enabled
         handler = UsageCallbackHandler() if capture else None
-        from app.services.observability import prompt_capture
 
         if prompt_capture.enabled():
             prompt_capture.capture_prompt_snapshot(

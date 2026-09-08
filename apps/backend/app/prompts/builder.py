@@ -24,6 +24,12 @@ from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.core.settings import get_settings
 from app.services.world.context_selector import render_world_section
+from app.prompts.behavior import build_activity_section, build_behavior_section
+from app.prompts.goal import build_goal_section, build_intention_section
+from app.prompts.scene import build_scene_sections
+from app.repositories import relationship_milestone_repository
+from app.services.action.context import render_action_section
+from app.services.relationship_milestone import MILESTONES
 
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",
@@ -79,9 +85,6 @@ def _append_within_budget(section: str, lines: list[str], budget: int) -> str:
 
 def _safe_recent_milestone_title(user_id: str) -> str | None:
     try:
-        from app.repositories import relationship_milestone_repository
-        from app.services.relationship_milestone import MILESTONES
-
         worthy = {spec.key for spec in MILESTONES if spec.memory_worthy}
         for record in relationship_milestone_repository.list_milestones(user_id):
             if record.milestone_key in worthy and record.title:
@@ -275,7 +278,6 @@ class PromptBuilder:
         world_text = render_world_section(
             world_ctx, get_settings().world_context_char_budget
         )
-        from app.services.action.context import render_action_section
 
         action_text = render_action_section(
             action_ctx, get_settings().action_context_char_budget
@@ -304,8 +306,6 @@ class PromptBuilder:
         behavior_section = None
         activity_section = None
         if analysis is not None and behavior_ctx is not None:
-            from app.prompts.behavior import build_activity_section, build_behavior_section
-
             activity_section = build_activity_section(behavior_ctx)
             if behavior_ctx.fallback_v2 is not None:
                 tail_sections.append(_literal(build_behavior_section(behavior_ctx)))
@@ -323,15 +323,12 @@ class PromptBuilder:
             else None
         )
         if scene_ctx is not None:
-            from app.prompts.scene import build_scene_sections
-
             tail_sections.extend(
                 _literal(section) for section in build_scene_sections(scene_ctx, scene_budget)
             )
         if activity_section is not None:
             tail_sections.append(activity_section)
 
-        from app.prompts.goal import build_goal_section, build_intention_section
 
         goal_section = None
         intention_section = None

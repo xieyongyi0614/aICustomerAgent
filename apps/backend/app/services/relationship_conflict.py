@@ -10,7 +10,13 @@ from datetime import datetime
 
 from app.character.asuna.relationship_lexicon import RECOVERY_LEXICON
 from app.core.settings import get_settings
-from app.models.relationship import ConflictRecord, RelationshipDelta, RelationshipState
+from app.models.relationship import (
+    ConflictRecord,
+    RelationshipDelta,
+    RelationshipState,
+    RelationshipEvent,
+)
+from app.services.relationship_evolution import clamp01
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +37,6 @@ class ConflictOutcome:
 
 
 def _system_event(user_id, session_id, cause, impact, now):
-    from app.models.relationship import RelationshipEvent
-
     return RelationshipEvent(
         user_id=user_id,
         session_id=session_id,
@@ -81,8 +85,6 @@ def _soften_tension(state: RelationshipState) -> RelationshipState:
 
 
 def _apply_settlement(state: RelationshipState, settle: RelationshipDelta) -> RelationshipState:
-    from app.services.relationship_evolution import clamp01
-
     return state.model_copy(
         update={
             "tension": max(0.0, min(1.0, state.tension + settle.tension)),

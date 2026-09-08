@@ -16,6 +16,8 @@ from app.core.db import Memory, ReflectionRunRow, SessionLocal
 from app.core.settings import get_settings
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
+from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory_conflict import same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,6 @@ _topic_buckets: dict[str, dict[str, dict]] = {}
 
 def register_with_job_worker() -> None:
     """编排层接线入口：周期触发挂靠 job_worker tick（执行 handler 由 REF-004 注册）。"""
-    from app.services.memory2 import job_worker as memory2_job_worker
 
     memory2_job_worker.register_tick_hook(run_reflection_trigger_tick)
 
@@ -217,8 +218,6 @@ def reset_trigger_state() -> None:
 
 
 def _match_bucket(buckets: dict[str, dict], content: str) -> dict | None:
-    from app.services.memory_conflict import same_topic
-
     for bucket in buckets.values():
         if same_topic(content, bucket["topic_content"]):
             return bucket
