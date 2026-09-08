@@ -1,6 +1,7 @@
 from app.core.settings import get_settings
 from app.models.conversation import ChatMessage
 from app.repositories import conversation_repository as repo
+from app.repositories import proactive_repository
 
 
 def ensure_conversation(session_id: str, user_id: str):
@@ -47,8 +48,6 @@ def save_proactive_turn(session_id: str, text: str) -> int:
 
 def reset_proactive_on_user_message(user_id: str) -> None:
     """用户发言复位（cooldown.md §5）：delivered 未 acked → acked；candidate → discarded。"""
-    from app.repositories import proactive_repository
-
     proactive_repository.reset_on_user_message(user_id)
 
 

@@ -14,6 +14,7 @@ from app.character.asuna.action import (
     ACTION_TRIGGER_LEXICON,
     REQUIRED_PARAMS,
 )
+from app.core.settings import get_settings
 from app.models.action import ActionIntent, make_dedupe_key
 from app.services.action.time_parse import parse_time_phrase
 
@@ -133,8 +134,6 @@ def detect_action_intent(
     now: datetime | None = None,
 ) -> ActionIntent | None:
     """确定性检出入口（H-A1）；门控 + 异常降级 None。"""
-    from app.core.settings import get_settings
-
     settings = get_settings()
     if not settings.action_enabled or not settings.action_detector_enabled:
         return None

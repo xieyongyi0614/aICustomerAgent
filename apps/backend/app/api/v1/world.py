@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.application import world_engine
 from app.core.settings import get_settings
+from app.repositories import world_repository
 
 world_router = APIRouter()
 
@@ -104,8 +105,6 @@ def update_location(body: LocationUpdate):
 
 @world_router.get("/debug/world/events")
 def list_world_events(user_id: str | None = None):
-    from app.repositories import world_repository
-
     world = world_engine.get_world(_user(user_id))
     if world is None:
         raise HTTPException(status_code=404, detail="世界不可用")
@@ -132,8 +131,6 @@ def create_world_event(body: EventCreate):
 
 @world_router.get("/debug/world/snapshots/{snapshot_id}")
 def get_world_snapshot(snapshot_id: str, user_id: str | None = None):
-    from app.repositories import world_repository
-
     world = world_engine.get_world(_user(user_id))
     if world is None:
         raise HTTPException(status_code=404, detail="世界不可用")
@@ -161,8 +158,6 @@ def create_snapshot(body: SnapshotCreate):
 
 @world_router.get("/debug/world/snapshots")
 def list_world_snapshots(user_id: str | None = None):
-    from app.repositories import world_repository
-
     world = world_engine.get_world(_user(user_id))
     if world is None:
         raise HTTPException(status_code=404, detail="世界不可用")

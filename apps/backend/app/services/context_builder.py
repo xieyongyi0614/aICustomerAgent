@@ -9,6 +9,7 @@ from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.reflection import InsightSummary
 from app.models.relationship import RelationshipState
+from app.prompts.builder import SHARED_EXPERIENCE_HEADER, SHARED_EXPERIENCE_NOTE
 from app.services import conversation_service
 from app.services import goal_service
 from app.services import memory_service
@@ -140,8 +141,6 @@ def _load_context_insights(
 
 def _select_shared_entries(collected: list, trace=None) -> tuple[list, dict]:
     """共同经历选材：Freshness（最新优先）选材 + 预算贪心装入，渲染保持时间序。"""
-    from app.prompts.builder import SHARED_EXPERIENCE_HEADER, SHARED_EXPERIENCE_NOTE
-
     settings = get_settings()
     budget = settings.v2_relationship_shared_budget_chars
     reserve = len(SHARED_EXPERIENCE_HEADER) + len(SHARED_EXPERIENCE_NOTE) + 1

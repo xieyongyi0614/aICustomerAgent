@@ -19,6 +19,7 @@ from app.models.memory import UserMemory
 from app.repositories import memory_repository
 from app.services.memory2 import embeddings as memory_embeddings
 from app.services.memory2 import lifecycle as memory_lifecycle
+from app.services.memory_conflict import same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -181,8 +182,6 @@ def _filter_reasons(
 
 
 def _same_topic(left: str, right: str) -> bool:
-    from app.services.memory_conflict import same_topic
-
     return same_topic(left, right)
 
 

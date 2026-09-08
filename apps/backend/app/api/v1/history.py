@@ -48,10 +48,8 @@ def list_conversation_messages(
 @history_router.get("/memories", response_model=MemoriesOut)
 def list_memories(
     user_id: str = Query(default=get_settings().default_user),
-    conversation_id: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
 ):
-    _ = conversation_id
     items = history_service.list_memories(user_id, limit=limit)
     return MemoriesOut(
         user_id=user_id,

@@ -176,9 +176,7 @@ class TestConsumer:
             now=NOW,
         )
         # 模拟第一 op 落库后崩溃：真实执行 op1 + 进度标记已持久化，但未 consumed
-        outbox_consumer._apply_world_op(
-            key, ops[0], world_engine, world_repository
-        )
+        outbox_consumer._apply_world_op(key, ops[0], world_engine)
         outbox_repository.advance_progress(key, 1)
 
         stats = outbox_consumer.consume_pending(now=NOW)
