@@ -1,0 +1,52 @@
+[
+  {
+    "id": "longcat",
+    "label": "LongCat (longcat.chat)",
+    "base_url": "https://api.longcat.chat/openai/v1",
+    "model": "LongCat-2.0",
+    "api_key": "",
+    "max_tokens": 50
+  },
+  {
+    "id": "minimax-m3",
+    "label": "MiniMax M3 (gmi-serving)",
+    "base_url": "https://api.gmi-serving.com/v1",
+    "model": "MiniMaxAI/MiniMax-M3",
+    "api_key": "",
+    "max_tokens": 1024
+  },
+  {
+    "id": "openrouter-glm",
+    "label": "GLM 5.2 (OpenRouter free)",
+    "base_url": "https://openrouter.ai/api/v1",
+    "model": "z-ai/glm-5.2:free",
+    "api_key": "",
+    "max_tokens": 1024,
+    "extra_body": {
+      "reasoning": {
+        "enabled": true
+      }
+    }
+  },
+  {
+    "id": "kimi-k2.7-code",
+    "label": "kimi-k2.7-code",
+    "base_url": "https://llm-y8rsj9qfa4h202ar.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "model": "kimi-k2.7-code",
+    "api_key": "",
+    "max_tokens": 1024,
+    "extra_body": {
+      "reasoning": {
+        "enabled": true
+      }
+    }
+  },
+  {
+    "id": "Deepseek-v4-flash",
+    "label": "Deepseek-v4-flash",
+    "base_url": "https://chatapi.weixin.qq.com/openai/v1",
+    "model": "Deepseek-v4-flash",
+    "api_key": "",
+    "max_tokens": 1024
+  }
+]

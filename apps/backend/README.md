@@ -34,8 +34,9 @@ api → application（编排） → services → repositories → core
 ## 快速开始
 
 ```bash
-# 1. 配置环境变量（复制 .env.example 为 .env，并在 LLM_PROFILES_JSON 中填入可用的 API Key）
+# 1. 配置环境变量 + LLM profiles（复制模板，填入真实 API Key）
 cp .env.example .env
+cp llm_profiles.example.json llm_profiles.json
 
 # 2. 启动本地 PostgreSQL 16（在仓库根目录执行，统一入口为根目录 docker-compose.yml，asuna/asuna/asuna）
 docker compose up -d postgres
@@ -117,7 +118,8 @@ uv run pylint app tests   # 代码检查
 
 | 配置                          | 默认值      | 说明                                |
 | ----------------------------- | ----------- | ----------------------------------- |
-| `LLM_PROFILES_JSON`           | -           | 模型 profile 数组（必填字段：id / label / base_url / model / api_key；可选覆盖：max_tokens、temperature、top_p、frequency_penalty、presence_penalty、extra_body_thinking；可选 `extra_body` 对象原样透传请求体顶层，设置后取代默认 thinking 注入） |
+| `LLM_PROFILES_JSON`           | -           | 模型 profile 数组内联单行字符串（必填字段：id / label / base_url / model / api_key；可选覆盖：max_tokens、temperature、top_p、frequency_penalty、presence_penalty、extra_body_thinking；可选 `extra_body` 对象原样透传请求体顶层，设置后取代默认 thinking 注入）。与 `LLM_PROFILES_FILE` 同时设置时本项优先 |
+| `LLM_PROFILES_FILE`           | -           | profile 数组外置 JSON 文件路径（相对启动目录，如 `llm_profiles.json`，可自由缩进排版）；缺失/读错启动即报 SettingsError |
 | `DEFAULT_LLM_PROFILE`         | longcat     | 默认 profile id（必须在数组内）      |
 | `ANSWER_MAX_TOKENS`           | 200         | 最终回答链的输出上限；路由/分析/记忆等辅助链不受此限制，使用各 profile 的 `max_tokens`（建议 ≥512） |
 | `TEMPERATURE` 等              | 见 settings | profile 未指定对应字段时的参数缺省   |

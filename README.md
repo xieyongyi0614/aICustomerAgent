@@ -38,7 +38,7 @@
 ### 方式一：Docker 一键起完整栈（推荐体验）
 
 ```bash
-# 1. 配置环境变量（在 LLM_PROFILES_JSON 中填入可用的 API Key）
+# 1. 复制 .env 并填入可用 API Key（容器方式推荐内联：LLM_PROFILES_JSON 写成单行 JSON，compose 会注入为环境变量）
 cp apps/backend/.env.example apps/backend/.env
 
 # 2. 构建并启动（自动执行 alembic 迁移 + 托管前端产物）
@@ -53,9 +53,10 @@ docker compose up -d --build
 # 1. 只启动 PostgreSQL 16 数据库（统一入口为根目录 compose）
 docker compose up -d postgres
 
-# 2. 后端（apps/backend/ 下）：安装依赖 + 迁移 + 启动
+# 2. 后端（apps/backend/ 下）：配置 LLM profiles + 安装依赖 + 迁移 + 启动
 cd apps/backend
-cp .env.example .env        # 并填入 LLM_PROFILES_JSON 的 API Key
+cp .env.example .env                            # 环境变量模板
+cp llm_profiles.example.json llm_profiles.json  # profiles 模板（api_key 为空串），填入真实 Key 即可自由排版
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8020
@@ -66,7 +67,7 @@ npm install
 npm run dev                 # http://localhost:2000，/api 代理到 :8020（VITE_PROXY_TARGET 可配置）
 ```
 
-> 环境变量说明见 `apps/backend/README.md` 的配置项表；模型通过 `LLM_PROFILES_JSON`（OpenAI 兼容服务商数组）配置。
+> 环境变量说明见 `apps/backend/README.md` 的配置项表。LLM profile 两种配置方式（`LLM_PROFILES_JSON` 优先级更高，同时配置时忽略文件）：本地开发用 `LLM_PROFILES_FILE` 指向外置 JSON 文件（如 `llm_profiles.json`，可排版）；容器 / 内联场景把 `LLM_PROFILES_JSON` 写成单行数组。
 
 ## 测试
 
