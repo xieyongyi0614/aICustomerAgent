@@ -1,3 +1,4 @@
+import { useActiveUserId } from "@/hooks/use-active-user-id"
 import { OverviewPanel } from "@/components/debug/overview-panel"
 import { ScenePanel } from "@/components/debug/scene-panel"
 import { StatePanel } from "@/components/debug/state-panel"
@@ -21,6 +22,7 @@ function DebugPane() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setActiveTab = useUiStore((s) => s.setActiveTab)
   const selectedTurnId = useUiStore((s) => s.selectedTurnId)
+  const activeUserId = useActiveUserId()
 
   return (
     <Tabs
@@ -42,10 +44,10 @@ function DebugPane() {
         <ScenePanel />
       </TabsContent>
       <TabsContent value="state" className="min-h-0 flex-1 overflow-y-auto">
-        <StatePanel />
+        <StatePanel userId={activeUserId} />
       </TabsContent>
       <TabsContent value="memory" className="min-h-0 flex-1 overflow-y-auto">
-        <MemoryPanel />
+        <MemoryPanel userId={activeUserId} />
       </TabsContent>
       <TabsContent value="trace" className="min-h-0 flex-1 overflow-y-auto">
         <TracePanel turnId={selectedTurnId} />
