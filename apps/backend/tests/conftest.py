@@ -334,6 +334,7 @@ def override_settings(monkeypatch):
             "world_time_mode": "WORLD_TIME_MODE",
             "world_sim_rate": "WORLD_SIM_RATE",
             "world_context_char_budget": "WORLD_CONTEXT_CHAR_BUDGET",
+            "world_household_autoseed_enabled": "WORLD_HOUSEHOLD_AUTOSEED_ENABLED",
             "world_interpreter_enabled": "WORLD_INTERPRETER_ENABLED",
             "world_llm_assist_enabled": "WORLD_LLM_ASSIST_ENABLED",
             "world_memory_bridge_enabled": "WORLD_MEMORY_BRIDGE_ENABLED",

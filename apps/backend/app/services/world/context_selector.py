@@ -7,6 +7,7 @@
 from app.character.asuna.world import ENVIRONMENT_EFFECT_NOTES
 from app.models.world import (
     EventStatus,
+    InventoryItem,
     TimeContext,
     World,
     WorldContext,
@@ -66,11 +67,26 @@ def build_world_context(
     salient.sort(key=lambda item: (item.due_at is None, item.due_at))
     event_briefs = [event.brief(now) for event in salient[:events_limit]]
 
+    inventory = []
+    for obj in entities:
+        inventory.append(
+            InventoryItem(
+                name=obj.name,
+                quantity=obj.quantity,
+                unit=obj.unit or "",
+                location_id=obj.location_id,
+                location_name=location_name(obj.location_id),
+                state=obj.state,
+                consumable=obj.consumable,
+            )
+        )
+
     return WorldContext(
         time=time_ctx,
         location=location_ctx,
         environment=world.environment if _environment_salient(world.environment) else None,
         nearby_objects=object_briefs,
+        inventory=inventory,
         salient_events=event_briefs,
         notes=list(world.notes or []),
     )
@@ -99,20 +115,50 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
 
     env_line = _environment_line(ctx)
     event_lines = [_event_line(brief) for brief in ctx.salient_events]
-    object_lines = [_object_line(brief) for brief in ctx.nearby_objects]
     note_lines = list(ctx.notes)
+    guide_line = "家里的物品、数量、位置与可消耗状态以本清单为准，不得凭空捏造或增减。"
+    inventory_lines = _inventory_lines(ctx.inventory)
 
     body: list[str] = []
-    total = len(head)
-    for line in event_lines + note_lines + object_lines + ([env_line] if env_line else []):
+    prefix = "【当前世界】\n"
+    total = len(prefix) + len(head)
+    for line in (
+        [guide_line]
+        + inventory_lines
+        + event_lines
+        + note_lines
+        + ([env_line] if env_line else [])
+    ):
         if total + len(line) + 1 > budget:
             break
         body.append(line)
         total += len(line) + 1
 
     if not body:
-        return "【当前世界】\n" + head
-    return "【当前世界】\n" + head + "\n" + "\n".join(body)
+        return prefix + head
+    return prefix + head + "\n" + "\n".join(body)
+
+
+def _inventory_lines(items) -> list[str]:
+    grouped: dict = {}
+    for item in items:
+        grouped.setdefault(item.location_id, []).append(item)
+    lines: list[str] = []
+    for _, objs in grouped.items():
+        loc_name = next((obj.location_name for obj in objs), None) or next(
+            (obj.location_id for obj in objs), "未命名"
+        )
+        lines.append(f"{loc_name}：")
+        for obj in objs:
+            lines.append(f"  {_inventory_item_line(obj)}")
+    return lines
+
+
+def _inventory_item_line(item) -> str:
+    qty = int(item.quantity) if item.quantity == int(item.quantity) else f"{item.quantity:g}"
+    if item.unit and item.unit not in ("piece", "个"):
+        return f"{item.name} × {qty}{item.unit}"
+    return f"{item.name} × {qty}"
 
 
 def _environment_line(ctx: WorldContext) -> str | None:
@@ -149,11 +195,6 @@ def _event_line(brief) -> str:
     if due is not None and 0 <= due <= 24:
         return f"{brief.title}（{brief.importance}，还有 {due:g} 小时）。"
     return f"{brief.title}（已记下）。"
-
-
-def _object_line(brief) -> str:
-    where = f"{brief.location_name}里" if brief.location_name else ""
-    return f"{where}有{brief.name}（{brief.state}，剩 {brief.quantity:g}）。"
 
 
 def environment_lighting_suggestion(now) -> str | None:

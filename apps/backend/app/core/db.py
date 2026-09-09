@@ -618,6 +618,8 @@ class WorldEntityRow(Base):
     location_id: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, server_default="1")
+    unit: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
+    consumable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
     properties: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default="active", server_default="active")
     last_action_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -12,7 +12,7 @@ def test_world_state_persists_across_sessions(db_session_factory):
 
     fresh_view = world_engine.get_full_state("default-user")
     assert fresh_view["world"]["environment"]["weather"] == "rain"
-    assert [obj["name"] for obj in fresh_view["entities"]] == ["西瓜"]
+    assert "西瓜" in {obj["name"] for obj in fresh_view["entities"]}
 
 
 def test_world_enabled_false_short_circuits(db_session_factory, override_settings):

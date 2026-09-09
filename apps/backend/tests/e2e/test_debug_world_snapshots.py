@@ -3,11 +3,13 @@
 from httpx import ASGITransport, AsyncClient
 import pytest
 
+from app.character.asuna.world import DEFAULT_HOUSEHOLD
 from app.main import app
 
 
 @pytest.mark.asyncio
 async def test_snapshot_history_and_restore_endpoints(db_session_factory):
+    seed_count = len(DEFAULT_HOUSEHOLD["objects"])
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         await client.post(
@@ -29,12 +31,17 @@ async def test_snapshot_history_and_restore_endpoints(db_session_factory):
         )
         detail = await client.get(f"/api/v1/debug/world/snapshots/{snapshot_id}")
         assert detail.status_code == 200
-        assert len(detail.json()["state"]["entities"]) == 1
+        baseline_names = {o["name"] for o in detail.json()["state"]["entities"]}
+        assert "西瓜" in baseline_names
+        assert len(baseline_names) == seed_count + 1
 
         restored = await client.post(f"/api/v1/debug/world/snapshots/{snapshot_id}/restore")
         assert restored.status_code == 200
         state = await client.get("/api/v1/debug/world")
-        assert len(state.json()["entities"]) == 1
+        restored_names = {o["name"] for o in state.json()["entities"]}
+        assert "西瓜" in restored_names
+        assert "蛋糕" not in restored_names
+        assert len(restored_names) == seed_count + 1
 
         missing = await client.post("/api/v1/debug/world/snapshots/snap_missing/restore")
         assert missing.status_code == 404

@@ -41,6 +41,18 @@ HOME_LOCATIONS = {
         "traits": ["indoor", "container", "food_related"],
         "available_actions": ["打开", "拿食物"],
     },
+    "home.kitchen.cabinet": {
+        "name": "橱柜",
+        "parent_id": "home.kitchen",
+        "traits": ["indoor", "container", "food_related"],
+        "available_actions": ["打开", "拿食物"],
+    },
+    "home.bathroom": {
+        "name": "浴室",
+        "parent_id": "home",
+        "traits": ["indoor"],
+        "available_actions": ["洗漱", "洗澡"],
+    },
 }
 
 LOCATION_ALIASES = {
@@ -50,7 +62,10 @@ LOCATION_ALIASES = {
     "卧室": "home.bedroom",
     "房间": "home.bedroom",
     "阳台": "home.balcony",
+    "浴室": "home.bathroom",
+    "卫生间": "home.bathroom",
     "冰箱": "home.kitchen.fridge",
+    "橱柜": "home.kitchen.cabinet",
 }
 
 WORLD_WEATHER_VALUES = ("sunny", "cloudy", "rain", "snow", "windy")
@@ -149,4 +164,58 @@ OBJECT_CREATION_HINTS = {
     "可乐": "drink",
     "果汁": "drink",
     "咖啡豆": "drink",
+}
+
+DEFAULT_HOUSEHOLD = {
+    "name": "默认家庭库存",
+    "objects": [
+        {
+            "name": "鸡蛋",
+            "category": "food",
+            "location_id": "home.kitchen.fridge",
+            "quantity": 6,
+            "unit": "piece",
+            "consumable": True,
+        },
+        {
+            "name": "牛奶",
+            "category": "drink",
+            "location_id": "home.kitchen.fridge",
+            "quantity": 1,
+            "unit": "piece",
+            "consumable": True,
+        },
+        {
+            "name": "可乐",
+            "category": "drink",
+            "location_id": "home.kitchen.fridge",
+            "quantity": 2,
+            "unit": "piece",
+            "consumable": True,
+        },
+        {
+            "name": "面条",
+            "category": "food",
+            "location_id": "home.kitchen.cabinet",
+            "quantity": 2,
+            "unit": "piece",
+            "consumable": True,
+        },
+        {
+            "name": "大米",
+            "category": "food",
+            "location_id": "home.kitchen.cabinet",
+            "quantity": 2,
+            "unit": "kg",
+            "consumable": True,
+        },
+        {
+            "name": "面包",
+            "category": "food",
+            "location_id": "home.kitchen.cabinet",
+            "quantity": 1,
+            "unit": "piece",
+            "consumable": True,
+        },
+    ],
 }

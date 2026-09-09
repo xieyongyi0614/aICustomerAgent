@@ -64,6 +64,8 @@ def _to_object(row: WorldEntityRow) -> WorldObject:
         location_id=row.location_id,
         state=row.state,
         quantity=row.quantity,
+        unit=row.unit or "",
+        consumable=bool(row.consumable),
         properties=row.properties or {},
         status=ObjectStatus(row.status),
         last_action_at=row.last_action_at,
@@ -152,6 +154,8 @@ def save_object(obj: WorldObject) -> None:
         row.location_id = obj.location_id
         row.state = obj.state
         row.quantity = obj.quantity
+        row.unit = obj.unit or ""
+        row.consumable = bool(obj.consumable)
         row.properties = obj.properties
         row.status = obj.status.value
         row.last_action_at = obj.last_action_at or now
@@ -393,6 +397,8 @@ def replace_entities(world_id: str, objects: list[WorldObject]) -> None:
                     location_id=obj.location_id,
                     state=obj.state,
                     quantity=obj.quantity,
+                    unit=obj.unit or "",
+                    consumable=bool(obj.consumable),
                     properties=obj.properties,
                     status=obj.status.value,
                     last_action_at=obj.last_action_at,

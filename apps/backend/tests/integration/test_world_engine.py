@@ -49,7 +49,8 @@ def test_snapshot_captures_full_state(db_session_factory):
     assert snapshot is not None
     assert snapshot.label == "test"
     assert snapshot.state["current_location"] == "home.living_room"
-    assert len(snapshot.state["entities"]) == 1
+    snapshot_names = {obj["name"] for obj in snapshot.state["entities"]}
+    assert "西瓜" in snapshot_names
     full = world_engine.get_full_state("default-user")
     assert len(full["snapshots"]) == 1
-    assert {obj["name"] for obj in full["entities"]} == {"西瓜"}
+    assert {obj["name"] for obj in full["entities"]} == snapshot_names
