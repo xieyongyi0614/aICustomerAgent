@@ -16,6 +16,7 @@ class WorldSettings(BaseSettings):
     world_context_char_budget: int = 600
     world_nearby_objects_limit: int = 3
     world_salient_events_limit: int = 3
+    world_household_autoseed_enabled: bool = True
     world_interpreter_enabled: bool = True
     world_llm_assist_enabled: bool = False
     world_llm_assist_sample_rate: float = 0.2

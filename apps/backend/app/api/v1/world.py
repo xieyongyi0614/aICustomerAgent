@@ -21,6 +21,8 @@ class EntityCreate(BaseModel):
     category: str = "misc"
     location_id: str | None = None
     quantity: float = 1.0
+    unit: str = ""
+    consumable: bool = False
     aliases: list[str] = []
     properties: dict = {}
 
@@ -52,6 +54,16 @@ class EventCreate(BaseModel):
     due_at: datetime | None = None
 
 
+class ConsumeBody(BaseModel):
+    user_id: str | None = None
+    object_ref: str
+    quantity: float
+
+
+class HouseholdSeedBody(BaseModel):
+    user_id: str | None = None
+
+
 def _user(user_id: str | None) -> str:
     return user_id or get_settings().default_user
 
@@ -72,12 +84,49 @@ def create_entity(body: EntityCreate):
         category=body.category,
         location_id=body.location_id,
         quantity=body.quantity,
+        unit=body.unit,
+        consumable=body.consumable,
         aliases=body.aliases,
         **body.properties,
     )
     if obj is None:
         raise HTTPException(status_code=409, detail="实体创建失败（上限或参数非法）")
     return obj.model_dump(mode="json")
+
+
+@world_router.post("/debug/world/household/seed")
+def seed_household(body: HouseholdSeedBody):
+    created = world_engine.seed_default_household(_user(body.user_id))
+    return {"seeded": created}
+
+
+@world_router.post("/debug/world/consume")
+def consume(body: ConsumeBody):
+    result = world_engine.consume_object(
+        _user(body.user_id), body.object_ref, body.quantity
+    )
+    if not result.ok:
+        return {
+            "ok": False,
+            "error": result.error.value if result.error else "ERROR",
+        }
+    return {"ok": True, "object": result.object.name, "quantity": result.object.quantity}
+
+
+@world_router.get("/debug/world/locations/{location_id}/objects")
+def list_objects_at_location(location_id: str, user_id: str | None = None):
+    return [
+        obj.model_dump(mode="json")
+        for obj in world_engine.get_objects_by_location(_user(user_id), location_id)
+    ]
+
+
+@world_router.get("/debug/world/consumables")
+def list_consumables(user_id: str | None = None):
+    return [
+        obj.model_dump(mode="json")
+        for obj in world_engine.get_available_consumables(_user(user_id))
+    ]
 
 
 @world_router.post("/debug/world/environment")

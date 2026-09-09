@@ -26,6 +26,13 @@ class ObjectStatus(StrEnum):
     DESTROYED = "destroyed"
 
 
+class ConsumeError(StrEnum):
+    OBJECT_NOT_FOUND = "OBJECT_NOT_FOUND"
+    NOT_CONSUMABLE = "NOT_CONSUMABLE"
+    INSUFFICIENT_QUANTITY = "INSUFFICIENT_QUANTITY"
+    INVALID_QUANTITY = "INVALID_QUANTITY"
+
+
 class EventStatus(StrEnum):
     SCHEDULED = "scheduled"
     ACTIVE = "active"
@@ -102,6 +109,8 @@ class WorldObject(BaseModel):
     location_id: str
     state: str
     quantity: float = Field(default=1.0, ge=0.0)
+    unit: str = ""
+    consumable: bool = False
     properties: dict[str, Any] = {}
     status: ObjectStatus = ObjectStatus.ACTIVE
     last_action_at: datetime | None = None
@@ -199,6 +208,27 @@ class ObjectBrief(BaseModel):
     location_name: str | None = None
 
 
+class InventoryItem(BaseModel):
+    """WorldContext 中的家庭库存条目：位置 + 数量 + 单位 + consumable 事实。"""
+
+    name: str
+    quantity: float
+    unit: str = ""
+    location_id: str
+    location_name: str | None = None
+    state: str
+    consumable: bool = False
+
+
+class ConsumeResult(BaseModel):
+    """统一 Consume 的结构化结果（错误由代码表达，不依赖 LLM 判断）。"""
+
+    ok: bool
+    error: ConsumeError | None = None
+    object: WorldObject | None = None
+    previous_quantity: float | None = None
+
+
 class EventBrief(BaseModel):
     id: str
     type: str
@@ -213,6 +243,7 @@ class WorldContext(BaseModel):
     location: LocationContext
     environment: WorldEnvironment | None = None
     nearby_objects: list[ObjectBrief] = []
+    inventory: list[InventoryItem] = []
     salient_events: list[EventBrief] = []
     notes: list[str] = []
 

@@ -9,10 +9,16 @@ import logging
 import time
 from datetime import datetime, timedelta
 
-from app.character.asuna.world import HOME_LOCATIONS, OBJECT_STATE_MACHINES
+from app.character.asuna.world import (
+    DEFAULT_HOUSEHOLD,
+    HOME_LOCATIONS,
+    OBJECT_STATE_MACHINES,
+)
 from app.core.settings import get_settings
 from app.models.world import (
     WorldEnvironment as WorldEnvironmentModel,
+    ConsumeError,
+    ConsumeResult,
     EventImportance,
     EventSource,
     EventStatus,
@@ -122,6 +128,117 @@ def discard_object(user_id: str, object_id: str) -> WorldObject | None:
     return obj
 
 
+def _find_inventory_object(world: World | None, ref: str) -> WorldObject | None:
+    """按 id 或名称/别名解析活跃库存物品；未命中返回 None。"""
+    if world is None:
+        return None
+    by_id = world_repository.get_object(world.world_id, ref)
+    if by_id is not None and by_id.status is ObjectStatus.ACTIVE:
+        return by_id
+    for obj in world_repository.list_objects(world.world_id):
+        if obj.name == ref or ref in obj.aliases:
+            return obj
+    return None
+
+
+def consume_object(
+    user_id: str, object_ref: str, quantity: float
+) -> ConsumeResult:
+    """统一 Consume：按 consumable 字段 + 数量规则扣减；失败不部分扣除，返回结构化错误码。"""
+    try:
+        world = get_world(user_id)
+        obj = _find_inventory_object(world, object_ref)
+        if world is None or obj is None:
+            return ConsumeResult(ok=False, error=ConsumeError.OBJECT_NOT_FOUND)
+        if not obj.consumable:
+            return ConsumeResult(ok=False, error=ConsumeError.NOT_CONSUMABLE, object=obj)
+        if quantity is None or quantity <= 0:
+            return ConsumeResult(ok=False, error=ConsumeError.INVALID_QUANTITY, object=obj)
+        if obj.quantity < quantity:
+            return ConsumeResult(
+                ok=False,
+                error=ConsumeError.INSUFFICIENT_QUANTITY,
+                object=obj,
+                previous_quantity=obj.quantity,
+            )
+        previous = obj.quantity
+        remaining = max(0.0, round(obj.quantity - quantity, 2))
+        obj.quantity = remaining
+        if remaining == 0:
+            obj.state = "empty"
+        obj.last_action_at = datetime.now()
+        obj.updated_at = datetime.now()
+        world_repository.save_object(obj)
+        return ConsumeResult(ok=True, object=obj, previous_quantity=previous)
+    except Exception:
+        logger.exception("世界物品消耗失败")
+        return ConsumeResult(ok=False, error=ConsumeError.OBJECT_NOT_FOUND)
+
+
+def get_objects_by_location(user_id: str, location_id: str) -> list[WorldObject]:
+    """返回某位置（含其子位置）的活跃物品清单；只读。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return []
+        prefix = location_id + "."
+        return [
+            obj
+            for obj in world_repository.list_objects(world.world_id)
+            if obj.location_id == location_id or obj.location_id.startswith(prefix)
+        ]
+    except Exception:
+        logger.exception("按地点查询世界物品失败")
+        return []
+
+
+def get_available_consumables(user_id: str) -> list[WorldObject]:
+    """可消耗且仍有剩余量的物品清单；只读。"""
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return []
+        return [
+            obj
+            for obj in world_repository.list_objects(world.world_id)
+            if obj.consumable and obj.quantity > 0
+        ]
+    except Exception:
+        logger.exception("查询可消耗物品失败")
+        return []
+
+
+def seed_default_household(user_id: str) -> int:
+    """幂等播种默认家庭库存；返回本次新建数量。已存在的同名物品不重复。"""
+    try:
+        world = ensure_world(user_id)
+        if world is None:
+            return 0
+        existing = {obj.name for obj in world_repository.list_objects(world.world_id)}
+        created = 0
+        for spec in DEFAULT_HOUSEHOLD["objects"]:
+            if spec["name"] in existing:
+                continue
+            obj = create_object(
+                user_id,
+                name=spec["name"],
+                category=spec["category"],
+                location_id=spec["location_id"],
+                quantity=spec["quantity"],
+                unit=spec.get("unit", ""),
+                consumable=spec.get("consumable", False),
+            )
+            if obj is not None:
+                obj.state = "available"
+                obj.last_action_at = datetime.now()
+                world_repository.save_object(obj)
+                created += 1
+        return created
+    except Exception:
+        logger.exception("默认家庭库存播种失败")
+        return 0
+
+
 def expire_due_objects(user_id: str, now: datetime | None = None) -> int:
     """时间演化（Changed）：expiry_at 到期的活跃物品迁移到 expired，幂等。"""
     try:
@@ -193,7 +310,17 @@ def advance_time(user_id: str, delta, provider: TimeProvider | None = None) -> W
 
 def ensure_world(user_id: str) -> World | None:
     try:
-        return world_repository.ensure_world(user_id)
+        existing = world_repository.get_world(user_id)
+        world = world_repository.ensure_world(user_id)
+        settings = get_settings()
+        if (
+            world is not None
+            and existing is None
+            and settings.world_enabled
+            and settings.world_household_autoseed_enabled
+        ):
+            seed_default_household(user_id)
+        return world
     except Exception:
         logger.exception("世界初始化失败，降级为无世界")
         return None
@@ -233,6 +360,8 @@ def create_object(
     location_id: str | None = None,
     quantity: float = 1.0,
     aliases: list[str] | None = None,
+    unit: str = "",
+    consumable: bool | None = None,
     **properties,
 ) -> WorldObject | None:
     try:
@@ -256,6 +385,12 @@ def create_object(
             location_id=location_id or world.current_location,
             state=object_initial_state(OBJECT_STATE_MACHINES, category),
             quantity=quantity,
+            unit=unit or "",
+            consumable=(
+                consumable
+                if consumable is not None
+                else category in ("food", "drink")
+            ),
             properties=properties,
             status=ObjectStatus.ACTIVE,
             last_action_at=now,
