@@ -37,6 +37,7 @@
 | `prompt/` | AI 辅助开发用的任务生成 / 执行 prompt 模板 |
 | `TESTING.md` | 后端测试规范（marker、执行级别） |
 | `chat-message-link-analysis.md` | `POST /chat/message` 全链路技术分析 |
+| `household-inventory-review.md` | Household Inventory 对话审查报告（叙事与世界状态脱节分析） |
 | `PR-feat-v3-to-main.md` / `-lite.md` | feat/v3 → main 合并 PR 描述 |
 
 ## 归档（`docs/_archive/`）
