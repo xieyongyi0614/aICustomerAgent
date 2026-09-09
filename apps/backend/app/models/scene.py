@@ -26,6 +26,8 @@ SCENE_INTENT_EXAMPLES = (
 
 ActionStatus = Literal["pending", "completed", "cancelled", "superseded"]
 
+COMPLETED_ACTIONS_WINDOW = 3
+
 _SCENE_FIELD_MAX_LENGTH = 50
 
 
@@ -51,6 +53,7 @@ class SceneState(BaseModel):
     pending_action: PendingAction | None = None
     scene_mood: str | None = Field(default=None, max_length=_SCENE_FIELD_MAX_LENGTH)
     last_active_at: datetime | None = None
+    completed_actions: list[str] = Field(default_factory=list)
 
     def persistent_dump(self) -> dict:
         return self.model_dump(exclude={"scene_mood"})
@@ -72,3 +75,4 @@ class SceneActionDecision(BaseModel):
     )
     pending_action_done: bool = False
     pending_action_cancel: bool = False
+    current_action_done: bool = False

@@ -102,3 +102,41 @@ def test_scene_section_without_last_active_at_has_no_time_line():
     )
     section = build_scene_section(state)
     assert "现在时间：" not in section
+
+
+def test_scene_section_completed_actions_rendered_as_done():
+    from app.models.scene import SceneState
+
+    state = SceneState(
+        session_id="s1",
+        current_action=None,
+        completed_actions=["端面碗", "加蛋"],
+    )
+    section = build_scene_section(state)
+    assert "刚完成：端面碗、加蛋" in section
+    assert "不要再重复执行" in section
+    assert "待完成动作" not in section
+
+
+def test_scene_section_completed_pending_not_rendered_as_todo():
+    from app.models.scene import PendingAction, SceneState
+
+    state = SceneState(
+        session_id="s1",
+        pending_action=PendingAction(action="端面碗", status="completed"),
+        completed_actions=["端面碗"],
+    )
+    section = build_scene_section(state)
+    assert "待完成动作" not in section
+    assert "刚完成：端面碗" in section
+
+
+def test_scene_update_snapshot_includes_completed_line():
+    from app.models.scene import SceneState
+    from app.chains.scene_update_chain import build_snapshot
+
+    snapshot = build_snapshot(
+        SceneState(session_id="s1", completed_actions=["端面碗"])
+    )
+    assert "刚完成：端面碗" in snapshot
+    assert "待完成动作：无" in snapshot

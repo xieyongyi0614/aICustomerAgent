@@ -3,7 +3,13 @@ from datetime import datetime
 
 from app.chains import scene_update_chain
 from app.core.settings import get_settings
-from app.models.scene import PendingAction, SceneActionDecision, SceneIntent, SceneState
+from app.models.scene import (
+    COMPLETED_ACTIONS_WINDOW,
+    PendingAction,
+    SceneActionDecision,
+    SceneIntent,
+    SceneState,
+)
 from app.repositories import scene_state_repository
 
 _FIELD_MAX_LENGTH = 50
@@ -137,6 +143,9 @@ def update_scene_state(
     if decision.current_action is not None:
         next_state.current_action = _truncate(decision.current_action)
 
+    if decision.current_action_done:
+        next_state = next_state.model_copy(update={"current_action": None})
+
     pending = next_state.pending_action
 
     if decision.new_pending_action is not None and intent == "request_action":
@@ -152,11 +161,21 @@ def update_scene_state(
         and pending is not None
         and pending.status == "pending"
     ):
+        history = [
+            action
+            for action in next_state.completed_actions
+            if action != pending.action
+        ]
+        history.append(pending.action)
         next_state = next_state.model_copy(
             update={
-                "pending_action": pending.model_copy(update={"status": "completed"})
+                "pending_action": None,
+                "completed_actions": history[-COMPLETED_ACTIONS_WINDOW:],
             }
         )
+        pending = None
+        if decision.current_action is None:
+            next_state = next_state.model_copy(update={"current_action": None})
 
     return next_state
 

@@ -10,10 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 def build_snapshot(state: SceneState) -> str:
+    pending = state.pending_action
     pending_line = (
-        f"待完成动作：{state.pending_action.action}（状态：{state.pending_action.status}）"
-        if state.pending_action is not None
+        f"待完成动作：{pending.action}（状态：{pending.status}）"
+        if pending is not None and pending.status == "pending"
         else "待完成动作：无"
+    )
+    completed_line = (
+        "刚完成：" + "、".join(state.completed_actions)
+        if state.completed_actions
+        else "刚完成：无"
     )
     return "\n".join(
         [
@@ -21,6 +27,7 @@ def build_snapshot(state: SceneState) -> str:
             f"活动：{state.current_activity or '未知'}",
             f"正在做：{state.current_action or '未知'}",
             pending_line,
+            completed_line,
         ]
     )
 
