@@ -477,6 +477,8 @@ def expire_stale_events(user_id: str, now: datetime | None = None) -> int:
             event.updated_at = now
             world_repository.save_event(event)
             expired += 1
+            if settings.world_memory_bridge_enabled:
+                materialize_event_memory(event, user_id)
         return expired
     except Exception:
         logger.exception("世界事件过期清理失败")

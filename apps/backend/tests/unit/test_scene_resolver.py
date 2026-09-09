@@ -80,3 +80,49 @@ def test_resolve_does_not_mutate_input_state():
     original_status = state.pending_action.status
     scene_service.resolve("interrupt", state, 4)
     assert state.pending_action.status == original_status
+
+
+def _stale_state(pending=None, hours_ago=30.0):
+    from datetime import datetime, timedelta
+
+    return SceneState(
+        session_id="s-1",
+        turn_id=4,
+        location="厨房",
+        current_activity="煮面",
+        pending_action=pending,
+        last_active_at=datetime.now() - timedelta(hours=hours_ago),
+    )
+
+
+def test_idle_gap_cancels_pending_and_clears_activity():
+    state = _stale_state(PendingAction(action="煮面", created_at_turn=1))
+    new_state, directive = scene_service.resolve("chat", state, 10)
+    assert new_state.pending_action.status == "cancelled"
+    assert new_state.current_activity is None
+    assert directive is not None
+    assert "一天" in directive
+    assert "不要延续旧活动" in directive
+
+
+def test_recent_activity_keeps_scene_alive():
+    state = _stale_state(PendingAction(action="煮面", created_at_turn=1), hours_ago=1.0)
+    new_state, directive = scene_service.resolve("continue_scene", state, 4)
+    assert new_state.pending_action.status == "pending"
+    assert new_state.current_activity == "煮面"
+    assert directive is not None and "先完成待完成动作" in directive
+
+
+def test_idle_reset_disabled_keeps_scene_alive(override_settings):
+    override_settings(scene_idle_reset_enabled=False)
+    state = _stale_state(PendingAction(action="煮面", created_at_turn=1))
+    new_state, directive = scene_service.resolve("continue_scene", state, 4)
+    assert new_state.pending_action.status == "pending"
+    assert directive is not None and "先完成待完成动作" in directive
+
+
+def test_state_without_last_active_at_is_never_stale():
+    state = _state(PendingAction(action="切西瓜", created_at_turn=1))
+    new_state, directive = scene_service.resolve("continue_scene", state, 4)
+    assert new_state.pending_action.status == "pending"
+    assert directive is not None and "先完成待完成动作" in directive

@@ -60,7 +60,9 @@ async def chat_message(
                     if "scene_intent" in event:
                         payload["scene_intent"] = event["scene_intent"].model_dump()
                     if "scene_state" in event:
-                        payload["scene_state"] = event["scene_state"].model_dump()
+                        payload["scene_state"] = event["scene_state"].model_dump(
+                            mode="json"
+                        )
                     if "intention" in event:
                         intention_payload = event["intention"].model_dump()
                         intention_payload["type"] = intention_payload.pop("intention")

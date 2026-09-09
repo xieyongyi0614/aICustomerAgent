@@ -46,6 +46,19 @@ _AFFINITY_TYPE_ALIASES = {
     "relationship_event": "relationship_fact",
 }
 
+TEMPORAL_QUERY_KEYWORDS = (
+    "什么时候",
+    "多久",
+    "上次",
+    "最近",
+    "昨天",
+    "前天",
+    "上周",
+    "之前",
+    "哪天",
+    "几号",
+)
+
 _DEFAULT_SALIENCE = 0.5
 
 
@@ -75,6 +88,10 @@ def _detect_query_types(query: str) -> set[str]:
         for memory_type, keywords in QUERY_TYPE_KEYWORDS.items()
         if any(keyword in query for keyword in keywords)
     }
+
+
+def _is_temporal_query(query: str) -> bool:
+    return any(keyword in query for keyword in TEMPORAL_QUERY_KEYWORDS)
 
 
 def _cosine(left: list[float], right: list[float]) -> float:
@@ -225,6 +242,7 @@ def _score_all(
     query_embedding: list[float] | None,
     query_types: set[str],
     now: datetime,
+    temporal: bool = False,
 ) -> list[RankedMemory]:
     settings = get_settings()
     ranked = []
@@ -241,6 +259,8 @@ def _score_all(
             + settings.v2_memory_weight_structured * structured
             + settings.v2_memory_weight_affinity * affinity
         )
+        if temporal:
+            score += settings.v2_memory_temporal_recency_boost * _recency(memory, now)
         ranked.append(
             RankedMemory(
                 memory=memory,
@@ -288,7 +308,9 @@ def retrieve(
     cooldown_ids = _contradicts_cooldown_ids(user_id, now) if pool else set()
 
     query_types = _detect_query_types(query_text)
-    ranked = _score_all(pool, facts, query_embedding, query_types, now)
+    ranked = _score_all(
+        pool, facts, query_embedding, query_types, now, temporal=_is_temporal_query(query_text)
+    )
     kept: list[RankedMemory] = []
     filtered: list[RankedMemory] = []
     for item in ranked:

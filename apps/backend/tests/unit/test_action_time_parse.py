@@ -31,6 +31,26 @@ def test_half_hour_later():
     assert parse_time_phrase("半小时后", NOW) == datetime(2026, 9, 3, 14, 30)
 
 
+def test_hours_before_absolute():
+    assert parse_time_phrase("22小时之前", NOW) == datetime(2026, 9, 2, 16, 0)
+
+
+def test_hours_before_cn_number():
+    assert parse_time_phrase("三小时前", NOW) == datetime(2026, 9, 3, 11, 0)
+
+
+def test_half_hour_before():
+    assert parse_time_phrase("半小时前", NOW) == datetime(2026, 9, 3, 13, 30)
+
+
+def test_days_before():
+    assert parse_time_phrase("2天前", NOW) == datetime(2026, 9, 1, 14, 0)
+
+
+def test_floor_number_is_not_time():
+    assert parse_time_phrase("我在22层煮面", NOW) is None
+
+
 def test_minutes_later_cn():
     assert parse_time_phrase("十分钟后", NOW) == datetime(2026, 9, 3, 14, 10)
 

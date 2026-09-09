@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -38,6 +39,7 @@ class PendingAction(BaseModel):
     action: str = Field(max_length=_SCENE_FIELD_MAX_LENGTH)
     status: ActionStatus = "pending"
     created_at_turn: int = Field(default=0, ge=0)
+    created_at: datetime | None = None
 
 
 class SceneState(BaseModel):
@@ -48,6 +50,7 @@ class SceneState(BaseModel):
     current_action: str | None = Field(default=None, max_length=_SCENE_FIELD_MAX_LENGTH)
     pending_action: PendingAction | None = None
     scene_mood: str | None = Field(default=None, max_length=_SCENE_FIELD_MAX_LENGTH)
+    last_active_at: datetime | None = None
 
     def persistent_dump(self) -> dict:
         return self.model_dump(exclude={"scene_mood"})
