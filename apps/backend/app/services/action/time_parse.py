@@ -19,6 +19,8 @@ _RELATIVE_DELTAS = {
 }
 
 _MINUTES_PATTERN = re.compile(r"(半|\d+|[零一二两三四五六七八九十]+)分钟")
+_HOURS_BEFORE_PATTERN = re.compile(r"(半|\d+|[零一二两三四五六七八九十]+)个?小时之?前")
+_DAYS_BEFORE_PATTERN = re.compile(r"(\d+|[零一二两三四五六七八九十]+)天之?前")
 
 
 def _parse_cn_int(text: str) -> int | None:
@@ -85,6 +87,19 @@ def parse_time_phrase(text: str, now: datetime) -> datetime | None:
     """时间短语 → due_at；无时间语义返回 None。"""
     if not text:
         return None
+
+    hours_before = _HOURS_BEFORE_PATTERN.search(text)
+    if hours_before:
+        value = hours_before.group(1)
+        hours = 0.5 if value == "半" else _parse_cn_int(value)
+        if hours is not None:
+            return (now - timedelta(hours=hours)).replace(second=0, microsecond=0)
+
+    days_before = _DAYS_BEFORE_PATTERN.search(text)
+    if days_before:
+        days = _parse_cn_int(days_before.group(1))
+        if days is not None:
+            return (now - timedelta(days=days)).replace(second=0, microsecond=0)
 
     for phrase, delta in _RELATIVE_DELTAS.items():
         if phrase in text:

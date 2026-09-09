@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from app.models.scene import SceneContext, SceneState
+from app.models.world import WEEKDAY_CN
 
 RHYTHM_BLOCK = """【回复节奏】
 一次回复只推进合理的一小步剧情：
@@ -44,6 +47,12 @@ def build_scene_section(state: SceneState) -> str | None:
     if not has_scene_content(state):
         return None
     lines = ["【当前场景】"]
+    if state.last_active_at is not None:
+        now = datetime.now()
+        lines.append(
+            f"现在时间：{now:%Y-%m-%d %H:%M}（星期{WEEKDAY_CN[now.weekday()]}）；"
+            f"本场景开始于{state.last_active_at:%Y-%m-%d %H:%M}"
+        )
     if state.location is not None:
         lines.append(f"地点：{state.location}")
     if state.current_activity is not None:

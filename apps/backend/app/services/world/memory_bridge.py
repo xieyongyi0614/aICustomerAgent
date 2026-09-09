@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 from app.core.settings import get_settings
-from app.models.world import EventImportance, WorldEvent
+from app.models.world import EventImportance, EventStatus, WorldEvent
 from app.repositories import memory_repository, world_repository
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,19 @@ def to_memory_candidates(event: WorldEvent) -> list[dict]:
     if threshold <= 0.0:
         return []
     moment = event.completed_at or event.due_at or datetime.now()
+    if event.status is EventStatus.EXPIRED:
+        started = event.started_at or event.due_at or datetime.now()
+        return [
+            {
+                "content": (
+                    f"用户在{started.strftime('%m月%d日')}提到过{event.title}，"
+                    f"后来没有完成，已过期"
+                ),
+                "memory_type": EVENT_MEMORY_TYPES.get(event.type, "important_event"),
+                "importance": min(threshold, 0.5),
+                "confidence": 0.7,
+            }
+        ]
     return [
         {
             "content": f"用户在{moment.strftime('%m月%d日')}完成了{event.title}",

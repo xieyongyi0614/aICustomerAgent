@@ -62,6 +62,7 @@ class MemorySettings(BaseSettings):
     v2_memory_penalty_contradicts: float = 0.2
     v2_memory_rejected_cooldown_hours: float = 24.0
     v2_memory_vector_recall_k: int = 20
+    v2_memory_temporal_recency_boost: float = 0.2
     v2_memory_ingest_max_per_turn: int = 10
     v2_memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'

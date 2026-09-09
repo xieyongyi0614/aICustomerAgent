@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 from app.chains import scene_update_chain
 from app.core.settings import get_settings
@@ -6,6 +7,32 @@ from app.models.scene import PendingAction, SceneActionDecision, SceneIntent, Sc
 from app.repositories import scene_state_repository
 
 _FIELD_MAX_LENGTH = 50
+
+
+def _idle_gap_text(state: SceneState, now: datetime) -> str:
+    reference = state.last_active_at
+    if reference is None:
+        return "一段时间"
+    delta = now - reference
+    hours = delta.total_seconds() / 3600
+    if hours >= 24:
+        days = int(hours // 24)
+        return f"{days}天" if days > 1 else "一天"
+    if hours >= 1:
+        return f"{int(hours)}个小时"
+    return f"{max(int(delta.total_seconds() // 60), 1)}分钟"
+
+
+def _stale_directive(state: SceneState, now: datetime) -> str | None:
+    if not get_settings().scene_idle_reset_enabled:
+        return None
+    if state.last_active_at is None:
+        return None
+    gap = _idle_gap_text(state, now)
+    return (
+        f"距上次对话已过去{gap}，之前的场景活动与待办均已结束，"
+        f"不要延续旧活动，自然承接当前对话"
+    )
 
 
 def load(session_id: str) -> SceneState:
@@ -16,19 +43,37 @@ def _pending_directive(pending: PendingAction, verb: str) -> str:
     return f"{verb}“{pending.action}”"
 
 
+def _is_idle_expired(state: SceneState, now: datetime) -> bool:
+    if not get_settings().scene_idle_reset_enabled or state.last_active_at is None:
+        return False
+    idle_hours = (now - state.last_active_at).total_seconds() / 3600
+    return idle_hours >= get_settings().scene_idle_reset_hours
+
+
 def resolve(
     intent: SceneIntent,
     state: SceneState,
     current_turn: int,
     pending_max_turns: int | None = None,
+    now: datetime | None = None,
 ) -> tuple[SceneState, str | None]:
+    current_now = now or datetime.now()
+    directives: list[str] = []
+    pending = state.pending_action
+    if _is_idle_expired(state, current_now):
+        stale = _stale_directive(state, current_now)
+        if stale is not None:
+            directives.append(stale)
+        state = state.model_copy(
+            update={"current_activity": None, "current_action": None}
+        )
+        if pending is not None and pending.status == "pending":
+            pending = pending.model_copy(update={"status": "cancelled"})
     max_turns = (
         pending_max_turns
         if pending_max_turns is not None
         else get_settings().scene_pending_max_turns
     )
-    directives: list[str] = []
-    pending = state.pending_action
 
     if pending is not None and pending.status == "pending":
         age = current_turn - pending.created_at_turn
@@ -60,9 +105,14 @@ def resolve(
 
 
 def apply_new_pending(
-    state: SceneState, action: str, current_turn: int
+    state: SceneState, action: str, current_turn: int, now: datetime | None = None
 ) -> SceneState:
-    new_pending = PendingAction(action=action, status="pending", created_at_turn=current_turn)
+    new_pending = PendingAction(
+        action=action,
+        status="pending",
+        created_at_turn=current_turn,
+        created_at=now or datetime.now(),
+    )
     return state.model_copy(update={"pending_action": new_pending})
 
 

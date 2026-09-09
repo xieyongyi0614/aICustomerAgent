@@ -78,6 +78,33 @@ def _freshness(memory) -> tuple:
     return (reference, memory.importance)
 
 
+def _relative_time_label(reference: datetime, now: datetime) -> str | None:
+    if reference.tzinfo is not None:
+        reference = reference.replace(tzinfo=None)
+    hours = (now - reference).total_seconds() / 3600
+    if hours < 1:
+        return None
+    if hours < 24:
+        return f"{int(hours)}小时前"
+    if hours < 48:
+        return "昨天"
+    if hours < 72:
+        return "前天"
+    return f"{int(hours // 24)}天前"
+
+
+def _with_time_anchor(memory, now: datetime):
+    reference = memory.last_accessed_at or memory.created_at
+    if reference is None or not memory.content:
+        return memory
+    label = _relative_time_label(reference, now)
+    if label is None:
+        return memory
+    if f"（{label}）" in memory.content:
+        return memory
+    return memory.model_copy(update={"content": f"{memory.content}（{label}）"})
+
+
 def _load_context_insights(
     user_id: str, retrieval_used: int, trace=None
 ) -> tuple[list[InsightSummary], dict]:
@@ -231,13 +258,17 @@ def _build_sync(
     try:
         if get_settings().v2_memory_enabled:
             ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
-            memories, retrieval_used, dropped = _select_retrieval_segment(ranked)
+            selected, retrieval_used, dropped = _select_retrieval_segment(ranked)
+            memories = [_with_time_anchor(m, datetime.now()) for m in selected]
             insights, insight_payload = _load_context_insights(
                 user_id, retrieval_used, trace=trace
             )
         else:
             recalled = memory_service.retrieve(user_id, current_input)
-            memories = memory_service.select_for_context(recalled)
+            memories = [
+                _with_time_anchor(m, datetime.now())
+                for m in memory_service.select_for_context(recalled)
+            ]
     except Exception:
         logger.exception("记忆检索失败，降级为空记忆")
         memories = []
