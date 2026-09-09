@@ -29,7 +29,7 @@ api → application（编排） → services → repositories → core
 - `api` 层禁止直接依赖 `repositories` 与 langchain。
 - LLM 实例必须来自 `core/llm_factory.get_llm()`（profile 机制），禁止各处新建 `ChatOpenAI`；结构化输出统一走 `chains/structured.py` 的 `build_structured_chain`（主链 + 一层降级），禁止自由解析。
 - DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM。
-- 数据库结构变更只走 Alembic（`migrations/`，当前链尾 `0032`），`create_all` 已退役（单元测试内存建表属豁免）。
+- 数据库结构变更只走 Alembic（`migrations/`，当前链尾 `0033`），`create_all` 已退役（单元测试内存建表属豁免）。
 - 所有阈值/魔法数字放 `core/settings/` 包（15 个领域模块，平铺字段名），禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理（post_process）失败不得影响已产出的回答。
 - 角色资产按人设分子目录存放于 `character/<persona>/`（如 `character/asuna/`），每人设一套 identity/personality/relationship/behavior/modes/goals/habits。
@@ -50,3 +50,11 @@ api → application（编排） → services → repositories → core
 - golden prompt 快照回归：`tests/golden/` + `tests/unit/test_prompt_golden.py`，`UPDATE_GOLDEN=1` 重新生成。
 - 慢测试加入 `conftest.py` 的 `SLOW_TEST_FILES`（或 `@pytest.mark.slow`），日常开发用 `-m "not slow"` 排除。
 - commit 门槛：影响范围分级测试全绿（Focused Test → Module Test → 必要时 Fast Test；`core/` 基础设施改动走 Fast Test）。全量 pytest 仅在阶段收口 / PR / 发布 / 用户明确要求时执行，执行前先汇报测试规模。
+
+## 临时文件处理
+
+- **禁止在仓库工作区内创建临时文件**：验证脚本、草稿、日志、测试输出一律不写入仓库目录；确需落盘时统一放 `apps/backend/.tmp/`（已 gitignore），或系统临时目录。
+- **pytest 输出重定向**：需要落盘测试输出时重定向到 `apps/backend/.tmp/` 下；`pytest_out.txt` / `pytest_err.txt` / `*.log` / `.pytest_tmp/` 虽已 gitignore 兜底，但生成后应随手删除，不留到任务结束。
+- **任务结束前清理**：每次任务收口（提交前）必须检查 `git status`，保证无未跟踪的临时产物（重定向日志、`pytest_last.log`、快照 diff、临时迁移草稿等）；已 gitignore 的临时目录（如 `.pytest_tmp/`）也应删除，避免磁盘残留。
+- **commit message 不落盘**：多行 commit message 用 `git commit -F <系统临时目录文件>` 或命令行传参，禁止在仓库根创建 `.git-commit-msg.txt` 之类文件（即便事后删除，也会污染 `git status`）。
+- **测试快照 / 报告产物**：golden 更新（`UPDATE_GOLDEN=1`）与 eval 报告属版本产物，按各自规范处理；其余一次性输出用完即删。

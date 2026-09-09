@@ -14,3 +14,5 @@ apps/backend/tests/eval/reports/rel-*.json
 # 本地临时与日志
 apps/backend/.tmp/
 *.log
+pytest_out.txt
+pytest_err.txt
