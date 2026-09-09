@@ -64,12 +64,56 @@ def test_new_pending_dropped_on_non_request_intent():
     assert new_state.pending_action is None
 
 
-def test_pending_action_done_completes_active_pending():
+def test_pending_action_done_moves_to_completed_history():
     prev = _state(pending=PendingAction(action="切西瓜", created_at_turn=1))
     new_state = scene_service.update_scene_state(
         prev, _decision(pending_action_done=True), "chat", 4
     )
-    assert new_state.pending_action.status == "completed"
+    assert new_state.pending_action is None
+    assert new_state.completed_actions == ["切西瓜"]
+    assert new_state.current_action is None
+
+
+def test_pending_done_keeps_new_current_action():
+    prev = _state(
+        pending=PendingAction(action="切西瓜", created_at_turn=1),
+        current_action="切西瓜",
+    )
+    new_state = scene_service.update_scene_state(
+        prev,
+        _decision(pending_action_done=True, current_action="装碗"),
+        "chat",
+        4,
+    )
+    assert new_state.pending_action is None
+    assert new_state.completed_actions == ["切西瓜"]
+    assert new_state.current_action == "装碗"
+
+
+def test_completed_history_dedupes_and_caps_window():
+    prev = _state(pending=PendingAction(action="端碗", created_at_turn=1))
+    prev = prev.model_copy(update={"completed_actions": ["端碗", "煮面", "摆桌"]})
+    new_state = scene_service.update_scene_state(
+        prev, _decision(pending_action_done=True), "chat", 4
+    )
+    assert new_state.completed_actions == ["煮面", "摆桌", "端碗"]
+    assert len(new_state.completed_actions) == 3
+
+
+def test_current_action_done_clears_current_action():
+    prev = _state(current_action="端碗")
+    new_state = scene_service.update_scene_state(
+        prev, _decision(current_action_done=True), "chat", 4
+    )
+    assert new_state.current_action is None
+
+
+def test_current_action_done_defaults_false_for_legacy_decisions():
+    decision = SceneActionDecision.model_construct(location="厨房")
+    assert decision.current_action_done is False
+    prev = _state(current_action="端碗")
+    new_state = scene_service.update_scene_state(prev, decision, "chat", 4)
+    assert new_state.current_action == "端碗"
 
 
 def test_updater_does_not_complete_cancelled_pending():
@@ -78,7 +122,9 @@ def test_updater_does_not_complete_cancelled_pending():
     new_state = scene_service.update_scene_state(
         prev, _decision(pending_action_done=True), "chat", 4
     )
+    assert new_state.pending_action is not None
     assert new_state.pending_action.status == "cancelled"
+    assert new_state.completed_actions == []
 
 
 def test_none_decision_keeps_previous_state():

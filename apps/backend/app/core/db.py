@@ -327,6 +327,9 @@ class SceneStateRow(Base):
     current_activity: Mapped[str | None] = mapped_column(String, nullable=True)
     current_action: Mapped[str | None] = mapped_column(String, nullable=True)
     pending_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completed_actions: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

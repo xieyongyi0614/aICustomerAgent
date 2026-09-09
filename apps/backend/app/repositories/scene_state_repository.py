@@ -20,6 +20,7 @@ def _to_state(row: SceneStateRow) -> SceneState:
         current_action=row.current_action,
         pending_action=_parse_pending_action(row.pending_action),
         last_active_at=row.updated_at,
+        completed_actions=list(row.completed_actions or []),
     )
 
 
@@ -46,8 +47,11 @@ def upsert_scene_state(session_id: str, state: SceneState) -> SceneState:
         if pending is not None and pending.created_at is None:
             pending = pending.model_copy(update={"created_at": now})
         row.pending_action = (
-            json.dumps(pending.model_dump()) if pending is not None else None
+            json.dumps(pending.model_dump(mode="json"))
+            if pending is not None
+            else None
         )
+        row.completed_actions = state.completed_actions
         row.updated_at = now
         session.commit()
         session.refresh(row)

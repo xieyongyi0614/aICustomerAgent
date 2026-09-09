@@ -32,7 +32,7 @@ def action_budget_line(budget) -> str:
 
 
 def has_scene_content(state: SceneState) -> bool:
-    return any(
+    return bool(state.completed_actions) or any(
         value is not None
         for value in (
             state.location,
@@ -59,9 +59,13 @@ def build_scene_section(state: SceneState) -> str | None:
         lines.append(f"活动：{state.current_activity}")
     if state.current_action is not None:
         lines.append(f"正在做：{state.current_action}")
-    if state.pending_action is not None:
+    pending = state.pending_action
+    if pending is not None and pending.status == "pending":
+        lines.append(f"待完成动作：{pending.action}（状态：{pending.status}）")
+    if state.completed_actions:
         lines.append(
-            f"待完成动作：{state.pending_action.action}（状态：{state.pending_action.status}）"
+            "刚完成：" + "、".join(state.completed_actions)
+            + "（这些动作已经发生，不要再重复执行或描写）"
         )
     if state.scene_mood is not None:
         lines.append(f"氛围：{state.scene_mood}")
