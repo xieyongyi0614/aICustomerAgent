@@ -229,7 +229,7 @@ def test_golden_v65_degraded_fallback():
             degraded=True,
         ),
         budget=ActionBudget(),
-        fallback_v2=BEHAVIOR_INSTRUCTIONS["comfort"],
+        fallback_directive=BEHAVIOR_INSTRUCTIONS["comfort"],
     )
     text = _render(
         PromptBuilder.build(

@@ -82,11 +82,11 @@ def _resolve_relationship_event(
     decision = analysis.relationship_event
     if decision.type != "none":
         return decision.type, decision.magnitude, decision.confidence, decision.cause
-    v2_event = analysis.user_emotion.event
-    mapped = turn_analysis_chain.map_v2_event_to_relationship(v2_event)
+    event = analysis.user_emotion.event
+    mapped = turn_analysis_chain.map_event_to_relationship(event)
     if mapped != "none":
         return mapped, "normal", 0.5, ""
-    if v2_event == "daily":
+    if event == "daily":
         return "long_interaction", "weak", 0.3, ""
     return "none", "normal", 0.0, ""
 

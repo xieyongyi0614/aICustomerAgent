@@ -341,8 +341,6 @@ def override_settings(monkeypatch):
             "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
             "action_enabled": "ACTION_ENABLED",
             "action_detector_enabled": "ACTION_DETECTOR_ENABLED",
-            "action_llm_assist_enabled": "ACTION_LLM_ASSIST_ENABLED",
-            "action_llm_assist_sample_rate": "ACTION_LLM_ASSIST_SAMPLE_RATE",
             "action_plan_max_steps": "ACTION_PLAN_MAX_STEPS",
             "action_plan_expires_minutes": "ACTION_PLAN_EXPIRES_MINUTES",
             "action_max_active_per_user": "ACTION_MAX_ACTIVE_PER_USER",

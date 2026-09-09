@@ -28,4 +28,3 @@ class AutonomyAdvancedSettings(BaseSettings):
     v2_autonomy_abandon_min_progress_days: int = 14
     v2_autonomy_arbitration_interval_minutes: int = 60
     v2_autonomy_priority_layer_weight_long: float = 1.0
-    v2_autonomy_judge_sample_rate: float = 1.0

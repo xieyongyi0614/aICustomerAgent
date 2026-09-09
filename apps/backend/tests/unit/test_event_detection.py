@@ -131,19 +131,19 @@ class TestEventDetection:
 
 class TestV2EventMapping:
     def test_documented_mappings(self):
-        assert turn_analysis_chain.map_v2_event_to_relationship("achievement") == "praise"
-        assert turn_analysis_chain.map_v2_event_to_relationship("complaint") == "criticized"
-        assert turn_analysis_chain.map_v2_event_to_relationship("conflict") == "conflict"
-        assert turn_analysis_chain.map_v2_event_to_relationship("share_goal") == "user_help"
-        assert turn_analysis_chain.map_v2_event_to_relationship("seek_help") == "user_help"
-        assert turn_analysis_chain.map_v2_event_to_relationship("help_given") == "user_care"
+        assert turn_analysis_chain.map_event_to_relationship("achievement") == "praise"
+        assert turn_analysis_chain.map_event_to_relationship("complaint") == "criticized"
+        assert turn_analysis_chain.map_event_to_relationship("conflict") == "conflict"
+        assert turn_analysis_chain.map_event_to_relationship("share_goal") == "user_help"
+        assert turn_analysis_chain.map_event_to_relationship("seek_help") == "user_help"
+        assert turn_analysis_chain.map_event_to_relationship("help_given") == "user_care"
 
     def test_ambiguous_events_map_to_none(self):
         for event in ("daily", "setback", "farewell"):
-            assert turn_analysis_chain.map_v2_event_to_relationship(event) == "none"
+            assert turn_analysis_chain.map_event_to_relationship(event) == "none"
 
     def test_unknown_event_defaults_none(self):
-        assert turn_analysis_chain.map_v2_event_to_relationship("unknown") == "none"
+        assert turn_analysis_chain.map_event_to_relationship("unknown") == "none"
 
 
 class TestRelationshipEventDecisionModel:

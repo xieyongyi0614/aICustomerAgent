@@ -233,7 +233,7 @@ def _degraded_directive(analysis=None) -> BehaviorDirective:
             degraded=True,
         ),
         budget=ActionBudget(),
-        fallback_v2=fallback,
+        fallback_directive=fallback,
     )
 
 
