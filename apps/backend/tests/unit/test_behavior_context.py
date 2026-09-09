@@ -60,7 +60,7 @@ def test_habits_rendered_max_two():
 
 
 def test_degraded_renders_v2_fallback():
-    directive = _directive(fallback_v2=BEHAVIOR_INSTRUCTIONS["comfort"])
+    directive = _directive(fallback_directive=BEHAVIOR_INSTRUCTIONS["comfort"])
     text = build_behavior_section(directive)
     assert "【本轮行为指令】" in text
     assert BEHAVIOR_INSTRUCTIONS["comfort"] in text
@@ -69,7 +69,7 @@ def test_degraded_renders_v2_fallback():
 
 def test_literal_braces_safe():
     directive = _directive(
-        fallback_v2=None,
+        fallback_directive=None,
         activity_text="整理{奇怪}的收藏",
     )
     directive.activity = "ambient_activity"

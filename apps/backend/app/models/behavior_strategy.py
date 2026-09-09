@@ -131,7 +131,7 @@ class BehaviorDirective(BaseModel):
     habits: list[HabitRule] = []
     activity: ActivityPresence = "idle"
     activity_text: str | None = None
-    fallback_v2: str | None = None
+    fallback_directive: str | None = None
     development_style: DevelopmentStyleParams | None = None
     development_care_hint: str = ""
 

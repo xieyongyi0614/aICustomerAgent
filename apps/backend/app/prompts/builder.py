@@ -307,7 +307,7 @@ class PromptBuilder:
         activity_section = None
         if analysis is not None and behavior_ctx is not None:
             activity_section = build_activity_section(behavior_ctx)
-            if behavior_ctx.fallback_v2 is not None:
+            if behavior_ctx.fallback_directive is not None:
                 tail_sections.append(_literal(build_behavior_section(behavior_ctx)))
             else:
                 behavior_section = build_behavior_section(behavior_ctx)
@@ -319,7 +319,7 @@ class PromptBuilder:
             tail_sections.append(PromptBuilder.build_behavior_section(analysis))
         scene_budget = (
             behavior_ctx.budget
-            if behavior_ctx is not None and behavior_ctx.fallback_v2 is None
+            if behavior_ctx is not None and behavior_ctx.fallback_directive is None
             else None
         )
         if scene_ctx is not None:

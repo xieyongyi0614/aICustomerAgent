@@ -56,7 +56,7 @@ def test_base_mapping_comfort_to_quiet_companion():
     assert directive.strategy.strategy == "quiet_companion"
     assert directive.strategy.base_strategy == "quiet_companion"
     assert directive.strategy.degraded is False
-    assert directive.fallback_v2 is None
+    assert directive.fallback_directive is None
 
 
 def test_modifier_professional_overrides_all():
@@ -130,7 +130,7 @@ def test_degraded_intention_falls_back_v2():
         _intention(degraded=True), _state(), _scene_ctx(), "default", turn
     )
     assert directive.degraded is True
-    assert directive.fallback_v2 is not None
+    assert directive.fallback_directive is not None
 
 
 def test_resolve_never_raises():

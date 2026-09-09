@@ -13,8 +13,6 @@ class ActionSettings(BaseSettings):
 
     action_enabled: bool = False
     action_detector_enabled: bool = True
-    action_llm_assist_enabled: bool = False
-    action_llm_assist_sample_rate: float = 0.0
     action_plan_max_steps: int = 1
     action_plan_expires_minutes: int = 5
     action_plan_expiry_hours: int = 24
@@ -44,8 +42,6 @@ class ActionSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_action_config(self):
-        if self.action_llm_assist_sample_rate < 0 or self.action_llm_assist_sample_rate > 1.0:
-            raise SettingsError("ACTION_LLM_ASSIST_SAMPLE_RATE 必须在 [0, 1]")
         if self.action_plan_max_steps < 1:
             raise SettingsError("ACTION_PLAN_MAX_STEPS 必须至少为 1")
         if self.action_max_active_per_user < 1:

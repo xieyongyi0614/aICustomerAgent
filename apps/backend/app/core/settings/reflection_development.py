@@ -29,7 +29,6 @@ class ReflectionSettings(BaseSettings):
     v2_reflection_run_timeout_minutes: int = 10
     v2_reflection_statement_max_chars: int = 200
     v2_reflection_invalidate_match_threshold: float = 0.7
-    v2_reflection_judge_sample_rate: float = 1.0
     v2_reflection_context_scopes_json: str = '["user", "relationship"]'
     v2_reflection_context_max_items: int = 5
     v2_reflection_context_statement_chars: int = 120
@@ -61,7 +60,6 @@ class RelationshipEvolvedSettings(BaseSettings):
     v2_relationship_shared_budget_chars: int = 200
     v2_relationship_shared_limit: int = 3
     v2_relationship_shared_min_salience: float = 0.6
-    v2_relationship_shared_cache_ttl_seconds: int = 0
     v2_relationship_pattern_min_strength: float = 0.6
     v2_relationship_pattern_budget_chars: int = 120
     v2_relationship_pattern_max_items: int = 2

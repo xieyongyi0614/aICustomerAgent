@@ -27,8 +27,8 @@ CONTACT_LINES = {
 def build_behavior_section(directive: BehaviorDirective | None) -> str | None:
     if directive is None:
         return None
-    if directive.fallback_v2 is not None:
-        lines = ["【本轮行为指令】", directive.fallback_v2]
+    if directive.fallback_directive is not None:
+        lines = ["【本轮行为指令】", directive.fallback_directive]
         budget_line = _budget_line(directive)
         if budget_line:
             lines.append(budget_line)
