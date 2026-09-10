@@ -549,9 +549,13 @@ def record_character_action_event(
 
         if dedupe_key:
             for event in world_repository.list_events(
-                world.world_id, statuses=["completed"], limit=50
+                world.world_id,
+                statuses=["completed"],
+                limit=50,
+                types=["character_action"],
+                order="created_at_desc",
             ):
-                if event.type == "character_action" and event.payload.get("dedupe_key") == dedupe_key:
+                if event.payload.get("dedupe_key") == dedupe_key:
                     return event
 
         now = datetime.now()
@@ -858,12 +862,13 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
         change_events = None
         if settings.v2_character_action_sync_enabled:
             try:
-                completed = world_repository.list_events(
-                    world.world_id, statuses=["completed"], limit=50
+                change_events = world_repository.list_events(
+                    world.world_id,
+                    statuses=["completed"],
+                    limit=50,
+                    types=["character_action"],
+                    order="created_at_desc",
                 )
-                change_events = [
-                    event for event in completed if event.type == "character_action"
-                ]
             except Exception:
                 logger.exception("角色动作事件查询失败，最近世界变化置空")
                 change_events = []

@@ -1,5 +1,8 @@
 """world_events.source 放宽为允许 'character'（角色动作事件历史）。
 
+注意：本迁移使用 drop/create check constraint，SQLite 方言不支持 ALTER CONSTRAINT，
+单测在 SQLite 上跑迁移链会失败；生产目标库为 PostgreSQL，属已知环境限制。
+
 Revision ID: 0035
 Revises: 0034
 Create Date: 2026-09-10

@@ -6,14 +6,14 @@
 
 import logging
 import re
-from typing import Any
 
 from app.character.asuna.narrative import (
     NARRATIVE_ACTION_VERBS,
     NARRATIVE_NOISE_PATTERNS,
+    NARRATIVE_OBJECT_NOUNS,
     NARRATIVE_QUANTITY_WORDS,
 )
-from app.character.asuna.world import LOCATION_ALIASES
+from app.character.asuna.world import LOCATION_ALIASES, OBJECT_CREATION_HINTS
 from app.core.settings import get_settings
 from app.models.character_action import (
     ExtractionResult,
@@ -64,36 +64,47 @@ def _parse_quantity(text: str) -> float | None:
     return None
 
 
-def _find_verb_match(
-    sentence: str,
-) -> tuple[str, str] | None:
-    best: tuple[str, str] | None = None
+def _find_verb_matches(sentence: str) -> list[tuple[str, str, int]]:
+    """按出现顺序返回不重叠动词；同位取最长。"""
+    raw: list[tuple[str, str, int]] = []
     for action_type, verbs in NARRATIVE_ACTION_VERBS.items():
         for verb in verbs:
-            if verb in sentence:
-                if best is None or len(verb) > len(best[1]):
-                    best = (action_type, verb)
-    return best
+            idx = sentence.find(verb)
+            if idx >= 0:
+                raw.append((action_type, verb, idx))
+    raw.sort(key=lambda item: (item[2], -len(item[1])))
+    selected: list[tuple[str, str, int]] = []
+    last_end = -1
+    for action_type, verb, idx in raw:
+        end = idx + len(verb)
+        if idx < last_end:
+            continue
+        selected.append((action_type, verb, idx))
+        last_end = end
+    return selected
+
+
+def _is_creatable_noun(name: str, known_names: set[str]) -> bool:
+    return (
+        name in known_names
+        or name in NARRATIVE_OBJECT_NOUNS
+        or name in OBJECT_CREATION_HINTS
+    )
 
 
 def _extract_object_name(
-    sentence: str,
+    clause: str,
     verb: str,
     action_type: str,
     known_names: set[str],
 ) -> str | None:
-    verb_idx = sentence.find(verb)
+    verb_idx = clause.find(verb)
     if verb_idx < 0:
         return None
-    after_verb = sentence[verb_idx + len(verb):]
-
-    if action_type == "MOVE":
-        move_match = re.search(r"到(.+?)(?:了|上|里|$)", after_verb)
-        if move_match:
-            return None
+    after_verb = clause[verb_idx + len(verb):]
 
     for name in sorted(known_names, key=len, reverse=True):
-        if name in sentence:
+        if name in clause:
             return name
 
     if action_type == "CREATE":
@@ -105,55 +116,115 @@ def _extract_object_name(
                 if m:
                     after_qty = after_qty[m.end():]
                     break
-            candidate = after_qty.strip("了的碗杯份个 ")
-            if 1 <= len(candidate) <= 10:
-                return candidate
+            candidate = after_qty.strip("了的碗杯份个把 ")
         else:
-            candidate = after_verb.strip("了的碗杯份个 ")
-            if 1 <= len(candidate) <= 10:
-                return candidate
+            candidate = after_verb.strip("了的碗杯份个把 ")
+        if 1 <= len(candidate) <= 10 and _is_creatable_noun(candidate, known_names):
+            return candidate
 
     return None
 
 
 def _extract_move_location(
-    sentence: str,
+    clause: str,
     verb: str,
 ) -> str | None:
-    verb_idx = sentence.find(verb)
+    verb_idx = clause.find(verb)
     if verb_idx < 0:
         return None
-    after_verb = sentence[verb_idx + len(verb):]
+    after_verb = clause[verb_idx + len(verb):]
     after_verb = after_verb.rstrip("。！？\n；，")
     location = resolve_location_alias(after_verb)
     if location:
         return location
     for alias in sorted(LOCATION_ALIASES, key=len, reverse=True):
-        if alias in sentence:
+        if alias in clause:
             return LOCATION_ALIASES[alias]
     return None
 
 
 def _extract_consume_quantity(
-    sentence: str,
+    clause: str,
     verb: str,
 ) -> float:
-    verb_idx = sentence.find(verb)
+    verb_idx = clause.find(verb)
     if verb_idx < 0:
         return 1.0
-    before_verb = sentence[:verb_idx]
-    after_verb = sentence[verb_idx + len(verb):]
+    before_verb = clause[:verb_idx]
+    after_verb = clause[verb_idx + len(verb):]
     combined = before_verb + after_verb
     qty = _parse_quantity(combined)
     return qty if qty is not None else 1.0
 
 
+def _build_candidate(
+    action_type: str,
+    clause: str,
+    verb: str,
+    known_names: set[str],
+    evidence: str,
+    start_idx: int,
+    turn_ref: TurnRef,
+    ordinal: int,
+) -> tuple[WorldAction, float | None] | None:
+    if action_type == "MOVE":
+        location_id = _extract_move_location(clause, verb)
+        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        if obj_name is None:
+            return None
+        target = TargetRef(name=obj_name, location_id=location_id)
+        quantity = None
+    elif action_type == "CONSUME":
+        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        if obj_name is None:
+            return None
+        quantity = _extract_consume_quantity(clause, verb)
+        target = TargetRef(name=obj_name)
+    elif action_type == "CREATE":
+        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        if obj_name is None:
+            return None
+        quantity = _parse_quantity(clause)
+        if quantity is None:
+            quantity = 1.0
+        target = TargetRef(name=obj_name)
+    else:
+        return None
+
+    action = WorldAction(
+        action_type=action_type,
+        target=target,
+        quantity=quantity,
+        source="character_reply",
+        metadata={
+            "evidence": evidence[:50],
+            "span": [start_idx, start_idx + len(evidence)] if start_idx >= 0 else [0, 0],
+            "channel": "lexicon",
+            "confidence": "high",
+            "verb": verb,
+        },
+        status=WorldActionStatus.CANDIDATE,
+        dedupe_key=build_dedupe_key(
+            action_type,
+            target.name,
+            quantity,
+            turn_ref.session_id,
+            turn_ref.turn_id,
+            ordinal,
+        ),
+        turn_ref=TurnRef(
+            session_id=turn_ref.session_id,
+            turn_id=turn_ref.turn_id,
+            ordinal=ordinal,
+        ),
+    )
+    return action, quantity
+
+
 def extract_actions(
     ai_reply: str,
     known_object_names: set[str] | None = None,
-    current_location: str | None = None,
     turn_ref: TurnRef | None = None,
-    world_notes: list[str] | None = None,
 ) -> ExtractionResult:
     settings = get_settings()
     if not settings.world_enabled:
@@ -177,73 +248,29 @@ def extract_actions(
         if _is_noise(sentence):
             continue
 
-        match = _find_verb_match(sentence)
-        if match is None:
-            continue
-
-        action_type, verb = match
-
-        if action_type == "MOVE":
-            location_id = _extract_move_location(sentence, verb)
-            obj_name = _extract_object_name(sentence, verb, action_type, known_names)
-            if obj_name is None:
+        matches = _find_verb_matches(sentence)
+        for i, (action_type, verb, idx) in enumerate(matches):
+            prev_end = 0 if i == 0 else matches[i - 1][2] + len(matches[i - 1][1])
+            next_start = len(sentence) if i + 1 >= len(matches) else matches[i + 1][2]
+            clause = sentence[prev_end:next_start]
+            built = _build_candidate(
+                action_type,
+                clause,
+                verb,
+                known_names,
+                sentence,
+                ai_reply.find(sentence),
+                turn_ref,
+                ordinal,
+            )
+            if built is None:
                 continue
-            target = TargetRef(name=obj_name, location_id=location_id)
-            quantity = None
-        elif action_type == "CONSUME":
-            obj_name = _extract_object_name(sentence, verb, action_type, known_names)
-            if obj_name is None:
+            action, _qty = built
+            if action.dedupe_key in seen_dedupes:
                 continue
-            quantity = _extract_consume_quantity(sentence, verb)
-            target = TargetRef(name=obj_name)
-        elif action_type == "CREATE":
-            obj_name = _extract_object_name(sentence, verb, action_type, known_names)
-            if obj_name is None:
-                continue
-            quantity = _parse_quantity(sentence)
-            if quantity is None:
-                quantity = 1.0
-            target = TargetRef(name=obj_name)
-        else:
-            continue
-
-        start_idx = ai_reply.find(sentence)
-        evidence = sentence[:50]
-
-        dedupe = build_dedupe_key(
-            action_type,
-            target.name,
-            quantity,
-            turn_ref.session_id,
-            turn_ref.turn_id,
-            ordinal,
-        )
-
-        if dedupe in seen_dedupes:
-            continue
-        seen_dedupes.add(dedupe)
-
-        action = WorldAction(
-            action_type=action_type,
-            target=target,
-            quantity=quantity,
-            source="character_reply",
-            metadata={
-                "evidence": evidence,
-                "span": [start_idx, start_idx + len(sentence)] if start_idx >= 0 else [0, 0],
-                "channel": "lexicon",
-                "confidence": "high",
-            },
-            status=WorldActionStatus.CANDIDATE,
-            dedupe_key=dedupe,
-            turn_ref=TurnRef(
-                session_id=turn_ref.session_id,
-                turn_id=turn_ref.turn_id,
-                ordinal=ordinal,
-            ),
-        )
-        candidates.append(action)
-        ordinal += 1
+            seen_dedupes.add(action.dedupe_key)
+            candidates.append(action)
+            ordinal += 1
 
     return ExtractionResult(
         candidates=candidates,
