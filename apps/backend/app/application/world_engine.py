@@ -494,6 +494,98 @@ def get_full_state(user_id: str) -> dict | None:
         return None
 
 
+def _character_action_title(
+    action_type: str,
+    target_name: str,
+    quantity: float | None,
+    location_to: str | None,
+) -> str:
+    if action_type == "CONSUME":
+        qty = "" if quantity is None else _format_action_quantity(quantity)
+        return f"消耗{target_name}{qty}"
+    if action_type == "CREATE":
+        return f"做出{target_name}"
+    if action_type == "MOVE":
+        to_name = HOME_LOCATIONS.get(location_to, {}).get("name") if location_to else None
+        return f"{target_name}移到{to_name or location_to}"
+    return f"{target_name} {action_type}"
+
+
+def _format_action_quantity(quantity: float) -> str:
+    text = str(int(quantity)) if quantity == int(quantity) else str(quantity)
+    return f" ×{text}"
+
+
+_ACTION_EVENT_IMPORTANCE = {
+    "CREATE": EventImportance.NORMAL,
+    "CONSUME": EventImportance.LOW,
+    "MOVE": EventImportance.LOW,
+}
+
+
+def record_character_action_event(
+    user_id: str,
+    action_type: str,
+    target_name: str,
+    quantity: float | None,
+    object_id: str | None,
+    before: dict | None,
+    after: dict | None,
+    location_from: str | None,
+    location_to: str | None,
+    dedupe_key: str,
+    session_id: str | None = None,
+    turn_id: str | None = None,
+    actor: str = "character",
+) -> WorldEvent | None:
+    """已发生历史落库：status=COMPLETED，source=character；同 dedupe_key 幂等不重复。"""
+    try:
+        world = ensure_world(user_id)
+        if world is None:
+            return None
+
+        if dedupe_key:
+            for event in world_repository.list_events(
+                world.world_id, statuses=["completed"], limit=50
+            ):
+                if event.type == "character_action" and event.payload.get("dedupe_key") == dedupe_key:
+                    return event
+
+        now = datetime.now()
+        event = WorldEvent(
+            id=world_repository.new_event_id(),
+            world_id=world.world_id,
+            type="character_action",
+            title=_character_action_title(action_type, target_name, quantity, location_to),
+            importance=_ACTION_EVENT_IMPORTANCE.get(action_type, EventImportance.NORMAL),
+            status=EventStatus.COMPLETED,
+            completed_at=now,
+            due_at=None,
+            payload={
+                "action_type": action_type,
+                "actor": actor,
+                "target_name": target_name,
+                "object_id": object_id,
+                "quantity": quantity,
+                "before": before,
+                "after": after,
+                "location_from": location_from,
+                "location_to": location_to,
+                "dedupe_key": dedupe_key,
+                "session_id": session_id,
+                "turn_id": turn_id,
+            },
+            source=EventSource.CHARACTER,
+            created_at=now,
+            updated_at=now,
+        )
+        world_repository.save_event(event)
+        return event
+    except Exception:
+        logger.exception("角色动作事件落库失败（不回滚已生效的世界变更）")
+        return None
+
+
 def create_event(
     user_id: str,
     event_type: str,
