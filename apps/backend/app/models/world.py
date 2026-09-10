@@ -51,6 +51,7 @@ class EventSource(StrEnum):
     USER_MENTION = "user_mention"
     MANUAL = "manual"
     AUTONOMY = "autonomy"
+    CHARACTER = "character"
 
 
 PART_OF_DAY_CN = {

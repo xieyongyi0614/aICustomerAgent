@@ -706,7 +706,7 @@ class WorldEventRow(Base):
             name="ck_world_events_status",
         ),
         CheckConstraint(
-            "source IN ('user_mention', 'manual', 'autonomy')",
+            "source IN ('user_mention', 'manual', 'autonomy', 'character')",
             name="ck_world_events_source",
         ),
         Index("idx_world_events_world_due", "world_id", "status", "due_at"),
