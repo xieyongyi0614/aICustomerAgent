@@ -20,6 +20,8 @@ class WorldSettings(BaseSettings):
     world_interpreter_enabled: bool = True
     world_llm_assist_enabled: bool = False
     world_llm_assist_sample_rate: float = 0.2
+    v2_character_action_sync_enabled: bool = False
+    v2_character_action_sync_context_lines: int = 3
     world_active_entities_limit: int = 200
     world_active_events_limit: int = 20
     world_event_grace_hours: float = 6.0

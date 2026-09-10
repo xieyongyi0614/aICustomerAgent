@@ -37,6 +37,7 @@ def _noop(calls):
 class _FakeEvent:
     def __init__(self, event_id: str):
         self.id = event_id
+        self.title = ""
 
 
 class _FakeObj:

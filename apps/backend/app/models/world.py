@@ -246,6 +246,7 @@ class WorldContext(BaseModel):
     nearby_objects: list[ObjectBrief] = []
     inventory: list[InventoryItem] = []
     salient_events: list[EventBrief] = []
+    recent_world_changes: list[str] = []
     notes: list[str] = []
 
 

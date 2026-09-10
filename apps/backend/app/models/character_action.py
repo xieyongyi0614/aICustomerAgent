@@ -227,3 +227,4 @@ class MutationOutcome(BaseModel):
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     world_event_id: str | None = None
+    title: str | None = None
