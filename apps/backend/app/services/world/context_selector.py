@@ -2,7 +2,10 @@
 
 切片选择 + 【当前世界】段渲染均为纯函数；world_ctx 为 None 或空 → 渲染 None
 → PromptBuilder 不追加任何字节（golden 不变量）。
+ACTION-005：从 character_action 事件派生「最近世界变化」行（有界、去重）。
 """
+
+from datetime import datetime
 
 from app.character.asuna.world import ENVIRONMENT_EFFECT_NOTES
 from app.models.world import (
@@ -25,6 +28,28 @@ EVENT_STATUS_CN = {
 }
 
 
+def recent_world_changes_from_events(events: list[WorldEvent], limit: int = 3) -> list[str]:
+    seen: set[str] = set()
+    rows: list[str] = []
+    ordered = sorted(
+        (event for event in events if event.type == "character_action"),
+        key=lambda event: (event.created_at or datetime.fromtimestamp(0)),
+        reverse=True,
+    )
+    for event in ordered:
+        if not event.title:
+            continue
+        dedupe_key = (event.payload or {}).get("dedupe_key")
+        if dedupe_key:
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+        rows.append(event.title)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
 def build_world_context(
     world: World,
     entities: list[WorldObject],
@@ -32,6 +57,8 @@ def build_world_context(
     time_ctx: TimeContext,
     nearby_limit: int = 3,
     events_limit: int = 3,
+    change_events: list[WorldEvent] | None = None,
+    changes_limit: int = 3,
 ) -> WorldContext:
     now = time_ctx.now
     location_ctx = build_location_context(world)
@@ -88,6 +115,7 @@ def build_world_context(
         nearby_objects=object_briefs,
         inventory=inventory,
         salient_events=event_briefs,
+        recent_world_changes=recent_world_changes_from_events(change_events or [], changes_limit),
         notes=list(world.notes or []),
     )
 
@@ -115,7 +143,9 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
 
     env_line = _environment_line(ctx)
     event_lines = [_event_line(brief) for brief in ctx.salient_events]
-    note_lines = list(ctx.notes)
+    recent_lines = _recent_changes_lines(ctx.recent_world_changes)
+    recent_set = set(ctx.recent_world_changes)
+    note_lines = [note for note in ctx.notes if note not in recent_set]
     guide_line = "家里的物品、数量、位置与可消耗状态以本清单为准，不得凭空捏造或增减。"
     inventory_lines = _inventory_lines(ctx.inventory)
 
@@ -125,6 +155,7 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     for line in (
         [guide_line]
         + inventory_lines
+        + recent_lines
         + event_lines
         + note_lines
         + ([env_line] if env_line else [])
@@ -159,6 +190,14 @@ def _inventory_item_line(item) -> str:
     if item.unit and item.unit not in ("piece", "个"):
         return f"{item.name} × {qty}{item.unit}"
     return f"{item.name} × {qty}"
+
+
+def _recent_changes_lines(rows: list[str]) -> list[str]:
+    if not rows:
+        return []
+    lines = ["最近世界变化："]
+    lines.extend(f"  - {row}" for row in rows)
+    return lines
 
 
 def _environment_line(ctx: WorldContext) -> str | None:

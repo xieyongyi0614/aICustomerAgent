@@ -40,8 +40,9 @@ from app.services.world.time_provider import TimeProvider
 from app.application.worker_loop import run_worker_loop
 from app.models.observability import bound_extra
 from app.services.world.context_selector import (
-    environment_lighting_suggestion,
     build_world_context,
+    environment_lighting_suggestion,
+    recent_world_changes_from_events,
 )
 from app.services.world.interpreter import interpret
 from app.services.world.memory_bridge import materialize_event_memory
@@ -512,6 +513,8 @@ def _character_action_title(
 
 
 def _format_action_quantity(quantity: float) -> str:
+    if quantity == 1:
+        return ""
     text = str(int(quantity)) if quantity == int(quantity) else str(quantity)
     return f" ×{text}"
 
@@ -584,6 +587,31 @@ def record_character_action_event(
     except Exception:
         logger.exception("角色动作事件落库失败（不回滚已生效的世界变更）")
         return None
+
+
+def merge_character_action_notes(user_id: str, cas_lines: list[str]) -> bool:
+    """第 9 步尾部：CAS 摘要行追加到 world.notes（幂等、有界）；失败不影响已生效变更。"""
+    if not cas_lines:
+        return True
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return False
+        notes = list(world.notes or [])
+        existing = set(notes)
+        added = [line for line in cas_lines if line not in existing]
+        if not added:
+            return True
+        notes = bounded_notes(
+            notes + added,
+            max(64, get_settings().world_context_char_budget // 4),
+        )
+        world.notes = notes
+        world_repository.save_world(world)
+        return True
+    except Exception:
+        logger.exception("角色动作摘要写 world.notes 失败（不影响已生效世界变更）")
+        return False
 
 
 def create_event(
@@ -827,6 +855,18 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             world.world_id, statuses=["scheduled", "active", "completed"], limit=20
         )
         settings = get_settings()
+        change_events = None
+        if settings.v2_character_action_sync_enabled:
+            try:
+                completed = world_repository.list_events(
+                    world.world_id, statuses=["completed"], limit=50
+                )
+                change_events = [
+                    event for event in completed if event.type == "character_action"
+                ]
+            except Exception:
+                logger.exception("角色动作事件查询失败，最近世界变化置空")
+                change_events = []
         context = build_world_context(
             world,
             entities,
@@ -834,6 +874,8 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             time_ctx,
             nearby_limit=settings.world_nearby_objects_limit,
             events_limit=settings.world_salient_events_limit,
+            change_events=change_events,
+            changes_limit=settings.v2_character_action_sync_context_lines,
         )
         if trace is not None:
             trace.record(
@@ -842,6 +884,7 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
                 "ok",
                 nearby=len(context.nearby_objects),
                 salient=len(context.salient_events),
+                recent_changes=len(context.recent_world_changes),
             )
         return context
     except Exception:

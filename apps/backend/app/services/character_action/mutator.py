@@ -160,6 +160,7 @@ def _apply_one(action: WorldAction, user_id: str, trace=None) -> MutationOutcome
             )
             if event is not None:
                 action.metadata["world_event_id"] = event.id
+                action.metadata["world_event_title"] = event.title
     except Exception:
         logger.exception("角色动作执行异常：%s", action.action_id)
         applied = False
@@ -183,6 +184,7 @@ def _apply_one(action: WorldAction, user_id: str, trace=None) -> MutationOutcome
         before=before,
         after=after,
         world_event_id=action.metadata.get("world_event_id"),
+        title=action.metadata.get("world_event_title"),
     )
     _record_trace(
         trace,

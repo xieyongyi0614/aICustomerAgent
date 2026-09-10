@@ -24,8 +24,9 @@ from app.services import (
 )
 from app.application import world_engine
 from app.models.action import ActionIntent
+from app.models.character_action import TurnRef
 from app.models.memory import MemoryExtraction
-from app.repositories import memory_repository
+from app.repositories import memory_repository, world_repository
 from app.services.memory2 import (
     commands as memory_commands,
     ingest as memory_ingest,
@@ -325,6 +326,72 @@ async def run_world_update(ctx: PostProcessContext) -> None:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
 
 
+async def run_character_action_sync(ctx: PostProcessContext) -> None:
+    """CAS 第 9 步：提取 → 校验 → 执行（ACTION-004）→ 摘要写 notes（ACTION-005 写侧）。"""
+    if not get_settings().v2_character_action_sync_enabled:
+        return
+    started = time.perf_counter()
+    try:
+        from app.services.character_action.extractor import extract_actions
+        from app.services.character_action.mutator import execute_actions
+        from app.services.character_action.validator import validate_actions
+
+        world = world_engine.ensure_world(ctx.user_id)
+        if world is None:
+            if ctx.trace is not None:
+                ctx.trace.record("character_action_sync", 0.0, "error", error="world unavailable")
+            return
+        known_names = {obj.name for obj in world_repository.list_objects(world.world_id)}
+        completed = world_repository.list_events(
+            world.world_id, statuses=["completed"], limit=50
+        )
+        recent_dedupe_keys = {
+            event.payload.get("dedupe_key")
+            for event in completed
+            if event.type == "character_action" and event.payload.get("dedupe_key")
+        }
+        turn_ref = TurnRef(
+            session_id=ctx.session_id,
+            turn_id=f"{ctx.session_id}:turn{ctx.current_turn}",
+            ordinal=0,
+        )
+        extracted = extract_actions(
+            ctx.ai_reply,
+            known_object_names=known_names,
+            current_location=world.current_location,
+            turn_ref=turn_ref,
+            world_notes=list(world.notes or []),
+        )
+        validation = validate_actions(
+            extracted.candidates,
+            world_id=world.world_id,
+            user_id=ctx.user_id,
+            recent_dedupe_keys=recent_dedupe_keys,
+        )
+        validated = [result.action for result in validation if result.status == "validated"]
+        outcomes = execute_actions(validated, user_id=ctx.user_id, trace=ctx.trace)
+        applied = [outcome for outcome in outcomes if outcome.status == "applied"]
+        cas_lines = [outcome.title for outcome in applied if outcome.title]
+        merged = world_engine.merge_character_action_notes(ctx.user_id, cas_lines)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "character_action_sync",
+                (time.perf_counter() - started) * 1000,
+                "ok",
+                extracted=len(extracted.candidates),
+                rejected=len(validation) - len(validated),
+                applied=len(applied),
+                notes_merged=merged,
+                event_ids=[outcome.world_event_id for outcome in applied if outcome.world_event_id],
+            )
+    except Exception:
+        logger.exception("角色动作同步步骤异常（双保险，不应触达）")
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "character_action_sync", 0.0, "error", error="character action sync crashed"
+            )
+
+
 async def run_action_planning(ctx: PostProcessContext) -> None:
     """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。"""
     if not get_settings().action_enabled:
@@ -377,6 +444,7 @@ STEP_HANDLERS = (
     run_budget_observer,
     run_evaluation,
     run_world_update,
+    run_character_action_sync,
     run_action_planning,
 )
 
