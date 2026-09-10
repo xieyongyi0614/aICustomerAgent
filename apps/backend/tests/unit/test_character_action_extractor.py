@@ -129,6 +129,22 @@ class TestExtractCreate:
         assert action.target.name is not None
         assert action.quantity is not None
 
+    def test_create_narrative_noun_rejected(self):
+        result = extract_actions(
+            "我做了个梦。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 0
+
+    def test_create_decision_rejected(self):
+        result = extract_actions(
+            "我做了个决定。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 0
+
 
 class TestExtractMove:
     def test_basic_move(self):
@@ -151,6 +167,40 @@ class TestExtractMove:
         )
         assert len(result.candidates) == 1
         assert result.candidates[0].target.location_id == "home.kitchen.fridge"
+
+    def test_move_nadao_table(self):
+        result = extract_actions(
+            "我把牛奶拿到桌上。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 1
+        assert result.candidates[0].action_type == "MOVE"
+        assert result.candidates[0].target.name == "牛奶"
+        assert result.candidates[0].target.location_id == "home.dining_area"
+
+    def test_nada_is_not_consume(self):
+        result = extract_actions(
+            "我拿了两个鸡蛋。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 0
+
+
+class TestMultiActionSentence:
+    def test_create_and_consume_without_comma(self):
+        result = extract_actions(
+            "我做了面用了两个鸡蛋。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 2
+        assert result.candidates[0].action_type == "CREATE"
+        assert result.candidates[0].target.name == "面"
+        assert result.candidates[1].action_type == "CONSUME"
+        assert result.candidates[1].target.name == "鸡蛋"
+        assert result.candidates[1].quantity == 2.0
 
 
 class TestNoiseFiltering:

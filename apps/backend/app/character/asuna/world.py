@@ -53,6 +53,12 @@ HOME_LOCATIONS = {
         "traits": ["indoor"],
         "available_actions": ["洗漱", "洗澡"],
     },
+    "home.dining_area": {
+        "name": "餐桌",
+        "parent_id": "home.living_room",
+        "traits": ["indoor", "food_related"],
+        "available_actions": ["用餐", "摆放"],
+    },
 }
 
 LOCATION_ALIASES = {
@@ -66,6 +72,10 @@ LOCATION_ALIASES = {
     "卫生间": "home.bathroom",
     "冰箱": "home.kitchen.fridge",
     "橱柜": "home.kitchen.cabinet",
+    "餐桌": "home.dining_area",
+    "饭桌": "home.dining_area",
+    "桌面": "home.dining_area",
+    "桌上": "home.dining_area",
 }
 
 WORLD_WEATHER_VALUES = ("sunny", "cloudy", "rain", "snow", "windy")

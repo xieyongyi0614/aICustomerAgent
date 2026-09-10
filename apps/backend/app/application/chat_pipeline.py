@@ -211,6 +211,33 @@ def _record_development_apply(trace, state: ConversationState, behavior_ctx) -> 
     )
 
 
+def _apply_inventory_grounding(reply: str, world_ctx, mode: str, trace) -> str:
+    try:
+        from app.services.grounding.inventory_guard import check_inventory_grounding
+
+        report = check_inventory_grounding(reply, list(world_ctx.inventory or []))
+        if not report.has_conflict:
+            return reply
+        conflict_kinds = sorted({c.kind for c in report.conflicts})
+        if trace is not None:
+            trace.record(
+                "inventory_grounding",
+                0.0,
+                "rewritten" if mode == "rewrite" and report.corrected_text else "conflict",
+                conflicts=len(report.conflicts),
+                kinds=conflict_kinds,
+                names=[c.name for c in report.conflicts][:8],
+            )
+        if mode == "rewrite" and report.corrected_text:
+            return report.corrected_text
+        return reply
+    except Exception:
+        logger.exception("库存 grounding 守卫失败，放行原始回复")
+        if trace is not None:
+            trace.record("inventory_grounding", 0.0, "error", error="grounding crashed")
+        return reply
+
+
 async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
@@ -398,6 +425,13 @@ async def run_chat_pipeline(
     action_ctx = None
     if get_settings().action_enabled:
         action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
+    settings = get_settings()
+    grounding_mode = (
+        settings.v2_inventory_grounding_mode
+        if settings.v2_inventory_grounding_enabled and world_ctx is not None
+        else "off"
+    )
+    buffer_reply = grounding_mode in ("rewrite", "annotate")
     try:
         async for token in answer_chain.astream(
             mode_decision.effective,
@@ -414,7 +448,8 @@ async def run_chat_pipeline(
             if first_token_ms is None:
                 first_token_ms = (time.perf_counter() - llm_started) * 1000
             full_reply.append(token)
-            yield {"kind": "token", "text": token}
+            if not buffer_reply:
+                yield {"kind": "token", "text": token}
     except ValueError as exc:
         if not full_reply:
             trace.record(
@@ -447,10 +482,15 @@ async def run_chat_pipeline(
     )
 
     reply = "".join(full_reply)
+    if buffer_reply and reply:
+        reply = _apply_inventory_grounding(reply, world_ctx, grounding_mode, trace)
+
     if reply:
         logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))
     else:
         logger.warning("模型输出为空")
+    if buffer_reply and reply:
+        yield {"kind": "token", "text": reply}
     ai_message_id = await asyncio.to_thread(
         conversation_service.save_turn,
         session_id,

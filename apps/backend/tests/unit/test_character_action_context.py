@@ -145,7 +145,7 @@ def test_render_respects_budget_keeping_guide_and_inventory():
     text = render_world_section(context, budget=120)
     assert text is not None
     assert len(text) <= 120
-    assert "家里的物品、数量、位置与可消耗状态" in text
+    assert "家里的物品、数量、位置以本清单为准" in text
     assert "鸡蛋" in text
 
 

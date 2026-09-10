@@ -27,13 +27,22 @@ def _action(action_type: str = "CONSUME", name: str = "鸡蛋", quantity: float 
 
 class _FakeObj:
     def __init__(self, id: str, name: str, quantity: float = 6.0, consumable: bool = True,
-                 status: str = "active", location_id: str = "home.kitchen.fridge"):
+                 status: str = "active", location_id: str = "home.kitchen.fridge",
+                 aliases: list[str] | None = None):
         self.id = id
         self.name = name
+        self.aliases = aliases or []
         self.quantity = quantity
         self.consumable = consumable
         self.status = type("S", (), {"value": status, "__eq__": lambda s, o: s.value == o})()
         self.location_id = location_id
+
+
+def _world(user_id: str = "u1", world_id: str = "w1", location: str | None = None):
+    payload = {"world_id": world_id}
+    if location is not None:
+        payload["current_location"] = location
+    return type("W", (), payload)()
 
 
 class TestWorkingView:
@@ -55,6 +64,10 @@ class TestWorkingView:
         wv.register_created("syn_1", "面", "food", 1.0)
         assert wv.active_count == 1
         assert len(wv.created_entities) == 1
+        found = wv.find_object("面")
+        assert found is not None
+        assert found.id == "syn_1"
+        assert wv.remaining_quantity["syn_1"] == 1.0
 
     def test_update_location(self):
         obj = _FakeObj("e1", "牛奶", location_id="home.kitchen.fridge")
@@ -180,7 +193,7 @@ class TestValidateMove:
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
         monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
-        action = _action("MOVE", "牛奶", quantity=None, location_id="home.dining_area")
+        action = _action("MOVE", "牛奶", quantity=None, location_id="home.nonexistent")
         results = validate_actions([action], user_id="u1")
         assert results[0].status == "rejected"
         assert results[0].reason == WorldActionReason.LOCATION_UNRESOLVED
@@ -245,3 +258,80 @@ class TestDisabledWorld:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_enabled": True})())
         results = validate_actions([])
         assert results == []
+
+
+def _patch(monkeypatch, objects, location=None, entity_limit=200):
+    monkeypatch.setattr(
+        "app.services.character_action.validator.get_settings",
+        lambda: type("S", (), {"world_enabled": True, "world_active_entities_limit": entity_limit})(),
+    )
+    monkeypatch.setattr(
+        "app.services.character_action.validator.world_repository",
+        type("R", (), {"list_objects": lambda self, wid: objects})(),
+    )
+    monkeypatch.setattr(
+        "app.services.character_action.validator.ensure_world",
+        lambda uid: _world(location=location),
+    )
+
+
+class TestDuplicateEntity:
+    def test_create_existing_name_rejected(self, monkeypatch):
+        obj = _FakeObj("e1", "面", quantity=1.0)
+        _patch(monkeypatch, [obj])
+        action = _action("CREATE", "面", 1.0)
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "rejected"
+        assert results[0].reason == WorldActionReason.DUPLICATE_ENTITY
+
+    def test_create_new_name_passes(self, monkeypatch):
+        _patch(monkeypatch, [])
+        action = _action("CREATE", "三明治", 1.0)
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "validated"
+
+    def test_same_turn_create_then_consume(self, monkeypatch):
+        _patch(monkeypatch, [])
+        a1 = _action("CREATE", "面", 1.0, dedupe_key="c1")
+        a2 = _action("CONSUME", "面", 1.0, dedupe_key="c2")
+        results = validate_actions([a1, a2], user_id="u1")
+        assert results[0].status == "validated"
+        assert results[1].status == "validated"
+        assert a2.target.object_id is not None
+        assert a2.target.object_id.startswith("syn_")
+
+
+class TestLocationUnreachable:
+    def test_consume_fridge_from_bedroom(self, monkeypatch):
+        obj = _FakeObj("e1", "鸡蛋", location_id="home.kitchen.fridge")
+        _patch(monkeypatch, [obj], location="home.bedroom")
+        action = _action("CONSUME", "鸡蛋", 1.0)
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "rejected"
+        assert results[0].reason == WorldActionReason.LOCATION_UNREACHABLE
+
+    def test_consume_fridge_from_living_room_allowed(self, monkeypatch):
+        obj = _FakeObj("e1", "鸡蛋", location_id="home.kitchen.fridge")
+        _patch(monkeypatch, [obj], location="home.living_room")
+        action = _action("CONSUME", "鸡蛋", 1.0)
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "validated"
+
+
+class TestAliasAndAmbiguous:
+    def test_alias_resolves(self, monkeypatch):
+        obj = _FakeObj("e1", "牛奶", aliases=["乳制品"], location_id="home.kitchen.fridge")
+        _patch(monkeypatch, [obj], location="home.living_room")
+        action = _action("CONSUME", "乳制品", 1.0)
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "validated"
+        assert action.target.object_id == "e1"
+
+    def test_same_name_ambiguous(self, monkeypatch):
+        a = _FakeObj("e1", "鸡蛋", location_id="home.kitchen.fridge")
+        b = _FakeObj("e2", "鸡蛋", location_id="home.kitchen.cabinet")
+        _patch(monkeypatch, [a, b], location="home.kitchen")
+        action = _action("MOVE", "鸡蛋", quantity=None, location_id="home.kitchen")
+        results = validate_actions([action], user_id="u1")
+        assert results[0].status == "rejected"
+        assert results[0].reason == WorldActionReason.AMBIGUOUS_TARGET

@@ -341,14 +341,21 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
             if ctx.trace is not None:
                 ctx.trace.record("character_action_sync", 0.0, "error", error="world unavailable")
             return
-        known_names = {obj.name for obj in world_repository.list_objects(world.world_id)}
+        known_names: set[str] = set()
+        for obj in world_repository.list_objects(world.world_id):
+            known_names.add(obj.name)
+            known_names.update(obj.aliases or [])
         completed = world_repository.list_events(
-            world.world_id, statuses=["completed"], limit=50
+            world.world_id,
+            statuses=["completed"],
+            limit=50,
+            types=["character_action"],
+            order="created_at_desc",
         )
         recent_dedupe_keys = {
             event.payload.get("dedupe_key")
             for event in completed
-            if event.type == "character_action" and event.payload.get("dedupe_key")
+            if event.payload.get("dedupe_key")
         }
         turn_ref = TurnRef(
             session_id=ctx.session_id,
@@ -358,9 +365,7 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
         extracted = extract_actions(
             ctx.ai_reply,
             known_object_names=known_names,
-            current_location=world.current_location,
             turn_ref=turn_ref,
-            world_notes=list(world.notes or []),
         )
         validation = validate_actions(
             extracted.candidates,

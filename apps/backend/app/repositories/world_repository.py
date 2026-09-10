@@ -238,17 +238,27 @@ def get_event(world_id: str, event_id: str) -> WorldEvent | None:
 
 
 def list_events(
-    world_id: str, statuses: list[str] | None = None, limit: int = 50
+    world_id: str,
+    statuses: list[str] | None = None,
+    limit: int = 50,
+    types: list[str] | None = None,
+    order: str = "due_at",
 ) -> list[WorldEvent]:
+    """order: due_at（默认，事件到期序）或 created_at_desc（最近落库优先）。"""
     with SessionLocal() as session:
         query = session.query(WorldEventRow).filter(WorldEventRow.world_id == world_id)
         if statuses:
             query = query.filter(WorldEventRow.status.in_(statuses))
-        rows = (
-            query.order_by(WorldEventRow.due_at.asc().nullslast())
-            .limit(limit)
-            .all()
-        )
+        if types:
+            query = query.filter(WorldEventRow.type.in_(types))
+        if order == "created_at_desc":
+            rows = query.order_by(WorldEventRow.created_at.desc()).limit(limit).all()
+        else:
+            rows = (
+                query.order_by(WorldEventRow.due_at.asc().nullslast())
+                .limit(limit)
+                .all()
+            )
         return [_to_event(row) for row in rows]
 
 

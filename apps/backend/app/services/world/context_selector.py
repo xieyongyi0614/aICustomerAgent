@@ -146,7 +146,10 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     recent_lines = _recent_changes_lines(ctx.recent_world_changes)
     recent_set = set(ctx.recent_world_changes)
     note_lines = [note for note in ctx.notes if note not in recent_set]
-    guide_line = "家里的物品、数量、位置与可消耗状态以本清单为准，不得凭空捏造或增减。"
+    guide_line = (
+        "家里的物品、数量、位置以本清单为准，不得凭空捏造或增减；"
+        "未列出的物品视为不存在，不得声称拥有或还有。"
+    )
     inventory_lines = _inventory_lines(ctx.inventory)
 
     body: list[str] = []
