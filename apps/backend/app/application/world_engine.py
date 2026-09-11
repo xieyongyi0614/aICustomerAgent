@@ -209,10 +209,21 @@ def get_available_consumables(user_id: str) -> list[WorldObject]:
         return []
 
 
+def _household_missing_defaults(world: World) -> bool:
+    """活跃物品清单中是否缺失至少一件默认家庭库存物品（回填判据）。"""
+    try:
+        names = {obj.name for obj in world_repository.list_objects(world.world_id)}
+    except Exception:
+        return True
+    return any(
+        spec["name"] not in names for spec in DEFAULT_HOUSEHOLD["objects"]
+    )
+
+
 def seed_default_household(user_id: str) -> int:
     """幂等播种默认家庭库存；返回本次新建数量。已存在的同名物品不重复。"""
     try:
-        world = ensure_world(user_id)
+        world = world_repository.ensure_world(user_id)
         if world is None:
             return 0
         existing = {obj.name for obj in world_repository.list_objects(world.world_id)}
@@ -316,9 +327,9 @@ def ensure_world(user_id: str) -> World | None:
         settings = get_settings()
         if (
             world is not None
-            and existing is None
             and settings.world_enabled
             and settings.world_household_autoseed_enabled
+            and (existing is None or _household_missing_defaults(world))
         ):
             seed_default_household(user_id)
         return world
@@ -366,7 +377,7 @@ def create_object(
     **properties,
 ) -> WorldObject | None:
     try:
-        world = ensure_world(user_id)
+        world = world_repository.ensure_world(user_id)
         if world is None:
             return None
         settings = get_settings()
