@@ -179,11 +179,61 @@ class TestExtractMove:
         assert result.candidates[0].target.name == "牛奶"
         assert result.candidates[0].target.location_id == "home.dining_area"
 
-    def test_nada_is_not_consume(self):
+    def test_take_with_quantity_is_consume(self):
         result = extract_actions(
             "我拿了两个鸡蛋。",
             known_object_names=KNOWN_NAMES,
             turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 1
+        assert result.candidates[0].action_type == "CONSUME"
+        assert result.candidates[0].target.name == "鸡蛋"
+        assert result.candidates[0].quantity == 2.0
+
+    def test_take_qty_last_is_consume(self):
+        result = extract_actions(
+            "我拿出鸡蛋6个。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 1
+        assert result.candidates[0].action_type == "CONSUME"
+        assert result.candidates[0].quantity == 6.0
+
+    def test_take_without_quantity_is_not_consume(self):
+        result = extract_actions(
+            "我把牛奶拿出来看看。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 0
+
+    def test_take_omitted_subject_resolved_from_context(self):
+        result = extract_actions(
+            "刚才拿了两个出来煎给你了。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+            context_text="用户：冰箱里还有几个蛋啊",
+        )
+        assert len(result.candidates) == 1
+        assert result.candidates[0].action_type == "CONSUME"
+        assert result.candidates[0].target.name == "鸡蛋"
+        assert result.candidates[0].quantity == 2.0
+
+    def test_take_omitted_subject_without_context_stays_unresolved(self):
+        result = extract_actions(
+            "刚才拿了两个出来煎给你了。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+        )
+        assert len(result.candidates) == 0
+
+    def test_take_omitted_subject_ambiguous_context_stays_unresolved(self):
+        result = extract_actions(
+            "刚才拿了两个出来煎给你了。",
+            known_object_names=KNOWN_NAMES,
+            turn_ref=_tr(),
+            context_text="用户：面条和面包怎么分",
         )
         assert len(result.candidates) == 0
 

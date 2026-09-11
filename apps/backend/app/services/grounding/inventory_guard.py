@@ -17,6 +17,7 @@ _CHINESE_QTY = {
     "一": 1.0,
     "二": 2.0,
     "两": 2.0,
+    "俩": 2.0,
     "三": 3.0,
     "四": 4.0,
     "五": 5.0,
@@ -105,6 +106,30 @@ _BARE_QTY_RE = re.compile(
     r"([一-鿿]{1,8})"
 )
 
+_TAKE_VERBS = ("拿出", "取出", "拿走", "拿了")
+
+_TAKE_QTY_FIRST_RE = re.compile(
+    r"(拿出|取出|拿走|拿了)\s*([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)"
+    r"[个份只颗瓶盒碗块片]?\s*([一-鿿]{1,6})"
+)
+
+_TAKE_QTY_LAST_RE = re.compile(
+    r"(拿出|取出|拿走|拿了)\s*([一-鿿]{1,6})\s*"
+    r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)[个份只颗瓶盒碗块片]?"
+)
+
+_TAKEAWAY_QTY_RE = re.compile(
+    r"(拿出|取出|拿走|拿了|用了|用掉|消耗了|舀了|吃掉|喝了)"
+    r"\s*([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)"
+    r"(个|份|盒|瓶|碗|块|袋|只|颗)?"
+)
+
+_LEFTOVER_QTY_RE = re.compile(
+    r"(冰箱里|家里|橱柜里|桌上|厨房里|锅中|碗里|盘子里)?"
+    r"(?:应该|大概|估计|可能)?(?:还(?:剩下?|剩)|剩下?|剩)"
+    r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)"
+    r"(个|份|盒|瓶|碗|块|袋|只|颗)(?=[。！？\n，]|$)"
+)
 _ITEM_SPLIT_RE = re.compile(r"[、，]|以及|和|跟|与")
 
 
@@ -218,6 +243,126 @@ def _format_qty_suffix(item: InventoryItem) -> str:
     qty_text = str(int(qty)) if qty == int(qty) else f"{qty:g}"
     unit = item.unit if item.unit and item.unit not in ("piece", "个") else "个"
     return f"{qty_text}{unit}"
+
+
+def _fmt_requested_num(value: float) -> str:
+    """返回请求数量的确定性文本（仅供改写替换，统一阿拉伯数字）。"""
+    return str(int(value)) if value == int(value) else f"{value:g}"
+
+
+def extract_requested_counts(
+    message: str, inventory: list[InventoryItem]
+) -> dict[str, float]:
+    """从用户消息抽取『数量 + 物品』的请求要求：{库存名: 数量}。"""
+    if not message:
+        return {}
+    inv = _inventory_map(inventory)
+    requested: dict[str, float] = {}
+    for name in sorted(inv, key=len, reverse=True):
+        pattern = re.compile(
+            r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)\s*"
+            r"[个份只颗瓶盒碗块片]?\s*" + re.escape(name)
+        )
+        match = pattern.search(message)
+        if not match:
+            continue
+        qty = _parse_qty(match.group(1))
+        if qty is not None:
+            requested[name] = qty
+    return requested
+
+
+def _take_overreach_matches(
+    reply: str,
+    inv: dict[str, InventoryItem],
+    claimable: set[str],
+    requested: dict[str, float],
+) -> list[dict]:
+    """回复中『取出 N 个 X』超过用户要求 M 的越界命中。"""
+    if not requested:
+        return []
+    out: list[dict] = []
+    for regex in (_TAKE_QTY_FIRST_RE, _TAKE_QTY_LAST_RE):
+        for match in regex.finditer(reply):
+            if match.group(2) and _parse_qty(match.group(2)) is not None:
+                num_text, name_text, qty_group = match.group(2), match.group(3), 2
+            elif match.group(3) and _parse_qty(match.group(3)) is not None:
+                num_text, name_text, qty_group = match.group(3), match.group(2), 3
+            else:
+                continue
+            matched = _match_strict_name(name_text, inv, claimable)
+            if matched is None or matched not in requested:
+                continue
+            qty = _parse_qty(num_text)
+            limit = requested[matched]
+            if qty is None or not (qty > limit + 1e-6):
+                continue
+            out.append(
+                {
+                    "name": matched,
+                    "qty": qty,
+                    "span": (match.start(qty_group), match.end(qty_group)),
+                    "text": match.group(0),
+                    "requested": limit,
+                }
+            )
+    return out
+
+
+def _infer_unique_name(
+    text: str, inv: dict[str, InventoryItem]
+) -> str | None:
+    """从文本里唯一推定的库存名（字面子串或单字命中）；候选多于一个则不猜。"""
+    if not text or not inv:
+        return None
+    hits: set[str] = set()
+    text_chars = set(text)
+    for name in inv:
+        if name in text:
+            hits.add(name)
+            continue
+        if set(name) & text_chars:
+            hits.add(name)
+    return hits.pop() if len(hits) == 1 else None
+
+
+def _leftover_plan(
+    reply: str,
+    inv: dict[str, InventoryItem],
+    context_text: str | None,
+) -> list[dict]:
+    """免主语存量句的对账计划：用上文唯一推定主语，
+    按『库存 - 回复声称取走量』计算应剩值，不符即给出改写命中。"""
+    if not context_text:
+        return []
+    name = _infer_unique_name(context_text, inv)
+    if name is None:
+        return []
+    stock = inv[name].quantity
+    takeaway = 0.0
+    takeaway_match = _TAKEAWAY_QTY_RE.search(reply)
+    if takeaway_match:
+        qty = _parse_qty(takeaway_match.group(2))
+        if qty is not None:
+            takeaway = qty
+    planned = max(0.0, round(stock - takeaway, 2))
+    hits: list[dict] = []
+    for match in _LEFTOVER_QTY_RE.finditer(reply):
+        qty = _parse_qty(match.group(2))
+        if qty is None:
+            continue
+        if abs(qty - planned) <= 1e-6:
+            continue
+        hits.append(
+            {
+                "name": name,
+                "qty": qty,
+                "planned": planned,
+                "span": (match.start(2), match.end(2)),
+                "text": match.group(0),
+            }
+        )
+    return hits
 
 
 def _split_items(fragment: str) -> list[str]:
@@ -408,6 +553,8 @@ def _conflict_for_claim(
 def check_inventory_grounding(
     reply: str,
     inventory: list[InventoryItem],
+    requested: dict[str, float] | None = None,
+    context_text: str | None = None,
 ) -> GroundingReport:
     if not reply:
         return GroundingReport(action="pass")
@@ -422,10 +569,41 @@ def check_inventory_grounding(
         if conflict is not None:
             conflicts.append(conflict)
 
+    if requested:
+        claimable = _claimable_nouns(inventory)
+        for hit in _take_overreach_matches(reply, inv, claimable, requested):
+            conflicts.append(
+                GroundingConflict(
+                    kind="TAKE_EXCEEDS_REQUEST",
+                    name=hit["name"],
+                    claimed_quantity=hit["qty"],
+                    actual_quantity=None,
+                    detail="回复声称取出数量超过用户要求",
+                    span=hit["span"],
+                    text=hit["text"],
+                )
+            )
+
+    if context_text:
+        for hit in _leftover_plan(reply, inv, context_text):
+            conflicts.append(
+                GroundingConflict(
+                    kind="LEFTOVER_MISMATCH",
+                    name=hit["name"],
+                    claimed_quantity=hit["qty"],
+                    actual_quantity=hit["planned"],
+                    detail="免主语存量陈述与账本应剩值不符",
+                    span=hit["span"],
+                    text=hit["text"],
+                )
+            )
+
     if not conflicts:
         return GroundingReport(claims=claims, conflicts=[], action="pass")
 
-    corrected = rewrite_grounded(reply, inventory)
+    corrected = rewrite_grounded(
+        reply, inventory, requested=requested or {}, context_text=context_text
+    )
     return GroundingReport(
         claims=claims,
         conflicts=conflicts,
@@ -434,7 +612,12 @@ def check_inventory_grounding(
     )
 
 
-def rewrite_grounded(reply: str, inventory: list[InventoryItem]) -> str | None:
+def rewrite_grounded(
+    reply: str,
+    inventory: list[InventoryItem],
+    requested: dict[str, float] | None = None,
+    context_text: str | None = None,
+) -> str | None:
     """把库存陈述改写成与账本一致的事实表述。覆盖跨度长的改写优先。"""
     if not reply or not inventory:
         return None
@@ -447,6 +630,14 @@ def rewrite_grounded(reply: str, inventory: list[InventoryItem]) -> str | None:
     def _add(start: int, end: int, text: str) -> None:
         if start < end:
             replacements.append((start, end, text))
+
+    if requested:
+        for hit in _take_overreach_matches(reply, inv, claimable, requested):
+            _add(hit["span"][0], hit["span"][1], _fmt_requested_num(hit["requested"]))
+
+    if context_text:
+        for hit in _leftover_plan(reply, inv, context_text):
+            _add(hit["span"][0], hit["span"][1], _fmt_requested_num(hit["planned"]))
 
     for match in _SUBJECT_QTY_RE.finditer(reply):
         raw_name = match.group(1)

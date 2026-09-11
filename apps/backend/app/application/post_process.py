@@ -362,10 +362,16 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
             turn_id=f"{ctx.session_id}:turn{ctx.current_turn}",
             ordinal=0,
         )
+        recent = ctx.state.messages[-get_settings().memory_recent_context_messages:]
+        context_text = "\n".join(
+            f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
+            for m in recent
+        )
         extracted = extract_actions(
             ctx.ai_reply,
             known_object_names=known_names,
             turn_ref=turn_ref,
+            context_text=context_text,
         )
         validation = validate_actions(
             extracted.candidates,
