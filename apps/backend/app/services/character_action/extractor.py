@@ -29,8 +29,12 @@ logger = logging.getLogger(__name__)
 
 _ARABIC_NUM_RE = re.compile(r"(\d+(?:\.\d+)?)")
 _CHINESE_QUANTITY_RE = re.compile(
-    "([一二两三四五六七八九十半]+)"
+    "([一二两俩三四五六七八九十半]+)"
 )
+
+# 取出/拿出/拿走/拿了：属于「占取」语义——只有显式数量才按消耗记账，
+# 无量词时只算移动（宁可不扣，不造账）。
+_APPROPRIATION_VERBS = frozenset({"拿出", "取出", "拿走", "拿了"})
 
 _SENTENCE_SPLIT_RE = re.compile(r"[。！\n；，]")
 
@@ -92,11 +96,27 @@ def _is_creatable_noun(name: str, known_names: set[str]) -> bool:
     )
 
 
+def _infer_single_known_name(text: str, known_names: set[str]) -> str | None:
+    """从文本里唯一推定的库存名（字面子串或单字命中）；候选多于一个则不猜。"""
+    if not text or not known_names:
+        return None
+    hits: set[str] = set()
+    text_chars = set(text)
+    for name in known_names:
+        if name in text:
+            hits.add(name)
+            continue
+        if set(name) & text_chars:
+            hits.add(name)
+    return hits.pop() if len(hits) == 1 else None
+
+
 def _extract_object_name(
     clause: str,
     verb: str,
     action_type: str,
     known_names: set[str],
+    context: str = "",
 ) -> str | None:
     verb_idx = clause.find(verb)
     if verb_idx < 0:
@@ -121,6 +141,11 @@ def _extract_object_name(
             candidate = after_verb.strip("了的碗杯份个把 ")
         if 1 <= len(candidate) <= 10 and _is_creatable_noun(candidate, known_names):
             return candidate
+
+    if action_type != "CREATE" and context:
+        inferred = _infer_single_known_name(context, known_names)
+        if inferred is not None:
+            return inferred
 
     return None
 
@@ -157,6 +182,20 @@ def _extract_consume_quantity(
     return qty if qty is not None else 1.0
 
 
+def _extract_explicit_quantity(
+    clause: str,
+    verb: str,
+) -> float | None:
+    """返回显式数量；无量词时返回 None（占取动词必须显式才记账）。"""
+    verb_idx = clause.find(verb)
+    if verb_idx < 0:
+        return None
+    combined = clause[:verb_idx] + clause[verb_idx + len(verb):]
+    if _parse_quantity(combined) is None:
+        return None
+    return _extract_consume_quantity(clause, verb)
+
+
 def _build_candidate(
     action_type: str,
     clause: str,
@@ -166,22 +205,29 @@ def _build_candidate(
     start_idx: int,
     turn_ref: TurnRef,
     ordinal: int,
+    context: str = "",
 ) -> tuple[WorldAction, float | None] | None:
     if action_type == "MOVE":
         location_id = _extract_move_location(clause, verb)
-        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        obj_name = _extract_object_name(clause, verb, action_type, known_names, context)
         if obj_name is None:
             return None
         target = TargetRef(name=obj_name, location_id=location_id)
         quantity = None
     elif action_type == "CONSUME":
-        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        obj_name = _extract_object_name(clause, verb, action_type, known_names, context)
         if obj_name is None:
             return None
-        quantity = _extract_consume_quantity(clause, verb)
+        if verb in _APPROPRIATION_VERBS:
+            explicit = _extract_explicit_quantity(clause, verb)
+            if explicit is None:
+                return None
+            quantity = explicit
+        else:
+            quantity = _extract_consume_quantity(clause, verb)
         target = TargetRef(name=obj_name)
     elif action_type == "CREATE":
-        obj_name = _extract_object_name(clause, verb, action_type, known_names)
+        obj_name = _extract_object_name(clause, verb, action_type, known_names, context)
         if obj_name is None:
             return None
         quantity = _parse_quantity(clause)
@@ -225,6 +271,7 @@ def extract_actions(
     ai_reply: str,
     known_object_names: set[str] | None = None,
     turn_ref: TurnRef | None = None,
+    context_text: str = "",
 ) -> ExtractionResult:
     settings = get_settings()
     if not settings.world_enabled:
@@ -262,6 +309,7 @@ def extract_actions(
                 ai_reply.find(sentence),
                 turn_ref,
                 ordinal,
+                context=context_text,
             )
             if built is None:
                 continue

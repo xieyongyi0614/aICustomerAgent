@@ -14,6 +14,10 @@ NARRATIVE_ACTION_VERBS: dict[str, tuple[str, ...]] = {
         "消耗了",
         "用去了",
         "舀了",
+        "拿出",
+        "取出",
+        "拿走",
+        "拿了",
     ),
     "CREATE": (
         "做好了",
@@ -58,6 +62,7 @@ NARRATIVE_QUANTITY_WORDS: dict[str, float] = {
     "一": 1.0,
     "二": 2.0,
     "两": 2.0,
+    "俩": 2.0,
     "三": 3.0,
     "四": 4.0,
     "五": 5.0,

@@ -211,11 +211,18 @@ def _record_development_apply(trace, state: ConversationState, behavior_ctx) -> 
     )
 
 
-def _apply_inventory_grounding(reply: str, world_ctx, mode: str, trace) -> str:
+def _apply_inventory_grounding(reply: str, content: str, world_ctx, mode: str, trace) -> str:
     try:
-        from app.services.grounding.inventory_guard import check_inventory_grounding
+        from app.services.grounding.inventory_guard import (
+            check_inventory_grounding,
+            extract_requested_counts,
+        )
 
-        report = check_inventory_grounding(reply, list(world_ctx.inventory or []))
+        inventory = list(world_ctx.inventory or [])
+        requested = extract_requested_counts(content, inventory)
+        report = check_inventory_grounding(
+            reply, inventory, requested=requested, context_text=content
+        )
         if not report.has_conflict:
             return reply
         conflict_kinds = sorted({c.kind for c in report.conflicts})
@@ -483,7 +490,7 @@ async def run_chat_pipeline(
 
     reply = "".join(full_reply)
     if buffer_reply and reply:
-        reply = _apply_inventory_grounding(reply, world_ctx, grounding_mode, trace)
+        reply = _apply_inventory_grounding(reply, content, world_ctx, grounding_mode, trace)
 
     if reply:
         logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))

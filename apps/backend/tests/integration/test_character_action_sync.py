@@ -9,7 +9,7 @@ from app.application.post_process import (
     run_character_action_sync,
     run_action_planning,
 )
-from app.models.conversation import ConversationState
+from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
 from app.repositories import world_repository
 from app.services.world.context_selector import render_world_section
@@ -199,3 +199,61 @@ def test_gate_off_handler_is_noop(db_session_factory, override_settings):
     assert world_engine.find_object_by_name("cas-u8", "测试蛋").quantity == 6.0
     assert _world_notes("cas-u8") == []
     assert world_engine.build_context("cas-u8").recent_world_changes == []
+
+
+def test_grounding_cap_and_take_consume_chain(db_session_factory, override_settings):
+    override_settings(v2_character_action_sync_enabled="true")
+
+    from app.models.world import InventoryItem
+    from app.services.grounding.inventory_guard import (
+        check_inventory_grounding,
+        extract_requested_counts,
+    )
+
+    user_id = "cas-take"
+    world_engine.ensure_world(user_id)
+    raw_reply = "从冰箱拿出鸡蛋6个，熟练地磕进碗里煎好。"
+    inventory = [
+        InventoryItem(
+            name="鸡蛋",
+            quantity=6.0,
+            unit="piece",
+            location_id="home.kitchen.fridge",
+            state="whole",
+            consumable=True,
+        )
+    ]
+
+    requested = extract_requested_counts("给我来俩个鸡蛋吧", inventory)
+    assert requested == {"鸡蛋": 2.0}
+
+    report = check_inventory_grounding(raw_reply, inventory, requested=requested)
+    capped = report.corrected_text or raw_reply
+    assert "拿出鸡蛋2个" in capped
+    assert "6个" not in capped
+
+    _run(_ctx(user_id, ai_reply=capped, current_turn=1))
+    after = world_engine.find_object_by_name(user_id, "鸡蛋")
+    assert after.quantity == 4.0
+    assert "消耗鸡蛋 ×2" in _world_notes(user_id)
+
+
+def test_omitted_subject_take_consumes_from_context(db_session_factory, override_settings):
+    override_settings(v2_character_action_sync_enabled="true")
+    user_id = "cas-omit"
+    world_engine.ensure_world(user_id)
+    ctx = _ctx(
+        user_id,
+        ai_reply="刚才拿了两个出来煎给你了，冰箱里应该还剩四个。",
+        user_input="冰箱里还有几个蛋啊",
+        current_turn=1,
+    )
+    ctx.state.messages = [
+        ChatMessage(role="human", content="冰箱里还有几个蛋啊")
+    ]
+    _run(ctx)
+
+    egg = world_engine.find_object_by_name(user_id, "鸡蛋")
+    assert egg is not None
+    assert egg.quantity == 4.0
+    assert "消耗鸡蛋 ×2" in _world_notes(user_id)
