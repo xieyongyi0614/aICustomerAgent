@@ -22,7 +22,7 @@
 
 - **配置**：`FeishuSettings` 覆盖 architecture.md §5.1 全部 14 项，含启用即校验、类型/区间校验、env 可覆盖。
 - **接线**：`FeishuSettings` 组合进既有 `Settings`，最小改动、不影响既有配置与旧测试。
-- **通道无关协议**：`app/channels/base.py` 定义 `InboundMessage` / `ChannelIdentity` / `ChannelReply` 三个**通道无关**基元，任何飞书特有概念都不得进入。
+- **通道无关契约**：`app/channels/base.py` 定义**入站基元**（`InboundMessage` / `ChannelIdentity` / `ChannelReply`）与**出站契约**（`RecipientRef` / `OutboundMessage` / `SendResult` / `ChannelErrorKind` / `ChannelAdapter` Protocol），任何飞书特有概念都不得进入。**本 Task 只冻结契约，不实现出站行为**（Feishu 侧的 `send` 实现在 FEISHU-005）。
 - **出站基础设施**：`tenant_access_token` 获取 / 缓存 / 提前刷新 / 并发单飞，以及可复用的 HTTP 传输层、错误分类、重试骨架。
 - **安全**：密钥零硬编码、日志与异常零泄漏。
 - **隐身边界**：`FEISHU_ENABLED=false` → 网络请求数恒为 0。
@@ -46,7 +46,9 @@
 | `tests/conftest.py` | `override_settings` 的 `env_map` 未收录飞书键，但**有兜底**：`key.upper()` 直接 `setenv`（`feishu_enabled` → `FEISHU_ENABLED`）；`get_settings.cache_clear()` 为标配 | **不改**（见「Testing」） |
 | `tests/` 分层 | `tests/unit/`（纯逻辑，marker 自动打标）+ `tests/integration/` + `tests/e2e/`；`marker` 由 `pytest_collection_modifyitems` 自动分配 | 新增测试全部落 `tests/unit/` |
 
-### 依赖决策（重要，需确认）
+### 依赖决策（**HTTP 传输层**，与 Risk #1 crypto 无关）
+
+> 本节只讨论 **HTTP 传输层**用 stdlib 还是 httpx。**与 crypto 依赖无关**——`cryptography` 的引入已在 **Risk #1 中决策为方案 A**（见 §1「runtime 依赖」与 FEISHU-002 §15.1），本 Task 必须引入。
 
 `httpx` 是 dev-only 依赖，生产镜像 `--no-dev` 不会安装它。若让 Feishu Client 直接使用 `httpx`，就必须把 `httpx` 提升到 `[project].dependencies`，进而需要同步更新 `uv.lock`（`uv sync --frozen` 会校验锁文件）——**这两处都超出本 Task 允许改动的文件白名单**。
 
@@ -68,7 +70,7 @@
 | `feishu_app_id` | `FEISHU_APP_ID` | str | `""` | enabled 时非空 | 飞书应用 ID（非密钥） |
 | `feishu_app_secret` | `FEISHU_APP_SECRET` | str | `""` | enabled 时非空 | **敏感** |
 | `feishu_verification_token` | `FEISHU_VERIFICATION_TOKEN` | str | `""` | enabled 时非空 | **敏感**；本 Task 只做"配置存在性"校验，校验逻辑属 FEISHU-002 |
-| `feishu_encrypt_key` | `FEISHU_ENCRYPT_KEY` | str | `""` | 无（可空=不加密） | **敏感**；解密逻辑属 FEISHU-002 |
+| `feishu_encrypt_key` | `FEISHU_ENCRYPT_KEY` | str | `""` | 无（**允许为空**） | **敏感**。**正式支持的配置项**：非空 → 支持加密事件 + 启用签名校验；为空 → 只接受未加密事件（安全性降级，见启动告警）。**解密业务属 FEISHU-002，本 Task 只做配置与取值出口** |
 | `feishu_api_base` | `FEISHU_API_BASE` | str | `"https://open.feishu.cn"` | 必须以 `http://`/`https://` 开头；尾部 `/` 归一化 | 可指向假服务以便测试 |
 | `feishu_llm_profile` | `FEISHU_LLM_PROFILE` | str | `""` | 无 | 空 = 走 `DEFAULT_LLM_PROFILE`（本 Task 不消费，仅登记） |
 | `feishu_timeout_seconds` | `FEISHU_TIMEOUT_SECONDS` | float | `10.0` | `> 0` | 单次出站 HTTP 超时 |
@@ -126,9 +128,41 @@
 
 **守卫（`__post_init__`）**：`channel` 非空、`external_user_id` 非空、`text` 非空且有上限（超限截断并置 `metadata["truncated"]=True`，避免无界内存）、`received_at` 必须时区感知。违规抛 `ValueError`（纯值对象，fail-fast）。
 
-**本 Task 只定义数据基元**：`parse / send` 等适配器**行为接口**留待 FEISHU-002 / FEISHU-005 定义——此处提前抽象只会固化成错误的接口形状。
+### 3. 出站契约（`app/channels/base.py`，本次修订新增）
 
-### 3. Tenant Token 运行时模型（`app/channels/feishu/client.py` 内私有）
+通道无关的出站契约。**本 Task 只定义、不实现**；Feishu 侧实现在 FEISHU-005。
+
+| 类型 | 字段 | 必需 | 说明 |
+|---|---|---|---|
+| `RecipientRef` | `channel: str` | ✅ | 通道标识 |
+| | `external_id: str` | ✅ | 通道内收件人标识（飞书侧填 `open_id`，**字段名不得叫 `open_id`**） |
+| `OutboundMessage` | `channel: str` | ✅ | 通道标识 |
+| | `recipient: RecipientRef` | ✅ | 收件人（**Reply 与 Proactive 都需要**，因为出站抽象不假设"有锚点"） |
+| | `text: str` | ✅ | 要发送的文本（非空） |
+| | `reply_ref: str \| None` | ⭕ | **有 = Reply 形态**（锚定某条外部消息）；**无 = Proactive 形态**（主动开口）。实现据此选择底层 API，调用方无需知道有哪些 API |
+| | `idempotency_key: str \| None` | ⭕ | **Proactive 必填**（无 `reply_ref` 时无外部消息 id 可依托）；Reply 可省略（由 `reply_ref` 充当） |
+| | `metadata: Mapping[str, Any]` | ⭕ | 有界、可序列化；通道私有扩展 |
+| `SendResult` | `ok: bool` | ✅ | 是否成功 |
+| | `external_message_id: str \| None` | ⭕ | 通道返回的消息 id（飞书 `message_id`；**不含敏感值**） |
+| | `error: ChannelErrorKind \| None` | ⭕ | 失败类别（`ok=False` 时非空） |
+| `ChannelErrorKind` | `StrEnum` | — | **通道无关错误词汇**：`not_found` / `auth` / `rate_limited` / `timeout` / `server_error` / `client_error` / `disabled` / `invalid_request` / `unknown` |
+| `ChannelAdapter` | `Protocol` | — | `async def send(message: OutboundMessage) -> SendResult` |
+
+**三条强制约束**
+
+1. **一个 `send` 而非两个方法**：`reply` 被建模为"带锚点的 send"。拆成 `reply_message` / `send_message` 会要求**调用方**判断"该用哪个"，等于把飞书 API 形态泄漏给核心。合并后由 `reply_ref` 的有无决定，调用方只表达"这条消息是否锚定在某条用户消息上"。
+2. **返回 `SendResult`、不抛异常**：出站失败是**正常业务分支**（架构 §6.2 #9），用返回值表达可让"投递永不冒泡"这条不变式在类型层面成立。
+3. **`ChannelErrorKind` 而非 `FeishuError`**：核心**永远看不到**渠道的错误分类；飞书 7 类错误在 `channels/feishu/errors.py` 内映射为上述通道无关词汇。
+
+**出站基元同样禁止出现飞书特有字段名**：`open_id` / `union_id` / `chat_id` / `message_id` / `reply_message_id` / `receive_id` / `receive_id_type` / `msg_type` / `tenant_access_token` / `app_id` / `lark_*`。
+
+**`base.py` 的依赖面约束（新增，R4）**：**零第三方依赖、零 `app.*` 依赖**（仅标准库）。原因：这是被**核心层**（`application` / `services`）允许 import 的最底层契约（architecture §2.2 R2），一旦带上第三方依赖或 `app.*` 依赖，就会把依赖图污染到核心。由 FEISHU-006 的专项依赖面断言守门。
+
+### 4. 本 Task 只定义数据契约，不定义行为实现
+
+入站侧的 `parse`（事件解析）**行为**留给 FEISHU-002；出站侧的 `send`（飞书发送）**行为**留给 FEISHU-005。本 Task 冻结的是**两边的类型与协议签名**——因为它们是跨 Task 的接口，必须在任何实现之前定死；而**函数体**属于各自 Task。
+
+### 5. Tenant Token 运行时模型（`app/channels/feishu/client.py` 内私有）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -145,7 +179,7 @@ needs_refresh(now, ratio) = now >= refresh_deadline
 is_expired(now)           = now >= hard_deadline
 ```
 
-### 4. 传输层契约（`client.py` 内 `Transport`）
+### 6. 传输层契约（`client.py` 内 `Transport`）
 
 ```
 Transport.post_json(url: str, body: dict, timeout: float) -> HttpResponse
@@ -402,6 +436,9 @@ _clock: Callable[[], float]       ← 模块级，默认 time.monotonic
   backoff_max < backoff → SettingsError
 - api_base 尾部斜杠归一化（"https://x/" → "https://x"）；非 http(s) 前缀 → SettingsError
 - 组合生效：get_settings() 上可直接访问 feishu_* 字段（证明 Settings 组合成功）
+- Encrypt Key 语义（Risk #1 = 方案 A）：非空 → 正常加载；为空 → 加载成功 + 一条安全性降级 warning
+  （断言 caplog 有 warning，且 warning 文案**不含密钥值**）
+- crypto runtime 依赖：`uv run python -c "from cryptography.hazmat.primitives.ciphers import Cipher"` 成功
 ```
 
 **关于 conftest**：`override_settings(feishu_enabled=False)` 走既有兜底分支（`feishu_enabled`.upper() → `FEISHU_ENABLED`）即可生效，**`tests/conftest.py` 无需修改**；需要重置单例时在测试文件内用**本文件 autouse fixture** 调 `reset_feishu_client()`（不新增全局夹具）。
@@ -461,6 +498,18 @@ _clock: Callable[[], float]       ← 模块级，默认 time.monotonic
 - 不可变：frozen dataclass 赋值抛异常
 - 守卫：空 channel / 空 external_user_id / 空 text → ValueError；
   非时区感知 received_at → ValueError；超长 text 被截断并置 metadata["truncated"]=True
+
+【出站契约（本次修订新增）】
+- 字段白名单：RecipientRef / OutboundMessage / SendResult 的字段名集合恰好等于期望集合；
+  对禁用名单 {open_id, union_id, chat_id, message_id, reply_message_id, receive_id,
+  receive_id_type, msg_type, tenant_access_token, app_id, lark_*} 逐个断言"不作为字段名出现"
+- ChannelErrorKind：值域闭集断言（恰好 9 个取值）；**不含任何飞书业务码**（如 10003 / 99991400）
+- 形态语义：OutboundMessage(reply_ref=None) 表示 Proactive；reply_ref 非空表示 Reply
+  （断言两个形态都能构造，且不触发任何 IO）
+- Protocol：空壳 ChannelAdapter 实现 satisfies 协议（runtime_checkable 断言）；
+  缺少 send 的类 **不** satisfies
+- 依赖面（R4，核心断言）：AST 扫描 app/channels/base.py → 只 import 标准库；
+  零第三方依赖、零 app.* 依赖（失败信息含模块名）
 ```
 
 **执行级别（AGENTS.md 门槛）**：`Focused Test`（4 个测试文件）→ `Module Test`（`pytest tests/unit -m unit`）→ 因涉及 `core/settings/` 基础设施改动，补跑 `Fast Test`（`pytest -m "(unit or api) and not slow"`）。
@@ -500,14 +549,25 @@ _clock: Callable[[], float]       ← 模块级，默认 time.monotonic
 [ ] token_view() 结构上不含 token 值字段
 
 通道协议
-[ ] base.py 三个基元的字段名集合通过白名单断言；飞书特有名词零出现（强制字段维度）        (AC-11)
+[ ] base.py 三个入站基元的字段名集合通过白名单断言；飞书特有名词零出现（强制字段维度）    (AC-11)
+[ ] base.py 出站基元（RecipientRef / OutboundMessage / SendResult / ChannelErrorKind）字段名
+    集合通过白名单断言；飞书特有名词（open_id/reply_message_id/receive_id_type/msg_type…）零出现
+[ ] ChannelErrorKind 为闭集（值域断言：恰好 9 个取值，无飞书业务码）
+[ ] OutboundMessage：reply_ref 为空且 idempotency_key 为空 → 构造即可（是否拒绝属 005 的调用方契约校验）
+[ ] ChannelAdapter 为 runtime_checkable Protocol；空壳实现 satisfies 协议
+[ ] base.py 依赖面（本次修订新增）：AST 扫描证明它只 import 标准库，
+    零第三方依赖、零 app.* 依赖（R4）
 
 边界与零回归
 [ ] FEISHU_ENABLED=false → get_tenant_access_token 抛 FeishuDisabledError 且网络请求数 == 0  (AC-1)
 [ ] 本 Task 未修改 Chat Pipeline（git diff 不含 application/ · api/v1/chat.py 等）      (AC-12)
 [ ] 本 Task 未修改 Character / World / Memory（git diff 不含 character/ · services/ · repositories/）(AC-13)
 [ ] 现有 Web 路径测试零失败（用例：focused + module + fast 三档全绿）                   (AC-14)
-[ ] 既有文件改动仅 2 个：app/core/settings/__init__.py、.env.example（git status 可证）
+[ ] 既有文件改动仅 4 个：app/core/settings/__init__.py、.env.example、pyproject.toml、uv.lock（git status 可证）
+[ ] **crypto runtime 依赖就位（Risk #1 = 方案 A）**：`cryptography` 在 `[project].dependencies`（非 dev 组）；
+    `uv.lock` 已由 uv 同步（未手工编辑）；`uv run python -c "from cryptography.hazmat.primitives.ciphers
+    import Cipher, algorithms, modes"` 成功；**`channels/base.py` 仍零第三方依赖**（R4 不破）
+[ ] `FEISHU_ENCRYPT_KEY` 为空时：配置加载成功（不报错），但产生一条**安全性降级 warning**
 ```
 
 ## Implementation Constraints
@@ -527,12 +587,21 @@ tests/unit/test_feishu_client.py
 tests/unit/test_feishu_channel_base.py
 ```
 
-**允许修改的既有文件（仅此 2 个）**
+**允许修改的既有文件（共 4 个）**
 
 ```text
 app/core/settings/__init__.py     # +1 import +1 基类（组合 FeishuSettings）
 .env.example                      # 追加 FEISHU_* 键（凭据留空值）
+pyproject.toml                    # ★ Risk #1 = 方案 A：uv add cryptography（runtime 依赖）
+uv.lock                           # ★ 同上，由 uv 生成（禁止手工编辑）
 ```
+
+**runtime 依赖：`cryptography`（Risk #1 已决策为方案 A）**
+
+- 加入 `[project].dependencies`（**不是** `[dependency-groups].dev`），因为生产镜像执行 `uv sync --frozen --no-dev`，dev 组依赖在生产**不存在**。
+- 加入方式：`uv add cryptography`（项目既有依赖管理流程）→ 自动同步 `uv.lock`。**禁止手工编辑 lock 文件。**
+- **本 Task 的边界**：只负责"**保证该依赖已存在且可导入**"（供 FEISHU-002 消费），**不实现**任何 Webhook 解密业务。
+- **与 R4 无关**：`cryptography` 只在 `channels/feishu/` 内使用；`channels/base.py` **仍然零第三方依赖**（FEISHU-002 的 `events.py` 才 import 它）。
 
 **明确禁止触碰**：`application/**`、`services/**`、`repositories/**`、`models/**`、`character/**`、`chains/**`、`world/**`、`memory/**`、`relationship/**`、`api/**`、`prompts/**`、`main.py`、`migrations/**`、`pyproject.toml`、`uv.lock`、`tests/conftest.py`。
 
@@ -545,14 +614,19 @@ app/core/settings/__init__.py     # +1 import +1 基类（组合 FeishuSettings�
 5. **错误判定单点**：`client.py` 内不得出现 `if status == 429` / `if status >= 500` / `if code != 0 → 认证` 之类的判断；一律调 `errors.classify(...)`。
 6. **脱敏不可绕过**：client 产出的日志与异常文案统一经 `_scrub(...)`；`secret_values()` 是唯一取值出口。
 7. **`retryable` 为类属性**：不得在每个调用点重复判断可重试性。
-8. **不新增抽象**：不建 `core/errors.py`、不建 `channels/feishu/retry.py`（重试策略放 `client.py`）、不定义 `ChannelAdapter` 行为协议（留给 002/005）、不引入 `SecretStr`、不引入 httpx/tenacity/backoff 等新依赖。
-9. **不添加代码注释**，用命名表达意图（全局约定）。
-10. **`channels/**` 的允许 import 白名单**：`app.core.settings`、`app.channels.*`、标准库。**不得** import `services` / `repositories` / `models` / `chains` / `character` / `application`（本 Task 天然满足，FEISHU-006 会用静态断言守门）。
-11. **覆盖要求**：`app/channels/*` 不在 `pyproject.toml` 的 coverage omit 列表内（`branch = true`），新增分支需被测试覆盖。
+8. **不新增抽象**：不建 `core/errors.py`、不建 `channels/feishu/retry.py`（重试策略放 `client.py`）、不引入 `SecretStr`、不引入 httpx/tenacity/backoff 等新依赖。
+   - **唯一例外（Risk #1 = 方案 A，已决策）**：引入 **`cryptography`**（runtime 依赖）——因为加密事件必须做 AES-256-CBC 解密，而 Python 标准库**没有 AES 实现**，不存在 stdlib 替代方案。该依赖由本 Task 负责加入，由 FEISHU-002 消费。
+   - **注意区分**：这与"HTTP 传输层不用 httpx"（见「依赖决策」）是**两件独立的事**——crypto 没有 stdlib 替代，HTTP 有（`urllib`）。
+   - **修订说明（本次）**：原约束中的"不定义 `ChannelAdapter` 行为协议（留给 002/005）"**已撤销**。原因：出站契约是**跨 Task 的接口**（FEISHU-005 实现它、未来 Autonomy 消费它），必须在任何实现之前冻结，否则 005 与未来调用方会各自长出不一致的形状。**本 Task 定义协议与类型，但不写实现体**（`send` 的 Feishu 实现属 005）。
+9. **`base.py` 的依赖面（新增约束）**：`app/channels/base.py` **零第三方依赖、零 `app.*` 依赖**（仅标准库）。它被核心层允许 import（architecture §2.2 R2），因此必须保持"薄契约"；任何 HTTP / 重试 / 飞书字段进入 `base.py` 都会被 FEISHU-006 的依赖面断言拦下。
+10. **`channels/**` 的允许 import 白名单（本次修订）**：`app.core.*`、`app.channels.*`、`openai`（仅异常类型）、标准库。**不得** import `services.*`（除 `channel_identity_service` / `trace_collector` / `agent_service`）/ `repositories` / `models` / `chains` / `character` / `application.chat_pipeline` / `application.post_process` / **任何 Autonomy / Life Loop / Scheduler / Policy 模块**（本 Task 天然满足，FEISHU-006 会用静态断言守门）。
+11. **不添加代码注释**，用命名表达意图（全局约定）。
+12. **覆盖要求**：`app/channels/*` 不在 `pyproject.toml` 的 coverage omit 列表内（`branch = true`），新增分支需被测试覆盖。
 
 ## Implementation Order
 
 ```text
+ 0. 依赖就位（Risk #1 = 方案 A）：`uv add cryptography` → 确认进入 [project].dependencies 且 uv.lock 同步
  1. 调研现有 Settings 架构
     └─ 读 _shared.py / 一个领域模块（observability.py）/ __init__.py / llm_factory.py
        / post_process.py 的锁范式 / conftest 的 override_settings；确认本 Task 的 2 文件白名单
@@ -600,7 +674,7 @@ app/core/settings/__init__.py     # +1 import +1 基类（组合 FeishuSettings�
 | LLM 调用 / AI 回复生成 | FEISHU-004 |
 | 消息发送 / 回复投递（`im/v1/messages`） | FEISHU-005 |
 | 群聊处理 | 不做（架构 §3.3 / §7.2） |
-| 主动消息 | 不做（架构 §7.2） |
+| 主动消息 | **出口能力**属 FEISHU-005（本 Task 只冻结其契约）；**触发方**不做（架构 §7.2 / §2.5.6） |
 | Streaming | 不做（架构 §7.2） |
 | 图片 / 文件 / 语音 / Interactive Card | 不做（架构 §7.2） |
 | 数据库迁移（任何 `migrations/**` 改动） | FEISHU-003 |

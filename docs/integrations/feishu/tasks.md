@@ -2,9 +2,16 @@
 
 > **状态**：Plan 阶段任务拆分，**仅设计，不含实现**；`task-details/` 按需后续生成。
 > **设计依据**：[`architecture.md`](./architecture.md)（本 Task 列表中的章节引用均指向该文档）。
-> **全局约束**：飞书只是 Channel Adapter；不改 Character / World / Inventory / Memory 核心；不建第二套 Chat Pipeline；不建第二套 Session / Memory 系统；不做大规模重构。
-> **禁止行为（每个 Task 通用）**：在 `app/channels/**` 内 import `character.*` / `services.memory*` / `services.world*` / `services.state*` / `services.relationship*` / `chains.*` / 直连 `repositories.*`；在 `application` / `services` / `repositories` 内 import `app.channels.*`；硬编码任何密钥。
-> **既有文件改动白名单**（超出即视为越界）：`core/settings/__init__.py`、`api/v1/router.py`、`.env.example`、`tests/conftest.py`。
+> **全局约束**：飞书是**双向** Channel Adapter（Inbound + Outbound）；出站同时支持 **Reply**（锚定用户消息）与 **Proactive**（主动开口）两形态；不改 Character / World / Inventory / Memory / Relationship 核心；不建第二套 Chat Pipeline；不建第二套 Session / Memory 系统；**不实现 Autonomy / Scheduler / Life Loop / Proactive Policy / 主动消息触发方**；不做大规模重构。
+> **依赖方向铁律（architecture.md §2.2 R1~R5，本次修订新增）**：
+> - 核心层（`application` / `services` / `repositories` / `character` / `chains` / `models` / `prompts` / `core`）**可以** import `app.channels.base`（**仅契约**），**不得** import `app.channels.<impl>`（如 `app.channels.feishu`）；
+> - `app.channels.<impl>` **不得** import 任何 Autonomy / Life Loop / Scheduler / Policy 模块；
+> - `app.channels.base` 必须**零第三方依赖、零 `app.*` 依赖**；
+> - `api → channels → application` 单向。
+> **禁止行为（每个 Task 通用）**：在 `app/channels/<impl>/**` 内 import `character.*` / `services.memory*` / `services.world*` / `services.state*` / `services.relationship*` / `chains.*` / 直连 `repositories.*` / 任何 Autonomy 模块；硬编码任何密钥。
+> **既有文件改动白名单**（超出即视为越界）：`core/settings/__init__.py`、`api/v1/router.py`、`.env.example`、`tests/conftest.py`、**`app/core/db.py`**（FEISHU-003 必需：新增 1 个 ORM 行类；理由见 FEISHU-003 §15.1）、**`api/v1/debug.py`**（FEISHU-006 可选只读排障）、**`pyproject.toml` + `uv.lock`**（FEISHU-001 必需：加入 runtime 依赖 `cryptography`，经 `uv add` 生成，**禁止手工编辑 lock**）。
+> **Risk #1 已决策（方案 A）**：引入 `cryptography`，**正式支持** Feishu Encrypt Key —— 包括 AES-256-CBC 解密与协议要求的签名校验。所有 Task 的文档统一按此描述，不得再出现"二选一 / 待决策 / 暂不支持加密"的表述。
+> **Risk #2 状态：Deferred，不阻塞当前实现**（出站触发方的 Push/Pull、Registry、组合根、adapter 生命周期一律延后到 Autonomy 落地时决策；本阶段只要求 FEISHU-005 提供可复用的 Outbound 能力）。
 
 ## Task 列表
 
@@ -12,11 +19,13 @@
 
 - **ID**：FEISHU-001
 - **Priority**：P0
-- **Goal**：打通"配置 → 认证 → 可发请求"的最小基础设施：新增配置领域模块 `core/settings/feishu.py`（`FeishuSettings` 组合进 `Settings`，含 §5.1 全部配置项与启用即校验）、通道无关协议骨架 `channels/base.py`、出站客户端 `channels/feishu/client.py` 的**认证子集**（`tenant_access_token` 获取 / 缓存 / 提前刷新）与 HTTP 基础设施（超时、错误分类、退避重试骨架）、错误类型 `channels/feishu/errors.py`。
+- **Goal**：打通"配置 → 认证 → 可发请求"的最小基础设施，并**冻结通道无关契约**：新增配置领域模块 `core/settings/feishu.py`（`FeishuSettings` 组合进 `Settings`，含 §5.1 全部配置项与启用即校验）、通道无关契约 `channels/base.py`（**入站基元** `InboundMessage` / `ChannelIdentity` / `ChannelReply` + **出站契约** `RecipientRef` / `OutboundMessage` / `SendResult` / `ChannelErrorKind` / `ChannelAdapter` Protocol；零第三方依赖）、出站客户端 `channels/feishu/client.py` 的**认证子集**（`tenant_access_token` 获取 / 缓存 / 提前刷新）与 HTTP 基础设施（超时、错误分类、退避重试骨架）、错误类型 `channels/feishu/errors.py`。
 - **Scope**：
-  - 新增：`app/core/settings/feishu.py`、`app/channels/__init__.py`、`app/channels/base.py`、`app/channels/feishu/__init__.py`、`app/channels/feishu/client.py`、`app/channels/feishu/errors.py`。
+  - 新增：`app/core/settings/feishu.py`、`app/channels/__init__.py`、`app/channels/base.py`（含出站契约）、`app/channels/feishu/__init__.py`、`app/channels/feishu/client.py`、`app/channels/feishu/errors.py`。
   - 接线：`app/core/settings/__init__.py`（组合 `FeishuSettings`）、`.env.example`（`FEISHU_*` 空值占位）。
-  - **不碰**：路由、`application/**`、`services/**`、`repositories/**`、`models/**`、迁移。
+  - **runtime 依赖（Risk #1 = 方案 A）**：通过项目既有 `uv` 流程加入 `cryptography` → 改动 `pyproject.toml` + `uv.lock`（`uv add cryptography`，禁止手工改 lock）。本 Task **不实现** Webhook 解密业务，只负责保证 **FEISHU-002 所需的 crypto runtime 依赖已存在且可导入**（含生产 `uv sync --frozen --no-dev` 场景）。
+  - **不碰**：路由、`application/**`、`services/**`、`repositories/**`、`models/**`、迁移、任何 Autonomy 模块。
+  - **只定义契约、不实现出站行为**：`ChannelAdapter` 的 Feishu 实现（`send`）属 FEISHU-005，本 Task 只把**契约**冻结下来。
 - **Dependency**：无。
 - **Acceptance Criteria**：
   1. `FEISHU_ENABLED=false` 时不构造任何 HTTP 客户端、不发起任何网络请求（调用计数 = 0 断言）。
@@ -25,12 +34,16 @@
   4. `tenant_access_token`：缓存命中不重复请求；到达 `FEISHU_TOKEN_REFRESH_RATIO` 阈值时提前刷新；并发获取只触发一次真实请求（假传输层请求次数断言）。
   5. 源码中零明文密钥；日志 / 异常信息中不出现 `APP_SECRET` / `ENCRYPT_KEY` / `tenant_access_token`（断言日志输出）。
   6. 出站错误分类可区分"可重试（429/5xx/超时）"与"不可重试（4xx）"。
+  7. **出站契约冻结（本次修订新增）**：`channels/base.py` 提供 `OutboundMessage`（含 `recipient` / `text` / `reply_ref` / `idempotency_key`）与 `ChannelAdapter` Protocol；`ChannelErrorKind` 为通道无关闭集；`base.py` **零第三方依赖、零 `app.*` 依赖**（静态断言守门）；出站类型中不出现任何飞书特有字段名（`open_id` / `message_id` / `tenant_access_token` 等）。
+  8. **crypto runtime 依赖就位（Risk #1 = 方案 A）**：`cryptography` 已进入 `[project].dependencies`（非 dev 组）且 `uv.lock` 已同步；`uv run python -c "from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes"` 可导入；**`channels/base.py` 仍保持零第三方依赖**（crypto 只在 `channels/feishu/` 内使用）。
 
 ### FEISHU-002 Webhook 与事件接收（P0）
 
 - **ID**：FEISHU-002
 - **Priority**：P0
-- **Goal**：建立入站链路：`POST /api/v1/feishu/events` 路由（读原始 body → 解密 → 验签 → 快速 ack）、校验与解析纯函数（`url_verification` challenge、`im.message.receive_v1` 文本事件）、`event_id` 去重（幂等）、群聊/非文本事件安全忽略、ack 与处理解耦（后台任务投递）。
+- **Goal**：建立入站链路：`POST /api/v1/feishu/events` 路由（读原始 body → **验证** → 解密（如加密）→ 解析 → 去重 → 快速 ack）、校验与解析纯函数（`url_verification` challenge、`im.message.receive_v1` 文本事件）、`event_id` 去重（幂等）、群聊/非文本事件安全忽略、ack 与处理解耦（后台任务投递）。
+  - **完整 Webhook 验证（Risk #1 = 方案 A 下的正式能力）**：`verification token`（身份归属）+ `X-Lark-Request-Timestamp` 时间戳窗口（防重放）+ **`X-Lark-Signature` 签名校验**（完整性与来源）+ **`Encrypt Key` 场景的 `AES-256-CBC` 解密**（机密性）。**二者职责不同、不可互相替代**（architecture §6.4）：**不得把 verification token 当作签名校验的替代品**。
+  - **两种来件都必须支持**：`Encrypt Key` 非空 → 支持**加密事件**；为空 → 接受**未加密事件**（此时按官方协议可执行的校验要素为准，启动时记安全性降级 warning）。
 - **Scope**：
   - 新增：`app/api/v1/feishu.py`、`app/channels/feishu/events.py`、`app/channels/feishu/adapter.py`（本 Task 只落地"接收 → 去重 → 投递"骨架与处理入口签名，具体处理体在 003/004 填充）。
   - 接线：`app/api/v1/router.py`（注册 `feishu_router`，1 行）；`tests/conftest.py`（假传输夹具，如需要）。
@@ -46,14 +59,19 @@
   6. 群聊（`chat_type != "p2p"`）与非 `text` 消息被忽略，返回 `200`，且不投递处理。
   7. **ack 先行**：处理入口被人为阻塞时，HTTP 响应仍在 3s 内返回 `200`（时序断言），处理在后台完成。
   8. 空/畸形 body、缺少 `header`、`content` 非合法 JSON 等异常输入均不抛 5xx（返回 `400` 或 `200` 并记录）。
+  9. **加密路径为正式能力（Risk #1 = 方案 A）**：真实 `cryptography` 实现，确定性单测覆盖"正确密钥解密成功 / 错误密钥失败 / 密文损坏失败 / 解密后能解析真实结构 / 未加密事件同样正常"；**禁用 monkeypatch 假解密**（走真实 crypto path）。
+  10. **验证机制不混同**：`verification token`（401）与 `X-Lark-Signature`（403）各自独立断言；时间戳超窗（403）断言；加密事件的**签名校验基于原始 body**（不基于解密后明文）。协议细节以飞书官方文档为最终依据。
 
 ### FEISHU-003 Feishu User / Session 映射（P0）
 
 - **ID**：FEISHU-003
 - **Priority**：P0
-- **Goal**：落地"外部身份 → 内部 User / Session"映射：新增 `channel_identities` 表（迁移 `0036`）、`repositories/channel_identity_repository.py`（单表 CRUD + upsert 幂等）、`services/channel_identity_service.py`（`get_or_create` / 解析业务入口）、`channels/feishu/identity.py`（`open_id → feishu:{open_id}` 派生规则），并提供多用户隔离的可验证保证。
+- **Goal**：落地"**双向**身份解析"：新增 `channel_identities` 表（迁移 `0036`）、`repositories/channel_identity_repository.py`（单表 CRUD + upsert 幂等 + 反查）、`services/channel_identity_service.py`（**正向** `resolve` / **反向** `resolve_recipient` 两个业务入口，派生规则在此冻结）、`channels/feishu/identity.py`（`InboundMessage → ChannelIdentity` 纯适配，**不含派生逻辑**），并提供多用户隔离的可验证保证。
 - **Scope**：
   - 新增：`migrations/versions/0036_channel_identities.py`、`app/repositories/channel_identity_repository.py`、`app/services/channel_identity_service.py`、`app/channels/feishu/identity.py`。
+  - **反向解析（本次修订新增）**：`resolve_recipient(internal_user_id, channel) -> RecipientRef | None`（主动消息的收件人来源，architecture §3.4）；未命中返回 `None`，**不得**从 `session_id` 反推。
+  - **派生规则归属**：`f"{channel}:{external_id}"` 放 **services**（通道无关）；`channels/feishu/identity.py` 只组装 `ChannelIdentity`——因为 `services` 不得 import `app.channels.*`（R1/R2）。
+  - **接线**：`tests/conftest.py::_REPO_MODULES` 追加新仓储（**必需**，否则测试连真实 PG 挂起）；`app/core/db.py` 新增 1 个 ORM 行类。
   - **不新增**：用户表、会话表、第二套 Memory / Session 系统。
   - **不修改**：`conversations` / `messages` / `memories` / `worlds` 等既有表结构。
 - **Dependency**：FEISHU-001。
@@ -64,6 +82,7 @@
   4. **隔离断言**：用户 A 与 B 各自 `conversation` / `messages` / `memories` / `worlds`（`home:{user_id}`）/ `relationship` 互不可见——A 写入后以 B 的身份读取为空。
   5. `alembic upgrade head` → `downgrade` 往返成功；ORM 与迁移一致（`tests/integration/test_db_migration.py` 口径）。
   6. `channel_identity_service` 是唯一读写入口；`channels/feishu/identity.py` 不直连 `repositories`（静态断言）。
+  7. **反向解析（本次修订新增）**：`resolve_recipient("feishu:ou_A", "feishu")` 返回 `RecipientRef(channel="feishu", external_id="ou_A")`；未知 `internal_user_id` 返回 `None`（不猜、不兜底）；多行时按 `created_at` 最早取（确定性）；**不以** `session_id` 字符串反推。
 
 ### FEISHU-004 接入现有 Chat Pipeline（P0）
 
@@ -86,66 +105,80 @@
   7. `git diff` 不含 `api/v1/chat.py`、`api/v1/schemas.py`、`application/chat_pipeline.py`（**Web 路径 0 改动**）。
   8. `channels/**` 无对 `character.*` / `services.memory*` / `services.world*` / `services.state*` / `services.relationship*` / `chains.*` / 直连 `repositories.*` 的 import（静态断言）。
 
-### FEISHU-005 发送 AI 回复到飞书（P0）
+### FEISHU-005 Feishu Outbound Messaging（P0）
 
 - **ID**：FEISHU-005
 - **Priority**：P0
-- **Goal**：完成出站投递：`client.py` 的 `reply`（优先，锚定 `message_id`）/ `send`（降级）实现、文本清洗与规范化、超长切分、可重试失败的退避与幂等防重、发送失败与会话状态解耦。
+- **Goal**：建立**统一的 Feishu Outbound Messaging 能力**，同时支持**用户消息 Reply** 与**未来 Character 主动消息（Proactive）**：实现 `ChannelAdapter.send(OutboundMessage) -> SendResult`（Feishu 侧）、`client.py` 的 Reply / Send 两个飞书 API、文本规范化与超长切分、可重试失败的退避、**两套幂等键**（Reply 用源 `message_id`；Proactive 用调用方提供的 `idempotency_key`）、以及"投递失败与会话状态解耦"。**本 Task 不实现 Autonomy**（只交付出口能力）。
 - **Scope**：
-  - 填充：`app/channels/feishu/client.py`（出站发消息）、`app/channels/feishu/adapter.py`（接线出站）、`app/channels/feishu/errors.py`（补充投递类错误）。
-  - **不实现**：卡片 / 富文本 / 流式 / 图片 / 主动消息。
-- **Dependency**：FEISHU-001、FEISHU-002、FEISHU-004。
+  - 填充：`app/channels/feishu/client.py`（Reply / Send 两个 API）、`app/channels/feishu/delivery.py`（出站编排：两形态 + 幂等 + 逐段 + 收口）、`app/channels/feishu/outbound.py`（规范化 + 切分纯函数）、`app/channels/feishu/adapter.py`（接线）、`app/channels/feishu/errors.py`（Feishu 错误 → `ChannelErrorKind` 映射 + 业务码可重试性）。
+  - **两条出站路径**：
+    - **Reply**：`reply_ref` 存在 → `POST im/v1/messages/{message_id}/reply`（无需收件人解析）
+    - **Proactive**：`reply_ref` 为空 → `internal_user_id → channel_identity_service.resolve_recipient → open_id` → `POST im/v1/messages?receive_id_type=open_id`
+  - **不实现**：Autonomy / Scheduler / Life Loop / Proactive Policy / 主动消息触发方 / 主动消息推送循环（触发与循环属未来任务）。
+  - **不实现**：卡片 / 富文本 / 流式 / 图片 / 文件 / 语音。
+- **Dependency**：FEISHU-001（契约 + 认证 + transport）、FEISHU-002（adapter 接线点）、**FEISHU-003（`resolve_recipient` 反向解析）**、FEISHU-004（Reply 形态的文本来源）。
 - **Acceptance Criteria**：
-  1. 回复通过 `POST {FEISHU_API_BASE}/open-apis/im/v1/messages/{message_id}/reply` 发送，`content` 为 `{"text": "..."}`；reply 不可用时按固定策略降级为 `send`（策略二选一，实现期冻结并断言）。
-  2. 空回复**不发送**空消息（按 §6.2 #8 固定策略：兜底文案或静默，二选一）。
-  3. 超长回复按 `FEISHU_MAX_REPLY_CHARS` 切分为多条**顺序**发送，内容无丢失、无重复（拼接还原断言）；单条仍超限时截断并记录。
-  4. `429` / `5xx` / 超时按指数退避重试（有上限）；`4xx` **不重试**；终败记录错误日志且**不抛至上层**。
-  5. 以 `message_id` 为幂等键防重复投递（重试场景下同一回复只发出一次，请求次数断言）。
-  6. 发送失败时，已落库的 `conversation` / `messages` 保持不变（状态断言）。
-  7. 日志与异常中不泄漏 `APP_SECRET` / `ENCRYPT_KEY` / `tenant_access_token`。
+  1. **Reply 路径**：`POST {FEISHU_API_BASE}/open-apis/im/v1/messages/{message_id}/reply`，`content` 为 `{"text": "..."}`；`reply_ref` 缺失时**不**降级为"对别的消息 reply"，而是走 Proactive 路径。
+  2. **Proactive 路径**：给定 `internal_user_id`，经 `resolve_recipient` 解析到 `open_id` 后经 `POST im/v1/messages?receive_id_type=open_id` 发送；**收件人解析失败（`None`）→ 不发、不猜、记 warning**。
+  3. **无锚点且无幂等键 → 拒绝发送**（调用方契约违规，记 error）。
+  4. 空/纯空白文本**不发送**空消息（固定为兜底文案策略，静默已否决）。
+  5. 超长回复按 `FEISHU_MAX_REPLY_CHARS` 切分为多条**顺序**发送，内容无丢失、无重复（`"".join(parts) == 规范化文本` 断言）；单条仍超限则截断并记录。
+  6. `429` / `5xx` / 超时按指数退避重试（有上限）；`4xx` **不重试**；终败记录错误日志且**不抛至上层**（`send` 返回 `ok=False`，不抛异常）。
+  7. **两套幂等键**：Reply 用源 `message_id` + 段序号；Proactive 用 `(channel, recipient, idempotency_key)` + 段序号。重复投递同一逻辑消息 → 请求次数不翻倍。
+  8. 发送失败时，已落库的 `conversation` / `messages` / `memory` / `world` / `character` / `relationship` 全部保持不变（逐项断言）。
+  9. 日志与异常中不泄漏 `APP_SECRET` / `ENCRYPT_KEY` / `tenant_access_token`。
+  10. **不 import 任何 Autonomy / Life Loop / Scheduler / Policy 模块**（静态断言）。
 
 ### FEISHU-006 错误处理与测试（P1）
 
 - **ID**：FEISHU-006
 - **Priority**：P1
-- **Goal**：收口错误处理与测试体系：固化 §6.2 全部 13 类错误的处理路径、补齐单元 / 集成 / e2e 测试（零真实飞书网络、零真实 LLM）、加入 `channels/` 依赖边界静态断言与"未启用即零路径"断言、产出人工回调冒烟回归清单与排障可见性。
+- **Goal**：收口错误处理与测试体系：固化 §6.2 全部 **15** 类错误（含新增的收件人解析失败、无锚点无幂等键）的处理路径、补齐单元 / 集成 / e2e 测试（零真实飞书网络、零真实 LLM）、加入**依赖边界静态断言**（R1~R5：核心可依赖 `channels.base` 契约、不得依赖 `channels.<impl>`；`channels.<impl>` 不得依赖 Autonomy；`base.py` 零第三方依赖）与"未启用即零路径"断言、**验证 Proactive 出口能力**（给定 `internal_user_id` 能解析到 `external_id` 并发送）、产出人工回调冒烟回归清单与排障可见性。
 - **Scope**：
   - 新增 / 收口：`app/channels/feishu/errors.py`；`tests/unit/test_feishu_*.py`、`tests/integration/test_feishu_*.py`、`tests/e2e/test_feishu_webhook.py`；`docs/integrations/feishu/regression-checklist.md`（可选，仅文档）；排障端点可选（如 `api/v1/debug.py` 增只读查询，或复用既有 observability trace）。
   - 测试基建：假飞书传输层（注入 `FEISHU_API_BASE`）+ `core/llm_factory.set_llm(FakeLLM)` + 内存 SQLite。
   - **不引入**：真实飞书调用、真实 LLM 调用。
 - **Dependency**：FEISHU-002、FEISHU-003、FEISHU-004、FEISHU-005。
 - **Acceptance Criteria**：
-  1. §6.2 十三类错误逐条断言：触发条件、HTTP 返回、是否调管线、用户可见结果、是否重试。
+  1. §6.2 **十五**类错误逐条断言：触发条件 / HTTP 返回 / 是否调管线 / 用户可见结果 / 是否重试。
   2. 场景矩阵全绿：正常文本 / 空文本 / 超长 / 重复 `event_id` / 群聊 / 非 text / 加密 / 未加密 / 验签失败 / 解密失败。
   3. 多用户隔离回归：两个 `open_id` 并发对话互不串（会话、记忆、世界逐项断言）。
-  4. `channels/**` 依赖边界静态断言常驻（禁止 import 列表命中即失败）；反向依赖断言（`application` / `services` / `repositories` 不 import `app.channels`）。
-  5. `FEISHU_ENABLED=false` 全链路零路径（网络调用 / token 获取 / 管线调用计数均为 0）。
+  4. **依赖边界静态断言常驻（本次修订更新为 R1~R5）**：`app.channels.<impl>`（如 `feishu`）禁止 import `character.*` / `services.memory*|world*|state*|relationship*` / `chains.*` / `repositories.*` / **任何 Autonomy / Life Loop / Scheduler / Policy 模块**；核心层（`application` / `services` / `repositories` / `character` / `chains` / `models` / `prompts` / `core`）**禁止 import `app.channels.<impl>`，但允许 import `app.channels.base`**（仅契约，fail-closed：`app.channels.` 前缀命中且不在 `base` 白名单内即失败）；`channels/base.py` **零第三方依赖、零 `app.*` 依赖**（专项依赖面断言）。
+  5. `FEISHU_ENABLED=false` 全链路零路径（网络 / token / 管线 / DB 写 四类计数均为 0）。
   6. 全部测试确定性、可 `pytest -m "not slow"` 快速通过；测试文件命名全局唯一（xdist 兼容）。
   7. `docs/integrations/feishu/regression-checklist.md`：人工步骤可执行（配置回调 URL → 发文本 → 收到回复 → 二次对话验证记忆延续 → 群聊不响应 → 关闭开关后端到端静默），含真模型抽查项。
+  8. **Proactive 出口能力验证（本次修订新增）**：不实现 Autonomy，但验证"已知 `internal_user_id` → `resolve_recipient` → 正确 `external_id` → 假传输收到一次 `send`（`receive_id_type=open_id`）"；未知 `internal_user_id` → 零发送；无 `idempotency_key` 的 Proactive → 拒绝发送。
 
 ## 依赖图
 
 ```text
-FEISHU-001 配置 + 认证 + 通道协议
+FEISHU-001 配置 + 认证 + 通道契约（入站基元 + 出站契约）
      │
      ├──────────────────────────┐
      ▼                          ▼
-FEISHU-002 Webhook / 事件接收   FEISHU-003 User / Session 映射（+迁移 0036）
-     │                          │
+FEISHU-002 Webhook / 事件接收   FEISHU-003 双向身份解析（+迁移 0036）
+     │                          │        · resolve（正向）
+     │                          │        · resolve_recipient（反向，供主动消息）
      └────────┬─────────────────┘
               ▼
-FEISHU-004 接入现有 Chat Pipeline（Web 路径 0 改动）
+FEISHU-004 接入现有 Chat Pipeline（Web 路径 0 改动；产出回复文本）
               │
               ▼
-FEISHU-005 发送 AI 回复到飞书
+FEISHU-005 Feishu Outbound Messaging
+              ├── Reply 路径（← 004 的文本，带 reply_ref）
+              └── Proactive 路径（← 未来 Autonomy，带 recipient + idempotency_key）
+                  （两条路径都依赖 003 的反向解析；本 Task 不实现触发方）
               │
               ▼
-FEISHU-006 错误处理 + 测试收口（P1，全链收口）
+FEISHU-006 错误处理 + 测试收口（P1，全链收口，含 Proactive 出口能力验证）
 ```
 
-- **关键路径（P0 最小闭环）**：`001 → 002 → 003 → 004 → 005`。完成后即具备"飞书发消息 → 角色正常回复 → 多轮状态保持"的完整能力。
+- **关键路径（P0 最小闭环）**：`001 → 002 → 003 → 004 → 005`。完成后即具备"飞书发消息 → 角色正常回复 → 多轮状态保持"的完整能力，**且出站已同时具备 Reply 与 Proactive 两种出口形态**（后者的触发方留给未来）。
 - **002 与 003 可并行**（互不依赖，仅共同依赖 001）。
-- **006 是收口任务**，必须在 002~005 全部完成后执行；其"§6.2 矩阵"与"边界断言"是 P0 的验收证据来源。
+- **005 对 003 的依赖是本次修订新增的**：Reply 不需要反向解析，但 Proactive 必须有；因两条路径共用同一个 `send`，故 005 必须等 003。
+- **006 是收口任务**，必须在 002~005 全部完成后执行；其"§6.2 矩阵"与"依赖边界断言"是 P0 的验收证据来源。
+- **未列入本次的依赖**：`Autonomy → 通道契约`。该依赖**存在但触发方不实现**（architecture §2.5.6 登记两条候选路径），故不进入本依赖图。
 
 ## 提交节奏
 
@@ -154,14 +187,24 @@ FEISHU-006 错误处理 + 测试收口（P1，全链收口）
 - 每个 Task 收口前检查 `git status`，确认无临时产物入库。
 - P0 链（001→005）收口时做一次回归：既有 Web 路径测试零失败（因为该路径零改动，此项应恒为绿）。
 
-## 后续建议生成 Task Detail 的任务
+## Task Detail 状态
 
-按"接口复杂 / 决策密度高 / 易返工"三条标准排序：
+`task-details/` 已全部生成（FEISHU-001~006）。本次修订（支持主动消息）影响：
 
-| 优先 | Task | 建议原因 |
+| 文件 | 本次修订 |
+|---|---|
+| `FEISHU-001.md` | 出站契约（`OutboundMessage` / `ChannelAdapter` / `ChannelErrorKind`）+ `base.py` 零依赖约束；原"不定义 ChannelAdapter 协议"的约束已撤销 |
+| `FEISHU-002.md` | 无实质改动（入站链路不受影响） |
+| `FEISHU-003.md` | 新增反向解析 `resolve_recipient` |
+| `FEISHU-004.md` | 出站交接改为通道无关契约（不硬编码 Feishu Reply） |
+| `FEISHU-005.md` | **重写为 Outbound Messaging**（Reply + Proactive 双形态） |
+| `FEISHU-006.md` | 错误矩阵扩到 15 类 + 边界断言按 R1~R5 重构 + Proactive 出口能力验证 |
+
+## 未来任务（**Risk #2 · Deferred，不阻塞当前实现**）
+
+> 出站触发方的装配问题（Push vs Pull / Registry / 组合根 / adapter 生命周期）**本阶段一律不决策**。此处仅登记，供 Autonomy / Proactive Messaging 真正落地时立项。
+
+| 候选 | 内容 | 前置条件 |
 |---|---|---|
-| 1 | **FEISHU-003** | 唯一涉及 DB schema（迁移 0036）+ 并发幂等 + 隔离不变式；映射规则一旦定错，后续多 Channel 与账号绑定都要返工 |
-| 2 | **FEISHU-004** | 管线接入点、并发串行策略、异常语义对齐三处最易踩坑；需要明确"零新增管线逻辑"的落地细节与断言方式 |
-| 3 | **FEISHU-005** | 超长切分、幂等防重、失败降级三类边界行为需要逐条冻结（策略二选一的地方必须写明选哪个） |
-| 4 | **FEISHU-002** | 验签/解密/去重细节多，但都是可单测的纯函数，接口相对稳定；可延后 |
-| — | FEISHU-001 / FEISHU-006 | 结构清晰（配置 + 测试收口），无需单独 Detail |
+| **FEISHU-007（未来）出站触发方接入** | 让未来 Autonomy 产出的主动消息真正送达飞书。两条候选（**均未决**）：① 渠道侧消费者拉取既有 `proactive_actions` 的待推送行 → `resolve_recipient` → `send` → 回写推送态；② 调用方经 Channel 抽象直调（需先解决"谁能 import 具体实现"的装配问题） | 需要一次 schema 变更（`proactive_actions` 无"外部推送态"载体）；需要 Autonomy 立项（architecture §2.5.6） |
+| 账号绑定（Web ↔ 飞书） | 改 `channel_identities.internal_user_id`，把飞书身份并入既有内部用户 | 架构 §7.2 明确不在本阶段 |
