@@ -5,6 +5,7 @@
 
 from app.application import world_engine
 from app.models.world import ConsumeError, ObjectStatus
+from app.repositories import world_repository
 from app.services.world.context_selector import render_world_section
 
 
@@ -197,3 +198,41 @@ def test_ensure_world_no_autoseed_when_disabled(db_session_factory, override_set
     override_settings(world_household_autoseed_enabled=False)
     world_engine.ensure_world("dave")
     assert world_engine.get_objects_by_location("dave", "home") == []
+
+
+def test_ensure_world_backfills_existing_empty_world(db_session_factory):
+    world_repository.ensure_world("erin")
+    assert world_engine.get_objects_by_location("erin", "home") == []
+    world_engine.ensure_world("erin")
+    names = {
+        obj.name for obj in world_engine.get_objects_by_location("erin", "home")
+    }
+    assert names == {"鸡蛋", "牛奶", "可乐", "面条", "大米", "面包"}
+
+
+def test_ensure_world_backfill_preserves_partial_and_fills_gap(db_session_factory):
+    world_repository.ensure_world("finn")
+    world_engine.create_object(
+        "finn",
+        name="鸡蛋",
+        category="food",
+        location_id="home.kitchen.fridge",
+        quantity=3,
+        consumable=True,
+    )
+    world_engine.ensure_world("finn")
+    by_name = {
+        obj.name: obj.quantity
+        for obj in world_engine.get_objects_by_location("finn", "home")
+    }
+    assert by_name["鸡蛋"] == 3
+    assert set(by_name) == {"鸡蛋", "牛奶", "可乐", "面条", "大米", "面包"}
+
+
+def test_ensure_world_backfill_is_idempotent(db_session_factory):
+    world_repository.ensure_world("grace")
+    world_engine.ensure_world("grace")
+    count1 = len(world_engine.get_objects_by_location("grace", "home"))
+    world_engine.ensure_world("grace")
+    count2 = len(world_engine.get_objects_by_location("grace", "home"))
+    assert count1 == count2 == 6
