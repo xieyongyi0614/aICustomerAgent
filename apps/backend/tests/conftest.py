@@ -387,6 +387,7 @@ SLOW_TEST_FILES = {
     "test_proactive_api.py",
     "test_state_e2e.py",
     "test_v65_matrix.py",
+    "test_v2_all_flags_smoke.py",
     "test_activity_continuity.py",
     "test_autonomy_matrix.py",
     "test_behavior_pipeline.py",

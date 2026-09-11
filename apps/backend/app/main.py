@@ -8,6 +8,7 @@ from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
 from app.application import autonomy_worker, observability, world_engine
 from app.core.settings import get_settings
+from app.core.settings.enablement import validate_enablement_chain
 from app.services import memory_service
 from app.application.action_engine import run_action_retry_loop
 from app.application.life_loop import run_life_loop_worker
@@ -37,6 +38,7 @@ async def lifespan(application: FastAPI):
     global _reclaim_task, _autonomy_task, _observability_cleanup_task
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
     global _life_loop_task
+    validate_enablement_chain(get_settings())
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
     if (
