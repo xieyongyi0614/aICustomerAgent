@@ -1,37 +1,288 @@
-"""飞书入站编排骨架：处理入口 + trace 起点 + 全异常兜底（FEISHU-002）。
+"""飞书入站编排：身份 → 会话串行 → LLM → 既有管线 → TurnOutcome（FEISHU-004）。
 
-身份映射（FEISHU-003）/ 管线调用（FEISHU-004）/ 出站发送（FEISHU-005）
-后续在同一函数体内顺序接线，不新增调度层。
+管线是唯一对话逻辑（零上下文构建/零落库/零后处理）；本模块只做
+"取身份 / 排队 / 取 LLM / 消费事件流 / 组装回复"。出站发送由 FEISHU-005
+消费 TurnOutcome（经通道无关 OutboundMessage 契约），不在本模块。
 """
 
+import asyncio
 import logging
 import time
+from dataclasses import dataclass
+
+import openai
 
 from app.channels.base import InboundMessage
-from app.services import trace_collector
+from app.channels.feishu.identity import FEISHU_CHANNEL
+from app.core import llm_factory
+from app.core.settings import get_settings
+from app.services import agent_service, channel_identity_service, trace_collector
+from app.services.agent_service import EmptyLLMResponseError
 
 logger = logging.getLogger(__name__)
 
+FALLBACK_TEXTS: dict[str, str] = {
+    "llm_error": "我这会儿有点走神，等下再说好不好？",
+    "empty_response": "我一下子不知道说什么好…你再说一次？",
+    "pipeline_error": "我这边出了点小问题，稍后再试。",
+    "identity_error": "我这边出了点小问题，稍后再试。",
+    "overloaded": "你发得太快了，我一条条慢慢回你～",
+}
 
-async def handle_inbound_message(inbound: InboundMessage) -> None:
-    started = time.perf_counter()
-    try:
-        trace = trace_collector.begin_trace()
-        logger.info(
-            "feishu inbound received: channel=%s external_user_id=%s reply_ref=%s text_len=%d",
-            inbound.channel,
-            inbound.external_user_id,
-            inbound.reply_ref,
-            len(inbound.text),
-        )
-        trace.record(
-            "feishu_dispatch",
-            (time.perf_counter() - started) * 1000,
-            status="not_implemented",
-        )
-    except Exception:
-        logger.exception("feishu inbound handling failed")
+
+@dataclass(frozen=True, slots=True)
+class TurnOutcome:
+    session_id: str
+    user_id: str
+    outbound_text: str | None
+    turn_id: str | None = None
+    error_kind: str | None = None
+    source_message_ref: str | None = None
+    thread_ref: str | None = None
+
+
+_session_locks: dict[str, asyncio.Lock] = {}
+_session_load: dict[str, int] = {}
 
 
 def reset_feishu_adapter() -> None:
+    _session_locks.clear()
+    _session_load.clear()
     trace_collector.reset_trace_collector()
+
+
+async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
+    started = time.perf_counter()
+    trace = _begin_trace()
+    try:
+        resolved = _resolve_identity(inbound, trace)
+    except Exception:
+        return _outcome(
+            inbound,
+            session_id="",
+            user_id="",
+            outbound_text=FALLBACK_TEXTS["identity_error"],
+            error_kind="identity_error",
+        )
+    try:
+        return await _process_turn(resolved, inbound, trace, started)
+    except Exception:
+        logger.exception("feishu inbound handling failed")
+        if trace is not None:
+            trace.record(
+                "feishu_dispatch",
+                (time.perf_counter() - started) * 1000,
+                status="error",
+                error="unhandled",
+            )
+        return _outcome(
+            inbound,
+            session_id=resolved.session_id,
+            user_id=resolved.internal_user_id,
+            outbound_text=FALLBACK_TEXTS["pipeline_error"],
+            error_kind="pipeline_error",
+        )
+
+
+def _outcome(
+    inbound: InboundMessage,
+    *,
+    session_id: str,
+    user_id: str,
+    outbound_text: str | None,
+    error_kind: str | None,
+    turn_id: str | None = None,
+) -> TurnOutcome:
+    return TurnOutcome(
+        session_id=session_id,
+        user_id=user_id,
+        outbound_text=outbound_text,
+        turn_id=turn_id,
+        error_kind=error_kind,
+        source_message_ref=inbound.reply_ref,
+        thread_ref=inbound.external_thread_id,
+    )
+
+
+def _begin_trace():
+    try:
+        return trace_collector.get_trace_collector().begin_trace()
+    except Exception:
+        logger.exception("feishu trace begin failed")
+        return None
+
+
+def _resolve_identity(inbound: InboundMessage, trace):
+    try:
+        return channel_identity_service.resolve(
+            FEISHU_CHANNEL,
+            inbound.external_user_id,
+            union_id=inbound.metadata.get("union_id"),
+            tenant_key=inbound.metadata.get("tenant_key"),
+            display_name=None,
+        )
+    except Exception as exc:
+        logger.exception(
+            "feishu identity resolve failed: external_user_id=%s", inbound.external_user_id
+        )
+        if trace is not None:
+            trace.record("feishu_dispatch", 0.0, status="error", error=type(exc).__name__)
+        raise
+
+
+async def _process_turn(resolved, inbound: InboundMessage, trace, started: float) -> TurnOutcome:
+    session_id = resolved.session_id
+    if not _try_acquire_slot(session_id):
+        logger.warning(
+            "feishu session overloaded: session_id=%s load=%d",
+            session_id,
+            _session_load.get(session_id, 0),
+        )
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=resolved.internal_user_id,
+            outbound_text=FALLBACK_TEXTS["overloaded"],
+            error_kind="overloaded",
+        )
+    lock = _get_lock(session_id)
+    try:
+        async with lock:
+            return await _run_turn(resolved, inbound, trace, started)
+    finally:
+        _release_slot(session_id)
+
+
+async def _run_turn(resolved, inbound: InboundMessage, trace, started: float) -> TurnOutcome:
+    session_id = resolved.session_id
+    user_id = resolved.internal_user_id
+    settings = get_settings()
+    try:
+        llm = llm_factory.get_llm(settings.feishu_llm_profile or None)
+    except Exception:
+        logger.exception("feishu llm resolve failed: session_id=%s", session_id)
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=FALLBACK_TEXTS["pipeline_error"],
+            error_kind="pipeline_error",
+        )
+    try:
+        chunks, turn_id, saw_done = await _consume_turn(resolved, inbound, llm, trace)
+    except EmptyLLMResponseError:
+        logger.warning("feishu turn empty response: session_id=%s", session_id)
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=FALLBACK_TEXTS["empty_response"],
+            error_kind="empty_response",
+        )
+    except openai.APIStatusError as exc:
+        logger.exception(
+            "feishu turn llm error: session_id=%s status=%s",
+            session_id,
+            getattr(exc, "status_code", None),
+        )
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=FALLBACK_TEXTS["llm_error"],
+            error_kind="llm_error",
+        )
+    except Exception:
+        logger.exception("feishu turn pipeline failed: session_id=%s", session_id)
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=FALLBACK_TEXTS["pipeline_error"],
+            error_kind="pipeline_error",
+        )
+    reply = "".join(chunks).strip()
+    if not reply:
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=FALLBACK_TEXTS["empty_response"],
+            error_kind="empty_response",
+        )
+    if not saw_done:
+        logger.error(
+            "feishu stream incomplete (no done event): session_id=%s text_len=%d",
+            session_id,
+            len(reply),
+        )
+        if trace is not None:
+            trace.record("feishu_dispatch", 0.0, status="error", error="incomplete")
+        return _outcome(
+            inbound,
+            session_id=session_id,
+            user_id=user_id,
+            outbound_text=reply,
+            error_kind="incomplete",
+            turn_id=turn_id,
+        )
+    if trace is not None:
+        trace.record("feishu_dispatch", (time.perf_counter() - started) * 1000)
+    logger.info(
+        "feishu turn completed: session_id=%s turn_id=%s elapsed_ms=%.0f text_len=%d",
+        session_id,
+        turn_id,
+        (time.perf_counter() - started) * 1000,
+        len(reply),
+    )
+    return _outcome(
+        inbound,
+        session_id=session_id,
+        user_id=user_id,
+        outbound_text=reply,
+        error_kind=None,
+        turn_id=turn_id,
+    )
+
+
+async def _consume_turn(resolved, inbound: InboundMessage, llm, trace):
+    chunks: list[str] = []
+    turn_id: str | None = None
+    saw_done = False
+    async for event in agent_service.stream_chat(
+        resolved.session_id,
+        resolved.internal_user_id,
+        inbound.text,
+        llm=llm,
+        trace=trace,
+    ):
+        kind = event.get("kind") if isinstance(event, dict) else None
+        if kind == "token":
+            text = event.get("text")
+            if isinstance(text, str):
+                chunks.append(text)
+        elif kind == "done":
+            turn_id = event.get("turn_id")
+            saw_done = True
+    return chunks, turn_id, saw_done
+
+
+def _get_lock(session_id: str) -> asyncio.Lock:
+    return _session_locks.setdefault(session_id, asyncio.Lock())
+
+
+def _try_acquire_slot(session_id: str) -> bool:
+    limit = get_settings().feishu_session_queue_limit
+    current = _session_load.get(session_id, 0)
+    if current >= limit:
+        return False
+    _session_load[session_id] = current + 1
+    return True
+
+
+def _release_slot(session_id: str) -> None:
+    remaining = _session_load.get(session_id, 0) - 1
+    if remaining <= 0:
+        _session_load.pop(session_id, None)
+    else:
+        _session_load[session_id] = remaining
