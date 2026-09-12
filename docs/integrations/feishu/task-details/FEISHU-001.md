@@ -20,7 +20,7 @@
 
 交付 Channel Adapter 的地基，使后续 Task 只需"调用"而不需要"再搭一遍基础设施"：
 
-- **配置**：`FeishuSettings` 覆盖 architecture.md §5.1 全部 14 项，含启用即校验、类型/区间校验、env 可覆盖。
+- **配置**：`FeishuSettings` 覆盖 architecture.md §5.1 的 14 项 + 本 Task 增补的 3 项重试策略（共 17 项，见「Data Model」），含启用即校验、类型/区间校验、env 可覆盖。
 - **接线**：`FeishuSettings` 组合进既有 `Settings`，最小改动、不影响既有配置与旧测试。
 - **通道无关契约**：`app/channels/base.py` 定义**入站基元**（`InboundMessage` / `ChannelIdentity` / `ChannelReply`）与**出站契约**（`RecipientRef` / `OutboundMessage` / `SendResult` / `ChannelErrorKind` / `ChannelAdapter` Protocol），任何飞书特有概念都不得进入。**本 Task 只冻结契约，不实现出站行为**（Feishu 侧的 `send` 实现在 FEISHU-005）。
 - **出站基础设施**：`tenant_access_token` 获取 / 缓存 / 提前刷新 / 并发单飞，以及可复用的 HTTP 传输层、错误分类、重试骨架。
@@ -41,7 +41,7 @@
 | `app/application/post_process.py` | 既有锁范式：模块级 `_user_write_locks: dict[str, asyncio.Lock]` + `get_user_write_lock()` + `reset_user_write_locks()` | 单飞锁沿用「模块级 + reset 接缝」风格；**但注意 `asyncio.Lock` 的事件循环绑定问题**（见「Implementation Constraints」） |
 | `app/core/errors.py` | **不存在**（`target-architecture.md` §4 曾建议新建，实际未落地） | **不创建**；错误类型放 `channels/feishu/errors.py`（Layer 内聚，不污染 core） |
 | `app/channels/`、任何 `feishu` 相关代码 | **完全不存在**（全库无 `feishu` / `Feishu` / `app.channels` 命中） | 全新包 |
-| `pyproject.toml` | `httpx>=0.28.1` 在 **[dependency-groups].dev**，不在 `[project].dependencies` | 见下方「依赖决策」——**不改** |
+| `pyproject.toml` | `httpx>=0.28.1` 在 **[dependency-groups].dev**，不在 `[project].dependencies`；`cryptography` 尚未进入 runtime 依赖 | 本 Task 仅限 `uv add cryptography`（Risk #1 = 方案 A）；**不迁移 httpx**（见下方「依赖决策」） |
 | `Dockerfile` | 生产镜像执行 `uv sync --frozen --no-dev` | 确认：dev 组依赖在生产**不存在** |
 | `tests/conftest.py` | `override_settings` 的 `env_map` 未收录飞书键，但**有兜底**：`key.upper()` 直接 `setenv`（`feishu_enabled` → `FEISHU_ENABLED`）；`get_settings.cache_clear()` 为标配 | **不改**（见「Testing」） |
 | `tests/` 分层 | `tests/unit/`（纯逻辑，marker 自动打标）+ `tests/integration/` + `tests/e2e/`；`marker` 由 `pytest_collection_modifyitems` 自动分配 | 新增测试全部落 `tests/unit/` |
@@ -50,11 +50,11 @@
 
 > 本节只讨论 **HTTP 传输层**用 stdlib 还是 httpx。**与 crypto 依赖无关**——`cryptography` 的引入已在 **Risk #1 中决策为方案 A**（见 §1「runtime 依赖」与 FEISHU-002 §15.1），本 Task 必须引入。
 
-`httpx` 是 dev-only 依赖，生产镜像 `--no-dev` 不会安装它。若让 Feishu Client 直接使用 `httpx`，就必须把 `httpx` 提升到 `[project].dependencies`，进而需要同步更新 `uv.lock`（`uv sync --frozen` 会校验锁文件）——**这两处都超出本 Task 允许改动的文件白名单**。
+`httpx` 是 dev-only 依赖，生产镜像 `--no-dev` 不会安装它。若让 Feishu Client 直接使用 `httpx`，就必须把 `httpx` 提升到 `[project].dependencies` 并同步 `uv.lock`。虽然这两个文件因 Risk #1（`uv add cryptography`）已在允许改动的白名单内，但白名单**仅限于 cryptography 一项依赖变更**，不应再叠加 httpx 的迁移。
 
 **决策：本 Task 的传输层使用标准库 `urllib.request` + `asyncio.to_thread`，封装在可注入的 `Transport` 协议之后。**
 
-理由：① 满足"只改 2 个既有文件"的硬约束；② 与项目既有"阻塞 IO 走 `asyncio.to_thread`"惯例一致（repositories 全量如此）；③ 本 Task 只需要一个 JSON POST 端点，httpx 的连接池 / HTTP2 / 细粒度超时能力用不上；④ 可注入 transport 让测试**零网络**。
+理由：① 避免本 Task 的依赖变更超出 cryptography 一项（白名单约束）；② 与项目既有"阻塞 IO 走 `asyncio.to_thread`"惯例一致（repositories 全量如此）；③ 本 Task 只需要一个 JSON POST 端点，httpx 的连接池 / HTTP2 / 细粒度超时能力用不上；④ 可注入 transport 让测试**零网络**。
 
 > **若团队更倾向 httpx**：需把 `httpx` 从 dev 组移入 `project.dependencies` 并 `uv lock`（额外改 `pyproject.toml` + `uv.lock` 两个文件），同时 `httpx.AsyncClient` 的构造时机必须落到懒构造里（不得在 import 期创建）。此处不实施，留待评审时二选一。
 
@@ -84,7 +84,7 @@
 | `feishu_http_backoff_seconds` | `FEISHU_HTTP_BACKOFF_SECONDS` | float | `0.5` | `>= 0` | **本 Task 增补** |
 | `feishu_http_backoff_max_seconds` | `FEISHU_HTTP_BACKOFF_MAX_SECONDS` | float | `8.0` | `>= backoff_seconds` | **本 Task 增补** |
 
-**配置增补说明**：最后 3 项（重试策略）不在 architecture.md §5.1 的 14 项之内。之所以新增而不是把 `3` / `0.5` / `8.0` 硬编码进 `client.py`，是因为项目全局约定"**所有阈值/魔法数字放 `core/settings/` 包，禁止硬编码**"——该约定优先级高于"字段列表不变"。**回填事项**：architecture.md §5.1 表格需补这 3 行（本 Task 不改该文件，留待评审统一回填）。
+**配置增补说明**：最后 3 项（重试策略）不在 architecture.md §5.1 的 14 项之内，合计 17 项。之所以新增而不是把 `3` / `0.5` / `8.0` 硬编码进 `client.py`，是因为项目全局约定"**所有阈值/魔法数字放 `core/settings/` 包，禁止硬编码**"——该约定优先级高于"字段列表不变"。**回填事项**：architecture.md §5.1 表格需补这 3 行（本 Task 不改该文件，留待评审统一回填）。
 
 **validator（`@model_validator(mode="after")`）**
 
@@ -426,7 +426,7 @@ _clock: Callable[[], float]       ← 模块级，默认 time.monotonic
 ### Settings（`test_feishu_settings.py`）
 
 ```text
-- 默认：feishu_enabled is False；14 项默认值与 §Data Model 表格逐条相等
+- 默认：feishu_enabled is False；17 项默认值与 §Data Model 表格逐条相等
 - 启用且完整：三项凭据齐备（env 注入假值）→ 构造成功
 - 启用缺 app_id / app_secret / verification_token → 各抛 SettingsError，消息含缺失键名
 - 未启用且凭据全空 → 构造成功（不得报错）
@@ -521,7 +521,7 @@ _clock: Callable[[], float]       ← 模块级，默认 time.monotonic
 
 ```text
 配置与组合
-[ ] FEISHU_* 全部 14 项默认值与 architecture.md §5.1 一致                          (AC-3)
+[ ] FEISHU_* 全部 17 项默认值（14 项与 architecture.md §5.1 一致 + 3 项重试策略增补）  (AC-3)
 [ ] 全部 FEISHU_* 可通过环境变量覆盖（逐键断言）                                     (AC-3)
 [ ] FEISHU_ENABLED=true 缺 app_id / app_secret / verification_token → 启动抛 SettingsError (AC-2)
 [ ] FEISHU_ENABLED=false 且凭据为空 → 正常构造，不报错                               (AC-2)
@@ -603,7 +603,7 @@ uv.lock                           # ★ 同上，由 uv 生成（禁止手工编
 - **本 Task 的边界**：只负责"**保证该依赖已存在且可导入**"（供 FEISHU-002 消费），**不实现**任何 Webhook 解密业务。
 - **与 R4 无关**：`cryptography` 只在 `channels/feishu/` 内使用；`channels/base.py` **仍然零第三方依赖**（FEISHU-002 的 `events.py` 才 import 它）。
 
-**明确禁止触碰**：`application/**`、`services/**`、`repositories/**`、`models/**`、`character/**`、`chains/**`、`world/**`、`memory/**`、`relationship/**`、`api/**`、`prompts/**`、`main.py`、`migrations/**`、`pyproject.toml`、`uv.lock`、`tests/conftest.py`。
+**明确禁止触碰**：`application/**`、`services/**`、`repositories/**`、`models/**`、`character/**`、`chains/**`、`world/**`、`memory/**`、`relationship/**`、`api/**`、`prompts/**`、`main.py`、`migrations/**`、`tests/conftest.py`。注意：`pyproject.toml` / `uv.lock` 不在禁止清单内，但**仅允许**由 `uv add cryptography` 产生的依赖变更——任何其他内容的手工编辑同样违规。
 
 **硬性约束**
 
@@ -629,7 +629,7 @@ uv.lock                           # ★ 同上，由 uv 生成（禁止手工编
  0. 依赖就位（Risk #1 = 方案 A）：`uv add cryptography` → 确认进入 [project].dependencies 且 uv.lock 同步
  1. 调研现有 Settings 架构
     └─ 读 _shared.py / 一个领域模块（observability.py）/ __init__.py / llm_factory.py
-       / post_process.py 的锁范式 / conftest 的 override_settings；确认本 Task 的 2 文件白名单
+       / post_process.py 的锁范式 / conftest 的 override_settings；确认本 Task 的 4 文件白名单
  2. FeishuSettings
     └─ 字段 + 区间 validator + 启用即校验 + secret_values()（先写 settings 单测，红→绿）
  3. Settings 组合
@@ -653,7 +653,9 @@ uv.lock                           # ★ 同上，由 uv 生成（禁止手工编
        tests/unit/test_feishu_client.py tests/unit/test_feishu_channel_base.py
 12. Fast Test
     └─ pytest -m "(unit or api) and not slow"（core/settings 属基础设施 → 门槛要求）
-    └─ 收口：git status 无临时产物；git diff 仅 2 个既有文件
+    └─ 收口：git status 无临时产物；git diff 仅允许包含 4 个既有文件：
+       app/core/settings/__init__.py、.env.example、pyproject.toml、uv.lock
+       （后两者仅限 uv add cryptography 产生的依赖变更）
 ```
 
 ## Out of Scope
