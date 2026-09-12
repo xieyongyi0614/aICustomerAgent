@@ -243,9 +243,12 @@ async def _run_turn(resolved, inbound: InboundMessage, trace, started: float) ->
     if trace is not None:
         trace.record("feishu_dispatch", (time.perf_counter() - started) * 1000)
     logger.info(
-        "feishu turn completed: session_id=%s turn_id=%s elapsed_ms=%.0f text_len=%d",
+        "feishu turn completed: session_id=%s user_id=%s turn_id=%s "
+        "source_message_id=%s elapsed_ms=%.0f text_len=%d",
         session_id,
+        user_id,
         turn_id,
+        inbound.reply_ref,
         (time.perf_counter() - started) * 1000,
         len(reply),
     )

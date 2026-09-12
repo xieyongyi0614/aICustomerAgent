@@ -5,6 +5,21 @@ import pytest
 from app.core.settings import Settings, SettingsError, get_settings
 from app.core.settings.feishu import FeishuSettings
 
+
+@pytest.fixture(autouse=True)
+def _reenable_app_loggers():
+    """防御 `logging.config.fileConfig(disable_existing_loggers=True)` 的跨用例副作用。
+
+    套件内存在进程内执行 alembic 迁移的用例（其 env.py 调用 fileConfig），会把
+    已存在的 app.* logger 置为 disabled，导致其后所有日志断言用例捕获为空。
+    本夹具在每个用例前重新启用 app.* logger，使断言与用例顺序无关。
+    """
+    for name, logger in list(logging.Logger.manager.loggerDict.items()):
+        if (name == "app" or name.startswith("app.")) and isinstance(logger, logging.Logger):
+            logger.disabled = False
+    yield
+
+
 EXPECTED_DEFAULTS = {
     "feishu_enabled": False,
     "feishu_app_id": "",

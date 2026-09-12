@@ -89,6 +89,13 @@ async def feishu_events(request: Request) -> JSONResponse:
         return JSONResponse(content={})
 
     inbound = events.to_inbound_message(parsed)
+    logger.info(
+        "feishu event accepted: event_id=%s message_id=%s open_id=%s chat_id=%s",
+        parsed.event_id,
+        parsed.message_id,
+        parsed.open_id,
+        parsed.chat_id,
+    )
     observability.spawn_background(adapter.handle_inbound_message(inbound))
     return JSONResponse(content={})
 

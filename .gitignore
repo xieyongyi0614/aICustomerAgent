@@ -2,6 +2,7 @@
 .vite
 .pytest_tmp
 .workbuddy
+.workbuddy-ai
 
 # Local databases
 *.db
