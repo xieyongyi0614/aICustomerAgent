@@ -1,5 +1,6 @@
 import pytest
 
+from app.channels.feishu import errors as errors_module
 from app.channels.feishu import errors as feishu_errors
 from app.channels.feishu.errors import (
     FeishuAuthError,
@@ -81,11 +82,42 @@ def test_classify_2xx_auth_business_codes(code):
     assert error.retryable is False
 
 
-def test_classify_2xx_other_nonzero_code_is_config():
+def test_classify_2xx_other_nonzero_code_is_client():
     for code in (99991400, 1, 230001):
         error = classify("op", 200, code)
-        assert isinstance(error, FeishuConfigError)
+        assert isinstance(error, FeishuClientError)
         assert error.retryable is False
+
+
+def test_classify_2xx_rate_limit_business_code_retries():
+    error = classify("op", 200, 230020)
+    assert isinstance(error, FeishuRateLimitError)
+    assert error.retryable is True
+
+
+def test_error_kind_mapping_table():
+    from app.channels.base import ChannelErrorKind
+
+    expectations = [
+        (FeishuRateLimitError("op"), ChannelErrorKind.RATE_LIMITED),
+        (FeishuServerError("op"), ChannelErrorKind.SERVER_ERROR),
+        (FeishuTimeoutError("op"), ChannelErrorKind.TIMEOUT),
+        (FeishuAuthError("op"), ChannelErrorKind.AUTH),
+        (FeishuClientError("op"), ChannelErrorKind.CLIENT_ERROR),
+        (FeishuConfigError("op"), ChannelErrorKind.INVALID_REQUEST),
+        (FeishuDisabledError("op"), ChannelErrorKind.DISABLED),
+    ]
+    for error, expected_kind in expectations:
+        assert errors_module.error_kind_of(error) == expected_kind
+
+
+def test_error_kind_unknown_fallback():
+    from app.channels.base import ChannelErrorKind
+
+    class _Anonymous(FeishuError):
+        pass
+
+    assert errors_module.error_kind_of(_Anonymous("op")) == ChannelErrorKind.UNKNOWN
 
 
 @pytest.mark.parametrize("status", [400, 404, 422])
@@ -101,6 +133,8 @@ def test_classify_unexpected_defaults_to_config():
     assert error.retryable is False
     redirect = classify("op", 302, None)
     assert isinstance(redirect, FeishuConfigError)
+    malformed_2xx = classify("op", 200, None)
+    assert isinstance(malformed_2xx, FeishuConfigError)
 
 
 def test_classify_passthrough_feishu_error_instance():

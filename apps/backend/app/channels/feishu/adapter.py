@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import openai
 
 from app.channels.base import InboundMessage
+from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core import llm_factory
 from app.core.settings import get_settings
@@ -65,7 +66,7 @@ async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
             error_kind="identity_error",
         )
     try:
-        return await _process_turn(resolved, inbound, trace, started)
+        outcome = await _process_turn(resolved, inbound, trace, started)
     except Exception:
         logger.exception("feishu inbound handling failed")
         if trace is not None:
@@ -75,12 +76,25 @@ async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
                 status="error",
                 error="unhandled",
             )
-        return _outcome(
+        outcome = _outcome(
             inbound,
             session_id=resolved.session_id,
             user_id=resolved.internal_user_id,
             outbound_text=FALLBACK_TEXTS["pipeline_error"],
             error_kind="pipeline_error",
+        )
+    await _deliver_outcome(outcome)
+    return outcome
+
+
+async def _deliver_outcome(outcome: TurnOutcome) -> None:
+    if not outcome.outbound_text:
+        return
+    try:
+        await delivery.deliver_reply(outcome)
+    except Exception:
+        logger.exception(
+            "feishu delivery failed (ignored): session_id=%s", outcome.session_id
         )
 
 

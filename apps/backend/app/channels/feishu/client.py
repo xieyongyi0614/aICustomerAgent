@@ -14,12 +14,15 @@ import urllib.request
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.parse import quote
 
+from app.channels.base import ChannelErrorKind, SendResult
 from app.channels.feishu.errors import (
     FeishuConfigError,
     FeishuDisabledError,
     FeishuError,
     classify,
+    error_kind_of,
 )
 from app.core.settings import get_settings
 
@@ -27,11 +30,16 @@ logger = logging.getLogger(__name__)
 
 TOKEN_OPERATION = "tenant_access_token"
 TOKEN_PATH = "/open-apis/auth/v3/tenant_access_token/internal"
+IM_SEND_OPERATION = "im_send"
+IM_REPLY_OPERATION = "im_reply"
+IM_MESSAGES_PATH = "/open-apis/im/v1/messages"
 REDACTED = "<redacted>"
 
 
 class Transport(Protocol):
-    async def post_json(self, url: str, body: dict, timeout: float) -> "HttpResponse": ...
+    async def post_json(
+        self, url: str, body: dict, timeout: float, headers: dict | None = None
+    ) -> "HttpResponse": ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,15 +58,24 @@ class TokenView:
 
 
 class UrllibTransport:
-    async def post_json(self, url: str, body: dict, timeout: float) -> HttpResponse:
-        return await asyncio.to_thread(self._post_json_sync, url, body, timeout)
+    async def post_json(
+        self, url: str, body: dict, timeout: float, headers: dict | None = None
+    ) -> HttpResponse:
+        return await asyncio.to_thread(
+            self._post_json_sync, url, body, timeout, headers
+        )
 
-    def _post_json_sync(self, url: str, body: dict, timeout: float) -> HttpResponse:
+    def _post_json_sync(
+        self, url: str, body: dict, timeout: float, headers: dict | None = None
+    ) -> HttpResponse:
         payload = json.dumps(body).encode("utf-8")
+        request_headers = {"Content-Type": "application/json; charset=utf-8"}
+        if headers:
+            request_headers.update(headers)
         request = urllib.request.Request(
             url,
             data=payload,
-            headers={"Content-Type": "application/json; charset=utf-8"},
+            headers=request_headers,
             method="POST",
         )
         try:
@@ -285,3 +302,77 @@ async def _with_retry(
                 ),
             )
             await _sleep(delay)
+
+
+def _text_content(text: str) -> str:
+    return json.dumps({"text": text}, ensure_ascii=False)
+
+
+async def reply_message(message_ref: str, text: str) -> SendResult:
+    url = (
+        f"{get_settings().feishu_api_base}"
+        f"{IM_MESSAGES_PATH}/{quote(message_ref, safe='')}/reply"
+    )
+    body = {"msg_type": "text", "content": _text_content(text)}
+    return await _send_request(IM_REPLY_OPERATION, url, body)
+
+
+async def send_message(recipient_external_id: str, text: str) -> SendResult:
+    url = f"{get_settings().feishu_api_base}{IM_MESSAGES_PATH}?receive_id_type=open_id"
+    body = {
+        "receive_id": recipient_external_id,
+        "msg_type": "text",
+        "content": _text_content(text),
+    }
+    return await _send_request(IM_SEND_OPERATION, url, body)
+
+
+async def _send_request(operation: str, url: str, body: dict) -> SendResult:
+    settings = get_settings()
+    try:
+        token = await get_tenant_access_token()
+    except FeishuError as exc:
+        logger.error(
+            "feishu %s skipped: %s",
+            operation,
+            _scrub(str(exc), settings.secret_values()),
+        )
+        return SendResult(ok=False, error=error_kind_of(exc))
+    transport = _ensure_transport()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async def _call() -> dict:
+        try:
+            response = await transport.post_json(
+                url, body, settings.feishu_timeout_seconds, headers=headers
+            )
+        except OSError as exc:
+            raise _scrubbed_error(
+                classify(operation, exc=exc), settings.secret_values()
+            ) from exc
+        payload = response.json if response.json is not None else {}
+        code = payload.get("code")
+        if not (200 <= response.status < 300 and code == 0):
+            raise _scrubbed_error(
+                classify(operation, response.status, code), settings.secret_values()
+            )
+        return payload
+
+    try:
+        payload = await _with_retry(_call, settings, operation)
+    except FeishuError as exc:
+        logger.error(
+            "feishu %s failed: %s",
+            operation,
+            _scrub(str(exc), settings.secret_values()),
+        )
+        return SendResult(ok=False, error=error_kind_of(exc))
+    except Exception:
+        logger.exception("feishu %s failed unexpectedly", operation)
+        return SendResult(ok=False, error=ChannelErrorKind.UNKNOWN)
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    message_id = data.get("message_id")
+    return SendResult(
+        ok=True,
+        external_message_id=message_id if isinstance(message_id, str) else None,
+    )

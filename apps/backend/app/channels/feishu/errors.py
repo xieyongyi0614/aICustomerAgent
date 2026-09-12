@@ -2,6 +2,23 @@
 
 from __future__ import annotations
 
+from app.channels.base import ChannelErrorKind
+
+_AUTH_FEISHU_CODES = frozenset({99991661, 99991663, 99991664, 99991668, 10003})
+
+RETRYABLE_BUSINESS_CODES = frozenset({230020})
+
+def _build_error_kind_map() -> dict[type, ChannelErrorKind]:
+    return {
+        FeishuDisabledError: ChannelErrorKind.DISABLED,
+        FeishuConfigError: ChannelErrorKind.INVALID_REQUEST,
+        FeishuAuthError: ChannelErrorKind.AUTH,
+        FeishuClientError: ChannelErrorKind.CLIENT_ERROR,
+        FeishuRateLimitError: ChannelErrorKind.RATE_LIMITED,
+        FeishuServerError: ChannelErrorKind.SERVER_ERROR,
+        FeishuTimeoutError: ChannelErrorKind.TIMEOUT,
+    }
+
 
 class FeishuError(Exception):
     retryable: bool = False
@@ -50,7 +67,11 @@ class FeishuTimeoutError(FeishuError):
     retryable = True
 
 
-_AUTH_FEISHU_CODES = frozenset({99991661, 99991663, 99991664, 99991668, 10003})
+def error_kind_of(error: FeishuError) -> ChannelErrorKind:
+    kind = _build_error_kind_map().get(type(error))
+    if kind is None:
+        return ChannelErrorKind.UNKNOWN
+    return kind
 
 
 def classify(
@@ -72,6 +93,10 @@ def classify(
     if http_status is not None and 200 <= http_status < 300:
         if feishu_code in _AUTH_FEISHU_CODES:
             return FeishuAuthError(operation, http_status, feishu_code)
+        if feishu_code in RETRYABLE_BUSINESS_CODES:
+            return FeishuRateLimitError(operation, http_status, feishu_code)
+        if feishu_code is not None:
+            return FeishuClientError(operation, http_status, feishu_code)
         return FeishuConfigError(operation, http_status, feishu_code)
     if http_status is not None and 400 <= http_status < 500:
         return FeishuClientError(operation, http_status, feishu_code)

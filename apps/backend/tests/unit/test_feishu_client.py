@@ -308,11 +308,11 @@ async def test_2xx_auth_business_code_not_cached(enabled):
 
 
 @pytest.mark.asyncio
-async def test_2xx_generic_business_code_config_error(enabled):
+async def test_2xx_generic_business_code_client_error(enabled):
     enabled()
     fake = FakeTransport([ok_response(code=99991400)])
     set_transport(fake)
-    with pytest.raises(FeishuConfigError):
+    with pytest.raises(FeishuClientError):
         await get_tenant_access_token()
     assert token_view().has_token is False
 
