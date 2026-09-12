@@ -9,6 +9,7 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -1154,4 +1155,30 @@ class DevelopmentChangeRow(Base):
         ),
         Index("idx_development_changes_state", "development_state_id"),
         Index("idx_development_changes_insight", "insight_id"),
+    )
+
+
+class ChannelIdentityRow(Base):
+    __tablename__ = "channel_identities"
+
+    channel: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
+    external_id: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
+    internal_user_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    external_union_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_tenant_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="active", server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("channel", "external_id"),
+        CheckConstraint(
+            "status IN ('active', 'inactive')",
+            name="ck_channel_identities_status",
+        ),
+        Index("idx_channel_identities_user", "internal_user_id"),
     )

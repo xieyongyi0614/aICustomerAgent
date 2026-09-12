@@ -65,6 +65,7 @@ from app.repositories import (
     action_repository,
     background_job_repository,
     character_state_repository,
+    channel_identity_repository,
     conversation_repository,
     decision_repository,
     emotion_history_repository,
@@ -93,6 +94,7 @@ WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
 _REPO_MODULES = (
     action_repository,
     background_job_repository,
+    channel_identity_repository,
     conversation_repository,
     summary_repository,
     memory_repository,
