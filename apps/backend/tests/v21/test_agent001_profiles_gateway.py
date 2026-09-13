@@ -39,12 +39,22 @@ class TestProfileRegistry:
     def test_autonomous_tick_matches_life_loop_pipeline(self):
         spec = profiles.get_profile("autonomous_tick")
         assert spec.stages == (
-            "perception", "state_update", "state_snapshot", "goal_check", "goal_supply",
-            "goal_advance", "memory_retrieval", "reflection_check",
+            "perception", "state_update", "state_snapshot", "goal_check", "goal_stack",
+            "goal_supply", "goal_advance", "memory_retrieval", "reflection_check",
             "decision", "world_experience",
         )
         assert spec.llm_capable == frozenset({"decision"})
         assert spec.critical == frozenset({"decision"})
+
+    def test_every_declared_stage_has_an_implementation(self):
+        from app.application.agent_runtime import controller
+
+        for stage in profiles.get_profile("autonomous_tick").stages:
+            if stage == "decision":
+                continue
+            assert callable(controller._autonomous_stage_runner(stage, "u1", None, NOW))
+        with pytest.raises(ValueError):
+            controller._autonomous_stage_runner("rogue_stage", "u1", None, NOW)
 
     def test_unknown_run_kind_rejected(self):
         with pytest.raises(ValueError):

@@ -225,8 +225,10 @@ class TestEvolutionLoopE2E:
             V21_UNIFIED_RUN_ENABLED="false",
             V21_AGENT_RUNTIME_ENABLED="false",
         )
+        runs_before = len(loop_run_repository.list_recent(run_kind="foreground_chat"))
         client.post("/api/v1/chat/message", json={"content": "在么"})
         runs = loop_run_repository.list_recent(run_kind="foreground_chat")
+        assert len(runs) == runs_before, "Flag 全关后不得新增 foreground_chat 台账行"
         assert all(r.status in ("done", "degraded") for r in runs)
 
 

@@ -47,6 +47,7 @@ _PROFILE_TABLE: dict[str, ProfileSpec] = {
             "state_update",
             "state_snapshot",
             "goal_check",
+            "goal_stack",
             "goal_supply",
             "goal_advance",
             "memory_retrieval",

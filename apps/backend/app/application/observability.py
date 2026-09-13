@@ -393,9 +393,14 @@ def on_decision(record: DecisionRecord) -> None:
 
 
 def record_turn_decisions(
-    trace, user_id: str, session_id: str, selected_goal, intention, behavior
+    trace, user_id: str, session_id: str, selected_goal, intention, behavior,
+    pipeline_audit: dict | None = None,
 ) -> None:
-    """turn 级决策后置采集（decision-history.md §3）：只读结果对象，零控制流变更。"""
+    """turn 级决策后置采集（decision-history.md §3）：只读结果对象，零控制流变更。
+
+    pipeline_audit（V2.1.0 AGENT-004）：统一决策管线的候选清单/六维得分/逐闸结果，
+    随 TURN_INTENTION 行落 decision_records.candidates（异步，不占热路径）。
+    """
     if not get_settings().observability_persist_enabled:
         return
     try:
@@ -441,6 +446,7 @@ def record_turn_decisions(
                     decision=getattr(intention, "intention", None) or "none",
                     reason=getattr(intention, "reason", "") or "",
                     input_snapshot=intention_payload,
+                    candidates=pipeline_audit,
                 )
             )
         )

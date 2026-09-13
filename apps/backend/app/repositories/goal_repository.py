@@ -12,6 +12,8 @@ from app.models.goal import (
     LAYER_VALUES,
     SubGoalSpec,
     goal_transitions,
+    validate_origin,
+    validate_parent_layer,
 )
 
 _HIERARCHICAL_HORIZON = "persistent"
@@ -300,6 +302,8 @@ def create_hierarchical_goal(
         raise ValueError(f"非法 layer：{layer!r}")
     if domain not in DOMAIN_VALUES:
         raise ValueError(f"非法 domain：{domain!r}")
+    if not validate_origin(origin):
+        raise ValueError(f"非法 origin：{origin!r}")
     if len(description) > GOAL_DESCRIPTION_MAX_LENGTH:
         raise ValueError("描述超长")
     resolved_horizon = _HIERARCHICAL_HORIZON
@@ -312,6 +316,8 @@ def create_hierarchical_goal(
                 raise ValueError("父目标不存在")
             if parent.layer is None:
                 raise ValueError("v1 目标不可作父级")
+            if not validate_parent_layer(parent.layer, layer):
+                raise ValueError(f"父层倒挂：{parent.layer!r} 不可作 {layer!r} 的父级")
         now = datetime.now()
         row = GoalRow(
             id=str(uuid.uuid4()),

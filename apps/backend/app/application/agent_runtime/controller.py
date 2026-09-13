@@ -5,11 +5,13 @@ Run 生命周期唯一管理者：open（loop_runs 建行，run_kind/profile）�
 （终态 + 成本汇总）。只调度不持有业务语义；唯一写面 = loop_runs。
 """
 
+import asyncio
 import logging
 import time
 from datetime import datetime
 
 from app.application.agent_runtime import profiles, trigger_router
+from app.application import agent_state_assembler
 from app.application.agent_state_assembler import run_state_snapshot_stage
 from app.services import goal_stack
 from app.application.agent_runtime.llm_gateway import acquire
@@ -57,6 +59,7 @@ def open_run(
         profile=profiles.snapshot_profile(run_kind),
         now=now,
     )
+    agent_state_assembler.ensure_personality_baseline(user_id)
     return RunContext(
         run_id=row.id,
         user_id=user_id,
@@ -155,6 +158,36 @@ def close_run(
     )
 
 
+def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: datetime):
+    """阶段名 → 既有步骤本体（Profile Registry 是唯一阶段序列来源）。
+
+    未注册阶段名 fail-closed 抛错：注册表与实现不一致必须暴露，不得静默跳过。
+    """
+    from app.application import life_loop as life_loop_mod
+
+    runners = {
+        "perception": lambda: life_loop_mod._step_perception(user_id, now),
+        "state_update": lambda: life_loop_mod._step_state_update(user_id, now),
+        "state_snapshot": lambda: asyncio.to_thread(run_state_snapshot_stage, user_id, run),
+        "goal_check": lambda: life_loop_mod._step_goal_check(user_id, now),
+        "goal_stack": lambda: goal_stack.run_goal_stack_stage(user_id, run, now),
+        "goal_supply": lambda: life_loop_mod._step_goal_supply(user_id, now),
+        "goal_advance": lambda: life_loop_mod._step_goal_advance(user_id, now),
+        "memory_retrieval": lambda: life_loop_mod._step_memory_retrieval(
+            user_id, now, run.data
+        ),
+        "reflection_check": lambda: life_loop_mod._step_reflection_check(user_id, now),
+        "world_experience": lambda: life_loop_mod._step_world_experience(user_id, now),
+    }
+    try:
+        return runners[name]
+    except KeyError as exc:
+        raise ValueError(f"Profile 声明了未实现的阶段：{name}") from exc
+
+
+_ASYNC_STAGES = frozenset({"goal_advance", "state_snapshot"})
+
+
 async def run_autonomous_cycle(
     user_id: str,
     llm=None,
@@ -162,12 +195,11 @@ async def run_autonomous_cycle(
     trigger_type: str | None = None,
     reason: str | None = None,
 ) -> str:
-    """autonomous_tick Profile：九步骤管线（本体复用 life_loop 步骤函数）。
+    """autonomous_tick Profile：按 Profile Registry 声明的阶段序列执行。
 
     与 v2.0.0 _run_user_cycle 的差异仅三处：台账经 open_run 落
     run_kind/profile、decision 增加第三道 Gateway 闸、支持事件升级触发源。
     """
-    from app.application import life_loop as life_loop_mod
     from app.application.post_process import get_user_write_lock
 
     now = now or datetime.now()
@@ -178,65 +210,60 @@ async def run_autonomous_cycle(
     steps: list = []
     budget = life_loop_budget.check_daily_budget(now=now)
     status = TERMINAL_DONE
+    spec = profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK)
     try:
         async with get_user_write_lock(user_id):
-            run_stage(run, steps, "perception", life_loop_mod._step_perception, user_id, now)
-            run_stage(run, steps, "state_update", life_loop_mod._step_state_update, user_id, now)
-            run_stage(
-                run, steps, "state_snapshot", run_state_snapshot_stage, user_id, run
-            )
-            run_stage(run, steps, "goal_check", life_loop_mod._step_goal_check, user_id, now)
-            run_stage(
-                run, steps, "goal_stack", goal_stack.run_goal_stack_stage, user_id, run, now
-            )
-            run_stage(run, steps, "goal_supply", life_loop_mod._step_goal_supply, user_id, now)
-            await run_stage_async(
-                run, steps, "goal_advance", lambda: life_loop_mod._step_goal_advance(user_id, now)
-            )
-            run_stage(
-                run, steps, "memory_retrieval",
-                life_loop_mod._step_memory_retrieval, user_id, now, run.data,
-            )
-            run_stage(
-                run, steps, "reflection_check",
-                life_loop_mod._step_reflection_check, user_id, now,
-            )
-            if budget.status == life_loop_budget._STATUS_DEGRADED:
-                append_step(
-                    run, steps,
-                    {"step": "decision", "status": "skipped", "skip_reason": "quota_circuit_open"},
-                )
-            elif life_loop_mod._cycle_llm_budget_exhausted(steps, settings):
-                append_step(
-                    run, steps,
-                    {"step": "decision", "status": "skipped", "skip_reason": "step_budget"},
-                )
-            elif not acquire(user_id, "proactive", run, now=now).granted:
-                append_step(
-                    run, steps,
-                    {"step": "decision", "status": "skipped", "skip_reason": "gateway_denied"},
-                )
-            else:
-                await run_stage_async(
-                    run, steps, "decision",
-                    lambda: life_loop_mod._step_decision(user_id, llm, now),
-                    critical=True,
-                )
-            run_stage(
-                run, steps, "world_experience",
-                life_loop_mod._step_world_experience, user_id, now,
-            )
+            for name in spec.stages:
+                if name == "decision":
+                    await _run_decision_stage(run, steps, user_id, llm, now, budget, settings)
+                    continue
+                runner = _autonomous_stage_runner(name, user_id, run, now)
+                if name in _ASYNC_STAGES:
+                    await run_stage_async(
+                        run, steps, name, runner, critical=name in spec.critical
+                    )
+                else:
+                    run_stage(run, steps, name, runner)
     except Exception as exc:
         logger.exception("agent run 用户周期中止：%s", user_id)
         status = TERMINAL_ABORTED
         steps.append(
             {"step": "abort", "status": "error", "error": exc.__class__.__name__}
         )
-    digest_token = run.data.get("digest_token")
-    if digest_token is not None:
-        memory_digest_var.reset(digest_token)
+    finally:
+        digest_token = run.data.get("digest_token")
+        if digest_token is not None:
+            memory_digest_var.reset(digest_token)
+        agent_state_assembler.reset_run_state(run)
     close_run(run, status, steps, budget_state=budget.as_dict(), now=datetime.now())
     return status
+
+
+async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -> None:
+    """decision 阶段：两道既有预算闸 → Gateway 第三道闸 → critical 执行。"""
+    from app.application import life_loop as life_loop_mod
+
+    if budget.status == life_loop_budget._STATUS_DEGRADED:
+        append_step(
+            run, steps,
+            {"step": "decision", "status": "skipped", "skip_reason": "quota_circuit_open"},
+        )
+    elif life_loop_mod._cycle_llm_budget_exhausted(steps, settings):
+        append_step(
+            run, steps,
+            {"step": "decision", "status": "skipped", "skip_reason": "step_budget"},
+        )
+    elif not acquire(user_id, "proactive", run, now=now).granted:
+        append_step(
+            run, steps,
+            {"step": "decision", "status": "skipped", "skip_reason": "gateway_denied"},
+        )
+    else:
+        await run_stage_async(
+            run, steps, "decision",
+            lambda: life_loop_mod._step_decision(user_id, llm, now),
+            critical=True,
+        )
 
 
 async def run_event_pregate(llm=None, now: datetime | None = None) -> int:

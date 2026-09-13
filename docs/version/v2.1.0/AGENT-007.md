@@ -203,6 +203,7 @@ Step 6  文档收口：产出 regression-checklist.md；遗留问题（Q1~Q5）�
 
 1. **enablement 全链**：五 Flag 依赖校验合入（unified/goal_stack/metrics 依赖总闸；personality_evolution 依赖总闸 + metrics——架构 §9.2 顺序约束成为启动期强约束）。
 2. **组合矩阵与全链测试**：`tests/v21/test_agent007_integration.py` 九例——enablement 组合矩阵、全 Flag 开启下前台 Run 九锚点贯通（前台台账/人格种子/快照存档）、后台 autonomous_tick 的 state_snapshot/goal_stack 阶段、指标快照 + Ledger、演化反馈链（越限→议题→Reflection 触发通道）、逐档回滚安全。
-3. **已知遗留（登记至 AGENT-007 收口核对的偏差）**：① 前台 Flow B 的 candidates 审计落 trace 而非 decision_records（免热路径 IO）；② Persona Consistency 的回复采样与 Judge 兜底、memory_accuracy 事实回查留待真实模型回归校准；③ Evolution Ledger 四源中 relationship/memory 两源暂未并入；④ 软排序 LLM 与 P0 用户显式请求识别（decision_pipeline P0 映射已声明、候选源未接）——均已在各 Task §12 登记，不阻塞版本交付。
-4. **性能预算实测**：串行口径下 v7.8 观测开销预算通过；xdist 并行负载下计时类用例存在固有抖动（SLOW_TEST_FILES 已登记），真实预算核实随本清单人工回归执行。
+3. **已知遗留（登记至 AGENT-007 收口核对的偏差）**：① ~~前台 Flow B 的 candidates 审计落 trace~~ → **已收口**（随 TURN_INTENTION 行异步落 decision_records.candidates）；② Persona Consistency 的回复采样与 Judge 兜底、memory_accuracy 事实回查留待真实模型回归校准；③ ~~Ledger relationship/memory 两源未并入~~ → **已收口**（四源齐全 + 修跨用户泄漏）；④ 软排序 LLM 与 P0 用户显式请求识别（decision_pipeline P0 映射已声明、候选源未接）仍遗留；⑤ **Gateway 未收口**：`scene_update`/`state_update`/`extractor`/`summary`/`judge`/`reflection` 六个调用点仍未接 Gateway，验收 3 按「注册表全覆盖 + 已接线点清单」理解。
+4. **评审修复（V2.1.0 code-review）**：详见 `code-review.md` §6——慢时钟接线（P0）、前后台共用决策管线（P0）、Ledger 跨用户泄漏（P0）、Rebalance 直写/阈值不可达（P1）、Profile Registry 驱动与台账一致性（P1）、后台 contextvar 复位（P1）、六维评分与逐闸留痕真实化（P1）、父层倒挂校验与低能量抑制生效（P1）；新增 `tests/v21/test_agent008_review_fixes.py`（25 例）与依赖方向守门测试。
+4. **性能预算实测**：~~串行口径下 v7.8 观测开销预算通过~~ → **更正**：`tests/v7.8/test_performance.py::test_observability_overhead_within_budget` **间歇失败**（同一提交多次运行可失败亦可通过），失败原因不是计时抖动而是 SQLAlchemy resultproxy `IndexError`；该现象在 V2.1.0 之前（`970cf29`）即已存在（worktree 对照验证），非本版本引入，但归因描述有误，需单独立项排查。其余性能预算随本清单人工回归执行。
 5. **文档**：`regression-checklist.md` 产出（开关准备 + 基础主线 + 三成长主线 + 回滚对照 + 上线判定）；Q1~Q5 裁决分布于 AGENT-001/002/004 §12，视为已登记。

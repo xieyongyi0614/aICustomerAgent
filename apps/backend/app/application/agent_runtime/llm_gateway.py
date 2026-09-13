@@ -90,9 +90,11 @@ def acquire(
     capability: str,
     run=None,
     now: datetime | None = None,
+    account: bool = True,
 ) -> Grant:
     """四问裁决入口：全局熔断 → run 级账户 → 记账放行。
 
+    account=False 为「只问不记账」（决策管线的风险闸预检），不消耗 run 预算。
     前台能力默认软模式（只记账标记 degraded，不拒绝用户回复），
     v21_foreground_gateway_enforced=true 时才硬拒绝。
     """
@@ -101,15 +103,18 @@ def acquire(
     now = now or datetime.now()
     if life_loop_budget.is_degraded(now=now):
         if spec.budget_type == "foreground" and not settings.v21_foreground_gateway_enforced:
-            _account(run, degraded=True)
+            if account:
+                _account(run, degraded=True)
             return Grant(True, True, "quota_circuit_open_soft")
         return Grant(False, False, "quota_circuit_open")
     if run is not None and run.llm_calls >= _run_llm_limit(run.run_kind, settings):
         if spec.budget_type == "foreground" and not settings.v21_foreground_gateway_enforced:
-            run.degraded = True
+            if account:
+                run.degraded = True
             return Grant(True, True, "run_budget_soft")
         return Grant(False, False, "run_budget_exhausted")
-    _account(run, degraded=False)
+    if account:
+        _account(run, degraded=False)
     return Grant(True, False, "ok")
 
 

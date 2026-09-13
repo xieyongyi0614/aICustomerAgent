@@ -33,9 +33,10 @@ def archive_if_significant(
     fallback_due = last is None or last.created_at.date() < now.date()
     if not changed and not fallback_due:
         return False
-    version = snapshot.snapshot_version if changed else last.version
     if changed:
         version = (last.version if last is not None else 0) + 1
+    else:
+        version = last.version
     snapshot_repo.save(
         user_id,
         snapshot=snapshot.model_dump(mode="json"),

@@ -1,7 +1,8 @@
 """Evolution Engine（V2.1.0 AGENT-005）：角色长期演化的唯一写入点。
 
 Personality 编译（Insight 证据 → 有界人格轴漂移，周级限速）、Goal Rebalance
-（评估趋势 → evolution 建议进 supply 审核队列）、Evolution Ledger 只读查询。
+（建议生成 propose_rebalance 纯读 + supply 审核侧应用 apply_rebalance）、
+Evolution Ledger 只读投影（personality/development/goal/relationship/memory 五源）。
 合法通道：演化唯一输入是 active Insight（经 Reflection 三闸）；写入集中单点。
 """
 
@@ -14,11 +15,12 @@ from app.core.db import (
     DevelopmentChangeRow,
     GoalRow,
     InsightRow,
+    Memory,
     PersonalityStateRow,
+    RelationshipEventRow,
     SessionLocal,
 )
 from app.core.settings import get_settings
-from app.models.goal import GoalRecord
 from app.repositories import goal_repository, personality_state_repository
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ _AXIS_EVIDENCE_RULES: dict[str, tuple[tuple[str, ...], float]] = {
     "patience": (("耐心", "倾听", "重复解释"), +1.0),
 }
 _BASE_DELTA = 0.02
+_REBALANCE_MAX_PRIORITY = 2
 
 
 def compile_personality(user_id: str, now: datetime | None = None) -> list[dict]:
@@ -44,10 +47,12 @@ def compile_personality(user_id: str, now: datetime | None = None) -> list[dict]
     insights = _recent_active_insights(user_id, window_start)
     applied: list[dict] = []
     for axis in evolution.PERSONALITY_AXES:
-        evidences = _match_axis_evidence(axis, insights)
+        evidences, direction = _match_axis_evidence(axis, insights)
         if not evidences:
             continue
-        drift = _constrain_drift(user_id, axis, evidences, now, settings, window_days)
+        drift = _constrain_drift(
+            user_id, axis, direction, evidences, now, settings, window_days
+        )
         if drift is None:
             continue
         if _apply_drift(user_id, axis, drift, evidences[0], now):
@@ -95,38 +100,81 @@ def rollback_personality_for_insight(insight_id: str, now: datetime | None = Non
     return reverted
 
 
-def rebalance_goals(user_id: str, now: datetime | None = None) -> list[str]:
-    """Goal Rebalance：长期劣化建议退役（abandoned, evolution_rebalance），
-    建议经 supply 审核语义即直接走既有 goal_repository 出口（0 直写 goals）。"""
+def propose_rebalance(user_id: str, now: datetime | None = None) -> list[dict]:
+    """Goal Rebalance 建议生成（纯读，0 写）：长期未推进的低优先 L2/L1 目标。
+
+    建议不落地、不写 goals；由 supply 审核侧（goal_stack 阶段）消费后决定是否退役。
+    阈值取该层超时窗口的**半程**：必须早于 goal_stack.retire_overdue 的硬超时
+    （整程），否则建议永远不可达（硬超时先退役，活跃集里已无该目标）。
+    """
     settings = get_settings()
     if not settings.v21_personality_evolution_enabled:
         return []
     now = now or datetime.now()
-    retired: list[str] = []
+    proposals: list[dict] = []
     for goal in goal_repository.list_layered_active(user_id):
         if goal.layer not in ("medium", "short_term"):
             continue
-        age_days = (now - goal.created_at).days if goal.created_at else 0
-        if age_days >= settings.v21_goal_medium_timeout_days * 2 and goal.priority <= 2:
-            record = goal_repository.finish_goal(
-                goal.id, "abandoned", failure_reason="evolution_rebalance"
-            )
-            if record is not None:
-                retired.append(goal.id)
+        if goal.priority > _REBALANCE_MAX_PRIORITY or goal.created_at is None:
+            continue
+        half_window = _rebalance_half_window(goal.layer, settings)
+        if half_window is None:
+            continue
+        age = now - goal.created_at
+        if age < half_window:
+            continue
+        proposals.append(
+            {
+                "goal_id": goal.id,
+                "layer": goal.layer,
+                "age_days": age.days,
+                "priority": goal.priority,
+                "reason": "evolution_rebalance",
+            }
+        )
+    return proposals
+
+
+def _rebalance_half_window(layer: str, settings) -> timedelta | None:
+    if layer == "medium":
+        return timedelta(days=max(settings.v21_goal_medium_timeout_days, 2) / 2)
+    if layer == "short_term":
+        return timedelta(hours=max(settings.v21_goal_short_timeout_hours, 2) / 2)
+    return None
+
+
+def apply_rebalance(user_id: str, proposals: list[dict], now: datetime | None = None) -> list[str]:
+    """supply 审核侧应用入口：退役经既有 finish_goal 状态机出口，不新增写路径。"""
+    retired: list[str] = []
+    for proposal in proposals:
+        record = goal_repository.finish_goal(
+            proposal["goal_id"], "abandoned", failure_reason=proposal["reason"]
+        )
+        if record is not None:
+            retired.append(proposal["goal_id"])
+    if retired:
+        logger.info(
+            "goal rebalance 退役：%s goals=%s", user_id, retired
+        )
     return retired
 
 
+def rebalance_goals(user_id: str, now: datetime | None = None) -> list[str]:
+    """建议 + 应用（等价 supply 审核通过）：保留既有单入口语义供周期任务调用。"""
+    return apply_rebalance(user_id, propose_rebalance(user_id, now), now)
+
+
 def ledger(user_id: str, limit: int = 50) -> list[dict]:
-    """Evolution Ledger 只读投影：development/personality/goal 三源时间线。"""
+    """Evolution Ledger 只读投影：development/personality/goal/relationship/memory 五源时间线。"""
     entries: list[dict] = []
     with SessionLocal() as session:
         changes = (
             session.query(DevelopmentChangeRow, PersonalityStateRow)
-            .outerjoin(
+            .join(
                 PersonalityStateRow,
                 DevelopmentChangeRow.personality_state_id == PersonalityStateRow.id,
             )
-            .filter(DevelopmentChangeRow.personality_state_id.isnot(None))
+            .filter(PersonalityStateRow.user_id == user_id)
             .order_by(DevelopmentChangeRow.created_at.desc())
             .limit(limit)
             .all()
@@ -137,7 +185,11 @@ def ledger(user_id: str, limit: int = 50) -> list[dict]:
                     "occurred_at": change.created_at,
                     "user_id": personality.user_id,
                     "change_kind": "personality",
-                    "summary": {"axis": personality.axis},
+                    "summary": {
+                        "axis": personality.axis,
+                        "before": (change.before or {}).get("current"),
+                        "after": (change.after or {}).get("current"),
+                    },
                     "source_ref": change.insight_id,
                 }
             )
@@ -162,6 +214,43 @@ def ledger(user_id: str, limit: int = 50) -> list[dict]:
                     "source_ref": goal.origin,
                 }
             )
+        events = (
+            session.query(RelationshipEventRow)
+            .filter(RelationshipEventRow.user_id == user_id)
+            .order_by(RelationshipEventRow.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        for event in events:
+            entries.append(
+                {
+                    "occurred_at": event.created_at,
+                    "user_id": event.user_id,
+                    "change_kind": "relationship",
+                    "summary": {"type": event.type, "magnitude": event.magnitude},
+                    "source_ref": event.cause or None,
+                }
+            )
+        superseded = (
+            session.query(Memory)
+            .filter(
+                Memory.user_id == user_id,
+                Memory.superseded_by.isnot(None),
+            )
+            .order_by(Memory.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        for memory in superseded:
+            entries.append(
+                {
+                    "occurred_at": memory.updated_at,
+                    "user_id": memory.user_id,
+                    "change_kind": "memory",
+                    "summary": {"type": memory.type, "content": memory.content[:40]},
+                    "source_ref": memory.superseded_by,
+                }
+            )
     return sorted(entries, key=lambda e: e["occurred_at"] or datetime.min, reverse=True)
 
 
@@ -181,30 +270,41 @@ def _recent_active_insights(user_id: str, window_start: datetime) -> list:
         return [(row.id, row.statement) for row in rows]
 
 
-def _match_axis_evidence(axis: str, insights: list[tuple[str, str]]) -> list[str]:
-    keywords, _direction = _AXIS_EVIDENCE_RULES[axis]
-    return [insight_id for insight_id, statement in insights
-            if any(keyword in statement for keyword in keywords)]
+def _match_axis_evidence(axis: str, insights: list[tuple[str, str]]) -> tuple[list[str], float]:
+    keywords, direction = _AXIS_EVIDENCE_RULES[axis]
+    matched = [insight_id for insight_id, statement in insights
+               if any(keyword in statement for keyword in keywords)]
+    return matched, direction
 
 
 def _constrain_drift(
-    user_id: str, axis: str, evidences: list[str], now: datetime, settings, window_days: int
+    user_id: str,
+    axis: str,
+    direction: float,
+    evidences: list[str],
+    now: datetime,
+    settings,
+    window_days: int,
 ) -> float | None:
+    """限速 + 边界钳制：单窗口至多一次漂移（连续同向需多窗口证据累积），
+    单次幅度不超过周级上限；越界钳制到 bound。"""
     rows = {r.axis: r for r in personality_state_repository.get_all(user_id)}
     row = rows.get(axis)
     if row is None:
         return None
-    base_delta = _BASE_DELTA * min(len(evidences), 3)
-    recent = _recent_drift_sum(user_id, axis, now - timedelta(days=window_days))
     max_week = settings.v21_evolution_max_drift_per_week
-    if abs(recent) + base_delta > max_week:
+    if max_week <= 0:
         return None
-    target = row.current + base_delta
-    if target > row.bound_max or target < row.bound_min:
-        target = min(row.bound_max, max(row.bound_min, target))
-        if abs(target - row.current) < 1e-9:
-            return None
-    return round(target - row.current, 6)
+    used = _recent_drift_sum(user_id, axis, now - timedelta(days=window_days))
+    if abs(used) > 1e-9:
+        return None
+    base_delta = min(_BASE_DELTA * min(len(evidences), 3), max_week)
+    target = row.current + direction * base_delta
+    clamped = min(row.bound_max, max(row.bound_min, target))
+    delta = round(clamped - row.current, 6)
+    if abs(delta) < 1e-9:
+        return None
+    return delta
 
 
 def _recent_drift_sum(user_id: str, axis: str, since: datetime) -> float:

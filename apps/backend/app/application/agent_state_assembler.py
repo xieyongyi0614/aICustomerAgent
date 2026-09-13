@@ -153,11 +153,25 @@ def _load_salient_memories(user_id: str, settings) -> list:
         return []
 
 
-def _load_personality(user_id: str, character_id: str) -> list[PersonalityAxisState]:
+def ensure_personality_baseline(user_id: str | None, character_id: str = "asuna") -> bool:
+    """AGENT-002 人格基线播种（显式初始化步骤，非快照读路径副作用）。
+
+    由 Run Open 调用：Run 生命周期内的显式初始化，保证组装阶段为纯只读。
+    """
+    if not user_id or not get_settings().v21_agent_runtime_enabled:
+        return False
     try:
-        rows = personality_state_repository.get_all_or_seed(
+        return personality_state_repository.seed_if_absent(
             user_id, evolution.PERSONALITY_AXES, character_id
         )
+    except Exception:
+        logger.exception("人格基线播种失败，不影响 Run")
+        return False
+
+
+def _load_personality(user_id: str, character_id: str) -> list[PersonalityAxisState]:
+    try:
+        rows = personality_state_repository.get_all(user_id, character_id)
         return [
             PersonalityAxisState(
                 axis=row.axis,

@@ -1,5 +1,6 @@
 """AGENT-005 Evolution：development_changes 扩展承载 personality 审计 +
-Evolution Ledger 只读视图（四源投影：development/personality/relationship/goal）。
+Evolution Ledger 只读投影（仓储层查询 evolution.ledger()，覆盖 personality/
+goal/relationship/memory 四源；跨 SQLite/PG 方言安全，故不建 SQL 视图）。
 
 Revision ID: 0042
 Revises: 0041

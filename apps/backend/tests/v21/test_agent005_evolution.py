@@ -143,15 +143,25 @@ class TestWriteProtection:
     def test_seed_only_write_path(self, db_session_factory):
         rows = personality_state_repository.get_all(USER)
         assert rows == []
-        assert personality_state_repository.seed_if_absent(
-            USER, persona_evolution.PERSONALITY_AXES
-        ) is False or True
+        assert (
+            personality_state_repository.seed_if_absent(
+                USER, persona_evolution.PERSONALITY_AXES
+            )
+            is True
+        )
+        assert (
+            personality_state_repository.seed_if_absent(
+                USER, persona_evolution.PERSONALITY_AXES
+            )
+            is False
+        )
+        assert len(personality_state_repository.get_all(USER)) == 4
 
 
 class TestRebalance:
     def test_old_low_priority_goal_retired(self, db_session_factory, evo_on):
         goal = goal_repository.create_hierarchical_goal(
-            USER, "medium", "personal", "过时且低优先的中期目标", 2, origin="test"
+            USER, "medium", "personal", "过时且低优先的中期目标", 2, origin="insight"
         )
         with goal_repository.SessionLocal() as session:
             from app.core.db import GoalRow
@@ -165,7 +175,7 @@ class TestRebalance:
 
     def test_high_priority_goal_survives(self, db_session_factory, evo_on):
         goal = goal_repository.create_hierarchical_goal(
-            USER, "medium", "personal", "重要的中期目标", 4, origin="test"
+            USER, "medium", "personal", "重要的中期目标", 4, origin="insight"
         )
         with goal_repository.SessionLocal() as session:
             from app.core.db import GoalRow

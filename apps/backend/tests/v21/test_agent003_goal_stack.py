@@ -35,7 +35,7 @@ def _goal(layer, description, priority=3, type_="conversation", age_days=0):
         layer=layer,
         created_at=NOW - timedelta(days=age_days),
         updated_at=NOW - timedelta(days=age_days),
-        origin="test",
+        origin="insight",
     )
 
 
@@ -61,10 +61,10 @@ class TestGoalStackEvaluator:
 
     def test_primary_selection_and_drives(self, db_session_factory, stack_on):
         goal_repository.create_hierarchical_goal(
-            USER, "long_term", "relationship", "成为信任的伙伴", 2, origin="test"
+            USER, "long_term", "relationship", "成为信任的伙伴", 2, origin="insight"
         )
         goal_repository.create_hierarchical_goal(
-            USER, "short_term", "world", "今晚问候用户", 4, origin="test"
+            USER, "short_term", "world", "今晚问候用户", 4, origin="insight"
         )
         stack = goal_stack.evaluate_stack(USER, NOW)
         assert stack.long_term.description == "成为信任的伙伴"
@@ -74,17 +74,17 @@ class TestGoalStackEvaluator:
 
     def test_same_layer_priority_wins(self, db_session_factory, stack_on):
         goal_repository.create_hierarchical_goal(
-            USER, "medium", "personal", "整理资料", 2, origin="test"
+            USER, "medium", "personal", "整理资料", 2, origin="insight"
         )
         goal_repository.create_hierarchical_goal(
-            USER, "medium", "personal", "了解用户新工作", 5, origin="test"
+            USER, "medium", "personal", "了解用户新工作", 5, origin="insight"
         )
         stack = goal_stack.evaluate_stack(USER, NOW)
         assert stack.medium.description == "了解用户新工作"
 
     def test_medium_timeout_retires(self, db_session_factory, stack_on):
         goal = goal_repository.create_hierarchical_goal(
-            USER, "medium", "personal", "早已过期的中期目标", 3, origin="test"
+            USER, "medium", "personal", "早已过期的中期目标", 3, origin="insight"
         )
         with goal_repository.SessionLocal() as session:
             from app.core.db import GoalRow
@@ -186,7 +186,9 @@ class TestRunIntegration:
         steps = [s["step"] for s in run.steps]
         assert "goal_stack" in steps
         assert steps.index("goal_stack") == steps.index("goal_check") + 1
-        assert run.data if hasattr(run, "data") else True
+        stack_step = next(s for s in run.steps if s["step"] == "goal_stack")
+        assert "primary_goal" in stack_step
+        assert "suppressed" in stack_step
 
 
 class TestEnablement:

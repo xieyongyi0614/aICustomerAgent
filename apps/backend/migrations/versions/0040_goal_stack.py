@@ -1,5 +1,5 @@
 """goals 扩列 origin（AGENT-003 Goal Stack）：来源可解释（既有供给标签 +
-commitment/user/evolution）；layer 值域扩展 medium 为代码层枚举（无 DB 约束）。
+commitment/user/evolution）；layer 值域扩展 medium（重建 ck_character_goals_layer）。
 
 Revision ID: 0040
 Revises: 0039

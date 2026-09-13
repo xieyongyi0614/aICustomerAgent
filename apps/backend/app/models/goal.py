@@ -44,12 +44,30 @@ LAYER_DEPTH: dict[str, int] = {"long_term": 3, "medium": 2, "short_term": 1}
 
 
 def validate_parent_chain(parent_layer: str | None, child_layer: str | None) -> bool:
-    """父子层深校验：L2 父必须 L3，L1 父必须 L2/L3；v1 行（均 NULL）合法。"""
+    """父子层深校验（严格版）：L2 父必须 L3，L1 父必须 L2/L3；v1 行（均 NULL）合法。"""
     if parent_layer is None and child_layer is None:
         return True
     if parent_layer is None or child_layer is None:
         return False
     return LAYER_DEPTH.get(child_layer, 0) < LAYER_DEPTH.get(parent_layer, 99)
+
+
+def validate_parent_layer(parent_layer: str | None, child_layer: str | None) -> bool:
+    """落库可接受性校验（宽版）：禁止层深倒挂，允许同层（V2.0.0 既有同层嵌套 Preserve）。
+
+    与 validate_parent_chain 的差异仅在同层：V2.0.0 的 short_term→short_term 父子
+    关系为既有行为，不得因四层扩展而失效（架构 §1.3 Preserve）。
+    """
+    if parent_layer is None or child_layer is None:
+        return True
+    return LAYER_DEPTH.get(child_layer, 0) <= LAYER_DEPTH.get(parent_layer, 99)
+
+
+def validate_origin(origin: str | None) -> bool:
+    """origin 合法性：允许空值与「标签:子标签」复合形式（如 relationship_pattern:key）。"""
+    if origin is None:
+        return True
+    return origin.split(":", 1)[0] in GOAL_ORIGINS
 DOMAIN_VALUES: tuple[str, ...] = ("personal", "relationship", "world")
 PLAN_STATUS_VALUES: tuple[str, ...] = (
     "draft",

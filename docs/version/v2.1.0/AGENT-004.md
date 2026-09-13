@@ -276,4 +276,7 @@ Step 4  胜者照旧进入生成回复；decision_records 落行（前后台审�
 2. **管线**：`services/decision_pipeline.py` 五段（collect→priority→score→gates→select）；被闸拒绝的候选**出局**（非降分），全部出局时 silence 胜出；胜者 Intention 经 `INTENTION_GOAL_DEFAULTS/FIT` 既有校验映射。
 3. **后台接线**：`autonomy_engine._pipeline_intention`（Flag=`v21_agent_runtime_enabled`）在 `_build_action` 前运行管线，胜者意图覆盖 verdict.intention、审计包落 `candidates`；管线异常回退 verdict 原值（零行为风险）。trigger_evaluator / autonomy_policy 本体零 diff。
 4. **评分口径**：goal_alignment（AGENT-003 契约）+ state_fit/relationship_fit/timing/cost 规则常量 0.5 + interest（焦点目标命中 0.6）；等权 `v21_decision_weight=1.0`。P0/P1 静态映射已声明（chat_response/user_directive=P0、commitment_delivery=P1），P0 识别（用户显式请求）与 P1 投递候选接入随 AGENT-005/007 补全。
+   *评审修复*：六维**全部改为真实规则取值**（state_fit ← energy/mood；relationship_fit ← 关系张力；timing ← 在途行动；cost ← 候选来源成本；无数据源时取中性 0.5），权重表 `_DIMENSION_WEIGHTS` 归一；风险闸补齐四闸顺序（Persona 预检含意图合法性 + FIT + 人格轴界内、Relationship 闸门含高张力拒绝、Action 检定显式声明 `delegated`、预算硬闸），不再以常量冒充「通过」。
+   *遗留*：P0 用户显式指令识别、P1 承诺投递候选、软排序轻量模型仍未接入（Q5）。
 5. **前台**：turn 内四链记账已在 AGENT-001 Gateway 交付；前台 Flow B 的 candidates 审计暂记 trace（免热路径 IO），decision_records 前台行审计随 AGENT-007 收口裁决。
+   *评审修复*：前台 Run 经 `chat_pipeline._run_foreground_decision` 调用**同一 `run_pipeline`**（候选 = 对话响应 P0 + 目标栈编译 + 静默，回复候选携带既有意图链产出的 L0 意图，故胜出者恒为 chat_response，行为零回归）；审计随 `TURN_INTENTION` 行异步落 `decision_records.candidates`，不再只落 trace。

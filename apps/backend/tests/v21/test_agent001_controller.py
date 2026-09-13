@@ -94,6 +94,8 @@ class TestAutonomousTickRun:
         assert run.profile["budget_tier"] == "background"
         assert run.profile["critical"] == ["decision"]
         assert [s["step"] for s in run.steps] == EXPECTED_STAGES
+        # A3 回归守门：台账 profile 快照必须与实际执行阶段序列一致
+        assert run.profile["stages"] == [s["step"] for s in run.steps]
 
     @pytest.mark.asyncio
     async def test_gateway_denied_skips_decision(

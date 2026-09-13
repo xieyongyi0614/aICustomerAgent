@@ -36,7 +36,13 @@ def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
     now = now or datetime.now()
     window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     metrics = _compute_metrics(user_id, now)
-    history = agent_metric_repository.list_recent(user_id, limit=settings.v21_metric_trend_windows)
+    history = [
+        row
+        for row in agent_metric_repository.list_recent(
+            user_id, limit=settings.v21_metric_trend_windows
+        )
+        if row.window_start < window_start
+    ]
     trend = _trend(metrics, history, settings)
     agent_metric_repository.save(
         user_id, window_start, now, metrics=metrics, trend=trend, now=now
@@ -136,26 +142,36 @@ def _persona_consistency(user_id: str) -> float | None:
 
 
 def _trend(metrics: dict, history: list, settings) -> dict:
+    """趋势：方向 + 连续越限窗口数（streak）。
+
+    越限判定 = 当前窗口与之前连续窗口的值均低于该指标阈值，且连续数达到
+    `v21_metric_breach_streak`（默认 2，与既有「当前+前值」规则等价）。
+    `v21_metric_trend_windows` 为历史取数深度；`windows` 字段回报真实连续数。
+    """
+    streak_required = max(settings.v21_metric_breach_streak, 1)
     trend: dict = {}
-    windows = settings.v21_metric_trend_windows
     for name, value in metrics.items():
         if value is None:
             continue
-        prior = [h for h in history if h.metrics.get(name) is not None]
-        previous = prior[0].metrics[name] if prior else None
+        prior_values = [h.metrics.get(name) for h in history]
+        previous = next((v for v in prior_values if v is not None), None)
+        threshold = getattr(settings, f"v21_metric_floor_{name}", None)
+        streak = 0
+        if threshold is not None and value < threshold:
+            streak = 1
+            for prior in prior_values:
+                if prior is None or prior >= threshold:
+                    break
+                streak += 1
         trend[name] = {
             "direction": (
                 "up" if previous is not None and value > previous else
                 "down" if previous is not None and value < previous else "flat"
             ),
             "previous": previous,
-            "breached": False,
-            "windows": 1,
+            "breached": streak >= streak_required,
+            "windows": streak,
         }
-        threshold = getattr(settings, f"v21_metric_floor_{name}", None)
-        if threshold is not None and value < threshold and previous is not None and previous < threshold:
-            trend[name]["breached"] = True
-            trend[name]["windows"] = min(len(prior) + 1, windows)
     return trend
 
 

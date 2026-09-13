@@ -105,7 +105,7 @@ class TestSnapshot:
 
     def test_goal_progress_computed(self, db_session_factory, metrics_on):
         goal_repository.create_hierarchical_goal(
-            USER, "long_term", "relationship", "成为信任的伙伴", 3, origin="test"
+            USER, "long_term", "relationship", "成为信任的伙伴", 3, origin="insight"
         )
         result = agent_evaluation.run_daily_snapshot(USER, NOW)
         assert result["metrics"]["goal_progress"] == 1.0

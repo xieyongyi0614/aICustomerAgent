@@ -277,8 +277,10 @@ Step 6  存档：Archiver 判定显著变化 ∧ 最小间隔 → 写 agent_stat
 ## 12. 实施记录（Coding 回填）
 
 1. **人格轴种子**：`personality_state_repository.seed_if_absent/get_all_or_seed` 幂等播种（(user, character, axis) 唯一约束），bound 物化为 `round(baseline ± bound, 6)` 并钳制到 [0,1]；baseline 来自 `character/asuna/evolution.py`（新增文件，未改既有 Persona 资产）。AGENT-005 接管前无任何其他写路径。
+   *评审修复*：播种从**快照读路径**移出为显式初始化步骤 `ensure_personality_baseline`（由 Run Open 调用），组装阶段（`_load_personality`）改为纯只读，消除「只读投影写库」副作用。
 2. **组装与激活分离**：`assemble_snapshot`（阻塞组装，供 `asyncio.to_thread`）+ `activate_run_state`（主协程上下文内激活 contextvar + 存档判定）。contextvar 复位用 `clear()`（`set(None)`）而非 Token——to_thread 线程内创建的 Token 无法在主上下文 reset（实测 `ValueError: different Context`）。
 3. **Run 接线形态**：autonomous_tick Profile 新增 `state_snapshot` 阶段（位于 state_update 之后，controller 经 run_stage 调用）；前台无独立阶段，在 `run_chat_pipeline` 开头 to_thread 组装 + 主上下文激活，finally 中复位。
+   *评审修复*：后台 Run 亦在 finally 中复位（原仅前台复位，阶段异常时残留上一 Run 快照）。
 4. **上下文段裁决**：快照段只渲染**净新增**的兴趣/焦点两行——mood/energy/inner_state 已由既有 `【角色当前状态】` 段承载，避免 prompt 重复；注入点在 `PromptBuilder.build()` 的 development overlay 之后（前台 answer 与后台 proactive 共用通道），Flag 关闭或无来源时该段整体缺席（prompt 字节不变）。
 5. **Interest 主题口径**：goal.description（权重×priority/5）/ preference.key（×strength）/ 记忆 content 前 24 字符（×salience）/ world 事件 title；四权重旋钮 `v21_interest_weight_*` 默认等权，`v21_interest_top_n=3`。
 6. **存档策略落地**：显著变化（interest 榜首/mood/relationship/活跃 goal_id）∧ 距上次 ≥15min；同日无行时每日保底；内容不变沿用版本号，变化则 +1；存档时顺带清理保留期（90 天）外旧行。

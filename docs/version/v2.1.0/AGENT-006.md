@@ -239,3 +239,4 @@ Step 7  观测：快照与议题在 trace/台账留痕；只读校验（见 §10
 3. **趋势与议题**：`v21_metric_trend_windows=7`；越限规则 = 当前值与前值均低于 `v21_metric_floor_*` 阈值；议题生成后调用 Reflection 既有 `trigger_for_user(trigger="event")` 通道进入证据窗口（三闸不变），议题文本与趋势随快照落库。
 4. **只读旁路**：模块对业务表零写入（唯一写面 agent_metric_snapshots）；Judge 经 Gateway 的样本级兜底未接入（规则可决全覆盖当前指标），AGENT-007 收口时随 Persona 采样补齐。
 5. **测试基建**：agent_metric_repository 注册进 conftest（import 与 _REPO_MODULES 各一处——重复注册 import 区会漏掉 _REPO_MODULES 导致连真实 PG 挂起）。
+   *评审修复（P0）*：`run_daily_snapshot` 原先**无任何生产调用方**（仅测试直接调用），慢时钟实际不存在。新增 `application/agent_evolution_worker.py`（`run_evolution_tick` + `run_agent_evolution_worker`）并在 lifespan 注册常驻循环：日级指标快照（同窗口已有行则跳过，避免覆盖当日趋势基线）+ 人格编译 + Goal Rebalance，全部置于 v21 子闸之后。

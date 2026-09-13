@@ -5,8 +5,8 @@
 「角色对话 Agent」—— 让「亚丝娜」角色成为具备记忆、情感、目标与自主行为的 AI Agent（FastAPI + LangChain + PostgreSQL）。
 
 - 当前开发分支：`feat/v2.0.0`
-- 开发阶段：V1~V9 全部完成（V7.5 Character Evaluation、V7.8 Character Runtime Intelligence、V8 World State System、V8.5 Relationship Evolution System、V9 Action Capability System 已实现；V7.8-014 Metrics 周期快照按设计留白）；后端架构 Refactor 完成；V2.0.0（Memory V2 / Reflection / Development / Life Loop / Action Engine / Autonomy Advanced）已实现（迁移链至 0035）
-- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 已有清单）
+- 开发阶段：V1~V9 全部完成（V7.5 Character Evaluation、V7.8 Character Runtime Intelligence、V8 World State System、V8.5 Relationship Evolution System、V9 Action Capability System 已实现）；后端架构 Refactor 完成；V2.0.0（Memory V2 / Reflection / Development / Life Loop / Action Engine / Autonomy Advanced）已实现；V2.1.0（Agent Runtime / Character State / Goal Stack / Decision Pipeline / Evolution / Agent Evaluation）已实现（迁移链至 0043）
+- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 / V2.1.0 已有清单）；V7.8-014 Metrics 周期快照留白已由 V2.1.0 AGENT-006（`agent_metric_snapshots`）关闭
 
 ## 目录结构
 
@@ -31,6 +31,7 @@
 - `docs/version/v1.0.0/v3/` — V3 场景状态与动作连续性设计
 - `docs/version/v1.0.0/backend-refactor/` — 后端架构审计与目标架构（application 编排层，已实现）
 - `docs/version/v1.0.0/v2/01-task-registry.md` / `docs/version/v1.0.0/v1/01-task-registry.md` — 早期版本（已完结）
+- `docs/version/v2.1.0/` — V2.1.0 Agent Evolution 架构 + 任务注册表（AGENT-001~007 已实现）+ Task Detail + regression-checklist + code-review
 
 ## 全局约定
 

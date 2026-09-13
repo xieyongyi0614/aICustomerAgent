@@ -27,6 +27,7 @@ from app.models.scene import SceneContext, SceneIntentResult, SceneState
 from app.application import (
     agent_runtime,
     agent_state_assembler,
+    agent_state_context,
     observability,
     world_engine,
 )
@@ -254,6 +255,56 @@ def _apply_inventory_grounding(reply: str, content: str, world_ctx, mode: str, t
         return reply
 
 
+def _run_foreground_decision(
+    run_ctx, user_id: str, validated_intention, selected_goal, now: datetime
+) -> dict | None:
+    """前台 Run 的统一决策管线调用（AGENT-004 §5.1：前后台同一代码路径）。
+
+    前台候选构成 = 对话响应（P0，回复用户恒优先）+ 活跃目标栈编译候选 + 静默；
+    回复候选携带本轮既有意图链产出的 L0 意图，故管线胜出者恒为 chat_response，
+    行为与 v2.0.0 一致；差异只体现在「候选如何评估/为什么赢」可审计。
+    目标栈为只读模式（铁律 4：长期化写入只发生在后台）。
+    """
+    if run_ctx is None:
+        return None
+    try:
+        from app.services import decision_pipeline, goal_stack as goal_stack_service
+
+        settings = get_settings()
+        stack = (
+            goal_stack_service.evaluate_stack(
+                user_id, now, retire_overdue_enabled=False
+            )
+            if settings.v21_goal_stack_enabled
+            else None
+        )
+        goal = getattr(selected_goal, "goal", None)
+        result = decision_pipeline.run_pipeline(
+            stack=stack,
+            snapshot=agent_state_context.get_snapshot(),
+            chat_response=True,
+            chat_response_intention=getattr(validated_intention, "intention", None),
+            chat_response_goal_id=getattr(validated_intention, "goal_id", None)
+            or getattr(goal, "id", None),
+            run=run_ctx,
+            now=now,
+        )
+        run_ctx.data["decision"] = {
+            "winner": result.winner.source if result.winner else None,
+            "intention": result.intention,
+            "candidates": len(result.audit.get("candidates") or []),
+        }
+        if result.winner is not None and result.winner.source != "chat_response":
+            logger.warning(
+                "前台 Run 决策胜出者非回复候选：%s（优先级铁律应保证回复优先）",
+                result.winner.source,
+            )
+        return result.audit
+    except Exception:
+        logger.exception("前台决策管线失败，不影响本轮回复")
+        return None
+
+
 async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
@@ -361,6 +412,9 @@ async def run_chat_pipeline(
         )
         if validated_intention.degraded:
             trace.mark_status("intention", "degraded")
+        decision_audit = _run_foreground_decision(
+            run_ctx, user_id, validated_intention, selected_goal, datetime.now()
+        )
         current_goal = (
             {
                 "id": selected_goal.goal.id,
@@ -569,6 +623,7 @@ async def run_chat_pipeline(
             selected_goal=selected_goal,
             intention=validated_intention,
             behavior=behavior_ctx,
+            pipeline_audit=decision_audit,
         )
         yield {
             "kind": "done",

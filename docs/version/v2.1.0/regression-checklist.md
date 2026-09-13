@@ -23,6 +23,8 @@
 | A3 | 关闭灯等后台 tick 触发（闲置/到期 trigger） | `loop_runs` 出现 `autonomous_tick` 行；steps 含 perception→state_snapshot→goal_check→goal_stack→…→world_experience | ☐ |
 | A4 | 触发主动行为 | 主动消息经管线选择（decision_records.candidates 可见候选来源/六维得分/闸结果/落选清单） | ☐ |
 | A5 | 断网/超预算场景 | Gateway 熔断：后台 decision skip（gateway_denied / quota_circuit_open），Run 终态 degraded；前台软降级不报错 | ☐ |
+| A6 | 等待慢时钟 tick（默认 1h；可将 `V21_AGENT_EVOLUTION_INTERVAL_SECONDS` 调小验证） | 日志出现 agent evolution worker；`agent_metric_snapshots` 当日窗口落行（同窗口不重复落）；`personality_state.current` 与 `evolution.ledger` 随时间变化 | ☐ |
+| A7 | 查前台 Run 台账与决策审计 | `loop_runs` 中 `profile.stages` 与 `steps` 阶段序列**完全一致**；`decision_records.candidates`（TURN_INTENTION 行）可见前台候选来源/六维得分/逐闸结果 | ☐ |
 
 ## 3. 成长主线（V2.1.0 核心）
 

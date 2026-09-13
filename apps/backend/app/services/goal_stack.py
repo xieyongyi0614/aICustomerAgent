@@ -5,13 +5,16 @@
 既有 goal_service.select / 状态机 / 仲裁语义零改动（本模块只读 + 退役出口）。
 """
 
+import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.models.goal import GOAL_TIER, GoalRecord
 from app.repositories import goal_repository
 from app.services import state_service
+
+logger = logging.getLogger(__name__)
 
 _LAYER_TIMEOUT_SETTINGS = {
     "medium": "v21_goal_medium_timeout_days",
@@ -53,12 +56,17 @@ class GoalStack:
         return self.short_term or self.medium or self.long_term
 
 
-def evaluate_stack(user_id: str, now: datetime | None = None) -> GoalStack:
+def evaluate_stack(
+    user_id: str, now: datetime | None = None, retire_overdue_enabled: bool = True
+) -> GoalStack:
+    """栈裁决。retire_overdue_enabled=False 为只读模式（前台 Run 用，铁律 4：
+    长期化写入只发生在后台）。"""
     settings = get_settings()
     now = now or datetime.now()
     if not settings.v21_goal_stack_enabled:
         return GoalStack()
-    retire_overdue(user_id, now, settings)
+    if retire_overdue_enabled:
+        retire_overdue(user_id, now, settings)
     goals = goal_repository.list_layered_active(user_id)
     character, _relationship = _load_states(user_id)
     low_energy = character.energy < 0.2
@@ -79,11 +87,12 @@ def evaluate_stack(user_id: str, now: datetime | None = None) -> GoalStack:
                 -(g.created_at.timestamp() if g.created_at else 0),
             ),
         )
-        setattr(stack, layer, primary)
         weight = {"long_term": 0.3, "medium": 0.6, "short_term": 1.0}[layer]
         stack.drives[primary.id] = round(weight * (primary.priority / 5.0), 4)
         if layer == "short_term" and low_energy:
             stack.suppressed[primary.id] = "low_energy"
+            continue
+        setattr(stack, layer, primary)
     return stack
 
 
@@ -96,9 +105,9 @@ def retire_overdue(user_id: str, now: datetime, settings) -> int:
             continue
         value = getattr(settings, timeout_setting)
         if goal.layer == "medium":
-            deadline = goal.created_at + __import__("datetime").timedelta(days=max(value, 0))
+            deadline = goal.created_at + timedelta(days=max(value, 0))
         else:
-            deadline = goal.created_at + __import__("datetime").timedelta(hours=max(value, 0))
+            deadline = goal.created_at + timedelta(hours=max(value, 0))
         if now >= deadline:
             record = goal_repository.finish_goal(
                 goal.id, "abandoned", failure_reason="timeout"
@@ -109,15 +118,38 @@ def retire_overdue(user_id: str, now: datetime, settings) -> int:
 
 
 def run_goal_stack_stage(user_id: str, run, now: datetime | None = None) -> dict:
-    """autonomous_tick 的 goal_stack 阶段实现：栈裁决 + RunContext 传递。"""
+    """autonomous_tick 的 goal_stack 阶段实现：栈裁决 + RunContext 传递。
+
+    Goal Rebalance 建议在此（supply 审核侧，后台唯一写入时机）消费：
+    Evolution Engine 只产建议，退役经既有 finish_goal 出口，不新增写路径。
+    """
+    now = now or datetime.now()
     stack = evaluate_stack(user_id, now)
     run.data["goal_stack"] = stack.as_summary()
+    retired = _apply_evolution_rebalance(user_id, now)
     primary = stack.primary()
     return {
         "status": "ok",
         "primary_goal": primary.id if primary is not None else None,
         "suppressed": stack.suppressed,
+        "rebalance_retired": retired,
     }
+
+
+def _apply_evolution_rebalance(user_id: str, now: datetime) -> list[str]:
+    settings = get_settings()
+    if not settings.v21_personality_evolution_enabled:
+        return []
+    try:
+        from app.services import evolution
+
+        proposals = evolution.propose_rebalance(user_id, now)
+        if not proposals:
+            return []
+        return evolution.apply_rebalance(user_id, proposals, now)
+    except Exception:
+        logger.exception("goal rebalance 建议消费失败，已忽略")
+        return []
 
 
 def _load_states(user_id: str):

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
 from app.application import autonomy_worker, observability, world_engine
+from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core.settings import get_settings
@@ -33,13 +34,14 @@ _world_maintenance_task: asyncio.Task | None = None
 _action_maintenance_task: asyncio.Task | None = None
 _v2_job_worker_task: asyncio.Task | None = None
 _life_loop_task: asyncio.Task | None = None
+_agent_evolution_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _reclaim_task, _autonomy_task, _observability_cleanup_task
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
-    global _life_loop_task
+    global _life_loop_task, _agent_evolution_task
     validate_enablement_chain(get_settings())
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
@@ -86,6 +88,13 @@ async def lifespan(application: FastAPI):
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()
         )
+    if agent_evolution_worker.enabled():
+        _agent_evolution_task = asyncio.create_task(
+            agent_evolution_worker.run_agent_evolution_worker()
+        )
+        logging.getLogger(__name__).info(
+            "v2.1 agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）"
+        )
     yield
     for task in (
         _reclaim_task,
@@ -95,6 +104,7 @@ async def lifespan(application: FastAPI):
         _action_maintenance_task,
         _v2_job_worker_task,
         _life_loop_task,
+        _agent_evolution_task,
     ):
         if task is not None:
             task.cancel()
