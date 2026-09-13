@@ -42,6 +42,10 @@ def enablement_violations(settings) -> list[str]:
         violations.append(
             "v21_personality_evolution_enabled 要求 v21_agent_runtime_enabled"
         )
+    if settings.v21_agent_metrics_enabled and not settings.v21_agent_runtime_enabled:
+        violations.append(
+            "v21_agent_metrics_enabled 要求 v21_agent_runtime_enabled"
+        )
     if settings.v21_goal_stack_enabled and not settings.v21_agent_runtime_enabled:
         violations.append(
             "v21_goal_stack_enabled 要求 v21_agent_runtime_enabled"

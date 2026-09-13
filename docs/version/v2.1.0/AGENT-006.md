@@ -229,3 +229,13 @@ Step 7  观测：快照与议题在 trace/台账留痕；只读校验（见 §10
 
 - `v21_agent_metrics_enabled=False`：V7.5/V7.8 既有评估套件零跳过全绿。
 - evaluation_rules 既有维度与 Judge 回归逐字节一致。
+
+---
+
+## 12. 实施记录（Coding 回填）
+
+1. **快照表**：`agent_metric_snapshots`（0043，(user, character, window_start) 唯一）；仓储 save 为按窗口 upsert（同窗重复执行零第二行）。
+2. **指标落地口径**：六指标中 action_quality（当日六态行动成功率）/ goal_progress（层叠目标逾期比）/ decision_quality（当日带 candidates 审计且结果已知的决策成功率）/ relationship_quality（intimacy+trust 均值 − tension/4）/ persona_consistency（人格轴在界内比例）为规则计算；memory_accuracy 缺可靠事实回查材料，按「无样本 = None」交付（不污染趋势），Persona Consistency 的回复采样与 Judge 兜底随 AGENT-007 收口联调补全。
+3. **趋势与议题**：`v21_metric_trend_windows=7`；越限规则 = 当前值与前值均低于 `v21_metric_floor_*` 阈值；议题生成后调用 Reflection 既有 `trigger_for_user(trigger="event")` 通道进入证据窗口（三闸不变），议题文本与趋势随快照落库。
+4. **只读旁路**：模块对业务表零写入（唯一写面 agent_metric_snapshots）；Judge 经 Gateway 的样本级兜底未接入（规则可决全覆盖当前指标），AGENT-007 收口时随 Persona 采样补齐。
+5. **测试基建**：agent_metric_repository 注册进 conftest（import 与 _REPO_MODULES 各一处——重复注册 import 区会漏掉 _REPO_MODULES 导致连真实 PG 挂起）。

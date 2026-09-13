@@ -64,6 +64,7 @@ from app.core.settings import get_settings
 from app.main import app
 from app.repositories import (
     action_repository,
+    agent_metric_repository,
     agent_state_snapshot_repository,
     background_job_repository,
     character_state_repository,
@@ -113,6 +114,7 @@ _REPO_MODULES = (
     trigger_registry_repository,
     loop_run_repository,
     agent_state_snapshot_repository,
+    agent_metric_repository,
     outbox_repository,
     personality_state_repository,
     llm_call_repository,

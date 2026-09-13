@@ -1230,3 +1230,25 @@ class AgentStateSnapshotRow(Base):
     __table_args__ = (
         Index("idx_agent_state_snapshots_user_created", "user_id", "created_at"),
     )
+
+
+class AgentMetricSnapshotRow(Base):
+    __tablename__ = "agent_metric_snapshots"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    window_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    window_end: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    trend: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "character_id",
+            "window_start",
+            name="uq_agent_metric_window",
+        ),
+    )

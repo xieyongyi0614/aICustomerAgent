@@ -19,6 +19,12 @@ class AgentRuntimeSettings(BaseSettings):
     v21_personality_evolution_enabled: bool = False
     v21_evolution_window_days: int = 7
     v21_evolution_max_drift_per_week: float = 0.05
+    v21_agent_metrics_enabled: bool = False
+    v21_metric_trend_windows: int = 7
+    v21_metric_floor_action_quality: float = 0.5
+    v21_metric_floor_goal_progress: float = 0.5
+    v21_metric_floor_decision_quality: float = 0.5
+    v21_metric_floor_persona_consistency: float = 0.9
     v21_interest_weight_goal: float = 1.0
     v21_interest_weight_preference: float = 1.0
     v21_interest_weight_memory: float = 1.0

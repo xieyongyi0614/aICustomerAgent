@@ -16,6 +16,7 @@ class _FakeSettings:
         self.v21_personality_evolution_enabled = flags.get(
             "v21_personality_evolution_enabled", False
         )
+        self.v21_agent_metrics_enabled = flags.get("v21_agent_metrics_enabled", False)
 
 
 def test_all_off_no_violations():
