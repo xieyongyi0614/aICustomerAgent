@@ -16,6 +16,9 @@ class AgentRuntimeSettings(BaseSettings):
     v21_goal_medium_timeout_days: int = 7
     v21_goal_short_timeout_hours: int = 24
     v21_decision_weight: float = 1.0
+    v21_personality_evolution_enabled: bool = False
+    v21_evolution_window_days: int = 7
+    v21_evolution_max_drift_per_week: float = 0.05
     v21_interest_weight_goal: float = 1.0
     v21_interest_weight_preference: float = 1.0
     v21_interest_weight_memory: float = 1.0

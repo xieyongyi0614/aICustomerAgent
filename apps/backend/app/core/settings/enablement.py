@@ -35,6 +35,13 @@ def enablement_violations(settings) -> list[str]:
             "v21_unified_run_enabled 要求 v21_agent_runtime_enabled"
             "（前台收编依赖统一 Run 模型）"
         )
+    if (
+        settings.v21_personality_evolution_enabled
+        and not settings.v21_agent_runtime_enabled
+    ):
+        violations.append(
+            "v21_personality_evolution_enabled 要求 v21_agent_runtime_enabled"
+        )
     if settings.v21_goal_stack_enabled and not settings.v21_agent_runtime_enabled:
         violations.append(
             "v21_goal_stack_enabled 要求 v21_agent_runtime_enabled"

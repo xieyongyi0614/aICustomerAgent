@@ -47,6 +47,7 @@ from app.services.memory2 import job_worker as memory2_job_worker
 from app.services.memory2 import lifecycle as memory2_lifecycle
 from app.services.memory2 import migration as memory2_migration
 from app.services.memory2 import retriever as memory2_retriever
+from app.services import evolution as evolution_service
 from app.services.development import aggregate as development_aggregate
 from app.services.development import audit as development_audit
 from app.services.development import attribution as development_attribution
@@ -146,6 +147,7 @@ _SERVICE_DB_MODULES = (
     development_audit,
     development_attribution,
     development_evaluation,
+    evolution_service,
 )
 
 

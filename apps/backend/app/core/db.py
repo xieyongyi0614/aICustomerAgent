@@ -1145,7 +1145,8 @@ class DevelopmentChangeRow(Base):
     __tablename__ = "development_changes"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    development_state_id: Mapped[str] = mapped_column(String, nullable=False)
+    development_state_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    personality_state_id: Mapped[str | None] = mapped_column(String, nullable=True)
     before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     insight_id: Mapped[str] = mapped_column(String, nullable=False)
@@ -1155,7 +1156,7 @@ class DevelopmentChangeRow(Base):
     __table_args__ = (
         CheckConstraint(
             "reason IN ('compiled', 'arbitrated', 'arbitrated_lost',"
-            " 'rolled_back', 'retired', 'replayed')",
+            " 'rolled_back', 'retired', 'replayed', 'personality')",
             name="ck_development_changes_reason",
         ),
         Index("idx_development_changes_state", "development_state_id"),

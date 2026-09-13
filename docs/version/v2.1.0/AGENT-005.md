@@ -243,3 +243,13 @@ Step 8  回滚通路：按 Insight 逆放（既有 rollback 作业扩展）；�
 
 - `v21_personality_evolution_enabled=False`：V2.0.0 P2/P3（Reflection/Development）与 AGENT-002/003/004 套件零跳过全绿。
 - `development_changes` 存量行与既有六值 reason 全路径回归一致。
+
+---
+
+## 12. 实施记录（Coding 回填）
+
+1. **审计扩展落地**：`development_changes.development_state_id` 转可空 + 新增 `personality_state_id`（subject 二选一 Check）；reason 约束追加 `personality`。SQLite 兼容要点：约束重建必须走 `batch_alter_table`（原生 `DROP CONSTRAINT IF EXISTS` 不支持）；**降级顺序**必须先 drop 引用 personality_state_id 的 subject 约束再 drop 列。
+2. **Ledger 落地形态偏差**：架构 §6.5 的 SQL 视图改为仓储层只读查询（`evolution.ledger()`，跨 SQLite/PG 方言安全）；memory supersede 链与 relationship_events 两源暂未并入（无业务消费方，AGENT-007 收口裁决是否补齐）。
+3. **编译参数**：证据映射 = 关键词规则表（_AXIS_EVIDENCE_RULES）；基础幅度 0.02 × 证据数（封顶 3）；周窗累计限速 `v21_evolution_max_drift_per_week=0.05`；越界钳制到 bound。逆放 = `rollback_personality_for_insight`（恢复 before.current + rolled_back 审计行）。
+4. **Rebalance 口径**：超 2× 中期窗口且 priority≤2 的 L2 目标 → abandoned + failure_reason="evolution_rebalance"（复用既有 finish_goal 出口，0 直写）；高优先目标豁免。
+5. **测试基建**：evolution 服务注册进 conftest `_SERVICE_DB_MODULES`（模块级 SessionLocal 才能被内存库替换——函数级 `from app.core.db import SessionLocal` 会绕过补丁连真实 PG 导致挂起）。
