@@ -107,3 +107,13 @@ class SceneProfile(BaseModel):
     expressiveness_cap: str = "rich"
     energy_bias: int = 0
     mood_bias: str | None = None
+
+
+class WorldBrief(BaseModel):
+    """世界简报（architecture.md §5.1）：世界"此刻状态"的 prompt 级聚合。"""
+
+    text: str = ""
+    time_line: str | None = None
+    place_line: str | None = None
+    situations_line: str | None = None
+    events_line: str | None = None

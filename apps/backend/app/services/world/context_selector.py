@@ -133,8 +133,13 @@ def _environment_salient(environment: WorldEnvironment) -> bool:
     )
 
 
-def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | None:
-    """渲染【当前世界】段；ctx 为 None → None（Prompt 字节不变的关键路径）。"""
+def render_world_section(
+    ctx: WorldContext | None,
+    budget: int = 600,
+    brief=None,
+) -> str | None:
+    """渲染【当前世界】段；ctx 为 None → None（Prompt 字节不变的关键路径）。
+    brief（V2.3.0 WorldBrief）非空时其行优先于其余行进入预算。"""
     if ctx is None:
         return None
 
@@ -142,7 +147,7 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     head = f"{ctx.time.day_line()}。你在{location_path}。"
 
     env_line = _environment_line(ctx)
-    event_lines = [_event_line(brief) for brief in ctx.salient_events]
+    event_lines = [_event_line(event) for event in ctx.salient_events]
     recent_lines = _recent_changes_lines(ctx.recent_world_changes)
     recent_set = set(ctx.recent_world_changes)
     note_lines = [note for note in ctx.notes if note not in recent_set]
@@ -152,10 +157,16 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     )
     inventory_lines = _inventory_lines(ctx.inventory)
 
+    brief_lines: list[str] = []
+    if brief is not None:
+        for line in (brief.time_line, brief.place_line, brief.situations_line, brief.events_line):
+            if line:
+                brief_lines.append(line)
+
     body: list[str] = []
     prefix = "【当前世界】\n"
     total = len(prefix) + len(head)
-    for line in (
+    for line in brief_lines + (
         [guide_line]
         + inventory_lines
         + recent_lines

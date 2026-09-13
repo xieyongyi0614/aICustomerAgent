@@ -911,6 +911,8 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             change_events=change_events,
             changes_limit=settings.v2_character_action_sync_context_lines,
         )
+        if settings.v23_world_simulation_enabled:
+            context = _attach_world_brief(user_id, world, time_ctx, context, settings)
         if trace is not None:
             trace.record(
                 "world_context",
@@ -926,6 +928,41 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
         if trace is not None:
             trace.record("world_context", 0.0, "error", error="world context failed")
         return None
+
+
+def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
+    """V2.3.0 WorldBrief 装配（总闸内）；失败降级为无简报。"""
+    try:
+        from app.models.world_simulation import DailyPlanStatus
+        from app.services.world import daily_plan as daily_plan_service
+        from app.services.world import user_situation as situation_service
+        from app.services.world import world_brief as brief_service
+
+        block = None
+        if settings.v23_daily_life_enabled:
+            minutes = time_ctx.now.hour * 60 + time_ctx.now.minute
+            plans = daily_plan_service.get_day_plan(
+                user_id, time_ctx.now.date()
+            )
+            active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
+            block = active[0] if active else None
+        situations = (
+            situation_service.active_situations(user_id)
+            if settings.v23_event_detection_enabled
+            else []
+        )
+        brief = brief_service.build_world_brief(
+            time_ctx,
+            world,
+            block,
+            situations,
+            context.salient_events,
+            budget=settings.world_brief_char_budget,
+        )
+        return context.model_copy(update={"brief": brief})
+    except Exception:
+        logger.exception("世界简报装配失败，本轮无简报")
+        return context
 
 
 def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:

@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.models.observability import bound_extra, bound_text
+from app.models.world_simulation import WorldBrief
 
 WORLD_DB_CATEGORIES = ("food", "drink", "tool", "furniture", "clothing", "device", "misc")
 
@@ -256,6 +257,7 @@ class WorldContext(BaseModel):
     salient_events: list[EventBrief] = []
     recent_world_changes: list[str] = []
     notes: list[str] = []
+    brief: WorldBrief | None = None
 
 
 class WorldFacts(BaseModel):
