@@ -775,7 +775,15 @@ class DailyPlanRow(Base):
             "status IN ('planned', 'active', 'completed', 'skipped', 'superseded')",
             name="ck_daily_plans_status",
         ),
-        UniqueConstraint("user_id", "plan_date", "seq", name="uq_daily_plans_user_date_seq"),
+        Index(
+            "uq_daily_plans_user_date_seq",
+            "user_id",
+            "plan_date",
+            "seq",
+            unique=True,
+            sqlite_where=text("status IN ('planned', 'active')"),
+            postgresql_where=text("status IN ('planned', 'active')"),
+        ),
         Index("idx_daily_plans_lookup", "user_id", "plan_date", "status"),
     )
 

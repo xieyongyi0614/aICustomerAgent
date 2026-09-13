@@ -1004,6 +1004,16 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
     day_cycle.emit_time_markers(user_id, now)
     weather.evolve_daily_weather(user_id)
     user_situation.expire_and_notify(user_id, now)
+    settings = get_settings()
+    if settings.v23_daily_life_enabled:
+        from app.services.world import daily_plan
+
+        world = get_world(user_id)
+        if world is not None:
+            world_now = _default_provider.now(world)
+            plans = daily_plan.ensure_day_plan(user_id, world_now.date(), world_now)
+            if not plans:
+                logger.info("当日计划缺失且构建失败（user=%s）", user_id)
 
 
 def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):
