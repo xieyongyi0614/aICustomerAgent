@@ -1070,6 +1070,8 @@ class LoopRunRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str | None] = mapped_column(String, nullable=True)
     kind: Mapped[str] = mapped_column(String, nullable=False)
+    run_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    profile: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     trigger_id: Mapped[str | None] = mapped_column(String, nullable=True)
     trigger_type: Mapped[str | None] = mapped_column(String, nullable=True)
     reason: Mapped[str] = mapped_column(String, nullable=False, default="")
@@ -1087,12 +1089,12 @@ class LoopRunRow(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('autonomy', 'world_maintenance', 'action_retry', "
+            "kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', "
             "'outbox_consume', 'trigger_reconcile')",
             name="ck_loop_runs_kind",
         ),
         CheckConstraint(
-            "status IN ('running', 'done', 'aborted')",
+            "status IN ('running', 'done', 'aborted', 'degraded')",
             name="ck_loop_runs_status",
         ),
         Index("idx_loop_runs_status_started_at", "status", "started_at"),

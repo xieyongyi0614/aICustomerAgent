@@ -30,6 +30,11 @@ def enablement_violations(settings) -> list[str]:
             "v2_action_outbox_enabled 要求 v2_life_loop_enabled"
             "（无消费器的 outbox 将死信堆积）"
         )
+    if settings.v21_unified_run_enabled and not settings.v21_agent_runtime_enabled:
+        violations.append(
+            "v21_unified_run_enabled 要求 v21_agent_runtime_enabled"
+            "（前台收编依赖统一 Run 模型）"
+        )
     return violations
 
 

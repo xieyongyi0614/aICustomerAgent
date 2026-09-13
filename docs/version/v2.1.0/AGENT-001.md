@@ -334,3 +334,16 @@ world_maintenance / action_retry / outbox_consume / trigger_reconcile 维持既�
 
 - `v21_agent_runtime_enabled=False`（且 unified_run=False）：现有 V2.0.0 / V2.0.1 全部测试套件零跳过全绿。
 - 迁移升级 + 回滚演练：0038 升级后旧数据可读、回滚后行为恢复。
+
+---
+
+## 12. 实施记录（Coding 回填）
+
+> 以下为 AGENT-001 实现过程中对设计文档的增量澄清与已知范围注记，供 AGENT-007 收口核对。
+
+1. **kind 值域扩展**：前台 Run 行落 `loop_runs.kind='chat'`（新增枚举值），后台 Run 沿用 `kind='autonomy'`；`run_kind` 列承载统一三值分类。迁移 0038 同步扩展 kind/status 两个 CheckConstraint（status 追加 `degraded` 终态）。
+2. **前台收编形态**：Run 生命周期内联进 `run_chat_pipeline` 本体（try/finally + `run_ctx is not None` 守卫），未引入外层包装生成器——Flag 关闭时零额外生成器层、零可测开销（v7.8 观测开销预算测试口径下不可见）。
+3. **Gateway 裁决接线点**：后台 = decision 阶段第三道闸（`gateway_denied` skip，前两道既有闸不变）；前台 = `account_turn_decisions`（四条决策链记账）+ `resolve_answer_llm`（answer 放行→降档 light→enforced 拒绝）。post_process 内逐 chain 调用点的裁决切换按 §2.6「未切换的调用点行为不变」渐进迁移，本任务交付注册表覆盖（全部 CallSite 值已注册为能力）。
+4. **前台 Gateway 默认软模式**：`v21_foreground_gateway_enforced=false` 时超预算只记账并标记 Run degraded，不拒绝用户回复（避免 Chat 500）；enforced=true 才硬拒绝/降档。`v21_foreground_run_llm_budget=8` 为熔断上限而非目标值（前台 ≤4 次 LLM 目标仍由 v2.0.0 LLM 分层承载，AGENT-007 实测核对）。
+5. **事件预闸**：`v21_event_escalation_types` 默认空 → `run_event_pregate` 零消耗直返（0 run 行、0 LLM）；配置白名单后升级为 autonomous_tick（trigger_type=world_event）。
+6. **已知边界**：`GatewayDeniedError` 仅在 enforced 且无 light profile 时抛出；loop_runs 台账对前台 Run 不记逐阶段 steps（阶段轨迹在 turn trace 内，台账记 profile 快照与终态）。

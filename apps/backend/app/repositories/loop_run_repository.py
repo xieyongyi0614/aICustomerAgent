@@ -27,6 +27,7 @@ def list_recent(
     limit: int = 50,
     status: str | None = None,
     kind: str | None = None,
+    run_kind: str | None = None,
 ) -> list[LoopRunRow]:
     with SessionLocal() as session:
         query = session.query(LoopRunRow)
@@ -36,6 +37,8 @@ def list_recent(
             query = query.filter(LoopRunRow.status == status)
         if kind is not None:
             query = query.filter(LoopRunRow.kind == kind)
+        if run_kind is not None:
+            query = query.filter(LoopRunRow.run_kind == run_kind)
         return query.order_by(LoopRunRow.started_at.desc()).limit(limit).all()
 
 
@@ -46,12 +49,16 @@ def create_run(
     trigger_id: str | None = None,
     trigger_type: str | None = None,
     now: datetime | None = None,
+    run_kind: str | None = None,
+    profile: dict | None = None,
 ) -> LoopRunRow:
     now = _now(now)
     run = LoopRunRow(
         id=str(uuid.uuid4()),
         user_id=user_id,
         kind=kind,
+        run_kind=run_kind,
+        profile=profile,
         trigger_id=trigger_id,
         trigger_type=trigger_type,
         reason=reason,

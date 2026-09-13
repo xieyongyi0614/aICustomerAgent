@@ -11,6 +11,7 @@ from pydantic_settings import BaseSettings
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, STAGE_KEYS, SettingsError
 from app.core.settings.action import ActionSettings
+from app.core.settings.agent_runtime import AgentRuntimeSettings
 from app.core.settings.autonomy import AutonomySettings
 from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
 from app.core.settings.character import CharacterSettings
@@ -46,6 +47,7 @@ class Settings(
     AutonomySettings,
     LifeLoopSettings,
     AutonomyAdvancedSettings,
+    AgentRuntimeSettings,
     ActionSettings,
     EvaluationSettings,
     FeishuSettings,

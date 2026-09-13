@@ -10,6 +10,8 @@ class _FakeSettings:
         self.v2_life_loop_enabled = flags.get("v2_life_loop_enabled", False)
         self.v2_action_outbox_enabled = flags.get("v2_action_outbox_enabled", False)
         self.action_enabled = flags.get("action_enabled", False)
+        self.v21_agent_runtime_enabled = flags.get("v21_agent_runtime_enabled", False)
+        self.v21_unified_run_enabled = flags.get("v21_unified_run_enabled", False)
 
 
 def test_all_off_no_violations():

@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.application import (
+    agent_runtime,
     autonomy_engine,
     world_engine,
     action_engine,
@@ -84,7 +85,12 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
         return stats
     for user_id in work_users:
         try:
-            result = await _run_user_cycle(user_id, llm=llm, now=now)
+            if agent_runtime.enabled():
+                result = await agent_runtime.run_autonomous_cycle(
+                    user_id, llm=llm, now=now
+                )
+            else:
+                result = await _run_user_cycle(user_id, llm=llm, now=now)
             if result == "aborted":
                 stats["aborted"] += 1
             else:
@@ -92,6 +98,8 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
         except Exception:
             stats["aborted"] += 1
             logger.exception("life loop 用户周期失败：%s", user_id)
+    if agent_runtime.enabled():
+        await agent_runtime.run_event_pregate(llm=llm, now=now)
     stats["maintenance"] = await _run_maintenance(now=now)
     stats["idle"] = not work_users and stats["maintenance"] == 0
     return stats
