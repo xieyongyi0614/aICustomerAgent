@@ -1185,3 +1185,45 @@ class ChannelIdentityRow(Base):
         ),
         Index("idx_channel_identities_user", "internal_user_id"),
     )
+
+
+class PersonalityStateRow(Base):
+    __tablename__ = "personality_state"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    axis: Mapped[str] = mapped_column(String, nullable=False)
+    baseline: Mapped[float] = mapped_column(Float, nullable=False)
+    current: Mapped[float] = mapped_column(Float, nullable=False)
+    bound_min: Mapped[float] = mapped_column(Float, nullable=False)
+    bound_max: Mapped[float] = mapped_column(Float, nullable=False)
+    source_insight_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "character_id",
+            "axis",
+            name="uq_personality_state_axis",
+        ),
+    )
+
+
+class AgentStateSnapshotRow(Base):
+    __tablename__ = "agent_state_snapshots"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("idx_agent_state_snapshots_user_created", "user_id", "created_at"),
+    )

@@ -12,3 +12,10 @@ class AgentRuntimeSettings(BaseSettings):
     v21_foreground_gateway_enforced: bool = False
     v21_light_llm_profile: str = ""
     v21_event_escalation_types: str = ""
+    v21_interest_weight_goal: float = 1.0
+    v21_interest_weight_preference: float = 1.0
+    v21_interest_weight_memory: float = 1.0
+    v21_interest_weight_world: float = 1.0
+    v21_interest_top_n: int = 3
+    v21_state_snapshot_min_interval_minutes: int = 15
+    v21_state_snapshot_retention_days: int = 90

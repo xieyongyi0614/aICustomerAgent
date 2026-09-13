@@ -144,6 +144,22 @@ class PromptBuilder:
         )
 
     @staticmethod
+    def build_agent_state_section() -> str | None:
+        """V2.1.0 AGENT-002：Run 内组装的统一意识状态只读段（contextvar 通道）。
+
+        仅渲染兴趣/焦点净新增行；Flag 关闭或无快照时返回 None，段不出现。
+        """
+        from app.application.agent_state_context import get_snapshot
+
+        snapshot = get_snapshot()
+        if snapshot is None:
+            return None
+        lines = snapshot.prompt_lines()
+        if not lines:
+            return None
+        return chr(10).join(lines) + chr(10) + "（这是你此刻真实的兴趣与关注，自然融入表达即可，不要罗列）"
+
+    @staticmethod
     def build_relationship_section(
         state: ConversationState,
         *,
@@ -399,6 +415,10 @@ class PromptBuilder:
                     "（这是相处带来的自然变化，融入表达即可，不要直接引用说明）",
                 )
             )
+
+        agent_state_section = PromptBuilder.build_agent_state_section()
+        if agent_state_section:
+            messages.append(("system", _literal(agent_state_section)))
 
         pattern_section = PromptBuilder.build_relationship_pattern_section(state)
         if pattern_section:

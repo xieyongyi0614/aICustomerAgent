@@ -21,6 +21,7 @@ SESSION = "ar-s1"
 EXPECTED_STAGES = [
     "perception",
     "state_update",
+    "state_snapshot",
     "goal_check",
     "goal_supply",
     "goal_advance",

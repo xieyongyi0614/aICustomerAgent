@@ -39,7 +39,7 @@ class TestProfileRegistry:
     def test_autonomous_tick_matches_life_loop_pipeline(self):
         spec = profiles.get_profile("autonomous_tick")
         assert spec.stages == (
-            "perception", "state_update", "goal_check", "goal_supply",
+            "perception", "state_update", "state_snapshot", "goal_check", "goal_supply",
             "goal_advance", "memory_retrieval", "reflection_check",
             "decision", "world_experience",
         )

@@ -24,7 +24,12 @@ from app.models.emotion import TurnAnalysis
 from app.models.intention import IntentionDecision
 from app.models.router import RoleMode
 from app.models.scene import SceneContext, SceneIntentResult, SceneState
-from app.application import agent_runtime, observability, world_engine
+from app.application import (
+    agent_runtime,
+    agent_state_assembler,
+    observability,
+    world_engine,
+)
 from app.application.agent_runtime import llm_gateway
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
@@ -255,6 +260,11 @@ async def run_chat_pipeline(
     try:
         started = time.perf_counter()
         trace.user_id = user_id
+        if run_ctx is not None:
+            snapshot = await asyncio.to_thread(
+                agent_state_assembler.assemble_snapshot, user_id
+            )
+            agent_state_assembler.activate_run_state(snapshot, run_ctx)
         world_ctx = await asyncio.to_thread(
             world_engine.build_context, user_id, session_id, trace=trace
         )
@@ -570,6 +580,7 @@ async def run_chat_pipeline(
         raise
     finally:
         if run_ctx is not None:
+            agent_state_assembler.reset_run_state(run_ctx)
             if status == "done" and run_ctx.degraded:
                 status = "degraded"
             agent_runtime.close_run(run_ctx, status)
