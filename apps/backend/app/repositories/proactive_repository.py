@@ -164,8 +164,16 @@ def get_by_id(action_id: str) -> ProactiveAction | None:
         return _to_model(row) if row is not None else None
 
 
-def list_pending(user_id: str, now: datetime | None = None) -> list[ProactiveAction]:
-    """delivered 未 acked；超 24h 未 ack 惰性置 expired（软状态审计）。"""
+def list_pending(
+    user_id: str,
+    now: datetime | None = None,
+    expired_out: list[str] | None = None,
+) -> list[ProactiveAction]:
+    """delivered 未 acked；超 24h 未 ack 惰性置 expired（软状态审计）。
+
+    expired_out 非 None 时收集本次被置 expired 的 action id，供调用方
+    补写 decision_records outcome（AUTO-006 结果记录闭环）。
+    """
     now = now or datetime.now()
     with SessionLocal() as session:
         rows = (
@@ -183,6 +191,8 @@ def list_pending(user_id: str, now: datetime | None = None) -> list[ProactiveAct
                     row.status = "expired"
                     row.updated_at = now
                     changed = True
+                    if expired_out is not None:
+                        expired_out.append(row.id)
                     continue
             if row.status in PENDING_STATUSES:
                 result.append(_to_model(row))

@@ -16,7 +16,14 @@ proactive_router = APIRouter()
 
 @proactive_router.get("/proactive/pending", response_model=ProactivePendingOut)
 def pending(user_id: str = Query(default=get_settings().default_user)):
-    actions = proactive_repository.list_pending(user_id)
+    expired_ids: list[str] = []
+    actions = proactive_repository.list_pending(user_id, expired_out=expired_ids)
+    for action_id in expired_ids:
+        if get_settings().observability_persist_enabled:
+            try:
+                decision_repository.mark_outcome(action_id, "expired")
+            except Exception:
+                logger.exception("决策结果回写失败：%s", action_id)
     return ProactivePendingOut(
         actions=[
             ProactiveActionOut(
