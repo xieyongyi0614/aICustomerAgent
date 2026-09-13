@@ -319,11 +319,24 @@ async def run_evaluation(ctx: PostProcessContext) -> None:
 
 
 async def run_world_update(ctx: PostProcessContext) -> None:
-    """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。"""
+    """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。
+    V2.3.0 追加：用户处境检出（确定性模式，独立子闸）。"""
     try:
         world_engine.run_turn_update(ctx.user_id, ctx.user_input, trace=ctx.trace)
     except Exception:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
+    settings = get_settings()
+    if settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled:
+        try:
+            from app.services.world import user_situation
+
+            user_situation.detect_from_message(
+                ctx.user_id,
+                ctx.user_input,
+                evidence={"session_id": ctx.session_id, "turn": ctx.current_turn},
+            )
+        except Exception:
+            logger.exception("用户处境检出异常")
 
 
 async def run_character_action_sync(ctx: PostProcessContext) -> None:
