@@ -32,6 +32,7 @@ from app.core.settings.reflection_development import (
 )
 from app.core.settings.relationship import RelationshipSettings
 from app.core.settings.world import WorldSettings
+from app.core.settings.world_simulation import WorldSimulationSettings
 
 
 class Settings(
@@ -55,6 +56,7 @@ class Settings(
     FeishuSettings,
     ObservabilitySettings,
     WorldSettings,
+    WorldSimulationSettings,
     BaseSettings,
 ):
     model_config = DOMAIN_MODEL_CONFIG

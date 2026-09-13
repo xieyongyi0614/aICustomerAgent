@@ -69,6 +69,36 @@ def enablement_violations(settings) -> list[str]:
             violations.append(
                 f"{sub_flag} 要求 v22_experience_enabled（V2.2.0 总闸先开）"
             )
+    v23_sub_flags = (
+        "v23_time_advance_enabled",
+        "v23_daily_life_enabled",
+        "v23_event_detection_enabled",
+        "v23_scene_expansion_enabled",
+        "v23_habit_time_enabled",
+        "v23_world_llm_assist_enabled",
+        "v23_debug_tick_enabled",
+    )
+    v23_master = getattr(settings, "v23_world_simulation_enabled", False)
+    v23_flags = {flag: getattr(settings, flag, False) for flag in v23_sub_flags}
+    for sub_flag, enabled in v23_flags.items():
+        if enabled and not v23_master:
+            violations.append(
+                f"{sub_flag} 要求 v23_world_simulation_enabled（V2.3.0 总闸先开）"
+            )
+    if v23_flags["v23_daily_life_enabled"] and not v23_flags[
+        "v23_time_advance_enabled"
+    ]:
+        violations.append(
+            "v23_daily_life_enabled 要求 v23_time_advance_enabled"
+            "（日程依赖日循环标记）"
+        )
+    if v23_flags["v23_world_llm_assist_enabled"] and not v23_flags[
+        "v23_event_detection_enabled"
+    ]:
+        violations.append(
+            "v23_world_llm_assist_enabled 要求 v23_event_detection_enabled"
+            "（辅助服务于处境检出）"
+        )
     return violations
 
 
