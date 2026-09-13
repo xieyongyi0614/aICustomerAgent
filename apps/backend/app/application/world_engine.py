@@ -56,13 +56,6 @@ _default_provider = TimeProvider()
 
 CONSUME_ACTIONS = {"eat"}
 
-_SIMULATION_SUBSTEPS: tuple = ()
-
-
-def register_simulation_substep(func) -> None:
-    global _SIMULATION_SUBSTEPS
-    _SIMULATION_SUBSTEPS = (*_SIMULATION_SUBSTEPS, func)
-
 
 def find_object_by_name(user_id: str, name: str) -> WorldObject | None:
     """按名称/别名匹配活跃实体；未命中返回 None（解释器宁缺毋滥）。"""
@@ -1005,8 +998,14 @@ async def run_world_maintenance_loop() -> None:
     )
 
 
+def _run_simulation_substeps(user_id: str, now: datetime) -> None:
+    from app.services.world import day_cycle
+
+    day_cycle.emit_time_markers(user_id, now)
+
+
 def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):
-    """V2.3.0 world_simulation 维护步：时间推进 + 注册的模拟子步骤。
+    """V2.3.0 world_simulation 维护步：时间推进 + 日循环/天气/日程等子步骤。
 
     全程 0 LLM；异常按世界旁路纪律降级，不中断其它维护步。
     """
@@ -1030,11 +1029,10 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
         result = advance_world_time(world.user_id, step_now)
         if result is not None:
             results.append(result)
-        for substep in _SIMULATION_SUBSTEPS:
-            try:
-                substep(world.user_id, now=step_now)
-            except Exception:
-                logger.exception("模拟子步骤失败：%s", getattr(substep, "__name__", substep))
+        try:
+            _run_simulation_substeps(world.user_id, step_now)
+        except Exception:
+            logger.exception("模拟子步骤执行失败：%s", world.user_id)
     return results
 
 

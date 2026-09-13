@@ -127,17 +127,13 @@ def test_maintenance_step_runs_for_all_worlds(db_session_factory, sim_flags):
 
 def test_maintenance_step_runs_substeps(db_session_factory, sim_flags, monkeypatch):
     calls = []
+    from app.services.world import day_cycle
 
     def _substep(user_id, now=None):
         calls.append((user_id, now))
 
-    world_engine.register_simulation_substep(_substep)
-    try:
-        world_engine.run_simulation_maintenance("ws003-hook", now=datetime(2026, 9, 14, 12, 0))
-    finally:
-        world_engine.__dict__["_SIMULATION_SUBSTEPS"] = tuple(
-            s for s in world_engine._SIMULATION_SUBSTEPS if s is not _substep
-        )
+    monkeypatch.setattr(day_cycle, "emit_time_markers", _substep)
+    world_engine.run_simulation_maintenance("ws003-hook", now=datetime(2026, 9, 14, 12, 0))
     assert calls and calls[0][0] == "ws003-hook"
 
 
