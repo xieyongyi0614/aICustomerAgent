@@ -52,6 +52,12 @@ class EventSource(StrEnum):
     MANUAL = "manual"
     AUTONOMY = "autonomy"
     CHARACTER = "character"
+    TIME = "time"
+    WEATHER = "weather"
+    CALENDAR = "calendar"
+    USER_EVIDENCE = "user_evidence"
+    DAILY_LIFE = "daily_life"
+    SIMULATION = "simulation"
 
 
 PART_OF_DAY_CN = {
@@ -145,6 +151,7 @@ class World(BaseModel):
     name: str = "家"
     time_mode: WorldTimeMode = WorldTimeMode.REAL_SYNC
     sim_time: datetime | None = None
+    sim_last_advanced_at: datetime | None = None
     sim_rate: float = 1.0
     current_location: str = "home.living_room"
     environment: WorldEnvironment = Field(default_factory=WorldEnvironment)
@@ -165,6 +172,7 @@ class WorldEvent(BaseModel):
     completed_at: datetime | None = None
     payload: dict[str, Any] = {}
     source: EventSource = EventSource.USER_MENTION
+    idempotency_key: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

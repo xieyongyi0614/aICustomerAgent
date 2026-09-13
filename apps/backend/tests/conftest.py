@@ -91,6 +91,7 @@ from app.repositories import (
     trace_repository,
     trigger_registry_repository,
     world_repository,
+    world_simulation_repository,
 )
 
 WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
@@ -121,6 +122,7 @@ _REPO_MODULES = (
     prompt_snapshot_repository,
     decision_repository,
     world_repository,
+    world_simulation_repository,
     relationship_milestone_repository,
     relationship_conflict_repository,
     relationship_snapshot_repository,

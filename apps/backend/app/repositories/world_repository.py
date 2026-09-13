@@ -45,6 +45,7 @@ def _to_world(row: WorldRow) -> World:
         name=row.name,
         time_mode=WorldTimeMode(row.time_mode),
         sim_time=row.sim_time,
+        sim_last_advanced_at=row.sim_last_advanced_at,
         sim_rate=row.sim_rate,
         current_location=row.current_location,
         environment=WorldEnvironment(**(row.environment or {})),
@@ -87,6 +88,7 @@ def _to_event(row: WorldEventRow) -> WorldEvent:
         completed_at=row.completed_at,
         payload=row.payload or {},
         source=EventSource(row.source),
+        idempotency_key=row.idempotency_key,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -129,6 +131,7 @@ def save_world(world: World) -> None:
             return
         row.name = world.name
         row.sim_time = world.sim_time
+        row.sim_last_advanced_at = world.sim_last_advanced_at
         row.sim_rate = world.sim_rate
         row.current_location = world.current_location
         row.environment = world.environment.model_dump(mode="json", exclude_none=True)
@@ -225,6 +228,7 @@ def save_event(event: WorldEvent) -> None:
         row.completed_at = event.completed_at
         row.payload = event.payload
         row.source = event.source.value
+        row.idempotency_key = event.idempotency_key
         row.updated_at = now
         session.commit()
 
