@@ -18,7 +18,11 @@ from app.models.world_simulation import (
     SituationDimension,
     SituationStatus,
 )
-from app.repositories import memory_repository, world_simulation_repository as plan_repo
+from app.repositories import (
+    memory_repository,
+    world_repository,
+    world_simulation_repository as plan_repo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +209,82 @@ def plan_topics(user_id: str, day: date) -> list[str]:
         block = template_by_seq.get(plan.seq) or {}
         topics.extend(block.get("topics") or [])
     return topics
+
+
+def _emit_life_event(user_id: str, plan: DailyPlan, kind: str, now: datetime) -> None:
+    from app.application import world_engine
+
+    importance = "normal" if plan.variability_source == DailyPlanVariability.USER_INFLUENCED else "low"
+    world_engine.create_event(
+        user_id,
+        event_type="life_event",
+        title=f"{plan.activity}（{kind}）",
+        importance=importance,
+        source="daily_life",
+        status="completed",
+        payload={
+            "kind": kind,
+            "plan_id": plan.id,
+            "seq": plan.seq,
+            "activity": plan.activity,
+            "location_id": plan.location_id,
+            "variability_source": plan.variability_source.value,
+            "date": plan.plan_date.isoformat(),
+        },
+        idempotency_key=f"life:{plan.id}:{kind}",
+    )
+
+
+def advance_daily_plan(user_id: str, now: datetime) -> dict:
+    """块推进：过点闭合/错点跳过/到点激活/位置迁移；单用户单次调用。"""
+    from app.services.world import movement
+
+    world = world_repository.get_world(user_id)
+    if world is None:
+        return {"completed": [], "skipped": [], "activated": None, "moved": False}
+    day = now.date()
+    minutes = now.hour * 60 + now.minute
+    plans = get_day_plan(user_id, day)
+    summary = {"completed": [], "skipped": [], "activated": None, "moved": False}
+
+    for plan in plans:
+        if plan.status == DailyPlanStatus.ACTIVE and plan.end_minutes <= minutes:
+            plan.status = DailyPlanStatus.COMPLETED
+            plan_repo.save_plan(plan)
+            _emit_life_event(user_id, plan, "activity_done", now)
+            summary["completed"].append(plan.id)
+        elif plan.status == DailyPlanStatus.PLANNED and plan.end_minutes <= minutes:
+            plan.status = DailyPlanStatus.SKIPPED
+            plan_repo.save_plan(plan)
+            _emit_life_event(user_id, plan, "block_skipped", now)
+            summary["skipped"].append(plan.id)
+
+    current = None
+    for plan in plans:
+        if (
+            plan.status == DailyPlanStatus.PLANNED
+            and plan.start_minutes <= minutes < plan.end_minutes
+        ):
+            plan.status = DailyPlanStatus.ACTIVE
+            plan_repo.save_plan(plan)
+            summary["activated"] = plan.id
+            current = plan
+            break
+
+    if current is None:
+        for plan in get_day_plan(user_id, day):
+            if plan.status == DailyPlanStatus.ACTIVE:
+                current = plan
+                break
+
+    if current is not None and current.location_id != world.current_location:
+        move = movement.apply(
+            user_id,
+            current.location_id,
+            source=movement.SOURCE_SCHEDULE,
+            reason=f"block:{current.activity}",
+            now=now,
+        )
+        summary["moved"] = move.applied
+        summary["move_skipped"] = move.skipped_reason
+    return summary

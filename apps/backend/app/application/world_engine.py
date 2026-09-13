@@ -1012,7 +1012,9 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
         if world is not None:
             world_now = _default_provider.now(world)
             plans = daily_plan.ensure_day_plan(user_id, world_now.date(), world_now)
-            if not plans:
+            if plans:
+                daily_plan.advance_daily_plan(user_id, world_now)
+            else:
                 logger.info("当日计划缺失且构建失败（user=%s）", user_id)
 
 
