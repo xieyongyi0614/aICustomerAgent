@@ -7,9 +7,11 @@ from fastapi import FastAPI
 from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
 from app.application import autonomy_worker, observability, world_engine
+from app.channels.feishu import delivery
+from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core.settings import get_settings
 from app.core.settings.enablement import validate_enablement_chain
-from app.services import memory_service
+from app.services import memory_service, proactive_delivery
 from app.application.action_engine import run_action_retry_loop
 from app.application.life_loop import run_life_loop_worker
 from app.services.development.audit import register_rollback_listener
@@ -73,6 +75,13 @@ async def lifespan(application: FastAPI):
             )
         if get_settings().action_enabled:
             _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
+    if get_settings().feishu_enabled:
+        proactive_delivery.register_proactive_outbound(
+            proactive_delivery.ProactiveOutbound(
+                channel=FEISHU_CHANNEL, send=delivery.send_proactive
+            )
+        )
+        logging.getLogger(__name__).info("主动消息出站端口已注册：%s", FEISHU_CHANNEL)
     if get_settings().observability_persist_enabled:
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()

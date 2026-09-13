@@ -68,6 +68,7 @@ class ProactiveAction(BaseModel):
     updated_at: datetime
     delivered_at: datetime | None = None
     message_id: str | None = None
+    external_message_id: str | None = None
     acked_at: datetime | None = None
 
 

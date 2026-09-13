@@ -1,6 +1,9 @@
 """V7 Proactive Executor（action-queue.md §2 / concurrency.md L1~L3 / failure-handling.md）。
 
-approved 状态的 ProactiveAction → 锁内二次校验 → 生成文本 → save_proactive_turn → delivered。
+approved 状态的 ProactiveAction → 锁内二次校验 → 生成文本 → save_proactive_turn
+→ send_proactive → delivered（AUTO-005 两阶段投递：生成可重试；Channel 失败
+仅重发，不重生成、不重新裁决）。delivered 语义 = Channel 已成功投递；
+未注册 outbound（纯 Web 部署）时退化为内部落库完成。
 主动消息不是对话轮：不触发 V5 状态更新 / goal_review / memory 提取。
 """
 
@@ -10,12 +13,17 @@ from datetime import datetime, timedelta
 
 from app.application import observability
 from app.application.post_process import get_user_write_lock
+from app.channels.base import ChannelErrorKind, SendResult
 from app.chains import proactive_chain
 from app.core.settings import get_settings
 from app.application.life_loop_context import memory_digest_var
 from app.models.autonomy import ProactiveAction
-from app.repositories import goal_repository, proactive_repository
-from app.services import conversation_service, trigger_evaluator
+from app.repositories import (
+    conversation_repository,
+    goal_repository,
+    proactive_repository,
+)
+from app.services import conversation_service, proactive_delivery
 from app.services.autonomy_policy import in_quiet_hours
 from app.services.trace_collector import TurnTraceSession
 from app.application.chat_pipeline import active_generations
@@ -41,11 +49,12 @@ def _recheck_failed_reason(
         now, settings.autonomy_quiet_hours_start, settings.autonomy_quiet_hours_end
     ):
         return "quiet_hours"
-    recent = conversation_service.load_window(session_id, max_messages=1)
+    recent = conversation_repository.get_recent_messages(session_id, limit=1)
     if recent:
         last = recent[-1]
         if (
             last.role == "human"
+            and last.created_at is not None
             and (now - last.created_at).total_seconds() / 60
             < settings.autonomy_min_user_reply_gap_minutes
         ):
@@ -65,12 +74,13 @@ async def _fail_for_retry(
     trace: TurnTraceSession | None,
     error: str,
     now: datetime,
+    **fields,
 ) -> ProactiveAction:
     settings = get_settings()
     attempt = action.attempt + 1
     if attempt >= settings.autonomy_max_retries:
         updated = proactive_repository.transition(
-            action.id, "failed", now=now, attempt=attempt, next_retry_at=None
+            action.id, "failed", now=now, attempt=attempt, next_retry_at=None, **fields
         )
         logger.error("主动消息重试耗尽：%s（终态 failed）", action.id)
         _mark_outcome(action.id, "failed")
@@ -81,6 +91,7 @@ async def _fail_for_retry(
             now=now,
             attempt=attempt,
             next_retry_at=now + timedelta(seconds=_backoff_seconds(attempt)),
+            **fields,
         )
     if trace is not None:
         trace.record("proactive_deliver", 0.0, "error", error=error)
@@ -101,6 +112,72 @@ def _goal_description(action: ProactiveAction) -> str | None:
     return goal.description
 
 
+def _generation_artifacts(action: ProactiveAction) -> tuple[str, int] | None:
+    """生成阶段的已持久化产物（重发路径复用，不重生成）；不完整返回 None。"""
+    if not action.payload_text or action.message_id is None:
+        return None
+    try:
+        return action.payload_text, int(action.message_id)
+    except ValueError:
+        return None
+
+
+async def _send_phase(
+    action: ProactiveAction,
+    text: str,
+    message_id: int,
+    llm,
+    trace: TurnTraceSession | None,
+    now: datetime,
+    started: float,
+) -> ProactiveAction | None:
+    """发送阶段：Channel 失败仅重发（产物随 failed 行持久化），不重生成、不重新裁决。"""
+    outbound = proactive_delivery.get_proactive_outbound()
+    result: SendResult | None = None
+    if outbound is not None:
+        try:
+            result = await outbound.send(action.user_id, text, action.dedupe_key)
+        except Exception:
+            logger.exception("主动消息通道发送异常：%s", outbound.channel)
+            result = SendResult(ok=False, error=ChannelErrorKind.UNKNOWN)
+        if not result.ok:
+            error = result.error.value if result.error else ChannelErrorKind.UNKNOWN.value
+            return await _fail_for_retry(
+                action,
+                trace,
+                f"send_{error}",
+                now,
+                payload_text=text,
+                message_id=str(message_id),
+            )
+    delivered = proactive_repository.transition(
+        action.id,
+        "delivered",
+        delivered_at=now,
+        message_id=str(message_id),
+        payload_text=text,
+        external_message_id=result.external_message_id if result else None,
+    )
+    if trace is not None:
+        trace.record(
+            "proactive_deliver",
+            (time.perf_counter() - started) * 1000,
+            external_message_id=result.external_message_id if result else None,
+            channel=outbound.channel if outbound else None,
+        )
+    _mark_outcome(action.id, "delivered")
+    _schedule_evaluation(delivered, llm)
+    logger.info(
+        "主动消息已投递：action=%s message=%s external=%s channel=%s 预览=%s",
+        action.id,
+        message_id,
+        result.external_message_id if result else None,
+        outbound.channel if outbound else None,
+        text[: get_settings().log_content_preview_chars or 12],
+    )
+    return delivered
+
+
 async def execute(
     action: ProactiveAction,
     llm=None,
@@ -108,7 +185,6 @@ async def execute(
     now: datetime | None = None,
 ) -> ProactiveAction | None:
     started = time.perf_counter()
-    settings = get_settings()
     now = now or datetime.now()
 
     lock = get_user_write_lock(action.user_id)
@@ -136,55 +212,39 @@ async def execute(
             _mark_outcome(action.id, "discarded")
             return discarded
 
-        goal_description = _goal_description(action)
-        if goal_description is None:
-            return await _fail_for_retry(action, trace, "goal_vanished", now)
-        recent = _recent_context(action.session_id)
-        digest = memory_digest_var.get()
-        if digest:
-            recent = f"{recent}\n{digest}" if recent else digest
-        text = await proactive_chain.generate(
-            goal_description,
-            action.intention,
-            recent,
-            llm=llm,
-            trace=trace,
-        )
-        if not text:
-            return await _fail_for_retry(action, trace, "generate_failed", now)
-
-        try:
-            message_id = conversation_service.save_proactive_turn(
-                action.session_id, text
+        artifacts = _generation_artifacts(approved)
+        if artifacts is not None:
+            text, message_id = artifacts
+        else:
+            goal_description = _goal_description(action)
+            if goal_description is None:
+                return await _fail_for_retry(action, trace, "goal_vanished", now)
+            recent = _recent_context(action.session_id)
+            digest = memory_digest_var.get()
+            if digest:
+                recent = f"{recent}\n{digest}" if recent else digest
+            text = await proactive_chain.generate(
+                goal_description,
+                action.intention,
+                recent,
+                llm=llm,
+                trace=trace,
             )
-        except Exception:
-            logger.exception("主动消息落库失败，action 停留 approved 下 tick 重试")
-            proactive_repository.transition(action.id, "candidate")
-            if trace is not None:
-                trace.record("proactive_deliver", 0.0, "error", error="persist_failed")
-            return None
-
-        delivered = proactive_repository.transition(
-            action.id,
-            "delivered",
-            delivered_at=now,
-            message_id=str(message_id),
-            payload_text=text,
+            if not text:
+                return await _fail_for_retry(action, trace, "generate_failed", now)
+            try:
+                message_id = conversation_service.save_proactive_turn(
+                    action.session_id, text
+                )
+            except Exception:
+                logger.exception("主动消息落库失败，action 停留 approved 下 tick 重试")
+                proactive_repository.transition(action.id, "candidate")
+                if trace is not None:
+                    trace.record("proactive_deliver", 0.0, "error", error="persist_failed")
+                return None
+        return await _send_phase(
+            approved, text, message_id, llm, trace, now, started
         )
-        if trace is not None:
-            trace.record(
-                "proactive_deliver",
-                (time.perf_counter() - started) * 1000,
-            )
-        _mark_outcome(action.id, "delivered")
-        _schedule_evaluation(delivered, llm)
-        logger.info(
-            "主动消息已投递：action=%s message=%s 预览=%s",
-            action.id,
-            message_id,
-            text[: settings.log_content_preview_chars or 12],
-        )
-        return delivered
 
 
 def _schedule_evaluation(delivered, llm) -> None:

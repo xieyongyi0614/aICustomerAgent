@@ -43,6 +43,7 @@ def _to_model(row: ProactiveActionRow) -> ProactiveAction:
         updated_at=row.updated_at,
         delivered_at=row.delivered_at,
         message_id=row.message_id,
+        external_message_id=row.external_message_id,
         acked_at=row.acked_at,
     )
 

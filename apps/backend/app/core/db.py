@@ -484,6 +484,7 @@ class ProactiveActionRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
     acked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (
