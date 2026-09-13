@@ -29,6 +29,19 @@ WORLD_PROACTIVE_EVENT_TYPES = frozenset({"interview", "exam"})
 
 STAGE_RANK = {"stranger": 0, "friend": 1, "close_friend": 2, "partner": 3}
 
+TRIGGER_PRIORITY: dict[str, str] = {
+    "scheduled_followup": "P0",
+    "action_due": "P1",
+    "conversation_inactivity": "P3",
+}
+
+HIGH_PRIORITY_OVERRIDE = frozenset({"P0", "P1"})
+
+
+def trigger_priority(signal: TriggerSignal) -> str:
+    """P0 用户明确要求 / P1 重要委托，P3 闲聊级（autonomy-policy.md 优先级表）。"""
+    return TRIGGER_PRIORITY.get(signal.type, "P3")
+
 
 @dataclass
 class PolicySnapshot:
@@ -227,7 +240,9 @@ def evaluate(
         signal.type not in QUIET_HOURS_EXEMPT_TYPES
     ):
         return _verdict("ignore", "静音时段")
-    if not _cooldown_passed(snapshot, config, now):
+    priority = trigger_priority(signal)
+    cooldown_passed = _cooldown_passed(snapshot, config, now)
+    if not cooldown_passed and priority not in HIGH_PRIORITY_OVERRIDE:
         return _verdict("wait", "冷却中")
     if snapshot.attempt_count >= config.autonomy_max_attempts_per_episode:
         return _verdict("ignore", "本集期已达上限")
@@ -240,13 +255,15 @@ def evaluate(
     if snapshot.goal_degraded or snapshot.selected_goal_type not in _PROACTIVE_GOAL_TYPES:
         return _verdict("ignore", "无主动动机")
 
-    intention = PROACTIVE_INTENTION_MAP[snapshot.selected_goal_type]
+    reason = f"触发 {signal.type}，存在 {snapshot.selected_goal_type} 目标"
+    if not cooldown_passed:
+        reason = f"{reason}；{priority}覆盖冷却"
     verdict = AutonomyVerdict(
         decision="act",
-        reason=f"触发 {signal.type}，存在 {snapshot.selected_goal_type} 目标",
+        reason=reason[:60],
         trigger=signal,
         goal_id=snapshot.extra_flags.get("goal_id"),
-        intention=intention,
+        intention=PROACTIVE_INTENTION_MAP[snapshot.selected_goal_type],
     )
     verdict = _apply_world_adjustments(verdict, snapshot)
     verdict = _apply_action_adjustments(verdict, snapshot)
