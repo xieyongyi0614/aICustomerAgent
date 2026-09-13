@@ -24,8 +24,8 @@ def build_emotion_expression(
     character_state: CharacterState, intensity_boost: float = 0.0
 ) -> EmotionExpression:
     entry = EMOTION_TONES.tones[character_state.mood]
-    effective_intensity = min(
-        max(character_state.intensity + intensity_boost, 0.0), 1.0
+    effective_intensity = round(
+        min(max(character_state.intensity + intensity_boost, 0.0), 1.0), 6
     )
     return EmotionExpression(
         channel_bias=entry.channel_bias,
