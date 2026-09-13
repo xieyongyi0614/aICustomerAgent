@@ -56,7 +56,10 @@ def assemble_style_contract(
     _apply_personality(contract, personality_state)
     if include_habits:
         _apply_habits(contract, state, analysis or TurnAnalysis())
-    _resolve_conflicts(contract, resolve_expressiveness=include_addressing)
+    _resolve_conflicts(
+        contract,
+        resolve_expressiveness=include_addressing and include_emotion,
+    )
     contract.style_hint = contract.build_style_hint()
     return contract
 

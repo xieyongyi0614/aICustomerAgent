@@ -40,7 +40,7 @@ def _set_flags(monkeypatch, **overrides):
     for key, value in envs.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
-    return lambda: get_settings.cache_clear()
+    return get_settings.cache_clear()
 
 
 def _state() -> ConversationState:
@@ -155,6 +155,26 @@ def test_build_style_context_relationship_gate_controls_boost(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_build_style_context_emotion_off_keeps_relationship_expressiveness(monkeypatch):
+    partner_state = ConversationState(
+        session_id="s",
+        user_id="u",
+        messages=[],
+        summary=None,
+        memories=[],
+        current_input="在吗",
+        character_state=CharacterState(mood="calm", intensity=0.2),
+        relationship_state=RelationshipState(stage="partner"),
+    )
+    _set_flags(monkeypatch, V22_EMOTION_TRANSITION_ENABLED="false")
+    try:
+        contract = build_style_context(partner_state, _analysis())
+        assert contract.addressing.emotion_expressiveness == "open"
+        assert contract.emotion_constraint == EmotionExpression()
+    finally:
+        get_settings.cache_clear()
+
+
 def test_build_style_context_degrades_to_none_on_failure(monkeypatch):
     _set_flags(monkeypatch)
 
@@ -239,7 +259,6 @@ async def test_astream_threads_style_ctx_to_builder(monkeypatch, fake_llm):
 def test_pipeline_style_context_records_trace_when_enabled(monkeypatch):
     from app.application import chat_pipeline
 
-    monkeypatch.setattr(chat_pipeline, "get_settings", get_settings)
     _set_flags(monkeypatch)
     try:
         trace = TurnTraceSession()
