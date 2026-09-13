@@ -22,6 +22,7 @@ from app.character.asuna.relationship_lexicon import (
 )
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
+from app.models.style_contract import StyleContract
 from app.core.settings import get_settings
 from app.services.world.context_selector import render_world_section
 from app.prompts.behavior import build_activity_section, build_behavior_section
@@ -46,6 +47,9 @@ INSIGHT_TYPE_LABELS = {
 
 EMOTION_BUDGET_CHARS = 120
 RELATIONSHIP_BUDGET_CHARS = 150
+
+STYLE_SECTION_HEADER = "【本轮表达风格】"
+STYLE_SECTION_BUDGET_CHARS = 300
 
 SHARED_EXPERIENCE_HEADER = "【共同经历】"
 SHARED_EXPERIENCE_NOTE = "（这是你们一起经历过的事，仅自然相关时提起，不要罗列）"
@@ -267,6 +271,21 @@ class PromptBuilder:
         return "\n".join(lines)
 
     @staticmethod
+    def build_style_section(style_ctx: StyleContract | None) -> str | None:
+        """V2.2.0 CHAR-007：StyleContract → prompt 风格段（behavior_ctx 并列，Q5）。"""
+        if style_ctx is None:
+            return None
+        lines = style_ctx.prompt_lines()
+        if not lines:
+            return None
+        section = _append_within_budget(
+            STYLE_SECTION_HEADER, lines, STYLE_SECTION_BUDGET_CHARS
+        )
+        if len(section) <= len(STYLE_SECTION_HEADER):
+            return None
+        return section
+
+    @staticmethod
     def build_behavior_section(analysis: TurnAnalysis) -> str:
         behavior = analysis.behavior.behavior
         instruction = BEHAVIOR_INSTRUCTIONS.get(
@@ -309,6 +328,7 @@ class PromptBuilder:
         behavior_ctx=None,
         world_ctx=None,
         action_ctx=None,
+        style_ctx=None,
     ) -> ChatPromptTemplate:
         world_text = render_world_section(
             world_ctx, get_settings().world_context_char_budget
@@ -331,6 +351,11 @@ class PromptBuilder:
                 ),
             ]
         tail_sections: list[str] = []
+        style_section = None
+        if style_ctx is not None:
+            style_section = PromptBuilder.build_style_section(style_ctx)
+            if style_section is not None:
+                style_section = _literal(style_section)
         if world_text:
             tail_sections.append(_literal(world_text))
         if action_text:
@@ -382,6 +407,7 @@ class PromptBuilder:
             + (len(goal_section) if goal_section else 0)
             + (len(intention_section) if intention_section else 0)
             + (len(behavior_section) if behavior_section else 0)
+            + (len(style_section) if style_section else 0)
             + len(state.current_input)
             + 120
         )
@@ -389,6 +415,8 @@ class PromptBuilder:
 
         messages = list(identity)
         messages.extend(("system", text) for text in state_sections)
+        if style_section is not None:
+            messages.append(("system", style_section))
         if goal_section is not None:
             messages.append(("system", goal_section))
         if intention_section is not None:

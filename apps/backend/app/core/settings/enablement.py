@@ -59,6 +59,16 @@ def enablement_violations(settings) -> list[str]:
             "v21_goal_stack_enabled 要求 v21_agent_runtime_enabled"
             "（Goal Stack 依赖 Run 阶段插槽）"
         )
+    for sub_flag in (
+        "v22_emotion_transition_enabled",
+        "v22_relationship_addressing_enabled",
+        "v22_habit_runtime_enabled",
+        "v22_style_contract_enabled",
+    ):
+        if getattr(settings, sub_flag, False) and not settings.v22_experience_enabled:
+            violations.append(
+                f"{sub_flag} 要求 v22_experience_enabled（V2.2.0 总闸先开）"
+            )
     return violations
 
 

@@ -46,6 +46,7 @@ from app.services import (
 )
 from app.services.goal_service import SelectedGoal
 from app.services.action.detector import detect_action_intent
+from app.services.experience.style_context import build_style_context
 from app.services.intention_policy import enforce as enforce_intention
 from app.chains.answer_chain import answer_max_tokens
 from app.repositories import relationship_milestone_repository
@@ -305,6 +306,30 @@ def _run_foreground_decision(
         return None
 
 
+def _build_style_context(state: ConversationState, turn: TurnAnalysis, trace):
+    """V2.2.0 CHAR-007：StyleContext 构造与 trace 记录；总闸关闭时为 None。"""
+    settings = get_settings()
+    if not settings.v22_experience_enabled:
+        return None
+    started = time.perf_counter()
+    personality_state = None
+    try:
+        snapshot = agent_state_context.get_snapshot()
+        if snapshot is not None:
+            personality_state = list(snapshot.personality)
+    except Exception:
+        logger.exception("人格轴快照读取失败，按基线装配风格契约")
+    style_ctx = build_style_context(state, turn, personality_state)
+    extra = style_ctx.model_dump(mode="json") if style_ctx is not None else {}
+    trace.record(
+        "style_contract",
+        (time.perf_counter() - started) * 1000,
+        "ok" if style_ctx is not None else "skipped",
+        **extra,
+    )
+    return style_ctx
+
+
 async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
@@ -462,6 +487,8 @@ async def run_chat_pipeline(
         )
         trace.set_meta(effective_mode, turn)
 
+        style_ctx = _build_style_context(state, turn, trace)
+
         behavior_meta = {
             "strategy": behavior_ctx.strategy.strategy,
             "budget": behavior_ctx.budget.model_dump(),
@@ -528,6 +555,7 @@ async def run_chat_pipeline(
                 behavior_ctx=behavior_ctx,
                 action_ctx=action_ctx,
                 world_ctx=world_ctx,
+                style_ctx=style_ctx,
             ):
                 if first_token_ms is None:
                     first_token_ms = (time.perf_counter() - llm_started) * 1000

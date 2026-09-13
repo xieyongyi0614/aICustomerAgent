@@ -25,6 +25,7 @@ TRACE_STEP_NAMES = (
     "prompt_builder",
     "mode_stabilize",
     "behavior_engine",
+    "style_contract",
     "llm",
     "state_update",
     "emotion_update",

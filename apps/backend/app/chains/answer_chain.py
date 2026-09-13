@@ -29,10 +29,19 @@ def build_chain(
     prompt=None,
     world_ctx=None,
     action_ctx=None,
+    style_ctx=None,
 ) -> Runnable:
     if prompt is None:
         prompt = PromptBuilder.build(
-            mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
+            mode,
+            state,
+            analysis,
+            scene_ctx,
+            goal_ctx,
+            behavior_ctx,
+            world_ctx,
+            action_ctx,
+            style_ctx,
         )
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=answer_max_tokens(state))
@@ -80,11 +89,12 @@ async def astream(
     behavior_ctx=None,
     world_ctx=None,
     action_ctx=None,
+    style_ctx=None,
 ) -> AsyncIterator[str]:
     started = time.perf_counter()
     started_at = datetime.now()
     prompt = PromptBuilder.build(
-        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
+        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx, style_ctx
     )
     chain = build_chain(
         mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx, prompt=prompt, action_ctx=action_ctx

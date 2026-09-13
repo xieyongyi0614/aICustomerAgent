@@ -17,6 +17,7 @@ from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
 from app.core.settings.character import CharacterSettings
 from app.core.settings.database import DatabaseSettings
 from app.core.settings.evaluation import EvaluationSettings
+from app.core.settings.experience import ExperienceSettings
 from app.core.settings.feishu import FeishuSettings
 from app.core.settings.goal import GoalSettings
 from app.core.settings.life_loop import LifeLoopSettings
@@ -50,6 +51,7 @@ class Settings(
     AgentRuntimeSettings,
     ActionSettings,
     EvaluationSettings,
+    ExperienceSettings,
     FeishuSettings,
     ObservabilitySettings,
     WorldSettings,

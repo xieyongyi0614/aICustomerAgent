@@ -43,13 +43,20 @@ def assemble_style_contract(
     state: ConversationState,
     analysis: TurnAnalysis | None = None,
     personality_state=None,
+    *,
+    include_addressing: bool = True,
+    include_emotion: bool = True,
+    include_habits: bool = True,
 ) -> StyleContract:
     contract = _hard_constraints()
-    _apply_addressing(contract, state)
-    _apply_emotion(contract, state)
+    if include_addressing:
+        _apply_addressing(contract, state)
+    if include_emotion:
+        _apply_emotion(contract, state, relationship_modulation=include_addressing)
     _apply_personality(contract, personality_state)
-    _apply_habits(contract, state, analysis or TurnAnalysis())
-    _resolve_conflicts(contract)
+    if include_habits:
+        _apply_habits(contract, state, analysis or TurnAnalysis())
+    _resolve_conflicts(contract, resolve_expressiveness=include_addressing)
     contract.style_hint = contract.build_style_hint()
     return contract
 
@@ -72,9 +79,15 @@ def _apply_addressing(contract: StyleContract, state: ConversationState) -> None
         logger.exception("Addressing 投影失败，降级默认档位")
 
 
-def _apply_emotion(contract: StyleContract, state: ConversationState) -> None:
+def _apply_emotion(
+    contract: StyleContract, state: ConversationState, relationship_modulation: bool = True
+) -> None:
     try:
-        boost = relationship_emotion_boost(state.relationship_state.stage)
+        boost = (
+            relationship_emotion_boost(state.relationship_state.stage)
+            if relationship_modulation
+            else 0.0
+        )
         contract.emotion_constraint = build_emotion_expression(
             state.character_state, intensity_boost=boost
         )
@@ -110,8 +123,11 @@ def _apply_habits(
         contract.habits = []
 
 
-def _resolve_conflicts(contract: StyleContract) -> None:
-    _resolve_emotion_vs_relationship(contract)
+def _resolve_conflicts(
+    contract: StyleContract, resolve_expressiveness: bool = True
+) -> None:
+    if resolve_expressiveness:
+        _resolve_emotion_vs_relationship(contract)
     _apply_personality_habit_boundary(contract)
 
 
