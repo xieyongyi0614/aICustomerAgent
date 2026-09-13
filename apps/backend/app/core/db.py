@@ -574,6 +574,7 @@ class DecisionRecordRow(Base):
     reason: Mapped[str] = mapped_column(String, nullable=False, default="")
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     outcome: Mapped[str | None] = mapped_column(String, nullable=True)
+    candidates: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (

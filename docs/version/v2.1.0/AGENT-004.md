@@ -267,3 +267,13 @@ Step 4  胜者照旧进入生成回复；decision_records 落行（前后台审�
 
 - `v21_agent_runtime_enabled=False`：autonomy / chat_pipeline / V9 全套件零跳过全绿。
 - autonomy_policy 与 trigger_evaluator 本体 diff 审查为零（只允许调用方改造）。
+
+---
+
+## 12. 实施记录（Coding 回填）
+
+1. **落库**：`decision_records.candidates` JSON（0041）；DecisionRecord 模型/仓储映射透传。
+2. **管线**：`services/decision_pipeline.py` 五段（collect→priority→score→gates→select）；被闸拒绝的候选**出局**（非降分），全部出局时 silence 胜出；胜者 Intention 经 `INTENTION_GOAL_DEFAULTS/FIT` 既有校验映射。
+3. **后台接线**：`autonomy_engine._pipeline_intention`（Flag=`v21_agent_runtime_enabled`）在 `_build_action` 前运行管线，胜者意图覆盖 verdict.intention、审计包落 `candidates`；管线异常回退 verdict 原值（零行为风险）。trigger_evaluator / autonomy_policy 本体零 diff。
+4. **评分口径**：goal_alignment（AGENT-003 契约）+ state_fit/relationship_fit/timing/cost 规则常量 0.5 + interest（焦点目标命中 0.6）；等权 `v21_decision_weight=1.0`。P0/P1 静态映射已声明（chat_response/user_directive=P0、commitment_delivery=P1），P0 识别（用户显式请求）与 P1 投递候选接入随 AGENT-005/007 补全。
+5. **前台**：turn 内四链记账已在 AGENT-001 Gateway 交付；前台 Flow B 的 candidates 审计暂记 trace（免热路径 IO），decision_records 前台行审计随 AGENT-007 收口裁决。

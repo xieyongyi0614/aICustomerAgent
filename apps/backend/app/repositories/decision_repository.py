@@ -28,6 +28,7 @@ def _to_model(row: DecisionRecordRow) -> DecisionRecord:
         reason=row.reason or "",
         confidence=row.confidence,
         outcome=row.outcome,
+        candidates=row.candidates,
         created_at=row.created_at,
     )
 
@@ -46,6 +47,7 @@ def _from_model(record: DecisionRecord, created_at: datetime) -> DecisionRecordR
         reason=record.reason,
         confidence=record.confidence,
         outcome=record.outcome,
+        candidates=record.candidates,
         created_at=created_at,
     )
 

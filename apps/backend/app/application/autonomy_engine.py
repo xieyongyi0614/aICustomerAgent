@@ -174,7 +174,7 @@ def _snapshot_for(
 
 
 def _build_action(
-    verdict, session_id: str, now: datetime
+    verdict, session_id: str, now: datetime, intention_override: str | None = None
 ) -> ProactiveAction:
     return ProactiveAction(
         id=uuid.uuid4().hex,
@@ -183,11 +183,40 @@ def _build_action(
         trigger_type=verdict.trigger.type,
         dedupe_key=verdict.trigger.dedupe_key,
         goal_id=verdict.goal_id,
-        intention=verdict.intention or "check_in",
+        intention=intention_override or verdict.intention or "check_in",
         reason=verdict.reason,
         created_at=now,
         updated_at=now,
     )
+
+
+def _pipeline_intention(verdict, user_id: str, now: datetime) -> tuple[str | None, dict | None]:
+    """AGENT-004 统一决策管线接线：Flag 开启时五段管线裁决主动意图，
+    候选审计落 decision_records.candidates；管线失败回退 verdict 原值。"""
+    settings = get_settings()
+    if not settings.v21_agent_runtime_enabled:
+        return None, None
+    try:
+        from app.application import agent_state_context
+        from app.services import decision_pipeline, goal_stack as goal_stack_service
+
+        stack = (
+            goal_stack_service.evaluate_stack(user_id, now)
+            if settings.v21_goal_stack_enabled
+            else None
+        )
+        result = decision_pipeline.run_pipeline(
+            stack=stack,
+            snapshot=agent_state_context.get_snapshot(),
+            trigger_intention=verdict.intention,
+            trigger_goal_id=verdict.goal_id,
+            run=None,
+            now=now,
+        )
+        return result.intention, result.audit
+    except Exception:
+        logger.exception("决策管线失败，回退 verdict 原值")
+        return None, None
 
 
 def reset_episode(user_id: str) -> None:
@@ -195,7 +224,14 @@ def reset_episode(user_id: str) -> None:
 
 
 def _decision_record(
-    verdict, signal, snapshot, user_id: str, session_id: str, action_id=None, outcome=None
+    verdict,
+    signal,
+    snapshot,
+    user_id: str,
+    session_id: str,
+    action_id=None,
+    outcome=None,
+    candidates=None,
 ) -> DecisionRecord:
     payload, _ = bound_extra(
         {
@@ -225,6 +261,7 @@ def _decision_record(
         input_snapshot=payload,
         decision=verdict.decision,
         reason=verdict.reason,
+        candidates=candidates,
     )
 
 
@@ -322,7 +359,12 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         )
         return None
 
-    action = _build_action(verdict, conversation.id, now)
+    intention_override, pipeline_audit = _pipeline_intention(
+        verdict, user_id, now
+    )
+    action = _build_action(
+        verdict, conversation.id, now, intention_override=intention_override
+    )
     enqueued = proactive_repository.enqueue(action)
     _record_decision(
         verdict=verdict,
@@ -332,6 +374,7 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         session_id=conversation.id,
         action_id=action.id,
         outcome=None if enqueued else "enqueue_failed",
+        candidates=pipeline_audit,
     )
     if not enqueued:
         return None

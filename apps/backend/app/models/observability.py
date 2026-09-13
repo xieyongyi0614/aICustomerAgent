@@ -172,6 +172,7 @@ class DecisionRecord(BaseModel):
     reason: str = ""
     confidence: float | None = None
     outcome: str | None = None
+    candidates: dict[str, Any] | None = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 

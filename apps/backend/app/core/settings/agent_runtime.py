@@ -15,6 +15,7 @@ class AgentRuntimeSettings(BaseSettings):
     v21_goal_stack_enabled: bool = False
     v21_goal_medium_timeout_days: int = 7
     v21_goal_short_timeout_hours: int = 24
+    v21_decision_weight: float = 1.0
     v21_interest_weight_goal: float = 1.0
     v21_interest_weight_preference: float = 1.0
     v21_interest_weight_memory: float = 1.0
