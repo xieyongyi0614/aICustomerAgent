@@ -63,6 +63,10 @@ async def lifespan(application: FastAPI):
         register_rollback_listener()
     if get_settings().v2_relationship_evolved_enabled:
         register_narrative_listener()
+    if get_settings().v23_world_simulation_enabled and get_settings().v23_event_detection_enabled:
+        from app.services.world.event_bridge import register_character_event_listeners
+
+        register_character_event_listeners()
     if get_settings().v2_life_loop_enabled:
         _life_loop_task = asyncio.create_task(run_life_loop_worker())
         logging.getLogger(__name__).info("v2 life loop 已接管周期调度（归并 autonomy/world/action 三循环）")

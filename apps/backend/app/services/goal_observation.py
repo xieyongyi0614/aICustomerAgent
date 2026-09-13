@@ -133,6 +133,15 @@ def _complete(goal) -> dict:
     _record_lifecycle(record or goal, "completed", "计划步骤全部完成", goal.id)
 
     try:
+        from app.services.world import event_bridge
+
+        event_bridge.register_goal_event(
+            goal.user_id, goal.id, goal.description, "completed"
+        )
+    except Exception:
+        logger.exception("goal 完成世界事件登记失败（goal=%s）", goal.id)
+
+    try:
         memory_ingest.ingest_from_goal_completion(
             goal.user_id, goal.id, goal.description
         )

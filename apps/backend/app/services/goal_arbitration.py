@@ -248,6 +248,14 @@ def check_abandonment(user_id: str, facts: dict, now: datetime) -> dict:
             "长期无进展且低相关",
             {"goal_id": goal.id, **arbitration},
         )
+        try:
+            from app.services.world import event_bridge
+
+            event_bridge.register_goal_event(
+                goal.user_id, goal.id, goal.description, "abandoned"
+            )
+        except Exception:
+            logger.exception("goal 放弃世界事件登记失败（goal=%s）", goal.id)
         _cascade_children(goal, "abandoned", {"abandoned_by_parent": goal.id}, now)
         abandoned.append({"goal_id": goal.id, "confidence": arbitration["confidence"]})
     return {"status": "ok", "abandoned": abandoned}
