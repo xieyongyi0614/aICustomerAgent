@@ -95,3 +95,15 @@ class UserSituation(BaseModel):
             "intensity": self.intensity,
             "status": self.status.value,
         }
+
+
+class SceneProfile(BaseModel):
+    """场景画像（architecture.md §5.5）：地点对表达/话题/能量的刻画。"""
+
+    location_id: str
+    atmosphere_tags: list[str] = []
+    tone_bias: str = "neutral"
+    topic_affordances: list[str] = []
+    expressiveness_cap: str = "rich"
+    energy_bias: int = 0
+    mood_bias: str | None = None

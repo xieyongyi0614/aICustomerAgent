@@ -13,6 +13,7 @@ from app.character.asuna.world import (
     DEFAULT_HOUSEHOLD,
     HOME_LOCATIONS,
     OBJECT_STATE_MACHINES,
+    WORLD_LOCATION_REGISTRY,
 )
 from app.core.settings import get_settings
 from app.models.world import (
@@ -46,6 +47,7 @@ from app.services.world.context_selector import (
 )
 from app.services.world.interpreter import interpret
 from app.services.world.memory_bridge import materialize_event_memory
+from app.services.world import movement
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,7 @@ def find_object_by_name(user_id: str, name: str) -> WorldObject | None:
 def move_object(user_id: str, object_id: str, location_id: str) -> WorldObject | None:
     try:
         world = ensure_world(user_id)
-        if world is None or location_id not in HOME_LOCATIONS:
+        if world is None or location_id not in WORLD_LOCATION_REGISTRY:
             return None
         obj = world_repository.get_object(world.world_id, object_id)
         if obj is None or obj.status is not ObjectStatus.ACTIVE:
@@ -434,7 +436,7 @@ def set_environment(user_id: str, updated_by: str = "manual", **fields) -> World
 
 def set_location(user_id: str, location_id: str) -> World | None:
     try:
-        if location_id not in HOME_LOCATIONS:
+        if location_id not in WORLD_LOCATION_REGISTRY:
             logger.warning("未知地点，拒绝迁移：%s", location_id)
             return None
         world = ensure_world(user_id)
@@ -518,7 +520,7 @@ def _character_action_title(
     if action_type == "CREATE":
         return f"做出{target_name}"
     if action_type == "MOVE":
-        to_name = HOME_LOCATIONS.get(location_to, {}).get("name") if location_to else None
+        to_name = WORLD_LOCATION_REGISTRY.get(location_to, {}).get("name") if location_to else None
         return f"{target_name}移到{to_name or location_to}"
     return f"{target_name} {action_type}"
 
@@ -636,6 +638,9 @@ def create_event(
     importance: str = "normal",
     due_at: datetime | None = None,
     source: str = "manual",
+    status: str = "scheduled",
+    payload: dict | None = None,
+    idempotency_key: str | None = None,
 ) -> WorldEvent | None:
     try:
         world = ensure_world(user_id)
@@ -655,10 +660,11 @@ def create_event(
             type=event_type,
             title=title or event_type,
             importance=EventImportance(importance),
-            status=EventStatus.SCHEDULED,
+            status=EventStatus(status),
             due_at=due_at,
-            payload={},
+            payload=payload or {},
             source=EventSource(source),
+            idempotency_key=idempotency_key,
             created_at=now,
             updated_at=now,
         )
@@ -790,8 +796,19 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
         for object_id in result.discards:
             if discard_object(user_id, object_id) is not None:
                 applied += 1
-        if result.location_move is not None and set_location(user_id, result.location_move) is not None:
-            applied += 1
+        if result.location_move is not None:
+            if settings.v23_world_simulation_enabled and settings.v23_scene_expansion_enabled:
+                move_result = movement.apply(
+                    user_id,
+                    result.location_move,
+                    source=movement.SOURCE_USER_NARRATIVE,
+                    reason="interpreter",
+                    now=now,
+                )
+                if move_result.applied:
+                    applied += 1
+            elif set_location(user_id, result.location_move) is not None:
+                applied += 1
         if result.environment_updates:
             if set_environment(user_id, updated_by="interpreter", **result.environment_updates) is not None:
                 applied += 1

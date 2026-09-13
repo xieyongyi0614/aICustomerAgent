@@ -7,6 +7,8 @@ from app.character.asuna.world import (
     HOME_LOCATIONS,
     LOCATION_ALIASES,
     OBJECT_STATE_MACHINES,
+    WORLD_LOCATION_REGISTRY,
+    WORLD_LOCATIONS,
     WORLD_WEATHER_VALUES,
     WEATHER_ALIASES,
 )
@@ -75,8 +77,13 @@ def test_asset_locations_hierarchy_and_aliases():
         assert definition["name"]
         assert isinstance(definition["available_actions"], list)
     assert HOME_LOCATIONS["home.kitchen.fridge"]["traits"][-1] == "food_related"
+    for location_id, definition in WORLD_LOCATIONS.items():
+        parent = definition["parent_id"]
+        assert parent is None or parent in WORLD_LOCATION_REGISTRY
+        assert definition["name"]
+        assert isinstance(definition["available_actions"], list)
     for alias, target in LOCATION_ALIASES.items():
-        assert target in HOME_LOCATIONS
+        assert target in WORLD_LOCATION_REGISTRY
 
 
 def test_asset_lexicons_consistent():
