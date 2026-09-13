@@ -999,9 +999,10 @@ async def run_world_maintenance_loop() -> None:
 
 
 def _run_simulation_substeps(user_id: str, now: datetime) -> None:
-    from app.services.world import day_cycle
+    from app.services.world import day_cycle, weather
 
     day_cycle.emit_time_markers(user_id, now)
+    weather.evolve_daily_weather(user_id)
 
 
 def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):

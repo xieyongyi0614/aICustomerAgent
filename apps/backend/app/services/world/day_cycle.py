@@ -21,6 +21,8 @@ class TimeMarkerDraft:
     key: str
     title: str
     importance: str
+    event_type: str = "time_marker"
+    source: str = "time"
     payload: dict = field(default_factory=dict)
 
 
@@ -74,6 +76,8 @@ def compute_due_markers(
     curr: TimeContext,
 ) -> list[TimeMarkerDraft]:
     """纯函数：对比相邻两次观测产出候选标记；冷启动只发 day_start。"""
+    from app.character.asuna.calendar import holiday_of, season_of
+
     drafts: list[TimeMarkerDraft] = []
     if prev is None:
         drafts.append(_day_start_draft(curr.now))
@@ -83,6 +87,31 @@ def compute_due_markers(
     if curr_day != prev_day:
         drafts.append(_day_close_draft(prev_day))
         drafts.append(_day_start_draft(curr.now))
+        if season_of(curr_day) != season_of(prev_day):
+            drafts.append(
+                TimeMarkerDraft(
+                    key=f"time:season:{curr_day.isoformat()}",
+                    title="季节更替",
+                    importance="low",
+                    payload={"date": curr_day.isoformat(), "season": season_of(curr_day)},
+                )
+            )
+        holiday = holiday_of(curr_day)
+        if holiday is not None:
+            drafts.append(
+                TimeMarkerDraft(
+                    key=f"calendar:{curr_day.isoformat()}",
+                    title=f"今天是{holiday['name']}",
+                    importance="normal",
+                    event_type="calendar_event",
+                    source="calendar",
+                    payload={
+                        "date": curr_day.isoformat(),
+                        "name": holiday["name"],
+                        "kind": holiday["kind"],
+                    },
+                )
+            )
         if curr.part_of_day != prev.part_of_day:
             drafts.append(
                 _part_transition_draft(curr_day, prev.part_of_day, curr.part_of_day)
@@ -116,10 +145,10 @@ def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
                 continue
             created = world_engine.create_event(
                 user_id,
-                event_type="time_marker",
+                event_type=draft.event_type,
                 title=draft.title,
                 importance=draft.importance,
-                source="time",
+                source=draft.source,
                 status="completed",
                 payload=draft.payload,
                 idempotency_key=draft.key,
