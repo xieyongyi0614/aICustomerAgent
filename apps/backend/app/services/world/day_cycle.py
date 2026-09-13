@@ -139,22 +139,23 @@ def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
         candidates = compute_due_markers(prev, curr)
         keys = [draft.key for draft in candidates]
         fired = world_simulation_repository.get_latest_idempotency_keys(world.world_id, keys)
-        emitted: list[str] = []
-        for draft in candidates:
-            if draft.key in fired:
-                continue
-            created = world_engine.create_event(
-                user_id,
-                event_type=draft.event_type,
-                title=draft.title,
-                importance=draft.importance,
-                source=draft.source,
-                status="completed",
-                payload=draft.payload,
-                idempotency_key=draft.key,
-            )
-            if created is not None:
-                emitted.append(draft.key)
+        pending = [draft for draft in candidates if draft.key not in fired]
+        if not pending:
+            _last_contexts[user_id] = curr
+            return []
+        drafts = [
+            {
+                "event_type": draft.event_type,
+                "title": draft.title,
+                "importance": draft.importance,
+                "source": draft.source,
+                "status": "completed",
+                "payload": draft.payload,
+                "idempotency_key": draft.key,
+            }
+            for draft in pending
+        ]
+        emitted = world_engine._emit_simulation_events(user_id, drafts)
         _last_contexts[user_id] = curr
         return emitted
     except Exception:

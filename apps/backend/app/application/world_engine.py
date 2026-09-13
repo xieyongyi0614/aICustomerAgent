@@ -1035,9 +1035,47 @@ async def run_world_maintenance_loop() -> None:
     )
 
 
-def _run_simulation_substeps(user_id: str, now: datetime) -> None:
-    from app.services.world import day_cycle, user_situation, weather
+_IMPORTANCE_ORDER = ("low", "normal", "high")
 
+
+def _emit_simulation_events(user_id: str, drafts: list[dict]) -> list[str]:
+    """模拟事件统一漏斗：单 tick 风暴上限，超出折叠为 world_digest。"""
+    settings = get_settings()
+    cap = settings.world_event_tick_cap
+    if cap > 0 and len(drafts) > cap:
+        ranked = sorted(
+            drafts,
+            key=lambda d: _IMPORTANCE_ORDER.index(d.get("importance", "low")),
+            reverse=True,
+        )
+        kept, dropped = ranked[: cap - 1], ranked[cap - 1 :]
+        digest = {
+            "event_type": "world_digest",
+            "title": f"世界变化摘要（{len(dropped)} 条）",
+            "importance": "low",
+            "source": "simulation",
+            "status": "completed",
+            "payload": {
+                "count": len(dropped),
+                "kinds": sorted({str(d.get("event_type", "")) for d in dropped}),
+            },
+            "idempotency_key": (
+                f"world_digest:{user_id}:{datetime.now().isoformat(timespec='seconds')}"
+            ),
+        }
+        drafts = kept + [digest]
+    emitted: list[str] = []
+    for draft in drafts:
+        event = create_event(user_id, **draft)
+        if event is not None:
+            emitted.append(draft["idempotency_key"])
+    return emitted
+
+
+def _run_simulation_substeps(user_id: str, now: datetime) -> None:
+    from app.services.world import catch_up, day_cycle, user_situation, weather
+
+    catch_up.run_catch_up(user_id, now)
     day_cycle.emit_time_markers(user_id, now)
     weather.evolve_daily_weather(user_id)
     user_situation.expire_and_notify(user_id, now)
