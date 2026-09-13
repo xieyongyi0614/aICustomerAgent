@@ -4,6 +4,13 @@
 002 填充启发式信号词表，005 填充恢复词表，004 填充里程碑目录，006 填充记忆模板。
 """
 
+from app.models.style_contract import (
+    ADDRESSING_EXPRESSIVENESS_LABELS,
+    ADDRESSING_INITIATIVE_LABELS,
+    ADDRESSING_TERM_LABELS,
+    ADDRESSING_TONE_LABELS,
+)
+
 RESPECT_LEVEL_TEXTS: dict[str, str] = {
     "low": "言行让你有些失望",
     "mid": "保持应有的尊重",
@@ -93,3 +100,74 @@ INTENT_UNLOCK_REQUIREMENTS: dict[str, str] = {
 }
 
 FOLLOWUP_INTENTIONS = frozenset({"check_in", "reminder", "followup"})
+
+
+ADDRESSING_TERM_TEXTS = ADDRESSING_TERM_LABELS
+ADDRESSING_TONE_TEXTS = ADDRESSING_TONE_LABELS
+ADDRESSING_INITIATIVE_TEXTS = ADDRESSING_INITIATIVE_LABELS
+ADDRESSING_EXPRESSIVENESS_TEXTS = ADDRESSING_EXPRESSIVENESS_LABELS
+
+ADDRESSING_TERM_LADDER: tuple[str, ...] = (
+    "respectful",
+    "name",
+    "affectionate",
+    "intimate",
+)
+ADDRESSING_TONE_LADDER: tuple[str, ...] = ("polite", "natural", "warm", "affectionate")
+ADDRESSING_INITIATIVE_LADDER: tuple[str, ...] = (
+    "passive",
+    "responsive",
+    "proactive",
+    "devoted",
+)
+ADDRESSING_EXPRESSIVENESS_LADDER: tuple[str, ...] = ("restrained", "natural", "open")
+
+TERM_BY_STAGE: dict[str, str] = {
+    "stranger": "respectful",
+    "friend": "name",
+    "close_friend": "affectionate",
+    "partner": "intimate",
+}
+
+STAGE_TONE: dict[str, str] = {
+    "stranger": "polite",
+    "friend": "natural",
+    "close_friend": "warm",
+    "partner": "affectionate",
+}
+
+STAGE_INITIATIVE: dict[str, str] = {
+    "stranger": "passive",
+    "friend": "responsive",
+    "close_friend": "proactive",
+    "partner": "devoted",
+}
+
+STAGE_EXPRESSIVENESS: dict[str, str] = {
+    "stranger": "restrained",
+    "friend": "natural",
+    "close_friend": "open",
+    "partner": "open",
+}
+
+ADDRESSING_INTIMACY_HIGH = 0.70
+ADDRESSING_COMFORT_HIGH = 0.70
+ADDRESSING_FAMILIARITY_HIGH = 0.75
+ADDRESSING_FAMILIARITY_LOW = 0.30
+ADDRESSING_COMFORT_LOW = 0.40
+
+CONFLICT_ADDRESSING_OVERRIDE: dict[str, tuple[int, int]] = {
+    "strain": (1, 1),
+    "conflict": (1, 2),
+    "cold": (2, 2),
+    "recovery": (1, 1),
+}
+
+RELATIONSHIP_EMOTION_BOOST_BY_STAGE: dict[str, float] = {
+    "stranger": 0.0,
+    "friend": 0.0,
+    "close_friend": 0.10,
+    "partner": 0.20,
+}
+
+RELATIONSHIP_EMOTION_BOOST_MAX = 0.5
