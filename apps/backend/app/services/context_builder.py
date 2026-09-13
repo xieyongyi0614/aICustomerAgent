@@ -291,11 +291,13 @@ def _build_sync(
             insight_selected=len(insights),
         )
     character_state, relationship_state = _load_states_with_fallback(user_id)
-    goals = [
-        goal
-        for goal in goal_service.load_active(user_id)
-        if goal.layer is None
-    ]
+    all_active_goals = goal_service.load_active(user_id)
+    goals = [goal for goal in all_active_goals if goal.layer is None]
+    layered_goals = (
+        [goal for goal in all_active_goals if goal.layer is not None]
+        if get_settings().v21_goal_stack_enabled
+        else []
+    )
     development_overlay = None
     if get_settings().v2_development_enabled:
         development_overlay = development_aggregate.read_overlay(user_id)
@@ -317,6 +319,7 @@ def _build_sync(
         character_state=character_state,
         relationship_state=relationship_state,
         goals=goals,
+        layered_goals=layered_goals,
         insights=insights,
         development_overlay=development_overlay,
         shared_experiences=shared_experiences,

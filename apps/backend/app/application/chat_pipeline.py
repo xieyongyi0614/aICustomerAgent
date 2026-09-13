@@ -159,8 +159,11 @@ def _select_goal(
             now.hour >= settings.goal_late_night_start
             or now.hour < settings.goal_late_night_end
         )
+        goals_for_select = list(state.goals)
+        if get_settings().v21_goal_stack_enabled and state.layered_goals:
+            goals_for_select.extend(state.layered_goals)
         return goal_service.select(
-            state.goals,
+            goals_for_select,
             tension=state.relationship_state.tension,
             user_emotion=state_service.load_last_user_emotion(user_id),
             character_mood=state.character_state.mood,

@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.application.agent_runtime import profiles, trigger_router
 from app.application.agent_state_assembler import run_state_snapshot_stage
+from app.services import goal_stack
 from app.application.agent_runtime.llm_gateway import acquire
 from app.application.agent_runtime.models import (
     RUN_KIND_AUTONOMOUS_TICK,
@@ -185,6 +186,9 @@ async def run_autonomous_cycle(
                 run, steps, "state_snapshot", run_state_snapshot_stage, user_id, run
             )
             run_stage(run, steps, "goal_check", life_loop_mod._step_goal_check, user_id, now)
+            run_stage(
+                run, steps, "goal_stack", goal_stack.run_goal_stack_stage, user_id, run, now
+            )
             run_stage(run, steps, "goal_supply", life_loop_mod._step_goal_supply, user_id, now)
             await run_stage_async(
                 run, steps, "goal_advance", lambda: life_loop_mod._step_goal_advance(user_id, now)

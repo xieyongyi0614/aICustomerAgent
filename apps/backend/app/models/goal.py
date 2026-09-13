@@ -20,7 +20,7 @@ GoalSource = Literal["definition", "policy", "scene"]
 
 GoalHorizon = Literal["persistent", "current"]
 
-GoalLayer = Literal["short_term", "long_term"]
+GoalLayer = Literal["short_term", "medium", "long_term"]
 
 GoalDomain = Literal["personal", "relationship", "world"]
 
@@ -28,7 +28,28 @@ GoalPlanStatus = Literal["draft", "validated", "active", "rejected", "superseded
 
 SubGoalStatus = Literal["pending", "in_progress", "done", "failed"]
 
-LAYER_VALUES: tuple[str, ...] = ("short_term", "long_term")
+LAYER_VALUES: tuple[str, ...] = ("short_term", "medium", "long_term")
+GOAL_ORIGINS: tuple[str, ...] = (
+    "insight",
+    "commitment",
+    "user",
+    "world",
+    "evolution",
+    "development_modulation",
+    "relationship_pattern",
+    "salient_memory",
+    "world_event",
+)
+LAYER_DEPTH: dict[str, int] = {"long_term": 3, "medium": 2, "short_term": 1}
+
+
+def validate_parent_chain(parent_layer: str | None, child_layer: str | None) -> bool:
+    """父子层深校验：L2 父必须 L3，L1 父必须 L2/L3；v1 行（均 NULL）合法。"""
+    if parent_layer is None and child_layer is None:
+        return True
+    if parent_layer is None or child_layer is None:
+        return False
+    return LAYER_DEPTH.get(child_layer, 0) < LAYER_DEPTH.get(parent_layer, 99)
 DOMAIN_VALUES: tuple[str, ...] = ("personal", "relationship", "world")
 PLAN_STATUS_VALUES: tuple[str, ...] = (
     "draft",
@@ -97,6 +118,7 @@ class GoalRecord(BaseModel):
     parent_goal_id: str | None = None
     layer: GoalLayer | None = None
     domain: GoalDomain | None = None
+    origin: str | None = None
     failure_reason: str | None = None
     arbitration_state: dict | None = None
 

@@ -358,6 +358,7 @@ class GoalRow(Base):
     parent_goal_id: Mapped[str | None] = mapped_column(String, nullable=True)
     layer: Mapped[str | None] = mapped_column(String, nullable=True)
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
+    origin: Mapped[str | None] = mapped_column(String, nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     arbitration_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -380,7 +381,7 @@ class GoalRow(Base):
             name="ck_character_goals_source",
         ),
         CheckConstraint(
-            "layer IN ('short_term', 'long_term') OR layer IS NULL",
+            "layer IN ('short_term', 'medium', 'long_term') OR layer IS NULL",
             name="ck_character_goals_layer",
         ),
         CheckConstraint(

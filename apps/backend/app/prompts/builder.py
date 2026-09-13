@@ -160,6 +160,25 @@ class PromptBuilder:
         return chr(10).join(lines) + chr(10) + "（这是你此刻真实的兴趣与关注，自然融入表达即可，不要罗列）"
 
     @staticmethod
+    def build_goal_stack_section(state: ConversationState) -> str | None:
+        """V2.1.0 AGENT-003：层叠目标栈只读段（L3/L2/L1 各一行，空层跳过）。"""
+        layered = getattr(state, "layered_goals", None) or []
+        if not layered:
+            return None
+        labels = {"long_term": "长期", "medium": "中期", "short_term": "当前"}
+        by_layer = {}
+        for goal in layered:
+            by_layer.setdefault(goal.layer, goal)
+        lines = [
+            f"{labels[layer]}：{goal.description}"
+            for layer in ("long_term", "medium", "short_term")
+            if (goal := by_layer.get(layer)) is not None
+        ]
+        if not lines:
+            return None
+        return chr(10).join(["【目标方向】", *lines]) + chr(10) + "（这些是你自己想做的事，与用户话题自然结合即可，不要刻意汇报）"
+
+    @staticmethod
     def build_relationship_section(
         state: ConversationState,
         *,
@@ -419,6 +438,10 @@ class PromptBuilder:
         agent_state_section = PromptBuilder.build_agent_state_section()
         if agent_state_section:
             messages.append(("system", _literal(agent_state_section)))
+
+        goal_stack_section = PromptBuilder.build_goal_stack_section(state)
+        if goal_stack_section:
+            messages.append(("system", _literal(goal_stack_section)))
 
         pattern_section = PromptBuilder.build_relationship_pattern_section(state)
         if pattern_section:

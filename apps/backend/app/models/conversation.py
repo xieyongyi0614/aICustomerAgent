@@ -26,6 +26,7 @@ class ConversationState(BaseModel):
     character_state: CharacterState = CharacterState()
     relationship_state: RelationshipState = RelationshipState()
     goals: list[GoalRecord] = []
+    layered_goals: list[GoalRecord] = []
     insights: list[InsightSummary] = []
     development_overlay: DevelopmentOverlay | None = None
     shared_experiences: list[SharedExperience] = []

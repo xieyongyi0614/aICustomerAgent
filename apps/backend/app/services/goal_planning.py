@@ -144,6 +144,11 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
         logger.exception("显著度记忆快查失败，world 记忆来源跳过")
         salient = []
     for row in salient:
+        if row.type == "commitment":
+            title = row.content.strip()[:_WORLD_TITLE_MAX_CHARS]
+            if title:
+                _append("medium", "personal", f"完成承诺：{title}", "commitment")
+            continue
         if row.type not in ("experience", "milestone_event"):
             continue
         title = row.content.strip()[:_WORLD_TITLE_MAX_CHARS]
@@ -180,6 +185,7 @@ def materialize(
             candidate["domain"],
             candidate["description"],
             candidate["priority"],
+            origin=candidate.get("origin"),
         )
         created.append(record.id)
         if candidate["layer"] == "long_term":

@@ -213,3 +213,14 @@ Step 8  台账：Goal Evaluation 阶段 steps 记录 Stack 摘要（各层主目
 
 - `v21_goal_stack_enabled=False`：既有 goal 全套件（含 V2.0.0 P6 AUT-001~005 测试）零跳过全绿。
 - v1 行目标（layer NULL）全路径行为对照一致。
+
+---
+
+## 12. 实施记录（Coding 回填）
+
+1. **layer 约束扩展**：goals 表存在 `ck_character_goals_layer` CheckConstraint（设计时未登记），迁移 0040 同时重建该约束纳入 `medium`；`origin` 列随 0040 落库。
+2. **超时退役裁决**：层级行六状态机禁止 active→expired（Preserve 优先），退役出口改用 `abandoned` + `failure_reason="timeout"`；旋钮 `v21_goal_medium_timeout_days=7` / `v21_goal_short_timeout_hours=24`。
+3. **origin 口径**：落库沿用供给链既有标签（development_modulation / relationship_pattern:* / world_event / salient_memory）并新增 `commitment`（commitment 类型记忆 → L2 候选）；`user` 来源依赖用户显式请求识别，归并到 AGENT-004 P0 识别交付；`evolution` 写入方属 AGENT-005（本任务仅保留合法标签）。
+4. **Run 接线**：autonomous_tick Profile 新增 `goal_stack` 阶段（goal_check 之后）；栈摘要（各层主目标/驱动分/抑制原因）写入 RunContext.data["goal_stack"] 供 AGENT-004 决策插槽消费。
+5. **上下文通道**：ConversationState 新增 `layered_goals` 字段（追加式）；prompt 在 agent_state 段之后追加 `【目标方向】` 栈式段（L3/L2/L1 各一行，空层跳过）；`_select_goal` 在 Flag 内把层叠目标并入选择输入。
+6. **对齐度契约冻结**：`goal_alignment.score(candidate, stack) -> [0,1]`；candidate 形状 `{"type": str, "capability": str|None}`；空栈/空候选恒 0；L1 权重 1.0 / L2 0.6 / L3 0.3 × 匹配度（type 全等 1.0 / capability 域提示 0.6 / scene 兜底 0.2）。

@@ -12,6 +12,7 @@ class _FakeSettings:
         self.action_enabled = flags.get("action_enabled", False)
         self.v21_agent_runtime_enabled = flags.get("v21_agent_runtime_enabled", False)
         self.v21_unified_run_enabled = flags.get("v21_unified_run_enabled", False)
+        self.v21_goal_stack_enabled = flags.get("v21_goal_stack_enabled", False)
 
 
 def test_all_off_no_violations():

@@ -35,6 +35,7 @@ def _to_record(row: GoalRow) -> GoalRecord:
         parent_goal_id=row.parent_goal_id,
         layer=row.layer,
         domain=row.domain,
+        origin=row.origin,
         failure_reason=row.failure_reason,
         arbitration_state=row.arbitration_state,
     )
@@ -293,6 +294,7 @@ def create_hierarchical_goal(
     parent_id: str | None = None,
     horizon: str | None = None,
     source: str = "policy",
+    origin: str | None = None,
 ) -> GoalRecord:
     if layer not in LAYER_VALUES:
         raise ValueError(f"非法 layer：{layer!r}")
@@ -328,6 +330,7 @@ def create_hierarchical_goal(
             parent_goal_id=parent_id,
             layer=layer,
             domain=domain,
+            origin=origin,
             failure_reason=None,
         )
         session.add(row)
