@@ -121,7 +121,7 @@ def _activity_busy(activity: str | None) -> bool:
 
 
 def _apply_world_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> AutonomyVerdict:
-    """W1/W2/W3（autonomy-integration.md §3）：world 只追加理由，绝不拆闸门。"""
+    """W1/W2/W3（autonomy-integration.md §3）+ W4/W5（V2.3.0 影响裁决）：world 只追加理由，绝不拆闸门。"""
     facts = snapshot.world_facts or {}
     if not facts:
         return verdict
@@ -135,6 +135,14 @@ def _apply_world_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot)
             and 0 <= (event.get("due_in_hours") or 24) <= 24
         ):
             notes.append(f"记得关心{event.get('title')}")
+    for impact in facts.get("impacts") or []:
+        if impact.get("urgency") == "high" or (impact.get("care_relevance") or 0) >= 0.8:
+            notes.append(f"世界事件值得关心：{impact.get('event_type')}")
+        elif (
+            facts.get("part_of_day") == "late_night"
+            and (impact.get("topic_value") or 0) > 0.5
+        ):
+            notes.append("深夜不宜为琐事打扰")
     if not notes:
         return verdict
     reason = f"{verdict.reason}；{'；'.join(notes)}"[:60]

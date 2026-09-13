@@ -134,6 +134,14 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
         if title:
             _append("short_term", "world", f"跟进{title}", "world_event")
 
+    for impact in (world_facts or {}).get("impacts") or []:
+        hint = impact.get("goal_opportunity") or {}
+        if not hint.get("type"):
+            continue
+        if hint.get("domain") != "scene" and (impact.get("care_relevance") or 0) < 0.5:
+            continue
+        _append("short_term", "world", str(hint.get("hint", ""))[:50], "world_event")
+
     try:
         salient = memory_repository.list_top_salience(
             user_id,

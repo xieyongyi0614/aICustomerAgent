@@ -965,6 +965,55 @@ def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
         return context
 
 
+def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
+    """V2.3.0 自治素材增强（v23 门控）：影响裁决包 + 当前日程块 + 活跃处境。"""
+    try:
+        settings = get_settings()
+        if not settings.v23_world_simulation_enabled:
+            return facts
+        from app.models.world_simulation import DailyPlanStatus
+        from app.services.world import daily_plan, event_impact, user_situation
+
+        context: dict = {"part_of_day": facts.get("part_of_day")}
+        if settings.v23_daily_life_enabled:
+            minutes = now.hour * 60 + now.minute
+            block = daily_plan.get_current_block(user_id, now.date(), minutes)
+            context["current_block"] = (
+                {
+                    "activity": block.activity,
+                    "part_of_day": block.part_of_day,
+                    "location_id": block.location_id,
+                }
+                if block is not None
+                else None
+            )
+        if settings.v23_event_detection_enabled:
+            situations = user_situation.active_situations(user_id)
+            context["active_situations"] = [
+                {"dimension": s.dimension.value, "summary": s.summary, "intensity": s.intensity}
+                for s in situations[:3]
+            ]
+            active_events = [
+                event
+                for event in world_repository.list_events(
+                    world_repository.world_id_for(user_id),
+                    statuses=["scheduled", "active"],
+                    limit=10,
+                )
+            ]
+            impacts = event_impact.evaluate_batch(active_events, context)[:3]
+            if impacts:
+                facts["impacts"] = [impact.to_dict() for impact in impacts]
+            if context.get("current_block"):
+                facts["current_block"] = context["current_block"]
+            if context.get("active_situations"):
+                facts["active_situations"] = context["active_situations"]
+        return facts
+    except Exception:
+        logger.exception("世界影响素材装配失败，返回基础事实包")
+        return facts
+
+
 def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
     """自治只读事实包（autonomy-integration.md §1）：装配失败 → 空包。"""
     if not get_settings().world_enabled:
@@ -988,7 +1037,7 @@ def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
                 or event.importance is EventImportance.HIGH
             ],
         }
-
+        facts = _attach_world_impacts(user_id, facts, now)
         bounded, _ = bound_extra(facts, get_settings().observability_step_extra_max_chars)
         return bounded
     except Exception:

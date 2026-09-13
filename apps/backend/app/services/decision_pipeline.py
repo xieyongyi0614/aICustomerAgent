@@ -113,8 +113,9 @@ def collect_candidates(
     chat_response: bool = False,
     chat_response_intention: str | None = None,
     chat_response_goal_id: str | None = None,
+    world_impacts: list[dict] | None = None,
 ) -> list[Candidate]:
-    """六源候选汇集（纯规则）；silence 恒在。"""
+    """候选汇集（纯规则）；silence 恒在；V2.3.0 支持世界影响候选。"""
     candidates: list[Candidate] = []
     if chat_response:
         candidates.append(
@@ -134,6 +135,18 @@ def collect_candidates(
         candidates.append(
             Candidate("capability", None, None, {"capability": name, "type": _CAPABILITY_TYPE_HINTS.get(name, "")})
         )
+    for impact in world_impacts or []:
+        hint = impact.get("goal_opportunity") or {}
+        if not hint.get("type"):
+            continue
+        candidates.append(
+            Candidate(
+                "world_affordance",
+                None,
+                None,
+                {"type": hint.get("type", ""), "impact": impact},
+            )
+        )
     candidates.append(Candidate("silence", None, None))
     return candidates
 
@@ -144,11 +157,13 @@ def assign_priorities(candidates: list[Candidate]) -> None:
 
 
 def score_candidates(
-    candidates: list[Candidate], stack=None, snapshot=None, run=None
+    candidates: list[Candidate], stack=None, snapshot=None, run=None,
+    world_schedule: dict | None = None,
 ) -> None:
     """六维规则评分（§5.2③）：每维取自 Snapshot / Goal Stack / 候选成本。
 
     无对应数据源时该维取中性 0.5（不臆造信号）；silence 恒为「与一切状态相容」。
+    V2.3.0：world_schedule 提供日程信号，None 时路径与上一版本逐字节一致。
     """
     settings = get_settings()
     for candidate in candidates:
@@ -160,7 +175,7 @@ def score_candidates(
             "goal_alignment": alignment,
             "state_fit": _state_fit(candidate, snapshot),
             "relationship_fit": _relationship_fit(candidate, snapshot),
-            "timing": _timing(candidate, snapshot),
+            "timing": _timing(candidate, snapshot, world_schedule),
             "interest": _interest(candidate, snapshot),
             "cost": _cost(candidate),
         }
@@ -201,17 +216,34 @@ def _relationship_fit(candidate: Candidate, snapshot) -> float:
     return round(min(max(1.0 - tension * 0.5, 0.0), 1.0), 4)
 
 
-def _timing(candidate: Candidate, snapshot) -> float:
-    """冷却/在途间隔：已有进行中行动时不再叠加新行动候选。"""
+_BUSY_ACTIVITIES = ("工作", "学习", "上课", "工作学习")
+
+
+def _timing(candidate: Candidate, snapshot, world_schedule: dict | None = None) -> float:
+    """冷却/在途间隔：已有进行中行动时不再叠加新行动候选。
+
+    V2.3.0：工作/学习块内低紧迫候选降分；高关怀候选豁免（打断合理性）。"""
     if snapshot is None:
-        return 0.5
-    focus = getattr(snapshot, "current_focus", None)
-    in_progress = bool(getattr(focus, "action", "")) if focus is not None else False
-    if not in_progress:
-        return 0.7
-    if candidate.source in _ACTION_SOURCES:
-        return 0.2
-    return 0.9
+        base = 0.5
+    else:
+        focus = getattr(snapshot, "current_focus", None)
+        in_progress = bool(getattr(focus, "action", "")) if focus is not None else False
+        if not in_progress:
+            base = 0.7
+        elif candidate.source in _ACTION_SOURCES:
+            base = 0.2
+        else:
+            base = 0.9
+    if world_schedule is None:
+        return base
+    block = world_schedule.get("current_block") or {}
+    activity = str(block.get("activity") or "")
+    if activity and any(busy in activity for busy in _BUSY_ACTIVITIES):
+        impact = candidate.payload.get("impact") or {}
+        urgent = impact.get("urgency") in ("high",) or (impact.get("care_relevance") or 0) >= 0.8
+        if not urgent:
+            base = min(base, 0.35)
+    return base
 
 
 def _interest(candidate: Candidate, snapshot) -> float:
@@ -373,8 +405,11 @@ def run_pipeline(
     chat_response_goal_id: str | None = None,
     run=None,
     now=None,
+    world_impacts: list[dict] | None = None,
+    world_schedule: dict | None = None,
 ) -> DecisionResult:
-    """五段管线唯一入口（前台 chat_response 与后台自主共用同一代码路径）。"""
+    """五段管线唯一入口（前台 chat_response 与后台自主共用同一代码路径）。
+    V2.3.0：world_impacts / world_schedule 为可选输入，None 时行为不变。"""
     candidates = collect_candidates(
         stack=stack,
         trigger_intention=trigger_intention,
@@ -383,9 +418,10 @@ def run_pipeline(
         chat_response=chat_response,
         chat_response_intention=chat_response_intention,
         chat_response_goal_id=chat_response_goal_id,
+        world_impacts=world_impacts,
     )
     assign_priorities(candidates)
-    score_candidates(candidates, stack=stack, snapshot=snapshot, run=run)
+    score_candidates(candidates, stack=stack, snapshot=snapshot, run=run, world_schedule=world_schedule)
     run_risk_gates(candidates, run=run, now=now, stack=stack, snapshot=snapshot)
     winner = select(candidates)
     intention = _intention_for(winner, stack)

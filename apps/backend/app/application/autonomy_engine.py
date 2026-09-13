@@ -205,6 +205,16 @@ def _pipeline_intention(verdict, user_id: str, now: datetime) -> tuple[str | Non
             if settings.v21_goal_stack_enabled
             else None
         )
+        world_impacts = None
+        world_schedule = None
+        if settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled:
+            facts = world_engine.collect_facts(user_id)
+            world_impacts = facts.get("impacts")
+            if settings.v23_daily_life_enabled:
+                world_schedule = {
+                    "current_block": facts.get("current_block"),
+                    "part_of_day": facts.get("part_of_day"),
+                }
         result = decision_pipeline.run_pipeline(
             stack=stack,
             snapshot=agent_state_context.get_snapshot(),
@@ -212,6 +222,8 @@ def _pipeline_intention(verdict, user_id: str, now: datetime) -> tuple[str | Non
             trigger_goal_id=verdict.goal_id,
             run=None,
             now=now,
+            world_impacts=world_impacts,
+            world_schedule=world_schedule,
         )
         return result.intention, result.audit
     except Exception:

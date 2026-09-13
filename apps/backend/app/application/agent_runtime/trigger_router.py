@@ -24,8 +24,16 @@ def classify_background_trigger(user_id: str, now) -> tuple[str, str]:
 
 
 def escalation_whitelist() -> frozenset[str]:
-    raw = get_settings().v21_event_escalation_types
-    return frozenset(t.strip() for t in raw.split(",") if t.strip())
+    settings = get_settings()
+    raw = settings.v21_event_escalation_types
+    types = {t.strip() for t in raw.split(",") if t.strip()}
+    if settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled:
+        types |= {
+            t.strip()
+            for t in (settings.v23_event_escalation_types or "").split(",")
+            if t.strip()
+        }
+    return frozenset(types)
 
 
 def evaluate_event_escalation(event_type: str) -> bool:
