@@ -175,6 +175,9 @@
 | C12 [P2] | 闸门副作用 / 前台候选走后台档 | `acquire` 增 `account=False`（只问不记账）；闸门能力按候选预算档选择 | `llm_gateway.py`、`decision_pipeline.py` |
 | C16 [P2] | 0040/0042 docstring 与代码不符 | 两处 docstring 更正 | `migrations/versions/` |
 | — | 文档链尾漂移 | 根/后端 `AGENTS.md` 迁移链尾 0035 → 0043；根 `AGENTS.md` 登记 v2.1.0 文档与 V7.8-014 关闭 | `AGENTS.md` ×2 |
+| A8 [P2] | 后台 Snapshot 同步组装 | `state_snapshot` 阶段经 `asyncio.to_thread` 异步执行（并入 `_ASYNC_STAGES`）；**处置过程发现修复轮自身引入回归**——runner 返回 to_thread 协程但 `asyncio` 未导入（NameError 被 run_stage 吞掉，后台快照静默失败且协程未被 await），已修复并由 test_agent002 集成用例覆盖 | `controller.py` |
+| C13 [P2] | 趋势「连续 N 窗口」未实现 | 修复轮已实现 streak 计数（`v21_metric_breach_streak` 参与判定），§6.2 原登记有误，移出遗留 | `agent_evaluation.py` |
+| §4.2 | 三处零信号断言 | seed 恒真断言改为「首播 True / 重播 False + 行数」；`run.data` 恒真断言改为 goal_stack 阶段 detail 字段断言；回滚测试补「Flag 全关后不新增 foreground_chat 台账行」核心断言 | `test_agent005/003/007` |
 | — | 测试盲区 | 新增 `tests/v21/test_agent008_review_fixes.py`（25 例）：依赖方向 AST 守门、慢时钟接线与幂等、Ledger 多用户隔离、Rebalance 建议/应用分离与供给阶段消费、漂移限速、低能量抑制、六维与闸门、前台共用管线、父层守卫、contextvar 生命周期、**0038~0043 迁移链往返** | `tests/v21/` |
 
 ### 6.2 遗留（未修复，需产品/架构裁决）
@@ -182,9 +185,7 @@
 | # | 问题 | 说明 |
 |---|---|---|
 | A7 [P2] | Gateway 未完全收口 | `scene_update`/`state_update`/`extractor`/`summary`/`judge`/`reflection` 六个调用点仍未接 Gateway。AGENT-001 验收 3 已按「注册表全覆盖 + 已接线点清单」重新表述。 |
-| A8 [P2] | 后台 Snapshot 同步组装 | 仍在 async 上下文同步执行（前台走 `to_thread`）。性能口径待实测裁决。 |
 | C8 [P2] | evolution 绕过仓储层 | 仍直接用 `SessionLocal` 读写（沿用实施记录 §12.5 的测试基建约束）。 |
-| C13 [P2] | 趋势「连续 N 窗口」未实现 | 仅比较前 1 个窗口，`v21_metric_trend_windows` 未参与判定。 |
 | C14 [P2] | run 级 LLM 记账为时间窗口径 | 并发 Run 互相计入；`request_id = run_id` 归因约定未落实。 |
 | C15 [P2] | 一次事件两行台账且无父子关联 | `event_driven` + `autonomous_tick` 无 parent 关联字段。 |
 | C17 [P2] | `memory_accuracy` 恒 None | 六指标实为 5 项，待事实回查材料接入。 |
@@ -193,9 +194,9 @@
 
 ### 6.3 验证
 
-- `pytest tests/v21` → **121 passed**（原 95 + 新增 25 + 拆分 1）
-- `pytest tests/v21 tests/v2` → **779 passed / 8 skipped**
-- `pytest tests --ignore=tests/e2e` → **2830 passed / 18 skipped / 0 failed**（该轮存量 flaky 用例恰好通过；多次运行中它间歇失败，非本次改动引入）
+- `pytest tests/v21` → **121 passed**（原 95 + 新增 25 + 拆分 1；修复轮交付时实际为 120 passed + 1 failed——A8 修复引入的 `asyncio` NameError 回归未被发现，复检时修复）
+- `pytest tests/v21 tests/v2` → 复检通过
+- `pytest` 全量 → **2957 passed / 18 skipped / 4 failed**（失败均为 `SLOW_TEST_FILES` 已登记的并行抖动集，串行复检通过，与本轮改动无关）
 
 ### 6.4 结论更新
 
