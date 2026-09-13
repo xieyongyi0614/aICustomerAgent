@@ -612,6 +612,15 @@ async def _run_maintenance(now: datetime) -> int:
         entry = _safe_sync_call("world_maintenance", world_engine.run_maintenance)
         _record_maintenance_run("world_maintenance", [entry], now)
         executed += 1
+    if (
+        settings.v23_world_simulation_enabled
+        and settings.v23_time_advance_enabled
+        and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
+    ):
+        _mark_maintenance("world_simulation")
+        entry = _safe_sync_call("world_simulation", world_engine.run_simulation_maintenance)
+        _record_maintenance_run("world_simulation", [entry], now)
+        executed += 1
     if settings.action_enabled and _maintenance_due(
         "action_retry", settings.action_maintenance_interval_seconds
     ):
@@ -676,6 +685,12 @@ def _maintenance_pending(settings) -> bool:
     """是否有维护步骤到期（Idle 判定项；不产生标记副作用）。"""
     if settings.world_enabled and _maintenance_due(
         "world_maintenance", settings.world_maintenance_interval_seconds
+    ):
+        return True
+    if (
+        settings.v23_world_simulation_enabled
+        and settings.v23_time_advance_enabled
+        and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
     ):
         return True
     if settings.action_enabled and _maintenance_due(

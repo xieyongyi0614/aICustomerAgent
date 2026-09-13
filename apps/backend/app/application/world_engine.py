@@ -48,12 +48,20 @@ from app.services.world.context_selector import (
 from app.services.world.interpreter import interpret
 from app.services.world.memory_bridge import materialize_event_memory
 from app.services.world import movement
+from app.services.world.time_advancer import advance_world_time
 
 logger = logging.getLogger(__name__)
 
 _default_provider = TimeProvider()
 
 CONSUME_ACTIONS = {"eat"}
+
+_SIMULATION_SUBSTEPS: tuple = ()
+
+
+def register_simulation_substep(func) -> None:
+    global _SIMULATION_SUBSTEPS
+    _SIMULATION_SUBSTEPS = (*_SIMULATION_SUBSTEPS, func)
 
 
 def find_object_by_name(user_id: str, name: str) -> WorldObject | None:
@@ -995,6 +1003,39 @@ async def run_world_maintenance_loop() -> None:
         run_maintenance,
         get_settings().world_maintenance_interval_seconds,
     )
+
+
+def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):
+    """V2.3.0 world_simulation 维护步：时间推进 + 注册的模拟子步骤。
+
+    全程 0 LLM；异常按世界旁路纪律降级，不中断其它维护步。
+    """
+    settings = get_settings()
+    if (
+        not settings.world_enabled
+        or not settings.v23_world_simulation_enabled
+        or not settings.v23_time_advance_enabled
+    ):
+        return None
+    worlds = (
+        [ensure_world(user_id)]
+        if user_id is not None
+        else world_repository.list_all_worlds()
+    )
+    results = []
+    for world in worlds:
+        if world is None:
+            continue
+        step_now = now or datetime.now()
+        result = advance_world_time(world.user_id, step_now)
+        if result is not None:
+            results.append(result)
+        for substep in _SIMULATION_SUBSTEPS:
+            try:
+                substep(world.user_id, now=step_now)
+            except Exception:
+                logger.exception("模拟子步骤失败：%s", getattr(substep, "__name__", substep))
+    return results
 
 
 def restore_snapshot(user_id: str, snapshot_id: str) -> World | None:
