@@ -5,6 +5,7 @@ import { StatePanel } from "@/components/debug/state-panel"
 import { MemoryPanel } from "@/components/debug/memory-panel"
 import { TracePanel } from "@/components/debug/trace-panel"
 import { RawPanel } from "@/components/debug/raw-panel"
+import { WorldSimPanel } from "@/features/world-sim/WorldSimPanel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUiStore } from "@/stores/ui-store"
 import type { DebugTabValue } from "@/stores/ui-store"
@@ -14,6 +15,7 @@ const DEBUG_TABS = [
   { value: "scene", label: "Scene" },
   { value: "state", label: "State" },
   { value: "memory", label: "Memory" },
+  { value: "world", label: "World" },
   { value: "trace", label: "Trace" },
   { value: "raw", label: "Raw" },
 ] as const satisfies ReadonlyArray<{ value: DebugTabValue; label: string }>
@@ -48,6 +50,9 @@ function DebugPane() {
       </TabsContent>
       <TabsContent value="memory" className="min-h-0 flex-1 overflow-y-auto">
         <MemoryPanel userId={activeUserId} />
+      </TabsContent>
+      <TabsContent value="world" className="min-h-0 flex-1 overflow-y-auto">
+        <WorldSimPanel userId={activeUserId} />
       </TabsContent>
       <TabsContent value="trace" className="min-h-0 flex-1 overflow-y-auto">
         <TracePanel turnId={selectedTurnId} />

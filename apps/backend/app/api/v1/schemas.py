@@ -151,3 +151,75 @@ class ProactiveActionOut(BaseModel):
 
 class ProactivePendingOut(BaseModel):
     actions: list[ProactiveActionOut] = []
+
+
+class WorldBriefPartsOut(BaseModel):
+    text: str = ""
+    time_line: str | None = None
+    place_line: str | None = None
+    situations_line: str | None = None
+    events_line: str | None = None
+
+
+class WorldBriefOut(BaseModel):
+    text: str = ""
+    parts: WorldBriefPartsOut | None = None
+
+
+class WorldSimPlanBlockOut(BaseModel):
+    seq: int
+    part_of_day: str
+    start_minutes: int
+    end_minutes: int
+    activity: str
+    location_id: str
+    variability_source: str | None = None
+    status: str
+    note: str | None = None
+
+
+class WorldSimSituationOut(BaseModel):
+    dimension: str
+    summary: str
+    intensity: int
+    status: str
+    source: str
+    detected_at: datetime | None = None
+    valid_until: datetime | None = None
+    evidence: dict = {}
+
+
+class WorldSimEventOut(BaseModel):
+    id: str
+    type: str
+    title: str
+    importance: str
+    status: str
+    idempotency_key: str | None = None
+    created_at: datetime | None = None
+
+
+class WorldSimulationOut(BaseModel):
+    enabled: bool
+    time_context: dict | None = None
+    brief: WorldBriefOut | None = None
+    current_block: WorldSimPlanBlockOut | None = None
+    active_situations: list[WorldSimSituationOut] = []
+    recent_events: list[WorldSimEventOut] = []
+    flags: dict = {}
+
+
+class WorldPlanOut(BaseModel):
+    enabled: bool
+    date: str | None = None
+    blocks: list[WorldSimPlanBlockOut] = []
+
+
+class WorldSituationsOut(BaseModel):
+    enabled: bool
+    situations: list[WorldSimSituationOut] = []
+
+
+class WorldSimTickOut(BaseModel):
+    enabled: bool
+    result: dict | None = None

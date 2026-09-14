@@ -1174,6 +1174,191 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
     return results
 
 
+_V23_FLAG_NAMES = (
+    "v23_world_simulation_enabled",
+    "v23_time_advance_enabled",
+    "v23_daily_life_enabled",
+    "v23_event_detection_enabled",
+    "v23_scene_expansion_enabled",
+    "v23_habit_time_enabled",
+    "v23_world_llm_assist_enabled",
+    "v23_debug_tick_enabled",
+)
+
+_SIMULATION_EVENT_SOURCES = ("simulation",)
+_SIMULATION_EVENT_TYPES = (
+    "world_digest",
+    "time_marker",
+    "weather_change",
+    "calendar_event",
+    "life_event",
+    "world_event",
+)
+
+
+def v23_flag_snapshot() -> dict:
+    """调试面：7+1 个 v23 开关当前取值（只读）。"""
+    settings = get_settings()
+    return {name: bool(getattr(settings, name, False)) for name in _V23_FLAG_NAMES}
+
+
+def build_debug_simulation(user_id: str) -> dict | None:
+    """WS-018：模拟总览只读装配（复用 WS-012 brief 装配路径）。
+
+    世界不存在 → None（端点转 404）；内部局部缺失降级为字段 null，不整体失败。
+    """
+    world = get_world(user_id)
+    if world is None:
+        return None
+    settings = get_settings()
+    time_ctx = _default_provider.context(world)
+    block = None
+    situations: list = []
+    try:
+        if settings.v23_daily_life_enabled:
+            from app.models.world_simulation import DailyPlanStatus
+            from app.services.world import daily_plan as daily_plan_service
+
+            plans = daily_plan_service.get_day_plan(user_id, time_ctx.now.date())
+            active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
+            block = active[0] if active else None
+    except Exception:
+        logger.exception("调试总览日程块装配失败")
+    try:
+        if settings.v23_event_detection_enabled:
+            from app.services.world import user_situation as situation_service
+
+            situations = situation_service.active_situations(user_id)
+    except Exception:
+        logger.exception("调试总览活跃处境装配失败")
+
+    brief_text = ""
+    world_section = None
+    try:
+        from app.services.world import world_brief as brief_service
+
+        brief = brief_service.build_world_brief(
+            time_ctx,
+            world,
+            block,
+            situations,
+            None,
+            budget=settings.world_brief_char_budget,
+        )
+        brief_text = brief.text
+        world_section = brief.model_dump(mode="json")
+    except Exception:
+        logger.exception("调试总览世界简报装配失败")
+
+    recent_events: list[dict] = []
+    try:
+        events = world_repository.list_events(
+            world.world_id, limit=40, order="created_at_desc"
+        )
+        for event in events:
+            if event.type in _SIMULATION_EVENT_TYPES or event.source.value in _SIMULATION_EVENT_SOURCES:
+                recent_events.append(
+                    {
+                        "id": event.id,
+                        "type": event.type,
+                        "title": event.title,
+                        "importance": event.importance.value,
+                        "status": event.status.value,
+                        "idempotency_key": event.idempotency_key,
+                        "created_at": event.created_at.isoformat() if event.created_at else None,
+                    }
+                )
+            if len(recent_events) >= 10:
+                break
+    except Exception:
+        logger.exception("调试总览近期模拟事件装配失败")
+
+    return {
+        "time_context": time_ctx.model_dump(mode="json"),
+        "brief": {"text": brief_text, "parts": world_section},
+        "current_block": block.brief() if block is not None else None,
+        "active_situations": build_debug_situations(user_id),
+        "recent_events": recent_events,
+        "flags": v23_flag_snapshot(),
+    }
+
+
+def build_debug_plan(user_id: str, day) -> list[dict]:
+    """WS-018：当日计划只读装配；尚未生成 → 空列表（不落库）。"""
+    from app.services.world import daily_plan as daily_plan_service
+
+    plans = daily_plan_service.get_day_plan(user_id, day)
+    blocks: list[dict] = []
+    for plan in plans:
+        item = plan.brief()
+        item["variability_source"] = plan.variability_source.value
+        item["note"] = plan.note
+        blocks.append(item)
+    return blocks
+
+
+def build_debug_situations(user_id: str, include_expired: bool = False) -> list[dict]:
+    """WS-018：处境只读装配；include_expired=True 时含 expired/dismissed。"""
+    from app.repositories import world_simulation_repository
+    from app.models.world_simulation import SituationStatus
+
+    statuses = None if include_expired else (SituationStatus.ACTIVE,)
+    situations = world_simulation_repository.list_situations(user_id, statuses=statuses)
+    rows: list[dict] = []
+    for situation in situations:
+        rows.append(
+            {
+                "dimension": situation.dimension.value,
+                "summary": situation.summary,
+                "intensity": situation.intensity,
+                "status": situation.status.value,
+                "source": situation.source.value,
+                "detected_at": (
+                    situation.detected_at.isoformat() if situation.detected_at else None
+                ),
+                "valid_until": (
+                    situation.valid_until.isoformat() if situation.valid_until else None
+                ),
+                "evidence": situation.evidence,
+            }
+        )
+    return rows
+
+
+def run_debug_tick(user_id: str) -> dict:
+    """WS-018：手动执行一次模拟维护步（双闸保护；调用方负责门控）。"""
+    results = run_simulation_maintenance(user_id) or []
+    advanced_minutes = 0.0
+    markers: list[str] = []
+    for result in results:
+        advanced_minutes += getattr(result, "advanced_minutes", 0.0)
+        markers.append(getattr(result, "mode", "unknown"))
+
+    plan_summary = None
+    try:
+        from app.services.world import daily_plan as daily_plan_service
+
+        world = get_world(user_id)
+        if world is not None and get_settings().v23_daily_life_enabled:
+            now = _default_provider.now(world)
+            plans = daily_plan_service.get_day_plan(user_id, now.date())
+            plan_summary = {
+                "date": now.date().isoformat(),
+                "total": len(plans),
+                "active": sum(1 for p in plans if p.status.value == "active"),
+                "completed": sum(1 for p in plans if p.status.value == "completed"),
+            }
+    except Exception:
+        logger.exception("调试 tick 计划摘要装配失败")
+
+    return {
+        "advanced_minutes": round(advanced_minutes, 2),
+        "markers": markers,
+        "plan_summary": plan_summary,
+        "errors": [],
+    }
+
+
 def restore_snapshot(user_id: str, snapshot_id: str) -> World | None:
     """整包恢复（persistence.md §3）：Character 状态不回滚；恢复前自动留存快照。"""
     try:

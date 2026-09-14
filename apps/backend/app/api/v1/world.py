@@ -1,13 +1,20 @@
 """V8 世界调试与运维端点（persistence.md §6 / testing.md §5）。
 
 GET 均只读；POST 为显式手动通道（播种实体 / 设定环境 / 迁移位置 / 快照 / 事件）。
+V2.3.0 WS-018 追加四个模拟观测端点（三个只读 + 一个调试触发），全部受总闸门控。
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.v1.schemas import (
+    WorldPlanOut,
+    WorldSimTickOut,
+    WorldSimulationOut,
+    WorldSituationsOut,
+)
 from app.application import world_engine
 from app.core.settings import get_settings
 from app.repositories import world_repository
@@ -61,6 +68,10 @@ class ConsumeBody(BaseModel):
 
 
 class HouseholdSeedBody(BaseModel):
+    user_id: str | None = None
+
+
+class WorldSimTickBody(BaseModel):
     user_id: str | None = None
 
 
@@ -214,3 +225,61 @@ def list_world_snapshots(user_id: str | None = None):
         item.model_dump(mode="json")
         for item in world_repository.list_snapshots(world.world_id)
     ]
+
+
+@world_router.get("/debug/world/simulation", response_model=WorldSimulationOut)
+def get_world_simulation(user_id: str | None = None):
+    """WS-018：模拟总览（时间上下文 / 简报 / 当前日程块 / 活跃处境 / 近期模拟事件 / flags）。"""
+    if not get_settings().v23_world_simulation_enabled:
+        return WorldSimulationOut(enabled=False)
+    data = world_engine.build_debug_simulation(_user(user_id))
+    if data is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    return WorldSimulationOut(enabled=True, **data)
+
+
+@world_router.get("/debug/world/plan", response_model=WorldPlanOut)
+def get_world_plan(
+    user_id: str | None = None,
+    date_str: str | None = Query(default=None, alias="date"),
+):
+    """WS-018：当日计划（缺省今日）；未生成时返回空列表，不落库。"""
+    if not get_settings().v23_world_simulation_enabled:
+        return WorldPlanOut(enabled=False)
+    user = _user(user_id)
+    if world_engine.get_world(user) is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    try:
+        day = date.fromisoformat(date_str) if date_str else datetime.now().date()
+    except ValueError:
+        raise HTTPException(status_code=422, detail="date 参数格式应为 YYYY-MM-DD")
+    blocks = world_engine.build_debug_plan(user, day)
+    return WorldPlanOut(enabled=True, date=day.isoformat(), blocks=blocks)
+
+
+@world_router.get("/debug/world/situations", response_model=WorldSituationsOut)
+def get_world_situations(user_id: str | None = None, include_expired: bool = False):
+    """WS-018：用户处境（缺省仅 active；include_expired=True 含 expired/dismissed）。"""
+    if not get_settings().v23_world_simulation_enabled:
+        return WorldSituationsOut(enabled=False)
+    user = _user(user_id)
+    if world_engine.get_world(user) is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    return WorldSituationsOut(
+        enabled=True,
+        situations=world_engine.build_debug_situations(user, include_expired),
+    )
+
+
+@world_router.post("/debug/world/simulation/tick", response_model=WorldSimTickOut)
+def trigger_world_simulation_tick(body: WorldSimTickBody):
+    """WS-018：手动执行一次模拟维护步（双闸：总闸 + v23_debug_tick_enabled）。"""
+    settings = get_settings()
+    if not settings.v23_world_simulation_enabled:
+        return WorldSimTickOut(enabled=False)
+    if not settings.v23_debug_tick_enabled:
+        raise HTTPException(status_code=403, detail="调试 tick 未启用（v23_debug_tick_enabled=false）")
+    user = _user(body.user_id)
+    if world_engine.get_world(user) is None and world_engine.ensure_world(user) is None:
+        raise HTTPException(status_code=404, detail="世界不可用")
+    return WorldSimTickOut(enabled=True, result=world_engine.run_debug_tick(user))
