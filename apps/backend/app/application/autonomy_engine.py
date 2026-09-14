@@ -2,12 +2,17 @@
 
 tick：候选用户枚举 → TriggerEvaluator → AutonomyPolicy → 入队 → Executor 同 tick 执行。
 复用 V6 goal_service.select 与 V6.5 行为层，不绕行（architecture.md §4）。
+
+V2.4.0 TOOL-006：总闸开启时自治 tick 首次实传 `capabilities=surface.tool_ids`
+（关闭断层 B7；off 时保持 `None` 原状），并把有界工具事实段并入 `action_facts`
+（`PolicySnapshot.tool_facts`）。**编排关系不变**：自治只产出意图（ActionIntent），
+执行仍经既有 `action_engine.run_action_planning`（Action = Intent，Tool = Execution）。
 """
 
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.core.settings import get_settings
 from app.application import observability, world_engine
@@ -18,6 +23,7 @@ from app.models.observability import (
     TraceKind,
     bound_extra,
 )
+from app.models.tool import ToolBinding, ToolSurface
 from app.repositories import (
     conversation_repository,
     goal_repository,
@@ -34,15 +40,137 @@ from app.services import (
 from app.services.trace_collector import TurnTraceSession, get_trace_collector
 from app.application.action_engine import collect_facts, run_action_planning
 from app.application.chat_pipeline import active_generations
-from app.character.asuna.action import PROACTIVE_ACTION_MAP
+from app.character.asuna.action import (
+    PROACTIVE_ACTION_MAP,
+    build_autonomy_action_params,
+)
+from app.character.asuna.tool import RUN_KIND_AUTONOMOUS_TICK
 from app.models.action import ActionIntent
 from app.repositories import action_repository, relationship_milestone_repository
 from app.services import relationship_patterns as relationship_pattern_service
+from app.services.tool.context import ToolContext
+from app.services.tool.registry import get_tool_registry
+from app.services.tool.surface import ToolSelector, ToolSurfaceResolver
 
 logger = logging.getLogger(__name__)
 
 _DATETIME_MIN = datetime(1970, 1, 1)
 _ACTION_FACTS_CACHE: dict[str, dict] = {}
+
+AUTONOMY_SOURCE = "autonomy"
+
+AUTONOMY_TOOL_SURFACE_STEP = "autonomy_tool_surface"
+
+TOOL_FACTS_AVAILABLE_LIMIT = 5
+TOOL_FACTS_RECENT_FAILURE_LIMIT = 3
+TOOL_FACTS_BREAKER_LIMIT = 3
+TOOL_FACTS_RECORDS_SCAN_LIMIT = 50
+
+_TOOL_STEP_FAILED_STATUS = "failed"
+
+
+def _autonomy_tool_context(user_id: str, now: datetime | None = None) -> ToolContext:
+    """自治来源 ToolContext（只读快照）：世界事实维度留空（TOOL-007 装配），
+    工具面投影据此降级为不裁剪那些维度（TOOL-004 E5/E14）。"""
+    return ToolContext(
+        user_id=user_id,
+        now=now,
+        settings=get_settings(),
+        run_kind=RUN_KIND_AUTONOMOUS_TICK,
+        source=AUTONOMY_SOURCE,
+    )
+
+
+def resolve_autonomy_surface(
+    user_id: str, now: datetime | None = None, ctx: ToolContext | None = None
+) -> ToolSurface | None:
+    """自治工具面（TOOL-006 §4.2）：总闸 off → None（调用方传 `capabilities=None`）。
+
+    总闸 on → 按 `autonomous_tick` Profile 投影：Profile 维度剔除 `channel` 命名空间，
+    日时段维度在 `late_night` 再剔除 `social` 标签（规则资产属 TOOL-004，本任务只消费）。
+    """
+    registry = get_tool_registry()
+    if registry is None:
+        return None
+    return ToolSurfaceResolver(registry).resolve(
+        RUN_KIND_AUTONOMOUS_TICK,
+        ctx if ctx is not None else _autonomy_tool_context(user_id, now),
+    )
+
+
+def _autonomy_binding(action_type: str, now: datetime) -> ToolBinding | None:
+    """`action_type` 在自治工具面内的工具绑定；总闸 off / 不在面内 → None。
+
+    工具面投影不读 `user_id`（TOOL-004 六维规则只读 source / world / scene /
+    relationship / world_enabled），故以无用户自治上下文解析；
+    TOOL-007 装配用户维度世界事实后，此处须改为按用户解析（风险已登记）。
+    """
+    registry = get_tool_registry()
+    if registry is None:
+        return None
+    surface = resolve_autonomy_surface("", now)
+    if surface is None:
+        return None
+    intent = ActionIntent(
+        action_type=action_type, confidence="confident", params={}, dedupe_key=""
+    )
+    return ToolSelector(registry).select(intent, surface)
+
+
+def _recent_tool_failures(
+    user_id: str, limit: int = TOOL_FACTS_RECENT_FAILURE_LIMIT
+) -> list[dict]:
+    """最近工具失败（执行台账 `action_records.steps` 是 `failure_kind` 的唯一落点）。
+
+    记录按 `created_at` 倒序给出，步骤按序扫描；同一 `tool_id` 只保留最近一次，
+    达到上限即停（确定性截断）。
+    """
+    failures: list[dict] = []
+    seen: set[str] = set()
+    for record in action_repository.list_records(user_id, limit=TOOL_FACTS_RECORDS_SCAN_LIMIT):
+        for step in record.steps or []:
+            tool_id = step.get("tool_id")
+            failure_kind = (step.get("result") or {}).get("failure_kind")
+            if not tool_id or failure_kind is None:
+                continue
+            if step.get("status") != _TOOL_STEP_FAILED_STATUS or tool_id in seen:
+                continue
+            seen.add(tool_id)
+            failures.append({"tool_id": tool_id, "failure_kind": failure_kind})
+            if len(failures) >= limit:
+                return failures
+    return failures
+
+
+def collect_tool_facts(user_id: str, ctx: ToolContext | None = None) -> dict:
+    """有界工具事实段（TOOL-006 §4.1）：`{available, recent_failures, breaker_open}`。
+
+    总闸 off 或任何异常 → `{}`（降级为空包 + 日志，不抛出、不阻塞 tick）；
+    整体经既有 `observability.bound_extra` 预算裁剪（不新增预算机制）。
+    """
+    try:
+        settings = get_settings()
+        if not settings.v24_tool_system_enabled:
+            return {}
+        registry = get_tool_registry()
+        if registry is None:
+            return {}
+        surface = resolve_autonomy_surface(user_id, ctx=ctx)
+        if surface is None:
+            return {}
+        health = registry.health()
+        facts = {
+            "available": list(surface.tool_ids)[:TOOL_FACTS_AVAILABLE_LIMIT],
+            "recent_failures": _recent_tool_failures(user_id),
+            "breaker_open": [
+                tool_id for tool_id in sorted(health) if health[tool_id].tripped
+            ][:TOOL_FACTS_BREAKER_LIMIT],
+        }
+        payload, _ = bound_extra(facts, settings.observability_step_extra_max_chars)
+        return payload
+    except Exception:
+        logger.exception("工具事实收集失败，返回空包")
+        return {}
 
 
 def _collect_action_facts(user_id: str) -> dict:
@@ -50,17 +178,21 @@ def _collect_action_facts(user_id: str) -> dict:
         _ACTION_FACTS_CACHE.pop(user_id, None)
         return {}
     try:
-        return collect_facts(user_id)
+        facts = collect_facts(user_id)
     except Exception:
         logger.exception("行动事实收集失败，返回空包")
         return {}
+    tool_facts = collect_tool_facts(user_id)
+    if tool_facts:
+        facts["tool_facts"] = tool_facts
+    return facts
 
 
 def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
     """自治产行动参数模板（autonomy-integration.md §4）；无模板返回空参。"""
-    if action_type == "create_reminder":
-        return {"content": "休息一下", "due_at": (now + timedelta(minutes=30)).isoformat()}
-    return {}
+    return build_autonomy_action_params(
+        action_type, now, _autonomy_binding(action_type, now)
+    )
 
 
 def _autonomy_action_today(user_id: str, now: datetime) -> int:
@@ -146,6 +278,7 @@ def _snapshot_for(
         relationship_patterns = tuple(pattern.key for pattern in patterns)
     except Exception:
         logger.exception("关系模式读取失败，闸门参考为空")
+    action_facts = _collect_action_facts(user_id)
     return autonomy_policy.PolicySnapshot(
         generating=active_generations.get(user_id, False),
         has_active_action=proactive_repository.has_non_terminal(user_id),
@@ -161,7 +294,8 @@ def _snapshot_for(
         goal_degraded=selected.goal is None,
         extra_flags={"goal_id": selected.goal.id if selected.goal is not None else None},
         world_facts=world_engine.collect_facts(user_id),
-        action_facts=_collect_action_facts(user_id),
+        action_facts=action_facts,
+        tool_facts=action_facts.get("tool_facts") or {},
         respect=getattr(relationship, "respect", 0.6),
         comfort=getattr(relationship, "comfort", 0.6),
         conflict_status=getattr(relationship, "conflict_status", "none") or "none",
@@ -190,9 +324,50 @@ def _build_action(
     )
 
 
-def _pipeline_intention(verdict, user_id: str, now: datetime) -> tuple[str | None, dict | None]:
+def _resolve_tick_capabilities(
+    user_id: str, now: datetime, trace, tool_facts: dict | None = None
+) -> list[str] | None:
+    """自治 tick 的工具面（TOOL-006 §5 Step1）：总闸 on 实传 `surface.tool_ids`（可为空，E1）；
+    off 或无 registry → None（断层 B7 原状，逐字节一致）。
+
+    工具面与工具事实经既有 `trace.record()` 落 `runtime_traces.steps`（不新建观测表）；
+    解析异常降级为 None + 日志，不阻塞 tick。
+    """
+    started = time.perf_counter()
+    try:
+        surface = resolve_autonomy_surface(user_id, now)
+    except Exception:
+        logger.exception("自治工具面解析失败，capabilities 退化为 None")
+        return None
+    if surface is None:
+        return None
+    payload, _ = bound_extra(
+        {
+            "run_kind": surface.run_kind,
+            "tool_ids": list(surface.tool_ids),
+            "excluded": [dict(item) for item in surface.excluded],
+            "surface_hash": surface.surface_hash,
+            "tool_facts": tool_facts or {},
+        },
+        get_settings().observability_step_extra_max_chars,
+    )
+    trace.record(
+        AUTONOMY_TOOL_SURFACE_STEP,
+        (time.perf_counter() - started) * 1000,
+        "ok",
+        **payload,
+    )
+    return list(surface.tool_ids)
+
+
+def _pipeline_intention(
+    verdict, user_id: str, now: datetime, capabilities: list[str] | None = None
+) -> tuple[str | None, dict | None]:
     """AGENT-004 统一决策管线接线：Flag 开启时五段管线裁决主动意图，
-    候选审计落 decision_records.candidates；管线失败回退 verdict 原值。"""
+    候选审计落 decision_records.candidates；管线失败回退 verdict 原值。
+
+    TOOL-006：`capabilities` 由调用方传入自治工具面（off 时为 None，管线行为不变）。
+    """
     settings = get_settings()
     if not settings.v21_agent_runtime_enabled:
         return None, None
@@ -220,6 +395,7 @@ def _pipeline_intention(verdict, user_id: str, now: datetime) -> tuple[str | Non
             snapshot=agent_state_context.get_snapshot(),
             trigger_intention=verdict.intention,
             trigger_goal_id=verdict.goal_id,
+            capabilities=capabilities,
             run=None,
             now=now,
             world_impacts=world_impacts,
@@ -245,24 +421,26 @@ def _decision_record(
     outcome=None,
     candidates=None,
 ) -> DecisionRecord:
+    audit_fields: dict = {
+        "generating": snapshot.generating,
+        "has_active_action": snapshot.has_active_action,
+        "last_proactive_at": (
+            str(snapshot.last_proactive_at) if snapshot.last_proactive_at else None
+        ),
+        "attempt_count": snapshot.attempt_count,
+        "intimacy": snapshot.intimacy,
+        "tension": snapshot.tension,
+        "mood": snapshot.mood,
+        "current_activity": snapshot.current_activity,
+        "selected_goal_type": snapshot.selected_goal_type,
+        "goal_degraded": snapshot.goal_degraded,
+        "goal_id": snapshot.extra_flags.get("goal_id"),
+        "relationship_patterns": list(snapshot.relationship_patterns),
+    }
+    if snapshot.tool_facts:
+        audit_fields["tool_facts"] = snapshot.tool_facts
     payload, _ = bound_extra(
-        {
-            "generating": snapshot.generating,
-            "has_active_action": snapshot.has_active_action,
-            "last_proactive_at": (
-                str(snapshot.last_proactive_at) if snapshot.last_proactive_at else None
-            ),
-            "attempt_count": snapshot.attempt_count,
-            "intimacy": snapshot.intimacy,
-            "tension": snapshot.tension,
-            "mood": snapshot.mood,
-            "current_activity": snapshot.current_activity,
-            "selected_goal_type": snapshot.selected_goal_type,
-            "goal_degraded": snapshot.goal_degraded,
-            "goal_id": snapshot.extra_flags.get("goal_id"),
-            "relationship_patterns": list(snapshot.relationship_patterns),
-        },
-        get_settings().observability_step_extra_max_chars,
+        audit_fields, get_settings().observability_step_extra_max_chars
     )
     return DecisionRecord(
         kind=DecisionKind.PROACTIVE_AUTONOMY,
@@ -371,8 +549,9 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         )
         return None
 
+    capabilities = _resolve_tick_capabilities(user_id, now, trace, snapshot.tool_facts)
     intention_override, pipeline_audit = _pipeline_intention(
-        verdict, user_id, now
+        verdict, user_id, now, capabilities=capabilities
     )
     action = _build_action(
         verdict, conversation.id, now, intention_override=intention_override

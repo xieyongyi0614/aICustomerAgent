@@ -1,9 +1,21 @@
-"""亚丝娜行动资产（V9-001）。
+"""亚丝娜行动资产（V9-001；V2.4.0 TOOL-006 §2.3 增补自治参数模板）。
 
 行动"设定"与行动"状态"分离：本模块只含词表、参数表、能力映射、
-记忆模板、关系信号映射与完成时宣称模式表，全部为数据定义；
+记忆模板、关系信号映射、完成时宣称模式表与自治参数模板，全部为数据定义；
 检出 / 闸门 / 执行逻辑属 services 与 application 层。
+自治参数模板只回答"没人在线时打算做什么、缺参怎么按工具声明补齐"（纯函数），
+不回答"什么时候产行动"（`autonomy_policy`）与"怎么执行"（`action_engine`）。
 """
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.models.tool import ToolBinding, ToolSchema
 
 # 触发词表（planner.md §1.1）：action_type → 触发模式列表。
 # 纪律：祈使优先（触发词 + 用户主语"我/帮我/替我"才命中）；问句守卫由检出器执行。
@@ -183,3 +195,61 @@ ENVIRONMENT_QUERY_DIMENSIONS: tuple[str, ...] = ("weather", "temperature", "time
 PROACTIVE_ACTION_MAP: dict[str, str] = {
     "check_in": "create_reminder",
 }
+
+
+@dataclass(frozen=True)
+class AutonomyParamTemplate:
+    """自治产行动参数模板（TOOL-006 §2.3）：静态值 + 相对当前时刻的时间偏移（分钟）。"""
+
+    values: dict[str, Any] = field(default_factory=dict)
+    offsets_minutes: dict[str, int] = field(default_factory=dict)
+
+
+# V9 固定模板（autonomy-integration.md §4）：工具层不可用时逐字节回退到此形态。
+AUTONOMY_ACTION_PARAM_TEMPLATES: dict[str, AutonomyParamTemplate] = {
+    "create_reminder": AutonomyParamTemplate(
+        values={"content": "休息一下"},
+        offsets_minutes={"due_at": 30},
+    ),
+}
+
+# 参数的来源标记：声明为 `default` 者，缺省值一律取 `ToolParameter.default`
+# （含显式 null），与 `user_message` 等"必须来自用户输入"的标记区分（TOOL-006 §4.4）。
+SOURCE_HINT_DEFAULT = "default"
+
+
+def fill_declared_defaults(
+    params: Mapping[str, Any], schema: ToolSchema
+) -> dict[str, Any]:
+    """按工具 `input_schema` 的 `default` / `source_hint` 补齐缺参（不覆盖既有键）。
+
+    声明了 `default` 或缺省来源标记为 `default` 的缺参取声明值；
+    其余缺参（含 `user_message` 来源）保持缺失——由检出器 / 参数校验层负责补问。
+    """
+    filled = dict(params)
+    for parameter in schema.parameters:
+        if parameter.name in filled:
+            continue
+        if parameter.default is None and parameter.source_hint != SOURCE_HINT_DEFAULT:
+            continue
+        filled[parameter.name] = parameter.default
+    return filled
+
+
+def build_autonomy_action_params(
+    action_type: str, now: datetime, binding: ToolBinding | None
+) -> dict[str, Any]:
+    """自治产行动参数模板（TOOL-006 §4.4）：无模板返回空参。
+
+    `binding` 为 None（总闸 off / 工具不在自治工具面内）→ 回退 V9 固定模板（既有行为）；
+    `binding` 存在 → 固定模板 + 按该工具 `input_schema` 补齐声明缺参。
+    """
+    template = AUTONOMY_ACTION_PARAM_TEMPLATES.get(action_type)
+    if template is None:
+        return {}
+    params: dict[str, Any] = dict(template.values)
+    for name, offset_minutes in template.offsets_minutes.items():
+        params[name] = (now + timedelta(minutes=offset_minutes)).isoformat()
+    if binding is None:
+        return params
+    return fill_declared_defaults(params, binding.definition.input_schema)

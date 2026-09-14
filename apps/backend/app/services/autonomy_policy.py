@@ -2,6 +2,8 @@
 
 (signal, snapshot, config, now) → AutonomyVerdict，八步按序短路，无 IO。
 V8.5 追加 R1~R5 门控（relationship 域规则，纯函数追加收紧/单点放行。
+V2.4.0 TOOL-006：`tool_facts` 作为既有八步的**输入面**（只追加理由，不新增步骤、
+不拆闸门）；缺省空 dict 时行为与 V2.3.0 逐字节一致。
 """
 
 import logging
@@ -58,6 +60,7 @@ class PolicySnapshot:
     extra_flags: dict = field(default_factory=dict)
     world_facts: dict = field(default_factory=dict)
     action_facts: dict = field(default_factory=dict)
+    tool_facts: dict = field(default_factory=dict)
     respect: float = 0.60
     comfort: float = 0.60
     conflict_status: str = "none"
@@ -233,6 +236,24 @@ def _apply_action_adjustments(
     return verdict.model_copy(update={"reason": reason})
 
 
+def _apply_tool_adjustments(
+    verdict: AutonomyVerdict, snapshot: PolicySnapshot
+) -> AutonomyVerdict:
+    """T1/T2（TOOL-006 §2.1）：tool_facts 作为既有八步的输入面，只追加理由，不拆闸门。"""
+    facts = snapshot.tool_facts or {}
+    if not facts:
+        return verdict
+    notes: list[str] = []
+    if facts.get("breaker_open"):
+        notes.append("有工具处于熔断，暂避该途径")
+    if facts.get("recent_failures"):
+        notes.append("近期工具有失败，选择手段需谨慎")
+    if not notes:
+        return verdict
+    reason = f"{verdict.reason}；{'；'.join(notes)}"[:60]
+    return verdict.model_copy(update={"reason": reason})
+
+
 def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
@@ -275,4 +296,5 @@ def evaluate(
     )
     verdict = _apply_world_adjustments(verdict, snapshot)
     verdict = _apply_action_adjustments(verdict, snapshot)
+    verdict = _apply_tool_adjustments(verdict, snapshot)
     return _apply_relationship_rules(verdict, snapshot, config)
