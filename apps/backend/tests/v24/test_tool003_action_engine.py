@@ -546,7 +546,7 @@ def test_no_new_migrations_for_tool_system():
     versions = sorted(
         path.name for path in (BACKEND_ROOT / "migrations" / "versions").glob("*.py")
     )
-    assert versions[-1].startswith("0045_")
+    assert versions[-1].startswith("0046_")
     assert len(versions) == len({name[:4] for name in versions})
     for name in versions:
         assert "v24_tool" not in name

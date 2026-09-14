@@ -433,7 +433,10 @@ def test_produce_autonomy_action_shape_unchanged():
 
 
 def test_decision_pipeline_untouched_by_tool006():
-    """`decision_pipeline.py` 零 diff：本任务只改调用方传参。"""
+    """`decision_pipeline.py` 无 TOOL-006 输入面：本任务只改调用方传参。
+
+    TOOL-009 追加的是 `tool_insights`（工具效能 Insight 只读反哺），非 TOOL-006 面。
+    """
     source = inspect.getsource(decision_pipeline)
     assert "autonomy_engine" not in source
     assert "tool_facts" not in source
@@ -451,8 +454,10 @@ def test_decision_pipeline_untouched_by_tool006():
         "now",
         "world_impacts",
         "world_schedule",
+        "tool_insights",
     ]
     assert signature.parameters["capabilities"].default is None
+    assert signature.parameters["tool_insights"].default is None
 
 
 def test_llm_gateway_budget_tier_and_math_unchanged():

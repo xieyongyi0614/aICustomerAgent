@@ -7,6 +7,10 @@
 - compute_metrics(...)：纯函数聚合场景结果 → E-REF-01~04 Eval Gate 报告。
 - build_db_report(...)：只读 DB 统计（offline_evaluator 的 reflection 小节引用；
   Flag OFF 返回空 dict）。
+
+TOOL-009 §5 Step 3：追加工具效能场景 `run_tool_scenario(...)`（注入式 seeder，
+零真实调用）。该场景**不并入** `run_scenarios`/`GATE_THRESHOLDS`，Eval Gate 指标
+（E-REF-01~04）保持零改动——工具效能的版本级 Gate 由 TOOL-012 承载。
 """
 
 import logging
@@ -20,6 +24,8 @@ from app.core.db import (
     SessionLocal,
 )
 from app.core.settings import get_settings
+from app.character.asuna import evaluation as asuna_evaluation
+from app.models.reflection import TOOL_INSIGHT_TYPES
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector as reflection_reflector
 from app.services.reflection import triggers as reflection_triggers
@@ -33,6 +39,7 @@ SCENARIO_NOISE_MONTH = "noise_month"
 SCENARIO_ISOLATED_SINGLE = "isolated_single"
 SCENARIO_REBUTTAL = "rebuttal"
 SCENARIO_FUZZY_CLARIFICATION = "fuzzy_clarification"
+SCENARIO_TOOL_EFFECTIVENESS = "tool_effectiveness"
 
 KIND_TO_METRIC = {
     SCENARIO_FATIGUE_PRESSURE: ("E-REF-01", "E-REF-01-JUDGE", "E-REF-02"),
@@ -261,6 +268,121 @@ def _run_fuzzy_scenario(session_factory, reflector_stub, now) -> dict:
     return _result(scenario_id, failures, {"invalidated": invalidated})
 
 
+def run_tool_scenario(
+    session_factory,
+    reflector_stub,
+    tool_seeder,
+    now=None,
+) -> dict:
+    """工具效能离线场景（TOOL-009 E13）：注入式 runner，零真实调用。
+
+    `tool_seeder(session_factory, user_id, now)` 由调用方注入（负责铺 `action_records`
+    与用户消息）；服务层不做 monkeypatch、不发外部调用。判定：reinforce 计数触发 →
+    按 run 裁决的窗口名取资产声明的 Insight 类型/scope 产出 stub 提案 → 执行 run →
+    产物类型与窗口一致、证据链指向 `tool:` 命名空间的工具证据。
+    """
+    now = now or datetime.now()
+    scenario_id = SCENARIO_TOOL_EFFECTIVENESS
+    user_id = f"eval-{scenario_id}"
+    failures: list[str] = []
+    if tool_seeder is None:
+        return _result(scenario_id, ["缺少注入式工具证据 seeder"], {})
+    tool_seeder(session_factory, user_id, now)
+    reflection_triggers.reset_trigger_state()
+    calls_before = reflector_stub.calls
+    fired = reflection_triggers.observe_tool_evidence_from_records(user_id, now=now)
+    window_kind = _queued_window_kind(session_factory)
+    expected_type = (
+        asuna_evaluation.insight_type_for(window_kind) if window_kind else None
+    )
+    if expected_type:
+        reflector_stub.proposals.append(
+            _capability_proposal(
+                insight_type=expected_type, scope=asuna_evaluation.scope_for(window_kind)
+            )
+        )
+    outcome = None
+    for run_id in _queued_run_ids(session_factory):
+        reflection_reflector._claim_run(run_id, now)
+        reflection_reflector.execute_run(run_id)
+        run = _run_row(session_factory, run_id)
+        outcome = run.outcome if run is not None else None
+    insights = _insight_rows(session_factory, user_id)
+    if not insights:
+        failures.append("未产出工具效能 Insight")
+    for insight in insights:
+        if insight["type"] not in TOOL_INSIGHT_TYPES:
+            failures.append(f"insight={insight['id']} 类型越界：{insight['type']}")
+        elif expected_type and insight["type"] != expected_type:
+            failures.append(
+                f"insight={insight['id']} 类型与窗口不符：{insight['type']} != {expected_type}"
+            )
+        if not _evidence_tool_ids(session_factory, insight["id"]):
+            failures.append(f"insight={insight['id']} 证据链未指向工具执行事实")
+    return _result(
+        scenario_id,
+        failures,
+        {
+            "fired": fired,
+            "window_kind": window_kind,
+            "outcome": outcome,
+            "insights": len(insights),
+            "llm_calls": reflector_stub.calls - calls_before,
+        },
+    )
+
+
+def _queued_window_kind(session_factory) -> str | None:
+    """queued run 裁决的窗口名（工具通道；无 queued run 返回 None）。"""
+    with SessionLocal() as session:
+        row = (
+            session.query(ReflectionRunRow)
+            .filter(ReflectionRunRow.status == "queued")
+            .order_by(ReflectionRunRow.created_at.asc())
+            .first()
+        )
+        if row is None:
+            return None
+        return (row.evidence_summary or {}).get("window_kind")
+
+
+def _capability_proposal(
+    *,
+    insight_type: str = "capability_note",
+    scope: str = "world",
+):
+    return ReflectionProposal(
+        insights=[
+            InsightDraft(
+                statement="最近天气接口不稳定，先别急着查",
+                type=insight_type,
+                scope=scope,
+                evidence_ids=["E1", "E2", "E3"],
+                counter_evidence="失败集中在同一时段，不足以说明长期不可靠",
+                self_confidence=0.8,
+            )
+        ]
+    )
+
+
+def _evidence_tool_ids(session_factory, insight_id: str) -> list[str]:
+    from app.services.reflection import evidence as reflection_evidence
+
+    with session_factory() as session:
+        rows = (
+            session.query(EvidenceLinkRow.memory_id)
+            .filter(EvidenceLinkRow.insight_id == insight_id)
+            .all()
+        )
+    return [
+        tool_id
+        for tool_id in (
+            reflection_evidence.tool_id_of_evidence_id(row[0]) for row in rows
+        )
+        if tool_id is not None
+    ]
+
+
 def compute_metrics(scenario_results: list[dict]) -> dict:
     """场景结果 → E-REF-01~04 指标报告（纯函数）。"""
     by_metric: dict[str, list[dict]] = {metric_id: [] for metric_id in GATE_THRESHOLDS}
@@ -378,7 +500,12 @@ def _insight_rows(session_factory, user_id) -> list[dict]:
             .all()
         )
         return [
-            {"id": row.id, "statement": row.statement, "confidence": row.confidence}
+            {
+                "id": row.id,
+                "statement": row.statement,
+                "confidence": row.confidence,
+                "type": row.type,
+            }
             for row in rows
         ]
 

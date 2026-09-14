@@ -5,6 +5,10 @@
 （引用完整性/形态合规/置信门槛）→ 单事务写 insights + evidence_links +
 reflection_runs 并 supersede 同主题旧 active Insight。核心裁决：LLM 只产候选，
 代码决定终值；被篡改证据（组外/伪造引用）必须拒绝。对 memories 零写入。
+
+TOOL-009 §2.4：证据窗按 run 的证据通道选取（工具通道优先工具窗），并在复检追加
+工具效能证据窗的**类型闸与 scope 闸**（只允许 capability_note / usage_preference /
+interaction_calibration，且不下关系域结论）；闸门本身与既有三道闸零改动。
 """
 
 import json
@@ -12,13 +16,19 @@ import logging
 import re
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.chains.structured import build_structured_chain
 from app.core.db import EvidenceLinkRow, InsightRow, ReflectionRunRow, SessionLocal
 from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
-from app.models.reflection import ReflectionProposal
+from app.models.reflection import (
+    EVIDENCE_CHANNEL_MEMORY,
+    EVIDENCE_CHANNEL_TOOL,
+    TOOL_INSIGHT_SCOPES,
+    ReflectionProposal,
+)
 from app.prompts.reflection import build_evidence_block, build_reflection_messages
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import lifecycle as reflection_lifecycle
@@ -55,6 +65,8 @@ _REVIEW_EMPTY_STATEMENT = "empty_statement"
 _REVIEW_STATEMENT_TOO_LONG = "statement_too_long"
 _REVIEW_MISSING_COUNTER = "missing_counter_evidence"
 _REVIEW_BELOW_CONFIDENCE = "below_min_confidence"
+_REVIEW_TYPE_NOT_ALLOWED = "insight_type_not_allowed"
+_REVIEW_SCOPE_NOT_ALLOWED = "insight_scope_not_allowed"
 
 
 def register_executor() -> None:
@@ -96,11 +108,12 @@ def execute_run(run_id: str, trace=None) -> str:
         return RUN_DONE
 
     settings = get_settings()
-    windows = reflection_evidence.aggregate_evidence_windows(
-        run.user_id, run.character_id, now=now
-    )
-    passing = [window for window in windows if window.passes_gate]
-    if not passing:
+    selection = _select_evidence(run, now)
+    if not selection.passing:
+        summary = {"passing": 0, "window_count": selection.window_count}
+        if selection.channel == EVIDENCE_CHANNEL_TOOL and selection.tool_package is not None:
+            summary["channel"] = EVIDENCE_CHANNEL_TOOL
+            summary["tool_windows"] = selection.tool_package.summary()
         _finish_run(
             run_id,
             RUN_DONE,
@@ -108,12 +121,12 @@ def execute_run(run_id: str, trace=None) -> str:
             [],
             llm_used=False,
             now=now,
-            evidence_summary={"passing": 0, "window_count": len(windows)},
+            evidence_summary=summary,
         )
         _trace(trace, started, run_id=run_id, decision="done", outcome=OUTCOME_EVIDENCE_GONE)
         return OUTCOME_EVIDENCE_GONE
 
-    window = passing[0]
+    window = selection.passing[0]
     evidence_block, provided = build_evidence_block(
         window,
         settings.v2_reflection_evidence_max_members,
@@ -174,6 +187,69 @@ def execute_run(run_id: str, trace=None) -> str:
     return RUN_DONE
 
 
+@dataclass
+class _EvidenceSelection:
+    """run 的证据窗选取结果（§2.4）：通道 / 达门槛窗口 / 参与判定窗口数 / 工具证据包。"""
+
+    channel: str
+    passing: list
+    window_count: int
+    tool_package: object | None = None
+
+
+def _select_evidence(run, now: datetime) -> _EvidenceSelection:
+    """证据窗选取：既有窗口恒参与；工具子闸开启时按 run 通道决定优先序。
+
+    - 工具子闸关闭（默认）：只看既有窗口，行为与 V2.3.0 逐字节一致。
+    - 工具通道 run：工具窗优先，取不到达门槛工具窗时回退既有窗口。
+    - 用户通道 run：既有窗口优先，取不到时回退工具窗（同一 run 不空转）。
+    """
+    settings = get_settings()
+    windows = reflection_evidence.aggregate_evidence_windows(
+        run.user_id, run.character_id, now=now
+    )
+    memory_passing = [window for window in windows if window.passes_gate]
+    if not getattr(settings, "v24_tool_reflection_enabled", False):
+        return _EvidenceSelection(
+            channel=_run_channel(run), passing=memory_passing, window_count=len(windows)
+        )
+    package = reflection_evidence.aggregate_tool_evidence(run.user_id, now=now)
+    tool_passing = _pick_tool_windows(package.windows, run)
+    channel = _run_channel(run)
+    window_count = len(windows) + package.judged
+    if channel == EVIDENCE_CHANNEL_TOOL:
+        passing = tool_passing or memory_passing
+    else:
+        passing = memory_passing or tool_passing
+    return _EvidenceSelection(
+        channel=channel,
+        passing=passing,
+        window_count=window_count,
+        tool_package=package,
+    )
+
+
+def _run_channel(run) -> str:
+    """run 的证据通道：由触发侧写入 `evidence_summary.channel`（缺省为既有用户通道）。"""
+    summary = run.evidence_summary or {}
+    channel = summary.get("channel")
+    return channel if channel == EVIDENCE_CHANNEL_TOOL else EVIDENCE_CHANNEL_MEMORY
+
+
+def _pick_tool_windows(tool_windows: list, run) -> list:
+    """按触发侧裁决的窗口名选取待分析窗口（同一天多窗达门槛时的轮转裁决）。
+
+    触发侧未标窗口名（历史 run / 直连执行）时保持优先序原样——一个 run 只分析一个
+    窗口（既有 REF-004「单 run ≤1 次成功 LLM 调用」纪律不变）。
+    """
+    summary = run.evidence_summary or {}
+    requested = summary.get("window_kind")
+    if not requested:
+        return list(tool_windows)
+    selected = [window for window in tool_windows if window.window_kind == requested]
+    return selected or list(tool_windows)
+
+
 def calibrate_confidence(
     coherence: float, distinct_source_refs: int, sources: list[str], settings=None
 ) -> float:
@@ -211,6 +287,7 @@ def _count_factor(count: int, curve_json: str) -> float:
 def _calibrate_and_review(proposal, window, provided, settings) -> tuple[list, list[dict]]:
     """逐 draft：evidence_ids 映射 → confidence 校准 → 三闸复检。返回 (通过, 拒绝)。"""
     min_confidence = settings.v2_reflection_min_confidence
+    allowed_types = _window_insight_types(window)
     accepted: list = []
     rejected: list[dict] = []
     for draft in proposal.insights:
@@ -221,13 +298,21 @@ def _calibrate_and_review(proposal, window, provided, settings) -> tuple[list, l
             [member.source for member in provided],
             settings,
         )
-        reasons = _review_draft(draft, resolved, invalid, final, settings)
+        reasons = _review_draft(
+            draft, resolved, invalid, final, settings, allowed_types=allowed_types
+        )
         if reasons:
             rejected.append({"statement": draft.statement[:60], "reasons": reasons})
             continue
         accepted.append((draft, resolved, final))
     accepted.sort(key=lambda item: item[2], reverse=True)
     return accepted, rejected
+
+
+def _window_insight_types(window) -> tuple[str, ...] | None:
+    """工具效能证据窗的类型值域（既有窗口无该字段 → None，复检不追加类型闸）。"""
+    types = tuple(getattr(window, "insight_types", ()) or ())
+    return types or None
 
 
 def _resolve_evidence_ids(raw_ids: list[str], provided) -> tuple[list[str], list[str]]:
@@ -252,8 +337,15 @@ def _resolve_evidence_ids(raw_ids: list[str], provided) -> tuple[list[str], list
 
 
 def _review_draft(
-    draft, resolved: list[str], invalid: list[str], final: float, settings
+    draft,
+    resolved: list[str],
+    invalid: list[str],
+    final: float,
+    settings,
+    *,
+    allowed_types: tuple[str, ...] | None = None,
 ) -> list[str]:
+    """三闸复检；`allowed_types` 非空时追加工具效能证据窗的类型闸与 scope 闸。"""
     reasons: list[str] = []
     if not draft.evidence_ids:
         reasons.append(_REVIEW_NO_EVIDENCE)
@@ -270,6 +362,11 @@ def _review_draft(
         reasons.append(_REVIEW_MISSING_COUNTER)
     if final < settings.v2_reflection_min_confidence:
         reasons.append(_REVIEW_BELOW_CONFIDENCE)
+    if allowed_types is not None:
+        if draft.type not in allowed_types:
+            reasons.append(_REVIEW_TYPE_NOT_ALLOWED)
+        if draft.scope not in TOOL_INSIGHT_SCOPES:
+            reasons.append(_REVIEW_SCOPE_NOT_ALLOWED)
     return reasons
 
 
@@ -374,8 +471,11 @@ def _supersede_conflicts(
 
 
 def _ask_llm_with_retry(window) -> ReflectionProposal:
+    insight_types = _window_insight_types(window)
     llm = _resolve_llm(get_settings())
-    chain = build_structured_chain(build_reflection_messages(window), ReflectionProposal, llm)
+    chain = build_structured_chain(
+        build_reflection_messages(window, insight_types), ReflectionProposal, llm
+    )
     last_exc: Exception | None = None
     for attempt in range(_LLM_RETRY_ATTEMPTS):
         if attempt:

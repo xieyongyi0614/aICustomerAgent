@@ -14,6 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import get_args
 
+from app.character.asuna import evaluation as asuna_evaluation
 from app.character.asuna.action import ACTION_CAPABILITY_MAP, ACTION_TOOL_MAP
 from app.core.settings import get_settings
 from app.models.intention import (
@@ -219,12 +220,13 @@ def assign_priorities(candidates: list[Candidate]) -> None:
 
 def score_candidates(
     candidates: list[Candidate], stack=None, snapshot=None, run=None,
-    world_schedule: dict | None = None,
+    world_schedule: dict | None = None, tool_insights: list[dict] | None = None,
 ) -> None:
     """六维规则评分（§5.2③）：每维取自 Snapshot / Goal Stack / 候选成本。
 
     无对应数据源时该维取中性 0.5（不臆造信号）；silence 恒为「与一切状态相容」。
     V2.3.0：world_schedule 提供日程信号，None 时路径与上一版本逐字节一致。
+    TOOL-009：tool_insights 提供工具效能 Insight 软信号，None 时同样逐字节一致。
     """
     settings = get_settings()
     for candidate in candidates:
@@ -237,7 +239,7 @@ def score_candidates(
             "state_fit": _state_fit(candidate, snapshot),
             "relationship_fit": _relationship_fit(candidate, snapshot),
             "timing": _timing(candidate, snapshot, world_schedule),
-            "interest": _interest(candidate, snapshot),
+            "interest": _interest(candidate, snapshot, tool_insights),
             "cost": _cost(candidate),
         }
         candidate.scores = scores
@@ -307,18 +309,51 @@ def _timing(candidate: Candidate, snapshot, world_schedule: dict | None = None) 
     return base
 
 
-def _interest(candidate: Candidate, snapshot) -> float:
-    """新颖度与兴趣信号：命中当前焦点目标得高分，否则按兴趣榜首递减。"""
+def _interest(candidate: Candidate, snapshot, tool_insights: list[dict] | None = None) -> float:
+    """新颖度与兴趣信号：命中当前焦点目标得高分，否则按兴趣榜首递减。
+
+    TOOL-009 §2.3：`tool_insights` 为只读反哺信号（工具效能 Insight），按候选的
+    tool_id 命中证据链时软性降分/加分；缺省 None 时与 V2.3.0 逐字节一致。
+    """
     if snapshot is None:
         return 0.0
+    score = 0.0
     focus = getattr(snapshot, "current_focus", None)
     if focus is not None and candidate.goal_id and candidate.goal_id == getattr(focus, "goal_id", None):
-        return 0.6
-    if candidate.source == "goal_compile" and candidate.payload.get("type"):
+        score = 0.6
+    elif candidate.source == "goal_compile" and candidate.payload.get("type"):
         topics = [t.topic for t in getattr(snapshot, "interest_focus", []) or []]
         if topics and candidate.payload["type"] in topics:
-            return 0.4
-    return 0.0
+            score = 0.4
+    return _apply_tool_insight(score, candidate, tool_insights)
+
+
+def _apply_tool_insight(
+    score: float, candidate: Candidate, tool_insights: list[dict] | None
+) -> float:
+    """工具效能 Insight 的 interest 维软信号（只调分，不拆闸门、不改优先级）。
+
+    TOOL-009 §2.4 只读反哺：只对带 `tool_id` 的候选生效（按证据链还原的工具身份命中），
+    能力不可靠（capability_note）降分、使用偏好（usage_preference）加分，按 confidence
+    加权并裁剪到 [0, 1]；无信号 / 未命中时逐字节保持原分。
+    """
+    if not tool_insights:
+        return score
+    tool_id = candidate.payload.get("tool_id")
+    if not tool_id:
+        return score
+    adjustment = 0.0
+    for item in tool_insights:
+        if tool_id not in (item.get("tool_ids") or []):
+            continue
+        confidence = float(item.get("confidence") or 0.0)
+        if item.get("type") == "capability_note":
+            adjustment -= asuna_evaluation.TOOL_INSIGHT_INTEREST_PENALTY * confidence
+        elif item.get("type") == "usage_preference":
+            adjustment += asuna_evaluation.TOOL_INSIGHT_INTEREST_BOOST * confidence
+    if adjustment == 0.0:
+        return score
+    return round(min(max(score + adjustment, 0.0), 1.0), 4)
 
 
 def _cost(candidate: Candidate) -> float:
@@ -468,9 +503,11 @@ def run_pipeline(
     now=None,
     world_impacts: list[dict] | None = None,
     world_schedule: dict | None = None,
+    tool_insights: list[dict] | None = None,
 ) -> DecisionResult:
     """五段管线唯一入口（前台 chat_response 与后台自主共用同一代码路径）。
-    V2.3.0：world_impacts / world_schedule 为可选输入，None 时行为不变。"""
+    V2.3.0：world_impacts / world_schedule 为可选输入，None 时行为不变。
+    TOOL-009：tool_insights 为只读反哺输入，None 时行为不变。"""
     candidates = collect_candidates(
         stack=stack,
         trigger_intention=trigger_intention,
@@ -482,7 +519,14 @@ def run_pipeline(
         world_impacts=world_impacts,
     )
     assign_priorities(candidates)
-    score_candidates(candidates, stack=stack, snapshot=snapshot, run=run, world_schedule=world_schedule)
+    score_candidates(
+        candidates,
+        stack=stack,
+        snapshot=snapshot,
+        run=run,
+        world_schedule=world_schedule,
+        tool_insights=tool_insights,
+    )
     run_risk_gates(candidates, run=run, now=now, stack=stack, snapshot=snapshot)
     winner = select(candidates)
     intention = _intention_for(winner, stack)

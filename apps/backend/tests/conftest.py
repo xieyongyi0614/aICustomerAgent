@@ -58,6 +58,7 @@ from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import evaluation as reflection_evaluation
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector as reflection_reflector
+from app.services.reflection import tool_feed as reflection_tool_feed
 from app.services.reflection import triggers as reflection_triggers
 from app.core.db import Base
 from app.core.settings import get_settings
@@ -145,6 +146,7 @@ _SERVICE_DB_MODULES = (
     reflection_evaluation,
     reflection_lifecycle,
     reflection_reflector,
+    reflection_tool_feed,
     reflection_triggers,
     development_aggregate,
     development_policy,

@@ -5,6 +5,12 @@
 skipped/failed 不占）→ 幂等入队（job_key=reflect:user:日桶）。门槛拦截写
 reflection_runs(skipped) 且 0 LLM；额度拦截不产新行（防行膨胀）。事件计数器为
 进程内存态（重启即丢，每日调度兜底），带冷却窗口防事件风暴。
+
+TOOL-009 §2.3：追加工具效能证据源。`trigger_for_user(channel=tool)` 与用户证据走
+**同一函数、同一顺序、同一判定**（三道闸零豁免），仅证据源与幂等键不同
+（`reflect:tool:user:日桶`，与既有日桶各自独立入队、共享既有额度语义）。
+工具证据 reinforce 计数入口独立成桶（同 tool_id 同 failure_kind），复用既有
+阈值与冷却窗机制；触发机制本身（周期 + 事件双触发）零改动。
 """
 
 import logging
@@ -14,6 +20,7 @@ from datetime import datetime, timedelta
 
 from app.core.db import Memory, ReflectionRunRow, SessionLocal
 from app.core.settings import get_settings
+from app.models.reflection import EVIDENCE_CHANNEL_MEMORY, EVIDENCE_CHANNEL_TOOL
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
 from app.services.memory2 import job_worker as memory2_job_worker
@@ -28,6 +35,9 @@ JOB_TYPE_REFLECTION_RUN = "reflection_run"
 TRIGGER_SCHEDULED = "scheduled"
 TRIGGER_EVENT = "event"
 
+CHANNEL_MEMORY = EVIDENCE_CHANNEL_MEMORY
+CHANNEL_TOOL = EVIDENCE_CHANNEL_TOOL
+
 OUTCOME_QUEUED = "queued"
 OUTCOME_SKIPPED = "skipped"
 OUTCOME_QUOTA = "quota"
@@ -38,10 +48,16 @@ DECISION_SKIPPED = "skipped"
 DECISION_QUOTA = "quota_exhausted"
 DECISION_OFF = "off"
 
+_REASON_NO_PASSING_WINDOW = "no_passing_window"
+_REASON_TOOL_OFF = "tool_reflection_off"
+
 _QUOTA_OCCUPYING_STATUSES = ("queued", "running", "done")
 _RUN_ID_PREFIX = "rr"
+_TOOL_SEEN_LIMIT = 500
 
 _topic_buckets: dict[str, dict[str, dict]] = {}
+_tool_buckets: dict[str, dict[str, dict]] = {}
+_tool_evidence_seen: dict[str, dict[str, bool]] = {}
 
 
 def register_with_job_worker() -> None:
@@ -56,19 +72,43 @@ def trigger_for_user(
     trigger: str = TRIGGER_SCHEDULED,
     now: datetime | None = None,
     trace=None,
+    *,
+    channel: str = CHANNEL_MEMORY,
 ) -> str:
-    """单用户触发判定：门槛预检 → 额度 → 入队；返回 queued|skipped|quota|off。"""
+    """单用户触发判定：门槛预检 → 额度 → 入队；返回 queued|skipped|quota|off。
+
+    `channel` 只切换证据源与幂等键：门槛 / 额度 / 入队顺序与判定逻辑两通道完全一致。
+    """
     started = time.perf_counter()
     now = now or datetime.now()
     settings = get_settings()
     if not settings.v2_reflection_enabled:
         _trace(trace, started, trigger=trigger, decision=DECISION_OFF)
         return OUTCOME_OFF
-
-    try:
-        windows = reflection_evidence.aggregate_evidence_windows(
-            user_id, character_id, now=now, trace=trace
+    if channel == CHANNEL_TOOL and not tool_channel_enabled(settings):
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_OFF,
+            reason=_REASON_TOOL_OFF,
+            **_channel_field(channel),
         )
+        return OUTCOME_OFF
+
+    windows: list = []
+    package: reflection_evidence.ToolEvidencePackage | None = None
+    try:
+        if channel == CHANNEL_TOOL:
+            package = reflection_evidence.aggregate_tool_evidence(
+                user_id, now=now, trace=trace
+            )
+            passing = list(package.windows)
+        else:
+            windows = reflection_evidence.aggregate_evidence_windows(
+                user_id, character_id, now=now, trace=trace
+            )
+            passing = [window for window in windows if window.passes_gate]
     except Exception as exc:
         logger.exception("证据聚合异常，按门槛未过处理：%s", user_id)
         _record_run(
@@ -80,49 +120,91 @@ def trigger_for_user(
             outcome="aggregate_error",
             now=now,
         )
-        _trace(trace, started, trigger=trigger, decision=DECISION_SKIPPED, reason=f"aggregate_error:{exc.__class__.__name__}")
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_SKIPPED,
+            reason=f"aggregate_error:{exc.__class__.__name__}",
+            **_channel_field(channel),
+        )
         return OUTCOME_SKIPPED
 
-    passing = [window for window in windows if window.passes_gate]
     if not passing:
-        _record_run(
-            user_id,
-            character_id,
-            trigger,
-            status=OUTCOME_SKIPPED,
-            evidence_summary={
+        if channel == CHANNEL_TOOL:
+            evidence_summary = _tool_evidence_summary(
+                user_id, character_id, package, now
+            )
+            outcome = "no_passing_tool_window"
+        else:
+            evidence_summary = {
                 "passing": 0,
                 "window_count": len(windows),
                 "gate_reasons": sorted(
                     {reason for window in windows for reason in window.gate_reasons}
                 ),
                 "top_window": _compact_digest(windows[0]) if windows else None,
-            },
-            outcome="no_passing_window",
+            }
+            outcome = "no_passing_window"
+        _record_run(
+            user_id,
+            character_id,
+            trigger,
+            status=OUTCOME_SKIPPED,
+            evidence_summary=evidence_summary,
+            outcome=outcome,
             now=now,
         )
-        _trace(trace, started, trigger=trigger, decision=DECISION_SKIPPED, reason="no_passing_window")
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_SKIPPED,
+            reason=_REASON_NO_PASSING_WINDOW,
+            **_channel_field(channel),
+        )
         return OUTCOME_SKIPPED
 
     if _quota_used(user_id, now):
-        _trace(trace, started, trigger=trigger, decision=DECISION_QUOTA)
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_QUOTA,
+            **_channel_field(channel),
+        )
         return OUTCOME_QUOTA
 
-    idempotency_key = _day_bucket_key(user_id, now)
+    idempotency_key = _channel_bucket_key(user_id, now, channel)
     if background_job_repository.has_job(idempotency_key):
-        _trace(trace, started, trigger=trigger, decision=DECISION_QUOTA, reason="already_enqueued")
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_QUOTA,
+            reason="already_enqueued",
+            **_channel_field(channel),
+        )
         return OUTCOME_QUOTA
 
     run_id = _new_run_id()
+    if channel == CHANNEL_TOOL:
+        summary = _tool_evidence_summary(user_id, character_id, package, now)
+        summary["windows"] = [
+            _compact_digest(window)
+            for window in _order_tool_windows(passing, summary["window_kinds"])
+        ]
+    else:
+        summary = {
+            "passing": len(passing),
+            "windows": [_compact_digest(window) for window in passing],
+        }
     _record_run(
         user_id,
         character_id,
         trigger,
         status="queued",
-        evidence_summary={
-            "passing": len(passing),
-            "windows": [_compact_digest(window) for window in passing],
-        },
+        evidence_summary=summary,
         run_id=run_id,
         now=now,
     )
@@ -136,14 +218,162 @@ def trigger_for_user(
     except Exception:
         logger.exception("反思任务入队异常，回滚 run 行待下轮重试：%s", user_id)
         _drop_run(run_id)
-        _trace(trace, started, trigger=trigger, decision="enqueue_failed", run_id=run_id)
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision="enqueue_failed",
+            run_id=run_id,
+            **_channel_field(channel),
+        )
         return OUTCOME_SKIPPED
     if not enqueued:
         _drop_run(run_id)
-        _trace(trace, started, trigger=trigger, decision=DECISION_QUOTA, reason="enqueue_duplicate")
+        _trace(
+            trace,
+            started,
+            trigger=trigger,
+            decision=DECISION_QUOTA,
+            reason="enqueue_duplicate",
+            **_channel_field(channel),
+        )
         return OUTCOME_QUOTA
-    _trace(trace, started, trigger=trigger, decision=DECISION_QUEUED, run_id=run_id)
+    _trace(
+        trace,
+        started,
+        trigger=trigger,
+        decision=DECISION_QUEUED,
+        run_id=run_id,
+        **_channel_field(channel),
+    )
     return OUTCOME_QUEUED
+
+
+def tool_channel_enabled(settings=None) -> bool:
+    """工具证据通道开关：总闸（v2_reflection_enabled）之外的工具子闸（默认 off）。"""
+    settings = settings or get_settings()
+    return bool(
+        getattr(settings, "v2_reflection_enabled", False)
+        and getattr(settings, "v24_tool_reflection_enabled", False)
+    )
+
+
+def observe_tool_evidence(
+    user_id: str,
+    *,
+    tool_id: str,
+    failure_kind: str | None = None,
+    now: datetime | None = None,
+    trace=None,
+) -> bool:
+    """工具证据 reinforce 计数（§2.3）：同 tool_id 同 failure_kind 达阈值 + 冷却 → 触发。
+
+    复用 REF-003 既有机制与冷却窗（阈值 `v2_reflection_event_threshold`、
+    冷却 `v2_reflection_event_cooldown_hours`）；触发走同一 `trigger_for_user`（channel=tool）。
+    """
+    settings = get_settings()
+    if not tool_channel_enabled(settings):
+        return False
+    started = time.perf_counter()
+    now = now or datetime.now()
+    topic = f"{tool_id}|{failure_kind or ''}"
+    bucket = _tool_buckets.setdefault(user_id, {}).get(topic)
+    if bucket is None:
+        bucket = {"topic": topic, "count": 0, "last_triggered_at": None}
+        _tool_buckets[user_id][topic] = bucket
+    bucket["count"] += 1
+    cooldown = timedelta(hours=settings.v2_reflection_event_cooldown_hours)
+    last = bucket.get("last_triggered_at")
+    if last is not None and now - last < cooldown:
+        _trace(
+            trace,
+            started,
+            trigger=TRIGGER_EVENT,
+            decision="observed",
+            channel=CHANNEL_TOOL,
+            tool_id=tool_id,
+            failure_kind=failure_kind,
+            fired=False,
+            reason="cooldown",
+        )
+        return False
+    if bucket["count"] < settings.v2_reflection_event_threshold:
+        _trace(
+            trace,
+            started,
+            trigger=TRIGGER_EVENT,
+            decision="observed",
+            channel=CHANNEL_TOOL,
+            tool_id=tool_id,
+            failure_kind=failure_kind,
+            fired=False,
+            reason="below_threshold",
+        )
+        return False
+    bucket["last_triggered_at"] = now
+    bucket["count"] = 0
+    fired = False
+    try:
+        fired = (
+            trigger_for_user(
+                user_id,
+                trigger=TRIGGER_EVENT,
+                now=now,
+                trace=trace,
+                channel=CHANNEL_TOOL,
+            )
+            == OUTCOME_QUEUED
+        )
+    except Exception:
+        logger.exception("工具证据触发判定异常：%s", user_id)
+    _trace(
+        trace,
+        started,
+        trigger=TRIGGER_EVENT,
+        decision="observed",
+        channel=CHANNEL_TOOL,
+        tool_id=tool_id,
+        failure_kind=failure_kind,
+        fired=fired,
+    )
+    return fired
+
+
+def observe_tool_evidence_from_records(
+    user_id: str,
+    now: datetime | None = None,
+    trace=None,
+    window_days: int = reflection_evidence.TOOL_EVIDENCE_WINDOW_DAYS,
+) -> int:
+    """从 `action_records` 投影补扫工具失败证据并喂 reinforce 计数（同证据只计一次）。
+
+    只读投影（不经工具注册表 / 健康度）；失败证据（含 timeout）才计数。
+    返回本次真正触发入队的次数。
+    """
+    settings = get_settings()
+    if not tool_channel_enabled(settings):
+        return 0
+    now = now or datetime.now()
+    facts = reflection_evidence.tool_fact_projection(
+        user_id, now=now, window_days=window_days
+    )
+    seen = _tool_evidence_seen.setdefault(user_id, {})
+    fired = 0
+    for fact in facts:
+        if fact.failure_kind is None or fact.evidence_id in seen:
+            continue
+        seen[fact.evidence_id] = True
+        if observe_tool_evidence(
+            user_id,
+            tool_id=fact.tool_id,
+            failure_kind=fact.failure_kind,
+            now=now,
+            trace=trace,
+        ):
+            fired += 1
+    _trim_seen(seen)
+    return fired
+
 
 
 def observe_reinforce(user_id: str, memory_ids: list[str], trace=None) -> None:
@@ -213,8 +443,88 @@ def run_reflection_trigger_tick(now: datetime | None = None) -> int:
 
 
 def reset_trigger_state() -> None:
-    """清空事件计数器（测试与运维复位）。"""
+    """清空事件计数器（测试与运维复位）；含工具证据计数与已见证据集合。"""
     _topic_buckets.clear()
+    _tool_buckets.clear()
+    _tool_evidence_seen.clear()
+
+
+def _channel_field(channel: str) -> dict:
+    """trace 字段：既有通道零新增字段（逐字节一致），仅工具通道标注来源。"""
+    return {"channel": channel} if channel == CHANNEL_TOOL else {}
+
+
+def _channel_bucket_key(user_id: str, now: datetime, channel: str) -> str:
+    """幂等键：用户证据沿用既有日桶；工具证据独立日桶（E14 各自独立入队）。"""
+    if channel == CHANNEL_TOOL:
+        return f"reflect:tool:{user_id}:{now:%Y-%m-%d}"
+    return _day_bucket_key(user_id, now)
+
+
+def _tool_evidence_summary(
+    user_id: str,
+    character_id: str,
+    package,
+    now: datetime,
+) -> dict:
+    """工具通道证据包（§2.2）：`tool_windows` + `existing_windows` + `passing`。
+
+    达门槛窗口按资产优先序排序后**按日轮转**起点（同一天多窗达门槛时，三天一轮让
+    能力 / 交互 / 用量三类认知各得一次主分析机会；未达门槛的窗口不参与轮转）。
+    """
+    if package is None:
+        package = reflection_evidence.ToolEvidencePackage()
+    kinds = reflection_evidence.order_tool_window_kinds(
+        [window.window_kind for window in package.windows]
+    )
+    rotated = _rotate(kinds, now.date().toordinal())
+    return {
+        "channel": CHANNEL_TOOL,
+        "passing": package.passing,
+        "window_kind": rotated[0] if rotated else None,
+        "window_kinds": rotated,
+        "tool_windows": package.summary(),
+        "existing_windows": _existing_windows_summary(user_id, character_id, now),
+    }
+
+
+def _rotate(kinds: list[str], offset: int) -> list[str]:
+    if not kinds:
+        return []
+    shift = offset % len(kinds)
+    return kinds[shift:] + kinds[:shift]
+
+
+def _order_tool_windows(windows: list, window_kinds: list[str]) -> list:
+    order = {kind: index for index, kind in enumerate(window_kinds)}
+    return sorted(
+        windows,
+        key=lambda window: (order.get(window.window_kind, len(order)), window.group_key),
+    )
+
+
+def _existing_windows_summary(
+    user_id: str, character_id: str, now: datetime
+) -> dict:
+    """既有窗口（对话/记忆/世界/关系）只读摘要：零写入、异常降级为空包。"""
+    try:
+        windows = reflection_evidence.aggregate_evidence_windows(
+            user_id, character_id, now=now
+        )
+    except Exception:
+        logger.exception("既有证据窗摘要失败，降级为空包：%s", user_id)
+        return {"count": 0, "passing": 0, "degraded": "aggregate_error"}
+    return {
+        "count": len(windows),
+        "passing": sum(1 for window in windows if window.passes_gate),
+    }
+
+
+def _trim_seen(seen: dict[str, bool]) -> None:
+    """已见证据集合有界（超出保留最近 `_TOOL_SEEN_LIMIT` 条）。"""
+    overflow = len(seen) - _TOOL_SEEN_LIMIT
+    for evidence_id in list(seen)[:overflow] if overflow > 0 else []:
+        seen.pop(evidence_id, None)
 
 
 def _match_bucket(buckets: dict[str, dict], content: str) -> dict | None:

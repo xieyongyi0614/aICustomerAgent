@@ -4,6 +4,8 @@
 V8.5 追加 R1~R5 门控（relationship 域规则，纯函数追加收紧/单点放行。
 V2.4.0 TOOL-006：`tool_facts` 作为既有八步的**输入面**（只追加理由，不新增步骤、
 不拆闸门）；缺省空 dict 时行为与 V2.3.0 逐字节一致。
+V2.4.0 TOOL-009：`tool_insights`（工具效能 Insight 只读信号）同为输入面——
+只追加"候选收缩"理由，不拆闸门；缺省空 dict 时行为与 V2.3.0 逐字节一致。
 """
 
 import logging
@@ -61,6 +63,7 @@ class PolicySnapshot:
     world_facts: dict = field(default_factory=dict)
     action_facts: dict = field(default_factory=dict)
     tool_facts: dict = field(default_factory=dict)
+    tool_insights: dict = field(default_factory=dict)
     respect: float = 0.60
     comfort: float = 0.60
     conflict_status: str = "none"
@@ -254,6 +257,22 @@ def _apply_tool_adjustments(
     return verdict.model_copy(update={"reason": reason})
 
 
+def _apply_tool_insight_adjustments(
+    verdict: AutonomyVerdict, snapshot: PolicySnapshot
+) -> AutonomyVerdict:
+    """T3（TOOL-009 §2.3）：工具效能 Insight 只读信号影响候选收缩，只追加理由。
+
+    信号由 `reflection.tool_feed.autonomy_signal` 只读产出（无写方法）；
+    缺省空 dict / 无 notes 时行为与 V2.3.0 逐字节一致。
+    """
+    signal = snapshot.tool_insights or {}
+    notes = [str(note) for note in (signal.get("notes") or []) if note]
+    if not notes:
+        return verdict
+    reason = f"{verdict.reason}；{'；'.join(notes)}"[:60]
+    return verdict.model_copy(update={"reason": reason})
+
+
 def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
@@ -297,4 +316,5 @@ def evaluate(
     verdict = _apply_world_adjustments(verdict, snapshot)
     verdict = _apply_action_adjustments(verdict, snapshot)
     verdict = _apply_tool_adjustments(verdict, snapshot)
+    verdict = _apply_tool_insight_adjustments(verdict, snapshot)
     return _apply_relationship_rules(verdict, snapshot, config)

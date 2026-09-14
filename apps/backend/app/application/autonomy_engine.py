@@ -173,6 +173,24 @@ def collect_tool_facts(user_id: str, ctx: ToolContext | None = None) -> dict:
         return {}
 
 
+def collect_tool_insights(user_id: str) -> dict:
+    """工具效能 Insight 只读信号段（TOOL-009 §2.3）：`{count, notes, insights, ...}`。
+
+    子闸 off / 无 active Insight / 任何异常 → `{}`（降级为空包 + 日志，不阻塞 tick）；
+    信号只读（`reflection.tool_feed` 无写方法），自治侧只把它当输入面追加理由。
+    """
+    try:
+        settings = get_settings()
+        if not getattr(settings, "v24_tool_reflection_enabled", False):
+            return {}
+        from app.services.reflection import tool_feed
+
+        return tool_feed.autonomy_signal(user_id)
+    except Exception:
+        logger.exception("工具效能 Insight 收集失败，返回空包")
+        return {}
+
+
 def _collect_action_facts(user_id: str) -> dict:
     if not get_settings().action_enabled:
         _ACTION_FACTS_CACHE.pop(user_id, None)
@@ -185,6 +203,9 @@ def _collect_action_facts(user_id: str) -> dict:
     tool_facts = collect_tool_facts(user_id)
     if tool_facts:
         facts["tool_facts"] = tool_facts
+    tool_insights = collect_tool_insights(user_id)
+    if tool_insights:
+        facts["tool_insights"] = tool_insights
     return facts
 
 
@@ -296,6 +317,7 @@ def _snapshot_for(
         world_facts=world_engine.collect_facts(user_id),
         action_facts=action_facts,
         tool_facts=action_facts.get("tool_facts") or {},
+        tool_insights=action_facts.get("tool_insights") or {},
         respect=getattr(relationship, "respect", 0.6),
         comfort=getattr(relationship, "comfort", 0.6),
         conflict_status=getattr(relationship, "conflict_status", "none") or "none",
@@ -361,12 +383,17 @@ def _resolve_tick_capabilities(
 
 
 def _pipeline_intention(
-    verdict, user_id: str, now: datetime, capabilities: list[str] | None = None
+    verdict,
+    user_id: str,
+    now: datetime,
+    capabilities: list[str] | None = None,
+    tool_insights: list[dict] | None = None,
 ) -> tuple[str | None, dict | None]:
     """AGENT-004 统一决策管线接线：Flag 开启时五段管线裁决主动意图，
     候选审计落 decision_records.candidates；管线失败回退 verdict 原值。
 
     TOOL-006：`capabilities` 由调用方传入自治工具面（off 时为 None，管线行为不变）。
+    TOOL-009：`tool_insights` 为只读反哺信号（缺省 None，interest 维行为不变）。
     """
     settings = get_settings()
     if not settings.v21_agent_runtime_enabled:
@@ -400,6 +427,7 @@ def _pipeline_intention(
             now=now,
             world_impacts=world_impacts,
             world_schedule=world_schedule,
+            tool_insights=tool_insights,
         )
         return result.intention, result.audit
     except Exception:
@@ -551,7 +579,11 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
 
     capabilities = _resolve_tick_capabilities(user_id, now, trace, snapshot.tool_facts)
     intention_override, pipeline_audit = _pipeline_intention(
-        verdict, user_id, now, capabilities=capabilities
+        verdict,
+        user_id,
+        now,
+        capabilities=capabilities,
+        tool_insights=(snapshot.tool_insights or {}).get("insights") or None,
     )
     action = _build_action(
         verdict, conversation.id, now, intention_override=intention_override

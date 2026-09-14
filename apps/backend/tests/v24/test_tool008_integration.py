@@ -68,7 +68,7 @@ MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
     "behavior_pattern",
 )
 
-MIGRATION_COUNT = 45
+MIGRATION_COUNT = 46
 
 TABLE_COUNT = 42
 

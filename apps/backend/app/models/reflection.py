@@ -3,6 +3,9 @@
 Insight / ReflectionRun 服务层投影；状态与枚举是生命周期状态机的事实源。
 类型终值由代码校准与复检决定（LLM 自报值仅作提案）。
 EvidenceMember / EvidenceWindow（REF-002）为证据聚合的计算结构。
+TOOL-009：Insight 类型值域增三类工具效能类型（capability_note /
+usage_preference / interaction_calibration），并新增工具效能证据窗结构
+ToolEvidenceWindow（复用 EvidenceWindow 结构与既有闸门语义）。
 """
 
 from dataclasses import dataclass, field
@@ -14,7 +17,38 @@ from pydantic import BaseModel
 
 InsightStatus = Literal["active", "superseded", "invalidated"]
 
-InsightType = Literal["belief", "preference", "pattern"]
+InsightType = Literal[
+    "belief",
+    "preference",
+    "pattern",
+    "capability_note",
+    "usage_preference",
+    "interaction_calibration",
+]
+
+InsightTypeCore = Literal["belief", "preference", "pattern"]
+
+ToolInsightType = Literal[
+    "capability_note", "usage_preference", "interaction_calibration"
+]
+
+TOOL_INSIGHT_TYPES: tuple[str, ...] = (
+    "capability_note",
+    "usage_preference",
+    "interaction_calibration",
+)
+"""工具效能 Insight 类型值域（TOOL-009 §2.2）：只增类型；性格/人格/关系类不新增。"""
+
+TOOL_INSIGHT_SCOPES: tuple[str, ...] = ("user", "world")
+"""工具效能 Insight 允许的 scope（TOOL-009 边界：不做关系域信号映射）。"""
+
+EVIDENCE_CHANNEL_MEMORY = "memory"
+EVIDENCE_CHANNEL_TOOL = "tool"
+
+EVIDENCE_CHANNELS: tuple[str, ...] = (EVIDENCE_CHANNEL_MEMORY, EVIDENCE_CHANNEL_TOOL)
+
+TOOL_EVIDENCE_KIND = "tool_evidence"
+CORE_EVIDENCE_KIND = "memory_evidence"
 
 InsightScope = Literal["user", "relationship", "world"]
 
@@ -35,6 +69,9 @@ class InsightTypeEnum(StrEnum):
     BELIEF = "belief"
     PREFERENCE = "preference"
     PATTERN = "pattern"
+    CAPABILITY_NOTE = "capability_note"
+    USAGE_PREFERENCE = "usage_preference"
+    INTERACTION_CALIBRATION = "interaction_calibration"
 
 
 class InsightScopeEnum(StrEnum):
@@ -89,6 +126,21 @@ class EvidenceWindow:
     @property
     def passes_gate(self) -> bool:
         return not self.gate_reasons
+
+
+@dataclass
+class ToolEvidenceWindow(EvidenceWindow):
+    """工具效能证据窗（TOOL-009 §2.2 / §4.1）：沿用 EvidenceWindow 结构走同一闸门。
+
+    members 由 `action_records` 投影的执行事实合成（`memory_id` 为 `tool:` 前缀的
+    证据 id），`window_kind` 标识三窗之一，`group_key` 为聚合键（tool_id /
+    action_type / failure_kind）。既有四个窗口结构零改动。
+    """
+
+    kind: str = TOOL_EVIDENCE_KIND
+    window_kind: str = ""
+    group_key: str = ""
+    insight_types: tuple[str, ...] = ()
 
 
 class Insight(BaseModel):

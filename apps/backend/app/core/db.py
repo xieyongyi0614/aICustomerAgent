@@ -1001,7 +1001,8 @@ class InsightRow(Base):
             name="ck_insights_status",
         ),
         CheckConstraint(
-            "type IN ('belief', 'preference', 'pattern')",
+            "type IN ('belief', 'preference', 'pattern',"
+            " 'capability_note', 'usage_preference', 'interaction_calibration')",
             name="ck_insights_type",
         ),
         CheckConstraint(

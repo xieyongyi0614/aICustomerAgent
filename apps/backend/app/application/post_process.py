@@ -463,6 +463,7 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             goal_id=goal_id,
         )
         surface_extra.update(_observe_pending_confirmation(record))
+        surface_extra.update(_observe_tool_evidence(ctx))
         if ctx.trace is not None:
             ctx.trace.record(
                 "action_planning",
@@ -542,6 +543,27 @@ def _observe_pending_confirmation(record) -> dict:
             "prompt": result.get("error"),
         }
     }
+
+
+def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
+    """工具证据反思接线（TOOL-009 §2.3）：只读 `action_records` 投影喂 reinforce 计数。
+
+    双闸（`v2_reflection_enabled` + `v24_tool_reflection_enabled`）任一关闭即零行为；
+    接线失败记日志、不影响行动规划（与 REF-003 既有接线同款纪律）。
+    """
+    settings = get_settings()
+    if not reflection_triggers.tool_channel_enabled(settings):
+        return {}
+    try:
+        fired = reflection_triggers.observe_tool_evidence_from_records(
+            ctx.user_id, trace=ctx.trace
+        )
+    except Exception:
+        logger.exception("工具证据反思接线失败，不影响行动规划")
+        return {}
+    if not fired:
+        return {}
+    return {"tool_evidence_reinforce": fired}
 
 
 def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
