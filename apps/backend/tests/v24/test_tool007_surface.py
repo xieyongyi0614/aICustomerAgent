@@ -156,11 +156,19 @@ def test_e5_location_exists_rejects_unknown_location(db_session_factory):
 
 
 def test_e5_unknown_current_location_still_supplies_location_vocabulary(db_session_factory):
+    """TOOL-010｜`world.object.move` 按 §2.2 追加 `object_in_inventory` 绑定：本夹具只建世界、
+    不建库存，故断言收敛到地点轴（已知地点词表仍生效：home.kitchen 不被判 location_not_found，
+    ghost_place 被判）。"""
     seed_world(location="ghost_place")
     ctx = _ctx_with_facts()
     assert ctx.world["location_name"] == "ghost_place"
-    assert _validate(MOVED_TOOL, _move_params("home.kitchen"), ctx).passed is True
-    assert _validate(MOVED_TOOL, _move_params("ghost_place"), ctx).passed is False
+    known = _validate(MOVED_TOOL, _move_params("home.kitchen"), ctx)
+    assert [issue["code"] for issue in known.semantic] == ["object_not_in_inventory"]
+    unknown = _validate(MOVED_TOOL, _move_params("ghost_place"), ctx)
+    assert [issue["code"] for issue in unknown.semantic] == [
+        "object_not_in_inventory",
+        "location_not_found",
+    ]
 
 
 def test_location_exists_degrades_when_facts_unassembled():

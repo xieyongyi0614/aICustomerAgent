@@ -41,14 +41,19 @@ def _meta(tool_id: str, *, duration_ms: float = 12.5, sensitive: tuple[str, ...]
 
 
 def test_mapping_table_covers_documented_tools():
+    """TOOL-010｜映射表以 §2.2 表为准：新增 `builtin.memory.save`（memory.id 双写）、
+    `builtin.notification.send`（note.created）与 `channel.feishu.send`（external.message_id）。"""
     assert set(TOOL_OBSERVATION_MAP) == {
         "builtin.reminder.create",
         "builtin.reminder.cancel",
+        "builtin.memory.save",
         "world.object.create",
         "world.object.move",
         "world.object.use",
         "world.env.query",
         "builtin.search.query",
+        "builtin.notification.send",
+        "channel.feishu.send",
     }
     assert GENERIC_OBSERVATION_MAP == {"world_event_id": "world.event_id", "memory_id": "memory.id"}
 
@@ -306,6 +311,11 @@ KNOWN_CAPABILITY_PAYLOAD_KEYS = frozenset(
         "results",
         "untrusted",
         "message_id",
+        "note_id",
+        "note_created",
+        "content",
+        "external_sent",
+        "external_message_id",
     }
 )
 

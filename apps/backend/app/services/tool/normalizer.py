@@ -6,15 +6,20 @@
   `memory.id`）**双写**；旧键原样保留在持久化 payload 内（兼容窗口 ≥ 1 个版本）。
 - `deferred_world_op` **不进 observations**（执行细节，outbox 依赖），留在 payload。
 - `failure_kind` 提升为顶层，旧位置（payload 内）保留。
-- 逐工具键映射见 `TOOL_OBSERVATION_MAP`；未知 payload 键忽略（E10）。
+- 逐工具键映射见 `TOOL_OBSERVATION_MAP`（TOOL-010：单一来源为角色资产
+  `app/character/asuna/tool.py::TOOL_OBSERVATION_KEYS`）；未知 payload 键忽略（E10）。
 - 敏感字段脱敏由 `ToolParameter.sensitive` 驱动，字段名记入 `redacted`（空值不脱敏，E12）。
 - 归一自身异常**不抛错**：降级为 `raw_error="normalize_failed"` 并记日志。
+- TOOL-010 新增两类效果：`note_id` → `ToolEffect.kind="note"`（行动 note，通知能力），
+  `external_sent` → `ToolEffect.kind="external"`（外部外发，**reversible 恒为 False**，§2.3 / §9.5-6）；
+  外发成功但响应缺 `external_message_id` 时 `ref` 为空字符串且**不视为失败**（E7）。
 """
 
 import logging
 from dataclasses import dataclass
 from typing import Any
 
+from app.character.asuna.tool import TOOL_OBSERVATION_KEYS
 from app.models.action import CapabilityResult
 from app.models.tool import (
     TOOL_FAILURE_KIND_VALUES,
@@ -35,22 +40,15 @@ GENERIC_OBSERVATION_MAP: dict[str, str] = {
 }
 
 TOOL_OBSERVATION_MAP: dict[str, dict[str, str]] = {
-    "builtin.reminder.create": {"due_at": "time.due_at"},
-    "builtin.reminder.cancel": {"cancelled": "world.cancelled_count"},
-    "world.object.create": {"object_id": "world.object_id", "location_id": "world.location_id"},
-    "world.object.move": {"object_id": "world.object_id", "location_id": "world.location_id"},
-    "world.object.use": {"object_id": "world.object_id", "location_id": "world.location_id"},
-    "world.env.query": {
-        "weather": "env.weather",
-        "part_of_day": "env.part_of_day",
-        "location": "env.location",
-    },
-    "builtin.search.query": {
-        "result_count": "search.result_count",
-        "untrusted": "search.untrusted",
-        "results": "search.results",
-    },
+    tool_id: dict(keys) for tool_id, keys in TOOL_OBSERVATION_KEYS.items()
 }
+
+NOTE_EFFECT_PAYLOAD_KEY = "note_id"
+
+EXTERNAL_EFFECT_PAYLOAD_KEY = "external_sent"
+
+EXTERNAL_MESSAGE_ID_PAYLOAD_KEY = "external_message_id"
+
 
 _STATUS_FAILURE_KINDS: dict[str, str] = {
     "timeout": "timeout",
@@ -186,6 +184,25 @@ class ObservationNormalizer:
         if memory_id:
             effects.append(
                 ToolEffect(kind="memory", ref=str(memory_id), detail="已记住", reversible=reversible)
+            )
+        note_id = payload.get(NOTE_EFFECT_PAYLOAD_KEY)
+        if note_id:
+            effects.append(
+                ToolEffect(
+                    kind="note",
+                    ref=str(note_id),
+                    detail=_truncate(payload.get("content"), 200) or str(defn.name)[:200],
+                    reversible=True,
+                )
+            )
+        if payload.get(EXTERNAL_EFFECT_PAYLOAD_KEY):
+            effects.append(
+                ToolEffect(
+                    kind="external",
+                    ref=str(payload.get(EXTERNAL_MESSAGE_ID_PAYLOAD_KEY) or ""),
+                    detail=str(defn.name)[:200],
+                    reversible=False,
+                )
             )
         return effects
 

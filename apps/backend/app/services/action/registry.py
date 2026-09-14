@@ -13,13 +13,20 @@ from app.models.action import ActionSchema, CapabilityResult
 
 @dataclass(frozen=True)
 class ExecutionContext:
-    """能力只拿到执行上下文，拿不到对话与 prompt。"""
+    """能力只拿到执行上下文，拿不到对话与 prompt。
+
+    `dedupe_key`（V2.4.0 TOOL-010 追加，默认空）：行动台账的幂等键，工具执行器在调用
+    实现体前从 `ToolInvocation.dedupe_key` 填入，供"外发类"能力直填
+    `OutboundMessage.idempotency_key`（§7.6 幂等天然对齐）。V9 六能力不读该字段，
+    行为逐字节不变。
+    """
 
     user_id: str
     character_id: str = "asuna"
     record_id: str = ""
     now: datetime | None = None
     settings: Any = None
+    dedupe_key: str = ""
 
 
 class Capability(Protocol):

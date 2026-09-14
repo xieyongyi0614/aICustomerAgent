@@ -1,12 +1,15 @@
 """亚丝娜工具资产（V2.4.0 TOOL-004 §2.2 工具面投影 / TOOL-005 §4.3 确认话术与确认词表
-/ TOOL-008 §2.2 工具结果记忆内容模板）。
+/ TOOL-008 §2.2 工具结果记忆内容模板 / TOOL-010 §2.2 语义文案、观察键、不可用话术）。
 
 纯数据：无 IO、无 LLM、无状态；投影逻辑在 `app/services/tool/surface.py`，
 确认判定与话术装配在 `app/services/tool/permission.py` 与 `confirmation.py`，
-记忆分层与候选构造在 `app/services/tool/memory_policy.py`。
+记忆分层与候选构造在 `app/services/tool/memory_policy.py`，
+观察键映射与效果归一的消费方是 `app/services/tool/normalizer.py`。
 资产只回答"哪些 Profile / 时段 / 场景 / 关系阶段该裁掉什么"（投影）、
-"哪些说法算点头或摇头"（确认词表）、"话术长什么样"（话术模板）与
-"沉淀进记忆时这句话怎么写"（记忆内容模板），不回答"怎么裁"与"怎么判"。
+"哪些说法算点头或摇头"（确认词表）、"话术长什么样"（话术模板）、
+"沉淀进记忆时这句话怎么写"（记忆内容模板）、"这个工具在角色眼里是什么"（语义文案）、
+"结果里哪些字段值得留成事实"（观察键）与"做不成的时候我怎么说"（失败话术），
+不回答"怎么裁""怎么判""怎么执行"。
 """
 
 from dataclasses import dataclass
@@ -82,6 +85,80 @@ WORLD_NAMESPACE = "world"
 
 CHANNEL_NAMESPACE = "channel"
 
+TOOL_SEMANTIC_TEXT_MAX_CHARS = 120
+
+TOOL_SEMANTIC_TEXT: dict[str, str] = {
+    "builtin.reminder.create": "在将来的某个时刻叫住你，把这件事再说一遍给你听。",
+    "builtin.reminder.cancel": "把之前答应过的那条提醒收回来，不再到点打扰你。",
+    "builtin.memory.save": "把你说过、要我长期记住的事写进我的长期记忆里。",
+    "world.object.create": "在世界里替你准备好一件东西，并把它放在该在的地方。",
+    "world.object.move": "把你手里那件东西挪到另一个地方去。",
+    "world.object.use": "拿起已有的东西用一次，看看会发生什么。",
+    "world.env.query": "看看现在几点、天色如何、外面是什么天气。",
+    "builtin.search.query": "向外面的世界打听一件事（我还没有可用的消息来源）。",
+    "builtin.notification.send": "在手边留一张字条，等你回来时亲口对你说。",
+    "channel.feishu.send": "经飞书给你递一句话，这条会真的送到你手上。",
+}
+
+TOOL_OBSERVATION_KEYS: dict[str, dict[str, str]] = {
+    "builtin.reminder.create": {
+        "world_event_id": "world.event_id",
+        "due_at": "time.due_at",
+    },
+    "builtin.reminder.cancel": {"cancelled": "world.cancelled_count"},
+    "builtin.memory.save": {"memory_id": "memory.id"},
+    "world.object.create": {
+        "object_id": "world.object_id",
+        "location_id": "world.location_id",
+    },
+    "world.object.move": {
+        "object_id": "world.object_id",
+        "location_id": "world.location_id",
+    },
+    "world.object.use": {
+        "object_id": "world.object_id",
+        "location_id": "world.location_id",
+    },
+    "world.env.query": {
+        "weather": "env.weather",
+        "part_of_day": "env.part_of_day",
+        "location": "env.location",
+    },
+    "builtin.search.query": {
+        "result_count": "search.result_count",
+        "untrusted": "search.untrusted",
+        "results": "search.results",
+    },
+    "builtin.notification.send": {"note_created": "note.created"},
+    "channel.feishu.send": {"external_message_id": "external.message_id"},
+}
+
+TOOL_UNAVAILABLE_TOOL_IDS: tuple[str, ...] = ("builtin.search.query",)
+
+TOOL_UNAVAILABLE_REASON = "unavailable:source_not_configured"
+
+TOOL_FAILURE_TEXT_MAX_CHARS = 60
+
+TOOL_FAILURE_TEXT: dict[str, str] = {
+    "builtin.search.query": "我还打听不到外面的消息，只能拿我知道的和你说。",
+    "channel.feishu.send": "这条我没能送出去，等下再试一次好吗？",
+    "builtin.notification.send": "这条我没能替你记下来，你再说一次好吗？",
+}
+
+CHANNEL_FAILURE_TEXT: dict[str, str] = {
+    "not_found": "我没找到对应的收件人，这条消息没送出去。",
+    "auth": "我这边通道的钥匙失效了，这条没能送出去。",
+    "rate_limited": "发得太急被通道挡了一下，等下我再试。",
+    "timeout": "通道那头一直没回我，这条先不算送出去。",
+    "server_error": "通道那头出了点状况，这条我先留着。",
+    "client_error": "通道没收下这条，我待会儿再试一次。",
+    "disabled": "通道现在是关着的，这条我送不出去。",
+    "invalid_request": "这条的格式通道不认，没送出去。",
+    "unknown": "送消息时出了点意外，我没算它成功。",
+}
+
+TOOL_SURFACE_RULES: dict[str, SurfaceRule] = SURFACE_RULES
+
 
 def known_tone_biases() -> frozenset[str]:
     """已注册的场景语气（含中性档）：未知语气按保守处理（不做场景维度裁剪）。"""
@@ -131,6 +208,8 @@ CONFIRM_PROMPT_DEFAULT = ConfirmPromptTemplate(
     with_subject="要我现在就去做「{subject}」吗？你说好我才动手。",
     without_subject="这件事我想先跟你确认一下，可以吗？",
 )
+
+TOOL_CONFIRM_PROMPTS: dict[str, ConfirmPromptTemplate] = CONFIRM_PROMPT_TEMPLATES
 
 CONFIRM_APPROVE_LEXICON: tuple[str, ...] = (
     "好",

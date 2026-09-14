@@ -13,10 +13,11 @@ ToolSelector.select(intent, surface) → ToolBinding | None
     → priority + tool_id 字典序取首（确定性）→ 注册表解析为绑定
 
 ToolSurfacePolicy.policy_for / should_exclude
-    Run Profile → SurfaceRule；七维规则判定裁剪原因（None = 保留）
+    Run Profile → SurfaceRule；八维规则判定裁剪原因（None = 保留）
 ```
 
-**七维**：状态 / Run Profile / 日时段 / 场景 / 关系阶段 / 世界可用性（预读事实 TOOL-007）/ 世界可用性（配置）。
+**八维**：状态 / 可用性降级（TOOL-010，必然失败的已声明工具默认裁剪）/ Run Profile /
+日时段 / 场景 / 关系阶段 / 世界可用性（预读事实 TOOL-007）/ 世界可用性（配置）。
 
 **零 IO / 零 LLM**：全部输入来自 `ToolContext` 与注册表内存态（无 DB / 无网络 / 无 LLM）。
 **缺省即降级**：世界事实维度为空（TOOL-007 未装配）时该维度不裁剪，只记 warning（E5 / E14）。
@@ -40,6 +41,8 @@ from app.character.asuna.tool import (
     LATE_NIGHT_PARTS,
     SCENE_EXCLUDE_TAGS_BY_TONE,
     SURFACE_RULES,
+    TOOL_UNAVAILABLE_REASON,
+    TOOL_UNAVAILABLE_TOOL_IDS,
     WORLD_NAMESPACE,
     SurfaceRule,
     intimate_min_stage_rank,
@@ -101,9 +104,10 @@ class ToolSurfacePolicy:
     def should_exclude(
         self, defn: ToolDefinition, ctx: ToolContext, rule: SurfaceRule
     ) -> str | None:
-        """七维规则判定（按文档顺序短路）：返回裁剪原因，None 表示保留。"""
+        """八维规则判定（按文档顺序短路）：返回裁剪原因，None 表示保留。"""
         return (
             self._status_reason(defn)
+            or self._unavailable_reason(defn)
             or self._run_profile_reason(defn, rule)
             or self._part_of_day_reason(defn, ctx)
             or self._scene_reason(defn, ctx)
@@ -111,6 +115,16 @@ class ToolSurfacePolicy:
             or self._world_facts_reason(defn, ctx)
             or self._world_reason(defn, ctx)
         )
+
+    def _unavailable_reason(self, defn: ToolDefinition) -> str | None:
+        """可用性降级维度（TOOL-010 §6.3 E1）：必然失败的已声明工具默认不进工具面。
+
+        与状态维度正交：工具仍是 `enabled`、仍可被 `resolve`（直调得可判定的
+        `unavailable` 结果），只是不再进入决策候选，避免反复触发必然失败的工具。
+        """
+        if defn.id in TOOL_UNAVAILABLE_TOOL_IDS:
+            return TOOL_UNAVAILABLE_REASON
+        return None
 
     def _status_reason(self, defn: ToolDefinition) -> str | None:
         """工具状态维度：非 enabled 一律剔除（内容态 / 运行期禁用 / 熔断）。"""

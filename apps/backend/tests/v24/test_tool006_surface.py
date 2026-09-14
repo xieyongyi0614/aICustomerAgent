@@ -115,7 +115,11 @@ def test_trace_step_carries_tool_facts(registry_on):
     trace = RecordingTrace()
     autonomy_engine._resolve_tick_capabilities(USER, NOW, trace, facts)
     assert trace.calls[0]["tool_facts"] == facts
-    assert [item["tool_id"] for item in trace.calls[0]["excluded"]] == ["channel.feishu.send"]
+    # TOOL-010｜`builtin.search.query` 走路线 B，默认被可用性降级维度裁掉（E1）。
+    assert [item["tool_id"] for item in trace.calls[0]["excluded"]] == [
+        "builtin.search.query",
+        "channel.feishu.send",
+    ]
 
 
 def test_capabilities_distinguish_empty_surface_from_none(monkeypatch, v24_tool_env):

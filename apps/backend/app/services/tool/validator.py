@@ -80,8 +80,10 @@ _SEMANTIC_PARAM_HINTS: dict[str, tuple[str, ...]] = {
     "location_exists": ("location",),
     "object_in_inventory": ("object",),
     "recipient_authorized": ("recipient", "to"),
-    "content_within_budget": ("content",),
+    "content_within_budget": ("content", "query", "fact", "target", "object"),
 }
+
+_BUDGET_PARAM_KEYS: tuple[str, ...] = ("content", "query", "fact", "target", "object")
 
 
 class ValidationReport(BaseModel):
@@ -389,11 +391,18 @@ def _recipient_authorized(params: dict[str, Any], ctx: ToolContext) -> list[str]
 
 
 def _content_within_budget(params: dict[str, Any], ctx: ToolContext) -> list[str]:
-    content = params.get("content")
-    if not isinstance(content, str):
-        return []
-    if len(content) > CONTENT_BUDGET_CHARS:
-        return [f"content 长度 {len(content)} 超出预算 {CONTENT_BUDGET_CHARS}"]
+    """正文预算（TOOL-010 §2.2）：逐字段判定 `content` / `query` / `fact` / `target` / `object`。
+
+    工具级的长度预算由结构层的 `ToolParameter.max_length` 承担（如通道 ≤ 200、检索 ≤ 60）；
+    本校验器是**语义层安全网**（全局 `CONTENT_BUDGET_CHARS`），保证任何进入正文位的字段
+    都不会把超长文本带进出站或台账。
+    """
+    for key in _BUDGET_PARAM_KEYS:
+        value = params.get(key)
+        if not isinstance(value, str):
+            continue
+        if len(value) > CONTENT_BUDGET_CHARS:
+            return [f"{key} 长度 {len(value)} 超出预算 {CONTENT_BUDGET_CHARS}"]
     return []
 
 

@@ -20,9 +20,13 @@ V2.4.0 TOOL-005：权限段由占位实现替换为真实七步判定（`ToolPer
 调用方预读下传（`permission_snapshot`），缺省时由闸门自身装配（`build_snapshot` 是唯一
 读 IO 入口，装配失败 → `deny(snapshot_unavailable)`）。权限闸 off 时保持 TOOL-003 交付态
 （占位 allow，reason=`permission_layer_off`），接口形状与 TOOL-003 完全一致。
+V2.4.0 TOOL-010：调用实现体前把 `ToolInvocation.dedupe_key` 填入上下文
+（`_with_dedupe_key`），供外发类能力直填 `OutboundMessage.idempotency_key`；
+其余字段与调用形态不变。
 """
 
 import logging
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -171,7 +175,7 @@ class ToolExecutor:
             params = dict(report.normalized)
 
         return await self._invoke(
-            index, defn, params, ctx, started_at, decision, validation
+            index, defn, params, ctx, started_at, decision, validation, invocation.dedupe_key
         )
 
     def _is_unavailable(self, tool_id: str, now: datetime) -> bool:
@@ -220,6 +224,7 @@ class ToolExecutor:
         started_at: datetime,
         decision: PermissionDecision,
         validation: dict[str, Any] | None,
+        dedupe_key: str = "",
     ) -> ToolExecution:
         raw = await self.capability_executor.run(
             ActionStep(
@@ -228,7 +233,7 @@ class ToolExecutor:
                 action=defn.action,
                 params=params,
             ),
-            ctx,
+            _with_dedupe_key(ctx, dedupe_key),
         )
         sensitive = redacted_param_names(defn, params)
         tool_result = self.normalizer.normalize(
@@ -316,6 +321,15 @@ class ToolExecutor:
 
 def _now(ctx: ToolContext | ExecutionContext) -> datetime:
     return getattr(ctx, "now", None) or datetime.now()
+
+
+def _with_dedupe_key(ctx: ToolContext | ExecutionContext, dedupe_key: str):
+    """把调用方的幂等键下传给能力（TOOL-010 §7.6）：不可填写时原样返回，不伪造。"""
+    if not dedupe_key or getattr(ctx, "dedupe_key", None) == dedupe_key:
+        return ctx
+    if not hasattr(ctx, "dedupe_key"):
+        return ctx
+    return replace(ctx, dedupe_key=dedupe_key)
 
 
 def _tool_ctx(ctx: ToolContext | ExecutionContext) -> ToolContext:

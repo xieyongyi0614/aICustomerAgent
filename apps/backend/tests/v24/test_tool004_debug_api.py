@@ -191,8 +191,12 @@ async def test_surface_endpoint_defaults_run_kind_and_lists_reasons(tools_on):
     assert payload["run_kind"] == RUN_KIND_FOREGROUND_CHAT
     assert payload["run_kind_defaulted"] is True
     assert CHANNEL_ID not in payload["tool_ids"]
-    assert len(payload["tool_ids"]) == 9
-    assert {item["tool_id"] for item in payload["excluded"]} == {CHANNEL_ID}
+    # TOOL-010｜通道工具声明态 disabled + 检索工具可用性降级裁剪 → 实际进面 8 个。
+    assert len(payload["tool_ids"]) == 8
+    assert {item["tool_id"] for item in payload["excluded"]} == {
+        CHANNEL_ID,
+        "builtin.search.query",
+    }
     assert payload["surface_hash"]
 
 

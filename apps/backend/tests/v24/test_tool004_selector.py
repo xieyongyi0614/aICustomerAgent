@@ -68,11 +68,13 @@ def test_select_is_deterministic_across_runs():
 
 
 def test_select_follows_action_tool_map_for_every_declared_action_type():
+    """TOOL-010｜`query_search` 走路线 B：`builtin.search.query` 默认被工具面裁剪，
+    故与 `send_notification` 一样不参与"映射可解析"的断言（E1）。"""
     registry = builtin_registry()
     surface = surface_of(registry)
     selector = ToolSelector(registry)
     for action_type, tool_ids in ACTION_TOOL_MAP.items():
-        if action_type == "send_notification":
+        if action_type in ("send_notification", "query_search"):
             continue
         binding = selector.select(intent(action_type), surface)
         assert binding is not None, action_type
@@ -188,5 +190,9 @@ def test_unregistered_mapped_tool_id_returns_none():
 def test_declared_mapping_is_resolvable_from_builtin_registry(action_type, tool_id):
     registry = builtin_registry()
     binding = ToolSelector(registry).select(intent(action_type), surface_of(registry))
+    if action_type == "query_search":
+        # TOOL-010｜路线 B：检索工具默认裁剪出工具面，故选择器返回 None（E1）。
+        assert binding is None
+        return
     assert binding is not None
     assert binding.tool_id == tool_id

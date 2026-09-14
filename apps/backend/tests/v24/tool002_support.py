@@ -119,7 +119,7 @@ MAPPING_TABLE: tuple[dict[str, Any], ...] = (
     },
     {
         "tool_id": "channel.feishu.send",
-        "capability": "notification",
+        "capability": "channel_feishu",
         "action": "send",
         "namespace": "channel",
         "level": "sensitive",

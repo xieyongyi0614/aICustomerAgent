@@ -562,8 +562,13 @@ def test_action_plan_max_steps_stays_one():
 
 
 def test_builtin_tool_registry_matches_v9_capability_registry():
+    """TOOL-010｜**可用**工具的绑定必须可解析；`channel.feishu.send` 是声明态 disabled
+    （通道未绑定），其 `channel_feishu` 能力随通道开关进入全局注册表。"""
     registry = ToolRegistry()
     register_builtin_tools(registry)
     capabilities = get_capability_registry()
     for item in registry.list():
+        if registry.effective_status(item.id) != "enabled":
+            assert item.id == "channel.feishu.send"
+            continue
         assert capabilities.has(item.capability, item.action), item.id

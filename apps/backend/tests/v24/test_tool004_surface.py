@@ -41,6 +41,11 @@ SURFACE_LOGGER = "app.services.tool.surface"
 
 READ_ONLY_IDS = ("world.env.query", "builtin.search.query")
 
+# TOOL-010：`builtin.search.query` 走路线 B（无可用检索来源、保持 unavailable），
+# 工具面按 §6.3 E1 默认裁剪（reason=`unavailable:source_not_configured`），
+# 因此实际进面的只读工具只剩环境查询。
+SURFACED_READ_ONLY_IDS = ("world.env.query",)
+
 
 def resolve(registry, ctx, *, settings=None) -> ToolSurface:
     return ToolSurfaceResolver(registry, settings).resolve(ctx.run_kind, ctx)
@@ -94,14 +99,15 @@ def test_run_profile_event_driven_keeps_read_only_tools():
     surface = resolve(
         builtin_registry(), surface_context(run_kind=RUN_KIND_EVENT_DRIVEN)
     )
-    assert surface.tool_ids == READ_ONLY_IDS
+    assert surface.tool_ids == SURFACED_READ_ONLY_IDS
     excluded = reasons_for(surface)
-    assert set(excluded) == set(BUILTIN_TOOL_IDS) - set(READ_ONLY_IDS)
+    assert set(excluded) == set(BUILTIN_TOOL_IDS) - set(SURFACED_READ_ONLY_IDS)
     assert excluded["channel.feishu.send"] == "tool_status:disabled"
+    assert excluded["builtin.search.query"] == "unavailable:source_not_configured"
     assert all(
         reason.startswith("run_profile:")
         for tool_id, reason in excluded.items()
-        if tool_id != "channel.feishu.send"
+        if tool_id not in ("channel.feishu.send", "builtin.search.query")
     )
 
 
@@ -461,6 +467,10 @@ def test_action_tool_map_covers_every_action_type_and_binds_registered_tools():
         for tool_id in tool_ids:
             definition = registry.get(tool_id)
             assert definition is not None, f"{action_type} → {tool_id} 未注册"
+            if definition.namespace == "channel":
+                # TOOL-010：通道工具绑定独立的 `channel_feishu` 能力（外发与"行动 note"
+                # 必须可分流），共用 legacy 能力名的只有内置工具。
+                continue
             assert (
                 definition.capability,
                 definition.action,
@@ -472,6 +482,7 @@ def test_toolcontext_field_set_is_frozen_to_documented_shape():
 
     from app.services.tool.context import ToolContext
 
+    # TOOL-010 追加 `dedupe_key`（外发类能力的幂等键下传面，§7.6），其余字段为 TOOL-004 形态。
     assert {field.name for field in fields(ToolContext)} == {
         "user_id",
         "character_id",
@@ -481,6 +492,7 @@ def test_toolcontext_field_set_is_frozen_to_documented_shape():
         "run_kind",
         "run_id",
         "source",
+        "dedupe_key",
         "world",
         "inventory",
         "situations",
@@ -496,7 +508,8 @@ def test_surface_limit_defaults_to_ctx_settings():
     resolver = ToolSurfaceResolver(registry)
     surface = resolver.resolve(ctx.run_kind, ctx)
     assert len(surface.tool_ids) == 1
-    assert [item["reason"] for item in surface.excluded].count(SURFACE_LIMIT_REASON) == 8
+    # TOOL-010：`builtin.search.query` 被可用性降级维度先裁掉，不计入上限截断。
+    assert [item["reason"] for item in surface.excluded].count(SURFACE_LIMIT_REASON) == 7
 
 
 @pytest.mark.parametrize("run_kind", list(SURFACE_RULES))

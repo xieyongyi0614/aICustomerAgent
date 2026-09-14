@@ -76,12 +76,21 @@ def test_builtin_definition_matches_mapping_table(row):
 
 @pytest.mark.parametrize("row", MAPPING_TABLE, ids=lambda row: row["tool_id"])
 def test_builtin_binding_resolves_to_real_capability(row):
+    """TOOL-010｜`channel.feishu.send` 绑定 `channel_feishu`：该能力仅在通道可用时
+    进入全局 CapabilityRegistry（默认 6 个能力不变），声明期由通道能力单例充当依据。"""
     registry = _builtin_registry()
     binding = registry.resolve(row["tool_id"])
     assert binding is not None
     assert binding.tool_id == row["tool_id"]
     capability_registry = get_capability_registry()
-    assert capability_registry.has(binding.capability, binding.action)
+    if not capability_registry.has(binding.capability, binding.action):
+        from app.services.tool.channel_tools import get_channel_capability
+
+        channel = get_channel_capability()
+        assert binding.capability == channel.name
+        assert binding.action in channel.actions
+        assert registry.effective_status(binding.tool_id) == "disabled"
+        return
     action_schema = capability_registry.get(binding.capability).actions[binding.action]
     declared_required = {
         parameter.name

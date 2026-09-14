@@ -420,16 +420,24 @@ def test_builtin_semantic_validators_cover_documented_names():
 
 
 def test_semantic_validators_are_declared_on_builtin_tools():
+    """TOOL-010｜按 §2.2 表补全绑定：提醒追加正文预算、移动追加库存校验，
+    并新增通道工具（收件人授权 + 正文预算）。"""
     registry = ToolRegistry()
     register_builtin_tools(registry)
     assert registry.get("builtin.reminder.create").input_schema.semantic_validators == (
         "future_datetime",
+        "content_within_budget",
     )
     assert registry.get("world.object.move").input_schema.semantic_validators == (
+        "object_in_inventory",
         "location_exists",
     )
     assert registry.get("world.object.use").input_schema.semantic_validators == (
         "object_in_inventory",
+    )
+    assert registry.get("channel.feishu.send").input_schema.semantic_validators == (
+        "recipient_authorized",
+        "content_within_budget",
     )
     declared = {
         name
@@ -437,7 +445,13 @@ def test_semantic_validators_are_declared_on_builtin_tools():
         for name in item.input_schema.semantic_validators
     }
     assert declared <= set(BUILTIN_SEMANTIC_VALIDATORS)
-    assert declared == {"future_datetime", "location_exists", "object_in_inventory"}
+    assert declared == {
+        "future_datetime",
+        "location_exists",
+        "object_in_inventory",
+        "recipient_authorized",
+        "content_within_budget",
+    }
 
 
 def test_declared_validators_are_all_registered():

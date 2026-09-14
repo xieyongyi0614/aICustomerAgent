@@ -6,7 +6,9 @@
 归属标注（本任务只定义结构，不接任何仓储）：
 - 世界事实（`world` / `inventory` / `situations` / `scene`）由 TOOL-007 装配；
 - 关系阶段（`relationship`）由 TOOL-007 装配；
-- 授权名单（`authorized_recipients`）由 TOOL-005 装配。
+- 授权名单（`authorized_recipients`）由 TOOL-005 装配；
+- 幂等键（`dedupe_key`）由 TOOL-010 追加，`ToolExecutor` 从 `ToolInvocation.dedupe_key`
+  填入（外发类能力直填 `OutboundMessage.idempotency_key`）。
 
 TOOL-007 装配标记：`world[WORLD_ENABLED_KEY]` 恒存在 = 世界事实已装配（见
 `world_facts_assembled()` / `world_facts_enabled()`）；装配态下 `inventory=[]` 表示
@@ -48,6 +50,7 @@ class ToolContext:
     run_kind: str = DEFAULT_RUN_KIND
     run_id: str | None = None
     source: str = DEFAULT_SOURCE
+    dedupe_key: str = ""
     world: dict[str, Any] = field(default_factory=dict)
     inventory: list[str] = field(default_factory=list)
     situations: list[dict[str, Any]] = field(default_factory=list)
@@ -64,6 +67,7 @@ class ToolContext:
             record_id=execution_ctx.record_id,
             now=execution_ctx.now,
             settings=execution_ctx.settings,
+            dedupe_key=str(getattr(execution_ctx, "dedupe_key", "") or ""),
         )
 
     def world_locations(self) -> Sequence[str] | None:
