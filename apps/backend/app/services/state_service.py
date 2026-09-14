@@ -123,6 +123,15 @@ def load_states(user_id: str) -> tuple[CharacterState, RelationshipState]:
     return decayed, relationship
 
 
+def load_relationship(user_id: str) -> RelationshipState:
+    """只读关系状态（零副作用，缺记录返回默认值不落库）。
+
+    工具层预读（TOOL-007 §2.2 关系阶段投影）与只读消费方的统一入口：
+    工具实现体禁止导入 `relationship_*_repository`，读面必须经服务层（静态扫描强制）。
+    """
+    return relationship_repository.get_relationship(user_id)
+
+
 def load_last_user_emotion(user_id: str) -> str:
     try:
         entries = emotion_history_repository.list_recent(user_id, 1)

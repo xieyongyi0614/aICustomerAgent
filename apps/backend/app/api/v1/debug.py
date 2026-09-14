@@ -17,6 +17,7 @@ from app.api.v1.schemas import (
     ToolRuntimeStatusOut,
     ToolSummaryOut,
     ToolSurfaceOut,
+    ToolWorldIntentOut,
     ToolsOut,
 )
 from app.character.asuna.tool import RUN_KIND_FOREGROUND_CHAT
@@ -43,6 +44,7 @@ from app.services.tool.confirmation import get_confirmation_service
 from app.services.tool.context import ToolContext
 from app.services.tool.registry import ToolRegistry, get_tool_registry
 from app.services.tool.surface import ToolSurfaceResolver
+from app.services.tool.world_intent import get_world_intent_submitter
 from app.services.trace_collector import get_trace_collector
 from app.repositories import (
     relationship_milestone_repository,
@@ -148,7 +150,11 @@ def _project_executions(
 
 @debug_router.get("/debug/tools", response_model=ToolsOut)
 def list_tools():
-    """工具清单（声明 + 状态 + 健康度）；总闸 off → `{"enabled": false}`。"""
+    """工具清单（声明 + 状态 + 健康度）；总闸 off → `{"enabled": false}`。
+
+    TOOL-007：附加 `world_intent` 段暴露 `world.intent.submit` 的接线状态
+    （本版本恒 `status="not_wired"`、`writes=0`），防止"看着有其实没有"。
+    """
     if not _tools_enabled():
         return ToolsOut(enabled=False)
     registry = get_tool_registry()
@@ -168,6 +174,7 @@ def list_tools():
             for definition in registry.list()
         ],
         runtime_disabled=sorted(registry.runtime_disabled_ids()),
+        world_intent=ToolWorldIntentOut(**get_world_intent_submitter().status()),
     )
 
 

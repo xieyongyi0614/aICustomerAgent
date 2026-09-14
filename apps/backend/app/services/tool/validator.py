@@ -10,8 +10,12 @@
   字符串空白折叠（内外）、枚举大小写等价形式归一。
 - 上下文缺失（`ToolContext` 世界事实维度为空，即 TOOL-007 未装配）时语义校验器
   **降级放行并记日志**，不因未装配而误拒；校验器自身异常按**默认拒绝**处理（fail-closed）。
-- 世界事实读面（TOOL-004 §2.2 结构）：地点取 `ToolContext.world["locations"]`，
-  库存取 `ToolContext.inventory`，收件人取 `ToolContext.authorized_recipients`。
+- 装配态与未装配态的区分（TOOL-007 §4.1）：世界事实**已装配**（`ToolContext.world` 含
+  `world_enabled` 且为真，见 `ToolContext.world_facts_enabled()`）时，空集合是**事实**
+  （如 `inventory=[]` 表示确实没有物品 → `object_in_inventory` 判失败，E4）；未装配或
+  世界不可用时才是**信息不足** → 降级放行。
+- 世界事实读面（TOOL-004 §2.2 结构）：地点取 `ToolContext.world["locations"]`（已知地点
+  词表，TOOL-007 供数据），库存取 `ToolContext.inventory`，收件人取 `ToolContext.authorized_recipients`。
 """
 
 import logging
@@ -350,16 +354,25 @@ def _location_exists(params: dict[str, Any], ctx: ToolContext) -> list[str]:
 
 
 def _object_in_inventory(params: dict[str, Any], ctx: ToolContext) -> list[str]:
+    """库存语义校验：世界事实**已装配**（`world_enabled` 键存在且为真）时，
+    `inventory=[]` 表示确实没有物品 → 任意 object 判失败（TOOL-007 E4）；
+    未装配 / 世界不可用 / 上下文缺失 → 信息不足，降级放行。"""
     obj = params.get("object")
     if obj is None:
         return []
-    inventory = _as_texts(ctx.inventory)
-    if not inventory:
+    trustworthy = _world_facts_trustworthy(ctx)
+    inventory = _as_texts(None if ctx is None else ctx.inventory)
+    if not inventory and trustworthy is not True:
         logger.info("object_in_inventory 降级放行：ToolContext.inventory 未装配（TOOL-007）")
         return []
     if str(obj) not in inventory:
         return [f"object 不在当前库存内：{obj}"]
     return []
+
+
+def _world_facts_trustworthy(ctx: ToolContext | None) -> bool | None:
+    """世界事实可信度：已装配且世界可用 → True；未装配 / 世界不可用 → None（降级）。"""
+    return None if ctx is None else ctx.world_facts_enabled()
 
 
 def _recipient_authorized(params: dict[str, Any], ctx: ToolContext) -> list[str]:

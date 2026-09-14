@@ -4,7 +4,7 @@
 
 ```text
 ToolSurfaceResolver.resolve(run_kind, ctx) → ToolSurface
-    候选全集（注册表声明）→ 六维规则逐条过滤（记 {tool_id, reason}，首条命中短路）
+    候选全集（注册表声明）→ 七维规则逐条过滤（记 {tool_id, reason}，首条命中短路）
     → priority 升序 + tool_id 字典序（确定性 tiebreak）→ 上限截断（reason=surface_limit）
     → surface_hash = sha1(规范化输入 + tool_ids)[:16]
 
@@ -13,8 +13,10 @@ ToolSelector.select(intent, surface) → ToolBinding | None
     → priority + tool_id 字典序取首（确定性）→ 注册表解析为绑定
 
 ToolSurfacePolicy.policy_for / should_exclude
-    Run Profile → SurfaceRule；六维规则判定裁剪原因（None = 保留）
+    Run Profile → SurfaceRule；七维规则判定裁剪原因（None = 保留）
 ```
+
+**七维**：状态 / Run Profile / 日时段 / 场景 / 关系阶段 / 世界可用性（预读事实 TOOL-007）/ 世界可用性（配置）。
 
 **零 IO / 零 LLM**：全部输入来自 `ToolContext` 与注册表内存态（无 DB / 无网络 / 无 LLM）。
 **缺省即降级**：世界事实维度为空（TOOL-007 未装配）时该维度不裁剪，只记 warning（E5 / E14）。
@@ -61,6 +63,7 @@ PART_OF_DAY_REASON_PREFIX = "part_of_day"
 SCENE_REASON_PREFIX = "scene"
 RELATIONSHIP_REASON_PREFIX = "relationship_stage"
 WORLD_REASON = "world_unavailable"
+WORLD_FACTS_REASON = "world_disabled"
 
 STATUS_LABELS: tuple[str, ...] = ("disabled", "deprecated", "removed", "tripped")
 
@@ -70,6 +73,7 @@ _HASH_WORLD_KEYS: tuple[str, ...] = (
     "weather",
     "current_block",
     "active_events",
+    "world_enabled",
 )
 
 _HASH_SCENE_KEYS: tuple[str, ...] = ("location_id", "tone_bias")
@@ -97,13 +101,14 @@ class ToolSurfacePolicy:
     def should_exclude(
         self, defn: ToolDefinition, ctx: ToolContext, rule: SurfaceRule
     ) -> str | None:
-        """六维规则判定（按文档顺序短路）：返回裁剪原因，None 表示保留。"""
+        """七维规则判定（按文档顺序短路）：返回裁剪原因，None 表示保留。"""
         return (
             self._status_reason(defn)
             or self._run_profile_reason(defn, rule)
             or self._part_of_day_reason(defn, ctx)
             or self._scene_reason(defn, ctx)
             or self._relationship_reason(defn, ctx)
+            or self._world_facts_reason(defn, ctx)
             or self._world_reason(defn, ctx)
         )
 
@@ -172,8 +177,17 @@ class ToolSurfacePolicy:
             return f"{RELATIONSHIP_REASON_PREFIX}:{stage}"
         return None
 
+    def _world_facts_reason(self, defn: ToolDefinition, ctx: ToolContext) -> str | None:
+        """世界可用性维度（预读事实，TOOL-007 §4.4）：装配态 `world_enabled=False`
+        时剔除整个 `world` 命名空间（理由 `world_disabled`）；未装配（None）降级不裁剪。"""
+        if ctx.world_facts_enabled() is not False:
+            return None
+        if defn.namespace == WORLD_NAMESPACE:
+            return WORLD_FACTS_REASON
+        return None
+
     def _world_reason(self, defn: ToolDefinition, ctx: ToolContext) -> str | None:
-        """世界可用性维度：world_enabled=False 剔除 world 命名空间（V9 world_gate 同款）。"""
+        """世界可用性维度（配置态）：world_enabled=False 剔除 world 命名空间（V9 world_gate 同款）。"""
         if ctx.world_enabled():
             return None
         if defn.namespace == WORLD_NAMESPACE:

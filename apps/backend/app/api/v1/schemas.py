@@ -243,10 +243,22 @@ class ToolSummaryOut(BaseModel):
     health: ToolHealthOut | None = None
 
 
+class ToolWorldIntentOut(BaseModel):
+    """`world.intent.submit` 接线状态（TOOL-007 §4.2）：未接线必须可见（status=not_wired）。"""
+
+    tool_id: str
+    status: str
+    wired: bool = False
+    writes: int = 0
+    intent_types: list[str] = []
+    note: str = ""
+
+
 class ToolsOut(BaseModel):
     enabled: bool
     tools: list[ToolSummaryOut] = []
     runtime_disabled: list[str] = []
+    world_intent: ToolWorldIntentOut | None = None
 
 
 class ToolDetailOut(BaseModel):

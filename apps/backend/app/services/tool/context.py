@@ -8,10 +8,14 @@
 - 关系阶段（`relationship`）由 TOOL-007 装配；
 - 授权名单（`authorized_recipients`）由 TOOL-005 装配。
 
+TOOL-007 装配标记：`world[WORLD_ENABLED_KEY]` 恒存在 = 世界事实已装配（见
+`world_facts_assembled()` / `world_facts_enabled()`）；装配态下 `inventory=[]` 表示
+**确实没有物品**（语义校验器判失败），未装配才是"信息不足 → 降级放行"。
+
 纪律：`ToolContext` 是**只读预读快照**，对齐 V9 `planner.GateSnapshot` 的
 "调用方预读、闸门内零 IO" 范式；工具实现体禁止自行读仓储（TOOL-007 静态扫描强制）。
-世界事实维度**缺省即为空**（`{}` / `[]`）表示**未装配**，工具面投影据此降级为不裁剪、
-语义校验器据此降级放行（TOOL-003 §2.3），不因装配未完成而误裁或误拒。
+世界事实维度保持默认空值（`{}` / `[]`）且无装配标记即为**未装配**，工具面投影据此降级为
+不裁剪、语义校验器据此降级放行（TOOL-003 §2.3），不因装配未完成而误裁或误拒。
 """
 
 from collections.abc import Sequence
@@ -25,6 +29,7 @@ DEFAULT_SOURCE = "conversation"
 
 WORLD_LOCATIONS_KEY = "locations"
 WORLD_PART_OF_DAY_KEY = "part_of_day"
+WORLD_ENABLED_KEY = "world_enabled"
 SCENE_TONE_BIAS_KEY = "tone_bias"
 RELATIONSHIP_STAGE_KEY = "stage"
 
@@ -80,3 +85,16 @@ class ToolContext:
 
     def world_enabled(self) -> bool:
         return bool(getattr(self.settings, "world_enabled", True))
+
+    def world_facts_assembled(self) -> bool:
+        """世界事实是否已装配（TOOL-007 预读标记）：`world_enabled` 键存在即已装配。"""
+        return WORLD_ENABLED_KEY in self.world
+
+    def world_facts_enabled(self) -> bool | None:
+        """装配态下的世界可用性；未装配返回 None（消费方降级，不误判）。
+
+        与 `world_enabled()`（读 settings）的区别：本方法读的是**预读快照**，
+        供投影规则与语义校验器判定"事实是否可信"，而非"配置是否开启"。
+        """
+        value = self.world.get(WORLD_ENABLED_KEY)
+        return None if value is None else bool(value)

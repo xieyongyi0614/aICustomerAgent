@@ -13,6 +13,11 @@ V2.4.0 TOOL-005：权限闸开启时装配 `PermissionSnapshot` 下传执行器�
 （回复素材），确认态映射为 `ActionRecord.status="planned"` + `gate_reason=pending_confirmation`；
 用户批准后的确认轮次复用原记录与幂等键重新执行（不产生第二条 `ActionRecord`）；
 过期确认请求复用既有 action 维护步清理（不新增维护步）。
+
+V2.4.0 TOOL-007：总闸开启时 `_build_snapshot` 经 `WorldContextBuilder` 八段预读世界事实并
+注入 `ToolContext`（挂 `snapshot.tool_context`），供工具面投影与工具执行复用；工具写世界
+仍只走"`deferred_world_op` → outbox → `world_engine`"唯一路径（本模块不新增写面）。
+总闸关闭时不装配（`snapshot.tool_context is None`），行为与 V2.3.0 逐字节一致。
 """
 
 import asyncio
@@ -34,7 +39,7 @@ from app.services.action.executor import CapabilityExecutor
 from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_gates
 from app.services.action.registry import ExecutionContext, get_capability_registry
 from app.services.tool.confirmation import get_confirmation_service
-from app.services.tool.context import ToolContext
+from app.services.tool.context import DEFAULT_SOURCE, ToolContext
 from app.services.tool.executor import ToolExecutor, resolve_step_binding
 from app.services.tool.health import ToolHealthTracker
 from app.services.tool.permission import (
@@ -49,6 +54,7 @@ from app.services.tool.permission import (
     required_scope,
 )
 from app.services.tool.registry import ToolRegistry, get_tool_registry
+from app.services.tool.world_context import WORLD_FACTS_KEYS, apply_world_facts, build_tool_context
 from app.application import world_engine
 from app.application.worker_loop import run_worker_loop
 from app.services.action import memory_bridge, relationship_bridge
@@ -109,7 +115,12 @@ def new_record(intent: ActionIntent, user_id: str, session_id: str | None, sourc
 
 
 def _build_snapshot(user_id: str, settings) -> GateSnapshot:
-    """装配六闸门快照（读世界现状与既有记录，闸门内零 IO）。"""
+    """装配六闸门快照（读世界现状与既有记录，闸门内零 IO）。
+
+    V2.4.0 TOOL-007：总闸开启时额外装配 `ToolContext`（八段世界事实预读）并挂到
+    `snapshot.tool_context`，供闸门后的工具面投影与工具执行复用（同一快照，零重复 IO）；
+    总闸关闭返回 `None` → 投影与执行走 V9 原路径，行为与 V2.3.0 一致。
+    """
     snapshot = GateSnapshot(settings=settings, registry=get_capability_registry(), now=_now())
     snapshot.records = [
         {"dedupe_key": r.dedupe_key, "status": r.status, "created_at": r.created_at}
@@ -125,7 +136,43 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
         snapshot.active_reminder_titles = [e.title for e in events if e.type in ("reminder", "appointment")]
     except Exception:
         logger.exception("世界快照装配失败，G6 退化为不否决")
+    snapshot.tool_context = _build_tool_context(user_id, settings, snapshot.now, snapshot.run_kind)
     return snapshot
+
+
+def _build_tool_context(
+    user_id: str, settings, now: datetime, run_kind: str
+) -> ToolContext | None:
+    """工具上下文预读（TOOL-007 §2.3）：总闸 off → `None`（零 IO，V2.3.0 行为）。
+
+    装配失败不抛出（`WorldContextBuilder` 逐段降级）；本函数自身异常同样降级为
+    `None`——工具系统是行动链路的旁路，任何失败都不得影响行动规划。
+    """
+    if not getattr(settings, "v24_tool_system_enabled", False):
+        return None
+    try:
+        base = ToolContext(
+            user_id=user_id,
+            now=now,
+            settings=settings,
+            run_kind=run_kind,
+            source=DEFAULT_SOURCE,
+        )
+        return build_tool_context(base, settings=settings, now=now)
+    except Exception:
+        logger.exception("工具上下文预读失败，降级为空世界事实")
+        return None
+
+
+def _tool_context_for_execution(
+    ctx: ExecutionContext, preloaded: ToolContext | None
+) -> ToolContext:
+    """执行用 `ToolContext`：执行上下文定身份（record_id / now / settings），
+    预读快照供世界事实（TOOL-007 §2.3"预读注入"）；未预读则世界事实留空（降级）。"""
+    base = ToolContext.from_execution_context(ctx)
+    if preloaded is None:
+        return base
+    return apply_world_facts(base, {key: getattr(preloaded, key) for key in WORLD_FACTS_KEYS})
 
 
 async def execute_plan(
@@ -134,8 +181,13 @@ async def execute_plan(
     ctx: ExecutionContext,
     *,
     permission_snapshot: PermissionSnapshot | None = None,
+    tool_context: ToolContext | None = None,
 ) -> ActionResult:
-    """执行计划：step 归一回填 steps/result；重试保留同 Record。"""
+    """执行计划：step 归一回填 steps/result；重试保留同 Record。
+
+    `tool_context`（TOOL-007）：`_build_snapshot` 预读的世界事实快照；缺省时按执行上下文
+    重建（世界事实留空）——总闸 off 的路径行为与 V2.3.0 逐字节一致。
+    """
     settings = get_settings()
     storage = get_capability_registry()
     executor = CapabilityExecutor(storage, settings.action_execution_timeout_seconds)
@@ -154,6 +206,7 @@ async def execute_plan(
             executor,
             tool_registry,
             permission_snapshot=permission_snapshot,
+            tool_context=tool_context,
         )
 
     step_dicts: list[dict] = []
@@ -206,6 +259,7 @@ async def _execute_plan_via_tools(
     tool_registry: ToolRegistry,
     *,
     permission_snapshot: PermissionSnapshot | None = None,
+    tool_context: ToolContext | None = None,
 ) -> ActionResult:
     """总闸开启时的执行路径：五段短路 + `steps[]` 新字段（TOOL-003 §2.2、§2.4）。"""
     tool_executor = ToolExecutor(
@@ -214,7 +268,7 @@ async def _execute_plan_via_tools(
         settings=settings,
         health=ToolHealthTracker(tool_registry, settings),
     )
-    tool_ctx = ToolContext.from_execution_context(ctx)
+    tool_ctx = _tool_context_for_execution(ctx, tool_context)
     intent = ActionIntent.model_validate(record.intent) if record.intent else plan.intent
 
     step_dicts: list[dict] = []
@@ -521,7 +575,8 @@ async def run_action_planning(
         now=_now(), settings=settings,
     )
     result = await execute_plan(
-        record, plan, ctx, permission_snapshot=_build_permission_snapshot(user_id, settings)
+        record, plan, ctx, permission_snapshot=_build_permission_snapshot(user_id, settings),
+        tool_context=snapshot.tool_context,
     )
     if record.status != "failed":
         integrate_result(record, result)
@@ -604,6 +659,7 @@ async def _resume_confirmed_record(
         plan,
         ctx,
         permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+        tool_context=snapshot.tool_context,
     )
     if record.status != "failed":
         integrate_result(record, result)
@@ -704,7 +760,7 @@ async def _process_due_retries():
         settings = get_settings()
         for record in records:
             try:
-                record, plan = _rebuild_plan(record, settings)
+                record, plan, snapshot = _rebuild_plan(record, settings)
                 if plan is None:
                     continue
                 ctx = ExecutionContext(
@@ -716,6 +772,7 @@ async def _process_due_retries():
                     plan,
                     ctx,
                     permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+                    tool_context=snapshot.tool_context,
                 )
                 if record.status != "failed":
                     integrate_result(record, result)
@@ -764,6 +821,7 @@ def _expire_pending_confirmations() -> int:
 
 
 def _rebuild_plan(record: ActionRecord, settings):
+    """重试重建计划：返回（记录，计划，快照）——快照供 TOOL-007 世界事实复用。"""
     intent = ActionIntent.model_validate(record.intent)
     snapshot = _build_snapshot(record.user_id, settings)
     plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
@@ -772,5 +830,5 @@ def _rebuild_plan(record: ActionRecord, settings):
         record.gate_reason = "capability_unavailable"
         record.updated_at = _now()
         action_repository.save_record(record)
-        return record, None
-    return record, plan
+        return record, None, snapshot
+    return record, plan, snapshot
