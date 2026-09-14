@@ -471,11 +471,19 @@ def _effect_ref(step_result: dict, kind: str) -> str | None:
     return None
 
 
+def _deliver_memory(record: ActionRecord, settings) -> dict | None:
+    """记忆投递路由（TOOL-008 §2.3）：工具记忆子闸 on 走泛化键，off 与 V9 逐字节一致。"""
+    if getattr(settings, "v24_tool_memory_enabled", False):
+        return memory_bridge.deliver(record, record.user_id, record.character_id)
+    return memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
+
+
 def integrate_result(record: ActionRecord, result: ActionResult) -> None:
     """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。
 
     V2.4.0：效果引用读 `steps[].result.effects`（新键）优先，`payload` 旧键兜底——
     兼容窗口 ≥ 一个版本，Flag off 时等价于 V9 原路径。
+    V2.4.0 TOOL-008：记忆投递经 `_deliver_memory` 路由，子闸 off 时调用与参数不变。
     """
     settings = get_settings()
 
@@ -502,7 +510,7 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
         return
 
     if settings.action_enabled:
-        memory_payload = memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
+        memory_payload = _deliver_memory(record, settings)
         if memory_payload:
             _append_effect(record, "memory", memory_payload.get("memory_id", ""), "已记住")
         relationship_bridge.deliver_action_signal(record, record.user_id)

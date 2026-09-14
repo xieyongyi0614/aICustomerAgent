@@ -2,6 +2,10 @@
 
 行动记忆第四供给方：候选经既有 memory_policy R1~R8 校验（零豁免）后由
 memory_repository 落库；source 只用 user_stated / user_derived。
+
+V2.4.0 TOOL-008：新增 `deliver` 泛化路径（键从 action_type 升级为 memory_policy_key），
+工具记忆子闸 `v24_tool_memory_enabled` off 时回退本模块既有的 `deliver_action_memory`。
+两条路径共用同一政策闸与落库入口，幂等标记同为 `effects.kind == "memory"`。
 """
 
 import logging
@@ -13,8 +17,11 @@ from app.character.asuna.action import (
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.models.memory import MemoryCandidate
+from app.models.tool import ToolDefinition
 from app.repositories import memory_repository
 from app.services import memory_policy
+from app.services.tool import memory_policy as tool_memory_policy
+from app.services.tool.registry import get_tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +70,70 @@ def to_memory_candidates(record: ActionRecord) -> list[MemoryCandidate]:
 
 
 def has_memory_effect(record: ActionRecord) -> bool:
-    """幂等：effects 中已登记 memory 效果则跳过重复投递。"""
-    result = record.result or {}
-    for effect in result.get("effects", []):
-        if effect.get("kind") == "memory":
-            return True
-    return False
+    """幂等：effects 中已登记 memory 效果则跳过重复投递（TOOL-008 泛化后归口工具记忆策略）。"""
+    return tool_memory_policy.has_memory_effect(record)
+
+
+def _tool_definition(record: ActionRecord) -> ToolDefinition | None:
+    """工具声明（供硬纪律①读 `side_effects` 与命名空间判定）；无注册表或不注册返回 None。"""
+    tool_id = tool_memory_policy.tool_id_of(record)
+    registry = get_tool_registry()
+    if tool_id is None or registry is None:
+        return None
+    return registry.get(tool_id)
+
+
+def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> dict | None:
+    """工具结果记忆投递（TOOL-008 §4.2）：门控 + 幂等 + 分类 + R1~R8 + 落库。
+
+    子闸 off → 回退 `deliver_action_memory`（action_type 键）；政策总开关 off → 不投递。
+    任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
+    """
+    settings = get_settings()
+    if not settings.v24_tool_memory_enabled:
+        return deliver_action_memory(record, user_id, character_id)
+    if not settings.action_memory_policy_enabled:
+        return None
+    try:
+        if tool_memory_policy.has_memory_effect(record):
+            return None
+        definition = _tool_definition(record)
+        candidates = tool_memory_policy.get_tool_memory_policy().to_candidates(
+            record, definition
+        )
+        if not candidates:
+            decision = tool_memory_policy.get_tool_memory_policy().classify(
+                record, definition
+            )
+            logger.debug(
+                "工具结果未产生记忆候选: tool_id=%s reason=%s",
+                tool_memory_policy.policy_key_for(record, definition),
+                decision.reason,
+            )
+            return None
+        report = memory_policy.apply_policy(candidates)
+        saved = report.saved
+        if not saved:
+            logger.info(
+                "工具结果记忆候选未通过政策闸，已丢弃: tool_id=%s rules=%s",
+                tool_memory_policy.policy_key_for(record, definition),
+                [outcome.rule for outcome in report.discarded],
+            )
+            return None
+        candidate = saved[0]
+        memory = memory_repository.create_memory(
+            user_id,
+            character_id,
+            content=candidate.content or "",
+            memory_type=candidate.type,
+            importance=candidate.importance,
+            confidence=candidate.confidence,
+            source=candidate.source,
+        )
+        return {"memory_id": memory.id, "content": memory.content}
+    except Exception:
+        logger.exception("工具结果记忆投递失败（不回滚工具执行）")
+        return None
 
 
 def deliver_action_memory(record: ActionRecord, user_id: str, character_id: str = "asuna") -> dict | None:

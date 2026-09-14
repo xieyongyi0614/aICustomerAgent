@@ -1,10 +1,12 @@
-"""亚丝娜工具资产（V2.4.0 TOOL-004 §2.2 工具面投影 / TOOL-005 §4.3 确认话术与确认词表）。
+"""亚丝娜工具资产（V2.4.0 TOOL-004 §2.2 工具面投影 / TOOL-005 §4.3 确认话术与确认词表
+/ TOOL-008 §2.2 工具结果记忆内容模板）。
 
 纯数据：无 IO、无 LLM、无状态；投影逻辑在 `app/services/tool/surface.py`，
-确认判定与话术装配在 `app/services/tool/permission.py` 与 `confirmation.py`。
+确认判定与话术装配在 `app/services/tool/permission.py` 与 `confirmation.py`，
+记忆分层与候选构造在 `app/services/tool/memory_policy.py`。
 资产只回答"哪些 Profile / 时段 / 场景 / 关系阶段该裁掉什么"（投影）、
-"哪些说法算点头或摇头"（确认词表）与"话术长什么样"（话术模板），
-不回答"怎么裁"与"怎么判"。
+"哪些说法算点头或摇头"（确认词表）、"话术长什么样"（话术模板）与
+"沉淀进记忆时这句话怎么写"（记忆内容模板），不回答"怎么裁"与"怎么判"。
 """
 
 from dataclasses import dataclass
@@ -159,3 +161,29 @@ CONFIRM_DENY_LEXICON: tuple[str, ...] = (
 CONFIRM_WORD_MAX_CONTENT_CHARS = 12
 
 CONFIRM_LEXICON_MIN_WORDS = 5
+
+TOOL_MEMORY_TEMPLATES: dict[str, str] = {
+    "builtin.reminder.create": "用户请我提醒他：{content}",
+    "builtin.reminder.cancel": "用户不想再被提醒：{target}",
+    "builtin.memory.save": "用户告诉我：{fact}",
+    "world.object.create": "用户请我准备：{object}",
+    "builtin.notification.send": "我主动提醒了用户：{content}",
+    "channel.feishu.send": "我主动给用户发了消息：{content}",
+}
+
+TOOL_MEMORY_FAILURE_TEMPLATE = "上次没能帮用户完成：{content}"
+
+
+def render(policy_key: str, params: dict, *, failed: bool = False) -> str:
+    """记忆内容渲染（TOOL-008 §4.3）：`failed=True` 用未完成语义，无模板或缺参返回空串。"""
+    template = TOOL_MEMORY_TEMPLATES.get(policy_key)
+    if template is None:
+        return ""
+    values = {key: str(value) for key, value in params.items()}
+    try:
+        content = template.format(**values)
+    except (KeyError, IndexError):
+        return ""
+    if failed:
+        return TOOL_MEMORY_FAILURE_TEMPLATE.format(content=content)
+    return content
