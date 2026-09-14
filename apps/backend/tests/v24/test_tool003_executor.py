@@ -15,13 +15,13 @@ from app.services.tool.executor import (
     PERMISSION_CONFIRM_REQUIRED,
     PERMISSION_DENY,
     PERMISSION_LAYER_OFF_REASON,
-    PERMISSION_PLACEHOLDER_REASON,
     PermissionDecision,
     PermissionGate,
     PermissionSnapshot,
     ToolExecutor,
     resolve_step_binding,
 )
+from app.services.tool.permission import REASON_LEVEL_NO_GRANT_REQUIRED
 from app.services.tool.normalizer import REDACTED_VALUE
 from app.services.tool.registry import ToolRegistry, register_builtin_tools
 from app.services.tool.validator import ParamValidator
@@ -193,14 +193,15 @@ async def test_permission_off_is_placeholder_allow():
 
 
 @pytest.mark.asyncio
-async def test_permission_on_keeps_placeholder_allow():
+async def test_permission_on_runs_real_gate_level_no_grant_required():
+    """TOOL-005 同步：权限闸 on 时占位 allow 由真实七步判定取代（normal 免授权）。"""
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
         registry, capability, settings=tool_settings(v24_tool_permission_enabled=True)
     )
     execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
     assert execution.permission["decision"] == "allow"
-    assert execution.permission["reason"] == PERMISSION_PLACEHOLDER_REASON
+    assert execution.permission["reason"] == REASON_LEVEL_NO_GRANT_REQUIRED
     assert execution.status == "succeeded"
 
 
@@ -244,11 +245,15 @@ async def test_unknown_permission_decision_fails_closed():
 
 
 def test_permission_interfaces_are_frozen_shapes():
+    """TOOL-005 同步：快照 / 裁决形状按 TOOL-005 §2.2 演进（新增快照字段与 confirm_kind）。"""
     assert set(PermissionSnapshot().__dict__) == {
         "user_id",
-        "character_id",
+        "now",
         "grants",
-        "confirmed",
+        "pending",
+        "channel_bound",
+        "settings",
+        "namespace_floors",
     }
     assert set(PermissionDecision("allow", "normal", "r").__dict__) == {
         "decision",
@@ -256,6 +261,7 @@ def test_permission_interfaces_are_frozen_shapes():
         "reason",
         "confirm_prompt",
         "scope_required",
+        "confirm_kind",
     }
     gate = PermissionGate(tool_settings())
     decision = gate.evaluate(definition(), _invocation(), PermissionSnapshot(user_id="u"))
@@ -263,6 +269,7 @@ def test_permission_interfaces_are_frozen_shapes():
     assert decision.level == "normal"
     assert decision.scope_required == ("world",)
     assert decision.confirm_prompt is None
+    assert decision.confirm_kind is None
 
 
 # --- ③ validate --------------------------------------------------------------

@@ -7,6 +7,12 @@ execute_plan → integrate_result。全部发生在 post_process 第 9 步（per
 V2.4.0：`v24_tool_system_enabled` 开启时 `execute_plan` 的步骤执行改走 `ToolExecutor`
 （五段短路 + 结果归一），`steps[]` 增量落 `tool_id` / `permission` / `validation` /
 `duration_ms`；总闸关闭时执行路径与 V2.3.0 逐字节一致。
+
+V2.4.0 TOOL-005：权限闸开启时装配 `PermissionSnapshot` 下传执行器（快照装配在引擎侧，
+闸门内零 IO）；`pending_confirmation` 步骤登记确认请求并把确认话术投影进行动结果
+（回复素材），确认态映射为 `ActionRecord.status="planned"` + `gate_reason=pending_confirmation`；
+用户批准后的确认轮次复用原记录与幂等键重新执行（不产生第二条 `ActionRecord`）；
+过期确认请求复用既有 action 维护步清理（不新增维护步）。
 """
 
 import asyncio
@@ -27,9 +33,21 @@ from app.repositories import action_repository
 from app.services.action.executor import CapabilityExecutor
 from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_gates
 from app.services.action.registry import ExecutionContext, get_capability_registry
+from app.services.tool.confirmation import get_confirmation_service
 from app.services.tool.context import ToolContext
 from app.services.tool.executor import ToolExecutor, resolve_step_binding
 from app.services.tool.health import ToolHealthTracker
+from app.services.tool.permission import (
+    CONFIRM_KIND_ALWAYS,
+    CONFIRM_KIND_FIRST_TIME,
+    CONFIRM_POLICY_ALWAYS,
+    PermissionDecision,
+    PermissionSnapshot,
+    ToolPermissionGate,
+    build_confirm_prompt,
+    confirm_policy,
+    required_scope,
+)
 from app.services.tool.registry import ToolRegistry, get_tool_registry
 from app.application import world_engine
 from app.application.worker_loop import run_worker_loop
@@ -39,6 +57,9 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_STATUSES = ("created", "planned", "executing")
 RETRYABLE_FAILURES = ("transient", "timeout")
+
+GATE_REASON_PENDING_CONFIRMATION = "pending_confirmation"
+GATE_REASON_PERMISSION_DENIED = "permission_denied"
 
 _TOOL_STEP_STATUSES: dict[str, str] = {
     "succeeded": "succeeded",
@@ -107,7 +128,13 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
     return snapshot
 
 
-async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionContext) -> ActionResult:
+async def execute_plan(
+    record: ActionRecord,
+    plan: ActionPlan,
+    ctx: ExecutionContext,
+    *,
+    permission_snapshot: PermissionSnapshot | None = None,
+) -> ActionResult:
     """执行计划：step 归一回填 steps/result；重试保留同 Record。"""
     settings = get_settings()
     storage = get_capability_registry()
@@ -120,7 +147,13 @@ async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionCon
     tool_registry = get_tool_registry() if settings.v24_tool_system_enabled else None
     if tool_registry is not None:
         return await _execute_plan_via_tools(
-            record, plan, ctx, settings, executor, tool_registry
+            record,
+            plan,
+            ctx,
+            settings,
+            executor,
+            tool_registry,
+            permission_snapshot=permission_snapshot,
         )
 
     step_dicts: list[dict] = []
@@ -171,6 +204,8 @@ async def _execute_plan_via_tools(
     settings,
     capability_executor: CapabilityExecutor,
     tool_registry: ToolRegistry,
+    *,
+    permission_snapshot: PermissionSnapshot | None = None,
 ) -> ActionResult:
     """总闸开启时的执行路径：五段短路 + `steps[]` 新字段（TOOL-003 §2.2、§2.4）。"""
     tool_executor = ToolExecutor(
@@ -184,6 +219,7 @@ async def _execute_plan_via_tools(
 
     step_dicts: list[dict] = []
     statuses: list[str] = []
+    confirm_prompt: str | None = None
     for step in plan.steps:
         binding = resolve_step_binding(tool_registry, step)
         if binding is None:
@@ -195,22 +231,28 @@ async def _execute_plan_via_tools(
             step_dicts.append(_unresolved_step_dict(step))
             statuses.append("unavailable")
             break
+        invocation = ToolInvocation(
+            tool_id=binding.tool_id,
+            params=dict(step.params),
+            rationale=str(record.intent.get("evidence", "")),
+            source=record.source,
+            intent=intent,
+            goal_id=record.goal_id,
+            dedupe_key=record.dedupe_key,
+        )
         execution = await tool_executor.run(
             binding,
-            ToolInvocation(
-                tool_id=binding.tool_id,
-                params=dict(step.params),
-                rationale=str(record.intent.get("evidence", "")),
-                source=record.source,
-                intent=intent,
-                goal_id=record.goal_id,
-                dedupe_key=record.dedupe_key,
-            ),
+            invocation,
             tool_ctx,
             index=step.index,
+            permission_snapshot=permission_snapshot,
         )
         step_dicts.append(_tool_step_dict(step, execution))
         statuses.append(execution.status)
+        if execution.status == "pending_confirmation":
+            confirm_prompt = _register_confirmation(
+                binding.definition, invocation, execution, tool_ctx, settings
+            )
         if execution.status not in ("succeeded", "failed", "timeout"):
             break
 
@@ -218,13 +260,59 @@ async def _execute_plan_via_tools(
     outcome = next((status for status in statuses if status != "succeeded"), "succeeded")
     if outcome in _TOOL_RECORD_OUTCOMES:
         record.status, record.gate_reason = _TOOL_RECORD_OUTCOMES[outcome]
-        result_out = _tool_action_result(record, outcome, step_dicts)
+        result_out = _tool_action_result(record, outcome, step_dicts, confirm_prompt)
     else:
         result_out = _settle_executed_record(record, settings, step_dicts)
     record.result = result_out.model_dump(mode="json")
     record.updated_at = _now()
     action_repository.save_record(record)
     return result_out
+
+
+def _register_confirmation(
+    definition,
+    invocation: ToolInvocation,
+    execution,
+    tool_ctx: ToolContext,
+    settings,
+) -> str | None:
+    """确认请求登记（TOOL-005 §2.3）：闸门内零 IO，DB 写只发生在执行器之外的本函数。"""
+    payload = dict(execution.permission or {})
+    decision = PermissionDecision(
+        decision=str(payload.get("decision") or "confirm_required"),
+        level=payload.get("level") or definition.permission.level,
+        reason=str(payload.get("reason") or "confirm_required"),
+        confirm_prompt=build_confirm_prompt(definition, invocation),
+        scope_required=required_scope(definition),
+        confirm_kind=_confirm_kind(definition),
+    )
+    request = get_confirmation_service(settings).request(invocation, decision, tool_ctx)
+    if request is None:
+        logger.warning("确认请求登记失败，本轮不执行外部调用：tool_id=%s", definition.id)
+        return None
+    return request.prompt
+
+
+def _confirm_kind(definition) -> str:
+    if confirm_policy(definition) == CONFIRM_POLICY_ALWAYS:
+        return CONFIRM_KIND_ALWAYS
+    return CONFIRM_KIND_FIRST_TIME
+
+
+def _build_permission_snapshot(
+    user_id: str, settings
+) -> PermissionSnapshot | None:
+    """权限快照装配（TOOL-005 §2.2）：唯一读 IO 入口在 `ToolPermissionGate.build_snapshot`。
+
+    装配在引擎侧完成并下传执行器，使权限闸内（`evaluate`）保持零 IO；双闸未全开返回
+    `None`（不产生读 IO），执行器据此走 TOOL-003 交付态。
+    """
+    if not (
+        getattr(settings, "v24_tool_system_enabled", False)
+        and getattr(settings, "v24_tool_permission_enabled", False)
+    ):
+        return None
+    return ToolPermissionGate(settings).build_snapshot(user_id, _now(), settings)
 
 
 def _settle_executed_record(
@@ -257,11 +345,19 @@ def _settle_executed_record(
 
 
 def _tool_action_result(
-    record: ActionRecord, outcome: str, step_dicts: list[dict]
+    record: ActionRecord,
+    outcome: str,
+    step_dicts: list[dict],
+    confirm_prompt: str | None = None,
 ) -> ActionResult:
-    """闸门段失败（unavailable / denied / invalid）与待确认行动的 ActionResult 投影。"""
+    """闸门段失败（unavailable / denied / invalid）与待确认行动的 ActionResult 投影。
+
+    待确认时不执行外部调用，`error` 承载确认话术（角色语气）供回复素材取材（TOOL-005 §2.3）。
+    """
     step_result = dict(step_dicts[0].get("result") or {}) if step_dicts else {}
     detail = step_result.get("error") or _TOOL_RECORD_OUTCOMES[outcome][1]
+    if outcome == GATE_REASON_PENDING_CONFIRMATION and confirm_prompt:
+        detail = confirm_prompt
     return ActionResult(
         status="failed",
         effects=[],
@@ -424,13 +520,123 @@ async def run_action_planning(
         user_id=user_id, character_id=record.character_id, record_id=record.id,
         now=_now(), settings=settings,
     )
-    result = await execute_plan(record, plan, ctx)
+    result = await execute_plan(
+        record, plan, ctx, permission_snapshot=_build_permission_snapshot(user_id, settings)
+    )
     if record.status != "failed":
         integrate_result(record, result)
     else:
         record.updated_at = _now()
         action_repository.save_record(record)
     return record
+
+
+async def run_confirmation_round(
+    user_id: str,
+    request_id: str,
+    *,
+    approved: bool,
+    session_id: str | None = None,
+) -> ActionRecord | None:
+    """确认轮次（TOOL-005 §2.3 步骤④）：以原 `invocation_snapshot` 与 `dedupe_key` 复用原记录。
+
+    批准 → 原记录（六闸门首次已过，状态 `planned`）直接从 `executing` 续跑，**不产生第二条
+    `ActionRecord`**、不重新抽取参数、不重新评估 G4（避免自我去重）；否定 / 过期 → 原记录转
+    `cancelled` + `permission_denied`，工具不执行（零外部调用）。
+    """
+    settings = get_settings()
+    if not settings.action_enabled:
+        return None
+    service = get_confirmation_service(settings)
+    outcome = service.resolve(request_id, approved=approved, source="user_confirm")
+    request = outcome.request
+    if request is None:
+        logger.info("确认请求不存在，确认轮次跳过：request_id=%s", request_id)
+        return None
+    record = _pending_confirmation_record(user_id, request.dedupe_key)
+    if outcome.status != "approved":
+        if record is None:
+            return None
+        record.status = "cancelled"
+        record.gate_reason = GATE_REASON_PERMISSION_DENIED
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return record
+    if record is None:
+        logger.warning(
+            "确认请求已批准但未找到待确认行动记录，不新建记录：request_id=%s", request_id
+        )
+        return None
+    try:
+        return await _resume_confirmed_record(record, request, settings, session_id)
+    finally:
+        if not service.confirm_ttl_reuse():
+            service.release_session_grant(user_id, request.tool_id)
+
+
+async def _resume_confirmed_record(
+    record: ActionRecord, request, settings, session_id: str | None
+) -> ActionRecord:
+    intent = _confirmed_intent(record, request)
+    snapshot = _build_snapshot(record.user_id, settings)
+    plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
+    if plan is None:
+        record.status = "failed"
+        record.gate_reason = "capability_unavailable"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return record
+    record.intent = intent.model_dump(mode="json")
+    record.params = dict(intent.params)
+    record.dedupe_key = intent.dedupe_key
+    record.gate_reason = None
+    if session_id is not None:
+        record.session_id = session_id
+    ctx = ExecutionContext(
+        user_id=record.user_id,
+        character_id=record.character_id,
+        record_id=record.id,
+        now=_now(),
+        settings=settings,
+    )
+    result = await execute_plan(
+        record,
+        plan,
+        ctx,
+        permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+    )
+    if record.status != "failed":
+        integrate_result(record, result)
+    else:
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    return record
+
+
+def _confirmed_intent(record: ActionRecord, request) -> ActionIntent:
+    """原调用快照优先（参数与幂等键原样复用），缺省回退记录意图。"""
+    try:
+        intent = request.invocation().intent
+    except Exception:
+        logger.exception("确认请求快照还原失败，回退记录意图：request_id=%s", request.request_id)
+        intent = ActionIntent.model_validate(record.intent)
+    dedupe_key = request.dedupe_key or intent.dedupe_key or record.dedupe_key
+    return intent.model_copy(update={"dedupe_key": dedupe_key, "confidence": "confident"})
+
+
+def _pending_confirmation_record(user_id: str, dedupe_key: str) -> ActionRecord | None:
+    if not dedupe_key:
+        return None
+    window = timedelta(hours=get_settings().action_dedupe_window_hours)
+    try:
+        records = action_repository.list_by_dedupe(user_id, dedupe_key, _now() - window)
+    except Exception:
+        logger.exception("待确认行动记录查询失败：dedupe_key=%s", dedupe_key)
+        return None
+    for record in records:
+        if record.gate_reason == GATE_REASON_PENDING_CONFIRMATION and record.status == "planned":
+            return record
+    return None
 
 
 def collect_facts(user_id: str) -> dict:
@@ -505,7 +711,12 @@ async def _process_due_retries():
                     user_id=record.user_id, character_id=record.character_id,
                     record_id=record.id, now=_now(), settings=settings,
                 )
-                result = await execute_plan(record, plan, ctx)
+                result = await execute_plan(
+                    record,
+                    plan,
+                    ctx,
+                    permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+                )
                 if record.status != "failed":
                     integrate_result(record, result)
             except Exception:
@@ -527,6 +738,29 @@ def _expire_planned():
                 action_repository.save_record(record)
     except Exception:
         logger.exception("行动过期扫描失败")
+    _expire_pending_confirmations()
+
+
+def _expire_pending_confirmations() -> int:
+    """TOOL-005 过期清理挂接点：复用既有 action 计划过期维护步（不新增维护步）。
+
+    挂接在 `_expire_planned` 函数体内（life_loop 维护步序列零改动）；清理失败仅记日志，
+    下一轮维护重试，不影响行动过期扫描。
+    """
+    settings = get_settings()
+    if not (
+        getattr(settings, "v24_tool_system_enabled", False)
+        and getattr(settings, "v24_tool_permission_enabled", False)
+    ):
+        return 0
+    try:
+        expired = get_confirmation_service(settings).expire_due(_now())
+    except Exception:
+        logger.exception("确认请求过期清理失败，下轮维护重试")
+        return 0
+    if expired:
+        logger.info("过期确认请求已清理：%d 条", expired)
+    return expired
 
 
 def _rebuild_plan(record: ActionRecord, settings):

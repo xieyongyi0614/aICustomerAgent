@@ -4,28 +4,31 @@
 
 ```text
 ① resolve    注册表无此 tool_id / effective_status != enabled → unavailable，终止
-② permission 权限闸 off → 占位 allow；deny → denied；confirm_required → pending_confirmation
+② permission 权限闸 off → 占位 allow；on → ToolPermissionGate.evaluate 真实判定；
+             deny → denied；confirm_required → pending_confirmation
 ③ validate   校验闸 off → 跳过；失败 → invalid；通过 → params := normalized
 ④ invoke     CapabilityExecutor.run(step, ctx)   ← V9 既有：超时 / 异常归一 / usage 计时
 ⑤ normalize  归一为 ToolResult + health 记一次 outcome
 ```
 
 红线：**复用 V9 执行器调用实现，不复制其代码**（本模块不出现任何超时包裹与异常归一的
-自研实现）；前置段失败路径零外部调用（不触达能力、不落台账——落库由 action_engine 负责）；
-除编程错误（binding 与 invocation 的 tool_id 不一致）外，一切失败归一为 `ToolExecution.status`。
+自研实现）；前置段失败路径零外部调用（不触达能力、不落台账——落库由 action_engine 负责，
+本模块零 DB 写）；除编程错误（binding 与 invocation 的 tool_id 不一致）外，一切失败归一为
+`ToolExecution.status`。
 
-权限段为**占位实现（allow-all）**：接口形状已冻结，真实七步判定由 TOOL-005 替换。
+V2.4.0 TOOL-005：权限段由占位实现替换为真实七步判定（`ToolPermissionGate`）；授权快照由
+调用方预读下传（`permission_snapshot`），缺省时由闸门自身装配（`build_snapshot` 是唯一
+读 IO 入口，装配失败 → `deny(snapshot_unavailable)`）。权限闸 off 时保持 TOOL-003 交付态
+（占位 allow，reason=`permission_layer_off`），接口形状与 TOOL-003 完全一致。
 """
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from app.core.settings import get_settings
 from app.models.action import ActionStep, CapabilityResult
 from app.models.tool import (
-    PermissionLevel,
     ToolBinding,
     ToolDefinition,
     ToolExecution,
@@ -43,23 +46,29 @@ from app.services.tool.normalizer import (
     redact_params,
     redacted_param_names,
 )
+from app.services.tool.permission import (
+    DECISION_ALLOW,
+    DECISION_CONFIRM_REQUIRED,
+    DECISION_DENY,
+    PERMISSION_DECISIONS,
+    REASON_LAYER_OFF,
+    PermissionDecision,
+    PermissionSnapshot,
+    ToolPermissionGate,
+    permission_layer_enabled,
+)
 from app.services.tool.registry import ToolRegistry
 from app.services.tool.validator import ParamValidator
 
 logger = logging.getLogger(__name__)
 
-PERMISSION_LAYER_OFF_REASON = "permission_layer_off"
-PERMISSION_PLACEHOLDER_REASON = "permission_gate_placeholder_allow_all"
+PERMISSION_LAYER_OFF_REASON = REASON_LAYER_OFF
 
-PERMISSION_ALLOW = "allow"
-PERMISSION_DENY = "deny"
-PERMISSION_CONFIRM_REQUIRED = "confirm_required"
+PERMISSION_ALLOW = DECISION_ALLOW
+PERMISSION_DENY = DECISION_DENY
+PERMISSION_CONFIRM_REQUIRED = DECISION_CONFIRM_REQUIRED
 
-PERMISSION_DECISIONS: tuple[str, ...] = (
-    PERMISSION_ALLOW,
-    PERMISSION_CONFIRM_REQUIRED,
-    PERMISSION_DENY,
-)
+PermissionGate = ToolPermissionGate
 
 _TERMINAL_ERRORS: dict[str, str] = {
     "unavailable": "工具不可用（未注册 / 已禁用 / 已熔断）",
@@ -67,58 +76,6 @@ _TERMINAL_ERRORS: dict[str, str] = {
     "invalid": "参数校验未通过",
     "pending_confirmation": "等待用户确认",
 }
-
-
-@dataclass(frozen=True)
-class PermissionSnapshot:
-    """授权快照（纯数据）：本轮执行前预读，闸门内零 IO。TOOL-005 填充 grants/confirmed。"""
-
-    user_id: str = ""
-    character_id: str = "asuna"
-    grants: tuple[str, ...] = ()
-    confirmed: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class PermissionDecision:
-    """权限裁决（architecture.md §4.2 冻结形状）。"""
-
-    decision: str
-    level: PermissionLevel
-    reason: str
-    confirm_prompt: str | None = None
-    scope_required: tuple[str, ...] = ()
-
-
-class PermissionGate:
-    """占位权限闸：权限闸 off 恒 allow；on 时仍为 allow-all（TOOL-005 替换实现）。"""
-
-    def __init__(self, settings=None) -> None:
-        self._settings = settings if settings is not None else get_settings()
-
-    def evaluate(
-        self,
-        defn: ToolDefinition,
-        inv: ToolInvocation,
-        snapshot: PermissionSnapshot,
-    ) -> PermissionDecision:
-        scope = tuple(defn.permission.scope)
-        if not getattr(self._settings, "v24_tool_permission_enabled", False):
-            return PermissionDecision(
-                decision=PERMISSION_ALLOW,
-                level=defn.permission.level,
-                reason=PERMISSION_LAYER_OFF_REASON,
-                scope_required=scope,
-            )
-        logger.warning(
-            "权限闸已开启但真实判定属 TOOL-005，占位实现放行：tool_id=%s", defn.id
-        )
-        return PermissionDecision(
-            decision=PERMISSION_ALLOW,
-            level=defn.permission.level,
-            reason=PERMISSION_PLACEHOLDER_REASON,
-            scope_required=scope,
-        )
 
 
 def resolve_step_binding(registry: ToolRegistry, step: ActionStep) -> ToolBinding | None:
@@ -157,7 +114,7 @@ class ToolExecutor:
         validator: ParamValidator | None = None,
         normalizer: ObservationNormalizer | None = None,
         health: ToolHealthTracker | None = None,
-        permission_gate: PermissionGate | None = None,
+        permission_gate: ToolPermissionGate | None = None,
     ) -> None:
         self.registry = registry
         self.capability_executor = capability_executor
@@ -166,7 +123,7 @@ class ToolExecutor:
         self.normalizer = normalizer if normalizer is not None else ObservationNormalizer()
         self.health = health if health is not None else ToolHealthTracker(registry, self.settings)
         self.permission_gate = (
-            permission_gate if permission_gate is not None else PermissionGate(self.settings)
+            permission_gate if permission_gate is not None else ToolPermissionGate(self.settings)
         )
 
     async def run(
@@ -176,6 +133,7 @@ class ToolExecutor:
         ctx: ToolContext | ExecutionContext,
         *,
         index: int = 0,
+        permission_snapshot: PermissionSnapshot | None = None,
     ) -> ToolExecution:
         if binding.tool_id != invocation.tool_id:
             raise ValueError(
@@ -189,7 +147,7 @@ class ToolExecutor:
         if self._is_unavailable(defn.id, started_at):
             return self._terminal(index, defn, params, started_at, "unavailable")
 
-        decision = self._evaluate_permission(defn, invocation, ctx)
+        decision = self._evaluate_permission(defn, invocation, ctx, permission_snapshot)
         if decision.decision == PERMISSION_DENY:
             return self._terminal(index, defn, params, started_at, "denied", decision=decision)
         if decision.decision == PERMISSION_CONFIRM_REQUIRED:
@@ -228,15 +186,19 @@ class ToolExecutor:
         defn: ToolDefinition,
         invocation: ToolInvocation,
         ctx: ToolContext | ExecutionContext,
+        permission_snapshot: PermissionSnapshot | None = None,
     ) -> PermissionDecision:
-        decision = self.permission_gate.evaluate(
-            defn,
-            invocation,
-            PermissionSnapshot(
-                user_id=getattr(ctx, "user_id", ""),
-                character_id=getattr(ctx, "character_id", "asuna"),
-            ),
+        """② permission：闸门 off 走 TOOL-003 交付态；on 走真实七步判定（零外部调用）。"""
+        gate_enabled = permission_layer_enabled(
+            getattr(ctx, "settings", None) or self.settings
         )
+        snapshot = permission_snapshot
+        builder = getattr(self.permission_gate, "build_snapshot", None)
+        if gate_enabled and snapshot is None and builder is not None:
+            snapshot = builder(
+                getattr(ctx, "user_id", ""), _now(ctx), getattr(ctx, "settings", None)
+            )
+        decision = self.permission_gate.evaluate(defn, invocation, snapshot)
         if decision.decision in PERMISSION_DECISIONS:
             return decision
         logger.warning(

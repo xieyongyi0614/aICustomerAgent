@@ -424,8 +424,16 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
     先投影工具面，把 `surface.tool_ids` 作为 capability 候选喂给既有决策管线（工具候选
     只参与六维评分与审计落库，前台 `chat_response` 恒胜出），投影结果随既有
     `trace.record()` 进 `runtime_traces.steps`。子闸关闭时零行为差异。
+
+    V2.4.0 TOOL-005：同样只做步骤**内部**增强——权限闸开启时先检出确认意图（确定性词表 +
+    问句守卫，零新增 LLM），命中则在既有步骤内处理确认轮次并提前返回；未命中或闸门关闭时
+    行为与 TOOL-004 一致。确认话术以 `record.gate_reason=pending_confirmation` 的行动记录
+    进入下一轮既有 `ActionContext` 回复素材（本步骤不改序列、不新增步骤）。
     """
     if not get_settings().action_enabled:
+        return
+
+    if await _run_confirmation_round(ctx):
         return
 
     action_intent = ctx.action_intent
@@ -448,12 +456,13 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             if goal is not None:
                 goal_id = getattr(goal, "id", None)
         surface_extra = _observe_tool_surface(ctx, goal_id)
-        await _run(
+        record = await _run(
             ctx.user_id,
             action_intent,
             session_id=ctx.session_id,
             goal_id=goal_id,
         )
+        surface_extra.update(_observe_pending_confirmation(record))
         if ctx.trace is not None:
             ctx.trace.record(
                 "action_planning",
@@ -466,6 +475,73 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             ctx.trace.record(
                 "action_planning", 0.0, "error", error="action planning crashed"
             )
+
+
+async def _run_confirmation_round(ctx: PostProcessContext) -> bool:
+    """确认轮次检出与执行（TOOL-005 §2.3 步骤④）；未命中返回 False（按普通对话处理）。"""
+    settings = get_settings()
+    if not (
+        getattr(settings, "v24_tool_system_enabled", False)
+        and getattr(settings, "v24_tool_permission_enabled", False)
+    ):
+        return False
+    started = time.perf_counter()
+    try:
+        from app.application.action_engine import run_confirmation_round
+        from app.services.tool.confirmation import (
+            get_confirmation_detector,
+            get_confirmation_service,
+        )
+
+        pending = get_confirmation_service(settings).pending(ctx.user_id)
+        if not pending:
+            return False
+        detected = get_confirmation_detector().detect(ctx.user_input, pending)
+        if detected is None:
+            return False
+        request_id, verb = detected
+        record = await run_confirmation_round(
+            ctx.user_id, request_id, approved=verb == "approve", session_id=ctx.session_id
+        )
+        _record_confirmation_trace(ctx, started, request_id, verb, record)
+        return True
+    except Exception:
+        logger.exception("确认轮次处理失败，降级为普通对话")
+        return False
+
+
+def _record_confirmation_trace(
+    ctx: PostProcessContext, started: float, request_id: str, verb: str, record
+) -> None:
+    """确认轮次的观测面（独立容错：记账失败不影响"本轮已被消费"的事实）。"""
+    if ctx.trace is None:
+        return
+    try:
+        ctx.trace.record(
+            "confirmation_round",
+            (time.perf_counter() - started) * 1000,
+            "ok",
+            request_id=request_id,
+            verb=verb,
+            record_id=None if record is None else record.id,
+            record_status=None if record is None else record.status,
+        )
+    except Exception:
+        logger.exception("确认轮次 trace 记账失败")
+
+
+def _observe_pending_confirmation(record) -> dict:
+    """确认态观测（TOOL-005 §2.3）：话术随既有 `trace.record()` 进回复素材与观测面。"""
+    if record is None or getattr(record, "gate_reason", None) != "pending_confirmation":
+        return {}
+    result = record.result or {}
+    return {
+        "pending_confirmation": {
+            "record_id": record.id,
+            "tool_id": (record.steps[0].get("tool_id") if record.steps else None),
+            "prompt": result.get("error"),
+        }
+    }
 
 
 def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:

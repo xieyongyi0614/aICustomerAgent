@@ -4,10 +4,16 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 
 from app.api.v1.schemas import (
+    ToolConfirmationRevokeOut,
+    ToolConfirmationsOut,
+    ToolConfirmationOut,
     ToolDetailOut,
     ToolExecutionRowOut,
     ToolExecutionsOut,
+    ToolGrantOut,
     ToolHealthOut,
+    ToolPermissionRevokeOut,
+    ToolPermissionsOut,
     ToolRuntimeStatusOut,
     ToolSummaryOut,
     ToolSurfaceOut,
@@ -33,6 +39,7 @@ from app.services.observability.metrics_aggregator import (
 )
 from app.services.memory2 import attribution as memory2_attribution
 from app.services.reflection import attribution as reflection_attribution
+from app.services.tool.confirmation import get_confirmation_service
 from app.services.tool.context import ToolContext
 from app.services.tool.registry import ToolRegistry, get_tool_registry
 from app.services.tool.surface import ToolSurfaceResolver
@@ -76,6 +83,30 @@ def _require_tool_registry() -> ToolRegistry:
             status_code=403, detail="工具系统未启用（v24_tool_system_enabled=false）"
         )
     return registry
+
+
+def _permission_layer_enabled() -> bool:
+    return bool(getattr(get_settings(), "v24_tool_permission_enabled", False))
+
+
+def _require_permission_layer() -> None:
+    """权限闸写类端点门控：总闸 off → 403；权限闸 off → 403，与 WS-018 惯例一致。"""
+    _require_tool_registry()
+    if not _permission_layer_enabled():
+        raise HTTPException(
+            status_code=403, detail="工具权限闸未启用（v24_tool_permission_enabled=false）"
+        )
+
+
+def _permission_read_gate() -> bool:
+    """权限闸读类端点门控：总闸 off → 200 `{"enabled": false}`；权限闸 off → 403。"""
+    if not _tools_enabled():
+        return False
+    if not _permission_layer_enabled():
+        raise HTTPException(
+            status_code=403, detail="工具权限闸未启用（v24_tool_permission_enabled=false）"
+        )
+    return True
 
 
 def _tool_health_out(registry: ToolRegistry, tool_id: str) -> ToolHealthOut | None:
@@ -183,6 +214,79 @@ def list_tool_executions(user_id: str, limit: int = 50):
         enabled=True,
         user_id=user_id,
         executions=_project_executions(user_id, limit),
+    )
+
+
+@debug_router.get("/debug/tools/permissions", response_model=ToolPermissionsOut)
+def list_tool_permissions(user_id: str):
+    """有效授权清单（持久层 + 进程层 + 通道级隐含）；总闸 off → `{"enabled": false}`。"""
+    if not _permission_read_gate():
+        return ToolPermissionsOut(enabled=False)
+    service = get_confirmation_service(get_settings())
+    grants = service.grant_records(user_id, datetime.now())
+    return ToolPermissionsOut(
+        enabled=True,
+        user_id=user_id,
+        grants=[ToolGrantOut(**grant) for grant in grants],
+    )
+
+
+@debug_router.get("/debug/tools/confirmations", response_model=ToolConfirmationsOut)
+def list_tool_confirmations(user_id: str):
+    """未决确认请求（按 created_at 倒序）；总闸 off → `{"enabled": false}`。"""
+    if not _permission_read_gate():
+        return ToolConfirmationsOut(enabled=False)
+    service = get_confirmation_service(get_settings())
+    return ToolConfirmationsOut(
+        enabled=True,
+        user_id=user_id,
+        confirmations=[
+            ToolConfirmationOut(
+                request_id=request.request_id,
+                tool_id=request.tool_id,
+                status=request.status,
+                dedupe_key=request.dedupe_key,
+                scope_required=list(request.scope_required),
+                prompt=request.prompt,
+                confirm_kind=request.confirm_kind,
+                created_at=request.created_at,
+                expires_at=request.expires_at,
+            )
+            for request in service.pending(user_id)
+        ],
+    )
+
+
+@debug_router.post(
+    "/debug/tools/confirmations/{request_id}/revoke",
+    response_model=ToolConfirmationRevokeOut,
+)
+def revoke_tool_confirmation(request_id: str):
+    """撤销未决确认请求（运维，等价否定，不执行）；未找到 → 404。"""
+    _require_permission_layer()
+    service = get_confirmation_service(get_settings())
+    request = service.get(request_id)
+    if request is None:
+        raise HTTPException(status_code=404, detail="确认请求不存在")
+    revoked = service.revoke_request(request_id)
+    return ToolConfirmationRevokeOut(
+        enabled=True,
+        request_id=request_id,
+        revoked=revoked,
+        status="denied" if revoked else request.status,
+    )
+
+
+@debug_router.post("/debug/tools/permissions/revoke", response_model=ToolPermissionRevokeOut)
+def revoke_tool_permissions(user_id: str, tool_id: str = "*"):
+    """撤销授权（运维，工具级 / 范围级 / 会话级）；无匹配授权 → 404。"""
+    _require_permission_layer()
+    service = get_confirmation_service(get_settings())
+    revoked = service.revoke(user_id, tool_id)
+    if revoked <= 0:
+        raise HTTPException(status_code=404, detail="无匹配授权")
+    return ToolPermissionRevokeOut(
+        enabled=True, user_id=user_id, tool_id=tool_id, revoked=revoked
     )
 
 

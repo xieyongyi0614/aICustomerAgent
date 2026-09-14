@@ -1,8 +1,10 @@
-"""亚丝娜工具面投影资产（V2.4.0 TOOL-004 §2.2；architecture.md §4.1 投影规则表）。
+"""亚丝娜工具资产（V2.4.0 TOOL-004 §2.2 工具面投影 / TOOL-005 §4.3 确认话术与确认词表）。
 
-纯数据：无 IO、无 LLM、无状态；投影逻辑在 `app/services/tool/surface.py`。
-资产只回答"哪些 Profile / 时段 / 场景 / 关系阶段该裁掉什么"，
-不回答"怎么裁"（那是 `ToolSurfacePolicy` 的职责）。
+纯数据：无 IO、无 LLM、无状态；投影逻辑在 `app/services/tool/surface.py`，
+确认判定与话术装配在 `app/services/tool/permission.py` 与 `confirmation.py`。
+资产只回答"哪些 Profile / 时段 / 场景 / 关系阶段该裁掉什么"（投影）、
+"哪些说法算点头或摇头"（确认词表）与"话术长什么样"（话术模板），
+不回答"怎么裁"与"怎么判"。
 """
 
 from dataclasses import dataclass
@@ -96,3 +98,64 @@ def relationship_stage_rank(stage: str) -> int | None:
 
 def intimate_min_stage_rank() -> int:
     return RELATIONSHIP_STAGE_ORDER.index(INTIMATE_MIN_STAGE)
+
+
+@dataclass(frozen=True)
+class ConfirmPromptTemplate:
+    """确认话术模板（TOOL-005 §2.3）：有素材与无素材两态，均为角色语气。"""
+
+    with_subject: str
+    without_subject: str
+
+
+CONFIRM_PROMPT_MAX_CHARS = 60
+
+CONFIRM_SUBJECT_MAX_CHARS = 20
+
+CONFIRM_PROMPT_FALLBACK = "这件事需要你点头我才敢做，可以吗？"
+
+CONFIRM_PROMPT_TEMPLATES: dict[str, ConfirmPromptTemplate] = {
+    "channel.feishu.send": ConfirmPromptTemplate(
+        with_subject="要我现在把「{subject}」发出去吗？",
+        without_subject="要我现在把这条消息发出去吗？",
+    ),
+    "builtin.notification.send": ConfirmPromptTemplate(
+        with_subject="要我把「{subject}」发给你吗？",
+        without_subject="要我现在给你发条消息吗？",
+    ),
+}
+
+CONFIRM_PROMPT_DEFAULT = ConfirmPromptTemplate(
+    with_subject="要我现在就去做「{subject}」吗？你说好我才动手。",
+    without_subject="这件事我想先跟你确认一下，可以吗？",
+)
+
+CONFIRM_APPROVE_LEXICON: tuple[str, ...] = (
+    "好",
+    "行",
+    "可以",
+    "发吧",
+    "嗯",
+    "对",
+    "确认",
+    "就这样",
+    "帮我发",
+    "好的",
+)
+
+CONFIRM_DENY_LEXICON: tuple[str, ...] = (
+    "不用了",
+    "算了",
+    "别发",
+    "取消",
+    "不要",
+    "先不发",
+    "不可以",
+    "不行",
+    "先别",
+    "别",
+)
+
+CONFIRM_WORD_MAX_CONTENT_CHARS = 12
+
+CONFIRM_LEXICON_MIN_WORDS = 5

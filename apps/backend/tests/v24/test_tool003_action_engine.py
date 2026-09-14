@@ -185,7 +185,7 @@ async def test_steps_round_trip_through_action_records(
 
 
 def _stub_tool_run(status: str, failure_kind: str | None):
-    async def _run(self, binding, invocation, ctx, *, index=0):
+    async def _run(self, binding, invocation, ctx, *, index=0, permission_snapshot=None):
         return ToolExecution(
             index=index,
             tool_id=binding.tool_id,

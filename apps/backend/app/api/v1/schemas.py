@@ -287,3 +287,49 @@ class ToolExecutionsOut(BaseModel):
     enabled: bool
     user_id: str | None = None
     executions: list[ToolExecutionRowOut] = []
+
+
+class ToolGrantOut(BaseModel):
+    tool_id: str
+    scope: list[str] = []
+    source: str
+    granted_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class ToolPermissionsOut(BaseModel):
+    enabled: bool
+    user_id: str | None = None
+    grants: list[ToolGrantOut] = []
+
+
+class ToolConfirmationOut(BaseModel):
+    request_id: str
+    tool_id: str
+    status: str
+    dedupe_key: str = ""
+    scope_required: list[str] = []
+    prompt: str | None = None
+    confirm_kind: str | None = None
+    created_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class ToolConfirmationsOut(BaseModel):
+    enabled: bool
+    user_id: str | None = None
+    confirmations: list[ToolConfirmationOut] = []
+
+
+class ToolConfirmationRevokeOut(BaseModel):
+    enabled: bool
+    request_id: str | None = None
+    revoked: bool = False
+    status: str | None = None
+
+
+class ToolPermissionRevokeOut(BaseModel):
+    enabled: bool
+    user_id: str | None = None
+    tool_id: str | None = None
+    revoked: int = 0

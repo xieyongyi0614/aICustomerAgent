@@ -2,17 +2,24 @@
 
 装配与渲染行动上下文段：让角色知道"我做过什么、成败如何"。
 纯函数渲染 + 有界查询，action_ctx=None 时 prompt 字节与 V8.5 完全一致。
+
+V2.4.0 TOOL-005：待确认行动（`gate_reason=pending_confirmation`）的确认话术进入回复素材——
+权限闸开启时该行动以小节形式传入角色语气确认话术（TOOL-005 §2.3 步骤③），关闭时渲染
+与 V9 逐字节一致。
 """
 
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.character.asuna.tool import CONFIRM_PROMPT_MAX_CHARS
 from app.core.settings import get_settings
 from app.models.action import TERMINAL_STATUSES
 from app.repositories import action_repository
 
 logger = logging.getLogger(__name__)
+
+GATE_REASON_PENDING_CONFIRMATION = "pending_confirmation"
 
 
 @dataclass
@@ -31,7 +38,29 @@ class ActionContext:
     items: list[ActionItem] = field(default_factory=list)
 
 
+def _pending_confirmation_prompt(record) -> str | None:
+    """待确认行动的确认话术（角色语气）；权限闸关闭或非待确认态返回 None。"""
+    if not getattr(get_settings(), "v24_tool_permission_enabled", False):
+        return None
+    if getattr(record, "gate_reason", None) != GATE_REASON_PENDING_CONFIRMATION:
+        return None
+    result = record.result or {}
+    text = " ".join(str(result.get("error") or "").split())
+    return text[:CONFIRM_PROMPT_MAX_CHARS] or None
+
+
 def _summarize_record(record) -> ActionItem:
+    confirmation_prompt = _pending_confirmation_prompt(record)
+    if confirmation_prompt is not None:
+        return ActionItem(
+            action_type=record.action_type,
+            status=record.status,
+            summary=confirmation_prompt,
+            updated_at=record.updated_at,
+            gate_reason=record.gate_reason,
+            attempt=record.attempt,
+            record_id=record.id,
+        )
     params = record.params or {}
     action_type = record.action_type
     if action_type == "create_reminder":
