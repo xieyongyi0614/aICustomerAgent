@@ -139,6 +139,9 @@ class TestTransitionAction:
             "quota_exceeded",
             "effect_already_satisfied",
             "target_not_found",
+            "permission_denied",
+            "invalid_params",
+            "pending_confirmation",
         }
 
 

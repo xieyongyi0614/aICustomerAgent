@@ -60,6 +60,9 @@ GateReason = Literal[
     "quota_exceeded",
     "effect_already_satisfied",
     "target_not_found",
+    "permission_denied",
+    "invalid_params",
+    "pending_confirmation",
 ]
 
 GATE_REASONS: tuple[str, ...] = (
@@ -70,6 +73,9 @@ GATE_REASONS: tuple[str, ...] = (
     "quota_exceeded",
     "effect_already_satisfied",
     "target_not_found",
+    "permission_denied",
+    "invalid_params",
+    "pending_confirmation",
 )
 
 FailureKind = Literal["transient", "permanent", "timeout", "unavailable"]

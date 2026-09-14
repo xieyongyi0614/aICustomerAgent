@@ -103,6 +103,31 @@ def enablement_violations(settings) -> list[str]:
             "v23_world_llm_assist_enabled 要求 v23_event_detection_enabled"
             "（辅助服务于处境检出）"
         )
+    v24_sub_flags = (
+        "v24_tool_permission_enabled",
+        "v24_tool_schema_validation_enabled",
+        "v24_tool_observation_enabled",
+        "v24_tool_surface_enabled",
+        "v24_tool_memory_enabled",
+        "v24_tool_reflection_enabled",
+        "v24_tool_channel_enabled",
+        "v24_tool_external_api_enabled",
+        "v24_tool_user_defined_enabled",
+    )
+    v24_master = getattr(settings, "v24_tool_system_enabled", False)
+    v24_flags = {flag: getattr(settings, flag, False) for flag in v24_sub_flags}
+    for sub_flag, enabled in v24_flags.items():
+        if enabled and not v24_master:
+            violations.append(
+                f"{sub_flag} 要求 v24_tool_system_enabled（V2.4.0 总闸先开）"
+            )
+    if v24_flags["v24_tool_channel_enabled"] and not getattr(
+        settings, "feishu_enabled", False
+    ):
+        violations.append(
+            "v24_tool_channel_enabled 要求 feishu_enabled"
+            "（channel.* 工具包装依赖飞书通道）"
+        )
     return violations
 
 
