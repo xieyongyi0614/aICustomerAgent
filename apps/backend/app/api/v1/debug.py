@@ -3,9 +3,22 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 
+from app.api.v1.schemas import (
+    ToolDetailOut,
+    ToolExecutionRowOut,
+    ToolExecutionsOut,
+    ToolHealthOut,
+    ToolRuntimeStatusOut,
+    ToolSummaryOut,
+    ToolSurfaceOut,
+    ToolsOut,
+)
+from app.character.asuna.tool import RUN_KIND_FOREGROUND_CHAT
+from app.core.settings import get_settings
 from app.models.evaluation import EvaluationSubjectKind
 from app.models.relationship import RelationshipState
 from app.repositories import (
+    action_repository,
     conversation_repository,
     decision_repository,
     evaluation_repository,
@@ -20,6 +33,9 @@ from app.services.observability.metrics_aggregator import (
 )
 from app.services.memory2 import attribution as memory2_attribution
 from app.services.reflection import attribution as reflection_attribution
+from app.services.tool.context import ToolContext
+from app.services.tool.registry import ToolRegistry, get_tool_registry
+from app.services.tool.surface import ToolSurfaceResolver
 from app.services.trace_collector import get_trace_collector
 from app.repositories import (
     relationship_milestone_repository,
@@ -37,6 +53,193 @@ from app.services.relationship_evolution import distance_index
 logger = logging.getLogger(__name__)
 
 debug_router = APIRouter()
+
+TOOL_SURFACE_DEFAULT_RUN_KIND = RUN_KIND_FOREGROUND_CHAT
+
+TOOL_EXECUTIONS_MIN_LIMIT = 1
+TOOL_EXECUTIONS_MAX_LIMIT = 200
+
+
+def _tools_enabled() -> bool:
+    return bool(get_settings().v24_tool_system_enabled)
+
+
+def _require_tool_registry() -> ToolRegistry:
+    """写类端点门控：总闸 off → 403；注册表不可用按未启用处理。"""
+    if not _tools_enabled():
+        raise HTTPException(
+            status_code=403, detail="工具系统未启用（v24_tool_system_enabled=false）"
+        )
+    registry = get_tool_registry()
+    if registry is None:
+        raise HTTPException(
+            status_code=403, detail="工具系统未启用（v24_tool_system_enabled=false）"
+        )
+    return registry
+
+
+def _tool_health_out(registry: ToolRegistry, tool_id: str) -> ToolHealthOut | None:
+    health = registry.health(tool_id).get(tool_id)
+    if health is None:
+        return None
+    return ToolHealthOut(**health.model_dump())
+
+
+def _project_executions(
+    user_id: str, limit: int, tool_id: str | None = None
+) -> list[ToolExecutionRowOut]:
+    """执行台账投影：从 `action_records.steps`（V9 既有列）取工具执行步骤。"""
+    rows: list[ToolExecutionRowOut] = []
+    records = action_repository.list_records(
+        user_id, limit=max(TOOL_EXECUTIONS_MIN_LIMIT, min(limit, TOOL_EXECUTIONS_MAX_LIMIT))
+    )
+    for record in records:
+        for step in record.steps or []:
+            step_tool_id = step.get("tool_id")
+            if not step_tool_id:
+                continue
+            if tool_id is not None and step_tool_id != tool_id:
+                continue
+            result = step.get("result") or {}
+            effects = result.get("effects")
+            rows.append(
+                ToolExecutionRowOut(
+                    record_id=record.id,
+                    tool_id=step_tool_id,
+                    status=str(step.get("status", "")),
+                    permission=step.get("permission") or {},
+                    duration_ms=step.get("duration_ms"),
+                    effects=[item for item in (effects or []) if isinstance(item, dict)],
+                )
+            )
+    return rows
+
+
+@debug_router.get("/debug/tools", response_model=ToolsOut)
+def list_tools():
+    """工具清单（声明 + 状态 + 健康度）；总闸 off → `{"enabled": false}`。"""
+    if not _tools_enabled():
+        return ToolsOut(enabled=False)
+    registry = get_tool_registry()
+    if registry is None:
+        return ToolsOut(enabled=False)
+    return ToolsOut(
+        enabled=True,
+        tools=[
+            ToolSummaryOut(
+                tool_id=definition.id,
+                name=definition.name,
+                namespace=definition.namespace,
+                status=registry.effective_status(definition.id),
+                side_effects=list(definition.side_effects),
+                health=_tool_health_out(registry, definition.id),
+            )
+            for definition in registry.list()
+        ],
+        runtime_disabled=sorted(registry.runtime_disabled_ids()),
+    )
+
+
+@debug_router.get("/debug/tools/surface", response_model=ToolSurfaceOut)
+def get_tool_surface(run_kind: str | None = None, user_id: str | None = None):
+    """工具面投影结果（含裁剪原因）；双闸：总闸 + `v24_tool_surface_enabled`。"""
+    settings = get_settings()
+    if not _tools_enabled():
+        return ToolSurfaceOut(enabled=False)
+    if not settings.v24_tool_surface_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="工具面投影未启用（v24_tool_surface_enabled=false）",
+        )
+    registry = get_tool_registry()
+    if registry is None:
+        return ToolSurfaceOut(enabled=False)
+    resolved_kind = run_kind or TOOL_SURFACE_DEFAULT_RUN_KIND
+    surface = ToolSurfaceResolver(registry, settings).resolve(
+        resolved_kind,
+        ToolContext(
+            user_id=user_id or "",
+            now=datetime.now(),
+            settings=settings,
+            run_kind=resolved_kind,
+        ),
+    )
+    return ToolSurfaceOut(
+        enabled=True,
+        run_kind=surface.run_kind,
+        run_kind_defaulted=not run_kind,
+        tool_ids=list(surface.tool_ids),
+        excluded=[dict(item) for item in surface.excluded],
+        surface_hash=surface.surface_hash,
+    )
+
+
+@debug_router.get("/debug/tools/executions", response_model=ToolExecutionsOut)
+def list_tool_executions(user_id: str, limit: int = 50):
+    """执行台账（从 `action_records.steps` 投影）；无记录返回空列表。"""
+    if not _tools_enabled():
+        return ToolExecutionsOut(enabled=False)
+    return ToolExecutionsOut(
+        enabled=True,
+        user_id=user_id,
+        executions=_project_executions(user_id, limit),
+    )
+
+
+@debug_router.post("/debug/tools/{tool_id}/disable", response_model=ToolRuntimeStatusOut)
+def disable_tool(tool_id: str):
+    """运行期禁用（风控，进程内存态叠加，不写回声明）。"""
+    registry = _require_tool_registry()
+    if registry.get(tool_id) is None:
+        raise HTTPException(status_code=404, detail="工具未注册")
+    registry.set_runtime_disabled(tool_id)
+    return ToolRuntimeStatusOut(
+        enabled=True,
+        tool_id=tool_id,
+        effective_status=registry.effective_status(tool_id),
+        runtime_disabled=True,
+    )
+
+
+@debug_router.post("/debug/tools/{tool_id}/enable", response_model=ToolRuntimeStatusOut)
+def enable_tool(tool_id: str):
+    """解除运行期禁用（恢复）。"""
+    registry = _require_tool_registry()
+    if registry.get(tool_id) is None:
+        raise HTTPException(status_code=404, detail="工具未注册")
+    registry.clear_runtime_disabled(tool_id)
+    return ToolRuntimeStatusOut(
+        enabled=True,
+        tool_id=tool_id,
+        effective_status=registry.effective_status(tool_id),
+        runtime_disabled=False,
+    )
+
+
+@debug_router.get("/debug/tools/{tool_id}", response_model=ToolDetailOut)
+def get_tool(tool_id: str, user_id: str | None = None, limit: int = 20):
+    """单工具详情（schema / permission / 健康度 / 最近执行）；未注册 → 404。"""
+    if not _tools_enabled():
+        return ToolDetailOut(enabled=False)
+    registry = get_tool_registry()
+    definition = None if registry is None else registry.get(tool_id)
+    if registry is None or definition is None:
+        raise HTTPException(status_code=404, detail="工具未注册")
+    return ToolDetailOut(
+        enabled=True,
+        tool_id=tool_id,
+        definition=definition.model_dump(mode="json"),
+        permission=definition.permission.model_dump(mode="json"),
+        health=_tool_health_out(registry, tool_id),
+        recent_executions=(
+            [
+                row.model_dump(mode="json")
+                for row in _project_executions(user_id, limit, tool_id=tool_id)
+            ]
+            if user_id
+            else []
+        ),
+    )
 
 
 @debug_router.get("/debug/memory/{memory_id}/attribution")

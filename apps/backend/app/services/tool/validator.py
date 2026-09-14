@@ -8,8 +8,10 @@
   recipient_not_authorized / content_over_budget（校验器名 → 错误码由 `_SEMANTIC_CODE_BY_NAME` 映射）。
 - `normalized` 幂等：对已规范化参数再规范化结果完全一致；时间统一 ISO 8601、
   字符串空白折叠（内外）、枚举大小写等价形式归一。
-- 上下文缺失（`ToolContext` 世界事实字段为 None 或空）时语义校验器**降级放行并记日志**，
-  不因 TOOL-007 未装配而误拒；校验器自身异常按**默认拒绝**处理（fail-closed）。
+- 上下文缺失（`ToolContext` 世界事实维度为空，即 TOOL-007 未装配）时语义校验器
+  **降级放行并记日志**，不因未装配而误拒；校验器自身异常按**默认拒绝**处理（fail-closed）。
+- 世界事实读面（TOOL-004 §2.2 结构）：地点取 `ToolContext.world["locations"]`，
+  库存取 `ToolContext.inventory`，收件人取 `ToolContext.authorized_recipients`。
 """
 
 import logging
@@ -295,6 +297,11 @@ def _ctx_now(ctx: ToolContext | None) -> datetime | None:
     return None if ctx is None else ctx.now
 
 
+def _ctx_world_locations(ctx: ToolContext | None) -> Any:
+    """世界地点读面：`ToolContext.world["locations"]`；上下文缺失返回 None。"""
+    return None if ctx is None else ctx.world_locations()
+
+
 def _comparable(left: datetime, right: datetime) -> tuple[datetime, datetime]:
     """时区对齐：一侧带 tz 时统一到另一侧，避免 naive/aware 比较抛错。"""
     if (left.tzinfo is None) == (right.tzinfo is None):
@@ -331,9 +338,11 @@ def _location_exists(params: dict[str, Any], ctx: ToolContext) -> list[str]:
     location = params.get("location")
     if location is None:
         return []
-    known = _as_texts(ctx.locations)
+    known = _as_texts(_ctx_world_locations(ctx))
     if not known:
-        logger.info("location_exists 降级放行：ToolContext.locations 未装配（TOOL-007）")
+        logger.info(
+            "location_exists 降级放行：ToolContext.world['locations'] 未装配（TOOL-007）"
+        )
         return []
     if str(location) not in known:
         return [f"location 不存在于当前世界：{location}"]

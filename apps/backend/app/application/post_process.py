@@ -8,6 +8,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
@@ -417,7 +418,13 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
 
 
 async def run_action_planning(ctx: PostProcessContext) -> None:
-    """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。"""
+    """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。
+
+    V2.4.0 TOOL-004：步骤**内部**增强（不新增步骤、不改序列）——总闸 + 工具面子闸开启时
+    先投影工具面，把 `surface.tool_ids` 作为 capability 候选喂给既有决策管线（工具候选
+    只参与六维评分与审计落库，前台 `chat_response` 恒胜出），投影结果随既有
+    `trace.record()` 进 `runtime_traces.steps`。子闸关闭时零行为差异。
+    """
     if not get_settings().action_enabled:
         return
 
@@ -440,6 +447,7 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             goal = getattr(selected_goal, "goal", None)
             if goal is not None:
                 goal_id = getattr(goal, "id", None)
+        surface_extra = _observe_tool_surface(ctx, goal_id)
         await _run(
             ctx.user_id,
             action_intent,
@@ -450,6 +458,7 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             ctx.trace.record(
                 "action_planning",
                 (time.perf_counter() - started) * 1000,
+                **surface_extra,
             )
     except Exception:
         logger.exception("行动规划步骤异常（双保险，不应触达）")
@@ -457,6 +466,102 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             ctx.trace.record(
                 "action_planning", 0.0, "error", error="action planning crashed"
             )
+
+
+def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
+    """第 9 步内部工具面观测（总闸 + `v24_tool_surface_enabled` 双闸；失败不影响本步骤）。"""
+    settings = get_settings()
+    if not (settings.v24_tool_system_enabled and settings.v24_tool_surface_enabled):
+        return {}
+    try:
+        from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
+        from app.services.tool.context import ToolContext
+        from app.services.tool.registry import get_tool_registry
+        from app.services.tool.surface import ToolSurfaceResolver
+
+        registry = get_tool_registry()
+        if registry is None:
+            return {}
+        now = datetime.now()
+        surface = ToolSurfaceResolver(registry, settings).resolve(
+            RUN_KIND_FOREGROUND_CHAT,
+            ToolContext(
+                user_id=ctx.user_id,
+                now=now,
+                settings=settings,
+                run_kind=RUN_KIND_FOREGROUND_CHAT,
+                run_id=getattr(ctx.trace, "request_id", None),
+                source="conversation",
+            ),
+        )
+        audit = _run_tool_decision(ctx, surface, goal_id, now)
+        _persist_tool_decision(ctx, surface, audit)
+        return {
+            "tool_surface": {
+                "run_kind": surface.run_kind,
+                "surface_hash": surface.surface_hash,
+                "tool_ids": list(surface.tool_ids),
+                "excluded": [dict(item) for item in surface.excluded],
+            },
+            "tool_winner": None if audit is None else _audit_winner(audit),
+        }
+    except Exception:
+        logger.exception("工具面投影失败，跳过（不影响行动规划）")
+        return {}
+
+
+def _run_tool_decision(
+    ctx: PostProcessContext, surface, goal_id: str | None, now: datetime
+) -> dict | None:
+    """把工具面作为 capability 候选接入既有决策管线（纯评分 + 审计；不改变前台回复）。"""
+    from app.services import decision_pipeline
+
+    if not surface.tool_ids:
+        return None
+    result = decision_pipeline.run_pipeline(
+        capabilities=list(surface.tool_ids),
+        chat_response=True,
+        chat_response_intention=getattr(ctx.intention, "intention", None),
+        chat_response_goal_id=goal_id,
+        run=None,
+        now=now,
+    )
+    audit = result.audit
+    audit["surface_hash"] = surface.surface_hash
+    audit["winner"] = result.winner.source if result.winner is not None else None
+    return audit
+
+
+def _audit_winner(audit: dict) -> str | None:
+    winner = next(
+        (item for item in audit.get("candidates", []) if item.get("won")),
+        None,
+    )
+    if winner is None:
+        return None
+    payload = winner.get("tool_id") or winner.get("source")
+    return payload
+
+
+def _persist_tool_decision(ctx: PostProcessContext, surface, audit: dict | None) -> None:
+    """工具候选审计落既有 `decision_records`（kind 复用既有值域，零迁移）。"""
+    if audit is None or not get_settings().observability_persist_enabled:
+        return
+    from app.application.observability import on_decision
+    from app.models.observability import DecisionKind, DecisionRecord
+
+    on_decision(
+        DecisionRecord(
+            kind=DecisionKind.TURN_INTENTION,
+            request_id=getattr(ctx.trace, "request_id", None),
+            user_id=ctx.user_id,
+            conversation_id=ctx.session_id,
+            decision="tool_surface",
+            reason=surface.surface_hash,
+            input_snapshot={"tool_ids": list(surface.tool_ids)},
+            candidates=audit,
+        )
+    )
 
 
 STEP_HANDLERS = (

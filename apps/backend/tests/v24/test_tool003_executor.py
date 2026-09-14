@@ -773,12 +773,17 @@ def test_tool_context_from_execution_context_keeps_world_fields_empty():
     assert tool_ctx.character_id == "asuna"
     assert tool_ctx.record_id == "r-1"
     assert tool_ctx.now == NOW
-    assert tool_ctx.locations is None
-    assert tool_ctx.inventory is None
-    assert tool_ctx.authorized_recipients is None
-    assert tool_ctx.scene is None
-    assert tool_ctx.relationship_stage is None
-    assert tool_ctx.world_id is None
+    assert tool_ctx.run_kind == "foreground_chat"
+    assert tool_ctx.run_id is None
+    assert tool_ctx.source == "conversation"
+    assert tool_ctx.world == {}
+    assert tool_ctx.inventory == []
+    assert tool_ctx.situations == []
+    assert tool_ctx.scene == {}
+    assert tool_ctx.relationship == {}
+    assert tool_ctx.authorized_recipients == []
+    assert tool_ctx.world_locations() is None
+    assert tool_ctx.relationship_stage() is None
 
 
 def test_tool_context_is_read_only_snapshot():

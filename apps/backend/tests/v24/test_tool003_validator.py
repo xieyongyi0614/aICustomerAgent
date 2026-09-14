@@ -287,8 +287,9 @@ def test_not_future_equal_to_now_is_rejected():
 
 def test_location_exists():
     defn = _with_validators(("location_exists",), [param("location", required=True)])
-    ok = VALIDATOR.validate(defn, {"location": "workshop"}, _ctx(locations=("home", "workshop")))
-    bad = VALIDATOR.validate(defn, {"location": "kitchen"}, _ctx(locations=("home", "workshop")))
+    world = {"locations": ("home", "workshop")}
+    ok = VALIDATOR.validate(defn, {"location": "workshop"}, _ctx(world=world))
+    bad = VALIDATOR.validate(defn, {"location": "kitchen"}, _ctx(world=world))
     assert ok.passed is True
     assert _codes(bad, "semantic") == ["location_not_found"]
     assert bad.semantic[0]["param"] == "location"
@@ -321,7 +322,7 @@ def test_content_within_budget():
 def test_five_semantic_codes_are_all_reachable():
     cases = [
         (_with_validators(("future_datetime",), definition().input_schema.parameters), _due_params("2026-05-01T00:00:00"), _ctx()),
-        (_with_validators(("location_exists",), [param("location", required=True)]), {"location": "x"}, _ctx(locations=("y",))),
+        (_with_validators(("location_exists",), [param("location", required=True)]), {"location": "x"}, _ctx(world={"locations": ("y",)})),
         (_with_validators(("object_in_inventory",), [param("object", required=True)]), {"object": "x"}, _ctx(inventory=["y"])),
         (_with_validators(("recipient_authorized",), [param("recipient", required=True)]), {"recipient": "x"}, _ctx(authorized_recipients=["y"])),
         (_with_validators(("content_within_budget",), [param("content", required=True)]), {"content": "x" * (CONTENT_BUDGET_CHARS + 1)}, _ctx()),
@@ -352,7 +353,7 @@ def test_semantic_downgrade_when_context_field_absent_e6(validators, params):
 
 def test_semantic_downgrade_when_context_field_empty_is_also_permissive():
     defn = _with_validators(("location_exists",), [param("location", required=True)])
-    report = VALIDATOR.validate(defn, {"location": "kitchen"}, _ctx(locations=()))
+    report = VALIDATOR.validate(defn, {"location": "kitchen"}, _ctx(world={"locations": ()}))
     assert report.passed is True
 
 

@@ -3,12 +3,18 @@
 前台与后台共用同一条代码路径；Intention 仍为 Decision 域值对象（13 值
 枚举 + FIT 映射校验不变）。每次决策可回答四问：候选来源 / 胜出理由 /
 逐闸结果 / 落选清单（candidates 审计包落 decision_records）。
+
+V2.4.0 TOOL-004：`capabilities` 参数的值语义从「能力名」扩展为「tool_id」，
+候选 payload 携带 `{tool_id, capability, type}`；目标类型由
+`resolve_goal_type_from_tool_id()` 解析（显式表优先，旧能力映射兜底）。
+五段结构、P0~P4 优先级、权重数学与 Select 的确定性 tiebreak 均不变。
 """
 
 import logging
 from dataclasses import dataclass, field
 from typing import get_args
 
+from app.character.asuna.action import ACTION_CAPABILITY_MAP, ACTION_TOOL_MAP
 from app.core.settings import get_settings
 from app.models.intention import (
     INTENTION_GOAL_DEFAULTS,
@@ -71,6 +77,48 @@ _CAPABILITY_TYPE_HINTS = {
     "world_action": "scene",
 }
 
+# V2.4.0 TOOL-004：capability 候选的值语义从「能力名」扩展为「tool_id」。
+# 优先查本表；未命中回退 _CAPABILITY_TYPE_HINTS 旧映射兜底（含裸能力名与派生能力名）。
+ACTION_TOOL_TYPE_HINTS = {
+    "builtin.reminder.create": "user_care",
+    "builtin.reminder.cancel": "user_care",
+    "builtin.memory.save": "conversation",
+    "builtin.search.query": "conversation",
+    "builtin.notification.send": "user_care",
+    "channel.feishu.send": "user_care",
+    "world.object.create": "scene",
+    "world.object.move": "scene",
+    "world.object.use": "scene",
+    "world.env.query": "scene",
+}
+
+_TOOL_CAPABILITY_HINTS = {
+    tool_id: ACTION_CAPABILITY_MAP[action_type][0]
+    for action_type, tool_ids in ACTION_TOOL_MAP.items()
+    for tool_id in tool_ids
+}
+
+
+def legacy_capability_of(name: str) -> str | None:
+    """tool_id → 绑定能力名（供目标对齐的能力域信号）；旧能力名原样返回。"""
+    if name in _CAPABILITY_TYPE_HINTS:
+        return name
+    return _TOOL_CAPABILITY_HINTS.get(name)
+
+
+def resolve_goal_type_from_tool_id(tool_id: str) -> str:
+    """工具身份 → 目标类型：显式表优先，未命中回退旧能力映射（裸名 / 派生名兜底）。"""
+    hint = ACTION_TOOL_TYPE_HINTS.get(tool_id)
+    if hint:
+        return hint
+    legacy = _CAPABILITY_TYPE_HINTS.get(tool_id)
+    if legacy:
+        return legacy
+    capability = _TOOL_CAPABILITY_HINTS.get(tool_id)
+    if capability:
+        return _CAPABILITY_TYPE_HINTS.get(capability, "")
+    return ""
+
 
 @dataclass
 class Candidate:
@@ -86,7 +134,7 @@ class Candidate:
     won: bool = False
 
     def to_audit(self) -> dict:
-        return {
+        audit = {
             "source": self.source,
             "intention": self.intention,
             "goal_id": self.goal_id,
@@ -96,6 +144,10 @@ class Candidate:
             "gates": self.gates,
             "won": self.won,
         }
+        tool_id = self.payload.get("tool_id")
+        if tool_id:
+            audit["tool_id"] = tool_id
+        return audit
 
 
 @dataclass
@@ -133,7 +185,16 @@ def collect_candidates(
                 break
     for name in capabilities or []:
         candidates.append(
-            Candidate("capability", None, None, {"capability": name, "type": _CAPABILITY_TYPE_HINTS.get(name, "")})
+            Candidate(
+                "capability",
+                None,
+                None,
+                {
+                    "tool_id": name,
+                    "capability": legacy_capability_of(name),
+                    "type": resolve_goal_type_from_tool_id(name),
+                },
+            )
         )
     for impact in world_impacts or []:
         hint = impact.get("goal_opportunity") or {}

@@ -103,6 +103,20 @@ ACTION_CAPABILITY_MAP: dict[str, tuple[str, str]] = {
     "send_notification": ("notification", "send"),
 }
 
+# 工具身份映射（V2.4.0 TOOL-004 §2.3）：ActionType → 工具 id 候选元组（一词多工具）。
+# 与 ACTION_CAPABILITY_MAP 并列：总闸 off 时只读旧表，on 时经 ToolRegistry.resolve 取绑定。
+ACTION_TOOL_MAP: dict[str, tuple[str, ...]] = {
+    "create_reminder": ("builtin.reminder.create",),
+    "cancel_reminder": ("builtin.reminder.cancel",),
+    "remember_fact": ("builtin.memory.save",),
+    "create_object": ("world.object.create",),
+    "move_object": ("world.object.move",),
+    "use_object": ("world.object.use",),
+    "query_environment": ("world.env.query",),
+    "query_search": ("builtin.search.query",),
+    "send_notification": ("builtin.notification.send", "channel.feishu.send"),
+}
+
 # 物品类目推断（world-integration.md §1 create_object 行）。
 OBJECT_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "food": ("牛奶", "面包", "西瓜", "鸡蛋", "蛋糕", "水果", "菜"),

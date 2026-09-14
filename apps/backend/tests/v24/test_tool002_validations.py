@@ -323,4 +323,9 @@ def test_public_interface_is_frozen_to_documented_surface():
         # 既有方法语义与返回形状不变。
         "mark_tripped",
         "clear_tripped",
+        # TOOL-004 增量：运行期禁用内存态叠加（管理面风控入口），
+        # 被 effective_status 与 settings 禁用清单一起消费。
+        "set_runtime_disabled",
+        "clear_runtime_disabled",
+        "runtime_disabled_ids",
     }

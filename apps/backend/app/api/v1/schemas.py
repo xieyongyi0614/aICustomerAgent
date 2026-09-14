@@ -224,3 +224,66 @@ class WorldSituationsOut(BaseModel):
 class WorldSimTickOut(BaseModel):
     enabled: bool
     result: dict | None = None
+
+
+class ToolHealthOut(BaseModel):
+    consecutive_failures: int = 0
+    failure_rate_window: float = 0.0
+    tripped: bool = False
+    last_failure_at: datetime | None = None
+    last_success_at: datetime | None = None
+
+
+class ToolSummaryOut(BaseModel):
+    tool_id: str
+    name: str
+    namespace: str
+    status: str
+    side_effects: list[str] = []
+    health: ToolHealthOut | None = None
+
+
+class ToolsOut(BaseModel):
+    enabled: bool
+    tools: list[ToolSummaryOut] = []
+    runtime_disabled: list[str] = []
+
+
+class ToolDetailOut(BaseModel):
+    enabled: bool
+    tool_id: str | None = None
+    definition: dict | None = None
+    permission: dict | None = None
+    health: ToolHealthOut | None = None
+    recent_executions: list[dict] = []
+
+
+class ToolSurfaceOut(BaseModel):
+    enabled: bool
+    run_kind: str | None = None
+    run_kind_defaulted: bool = False
+    tool_ids: list[str] = []
+    excluded: list[dict] = []
+    surface_hash: str | None = None
+
+
+class ToolRuntimeStatusOut(BaseModel):
+    enabled: bool
+    tool_id: str | None = None
+    effective_status: str | None = None
+    runtime_disabled: bool = False
+
+
+class ToolExecutionRowOut(BaseModel):
+    record_id: str
+    tool_id: str | None = None
+    status: str
+    permission: dict = {}
+    duration_ms: int | None = None
+    effects: list[dict] = []
+
+
+class ToolExecutionsOut(BaseModel):
+    enabled: bool
+    user_id: str | None = None
+    executions: list[ToolExecutionRowOut] = []
