@@ -207,6 +207,7 @@ class WorldSimulationOut(BaseModel):
     active_situations: list[WorldSimSituationOut] = []
     recent_events: list[WorldSimEventOut] = []
     flags: dict = {}
+    event_quota_drops: dict = {}
 
 
 class WorldPlanOut(BaseModel):

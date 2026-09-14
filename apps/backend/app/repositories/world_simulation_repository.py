@@ -1,5 +1,6 @@
 """V2.3.0 世界模拟仓储：daily_plans / user_situations 两表与时间推进锚点。"""
 
+import logging
 import uuid
 from datetime import date, datetime
 
@@ -23,6 +24,10 @@ from app.models.world_simulation import (
 )
 
 OPEN_PLAN_STATUSES = (DailyPlanStatus.PLANNED, DailyPlanStatus.ACTIVE)
+
+logger = logging.getLogger(__name__)
+
+DAY_CYCLE_OBSERVATION_KEY = "day_cycle_observation"
 
 
 def new_plan_id() -> str:
@@ -93,6 +98,52 @@ def save_plan(plan: DailyPlan) -> None:
         row.note = plan.note
         row.updated_at = now
         session.commit()
+
+
+def replace_day_plans(plans: list[DailyPlan]) -> int:
+    """单事务写入当日新计划块：先 supersede 旧 OPEN 行，再整批插入。
+
+    与逐块 save_plan 语义一致（保留 SUPERSEDED 历史行作为审计轨迹），
+    但合并为一次事务：既避免 N 次 commit，也消除"旧计划已 supersede +
+    新计划只写了一半"的中间态。
+    """
+    if not plans:
+        return 0
+    user_id = plans[0].user_id
+    plan_date = plans[0].plan_date
+    now = datetime.now()
+    with SessionLocal() as session:
+        session.execute(
+            update(DailyPlanRow)
+            .where(
+                DailyPlanRow.user_id == user_id,
+                DailyPlanRow.plan_date == plan_date,
+                DailyPlanRow.status.in_([s.value for s in OPEN_PLAN_STATUSES]),
+            )
+            .values(status=DailyPlanStatus.SUPERSEDED.value, updated_at=now)
+        )
+        for plan in plans:
+            session.add(
+                DailyPlanRow(
+                    id=plan.id,
+                    user_id=plan.user_id,
+                    plan_date=plan.plan_date,
+                    seq=plan.seq,
+                    part_of_day=plan.part_of_day,
+                    start_minutes=plan.start_minutes,
+                    end_minutes=plan.end_minutes,
+                    activity=plan.activity,
+                    location_id=plan.location_id,
+                    variability_source=plan.variability_source.value,
+                    status=plan.status.value,
+                    routine_version=plan.routine_version,
+                    note=plan.note,
+                    created_at=plan.created_at or now,
+                    updated_at=now,
+                )
+            )
+        session.commit()
+        return len(plans)
 
 
 def supersede_open_plans(user_id: str, plan_date: date) -> int:
@@ -235,9 +286,23 @@ def commit_time_advance(
     sim_time: datetime | None,
     sim_last_advanced_at: datetime,
 ) -> bool:
+    """提交时间推进锚点：仅当新锚点晚于已存锚点才写入（防并发回退）。
+
+    多 worker 并发 tick 时，后到但更早的推进结果不会覆盖更晚的结果；
+    无条件写会造成模拟时间回退（世界时钟倒退）。返回是否实际写入。
+    """
     with SessionLocal() as session:
         row = session.get(WorldRow, world_id)
         if row is None:
+            return False
+        current_anchor = row.sim_last_advanced_at
+        if current_anchor is not None and sim_last_advanced_at <= current_anchor:
+            logger.debug(
+                "时间推进锚点未前移，跳过写入：world=%s current=%s incoming=%s",
+                world_id,
+                current_anchor.isoformat(),
+                sim_last_advanced_at.isoformat(),
+            )
             return False
         row.sim_time = sim_time if sim_time is not None else row.sim_time
         row.sim_last_advanced_at = sim_last_advanced_at
@@ -257,3 +322,50 @@ def get_latest_idempotency_keys(world_id: str, keys: list[str]) -> set[str]:
             )
         ).all()
         return {key for key in rows if key is not None}
+
+
+def get_day_cycle_observation(world_id: str) -> dict | None:
+    """读取上次日循环观测（存于 worlds.environment，跨进程/重启可见）。"""
+    with SessionLocal() as session:
+        row = session.get(WorldRow, world_id)
+        if row is None:
+            return None
+        environment = row.environment or {}
+        observation = environment.get(DAY_CYCLE_OBSERVATION_KEY)
+        return dict(observation) if isinstance(observation, dict) else None
+
+
+def save_day_cycle_observation(
+    world_id: str,
+    observed_at: datetime,
+    part_of_day: str,
+    time_mode: str,
+) -> None:
+    """写入上次日循环观测锚点（整体替换 JSON 键，避免残留旧值）。"""
+    with SessionLocal() as session:
+        row = session.get(WorldRow, world_id)
+        if row is None:
+            return
+        environment = dict(row.environment or {})
+        environment[DAY_CYCLE_OBSERVATION_KEY] = {
+            "observed_at": observed_at.isoformat(),
+            "part_of_day": part_of_day,
+            "time_mode": time_mode,
+        }
+        row.environment = environment
+        row.updated_at = observed_at
+        session.commit()
+
+
+def clear_day_cycle_observation(world_id: str) -> None:
+    """清除日循环观测锚点（下次 tick 按冷启动处理）。"""
+    with SessionLocal() as session:
+        row = session.get(WorldRow, world_id)
+        if row is None:
+            return
+        environment = dict(row.environment or {})
+        if environment.pop(DAY_CYCLE_OBSERVATION_KEY, None) is None:
+            return
+        row.environment = environment
+        row.updated_at = datetime.now()
+        session.commit()

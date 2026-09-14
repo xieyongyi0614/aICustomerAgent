@@ -1,9 +1,19 @@
 """World Simulation 域设置（V2.3.0 WS-001）：世界模拟总闸与子闸及模拟参数。
 
 总闸 + 子闸双开才生效；全部默认 off，关闭后行为与 V2.2.0 逐字节一致。
+
+RESERVED 子闸：已定义并纳入总闸校验，但当前版本尚无行为分支，开启不生效。
+上线前若运维误开会产生"看着开了但没变化"的困惑，故在启动时告警提示
+（见 enablement.validate_v23_reserved_flags）。
 """
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
+
+RESERVED_V23_SUB_FLAGS = (
+    "v23_scene_expansion_enabled",
+    "v23_habit_time_enabled",
+)
+"""声明但未接线（WS-016 场景分层延后交付）：开启不会产生行为变化。"""
 
 
 class WorldSimulationSettings(BaseSettings):
@@ -14,7 +24,9 @@ class WorldSimulationSettings(BaseSettings):
     v23_daily_life_enabled: bool = False
     v23_event_detection_enabled: bool = False
     v23_scene_expansion_enabled: bool = False
+    """RESERVED：场景 profile 尚未接入 brief/context 装配（WS-016）。"""
     v23_habit_time_enabled: bool = False
+    """RESERVED：习惯时段信号尚未实现（WS-016）。"""
     v23_world_llm_assist_enabled: bool = False
     v23_debug_tick_enabled: bool = False
 

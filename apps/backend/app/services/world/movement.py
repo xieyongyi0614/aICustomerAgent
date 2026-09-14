@@ -7,6 +7,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.models.world import part_of_day
 from app.repositories import world_repository
 
@@ -60,7 +62,11 @@ def apply(
     reason: str | None = None,
     now: datetime | None = None,
 ) -> MoveResult:
-    """位置迁移仲裁入口；失败只留原因，不抛错（世界旁路纪律）。"""
+    """位置迁移仲裁入口；失败只留原因，不抛错（世界旁路纪律）。
+
+    异常分级：仓储/IO 类（SQLAlchemyError）判定为可重试，下一 tick 会自然重放；
+    其余视为逻辑缺陷，日志级别更高以便定位。
+    """
     from app.application import world_engine
 
     try:
@@ -120,6 +126,14 @@ def apply(
             from_location=world.current_location,
             to_location=target_location_id,
         )
+    except SQLAlchemyError:
+        logger.warning(
+            "位置迁移仓储异常（可重试，下一 tick 重放）：user=%s target=%s",
+            user_id,
+            target_location_id,
+            exc_info=True,
+        )
+        return MoveResult(applied=False, skipped_reason="retryable_error")
     except Exception:
-        logger.exception("位置迁移裁决失败")
+        logger.exception("位置迁移裁决失败（逻辑异常）")
         return MoveResult(applied=False, skipped_reason="error")

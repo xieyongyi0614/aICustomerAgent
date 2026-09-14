@@ -9,7 +9,11 @@
 以保留子域隔离单测使用部分 Flag 组合的自由度。
 """
 
+import logging
+
 from app.core.settings._shared import SettingsError
+
+_logger = logging.getLogger(__name__)
 
 
 def enablement_violations(settings) -> list[str]:
@@ -102,7 +106,24 @@ def enablement_violations(settings) -> list[str]:
     return violations
 
 
+def v23_reserved_flag_warnings(settings) -> list[str]:
+    """RESERVED 子闸被开启时的提示（非阻断）：开了但当前版本无行为分支。"""
+    from app.core.settings.world_simulation import RESERVED_V23_SUB_FLAGS
+
+    warnings: list[str] = []
+    if not getattr(settings, "v23_world_simulation_enabled", False):
+        return warnings
+    for flag in RESERVED_V23_SUB_FLAGS:
+        if getattr(settings, flag, False):
+            warnings.append(
+                f"{flag} 为 RESERVED 开关：当前版本尚未接线，开启不会产生行为变化"
+            )
+    return warnings
+
+
 def validate_enablement_chain(settings) -> None:
     violations = enablement_violations(settings)
     if violations:
         raise SettingsError("V2 启用链配置错误：" + "；".join(violations))
+    for message in v23_reserved_flag_warnings(settings):
+        _logger.warning("V2.3.0 开关提示：%s", message)

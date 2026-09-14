@@ -2,18 +2,17 @@
 
 纯函数计算 + 薄发射层；标记以 idempotency_key 幂等落 world_events（唯一 SoT）。
 多日追赶折叠见 catch_up（WS-017）；本模块只处理单 tick 邻近区间。
+观测锚点持久化于 worlds.environment，跨进程/重启可见（不做进程级缓存）。
 """
 
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from app.models.world import WEEKDAY_CN, TimeContext
+from app.models.world import WEEKDAY_CN, TimeContext, WorldTimeMode, part_of_day
 from app.repositories import world_repository, world_simulation_repository
 
 logger = logging.getLogger(__name__)
-
-_last_contexts: dict[str, TimeContext] = {}
 
 
 @dataclass
@@ -126,8 +125,38 @@ def compute_due_markers(
     return drafts
 
 
+def _load_prev_context(world_id: str) -> TimeContext | None:
+    """从世界环境读回上次观测；缺失或不可解析 → None（冷启动）。"""
+    observation = world_simulation_repository.get_day_cycle_observation(world_id)
+    if not observation:
+        return None
+    observed_at = observation.get("observed_at")
+    part = observation.get("part_of_day")
+    if not observed_at or not part:
+        return None
+    try:
+        parsed = datetime.fromisoformat(observed_at)
+    except ValueError:
+        logger.warning("日循环观测锚点时间不可解析，按冷启动处理：world=%s", world_id)
+        return None
+    try:
+        time_mode = WorldTimeMode(observation.get("time_mode") or WorldTimeMode.REAL_SYNC.value)
+    except ValueError:
+        time_mode = WorldTimeMode.REAL_SYNC
+    return TimeContext(
+        now=parsed,
+        weekday=WEEKDAY_CN[parsed.weekday()],
+        part_of_day=part,
+        time_mode=time_mode,
+    )
+
+
 def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
-    """发射层：比对上次观测 → 幂等落库；返回本次发出的标记键。"""
+    """发射层：读取上次观测 → 比对 → 幂等落库 → 回写观测。
+
+    观测锚点存 worlds.environment，因此多进程各自读取同一份状态，
+    不会出现单进程内存盲区；进程重启后仍能正确判定时段切换。
+    """
     from app.application import world_engine
 
     try:
@@ -135,28 +164,32 @@ def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
         if world is None:
             return []
         curr = world_engine._default_provider.context(world)
-        prev = _last_contexts.get(user_id)
+        prev = _load_prev_context(world.world_id)
         candidates = compute_due_markers(prev, curr)
         keys = [draft.key for draft in candidates]
         fired = world_simulation_repository.get_latest_idempotency_keys(world.world_id, keys)
         pending = [draft for draft in candidates if draft.key not in fired]
-        if not pending:
-            _last_contexts[user_id] = curr
-            return []
-        drafts = [
-            {
-                "event_type": draft.event_type,
-                "title": draft.title,
-                "importance": draft.importance,
-                "source": draft.source,
-                "status": "completed",
-                "payload": draft.payload,
-                "idempotency_key": draft.key,
-            }
-            for draft in pending
-        ]
-        emitted = world_engine._emit_simulation_events(user_id, drafts)
-        _last_contexts[user_id] = curr
+        emitted: list[str] = []
+        if pending:
+            drafts = [
+                {
+                    "event_type": draft.event_type,
+                    "title": draft.title,
+                    "importance": draft.importance,
+                    "source": draft.source,
+                    "status": "completed",
+                    "payload": draft.payload,
+                    "idempotency_key": draft.key,
+                }
+                for draft in pending
+            ]
+            emitted = world_engine._emit_simulation_events(user_id, drafts)
+        world_simulation_repository.save_day_cycle_observation(
+            world.world_id,
+            observed_at=curr.now,
+            part_of_day=curr.part_of_day,
+            time_mode=curr.time_mode.value,
+        )
         return emitted
     except Exception:
         logger.exception("日循环标记发射失败")
@@ -164,4 +197,11 @@ def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
 
 
 def reset_observation(user_id: str) -> None:
-    _last_contexts.pop(user_id, None)
+    """清除观测锚点（测试与显式重放用）：下次 tick 按冷启动处理。"""
+    try:
+        world = world_repository.get_world(user_id)
+        if world is None:
+            return
+        world_simulation_repository.clear_day_cycle_observation(world.world_id)
+    except Exception:
+        logger.exception("日循环观测锚点清除失败：%s", user_id)

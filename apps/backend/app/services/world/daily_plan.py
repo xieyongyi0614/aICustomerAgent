@@ -123,7 +123,7 @@ def _jitter(block: dict, rng: random.Random, variability: DailyPlanVariability) 
 
 
 def build_daily_plan(user_id: str, day: date, now: datetime | None = None) -> list[DailyPlan]:
-    """具象化当日计划：种子随机 + 用户影响；重复构建先 supersede 旧行。"""
+    """具象化当日计划：种子随机 + 用户影响；单事务 supersede 旧行并写入新行。"""
     current = now or datetime.now()
     template = routine_template(day_type_of(day))
     rng = random.Random(f"{user_id}|{day.isoformat()}|{ROUTINE_VERSION}")
@@ -136,6 +136,7 @@ def build_daily_plan(user_id: str, day: date, now: datetime | None = None) -> li
         default=None,
     )
 
+    plan_repo.supersede_open_plans(user_id, day)
     plan_repo.supersede_open_plans(user_id, day)
     plans: list[DailyPlan] = []
     for block in template:
@@ -152,24 +153,25 @@ def build_daily_plan(user_id: str, day: date, now: datetime | None = None) -> li
             location_id = situation_influence["location_id"]
             variability = DailyPlanVariability.USER_INFLUENCED
             note = situation_influence["note"]
-        plan = DailyPlan(
-            id=plan_repo.new_plan_id(),
-            user_id=user_id,
-            plan_date=day,
-            seq=block["seq"],
-            part_of_day=block["part"],
-            start_minutes=start,
-            end_minutes=end,
-            activity=activity[:50],
-            location_id=location_id,
-            variability_source=variability,
-            status=DailyPlanStatus.PLANNED,
-            routine_version=ROUTINE_VERSION,
-            note=note,
-            created_at=current,
+        plans.append(
+            DailyPlan(
+                id=plan_repo.new_plan_id(),
+                user_id=user_id,
+                plan_date=day,
+                seq=block["seq"],
+                part_of_day=block["part"],
+                start_minutes=start,
+                end_minutes=end,
+                activity=activity[:50],
+                location_id=location_id,
+                variability_source=variability,
+                status=DailyPlanStatus.PLANNED,
+                routine_version=ROUTINE_VERSION,
+                note=note,
+                created_at=current,
+            )
         )
-        plan_repo.save_plan(plan)
-        plans.append(plan)
+    plan_repo.replace_day_plans(plans)
     if directive is not None and not directive_applied:
         logger.info("承诺记忆无可绑定日程块（user=%s day=%s）", user_id, day)
     return plans
@@ -209,6 +211,26 @@ def plan_topics(user_id: str, day: date) -> list[str]:
         block = template_by_seq.get(plan.seq) or {}
         topics.extend(block.get("topics") or [])
     return topics
+
+
+def prune_expired_plans(user_id: str, today: date) -> int:
+    """清理超过保留期的历史计划行，返回删除条数（保留期见 daily_plan_retention_days）。
+
+    仅按日期裁剪，不区分状态：保留期内的 COMPLETED 行仍可支撑 plan_topics；
+    超期后其话题素材已无引用价值。
+    """
+    retention_days = get_settings().daily_plan_retention_days
+    if retention_days <= 0:
+        return 0
+    cutoff = today - timedelta(days=retention_days)
+    try:
+        removed = plan_repo.prune_plans_before(user_id, cutoff)
+    except Exception:
+        logger.exception("历史计划清理失败（user=%s cutoff=%s）", user_id, cutoff)
+        return 0
+    if removed:
+        logger.info("清理历史计划 %s 条（user=%s cutoff=%s）", removed, user_id, cutoff)
+    return removed
 
 
 def _emit_life_event(user_id: str, plan: DailyPlan, kind: str, now: datetime) -> None:

@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import hashlib
 import logging
 import time
 from datetime import datetime, timedelta
@@ -632,6 +633,41 @@ def merge_character_action_notes(user_id: str, cas_lines: list[str]) -> bool:
         return False
 
 
+_QUOTA_EXEMPT_EVENT_TYPES = (
+    "time_marker",
+    "calendar_event",
+    "world_digest",
+    "weather_change",
+)
+"""时间标记类事件：承载时间轴连续性（日/时段/节气/天气/折叠摘要）。
+
+此类事件条数有天然上限（每天几条）且多为 completed 终态，不占用世界活跃配额；
+若与普通事件共享配额，长跑世界会在配额打满后静默丢失追赶语义。
+"""
+
+_EVENT_QUOTA_DROPS_TOTAL = 0
+_EVENT_QUOTA_DROPS_BY_TYPE: dict[str, int] = {}
+
+
+def event_quota_drop_snapshot() -> dict:
+    """配额丢弃计数快照（观测用）：总量 + 分事件类型。"""
+    return {
+        "total": _EVENT_QUOTA_DROPS_TOTAL,
+        "by_type": dict(_EVENT_QUOTA_DROPS_BY_TYPE),
+    }
+
+
+def reset_event_quota_drop_snapshot() -> None:
+    global _EVENT_QUOTA_DROPS_TOTAL
+    _EVENT_QUOTA_DROPS_TOTAL = 0
+    _EVENT_QUOTA_DROPS_BY_TYPE.clear()
+
+
+def _periodic_event_drop_metric() -> int:
+    """配额丢弃的周期汇总计数：每 10 次上报一次，避免刷日志。"""
+    return 10
+
+
 def create_event(
     user_id: str,
     event_type: str,
@@ -649,10 +685,11 @@ def create_event(
             return None
         settings = get_settings()
         if (
-            world_repository.count_active_events(world.world_id)
+            event_type not in _QUOTA_EXEMPT_EVENT_TYPES
+            and world_repository.count_active_events(world.world_id)
             >= settings.world_active_events_limit
         ):
-            logger.warning("世界活跃事件数达上限，拒绝新建：%s", user_id)
+            _record_event_quota_drop(event_type, user_id)
             return None
         now = datetime.now()
         event = WorldEvent(
@@ -674,6 +711,28 @@ def create_event(
     except Exception:
         logger.exception("世界事件创建失败")
         return None
+
+
+def _record_event_quota_drop(event_type: str, user_id: str) -> None:
+    """记录被配额拒绝的事件：计数 + 周期汇总日志（可观测，不再静默）。"""
+    global _EVENT_QUOTA_DROPS_TOTAL
+    _EVENT_QUOTA_DROPS_TOTAL += 1
+    _EVENT_QUOTA_DROPS_BY_TYPE[event_type] = (
+        _EVENT_QUOTA_DROPS_BY_TYPE.get(event_type, 0) + 1
+    )
+    interval = _periodic_event_drop_metric()
+    if interval > 0 and _EVENT_QUOTA_DROPS_TOTAL % interval == 0:
+        logger.warning(
+            "世界活跃事件数达上限，累计拒绝 %s 条（user=%s 最近类型=%s 分布=%s）",
+            _EVENT_QUOTA_DROPS_TOTAL,
+            user_id,
+            event_type,
+            _EVENT_QUOTA_DROPS_BY_TYPE,
+        )
+    else:
+        logger.info(
+            "世界活跃事件数达上限，拒绝新建（user=%s type=%s）", user_id, event_type
+        )
 
 
 def _transition_events_by_type(
@@ -1087,16 +1146,38 @@ async def run_world_maintenance_loop() -> None:
 _IMPORTANCE_ORDER = ("low", "normal", "high")
 
 
+def _rank_drafts(drafts: list[dict]) -> list[dict]:
+    """按重要度降序 + 幂等键升序排名：cap 边界取舍跨 tick 稳定。
+
+    仅按重要度排序时会依赖输入顺序（不可控），同重要级事件在 cap 边界上
+    可能跨 tick 摆动；幂等键是确定性派生，用作次级键可消除该抖动。
+    """
+    return sorted(
+        drafts,
+        key=lambda d: (
+            -_IMPORTANCE_ORDER.index(d.get("importance", "low")),
+            str(d.get("idempotency_key") or ""),
+        ),
+    )
+
+
+def _digest_idempotency_key(user_id: str, drafts: list[dict]) -> str:
+    """world_digest 幂等键：由被折叠内容的幂等键集合确定性派生。
+
+    不用 datetime.now()：秒级时间戳在同一秒内多次 tick 会碰撞，且时钟回拨
+    会产生重复摘要。派生键保证"同一批被折叠事件 → 同一摘要键"。
+    """
+    keys = sorted(str(d.get("idempotency_key") or "") for d in drafts)
+    fingerprint = hashlib.sha1("|".join(keys).encode("utf-8")).hexdigest()[:16]
+    return f"world_digest:{user_id}:{fingerprint}"
+
+
 def _emit_simulation_events(user_id: str, drafts: list[dict]) -> list[str]:
     """模拟事件统一漏斗：单 tick 风暴上限，超出折叠为 world_digest。"""
     settings = get_settings()
     cap = settings.world_event_tick_cap
     if cap > 0 and len(drafts) > cap:
-        ranked = sorted(
-            drafts,
-            key=lambda d: _IMPORTANCE_ORDER.index(d.get("importance", "low")),
-            reverse=True,
-        )
+        ranked = _rank_drafts(drafts)
         kept, dropped = ranked[: cap - 1], ranked[cap - 1 :]
         digest = {
             "event_type": "world_digest",
@@ -1108,9 +1189,7 @@ def _emit_simulation_events(user_id: str, drafts: list[dict]) -> list[str]:
                 "count": len(dropped),
                 "kinds": sorted({str(d.get("event_type", "")) for d in dropped}),
             },
-            "idempotency_key": (
-                f"world_digest:{user_id}:{datetime.now().isoformat(timespec='seconds')}"
-            ),
+            "idempotency_key": _digest_idempotency_key(user_id, dropped),
         }
         drafts = kept + [digest]
     emitted: list[str] = []
@@ -1122,10 +1201,15 @@ def _emit_simulation_events(user_id: str, drafts: list[dict]) -> list[str]:
 
 
 def _run_simulation_substeps(user_id: str, now: datetime) -> None:
+    """子步骤顺序不可调换：catch_up 必须先补齐断层，后续步骤才基于连续时间轴。
+
+    catch_up（多日折叠）→ day_cycle（日/时段标记）→ weather → 处境过期
+    → daily_life（计划构建/推进/历史裁剪）。
+    """
     from app.services.world import catch_up, day_cycle, user_situation, weather
 
     catch_up.run_catch_up(user_id, now)
-    day_cycle.emit_time_markers(user_id, now)
+    marker_keys = day_cycle.emit_time_markers(user_id, now)
     weather.evolve_daily_weather(user_id)
     user_situation.expire_and_notify(user_id, now)
     settings = get_settings()
@@ -1140,6 +1224,13 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
                 daily_plan.advance_daily_plan(user_id, world_now)
             else:
                 logger.info("当日计划缺失且构建失败（user=%s）", user_id)
+            if _day_rolled_over(marker_keys):
+                daily_plan.prune_expired_plans(user_id, world_now.date())
+
+
+def _day_rolled_over(marker_keys: list[str]) -> bool:
+    """当日跨天标记触发时做一次日粒度维护（历史计划裁剪）。"""
+    return any(key.startswith("time:day_start:") for key in marker_keys)
 
 
 def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):
@@ -1280,6 +1371,7 @@ def build_debug_simulation(user_id: str) -> dict | None:
         "active_situations": build_debug_situations(user_id),
         "recent_events": recent_events,
         "flags": v23_flag_snapshot(),
+        "event_quota_drops": event_quota_drop_snapshot(),
     }
 
 

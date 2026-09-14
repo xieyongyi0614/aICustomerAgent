@@ -1,32 +1,33 @@
 # V2.3.0 World Simulation System — Task Registry
 
 > 上游：[../architecture.md](../architecture.md)（架构唯一依据，Task 不得超出其边界）
-> 状态：全部 **未开始**（状态列随实现回写：未开始 / 进行中 / 已完成 / 已取消）
+> 状态：WS-001 ~ WS-015、WS-017 ~ WS-019 **已完成**；WS-016 **部分完成**（见状态列注记）
 > 全局红线：零新建 Runtime / Event Engine / Chat Pipeline；模拟默认路径 0 LLM；世界永不写 Character 域状态；`v23_*` 全部默认 off，总闸关闭时与 V2.2.0 逐字节一致。
 
 ## 任务索引
 
 | ID | Task Name | Priority | Dependencies | Status |
 |---|---|---|---|---|
-| [WS-001](WS-001.md) | Flag 体系与世界模拟配置 | P0 | — | 未开始 |
-| [WS-002](WS-002.md) | 数据模型与迁移（0044/0045） | P0 | — | 未开始 |
-| [WS-003](WS-003.md) | TimeAdvancer 与 Life Loop 模拟维护步 | P0 | WS-001, WS-002 | 未开始 |
-| [WS-004](WS-004.md) | DayCycleEngine 日循环标记 | P0 | WS-003 | 未开始 |
-| [WS-005](WS-005.md) | CalendarAsset 与 WeatherEvolver | P1 | WS-004 | 未开始 |
-| [WS-006](WS-006.md) | Scene 资产层（地点扩展/SceneProfile/MovementResolver） | P1 | — | 未开始 |
-| [WS-007](WS-007.md) | RoutineAsset 与 DailyPlanBuilder | P1 | WS-002, WS-004, WS-006 | 未开始 |
-| [WS-008](WS-008.md) | DailyPlanRunner 块推进与位置迁移 | P1 | WS-007, WS-006 | 未开始 |
-| [WS-009](WS-009.md) | UserSituationTracker 用户处境追踪 | P1 | WS-002, WS-001 | 未开始 |
-| [WS-010](WS-010.md) | CharacterEventBridge 角色事件桥 | P2 | WS-002 | 未开始 |
-| [WS-011](WS-011.md) | EventImpactRules 事件影响裁决 | P1 | WS-004 | 未开始 |
-| [WS-012](WS-012.md) | WorldBriefAssembler 与 Context 注入 | P0 | WS-004, WS-007, WS-009 | 未开始 |
-| [WS-013](WS-013.md) | 事件升级白名单与自治素材增强 | P1 | WS-011, WS-009, WS-010 | 未开始 |
-| [WS-014](WS-014.md) | 决策管线日程感知与世界目标机会 | P1 | WS-011, WS-007, WS-008 | 未开始 |
-| [WS-015](WS-015.md) | World→Memory/Reflection 接入 | P1 | WS-004, WS-008, WS-010 | 未开始 |
-| [WS-016](WS-016.md) | Character Experience 世界信号（Style/Emotion/Habit） | P1 | WS-006, WS-004, WS-008 | 未开始 |
-| [WS-017](WS-017.md) | Catch-up 追赶与事件风暴防护 | P1 | WS-003, WS-004 | 未开始 |
-| [WS-018](WS-018.md) | 观测与调试（Debug API + 前端面板） | P2 | WS-002, WS-007, WS-009 | 未开始 |
-| [WS-019](WS-019.md) | 全链路验收与逐字节一致性回归 | P0 | WS-001 ~ WS-018 | 未开始 |
+| [WS-001](WS-001.md) | Flag 体系与世界模拟配置 | P0 | — | 已完成 |
+| [WS-002](WS-002.md) | 数据模型与迁移（0044/0045） | P0 | — | 已完成 |
+| [WS-003](WS-003.md) | TimeAdvancer 与 Life Loop 模拟维护步 | P0 | WS-001, WS-002 | 已完成 |
+| [WS-004](WS-004.md) | DayCycleEngine 日循环标记 | P0 | WS-003 | 已完成 |
+| [WS-005](WS-005.md) | CalendarAsset 与 WeatherEvolver | P1 | WS-004 | 已完成 |
+| [WS-006](WS-006.md) | Scene 资产层（地点扩展/SceneProfile/MovementResolver） | P1 | — | 已完成 |
+| [WS-007](WS-007.md) | RoutineAsset 与 DailyPlanBuilder | P1 | WS-002, WS-004, WS-006 | 已完成 |
+| [WS-008](WS-008.md) | DailyPlanRunner 块推进与位置迁移 | P1 | WS-007, WS-006 | 已完成 |
+| [WS-009](WS-009.md) | UserSituationTracker 用户处境追踪 | P1 | WS-002, WS-001 | 已完成 |
+| [WS-010](WS-010.md) | CharacterEventBridge 角色事件桥 | P2 | WS-002 | 已完成 |
+| [WS-011](WS-011.md) | EventImpactRules 事件影响裁决 | P1 | WS-004 | 已完成 |
+| [WS-012](WS-012.md) | WorldBriefAssembler 与 Context 注入 | P0 | WS-004, WS-007, WS-009 | 已完成 |
+| [WS-013](WS-013.md) | 事件升级白名单与自治素材增强 | P1 | WS-011, WS-009, WS-010 | 已完成 |
+| [WS-014](WS-014.md) | 决策管线日程感知与世界目标机会 | P1 | WS-011, WS-007, WS-008 | 已完成 |
+| [WS-015](WS-015.md) | World→Memory/Reflection 接入 | P1 | WS-004, WS-008, WS-010 | 已完成 |
+| [WS-016](WS-016.md) | Character Experience 世界信号（Style/Emotion/Habit） | P1 | WS-006, WS-004, WS-008 | **部分完成**：SceneProfile 资产已就绪但未接入 brief/context（`v23_scene_expansion_enabled` / `v23_habit_time_enabled` 标记为 RESERVED） |
+| [WS-017](WS-017.md) | Catch-up 追赶与事件风暴防护 | P1 | WS-003, WS-004 | 已完成 |
+| [WS-018](WS-018.md) | 观测与调试（Debug API + 前端面板） | P2 | WS-002, WS-007, WS-009 | 已完成 |
+| [WS-019](WS-019.md) | 全链路验收与逐字节一致性回归 | P0 | WS-001 ~ WS-018 | 已完成 |
+
 
 ## 依赖图
 

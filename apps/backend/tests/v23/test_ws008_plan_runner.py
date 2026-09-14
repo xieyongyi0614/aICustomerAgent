@@ -107,7 +107,7 @@ def test_maintenance_step_advances_plan(db_session_factory, monkeypatch):
         world = world_repository.ensure_world(user)
         anchor = datetime(2026, 9, 14, 12, 0)
         repo.commit_time_advance(world.world_id, anchor, anchor)
-        world_engine.run_simulation_maintenance(user)
+        world_engine.run_simulation_maintenance(user, now=anchor)
         plans = daily_plan.get_day_plan(user, date(2026, 9, 14))
         assert plans
         active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
