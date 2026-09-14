@@ -4,7 +4,8 @@
 只做声明与发现——不执行、不做授权判断、不做参数校验（TOOL-003 / 004 / 005）。
 注册期七项校验失败即抛错：注册是启动期行为，错误必须显式暴露，不降级不静默。
 生命周期为三层纯函数式叠加（代码态基线 + 运行期禁用 + 熔断），覆盖层不写回声明；
-健康度为进程内存态，重启归零，`record_outcome()` 是唯一写入面。
+健康度为进程内存态，重启归零，`record_outcome()` 与熔断置位/解除（TOOL-003 写入面）
+是仅有的写入面。
 `ToolHealth.failure_rate_window` 沿用 TOOL-001 的滑动窗失败率（float）定义：
 有界原始序列留在本模块私有结构中，只把算出的比率写进健康度。
 """
@@ -361,6 +362,20 @@ class ToolRegistry:
             1 for outcome in window if not outcome
         ) / len(window)
 
+    def mark_tripped(self, tool_id: str) -> None:
+        """熔断置位（TOOL-003 健康度 tracker 的写入面）；未注册 id 为无操作。"""
+        record = self._health.get(tool_id)
+        if record is None:
+            return
+        record.tripped = True
+
+    def clear_tripped(self, tool_id: str) -> None:
+        """熔断解除 / 冷却半开；`consecutive_failures` 由调用方保留（半开后下次失败立即重熔）。"""
+        record = self._health.get(tool_id)
+        if record is None:
+            return
+        record.tripped = False
+
 
 def _surface_tool_ids(surface: ToolSurface) -> list[str]:
     ordered: list[str] = []
@@ -433,7 +448,8 @@ def _builtin_definitions() -> tuple[ToolDefinition, ...]:
                         enum=("low", "normal", "high"),
                         default="normal",
                     ),
-                ]
+                ],
+                semantic_validators=("future_datetime",),
             ),
             permission=PermissionProfile(level="normal", scope=("world",)),
             side_effects=("write_world",),
@@ -569,7 +585,8 @@ def _builtin_definitions() -> tuple[ToolDefinition, ...]:
                         format_="location_id",
                         source_hint="user_message",
                     ),
-                ]
+                ],
+                semantic_validators=("location_exists",),
             ),
             permission=PermissionProfile(level="normal", scope=("world",)),
             side_effects=("write_world",),
@@ -597,7 +614,8 @@ def _builtin_definitions() -> tuple[ToolDefinition, ...]:
                         source_hint="user_message",
                     ),
                     _parameter("action", "string", description="使用动作细分"),
-                ]
+                ],
+                semantic_validators=("object_in_inventory",),
             ),
             permission=PermissionProfile(level="normal", scope=("world",)),
             side_effects=("write_world",),

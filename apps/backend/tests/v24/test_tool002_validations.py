@@ -319,4 +319,8 @@ def test_public_interface_is_frozen_to_documented_surface():
         "effective_status",
         "health",
         "record_outcome",
+        # TOOL-003 增量：熔断置位 / 解除（health tracker 的唯一写入面），
+        # 既有方法语义与返回形状不变。
+        "mark_tripped",
+        "clear_tripped",
     }

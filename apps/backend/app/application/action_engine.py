@@ -3,6 +3,10 @@
 行动域唯一编排器：create_record → evaluate_gates → assemble_plan →
 execute_plan → integrate_result。全部发生在 post_process 第 9 步（per-user 写锁内）
 或重试维护循环中。只做调度与容错，检出/闸门/执行逻辑在 services。
+
+V2.4.0：`v24_tool_system_enabled` 开启时 `execute_plan` 的步骤执行改走 `ToolExecutor`
+（五段短路 + 结果归一），`steps[]` 增量落 `tool_id` / `permission` / `validation` /
+`duration_ms`；总闸关闭时执行路径与 V2.3.0 逐字节一致。
 """
 
 import asyncio
@@ -18,10 +22,15 @@ from app.models.action import (
     ActionIntent,
     transition_action,
 )
+from app.models.tool import ToolInvocation
 from app.repositories import action_repository
 from app.services.action.executor import CapabilityExecutor
 from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_gates
 from app.services.action.registry import ExecutionContext, get_capability_registry
+from app.services.tool.context import ToolContext
+from app.services.tool.executor import ToolExecutor, resolve_step_binding
+from app.services.tool.health import ToolHealthTracker
+from app.services.tool.registry import ToolRegistry, get_tool_registry
 from app.application import world_engine
 from app.application.worker_loop import run_worker_loop
 from app.services.action import memory_bridge, relationship_bridge
@@ -30,6 +39,32 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_STATUSES = ("created", "planned", "executing")
 RETRYABLE_FAILURES = ("transient", "timeout")
+
+_TOOL_STEP_STATUSES: dict[str, str] = {
+    "succeeded": "succeeded",
+    "failed": "failed",
+    "timeout": "failed",
+    "unavailable": "skipped",
+    "denied": "skipped",
+    "invalid": "skipped",
+    "pending_confirmation": "skipped",
+}
+
+_TOOL_RECORD_OUTCOMES: dict[str, tuple[str, str]] = {
+    "unavailable": ("cancelled", "capability_unavailable"),
+    "denied": ("cancelled", "permission_denied"),
+    "invalid": ("cancelled", "invalid_params"),
+    "pending_confirmation": ("planned", "pending_confirmation"),
+}
+
+_TOOL_ACTION_FAILURE_KINDS: dict[str, str] = {
+    "invalid": "permanent",
+    "denied": "permanent",
+    "unavailable": "unavailable",
+    "timeout": "timeout",
+    "transient": "transient",
+    "permanent": "permanent",
+}
 
 
 def _now() -> datetime:
@@ -82,6 +117,12 @@ async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionCon
     record.updated_at = _now()
     action_repository.save_record(record)
 
+    tool_registry = get_tool_registry() if settings.v24_tool_system_enabled else None
+    if tool_registry is not None:
+        return await _execute_plan_via_tools(
+            record, plan, ctx, settings, executor, tool_registry
+        )
+
     step_dicts: list[dict] = []
     for step in plan.steps:
         result = await executor.run(step, ctx)
@@ -122,26 +163,183 @@ async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionCon
     action_repository.save_record(record)
     return result_out
 
+
+async def _execute_plan_via_tools(
+    record: ActionRecord,
+    plan: ActionPlan,
+    ctx: ExecutionContext,
+    settings,
+    capability_executor: CapabilityExecutor,
+    tool_registry: ToolRegistry,
+) -> ActionResult:
+    """总闸开启时的执行路径：五段短路 + `steps[]` 新字段（TOOL-003 §2.2、§2.4）。"""
+    tool_executor = ToolExecutor(
+        tool_registry,
+        capability_executor,
+        settings=settings,
+        health=ToolHealthTracker(tool_registry, settings),
+    )
+    tool_ctx = ToolContext.from_execution_context(ctx)
+    intent = ActionIntent.model_validate(record.intent) if record.intent else plan.intent
+
+    step_dicts: list[dict] = []
+    statuses: list[str] = []
+    for step in plan.steps:
+        binding = resolve_step_binding(tool_registry, step)
+        if binding is None:
+            logger.warning(
+                "工具层无法解析步骤绑定，判为不可用: capability=%s action=%s",
+                step.capability,
+                step.action,
+            )
+            step_dicts.append(_unresolved_step_dict(step))
+            statuses.append("unavailable")
+            break
+        execution = await tool_executor.run(
+            binding,
+            ToolInvocation(
+                tool_id=binding.tool_id,
+                params=dict(step.params),
+                rationale=str(record.intent.get("evidence", "")),
+                source=record.source,
+                intent=intent,
+                goal_id=record.goal_id,
+                dedupe_key=record.dedupe_key,
+            ),
+            tool_ctx,
+            index=step.index,
+        )
+        step_dicts.append(_tool_step_dict(step, execution))
+        statuses.append(execution.status)
+        if execution.status not in ("succeeded", "failed", "timeout"):
+            break
+
+    record.steps = step_dicts
+    outcome = next((status for status in statuses if status != "succeeded"), "succeeded")
+    if outcome in _TOOL_RECORD_OUTCOMES:
+        record.status, record.gate_reason = _TOOL_RECORD_OUTCOMES[outcome]
+        result_out = _tool_action_result(record, outcome, step_dicts)
+    else:
+        result_out = _settle_executed_record(record, settings, step_dicts)
+    record.result = result_out.model_dump(mode="json")
+    record.updated_at = _now()
+    action_repository.save_record(record)
+    return result_out
+
+
+def _settle_executed_record(
+    record: ActionRecord, settings, step_dicts: list[dict]
+) -> ActionResult:
+    """已触达能力的步骤按 V9 既有语义结账（成功终态 / 失败退避）。"""
+    all_ok = all(s["status"] == "succeeded" for s in step_dicts)
+    if all_ok:
+        record.status = transition_action("executing", "step_all_succeeded") or record.status
+        return ActionResult(status="succeeded", effects=[])
+    step_result = dict(step_dicts[0].get("result") or {})
+    payload = step_result.get("payload") or {}
+    failure_kind = (
+        step_result.get("failure_kind") or payload.get("failure_kind") or "transient"
+    )
+    result_out = ActionResult(
+        status="failed",
+        effects=[],
+        error=str(step_result.get("error"))[:80],
+        failure_kind=_TOOL_ACTION_FAILURE_KINDS.get(str(failure_kind), "transient"),
+    )
+    if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
+        record.status = "executing"
+        record.attempt += 1
+        backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
+        record.next_retry_at = _now() + timedelta(seconds=backoff)
+    else:
+        record.status = "failed"
+    return result_out
+
+
+def _tool_action_result(
+    record: ActionRecord, outcome: str, step_dicts: list[dict]
+) -> ActionResult:
+    """闸门段失败（unavailable / denied / invalid）与待确认行动的 ActionResult 投影。"""
+    step_result = dict(step_dicts[0].get("result") or {}) if step_dicts else {}
+    detail = step_result.get("error") or _TOOL_RECORD_OUTCOMES[outcome][1]
+    return ActionResult(
+        status="failed",
+        effects=[],
+        error=str(detail)[:80],
+        failure_kind=_TOOL_ACTION_FAILURE_KINDS.get(outcome, "permanent"),
+    )
+
+
+def _tool_step_dict(step, execution) -> dict:
+    return {
+        "index": step.index,
+        "capability": step.capability,
+        "action": step.action,
+        "params": execution.params,
+        "status": _TOOL_STEP_STATUSES[execution.status],
+        "result": execution.result,
+        "tool_id": execution.tool_id,
+        "permission": execution.permission,
+        "validation": execution.validation,
+        "duration_ms": execution.duration_ms,
+    }
+
+
+def _unresolved_step_dict(step) -> dict:
+    return {
+        "index": step.index,
+        "capability": step.capability,
+        "action": step.action,
+        "params": step.params,
+        "status": "skipped",
+        "result": {
+            "status": "unavailable",
+            "failure_kind": "unavailable",
+            "error": "工具不可用（未注册 / 已禁用 / 已熔断）",
+        },
+        "tool_id": None,
+        "permission": {},
+        "validation": None,
+        "duration_ms": 0,
+    }
+
+
 def _append_effect(record: ActionRecord, kind: str, ref: str, detail: str) -> None:
     result = ActionResult(**record.result) if record.result else ActionResult(status="succeeded", effects=[])
     result.effects.append(ActionEffect(kind=kind, ref=ref, detail=detail[:200]))
     record.result = result.model_dump(mode="json")
 
 
+def _effect_ref(step_result: dict, kind: str) -> str | None:
+    """新键优先：从 `ToolResult.effects`（V2.4.0）取效果引用；缺省返回 None 走旧键兜底。"""
+    effects = step_result.get("effects")
+    if not isinstance(effects, list):
+        return None
+    for effect in effects:
+        if isinstance(effect, dict) and effect.get("kind") == kind and effect.get("ref"):
+            return str(effect["ref"])
+    return None
+
+
 def integrate_result(record: ActionRecord, result: ActionResult) -> None:
-    """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。"""
+    """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。
+
+    V2.4.0：效果引用读 `steps[].result.effects`（新键）优先，`payload` 旧键兜底——
+    兼容窗口 ≥ 一个版本，Flag off 时等价于 V9 原路径。
+    """
     settings = get_settings()
 
     effects = list(result.effects)
     if record.status == "succeeded":
         payloads = [(s.get("result") or {}).get("payload", {}) for s in record.steps]
         first_payload = next(iter(payloads)) if payloads else {}
+        first_result = (record.steps[0].get("result") or {}) if record.steps else {}
         if record.action_type in ("create_reminder", "cancel_reminder"):
-            event_id = first_payload.get("world_event_id")
+            event_id = _effect_ref(first_result, "world") or first_payload.get("world_event_id")
             if event_id:
                 effects.append(ActionEffect(kind="world", ref=event_id, detail=_detail_for(record)))
         if record.action_type == "remember_fact":
-            memory_id = first_payload.get("memory_id")
+            memory_id = _effect_ref(first_result, "memory") or first_payload.get("memory_id")
             if memory_id:
                 effects.append(ActionEffect(kind="memory", ref=memory_id, detail="已记住"))
 
