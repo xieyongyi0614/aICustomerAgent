@@ -345,3 +345,59 @@ class ToolPermissionRevokeOut(BaseModel):
     user_id: str | None = None
     tool_id: str | None = None
     revoked: int = 0
+
+
+class ToolManifestSkipOut(BaseModel):
+    """单条清单跳过项（TOOL-011 §4.1）：文件 + 失败项 + 原因（不含凭据值）。"""
+
+    file: str = ""
+    tool_id: str | None = None
+    rule: int | str | None = None
+    reason: str = ""
+
+
+class ToolManifestOut(BaseModel):
+    """外部 API 声明投影：声明信息 + 凭据**变量名**（绝不含凭据值）。"""
+
+    tool_id: str
+    name: str
+    description: str = ""
+    when_to_use: str = ""
+    http: dict = {}
+    auth: dict = {}
+    response_map: dict = {}
+    permission: dict = {}
+    side_effects: list[str] = []
+    parameters: list[str] = []
+    source_file: str = ""
+
+
+class ToolManifestsOut(BaseModel):
+    """清单加载报告（TOOL-011 §4.5）：loaded / skipped / reasons。"""
+
+    enabled: bool
+    path: str = ""
+    loaded: list[str] = []
+    skipped: list[ToolManifestSkipOut] = []
+    total: int = 0
+    manifests: list[ToolManifestOut] = []
+
+
+class ToolExternalOut(BaseModel):
+    enabled: bool
+    allowed_hosts: list[str] = []
+    host_whitelist_empty: bool = True
+    tools: list[dict] = []
+
+
+class ToolUserDefinedOut(BaseModel):
+    enabled: bool
+    registered: list[str] = []
+    tools: list[dict] = []
+
+
+class ToolUserDefinedRevokeOut(BaseModel):
+    enabled: bool
+    tool_id: str | None = None
+    revoked: bool = False
+    registered: list[str] = []

@@ -49,6 +49,14 @@ EXTERNAL_EFFECT_PAYLOAD_KEY = "external_sent"
 
 EXTERNAL_MESSAGE_ID_PAYLOAD_KEY = "external_message_id"
 
+EXT_API_NAMESPACE = "ext.api"
+
+OBSERVATIONS_PAYLOAD_KEY = "observations"
+
+UNTRUSTED_PAYLOAD_KEY = "untrusted"
+
+UNTRUSTED_OBSERVATION_KEY = "ext.untrusted"
+
 
 _STATUS_FAILURE_KINDS: dict[str, str] = {
     "timeout": "timeout",
@@ -216,4 +224,20 @@ class ObservationNormalizer:
             value = payload.get(payload_key)
             if value is not None:
                 observations[observation_key] = value
+        if defn.namespace == EXT_API_NAMESPACE:
+            observations.update(self._external_observations(payload))
+        return observations
+
+    @staticmethod
+    def _external_observations(payload: dict[str, Any]) -> dict[str, Any]:
+        """`ext.api.*` 的 observations 由清单 `response_map` 动态声明（tool_id 无法静态建表），
+        故按约定键取用；外部内容恒打 `untrusted=True`（§9.5-10 提示注入防线）。"""
+        declared = payload.get(OBSERVATIONS_PAYLOAD_KEY)
+        observations = (
+            {str(key): value for key, value in declared.items()}
+            if isinstance(declared, dict)
+            else {}
+        )
+        if payload.get(UNTRUSTED_PAYLOAD_KEY):
+            observations[UNTRUSTED_OBSERVATION_KEY] = True
         return observations

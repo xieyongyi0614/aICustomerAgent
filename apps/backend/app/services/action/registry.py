@@ -76,6 +76,16 @@ class CapabilityRegistry:
 _registry: CapabilityRegistry | None = None
 
 
+def unregister_capability(registry: CapabilityRegistry, name: str) -> bool:
+    """移除运行期登记的能力（V2.4.0 TOOL-011 自定义工具注销的写入面）；未注册返回 False。
+
+    只在**同一个模块内**按注册面的私有字典移除同名能力——`CapabilityRegistry` 类本身不在
+    V2.4.0 被改动（TOOL-002 冻结源哈希守门），既有六个内置能力与通道能力也不在运行期被移除，
+    故对 V9 行为零影响；调用方只有 `services/tool/user_defined.py`（自定义工具注销）。
+    """
+    return registry._capabilities.pop(name, None) is not None
+
+
 def get_capability_registry() -> CapabilityRegistry:
     global _registry
     if _registry is None:

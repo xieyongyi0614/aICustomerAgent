@@ -14,6 +14,7 @@ from app.core.settings import get_settings
 from app.core.settings.enablement import validate_enablement_chain
 from app.services import memory_service, proactive_delivery
 from app.services.tool import channel_tools
+from app.services.tool.ext_api import get_manifest_loader
 from app.application.action_engine import run_action_retry_loop
 from app.application.life_loop import run_life_loop_worker
 from app.services.development.audit import register_rollback_listener
@@ -96,6 +97,14 @@ async def lifespan(application: FastAPI):
             logging.getLogger(__name__).info(
                 "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
             )
+    if get_settings().v24_tool_external_api_enabled:
+        report = get_manifest_loader().load(get_settings().v24_tool_ext_manifest_path)
+        logging.getLogger(__name__).info(
+            "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",
+            report.path or "<未配置>",
+            len(report.loaded),
+            len(report.skipped),
+        )
     if get_settings().observability_persist_enabled:
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()

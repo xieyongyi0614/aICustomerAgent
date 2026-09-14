@@ -10,13 +10,19 @@ from app.api.v1.schemas import (
     ToolDetailOut,
     ToolExecutionRowOut,
     ToolExecutionsOut,
+    ToolExternalOut,
     ToolGrantOut,
     ToolHealthOut,
+    ToolManifestOut,
+    ToolManifestsOut,
+    ToolManifestSkipOut,
     ToolPermissionRevokeOut,
     ToolPermissionsOut,
     ToolRuntimeStatusOut,
     ToolSummaryOut,
     ToolSurfaceOut,
+    ToolUserDefinedOut,
+    ToolUserDefinedRevokeOut,
     ToolWorldIntentOut,
     ToolsOut,
 )
@@ -42,8 +48,15 @@ from app.services.memory2 import attribution as memory2_attribution
 from app.services.reflection import attribution as reflection_attribution
 from app.services.tool.confirmation import get_confirmation_service
 from app.services.tool.context import ToolContext
+from app.services.tool.ext_api import (
+    EXT_API_NAMESPACE,
+    allowed_ext_hosts,
+    get_manifest_index,
+    last_load_report,
+)
 from app.services.tool.registry import ToolRegistry, get_tool_registry
 from app.services.tool.surface import ToolSurfaceResolver
+from app.services.tool.user_defined import get_user_tool_registrar
 from app.services.tool.world_intent import get_world_intent_submitter
 from app.services.trace_collector import get_trace_collector
 from app.repositories import (
@@ -107,6 +120,56 @@ def _permission_read_gate() -> bool:
     if not _permission_layer_enabled():
         raise HTTPException(
             status_code=403, detail="工具权限闸未启用（v24_tool_permission_enabled=false）"
+        )
+    return True
+
+
+def _external_api_enabled() -> bool:
+    return bool(getattr(get_settings(), "v24_tool_external_api_enabled", False))
+
+
+def _user_defined_enabled() -> bool:
+    return bool(getattr(get_settings(), "v24_tool_user_defined_enabled", False))
+
+
+def _require_external_api() -> None:
+    """外部 API 面写类门控：总闸 off / 外部面 off → 403（与 WS-018 惯例一致）。"""
+    _require_tool_registry()
+    if not _external_api_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="外部 API 工具未启用（v24_tool_external_api_enabled=false）",
+        )
+
+
+def _external_api_read_gate() -> bool:
+    """外部 API 面读类门控：总闸 off → 200 `{"enabled": false}`；外部面 off → 403。"""
+    if not _tools_enabled():
+        return False
+    if not _external_api_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="外部 API 工具未启用（v24_tool_external_api_enabled=false）",
+        )
+    return True
+
+
+def _require_user_defined() -> None:
+    _require_tool_registry()
+    if not _user_defined_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="自定义工具未启用（v24_tool_user_defined_enabled=false）",
+        )
+
+
+def _user_defined_read_gate() -> bool:
+    if not _tools_enabled():
+        return False
+    if not _user_defined_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="自定义工具未启用（v24_tool_user_defined_enabled=false）",
         )
     return True
 
@@ -324,6 +387,85 @@ def enable_tool(tool_id: str):
         tool_id=tool_id,
         effective_status=registry.effective_status(tool_id),
         runtime_disabled=False,
+    )
+
+
+@debug_router.get("/debug/tools/manifests", response_model=ToolManifestsOut)
+def list_tool_manifests():
+    """外部 API 清单加载报告（loaded / skipped / reasons）+ 已加载声明投影。
+
+    TOOL-011：报告是**进程内存态**（重启由声明文件重建）；投影只含声明信息与凭据**变量名**，
+    凭据值从不落内存结构、不落日志、不落端点（E17）。
+    """
+    if not _external_api_read_gate():
+        return ToolManifestsOut(enabled=False)
+    report = last_load_report()
+    return ToolManifestsOut(
+        enabled=True,
+        path=report.path,
+        loaded=list(report.loaded),
+        skipped=[ToolManifestSkipOut(**item) for item in report.skipped],
+        total=report.total,
+        manifests=[
+            ToolManifestOut(**manifest.public_view())
+            for manifest in get_manifest_index().all()
+        ],
+    )
+
+
+@debug_router.get("/debug/tools/external", response_model=ToolExternalOut)
+def list_external_tools():
+    """外部 API 工具清单：白名单现状 + 每条声明的**执行期**状态（不含凭据值）。"""
+    if not _external_api_read_gate():
+        return ToolExternalOut(enabled=False)
+    hosts = sorted(allowed_ext_hosts(get_settings()))
+    registry = get_tool_registry()
+    tools: list[dict] = []
+    for manifest in get_manifest_index().all():
+        view = manifest.public_view()
+        view["status"] = (
+            "unregistered" if registry is None else registry.effective_status(manifest.tool_id)
+        )
+        tools.append(view)
+    return ToolExternalOut(
+        enabled=True,
+        allowed_hosts=hosts,
+        host_whitelist_empty=not hosts,
+        tools=tools,
+    )
+
+
+@debug_router.get("/debug/tools/user-defined", response_model=ToolUserDefinedOut)
+def list_user_defined_tools():
+    """自定义工具清单（进程内存态；重启即空，E13）：含推导副作用与强制纪律生效值。"""
+    if not _user_defined_read_gate():
+        return ToolUserDefinedOut(enabled=False)
+    registrar = get_user_tool_registrar()
+    registered = registrar.list_registered()
+    return ToolUserDefinedOut(
+        enabled=True,
+        registered=registered,
+        tools=[
+            view for view in (registrar.view(tool_id) for tool_id in registered) if view
+        ],
+    )
+
+
+@debug_router.post(
+    "/debug/tools/user-defined/{tool_id}/revoke", response_model=ToolUserDefinedRevokeOut
+)
+def revoke_user_defined_tool(tool_id: str):
+    """注销自定义工具（运维）：未注册 → 404；注销后调用得 `unavailable`（E14）。"""
+    _require_user_defined()
+    registrar = get_user_tool_registrar()
+    if registrar.view(tool_id) is None:
+        raise HTTPException(status_code=404, detail="自定义工具未注册")
+    registrar.unregister(tool_id)
+    return ToolUserDefinedRevokeOut(
+        enabled=True,
+        tool_id=tool_id,
+        revoked=True,
+        registered=registrar.list_registered(),
     )
 
 

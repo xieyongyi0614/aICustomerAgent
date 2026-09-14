@@ -157,6 +157,19 @@ CHANNEL_FAILURE_TEXT: dict[str, str] = {
     "unknown": "送消息时出了点意外，我没算它成功。",
 }
 
+# 外部 API 工具失败话术（TOOL-011 §4.2）：键为失败原因分类，工具 id 由清单动态声明，
+# 故按 reason_kind 而非 tool_id 归档。只谈"没办成"，不透出域名 / 凭据 / 状态码细节。
+EXT_API_FAILURE_TEXT: dict[str, str] = {
+    "credential_missing": "我还没拿到这个服务的钥匙，这次先不查了。",
+    "host_not_allowed": "这个地址不在我能去的名单里，我没有发出去。",
+    "manifest_unresolved": "我暂时不知道要对接哪个外部服务，这次先算了。",
+    "external_api_disabled": "外部服务现在是关着的，我这次查不了。",
+    "network_error": "外面那头没接上，这次没查到结果。",
+    "http_status": "外部服务这次没给我结果，我先按落空处理。",
+    "request_timeout": "外面那头一直没回我，这次先不算数。",
+    "unexpected_error": "查外部消息时出了点意外，我没算它成功。",
+}
+
 TOOL_SURFACE_RULES: dict[str, SurfaceRule] = SURFACE_RULES
 
 

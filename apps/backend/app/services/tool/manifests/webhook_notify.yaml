@@ -1,0 +1,31 @@
+tool_id: ext.api.hook.notify
+name: 外部提醒投递
+description: 把一个短标题投递到外部 webhook，作为跨系统提醒的落点。
+when_to_use: 需要把一条提醒真正投递到外部系统时使用
+when_not_to_use: 只留行动 note、不外发时不要使用
+capability: external_api
+action: call
+http:
+  method: POST
+  url: https://hooks.example.com/services/notify
+  auth:
+    type: apikey
+    env: EXT_API_HOOK_KEY
+  params:
+    title: "{params.title}"
+  timeout_seconds: 8
+input_schema:
+  parameters:
+    - name: title
+      type: string
+      required: true
+      description: 投递标题
+      max_length: 60
+response_map:
+  hook.accepted: "$.ok:bool"
+  hook.job_id: "$.job[0].id:str"
+permission:
+  level: sensitive
+  scope: ["external:hooks.example.com"]
+  confirm: first_time
+side_effects: ["send_external"]
