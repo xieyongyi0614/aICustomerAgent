@@ -1,17 +1,36 @@
-"""TOOL-004 §6.1/§6.3：工具选择的确定性、一词多工具与旧映射兜底（E2、E7、E8）。"""
+"""TOOL-004 §6.1/§6.3：工具选择的确定性、一词多工具与旧映射兜底（E2、E7、E8）。
+
+P0-2：追加"收件人感知"选择（`channel.*` 在外部投递意图下整体前置）的确定性与纯函数断言。
+"""
 
 import pytest
 
 from app.character.asuna.action import ACTION_TOOL_MAP
 from app.models.action import ActionIntent
 from app.models.tool import ToolSurface
-from app.services.tool.surface import ToolSelector, ToolSurfaceResolver
+from app.services.tool.surface import (
+    RECIPIENT_PARAM_KEYS,
+    SELECTION_REASON_CHANNEL_RECIPIENT,
+    SELECTION_REASON_NO_CANDIDATE,
+    SELECTION_REASON_PRIORITY_ORDER,
+    ToolSelector,
+    ToolSurfaceResolver,
+    delivery_recipient,
+)
 from tests.v24.tool004_support import (
     RUN_KIND_AUTONOMOUS_TICK,
     builtin_registry,
     registry_with,
     surface_context,
     tool_definition,
+)
+from tests.v24.tool010_support import (
+    CHANNEL_ENVS,
+    CHANNEL_TOOL_ID,
+    NOTIFICATION_TOOL_ID,
+    builtin_registry as channel_bound_registry,
+    enable,
+    reset_runtime_state,
 )
 
 
@@ -82,11 +101,126 @@ def test_select_follows_action_tool_map_for_every_declared_action_type():
 
 
 def test_select_one_to_many_picks_lowest_priority():
+    """无收件人键的 `send_notification`：维持 priority + 字典序（P0-2 非触发路径）。"""
     registry = builtin_registry()
     surface = surface_of(registry)
-    binding = ToolSelector(registry).select(intent("send_notification"), surface)
-    assert binding is not None
-    assert binding.tool_id == "builtin.notification.send"
+    selection = ToolSelector(registry).select_with_reason(intent("send_notification"), surface)
+    assert selection.binding is not None
+    assert selection.binding.tool_id == "builtin.notification.send"
+    assert selection.reason == SELECTION_REASON_PRIORITY_ORDER
+    assert selection.recipient == ""
+
+
+# --- P0-2 收件人感知（外部投递优先通道工具） ---------------------------------
+
+
+def _delivery_surface(monkeypatch) -> tuple:
+    """通道可用态的内置注册表与工具面：`channel.feishu.send` 与本地通知候选同时在面内。"""
+    enable(monkeypatch, **CHANNEL_ENVS)
+    reset_runtime_state()
+    registry = channel_bound_registry()
+    return registry, surface_of(registry)
+
+
+def test_recipient_intent_prefers_channel_namespace(monkeypatch):
+    registry, surface = _delivery_surface(monkeypatch)
+    assert CHANNEL_TOOL_ID in surface.tool_ids
+    assert NOTIFICATION_TOOL_ID in surface.tool_ids
+    assert surface.tool_ids.index(CHANNEL_TOOL_ID) > surface.tool_ids.index(
+        NOTIFICATION_TOOL_ID
+    )
+
+    selection = ToolSelector(registry).select_with_reason(
+        intent("send_notification", recipient="ou_asuna"), surface
+    )
+
+    assert selection.binding is not None
+    assert selection.binding.tool_id == CHANNEL_TOOL_ID
+    assert selection.reason == SELECTION_REASON_CHANNEL_RECIPIENT
+    assert selection.recipient == "ou_asuna"
+    assert selection.candidates[0] == CHANNEL_TOOL_ID
+    assert sorted(selection.candidates) == [NOTIFICATION_TOOL_ID, CHANNEL_TOOL_ID]
+
+
+def test_select_without_recipient_keeps_local_tool_under_channel_binding(monkeypatch):
+    """同一注册表与工具面：去掉收件人键即回到本地工具（规则只看意图参数）。"""
+    registry, surface = _delivery_surface(monkeypatch)
+    selection = ToolSelector(registry).select_with_reason(
+        intent("send_notification", content="在吗"), surface
+    )
+    assert selection.binding.tool_id == NOTIFICATION_TOOL_ID
+    assert selection.reason == SELECTION_REASON_PRIORITY_ORDER
+
+
+@pytest.mark.parametrize("key", RECIPIENT_PARAM_KEYS)
+def test_every_recipient_param_key_triggers_channel_preference(monkeypatch, key):
+    registry, surface = _delivery_surface(monkeypatch)
+    selection = ToolSelector(registry).select_with_reason(
+        intent("send_notification", content="在吗", **{key: "ou_asuna"}), surface
+    )
+    assert selection.binding.tool_id == CHANNEL_TOOL_ID
+    assert selection.reason == SELECTION_REASON_CHANNEL_RECIPIENT
+
+
+@pytest.mark.parametrize(
+    "value", ["", "   ", None, 42, ["ou_asuna"], {"external_id": "ou"}]
+)
+def test_blank_or_non_text_recipient_keeps_priority_order(monkeypatch, value):
+    registry, surface = _delivery_surface(monkeypatch)
+    selection = ToolSelector(registry).select_with_reason(
+        intent("send_notification", content="在吗", recipient=value), surface
+    )
+    assert selection.binding.tool_id == NOTIFICATION_TOOL_ID
+    assert selection.reason == SELECTION_REASON_PRIORITY_ORDER
+
+
+def test_recipient_rule_needs_both_channel_and_other_candidates(monkeypatch):
+    """候选集只有通道声明（本地声明被工具面裁掉）时不触发优先规则。"""
+    registry, surface = _delivery_surface(monkeypatch)
+    channel_only = ToolSurface(
+        run_kind=surface.run_kind, tool_ids=(CHANNEL_TOOL_ID,), surface_hash="channel-only"
+    )
+    selection = ToolSelector(registry).select_with_reason(
+        intent("send_notification", recipient="ou_asuna"), channel_only
+    )
+    assert selection.binding.tool_id == CHANNEL_TOOL_ID
+    assert selection.reason == SELECTION_REASON_PRIORITY_ORDER
+
+
+def test_selection_is_deterministic_across_runs(monkeypatch):
+    registry, surface = _delivery_surface(monkeypatch)
+    selector = ToolSelector(registry)
+    picks = {
+        (
+            selection.binding.tool_id if selection.binding else None,
+            selection.reason,
+            selection.candidates,
+        )
+        for selection in (
+            selector.select_with_reason(
+                intent("send_notification", recipient="ou_asuna"), surface
+            )
+            for _ in range(5)
+        )
+    }
+    assert len(picks) == 1
+    assert next(iter(picks))[0] == CHANNEL_TOOL_ID
+
+
+def test_delivery_recipient_is_a_pure_accessor():
+    assert delivery_recipient(intent("send_notification", recipient=" ou_a ")) == "ou_a"
+    assert delivery_recipient(intent("send_notification", recipient_id="ou_b")) == "ou_b"
+    assert delivery_recipient(intent("send_notification", to="ou_c")) == "ou_c"
+    assert delivery_recipient(intent("send_notification", external_id="ou_d")) == "ou_d"
+    assert delivery_recipient(intent("send_notification", recipient="")) == ""
+    assert delivery_recipient(intent("send_notification")) == ""
+    assert delivery_recipient(None) == ""
+
+
+def test_no_candidate_reports_reason():
+    selection = ToolSelector(builtin_registry()).select_with_reason(intent(), EMPTY_SURFACE)
+    assert selection.binding is None
+    assert selection.reason == SELECTION_REASON_NO_CANDIDATE
 
 
 # --- E7 一词多工具 ---------------------------------------------------------

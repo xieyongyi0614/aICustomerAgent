@@ -6,7 +6,7 @@
 七步短路（判定顺序固定，每步一个独立私有函数，按序被调用且首命中即终止）：
 
 ```text
-⓪ 快照不可用 / 权限闸 off          → deny(snapshot_unavailable) / allow(permission_layer_off)
+⓪ 快照不可用 / 权限段未参与         → deny(snapshot_unavailable) / 三段语义（见下）
 ① 等级为 safe 或 normal            → allow(level_no_grant_required)
 ② 存在有效 grant（scope 覆盖）      → allow(grant_matched)
 ③ confirm == first_time 且无授权集  → confirm_required(kind=first_time)
@@ -19,9 +19,25 @@
 **默认拒绝（fail-closed）是硬纪律**：任何未明确 allow 的情况一律 deny——
 与 V9 detector"宁缺毋滥"同一价值观；判定函数不抛异常，编程级异常也归一为 deny。
 
+第 ⓪ 步的三段语义（§9.5-1「默认拒绝」在双闸部署下的完整表达）：
+
+| 总闸 | 权限子闸 | 判定 |
+|---|---|---|
+| off | — | `allow(permission_layer_off)`——权限段不参与（TOOL-003 交付态，逐字节不变） |
+| on | off | 免授权档（有效等级 safe / normal 且不是不受信命名空间）→ `allow(permission_layer_disabled_grant_free)`；其余 → `deny(permission_layer_disabled)` |
+| on | on | 继续 ①~⑦ 真实七步判定 |
+
+即"总闸开、权限子闸未开"**不等于放行一切**：此时没有可读的授权存储，特权工具
+（sensitive / dangerous / `user.*` / `ext.api.*`）只能默认拒绝——子闸未启用不得被读成
+"特权豁免"，否则 §9.5-1 的"无 grant 的 sensitive/dangerous 永不执行"会被部署开关绕过。
+
 纪律：`evaluate` 纯函数、零 IO；`build_snapshot` 是**唯一的读 IO 入口**，装配失败返回
 `None`，由 `evaluate` 保守拒绝（E1）。授权 / 确认请求 / 通道绑定的读面全部经既有仓储，
 本模块不直接触碰 SessionLocal。
+
+P2-2：`PermissionDecision` 的类定义归口 `app/models/tool.py`（模型层零服务依赖，
+`ToolExecution.permission_model()` 需要它是模型层契约），本模块**原样再导入**——
+`from app.services.tool.permission import PermissionDecision` 的既有调用点全部不变。
 """
 
 import logging
@@ -39,6 +55,7 @@ from app.character.asuna.tool import (
 from app.core.settings import get_settings
 from app.models.tool import (
     TOOL_NAMESPACES,
+    PermissionDecision,
     PermissionLevel,
     ToolDefinition,
     ToolInvocation,
@@ -80,6 +97,8 @@ WILDCARD = "*"
 EXT_HOST_PARAM_KEYS: tuple[str, ...] = ("url", "endpoint", "host", "target")
 
 REASON_LAYER_OFF = "permission_layer_off"
+REASON_LAYER_DISABLED = "permission_layer_disabled"
+REASON_LAYER_DISABLED_GRANT_FREE = "permission_layer_disabled_grant_free"
 REASON_SNAPSHOT_UNAVAILABLE = "snapshot_unavailable"
 REASON_LEVEL_NO_GRANT_REQUIRED = "level_no_grant_required"
 REASON_GRANT_MATCHED = "grant_matched"
@@ -109,18 +128,6 @@ class PermissionSnapshot:
     channel_bound: bool = False
     settings: Any = None
     namespace_floors: dict[str, str] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class PermissionDecision:
-    """权限裁决（形状由 TOOL-005 §2.2 冻结）。"""
-
-    decision: str
-    level: PermissionLevel
-    reason: str
-    confirm_prompt: str | None = None
-    scope_required: tuple[str, ...] = ()
-    confirm_kind: str | None = None
 
 
 def _allow(reason: str, level: PermissionLevel, scope: tuple[str, ...]) -> PermissionDecision:
@@ -342,19 +349,57 @@ def permission_layer_enabled(settings: Any) -> bool:
     return bool(getattr(settings, "v24_tool_permission_enabled", False))
 
 
+def permission_sub_layer_disabled(settings: Any) -> bool:
+    """"总闸 on 而权限子闸 off"：权限段既不参与七步判定，也不得放行特权工具。"""
+    if not bool(getattr(settings, "v24_tool_system_enabled", False)):
+        return False
+    return not bool(getattr(settings, "v24_tool_permission_enabled", False))
+
+
+_FLOOR_ONLY_SNAPSHOT = PermissionSnapshot()
+
+
+def effective_level_without_snapshot(definition: ToolDefinition) -> PermissionLevel:
+    """无授权快照时的生效等级：只按声明等级与命名空间下限判定（纯函数、零 IO）。"""
+    return effective_level(definition, _FLOOR_ONLY_SNAPSHOT)
+
+
+def _disabled_layer_decision(
+    definition: ToolDefinition, scope: tuple[str, ...]
+) -> PermissionDecision:
+    """子闸未启用（总闸 on）时的保守判定：只有免授权档可放行。
+
+    免授权档 = 有效等级 ∈ {safe, normal} 且命名空间不是不受信命名空间；其余
+    （sensitive / dangerous / `user.*` / `ext.api.*`）一律默认拒绝——此时没有可读的
+    授权存储，放行等于把"子闸未启用"当作特权豁免（§9.5-1 默认拒绝）。
+    """
+    level = effective_level_without_snapshot(definition)
+    if level in GRANT_FREE_LEVELS and not is_untrusted_namespace(definition):
+        return _allow(REASON_LAYER_DISABLED_GRANT_FREE, level, scope)
+    logger.warning(
+        "权限子闸未启用（v24_tool_permission_enabled=false），特权工具默认拒绝："
+        "tool_id=%s level=%s",
+        definition.id,
+        level,
+    )
+    return _deny(REASON_LAYER_DISABLED, level, scope)
+
+
 def _step_snapshot_guard(
     definition: ToolDefinition,
     invocation: ToolInvocation,
     snapshot: PermissionSnapshot | None,
     settings: Any,
 ) -> PermissionDecision | None:
-    """⓪ 权限段未参与 → 占位 allow（TOOL-003 交付态）；快照不可用 → 保守拒绝（E1）。"""
+    """⓪ 总闸 off → 占位 allow（TOOL-003 交付态）；子闸 off → 三段语义；快照不可用 → 拒绝。"""
     scope = required_scope(definition)
-    if not permission_layer_enabled(settings):
+    if permission_layer_enabled(settings):
+        if snapshot is None:
+            return _deny(REASON_SNAPSHOT_UNAVAILABLE, definition.permission.level, scope)
+        return None
+    if not permission_sub_layer_disabled(settings):
         return _allow(REASON_LAYER_OFF, definition.permission.level, scope)
-    if snapshot is None:
-        return _deny(REASON_SNAPSHOT_UNAVAILABLE, definition.permission.level, scope)
-    return None
+    return _disabled_layer_decision(definition, scope)
 
 
 def _step_level_no_grant_required(

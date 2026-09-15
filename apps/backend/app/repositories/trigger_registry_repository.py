@@ -12,6 +12,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Sequence
 
+from sqlalchemy import or_
+
 from app.core.db import SessionLocal, TriggerRegistryRow
 
 logger = logging.getLogger(__name__)
@@ -281,11 +283,22 @@ def has_due(
     user_id: str | None = None,
     now: datetime | None = None,
     include_types: Sequence[str] | None = None,
+    exclude_payload_kinds: Sequence[str] | None = None,
 ) -> bool:
     """是否存在到期待领取触发（pending 且 due_at≤now 且冷却已过）。
 
     Idle 判定（LIFE-003）用 include_types 排除 conversation_inactivity——
     重检型触发逐 tick 重检测，恒有 pending 行会令 Idle 永不命中。
+
+    `exclude_payload_kinds`（P2-1，可选）：按 `payload.kind` 排除"借表的非待办行"。
+    V2.4.0 的确认请求 / 授权行复用本表（`trigger_type = action_due`，判别位在
+    `payload.kind`），`due_at` 只用于表达 TTL——从到期到清理的窗口里若被计入
+    "到期待办触发"，会令自治 tick 多跑一轮。调用侧（`life_loop`）**仅在工具总闸开启时**
+    传入 `("tool_confirmation", "tool_grant")`。
+
+    `payload` 缺 `kind` 键的行（V9 既有 action_due 行）**必须仍被计入**，故条件写成
+    "kind IS NULL OR kind NOT IN (...)"；`None`（默认）时**不加该条件**，SQL 与行为与
+    V9 逐字节一致。
     """
     now = _now(now)
     with SessionLocal() as session:
@@ -297,6 +310,14 @@ def has_due(
             query = query.filter(TriggerRegistryRow.user_id == user_id)
         if include_types is not None:
             query = query.filter(TriggerRegistryRow.trigger_type.in_(include_types))
+        kinds = [
+            str(kind) for kind in (exclude_payload_kinds or ()) if str(kind)
+        ]
+        if kinds:
+            payload_kind = TriggerRegistryRow.payload["kind"].as_string()
+            query = query.filter(
+                or_(payload_kind.is_(None), ~payload_kind.in_(kinds))
+            )
         return session.query(query.exists()).scalar()
 
 

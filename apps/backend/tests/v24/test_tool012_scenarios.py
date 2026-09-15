@@ -18,18 +18,42 @@ from app.models.tool import (
     ToolSchema,
 )
 from tests.v24 import tool012_support as support
+from tests.v24.tool002_support import MAPPING_TABLE
 from tests.v24.tool003_support import (
     StubCapability,
     build_executor,
     stub_registry,
 )
-from tests.v24.tool005_support import SENSITIVE_TOOL_ID, invocation, snapshot
+from tests.v24.tool005_support import SENSITIVE_TOOL_ID, grant, invocation, snapshot
 from tests.v24.tool010_support import builtin_registry
 
 pytestmark = pytest.mark.xdist_group("tool012")
 
 USER = "u-tool012-scenario"
 SESSION = "s-tool012-scenario"
+
+GRANT_FREE_LEVELS: tuple[str, ...] = ("safe", "normal")
+
+TOOL_LEVELS: dict[str, str] = {row["tool_id"]: row["level"] for row in MAPPING_TABLE}
+
+PRIVILEGED_TOOL_IDS: frozenset[str] = frozenset(
+    tool_id for tool_id, level in TOOL_LEVELS.items() if level not in GRANT_FREE_LEVELS
+)
+"""P0-1：总闸 on + 权限子闸 off 时特权档默认拒绝；要到达能力必须补权限子闸与授权快照。"""
+
+
+def _env_reaching_capability(tool_id: str, base_env: dict) -> dict:
+    """特权档额外打开权限子闸（子闸 off 时那些工具根本走不到能力实现）。"""
+    if tool_id not in PRIVILEGED_TOOL_IDS:
+        return dict(base_env)
+    return {**base_env, "V24_TOOL_PERMISSION_ENABLED": True}
+
+
+def _grant_snapshot_for(tool_id: str, settings):
+    """特权档的授权快照（通配范围覆盖任意声明 scope）；免授权档不需要快照。"""
+    if tool_id not in PRIVILEGED_TOOL_IDS:
+        return None
+    return snapshot(grants=[grant(tool_id, ("*",))], settings=settings)
 
 MASTER_ON = {"V24_TOOL_SYSTEM_ENABLED": True}
 CHANNEL_ON = {
@@ -127,16 +151,25 @@ S1_PARAMS: dict[str, object] = {
 
 @pytest.mark.parametrize("tool_id", S1_TOOL_IDS)
 def test_s1_foreground_tool_call_reaches_capability(monkeypatch, tool_id):
-    """用户消息 → 工具选择 → 执行 → 结果归一（每个声明工具各一例）。"""
+    """用户消息 → 工具选择 → 执行 → 结果归一（每个声明工具各一例）。
+
+    P0-1 后特权档（sensitive 及以上）需要权限子闸 + 授权快照才能到达能力实现。
+    """
     env = CHANNEL_ON if tool_id == "channel.feishu.send" else MASTER_ON
-    support.apply_flag_env(monkeypatch, env)
+    support.apply_flag_env(monkeypatch, _env_reaching_capability(tool_id, env))
     settings = get_settings()
     registry = builtin_registry()
     definition = registry.get(tool_id)
     stub = StubCapability(name=definition.capability, action=definition.action)
     executor = _executor(registry, stub, settings)
 
-    execution = _run(executor, tool_id, dict(S1_PARAMS), _context(settings=settings))
+    execution = _run(
+        executor,
+        tool_id,
+        dict(S1_PARAMS),
+        _context(settings=settings),
+        snapshot_=_grant_snapshot_for(tool_id, settings),
+    )
 
     assert execution.tool_id == tool_id
     assert execution.capability == definition.capability
@@ -935,9 +968,15 @@ def test_s9_user_dsl_rejects_arbitrary_code():
 
 
 def test_s10_tool_failure_records_failure_kind(monkeypatch):
-    """工具失败归一：failure_kind 落执行结果，健康度记一次失败。"""
+    """工具失败归一：failure_kind 落执行结果，健康度记一次失败。
+
+    P0-1：`builtin.notification.send` 属特权档，需权限子闸 + 授权快照才走到能力。
+    """
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_OBSERVATION_ENABLED": True}
+        monkeypatch,
+        _env_reaching_capability(
+            SENSITIVE_TOOL_ID, {**MASTER_ON, "V24_TOOL_OBSERVATION_ENABLED": True}
+        ),
     )
     settings = get_settings()
     from app.models.action import CapabilityResult
@@ -953,7 +992,11 @@ def test_s10_tool_failure_records_failure_kind(monkeypatch):
     executor = _executor(builtin_registry(), capability, settings)
 
     execution = _run(
-        executor, SENSITIVE_TOOL_ID, {"content": "在吗"}, _context(settings=settings)
+        executor,
+        SENSITIVE_TOOL_ID,
+        {"content": "在吗"},
+        _context(settings=settings),
+        snapshot_=_grant_snapshot_for(SENSITIVE_TOOL_ID, settings),
     )
 
     assert execution.status == "failed"

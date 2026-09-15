@@ -15,6 +15,9 @@ CANCEL_PARAMS: dict[str, Any] = {"target": "开会"}
 OBJECT_PARAMS: dict[str, Any] = {"object": "牛奶"}
 NOTIFY_PARAMS: dict[str, Any] = {"content": "喝水"}
 
+TEMPLATE_REMINDER_CREATE = "用户请我提醒：开会"
+"""P1-3：模板文案去掉未消解人称代词（原「用户请我提醒他：…」被 R8 恒定拒收）。"""
+
 BOUNDARY_ROWS: tuple[tuple[str, dict[str, Any], dict[str, Any], str], ...] = (
     (
         "builtin.reminder.create",
@@ -54,7 +57,7 @@ BOUNDARY_ROWS: tuple[tuple[str, dict[str, Any], dict[str, Any], str], ...] = (
 )
 
 TEMPLATE_CASES: tuple[tuple[str, dict[str, Any], str], ...] = (
-    ("builtin.reminder.create", REMINDER_PARAMS, "用户请我提醒他：开会"),
+    ("builtin.reminder.create", REMINDER_PARAMS, TEMPLATE_REMINDER_CREATE),
     ("builtin.reminder.cancel", CANCEL_PARAMS, "用户不想再被提醒：开会"),
     ("world.object.create", OBJECT_PARAMS, "用户请我准备：牛奶"),
     ("builtin.notification.send", NOTIFY_PARAMS, "我主动提醒了用户：喝水"),
@@ -62,7 +65,7 @@ TEMPLATE_CASES: tuple[tuple[str, dict[str, Any], str], ...] = (
 )
 
 EXPECTED_TEMPLATES: dict[str, str] = {
-    "builtin.reminder.create": "用户请我提醒他：{content}",
+    "builtin.reminder.create": "用户请我提醒：{content}",
     "builtin.reminder.cancel": "用户不想再被提醒：{target}",
     "builtin.memory.save": "用户告诉我：{fact}",
     "world.object.create": "用户请我准备：{object}",
@@ -259,7 +262,7 @@ def test_failed_without_gate_reason_deposits_failure_shape():
     candidate = candidates[0]
     assert candidate.type == "important_event"
     assert candidate.importance >= 0.6
-    assert candidate.content == "上次没能帮用户完成：用户请我提醒他：开会"
+    assert candidate.content == "上次没能帮用户完成：用户请我提醒：开会"
 
 
 def test_timeout_step_deposits_as_true_failure():
@@ -331,7 +334,7 @@ def test_template_content_matches_asset(key, params, expected):
 def test_failure_template_wraps_rendered_content():
     assert (
         render("builtin.reminder.create", REMINDER_PARAMS, failed=True)
-        == "上次没能帮用户完成：用户请我提醒他：开会"
+        == "上次没能帮用户完成：用户请我提醒：开会"
     )
     assert (
         render("builtin.reminder.create", {}, failed=True) == ""
@@ -341,6 +344,16 @@ def test_failure_template_wraps_rendered_content():
 def test_render_returns_empty_without_template():
     assert render("builtin.unknown.tool", {"content": "开会"}) == ""
     assert render("", {}) == ""
+
+
+def test_templates_never_trigger_r8_unresolved_reference():
+    """P1-3 回归护栏：模板文案自身不得命中 R8，否则该工具的记忆通道会恒定零产出。"""
+    from app.services import memory_policy as v9_memory_policy
+
+    for key, template in TOOL_MEMORY_TEMPLATES.items():
+        assert not v9_memory_policy.UNRESOLVED_REFERENCE_PATTERN.search(template), (
+            f"{key} 的模板文案含未消解人称代词，会被 R8 恒定拒收：{template}"
+        )
 
 
 def test_missing_template_param_skips_deposit():

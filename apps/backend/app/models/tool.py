@@ -7,6 +7,7 @@ ToolObservation / ToolSurface / ToolHealth + 生命周期状态机与权限等�
 """
 
 import re
+from dataclasses import dataclass, fields as dataclass_fields
 from datetime import datetime
 from typing import Any, Literal, get_args
 
@@ -317,6 +318,32 @@ class ToolObservation(BaseModel):
     facts: dict[str, Any] = {}
 
 
+@dataclass(frozen=True)
+class PermissionDecision:
+    """权限裁决（形状由 TOOL-005 §2.2 冻结；P2-2 起定义在模型层）。
+
+    模型层**零服务依赖**（依赖方向 services → models 不可逆），而 `ToolExecution.permission`
+    的类型化视图正是本裁决，故契约归位模型层；`services/tool/permission.py` 原样再导出，
+    既有导入路径不变。
+    """
+
+    decision: str
+    level: PermissionLevel
+    reason: str
+    confirm_prompt: str | None = None
+    scope_required: tuple[str, ...] = ()
+    confirm_kind: str | None = None
+
+
+class ValidationReport(BaseModel):
+    """校验产出（architecture.md §4.4）：错误分类 + 规范化参数（P2-2 起定义在模型层）。"""
+
+    passed: bool
+    structural: list[dict[str, Any]] = []
+    semantic: list[dict[str, Any]] = []
+    normalized: dict[str, Any] = {}
+
+
 class ToolResult(BaseModel):
     status: ToolExecutionStatus
     effects: list[ToolEffect] = []
@@ -340,6 +367,46 @@ class ToolExecution(BaseModel):
     result: dict[str, Any] | None = None
     started_at: datetime | None = None
     duration_ms: int | None = None
+
+    def result_model(self) -> ToolResult | None:
+        """`result` 的类型化视图（P2-2）：dict 与模型实例都能还原，失败返回 `None`。
+
+        只读便利访问器：**字段名与 JSON 序列化形状不变**（落库与 outbox 读面不受影响）。
+        落库形态含 `payload` 等非 `ToolResult` 键（TOOL-010 兼容双写），多余键被忽略。
+        """
+        return _coerce_model(ToolResult, self.result)
+
+    def validation_model(self) -> ValidationReport | None:
+        """`validation` 的类型化视图（P2-2）；`None` / 形状不合 → `None`，不抛错。"""
+        return _coerce_model(ValidationReport, self.validation)
+
+    def permission_model(self) -> PermissionDecision | None:
+        """`permission` 的类型化视图（P2-2）；`None` / 形状不合 → `None`，不抛错。
+
+        `PermissionDecision` 是 frozen dataclass（非 pydantic），按字段名过滤后构造：
+        `ToolExecution.permission` 里的 `confirmed` 不在其字段集内，被安全丢弃。
+        """
+        return _coerce_model(PermissionDecision, self.permission)
+
+
+def _coerce_model(model_type: Any, value: Any) -> Any | None:
+    """dict / 模型实例 → 模型实例；不匹配或构造失败一律返回 `None`（不抛错、不记日志）。"""
+    if value is None:
+        return None
+    if isinstance(value, model_type):
+        return value
+    if not isinstance(value, dict):
+        return None
+    try:
+        validator = getattr(model_type, "model_validate", None)
+        if callable(validator):
+            return validator(value)
+        field_names = {item.name for item in dataclass_fields(model_type)}
+        return model_type(
+            **{key: item for key, item in value.items() if key in field_names}
+        )
+    except Exception:
+        return None
 
 
 class ToolSurface(BaseModel):

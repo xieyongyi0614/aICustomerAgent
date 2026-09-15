@@ -34,6 +34,7 @@ from app.repositories import (
     trigger_registry_repository,
 )
 from app.application.life_loop_context import memory_digest_var
+from app.services.tool.confirmation import non_todo_payload_kinds
 from app.services import (
     life_loop_budget,
     state_service,
@@ -105,13 +106,26 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
     return stats
 
 
+def _due_trigger_present(user_id: str, now: datetime) -> bool:
+    """到期待办触发判定（工作发现 / 周期原因共用）。
+
+    P2-1：工具总闸开启时排除借表的确认请求行与授权行（`payload.kind`）——它们用
+    `due_at` 只表达 TTL，从到期到清理的窗口里不应被算成"到期待办"而多跑一轮自治 tick。
+    总闸 off 时 `non_todo_payload_kinds` 返回 `None`，调用形态与 SQL 与 V9 逐字节一致。
+    """
+    return trigger_registry_repository.has_due(
+        user_id,
+        now=now,
+        include_types=("scheduled_followup", "action_due"),
+        exclude_payload_kinds=non_todo_payload_kinds(get_settings()),
+    )
+
+
 def _collect_work_users(now: datetime) -> list[str]:
     """工作发现：due 触发（排除重检型 inactivity）∪ goal 追求 ∪ 闲置 Eligible ∪ goal 补扫。"""
     users: set[str] = set()
     for user_id in conversation_repository.list_user_ids():
-        if trigger_registry_repository.has_due(
-            user_id, now=now, include_types=("scheduled_followup", "action_due")
-        ):
+        if _due_trigger_present(user_id, now):
             users.add(user_id)
             continue
         if _goal_work_due(user_id, now) or _inactivity_eligible(
@@ -310,9 +324,7 @@ async def _step_decision(user_id: str, llm, now: datetime) -> dict:
 
 
 def _cycle_reason(user_id: str, now: datetime) -> str:
-    if trigger_registry_repository.has_due(
-        user_id, now=now, include_types=("scheduled_followup", "action_due")
-    ):
+    if _due_trigger_present(user_id, now):
         return "due_trigger"
     if _goal_work_due(user_id, now):
         return "goal_work"

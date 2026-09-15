@@ -24,9 +24,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
-
-from app.models.tool import ToolDefinition, ToolParameter
+from app.models.tool import ToolDefinition, ToolParameter, ValidationReport
 from app.services.tool.context import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -84,15 +82,6 @@ _SEMANTIC_PARAM_HINTS: dict[str, tuple[str, ...]] = {
 }
 
 _BUDGET_PARAM_KEYS: tuple[str, ...] = ("content", "query", "fact", "target", "object")
-
-
-class ValidationReport(BaseModel):
-    """校验产出（architecture.md §4.4）：错误分类 + 规范化参数。"""
-
-    passed: bool
-    structural: list[dict[str, Any]] = []
-    semantic: list[dict[str, Any]] = []
-    normalized: dict[str, Any] = {}
 
 
 SemanticValidator = Callable[[dict[str, Any], ToolContext], list[str]]

@@ -268,6 +268,98 @@ def test_expire_due_cleans_expired_grant_rows():
     assert service.has_grant(USER_ID, SENSITIVE_TOOL_ID, ("self",), now=now) is False
 
 
+# --- P2-1：确认 / 授权行不污染 has_due 的待办口径 ------------------------------
+
+
+def test_has_due_excludes_confirmation_and_grant_rows():
+    """确认行与授权行不再被计入"到期待办触发"（污染窗口 = TTL 到期到 `expire_due` 之间）。"""
+    from app.services.tool.confirmation import non_todo_payload_kinds
+
+    now = datetime.now()
+    settings = _settings()
+    service = ConfirmationService(settings)
+
+    request = _register(service, now - timedelta(hours=48))
+    grant_id = service.grant_scope(
+        USER_ID, SENSITIVE_TOOL_ID, ("self",), now=now - timedelta(hours=48)
+    )
+    assert request is not None and grant_id is not None
+    assert trigger_registry_repository.get(grant_id).due_at <= now
+
+    kinds = non_todo_payload_kinds(settings)
+    assert kinds == (CONFIRMATION_ROW_KIND, "tool_grant")
+
+    assert (
+        trigger_registry_repository.has_due(
+            user_id=USER_ID, now=now, include_types=(CONFIRMATION_TRIGGER_TYPE,)
+        )
+        is True
+    )
+    assert (
+        trigger_registry_repository.has_due(
+            user_id=USER_ID,
+            now=now,
+            include_types=(CONFIRMATION_TRIGGER_TYPE,),
+            exclude_payload_kinds=kinds,
+        )
+        is False
+    )
+
+
+def test_has_due_keeps_real_action_due_rows_with_exclusion():
+    """排除生效时，真正的 `action_due` 待办行（payload 无 `kind` 键）仍被计入。"""
+    from app.services.tool.confirmation import non_todo_payload_kinds
+
+    now = datetime.now()
+    settings = _settings()
+    service = ConfirmationService(settings)
+    request = _register(service, now - timedelta(hours=48))
+    assert request is not None
+    trigger_registry_repository.register(
+        USER_ID,
+        "action_due",
+        "v9-real-action-due",
+        due_at=now - timedelta(seconds=1),
+        payload={"plan_id": "p-1"},
+        now=now,
+    )
+
+    assert (
+        trigger_registry_repository.has_due(
+            user_id=USER_ID,
+            now=now,
+            include_types=(CONFIRMATION_TRIGGER_TYPE,),
+            exclude_payload_kinds=non_todo_payload_kinds(settings),
+        )
+        is True
+    )
+
+
+def test_has_due_default_arguments_keep_v9_shape():
+    """不传 `exclude_payload_kinds`：到期的确认行照旧被计入（默认口径与 V9 逐字节一致）。"""
+    now = datetime.now()
+    request = _register(ConfirmationService(_settings()), now - timedelta(hours=48))
+    assert request is not None
+    for kwargs in ({}, {"exclude_payload_kinds": None}, {"exclude_payload_kinds": ()}):
+        assert (
+            trigger_registry_repository.has_due(
+                user_id=USER_ID,
+                now=now,
+                include_types=(CONFIRMATION_TRIGGER_TYPE,),
+                **kwargs,
+            )
+            is True
+        ), kwargs
+
+
+def test_non_todo_payload_kinds_is_gated_by_master_switch():
+    """总闸 off → `None`（不排除）：这些行根本不会被登记，life_loop 侧的调用形态与 V9 一致。"""
+    from app.services.tool.confirmation import non_todo_payload_kinds
+
+    assert non_todo_payload_kinds(_settings(v24_tool_system_enabled=False)) is None
+    assert non_todo_payload_kinds(_settings()) is not None
+
+
 # --- TTL 复用两态 -------------------------------------------------------------
 
 

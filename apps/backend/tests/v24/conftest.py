@@ -26,11 +26,14 @@ def _isolate_capability_registry(monkeypatch):
     该对象若留在 `app.services.action.registry._registry`，会污染同 worker 后续
     `tests/unit` 对"V9 六能力"的断言（xdist 下顺序不定 → 偶发失败）。
     用 monkeypatch 承载"用例前归零 + 用例后还原"，与 `v24_tool_env` 对
-    `tool_registry._registry` 的纪律一致。
+    `tool_registry._registry` 的纪律一致。构建期 Flag 快照（P1-1 `_registry_flags`）
+    与单例一起归零，避免上一用例的构建期快照泄漏到下一用例。
     """
     monkeypatch.setattr(capability_registry_module, "_registry", None)
+    capability_registry_module._registry_flags.clear()
     get_settings.cache_clear()
     yield
+    capability_registry_module._registry_flags.clear()
     get_settings.cache_clear()
 
 

@@ -10,11 +10,18 @@ ToolSurfaceResolver.resolve(run_kind, ctx) → ToolSurface
 
 ToolSelector.select(intent, surface) → ToolBinding | None
     ACTION_TOOL_MAP 候选 → 与 surface.tool_ids 取交集 → 空交返回 None（等价 V9 capability_unavailable）
-    → priority + tool_id 字典序取首（确定性）→ 注册表解析为绑定
+    → 排序取首（确定性，规则见下）→ 注册表解析为绑定
+    select_with_reason(...) 另返回 selection_reason（可排障、可断言）
 
 ToolSurfacePolicy.policy_for / should_exclude
     Run Profile → SurfaceRule；八维规则判定裁剪原因（None = 保留）
 ```
+
+**选择排序（P0-2，确定且零 IO）**：候选集同时含 `channel.*` 与非 `channel.*` 且意图参数带
+非空收件人键（`recipient` / `recipient_id` / `to` / `external_id`）时，`channel.*` 整体前置
+（reason=`channel_recipient_preferred`）——否则旗舰通道工具会被 priority 更小的本地工具
+永久压住（选择器按 priority 升序取首）。其余情况一律 priority + tool_id 字典序
+（reason=`priority_order`），与 TOOL-004 交付态逐字节一致。
 
 **八维**：状态 / 可用性降级（TOOL-010，必然失败的已声明工具默认裁剪）/ Run Profile /
 日时段 / 场景 / 关系阶段 / 世界可用性（预读事实 TOOL-007）/ 世界可用性（配置）。
@@ -30,10 +37,12 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from app.character.asuna.action import ACTION_CAPABILITY_MAP, ACTION_TOOL_MAP
 from app.character.asuna.tool import (
+    CHANNEL_NAMESPACE,
     DEFAULT_SURFACE_RULE,
     INTIMATE_TAG,
     LATE_NIGHT_EXCLUDE_NAMESPACES,
@@ -59,6 +68,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_SURFACE_MAX_TOOLS = 12
 
 SURFACE_LIMIT_REASON = "surface_limit"
+
+RECIPIENT_PARAM_KEYS: tuple[str, ...] = ("recipient", "recipient_id", "to", "external_id")
+
+SELECTION_REASON_PRIORITY_ORDER = "priority_order"
+SELECTION_REASON_CHANNEL_RECIPIENT = "channel_recipient_preferred"
+SELECTION_REASON_NO_CANDIDATE = "no_candidate"
 
 STATUS_REASON_PREFIX = "tool_status"
 RUN_PROFILE_REASON_PREFIX = "run_profile"
@@ -264,8 +279,33 @@ class ToolSurfaceResolver:
         )
 
 
+@dataclass(frozen=True)
+class ToolSelection:
+    """选择结果 + 可复现原因（P0-2）：`reason` 见 `SELECTION_REASON_*`，`candidates` 为排序后全序。"""
+
+    binding: ToolBinding | None
+    reason: str
+    recipient: str = ""
+    candidates: tuple[str, ...] = ()
+
+
+def delivery_recipient(intent: ActionIntent) -> str:
+    """外部投递收件人：`intent.params` 里首个非空字符串收件人键的值（纯函数、零 IO）。
+
+    同时支持 `intent` 为 `None` 或 `params` 非映射的退化输入——一律视为"无收件人"。
+    """
+    params = getattr(intent, "params", None)
+    if not isinstance(params, Mapping):
+        return ""
+    for key in RECIPIENT_PARAM_KEYS:
+        value = params.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 class ToolSelector:
-    """意图 → 工具绑定：ACTION_TOOL_MAP → 工具面交集 → priority + 字典序取首。"""
+    """意图 → 工具绑定：ACTION_TOOL_MAP → 工具面交集 → 排序取首（收件人感知，见 `select_with_reason`）。"""
 
     def __init__(
         self,
@@ -282,21 +322,66 @@ class ToolSelector:
 
     def select(self, intent: ActionIntent, surface: ToolSurface | None) -> ToolBinding | None:
         """交集为空返回 None（工具不可用，等价 V9 `capability_unavailable`）。"""
+        return self.select_with_reason(intent, surface).binding
+
+    def select_with_reason(
+        self, intent: ActionIntent, surface: ToolSurface | None
+    ) -> ToolSelection:
+        """选择结果 + 可读原因（P0-2）：纯函数、零 IO、确定（同输入同输出）。
+
+        候选排序分两种：
+        - **外部投递收件人感知**（`SELECTION_REASON_CHANNEL_RECIPIENT`）：同一 `action_type`
+          的候选集里同时含 `channel.*` 与其它候选，且意图参数携带非空收件人键时，
+          `namespace == "channel"` 的候选整体前置——`channel.*` 是"真发出去"的那一个，
+          否则旗舰通道工具会被 priority 更小的本地工具永久压住（选择器按 priority 升序取首）。
+        - **原 priority + tool_id 字典序**（`SELECTION_REASON_PRIORITY_ORDER`）：其余情况，
+          与 TOOL-004 交付态逐字节一致。
+        """
         if self.registry is None or surface is None or not surface.tool_ids:
-            return None
+            return ToolSelection(None, SELECTION_REASON_NO_CANDIDATE)
         available = set(surface.tool_ids)
         candidates = [tool_id for tool_id in self.tool_map.get(intent.action_type, ()) if tool_id in available]
         if not candidates:
             candidates = self._fallback_candidates(intent, available)
         if not candidates:
-            return None
-        ordered = sorted(candidates, key=self._order_key)
+            return ToolSelection(None, SELECTION_REASON_NO_CANDIDATE)
+        recipient = delivery_recipient(intent)
+        channel_first = bool(recipient) and self._mixes_channel_and_others(candidates)
+        ordered = sorted(
+            candidates,
+            key=lambda tool_id: (0 if channel_first and self._is_channel(tool_id) else 1,)
+            + self._order_key(tool_id),
+        )
+        reason = (
+            SELECTION_REASON_CHANNEL_RECIPIENT if channel_first else SELECTION_REASON_PRIORITY_ORDER
+        )
+        logger.debug(
+            "surface_tool_selected:%s recipient=%s candidates=%s",
+            ordered[0],
+            recipient,
+            list(ordered),
+        )
         binding = self.registry.resolve(ordered[0])
         if binding is None:
             logger.warning(
                 "surface_tool_unresolvable:%s（声明缺失，判为不可用）", ordered[0]
             )
-        return binding
+        return ToolSelection(
+            binding, reason, recipient=recipient, candidates=tuple(ordered)
+        )
+
+    def _is_channel(self, tool_id: str) -> bool:
+        definition = self.registry.get(tool_id)
+        return definition is not None and definition.namespace == CHANNEL_NAMESPACE
+
+    def _mixes_channel_and_others(self, candidates: Sequence[str]) -> bool:
+        """候选集是否"既有通道候选又有非通道候选"（只有一个候选时谈不上优先级）。"""
+        namespaces = {
+            definition.namespace
+            for tool_id in candidates
+            if (definition := self.registry.get(tool_id)) is not None
+        }
+        return CHANNEL_NAMESPACE in namespaces and len(namespaces) > 1
 
     def _fallback_candidates(self, intent: ActionIntent, available: set[str]) -> list[str]:
         """ACTION_TOOL_MAP 未覆盖时的旧映射兜底：按 (capability, action) 在面上寻回（E8）。"""

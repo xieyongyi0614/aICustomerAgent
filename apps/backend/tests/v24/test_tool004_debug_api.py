@@ -155,6 +155,55 @@ async def test_tool_list_exposes_declaration_status_and_health(tools_on):
     assert payload["runtime_disabled"] == []
 
 
+class _NoopTrace:
+    def record(self, *args, **kwargs) -> None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_tool_list_exposes_capability_registry_build_flags(tools_on):
+    """P1-1：排障面暴露能力注册表的**构建期** Flag 快照与能力名（注册表内容进程内冻结）。"""
+    from app.services.action import registry as capability_registry_module
+
+    payload = (await _get("/debug/tools")).json()
+
+    assert payload["capability_registry_flags"]["v24_tool_system_enabled"] is True
+    assert set(payload["capability_registry_flags"]) == set(
+        capability_registry_module.REGISTRY_FLAG_NAMES
+    )
+    assert payload["capability_names"] == [
+        "environment_query",
+        "memory",
+        "notification",
+        "reminder",
+        "search",
+        "world_action",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_tool_list_exposes_tool_surface_degrade_count(tools_on, monkeypatch):
+    """P2-3：工具面降级计数在既有工具端点可见（0 也暴露，区分"无降级"与"未接线"）。"""
+    from app.application import autonomy_engine
+
+    assert (await _get("/debug/tools")).json()["tool_surface_degrade_count"] == 0
+
+    autonomy_engine.reset_tool_surface_degrade_count()
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(autonomy_engine, "resolve_autonomy_surface", _boom)
+    assert (
+        autonomy_engine._resolve_tick_capabilities(
+            EXEC_USER, surface_context().now, _NoopTrace(), {}
+        )
+        is None
+    )
+    assert (await _get("/debug/tools")).json()["tool_surface_degrade_count"] == 1
+    autonomy_engine.reset_tool_surface_degrade_count()
+
+
 # --- 单工具详情（E9） ------------------------------------------------------
 
 

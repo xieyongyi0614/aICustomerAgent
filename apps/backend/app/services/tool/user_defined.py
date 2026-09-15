@@ -43,7 +43,6 @@ from app.services.action.registry import (
     CapabilityRegistry,
     ExecutionContext,
     get_capability_registry,
-    unregister_capability,
 )
 from app.services.tool.dsl import (
     PARAMS_MAP_KEY,
@@ -598,7 +597,7 @@ class UserToolRegistrar:
             try:
                 registry.register(definition, capability)
             except Exception:
-                unregister_capability(capability_registry, tool_id)
+                capability_registry.unregister(tool_id)
                 raise
         except UserToolRejected:
             raise
@@ -633,7 +632,7 @@ class UserToolRegistrar:
         registry = self.tool_registry()
         if registry is not None:
             registry.unregister(tool_id)
-        unregister_capability(self.capability_registry(), tool_id)
+        self.capability_registry().unregister(tool_id)
 
 
 _registrar: UserToolRegistrar | None = None

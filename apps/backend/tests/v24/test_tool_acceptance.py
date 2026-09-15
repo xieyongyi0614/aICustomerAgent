@@ -18,8 +18,14 @@ import pytest
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
 from app.core.settings.enablement import enablement_violations, validate_enablement_chain
+from app.models.tool import PermissionProfile
+from app.services.tool.registry import ToolRegistry
 from tests.v24 import tool012_support as support
-from tests.v24.tool003_support import build_executor, stub_registry
+from tests.v24.tool003_support import (
+    build_executor,
+    notification_definition,
+    stub_registry,
+)
 from tests.v24.tool005_support import (
     CHANNEL_TOOL_ID,
     SENSITIVE_TOOL_ID,
@@ -144,13 +150,28 @@ def _permission_registry():
     return registry
 
 
+def _grant_free_registry():
+    """同形通知声明的免授权档版本（P0-1：总闸 on + 子闸 off 时 sensitive 默认拒绝）。
+
+    校验段 / 观测段等**非权限主题**的用例改走该档，才能在"仅总闸"的矩阵组合下
+    走到被验证的那一段；权限段本身的行为由 `test_flag_matrix_permission_branch` 持有。
+    """
+    registry = ToolRegistry()
+    registry.register(
+        notification_definition(
+            permission=PermissionProfile(level="normal", scope=("self",))
+        )
+    )
+    return registry
+
+
 @pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g03_only_schema_validation"])
 def test_flag_matrix_schema_validation_branch(monkeypatch, group):
     """校验闸：仅 g03 拦下参数错误，g02 放行至能力实现。"""
     support.apply_flag_env(monkeypatch, support.group_env(group))
     settings = get_settings()
     capability = notification_capability()
-    executor = _executor_for(capability, settings)
+    executor = _executor_for(capability, settings, registry=_grant_free_registry())
 
     execution = _run(
         executor,
@@ -169,7 +190,7 @@ def test_flag_matrix_schema_validation_branch(monkeypatch, group):
 
 @pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g04_only_permission"])
 def test_flag_matrix_permission_branch(monkeypatch, group):
-    """权限闸：仅 g04 进入七步判定（无授权 → 首次确认），g02 保持占位 allow。"""
+    """权限闸：仅 g04 进入七步判定（无授权 → 首次确认）；g02 特权档默认拒绝（P0-1）。"""
     support.apply_flag_env(monkeypatch, support.group_env(group))
     settings = get_settings()
     capability = notification_capability()
@@ -187,8 +208,9 @@ def test_flag_matrix_permission_branch(monkeypatch, group):
         assert execution.permission["reason"] == "first_time_confirmation"
         assert capability.calls == []
     else:
-        assert execution.status == "succeeded"
-        assert execution.permission["reason"] == "permission_layer_off"
+        assert execution.status == "denied"
+        assert execution.permission["reason"] == "permission_layer_disabled"
+        assert capability.calls == []
 
 
 @pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g05_only_observation"])
@@ -196,7 +218,9 @@ def test_flag_matrix_observation_branch(monkeypatch, group):
     """观测闸：g05 落 ToolResult 结构化键，g02 落 V9 原始 CapabilityResult 形态。"""
     support.apply_flag_env(monkeypatch, support.group_env(group))
     settings = get_settings()
-    executor = _executor_for(notification_capability(), settings)
+    executor = _executor_for(
+        notification_capability(), settings, registry=_grant_free_registry()
+    )
 
     execution = _run(
         executor, invocation(SENSITIVE_TOOL_ID, {"content": "在吗"}), settings
@@ -379,9 +403,23 @@ def test_g_compat_post_process_step_sequence_unchanged():
 
 
 def test_g_compat_frozen_blobs_zero_diff():
-    """冻结面文件与 V2.3.0 的 git blob 零 diff（对象口径，LF 归一）。"""
+    """冻结面文件与 V2.3.0 的 git blob 零 diff（对象口径，LF 归一）。
+
+    P2-4：`app/application/life_loop.py` 已从 blob 冻结面撤下（P2-1 在 `has_due` 调用侧
+    合法新增到期口径排除），改由下面的语义断言持有；冻结整文件哈希会把正常演进判成违规。
+    """
     for relative_path, expected_sha in support.FROZEN_BLOB_SHA_BASELINE.items():
         assert support.git_blob_sha(relative_path) == expected_sha, relative_path
+
+
+def test_g_compat_life_loop_semantics_replacing_blob_freeze():
+    """life_loop 的语义面替代 blob 哈希：维护步序列不变 + 不新增确认清理路径。"""
+    source = (support.APP_ROOT / "application" / "life_loop.py").read_text(
+        encoding="utf-8"
+    )
+    assert support.live_loop_maintenance_names(source) == support.LIFE_LOOP_MAINTENANCE_SEQUENCE
+    assert "ConfirmationService" not in source
+    assert "_expire_pending_confirmations" not in source
 
 
 def test_g_compat_action_domain_steps_shape_is_v9_when_master_off(
@@ -724,7 +762,7 @@ def test_g_validate_rejects_before_execution(monkeypatch):
     settings = get_settings()
     capability = notification_capability()
     executor = build_executor(
-        builtin_registry(),
+        _grant_free_registry(),
         capability,
         settings=settings,
         timeout_seconds=5.0,

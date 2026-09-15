@@ -26,6 +26,7 @@ from app.api.v1.schemas import (
     ToolWorldIntentOut,
     ToolsOut,
 )
+from app.application.autonomy_engine import tool_surface_degrade_count
 from app.character.asuna.tool import RUN_KIND_FOREGROUND_CHAT
 from app.core.settings import get_settings
 from app.models.evaluation import EvaluationSubjectKind
@@ -39,6 +40,10 @@ from app.repositories import (
     prompt_snapshot_repository,
     proactive_repository,
     trace_repository,
+)
+from app.services.action.registry import (
+    capability_registry_flags,
+    peek_capability_registry,
 )
 from app.services.observability.metrics_aggregator import (
     build_metric_report,
@@ -217,6 +222,9 @@ def list_tools():
 
     TOOL-007：附加 `world_intent` 段暴露 `world.intent.submit` 的接线状态
     （本版本恒 `status="not_wired"`、`writes=0`），防止"看着有其实没有"。
+    P1-1：附加 `capability_registry_flags`（能力注册表的**构建期** Flag 快照）与
+    `capability_names`，排障"为何某能力未注册"——注册表内容在首次构建时冻结，
+    开关后开不会补注册。P2-3：附加 `tool_surface_degrade_count`（自治工具面降级计数）。
     """
     if not _tools_enabled():
         return ToolsOut(enabled=False)
@@ -238,7 +246,18 @@ def list_tools():
         ],
         runtime_disabled=sorted(registry.runtime_disabled_ids()),
         world_intent=ToolWorldIntentOut(**get_world_intent_submitter().status()),
+        capability_registry_flags=capability_registry_flags(),
+        capability_names=_capability_names(),
+        tool_surface_degrade_count=tool_surface_degrade_count(),
     )
+
+
+def _capability_names() -> list[str]:
+    """已构建能力注册表的能力名（只读快照，**不触发构建**）。"""
+    peeked = peek_capability_registry()
+    if peeked is None:
+        return []
+    return sorted(entry["name"] for entry in peeked.describe())
 
 
 @debug_router.get("/debug/tools/surface", response_model=ToolSurfaceOut)

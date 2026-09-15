@@ -18,6 +18,7 @@ from app.models.tool import (
     TOOL_LIFECYCLES,
     TOOL_LIFECYCLE_VALUES,
     TOOL_NAMESPACES,
+    PermissionDecision,
     PermissionProfile,
     ToolBinding,
     ToolDefinition,
@@ -30,6 +31,7 @@ from app.models.tool import (
     ToolResult,
     ToolSchema,
     ToolSurface,
+    ValidationReport,
     namespace_permission_floor,
     permission_level_rank,
     resolve_permission_level,
@@ -369,6 +371,105 @@ def test_derived_read_only_and_effective_timeout():
     assert _definition().is_read_only() is False
     assert _definition(side_effects=("read",)).effective_timeout(9.5) == 9.5
     assert _definition(timeout_seconds=3.0).effective_timeout(9.5) == 3.0
+
+
+# --- P2-2：ToolExecution 结果字段的类型化访问器 -------------------------------
+
+
+def _execution(**overrides):
+    payload = {
+        "index": 0,
+        "tool_id": "builtin.notification.send",
+        "capability": "notification",
+        "action": "send",
+        "status": "denied",
+        "params": {"content": "开会"},
+        "permission": {
+            "level": "sensitive",
+            "decision": "deny",
+            "reason": "permission_layer_disabled",
+            "confirmed": False,
+        },
+        "validation": {
+            "passed": False,
+            "structural": [{"param": "x", "code": "unknown_param", "message": "未知参数"}],
+            "semantic": [],
+            "normalized": {},
+        },
+        "result": {
+            "status": "denied",
+            "effects": [{"kind": "world", "ref": "we-1", "detail": "", "reversible": True}],
+            "observations": {},
+            "failure_kind": "denied",
+            "error": "权限拒绝",
+            "usage": {},
+            "redacted": [],
+            "raw_error": None,
+            "payload": {"legacy": True},
+        },
+    }
+    payload.update(overrides)
+    return ToolExecution(**payload)
+
+
+def test_execution_accessors_return_models_from_dicts():
+    execution = _execution()
+
+    assert isinstance(execution.permission_model(), PermissionDecision)
+    assert execution.permission_model().reason == "permission_layer_disabled"
+    assert isinstance(execution.validation_model(), ValidationReport)
+    assert execution.validation_model().structural == [
+        {"param": "x", "code": "unknown_param", "message": "未知参数"}
+    ]
+    assert isinstance(execution.result_model(), ToolResult)
+    assert execution.result_model().failure_kind == "denied"
+    assert execution.result_model().effects[0].ref == "we-1"
+
+
+def test_execution_accessors_accept_model_instances_verbatim():
+    result = ToolResult(status="succeeded", observations={"world.event_id": "we-1"})
+    permission = PermissionDecision(decision="allow", level="normal", reason="level_no_grant_required")
+    validation = ValidationReport(passed=True, normalized={"content": "开会"})
+    execution = _execution(
+        status="succeeded",
+        result=result.model_dump(mode="json"),
+        permission={"decision": "allow", "level": "normal", "reason": "level_no_grant_required"},
+        validation=validation.model_dump(mode="json"),
+    )
+    assert execution.result_model() == result
+    assert execution.permission_model() == permission
+    assert execution.validation_model() == validation
+
+
+@pytest.mark.parametrize(
+    "field,accessor",
+    [
+        ("result", "result_model"),
+        ("permission", "permission_model"),
+        ("validation", "validation_model"),
+    ],
+)
+def test_execution_accessors_fail_soft_on_broken_payload(field, accessor):
+    """形状不合 / 缺失一律返回 None，且不抛错（访问器不得成为新的失败源）。"""
+    empty = {} if field == "permission" else None
+    assert getattr(_execution(**{field: empty}), accessor)() is None
+
+    broken = {
+        "result": {"status": "not-a-status"},
+        "permission": {"reason": "only-reason"},
+        "validation": {"passed": "not-a-bool"},
+    }[field]
+    assert getattr(_execution(**{field: broken}), accessor)() is None
+
+
+def test_execution_accessors_do_not_change_serialization_shape():
+    """只读访问器不改字段名与 JSON 形状（落库兼容）：dump 出来的键集不变。"""
+    execution = _execution()
+    dumped = execution.model_dump(mode="json")
+    assert set(dumped) == set(ToolExecution.model_fields)
+    assert dumped["permission"]["confirmed"] is False
+    assert dumped["result"]["payload"] == {"legacy": True}
+    assert execution.permission_model() is not None
 
 
 def test_json_shape_is_stable_and_carries_type_and_required():

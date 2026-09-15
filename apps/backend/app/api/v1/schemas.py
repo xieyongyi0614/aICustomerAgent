@@ -259,6 +259,9 @@ class ToolsOut(BaseModel):
     tools: list[ToolSummaryOut] = []
     runtime_disabled: list[str] = []
     world_intent: ToolWorldIntentOut | None = None
+    capability_registry_flags: dict[str, bool] = {}
+    capability_names: list[str] = []
+    tool_surface_degrade_count: int = 0
 
 
 class ToolDetailOut(BaseModel):

@@ -154,6 +154,44 @@ def test_describe_excludes_disabled_placeholder():
     assert "channel.feishu.send" not in [item.tool_id for item in registry.describe()]
 
 
+def test_describe_enabled_only_false_includes_disabled_and_tripped(v24_tool_env):
+    """P2-5：`enabled_only=False` 显式关闭过滤，disabled / 熔断条目带真实状态回归投影。"""
+    v24_tool_env(v24_tool_system_enabled=True, v24_tool_disabled_ids="world.object.move")
+    registry = _registry_with_builtins()
+    registry.mark_tripped("world.object.use")
+
+    default_ids = [item.tool_id for item in registry.describe()]
+    assert "channel.feishu.send" not in default_ids
+    assert "world.object.move" not in default_ids
+    assert "world.object.use" not in default_ids
+
+    all_descriptors = {
+        item.tool_id: item for item in registry.describe(enabled_only=False)
+    }
+    assert set(all_descriptors) >= {
+        "channel.feishu.send",
+        "world.object.move",
+        "world.object.use",
+    }
+    assert all_descriptors["channel.feishu.send"].status == "disabled"
+    assert all_descriptors["world.object.move"].status == "disabled"
+    assert all_descriptors["world.object.use"].status == "disabled"
+    assert all_descriptors["builtin.reminder.create"].status == "enabled"
+
+
+def test_describe_enabled_only_false_respects_surface_order(v24_tool_env):
+    """`enabled_only=False` 与 `surface` 组合：保 surface 序、去重、忽略未注册 id。"""
+    v24_tool_env(v24_tool_system_enabled=True)
+    registry = _registry_with_builtins()
+    surface = ToolSurface(
+        run_kind="conversation",
+        tool_ids=("channel.feishu.send", "missing.tool.id", "builtin.reminder.create"),
+    )
+    assert [
+        item.tool_id for item in registry.describe(surface=surface, enabled_only=False)
+    ] == ["channel.feishu.send", "builtin.reminder.create"]
+
+
 def test_describe_with_surface_keeps_surface_order_and_ignores_unknown(v24_tool_env):
     v24_tool_env(v24_tool_system_enabled=True)
     registry = _registry_with_builtins()

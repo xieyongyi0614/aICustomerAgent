@@ -7,13 +7,15 @@ from pathlib import Path
 import pytest
 
 from app.models.action import ActionIntent, ActionStep, CapabilityResult
-from app.models.tool import ToolBinding, ToolInvocation, ToolSchema
+from app.models.tool import PermissionProfile, ToolBinding, ToolInvocation, ToolSchema
 from app.services.action.executor import CapabilityExecutor
 from app.services.action.registry import ExecutionContext
 from app.services.tool.context import ToolContext
 from app.services.tool.executor import (
     PERMISSION_CONFIRM_REQUIRED,
     PERMISSION_DENY,
+    PERMISSION_LAYER_DISABLED_GRANT_FREE_REASON,
+    PERMISSION_LAYER_DISABLED_REASON,
     PERMISSION_LAYER_OFF_REASON,
     PermissionDecision,
     PermissionGate,
@@ -42,6 +44,9 @@ from tests.v24.tool003_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 TOOL_ID = "builtin.reminder.create"
 NOTIFICATION_ID = "builtin.notification.send"
+
+GRANT_FREE_PERMISSION = PermissionProfile(level="normal", scope=("self",))
+"""同形声明的免授权档权限画像（P0-1：总闸 on + 子闸 off 时特权档默认拒绝）。"""
 
 
 def _intent() -> ActionIntent:
@@ -88,6 +93,11 @@ def _builtin_registry_and_capability(behavior=None):
 
 
 def _budget_definition(*, sensitive: bool = False):
+    """超预算 / 脱敏负例声明。
+
+    等级取免授权档：本文件的这些用例主题在**校验段与脱敏段**，而 P0-1 后权限子闸未开时
+    特权档（sensitive 及以上）一律默认拒绝，会把用例挡在主题之前。
+    """
     return notification_definition(
         input_schema=ToolSchema(
             parameters=[
@@ -95,7 +105,8 @@ def _budget_definition(*, sensitive: bool = False):
                 param("recipient", sensitive=sensitive),
             ],
             semantic_validators=("content_within_budget",),
-        )
+        ),
+        permission=GRANT_FREE_PERMISSION,
     )
 
 
@@ -179,17 +190,59 @@ async def test_tripped_tool_is_unavailable_after_resolve_e2():
 
 
 @pytest.mark.asyncio
-async def test_permission_off_is_placeholder_allow():
+async def test_permission_sub_layer_off_keeps_grant_free_tier_allow():
+    """P0-1：总闸 on + 权限子闸 off 时，免授权档（normal）仍放行——三段的中间段。"""
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(registry, capability)
     execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
     assert execution.permission == {
         "level": "normal",
         "decision": "allow",
-        "reason": PERMISSION_LAYER_OFF_REASON,
+        "reason": PERMISSION_LAYER_DISABLED_GRANT_FREE_REASON,
         "confirmed": False,
     }
     assert execution.status == "succeeded"
+    assert capability.calls == [{}]
+
+
+@pytest.mark.asyncio
+async def test_permission_sub_layer_off_denies_sensitive_tier():
+    """P0-1：总闸 on + 权限子闸 off 时，特权档（sensitive）默认拒绝——fail-closed。"""
+    registry = registry_with(sensitive_definition())
+    capability = StubCapability()
+    executor = build_executor(registry, capability)
+    execution = await executor.run(
+        registry.resolve(NOTIFICATION_ID),
+        _invocation(NOTIFICATION_ID, {"content": "你好", "recipient": "u-9"}),
+        _ctx(),
+    )
+    assert execution.status == "denied"
+    assert execution.permission == {
+        "level": "sensitive",
+        "decision": "deny",
+        "reason": PERMISSION_LAYER_DISABLED_REASON,
+        "confirmed": False,
+    }
+    assert capability.calls == []
+
+
+@pytest.mark.asyncio
+async def test_master_gate_off_is_placeholder_allow_for_every_tier():
+    """总闸 off：权限段不参与（TOOL-003 交付态），特权档同样放行——三段的首段。"""
+    registry = registry_with(sensitive_definition())
+    capability = StubCapability()
+    executor = build_executor(
+        registry, capability, settings=tool_settings(v24_tool_system_enabled=False)
+    )
+    execution = await executor.run(
+        registry.resolve(NOTIFICATION_ID),
+        _invocation(NOTIFICATION_ID, {"content": "你好", "recipient": "u-9"}),
+        _ctx(),
+    )
+    assert execution.permission["decision"] == "allow"
+    assert execution.permission["reason"] == PERMISSION_LAYER_OFF_REASON
+    assert execution.status == "succeeded"
+    assert capability.calls != []
 
 
 @pytest.mark.asyncio
@@ -532,7 +585,7 @@ async def test_invocation_params_are_not_mutated():
 
 @pytest.mark.asyncio
 async def test_sensitive_params_are_redacted_in_execution_params():
-    registry = registry_with(sensitive_definition())
+    registry = registry_with(sensitive_definition(permission=GRANT_FREE_PERMISSION))
     capability = StubCapability()
     executor = build_executor(
         registry, capability, settings=tool_settings(v24_tool_observation_enabled=True)
@@ -549,7 +602,7 @@ async def test_sensitive_params_are_redacted_in_execution_params():
 
 @pytest.mark.asyncio
 async def test_empty_sensitive_param_is_not_redacted_e12():
-    registry = registry_with(sensitive_definition())
+    registry = registry_with(sensitive_definition(permission=GRANT_FREE_PERMISSION))
     capability = StubCapability()
     executor = build_executor(
         registry, capability, settings=tool_settings(v24_tool_observation_enabled=True)

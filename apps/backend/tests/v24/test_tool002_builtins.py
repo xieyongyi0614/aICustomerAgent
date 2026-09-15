@@ -10,7 +10,8 @@ import pytest
 
 from app.core.settings import get_settings
 from app.models.tool import TOOL_DESCRIPTION_MAX_LENGTH, TOOL_NAME_MAX_LENGTH, TOOL_WHEN_MAX_LENGTH
-from app.services.action.registry import get_capability_registry
+from app.services.action import registry as action_registry
+from app.services.action.registry import CapabilityRegistry, get_capability_registry
 from app.services.tool import registry as tool_registry
 from app.services.tool.registry import (
     ToolRegistry,
@@ -28,12 +29,22 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 FROZEN_SOURCE_HASHES: dict[str, dict[str, str]] = {
     "app/services/action/registry.py": {
         "Capability": "0d4bbd17c64cea99f38c44b89d5202dbac71ef2ee7cb75ae0c7f2d7bfa9a435a",
-        "CapabilityRegistry": "b255acb1f49b1bcb2e58f0636ceb763833a31c4e5368ce2dc8e8feb2603b606e",
     },
     "app/models/action.py": {
         "ActionSchema": "48881bbf60c6811b58fc59644b0bd86a6ceb1c47bd5b7e85f18f970189ad5adc",
     },
 }
+"""类体冻结面（P1-1 后仅剩未演进的 `Capability` / `ActionSchema`）。
+
+`CapabilityRegistry` 的整类哈希已被撤下：类体在 TOOL-011 合法新增 `unregister`（正式方法，
+取代模块级 `unregister_capability` 对私有字典的越界写入），冻结整类哈希会把正常演进判成违规；
+其语义面由下面三组断言持有（导出方法集合 / 六能力行为 / unregister 语义）。
+"""
+
+
+def _normalized_hash(text: str) -> str:
+    """行尾归一（LF）后的 sha256：抵消 CRLF 检出带来的假失败（P2-4）。"""
+    return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
 def _builtin_registry() -> ToolRegistry:
@@ -47,7 +58,7 @@ def _class_source_hash(relative_path: str, class_name: str) -> str:
     for node in ast.parse(source).body:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             segment = ast.get_source_segment(source, node)
-            return hashlib.sha256(segment.encode("utf-8")).hexdigest()
+            return _normalized_hash(segment)
     raise AssertionError(f"未找到类定义: {relative_path}::{class_name}")
 
 
@@ -205,5 +216,74 @@ def test_action_registry_and_action_schema_are_frozen_for_this_task():
         for class_name, expected in classes.items():
             assert _class_source_hash(relative_path, class_name) == expected, (
                 f"{relative_path}::{class_name} 在 TOOL-002 中被改动；"
-                "本任务不得修改 CapabilityRegistry / Capability / ActionSchema"
+                "本任务不得修改 Capability / ActionSchema"
             )
+
+
+# --- P1-1：CapabilityRegistry 由"整类哈希"改为语义级断言 ----------------------
+
+
+def test_capability_registry_exports_expected_methods():
+    """导出方法集合（语义面）：类体已合法演进（TOOL-011 新增 `unregister`），不再冻结整类哈希。"""
+    exported = {
+        name
+        for name, value in vars(CapabilityRegistry).items()
+        if not name.startswith("_") and callable(value)
+    }
+    assert exported == {"register", "unregister", "get", "has", "describe"}
+
+
+def test_capability_registry_six_builtin_capabilities_behave_unchanged():
+    registry = get_capability_registry()
+    assert {entry["name"] for entry in registry.describe()} == {
+        "reminder",
+        "memory",
+        "world_action",
+        "environment_query",
+        "search",
+        "notification",
+    }
+    assert registry.has("reminder", "create") is True
+    assert registry.has("reminder", "purge") is False
+    assert registry.get("reminder") is None or registry.get("reminder").name == "reminder"
+
+
+def test_capability_registry_unregister_semantics():
+    """`unregister` 语义：命中即移除并返回 True，重复 / 未注册返回 False（幂等不抛错）。"""
+    from tests.v24.tool003_support import StubCapability
+
+    registry = CapabilityRegistry()
+    registry.register(StubCapability(name="probe", action="run"))
+    assert registry.has("probe") is True
+    assert registry.unregister("probe") is True
+    assert registry.get("probe") is None
+    assert registry.has("probe") is False
+    assert registry.unregister("probe") is False
+    assert registry.unregister("never.registered") is False
+
+
+def test_module_level_unregister_capability_is_gone():
+    """私有字典写入面已撤销：注销统一走 `CapabilityRegistry.unregister`（正式方法）。"""
+    assert not hasattr(action_registry, "unregister_capability")
+    source = (BACKEND_ROOT / "app/services/tool/user_defined.py").read_text(
+        encoding="utf-8"
+    )
+    assert "unregister_capability" not in source
+    assert ".unregister(tool_id)" in source
+
+
+def test_capability_registry_flags_snapshot_is_read_only_copy(v24_tool_env):
+    v24_tool_env(v24_tool_system_enabled=True)
+    action_registry._registry = None
+    action_registry._registry_flags.clear()
+    assert action_registry.capability_registry_flags() == {}
+    assert action_registry.peek_capability_registry() is None
+
+    registry = get_capability_registry()
+
+    snapshot = action_registry.capability_registry_flags()
+    assert snapshot["v24_tool_system_enabled"] is True
+    assert set(snapshot) == set(action_registry.REGISTRY_FLAG_NAMES)
+    snapshot["v24_tool_system_enabled"] = False
+    assert action_registry.capability_registry_flags()["v24_tool_system_enabled"] is True
+    assert action_registry.peek_capability_registry() is registry

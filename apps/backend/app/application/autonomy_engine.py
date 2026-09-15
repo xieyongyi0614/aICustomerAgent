@@ -7,6 +7,9 @@ V2.4.0 TOOL-006：总闸开启时自治 tick 首次实传 `capabilities=surface.
 （关闭断层 B7；off 时保持 `None` 原状），并把有界工具事实段并入 `action_facts`
 （`PolicySnapshot.tool_facts`）。**编排关系不变**：自治只产出意图（ActionIntent），
 执行仍经既有 `action_engine.run_action_planning`（Action = Intent，Tool = Execution）。
+
+P2-3：工具面解析降级不再静默——异常次数记入进程级 `tool_surface_degrade_count()`
+（经 `/debug/tools` 的 `tool_surface_degrade_count` 字段暴露），返回 `None` + 日志的行为不变。
 """
 
 import logging
@@ -67,6 +70,28 @@ TOOL_FACTS_BREAKER_LIMIT = 3
 TOOL_FACTS_RECORDS_SCAN_LIMIT = 50
 
 _TOOL_STEP_FAILED_STATUS = "failed"
+
+_TOOL_SURFACE_DEGRADE_COUNT = 0
+
+
+def tool_surface_degrade_count() -> int:
+    """自治工具面降级计数（进程级，重启归零）：`_resolve_tick_capabilities` 解析异常的次数。
+
+    只计数、不改行为——降级仍返回 `None` + 日志。**总闸 off（注册表缺失 → `None`）不计入**：
+    那是设计路径（断层 B7 原状）而非降级，计入会让指标失去意义。
+    """
+    return _TOOL_SURFACE_DEGRADE_COUNT
+
+
+def reset_tool_surface_degrade_count() -> None:
+    """计数器归零（测试隔离用；生产无调用方）。"""
+    global _TOOL_SURFACE_DEGRADE_COUNT
+    _TOOL_SURFACE_DEGRADE_COUNT = 0
+
+
+def _record_tool_surface_degrade() -> None:
+    global _TOOL_SURFACE_DEGRADE_COUNT
+    _TOOL_SURFACE_DEGRADE_COUNT += 1
 
 
 def _autonomy_tool_context(user_id: str, now: datetime | None = None) -> ToolContext:
@@ -353,13 +378,15 @@ def _resolve_tick_capabilities(
     off 或无 registry → None（断层 B7 原状，逐字节一致）。
 
     工具面与工具事实经既有 `trace.record()` 落 `runtime_traces.steps`（不新建观测表）；
-    解析异常降级为 None + 日志，不阻塞 tick。
+    解析异常降级为 None + 日志，不阻塞 tick（异常次数记入进程级
+    `tool_surface_degrade_count()`——降级不再静默）。
     """
     started = time.perf_counter()
     try:
         surface = resolve_autonomy_surface(user_id, now)
     except Exception:
         logger.exception("自治工具面解析失败，capabilities 退化为 None")
+        _record_tool_surface_degrade()
         return None
     if surface is None:
         return None

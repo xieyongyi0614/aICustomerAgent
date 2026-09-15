@@ -8,6 +8,15 @@
 写入侧只经既有 `memory_policy` R1~R8（零豁免）与 `memory_repository`，
 本模块不新增记忆表、不扩记忆类型域；内容由 `TOOL_MEMORY_TEMPLATES` 渲染，
 无模板或渲染缺参返回空串，调用方据此跳过沉淀（不写半成品内容）。
+
+**边界表 importance 档与政策阈值的既有落差（保持现状，属预期）**：
+
+- 0.5 档（`builtin.reminder.cancel` / `world.object.create`）在默认
+  `memory_importance_threshold = 0.6` 下被 **R6 拒收**——档位取自文档 §2.2 表，本模块不
+  上调，也不为工具通道破例；部署侧下调阈值即可放行，行为由配置单点决定。
+- `source = "ai_inferred"` 的行（`builtin.notification.send` / `channel.feishu.send`）被
+  **R1 拒收**：AI 推测不入库是政策硬规则，与档位无关。
+- 模板文案不得含未消解人称代词（R8 会拒收），`TOOL_MEMORY_TEMPLATES` 的措辞受此约束。
 """
 
 from __future__ import annotations

@@ -255,13 +255,20 @@ CONFIRM_WORD_MAX_CONTENT_CHARS = 12
 CONFIRM_LEXICON_MIN_WORDS = 5
 
 TOOL_MEMORY_TEMPLATES: dict[str, str] = {
-    "builtin.reminder.create": "用户请我提醒他：{content}",
+    "builtin.reminder.create": "用户请我提醒：{content}",
     "builtin.reminder.cancel": "用户不想再被提醒：{target}",
     "builtin.memory.save": "用户告诉我：{fact}",
     "world.object.create": "用户请我准备：{object}",
     "builtin.notification.send": "我主动提醒了用户：{content}",
     "channel.feishu.send": "我主动给用户发了消息：{content}",
 }
+"""工具结果记忆内容模板（TOOL-008 §4.3 / §2.2）。
+
+文案里**不得出现未消解人称代词**（`它` / `那个` / `他` / `她`）：既有 `memory_policy` R8
+会拒收含指代的内容，而工具通道对政策闸**零豁免**。`builtin.reminder.create` 原文案
+「用户请我提醒他：{content}」因含「他」被 R8 恒定拒收，导致该工具的记忆通道零产出；
+改为「用户请我提醒：{content}」后经 R1~R8 通过并正常落库。
+"""
 
 TOOL_MEMORY_FAILURE_TEMPLATE = "上次没能帮用户完成：{content}"
 

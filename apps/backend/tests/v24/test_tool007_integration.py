@@ -33,10 +33,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
     "app/application/world_engine.py": "7e22040a12d4d2198e69a572717f4e12f911756f9fd3e88c668da1d44a445947",
-    "app/application/outbox_consumer.py": "badc99eaf8ffd052bec89c0514431adf2532799263c6768896ea84fd8805b66a",
-    "app/application/life_loop.py": "d366aff6e66598e8bcc5a409aa68097d20de769f3c8c346bb1f45f8a8dcfc9f3",
+    "app/application/outbox_consumer.py": "e4ea78f0b3800c3ddc7edc8d90066e1fe4b14c9adb68e1fc8f11d72ecbaad0d6",
 }
-"""V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。"""
+"""V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
+
+`app/application/life_loop.py` 已从本表撤下（P2-1 在 `has_due` 调用侧合法新增到期口径排除），
+其语义面由 `_maintenance_steps()` / `test_action_retry_substeps_unchanged` 持有——
+冻结整文件哈希会把正常演进判成违规。
+"""
 
 EXPECTED_MAINTENANCE_STEPS: tuple[str, ...] = (
     "world_maintenance",
@@ -97,6 +101,16 @@ CHARACTER_TABLES: dict[str, tuple[str, ...]] = {
 def _world_fixture_isolation(db_session_factory, override_settings):
     override_settings(world_household_autoseed_enabled="false")
     yield
+
+
+@pytest.fixture(autouse=True)
+def _pin_action_engine_clock(monkeypatch):
+    """`_build_snapshot` 无 `now` 形参，内部经 `action_engine._now()` 读真实墙钟。
+
+    夹具的 `daily_plans` 按 `tool007_support.NOW` 的日期落键，故此处把该时间源钉到 `NOW`
+    （测试侧 seam，不改生产签名），使 `current_block` 等日期派生事实不随真实日期滚更失配。
+    """
+    monkeypatch.setattr(action_engine, "_now", lambda: NOW)
 
 
 # --- `_build_snapshot` 装配接入 ---------------------------------------------
@@ -258,8 +272,11 @@ def test_assemble_plan_uses_preloaded_facts_for_tool_choice(db_session_factory, 
 
 @pytest.mark.parametrize("relative,digest", sorted(FROZEN_SOURCES.items()))
 def test_frozen_sources_have_zero_diff(relative, digest):
-    """世界模拟与 outbox 消费路径零 diff（TOOL-007 硬约束）。"""
-    data = (BACKEND_ROOT / relative).read_bytes()
+    """世界模拟与 outbox 消费路径零 diff（TOOL-007 硬约束）。
+
+    摘要比对前做**行尾归一（LF）**：CRLF 检出不应造成假失败（P2-4）。
+    """
+    data = (BACKEND_ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
     assert hashlib.sha256(data).hexdigest() == digest, (
         f"{relative} 被修改：世界模拟 / outbox 消费器在本任务内必须零 diff"
     )

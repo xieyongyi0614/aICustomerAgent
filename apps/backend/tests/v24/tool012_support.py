@@ -133,8 +133,14 @@ SCHEMA_FROZEN_TABLES: tuple[str, ...] = (
 
 FROZEN_BLOB_SHA_BASELINE: dict[str, str] = {
     "app/application/agent_runtime/profiles.py": "77dade3b10b9e73a0115a12df0fb40072f0bbe16",
-    "app/application/life_loop.py": "c3254b9ecbd3a2fea3cec5e06826ab992a1e2725",
 }
+"""冻结面 blob sha1 基线（LF 归一，git 对象口径）。
+
+`app/application/life_loop.py` 已撤下（P2-4）：P2-1 在它的 `has_due` 调用侧合法新增到期
+口径排除，整文件哈希会把正常演进判成违规；其语义面（维护步序列 / 无第二套确认清理路径）
+改由 `test_tool012_bans.test_ban_no_second_agent_stage_sequence_unchanged` 与
+`test_tool_acceptance.test_g_compat_life_loop_semantics_replacing_blob_freeze` 持有。
+"""
 
 LIFE_LOOP_MAINTENANCE_SEQUENCE: tuple[str, ...] = (
     "world_maintenance",

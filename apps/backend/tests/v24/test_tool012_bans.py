@@ -112,7 +112,12 @@ def test_ban_no_second_agent_profiles_frozen():
 
 
 def test_ban_no_second_agent_stage_sequence_unchanged():
-    """阶段序列零改动：后处理步序列与 life_loop 维护步序列均与 V2.3.0 相同。"""
+    """阶段序列零改动：后处理步序列与 life_loop 维护步序列均与 V2.3.0 相同。
+
+    P2-4：life_loop 的 blob 哈希冻结已撤下（P2-1 在其 `has_due` 调用侧合法新增到期口径
+    排除），语义面由**同一条维护步序列断言** + "无第二套确认清理路径"持有——
+    blob 哈希是同一语义的整文件代理，冻结它会把正常演进判成违规。
+    """
     from app.application import post_process
 
     assert (
@@ -126,10 +131,9 @@ def test_ban_no_second_agent_stage_sequence_unchanged():
         support.live_loop_maintenance_names(source)
         == support.LIFE_LOOP_MAINTENANCE_SEQUENCE
     )
-    assert (
-        support.git_blob_sha("app/application/life_loop.py")
-        == support.FROZEN_BLOB_SHA_BASELINE["app/application/life_loop.py"]
-    )
+    assert "ConfirmationService" not in source
+    assert "_expire_pending_confirmations" not in source
+    assert "app/application/life_loop.py" not in support.FROZEN_BLOB_SHA_BASELINE
 
 
 def test_ban_no_second_agent_declaration_surface_is_clean():
@@ -443,19 +447,27 @@ def test_invariant_04_domain_whitelist_rejects_at_call_time(tmp_path):
 
 
 def test_invariant_05_sensitive_params_are_redacted(monkeypatch):
-    """不变量 5：sensitive 参数进台账前脱敏，脱敏字段名记入 `redacted`。"""
+    """不变量 5：sensitive 参数进台账前脱敏，脱敏字段名记入 `redacted`。
+
+    等级取免授权档：本用例主题是脱敏段，而 P0-1 后权限子闸未开时特权档默认拒绝。
+    """
     support.apply_flag_env(
         monkeypatch,
         {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_OBSERVATION_ENABLED": True},
     )
     settings = get_settings()
+    from app.models.tool import PermissionProfile
     from app.services.action.executor import CapabilityExecutor
     from app.services.tool.executor import ToolExecutor
     from app.services.tool.registry import ToolRegistry
     from tests.v24.tool003_support import StubCapability, sensitive_definition, stub_registry
 
     registry = ToolRegistry()
-    registry.register(sensitive_definition())
+    registry.register(
+        sensitive_definition(
+            permission=PermissionProfile(level="normal", scope=("self",))
+        )
+    )
     capability = StubCapability(name="notification", action="send", required=["content"])
     executor = ToolExecutor(
         registry,

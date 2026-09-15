@@ -316,8 +316,18 @@ class ToolRegistry:
             for namespace in TOOL_NAMESPACES
         }
 
-    def describe(self, *, surface: ToolSurface | None = None) -> list[ToolDescriptor]:
-        """工具描述投影：无 surface 取全部可用工具，有 surface 取其中可用工具（保序）。"""
+    def describe(
+        self, *, surface: ToolSurface | None = None, enabled_only: bool = True
+    ) -> list[ToolDescriptor]:
+        """工具描述投影：无 surface 取全部声明，有 surface 取其声明（保序、去重、忽略未知）。
+
+        `enabled_only`（P2-5，**显式参数**而非隐式过滤）：
+
+        - `True`（默认，与既有行为逐字节一致）：只保留 `effective_status == "enabled"` 的条目，
+          声明态 disabled / deprecated / removed 与运行期禁用、熔断的工具都不进投影；
+        - `False`：连同非 enabled 状态一起返回，`status` 字段携带真实状态——排障面用它看
+          "声明在、投影不在"的差集，调用方也不必再猜这个过滤条件存在与否。
+        """
         tool_ids = (
             sorted(self._tools) if surface is None else _surface_tool_ids(surface)
         )
@@ -327,7 +337,7 @@ class ToolRegistry:
             if definition is None:
                 continue
             status = self.effective_status(tool_id)
-            if status != "enabled":
+            if enabled_only and status != "enabled":
                 continue
             descriptors.append(_descriptor(definition, status))
         return descriptors

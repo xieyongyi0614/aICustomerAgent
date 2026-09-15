@@ -67,24 +67,58 @@ def _expected_success_status(tool_id: str) -> str:
     return "unavailable" if tool_id == SEARCH_TOOL_ID else "succeeded"
 
 
+CRLF = b"\r\n"
+LF = b"\n"
+
 ZERO_DIFF_HASHES: dict[str, str] = {
-    "app/channels/base.py": "75b95309f2d32fe89b77f28d48e89fe67c91a35cafad792b58d7843f87ee9be8",
-    "app/channels/feishu/outbound.py": "891c8a1bc9feb8527c75e87006bcfc1217668ce3b27fbef3a7cc6da45b809ccc",
-    "app/channels/feishu/client.py": "ccab2ce2624321c1630afa4d4d8aecb0bd5b8a7796366ab23378bad035077538",
-    "app/channels/feishu/delivery.py": "e5f39144ecbf6d62b6730b6bbb05b584823abd97c45e8bcdb81173c3bfca2ecc",
-    "app/services/action/capabilities/reminder.py": "9bf57de69e7e7a65430f514de2bed9345134d0d80ad96b928e2a707ed258d5d0",
-    "app/services/action/capabilities/memory.py": "d0efa2552f882270f17c20bf8ee581145588dcbd3bf29435ac0317fbf63b9e65",
-    "app/services/action/capabilities/world_action.py": "7fff96fa065953d9d2e3098c2a66fdc28cdb9e9b185bd20ee219c8c4ae9b6562",
-    "app/services/action/capabilities/environment_query.py": "0db79feeeee4f61e4dd562eee3fa64433490e83b0c7f9d162adaf6e1e02ddd9d",
-    "app/character/asuna/action.py": "209b61636d0e159a7ebb5285084cda0e0de5789b17fa808eebbe655c2f4674f9",
-    "app/services/action/planner.py": "2bff7f150d003b04281180dec124bf521495160b78c8b7fc9c254dc29c12e775",
-    "app/services/decision_pipeline.py": "b24f6a9c04b35680b75ac7d7d1094f69806b8411961f018a7fe5d73b5ae62cb6",
-    "app/application/chat_pipeline.py": "bd67b0897d499da2ac1afce7c89b0af714e28d64f323e38eceb74e24f219805d",
-    "app/application/post_process.py": "2f955cb302f6126a0b5113fa391553e36fa14eacb34f4ac58cfb347fe216fa11",
-    "app/application/action_engine.py": "2e43c6edb703ec95d9638b77d3c3f8f0a5268fc218e867f9ee96694dac5a77e6",
-    "app/application/autonomy_engine.py": "57b389fb2ae8133d88632c49b56205c868948d9f2f3d9a6cb7af37679476bc4b",
-    "app/prompts/builder.py": "10b88044a7dc5ce842e9f0c52e89d99972bd599db6351cc5401864b5fb15c41d",
+    "app/channels/base.py": "f992542b7585468c09f169a16d1f6d4aab36639eb35ae840936b201402359617",
+    "app/channels/feishu/outbound.py": "50aa5f198d1793195ba32634e6d25e67fd21f160821957f96c4e5d78b1b800ac",
+    "app/channels/feishu/client.py": "5f9fe0dadc8a5fa49a945f611d68600f3dc15d07e65d3d2463384a6f036bff7e",
+    "app/channels/feishu/delivery.py": "4b16ad9e5e57694b4f2d8ff57029981a36cfa48efd9475870dfc2766110b493c",
+    "app/services/action/capabilities/reminder.py": "df820840262c7d00c229e29cb412ceebf71011e2e72356ded51efbf0accd8062",
+    "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
+    "app/services/action/capabilities/world_action.py": "10c0ef114fdd32b2fc6ad44354127cea19e501be3b15c5fb6c211c44a86c4cb0",
+    "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
+    "app/character/asuna/action.py": "86d8080c29b29c2f2a88c6b804ac4b4500b4d8b75d92b8557cf8bb17425b6a8d",
+    "app/services/action/planner.py": "3efc790a9cbde441885a1ae789bb0af844d2e12ec75fd35304f1b959240013cd",
+    "app/services/decision_pipeline.py": "2ac6b51e501bd127fab008ea985beb5fe5cfa0167485b0ae64daeb00c2daf757",
+    "app/application/chat_pipeline.py": "da4ac2ccfb6c7923ac62a683e7a1452297c2d27dc619cf8c37b3ed4d07b34bc7",
+    "app/application/post_process.py": "89bbad291a139ecdc18ecefa8cd9a651ff6c1ee1229b4caefcd0075643943e6e",
+    "app/application/action_engine.py": "2529395ca3eb97b36ce9b9a520ef0f8449ae760344dd6d1aa7ab55d4f5e92f4c",
+    "app/prompts/builder.py": "d1a98f6887735b34c935896b00cf5d94d2bd36e41a8c433620ced649c678c826",
 }
+"""整文件零 diff 冻结面。
+
+`app/application/autonomy_engine.py` 已从本表撤下（P2-3 合法新增降级计数器与访问器），
+改由 `test_autonomy_engine_has_no_channel_tool_coupling` 做语义级断言——冻结整文件哈希会把
+正常演进判成违规。
+"""
+
+
+def test_autonomy_engine_has_no_channel_tool_coupling():
+    """TOOL-010 的真实关切：新通道工具没有把自治管线改脏（语义替代整文件哈希）。"""
+    from app.application import autonomy_engine
+
+    source = (BACKEND_ROOT / "app/application/autonomy_engine.py").read_text(
+        encoding="utf-8"
+    )
+    for forbidden in (
+        "channel.feishu",
+        "channel_feishu",
+        "ChannelCapability",
+        "app.channels",
+        "OutboundMessage",
+    ):
+        assert forbidden not in source
+    for name in (
+        "tick",
+        "resolve_autonomy_surface",
+        "collect_tool_facts",
+        "_resolve_tick_capabilities",
+        "_autonomy_binding",
+    ):
+        assert callable(getattr(autonomy_engine, name))
+
 
 TOOL_ADDITION_STEPS: tuple[str, ...] = (
     "① 声明：`tool/builtin.py` 加一条 ToolDefinition（schema / permission / side_effects / 记忆键）",
@@ -273,10 +307,17 @@ def test_every_declared_tool_is_describable_and_resolvable():
 # --- §6.2 零 diff 断言 ------------------------------------------------------
 
 
+def _file_digest(relative_path: str) -> str:
+    """行尾归一（LF）后的 sha256：抵消 CRLF 检出带来的假失败（P2-4）。"""
+    data = (BACKEND_ROOT / relative_path).read_bytes().replace(CRLF, LF)
+    return hashlib.sha256(data).hexdigest()
+
+
 @pytest.mark.parametrize("relative_path", sorted(ZERO_DIFF_HASHES), ids=lambda value: value)
 def test_zero_diff_frozen_surfaces(relative_path):
-    digest = hashlib.sha256((BACKEND_ROOT / relative_path).read_bytes()).hexdigest()
-    assert digest == ZERO_DIFF_HASHES[relative_path], f"{relative_path} 被 TOOL-010 改动"
+    assert _file_digest(relative_path) == ZERO_DIFF_HASHES[relative_path], (
+        f"{relative_path} 被 TOOL-010 改动"
+    )
 
 
 def test_existing_channel_split_and_contract_modules_untouched():
@@ -290,16 +331,17 @@ def test_existing_channel_split_and_contract_modules_untouched():
 
 
 def test_pipelines_are_not_touched_by_the_new_tool():
+    """管线整文件零 diff：`autonomy_engine.py` 由语义断言接手（P2-3 的合法演进）。"""
     for relative_path in (
         "app/services/action/planner.py",
         "app/services/decision_pipeline.py",
         "app/application/chat_pipeline.py",
         "app/application/post_process.py",
         "app/application/action_engine.py",
-        "app/application/autonomy_engine.py",
         "app/prompts/builder.py",
     ):
         assert relative_path in ZERO_DIFF_HASHES
+    assert "app/application/autonomy_engine.py" not in ZERO_DIFF_HASHES
 
 
 # --- 四步流程实操（≤ 4 步、不改管线） ----------------------------------------
@@ -369,8 +411,7 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
     assert MATRIX_OBSERVATIONS["world.object.move"] != execution.result["observations"]
 
     for relative_path in ZERO_DIFF_HASHES:
-        digest = hashlib.sha256((BACKEND_ROOT / relative_path).read_bytes()).hexdigest()
-        assert digest == ZERO_DIFF_HASHES[relative_path]
+        assert _file_digest(relative_path) == ZERO_DIFF_HASHES[relative_path]
 
 
 # --- Flag 全 off：既有路径零变化 -------------------------------------------

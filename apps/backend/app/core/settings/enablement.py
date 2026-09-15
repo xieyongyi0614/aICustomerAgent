@@ -146,9 +146,31 @@ def v23_reserved_flag_warnings(settings) -> list[str]:
     return warnings
 
 
+def v24_permission_sub_layer_warnings(settings) -> list[str]:
+    """权限子闸未开启时的提示（非阻断）：总闸 on 而权限子闸 off。
+
+    该组合不是"权限段不参与"（那是总闸 off 的语义），而是"特权工具默认拒绝"：
+    免授权档（safe / normal）照常放行，sensitive / dangerous / `user.*` / `ext.api.*`
+    因无可读授权存储而一律 `deny(permission_layer_disabled)`。做成 warning 而非
+    violations，是为了保留子域单测使用"仅总闸"组合的自由度。
+    """
+    warnings: list[str] = []
+    if not getattr(settings, "v24_tool_system_enabled", False):
+        return warnings
+    if getattr(settings, "v24_tool_permission_enabled", False):
+        return warnings
+    warnings.append(
+        "v24_tool_permission_enabled 未开启：sensitive / dangerous / user.* / ext.api.* "
+        "工具将默认拒绝（fail-closed），仅 safe / normal 免授权档可执行"
+    )
+    return warnings
+
+
 def validate_enablement_chain(settings) -> None:
     violations = enablement_violations(settings)
     if violations:
         raise SettingsError("V2 启用链配置错误：" + "；".join(violations))
     for message in v23_reserved_flag_warnings(settings):
         _logger.warning("V2.3.0 开关提示：%s", message)
+    for message in v24_permission_sub_layer_warnings(settings):
+        _logger.warning("V2.4.0 开关提示：%s", message)

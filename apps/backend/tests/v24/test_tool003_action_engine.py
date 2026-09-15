@@ -128,7 +128,7 @@ async def test_master_flag_on_adds_tool_fields_incrementally(
     assert step["permission"] == {
         "level": "normal",
         "decision": "allow",
-        "reason": "permission_layer_off",
+        "reason": "permission_layer_disabled_grant_free",
         "confirmed": False,
     }
     assert step["validation"] is None
@@ -504,13 +504,16 @@ def test_effect_ref_helper_reads_only_matching_kind():
 # --- 冻结面与零迁移 ----------------------------------------------------------
 
 
+def _segment_hash(segment: str) -> str:
+    """行尾归一（LF）后的段哈希：CRLF 检出不应造成假失败（P2-4）。"""
+    return hashlib.sha256(segment.replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
 def _class_source_hash(relative_path: str, class_name: str) -> str:
     source = (BACKEND_ROOT / relative_path).read_text(encoding="utf-8")
     for node in ast.parse(source).body:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
-            return hashlib.sha256(
-                ast.get_source_segment(source, node).encode("utf-8")
-            ).hexdigest()
+            return _segment_hash(ast.get_source_segment(source, node))
     raise AssertionError(f"未找到类定义: {relative_path}::{class_name}")
 
 
@@ -518,9 +521,7 @@ def _function_source_hash(relative_path: str, function_name: str) -> str:
     source = (BACKEND_ROOT / relative_path).read_text(encoding="utf-8")
     for node in ast.parse(source).body:
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
-            return hashlib.sha256(
-                ast.get_source_segment(source, node).encode("utf-8")
-            ).hexdigest()
+            return _segment_hash(ast.get_source_segment(source, node))
     raise AssertionError(f"未找到函数定义: {relative_path}::{function_name}")
 
 

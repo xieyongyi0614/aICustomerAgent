@@ -539,9 +539,39 @@ def _maintenance_call_names(source: str) -> tuple[str, ...]:
 
 
 def test_life_loop_maintenance_sequence_unchanged():
+    """维护步序列零改动；life_loop 不新增确认清理路径（P2-1 只加 `has_due` 口径参数）。
+
+    P2-1 后 life_loop 会 import 确认模块的 `non_todo_payload_kinds`（到期口径排除），
+    故断言从"整文件不含 confirmation 字样"收紧为"不含确认服务 / 清理调用"。
+    """
     source = (BACKEND_ROOT / "app/application/life_loop.py").read_text(encoding="utf-8")
     assert _maintenance_call_names(source) == LIFE_LOOP_MAINTENANCE_SEQUENCE
-    assert "confirmation" not in source
+    assert "ConfirmationService" not in source
+    assert "_expire_pending_confirmations" not in source
+    assert not [step for step in LIFE_LOOP_MAINTENANCE_SEQUENCE if "confirmation" in step]
+
+
+def test_life_loop_passes_due_exclusion_only_when_master_gate_on(override_settings):
+    """P2-1 调用侧：工具总闸 off → 不传排除（V9 口径）；on → 传两类非待办 kind。"""
+    from app.application import life_loop
+
+    calls: list[object] = []
+    original = trigger_repository.has_due
+
+    def _spy(*args, **kwargs):
+        calls.append(kwargs.get("exclude_payload_kinds"))
+        return False
+
+    trigger_repository.has_due = _spy
+    try:
+        override_settings(v24_tool_system_enabled=False)
+        life_loop._cycle_reason("u-exclusion", NOW)
+        override_settings(v24_tool_system_enabled=True)
+        life_loop._cycle_reason("u-exclusion", NOW)
+    finally:
+        trigger_repository.has_due = original
+
+    assert calls == [None, ("tool_confirmation", "tool_grant")]
 
 
 def test_expire_planned_calls_confirmation_cleanup():

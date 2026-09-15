@@ -656,6 +656,91 @@ async def test_e8_denying_after_approval_does_not_revert(db_session_factory):
     assert replay.reason == "already_resolved"
 
 
+# --- P0-2 端到端：收件人意图 → 通道工具 → 首次确认 → 批准 → 原 dedupe_key 外发 ---
+
+
+@pytest.mark.asyncio
+async def test_recipient_intent_reaches_channel_tool_through_confirmation(
+    monkeypatch, override_settings, db_session_factory
+):
+    """含收件人的 `send_notification`：选择器取通道工具，确认流批准后按原 dedupe_key 外发。
+
+    链路：六闸门 → `assemble_plan`（收件人感知选择）→ `pending_confirmation` 且零外发
+    → 批准落 grant → 复用原 `invocation_snapshot` 与原 `dedupe_key` 执行 → 通道 stub 收到
+    一次 `OutboundMessage`（幂等键 = 原记录 dedupe_key），全程只有一条 `ActionRecord`。
+    """
+    from app.application import action_engine
+    from app.core.settings import get_settings
+    from app.repositories import action_repository
+    from app.services.action import planner as planner_module
+    from app.services.action.capabilities.notification import NotificationCapability
+    from app.services.action.registry import CapabilityRegistry
+    from app.services.tool.confirmation import get_confirmation_service
+
+    override_settings(
+        action_enabled=True,
+        world_enabled=False,
+        v24_tool_system_enabled=True,
+        v24_tool_permission_enabled=True,
+        v24_tool_surface_enabled=False,
+        v24_tool_channel_enabled=True,
+        feishu_enabled=True,
+        v24_tool_confirm_ttl_reuse=True,
+    )
+    get_settings.cache_clear()
+
+    adapter = RecordingAdapter(SendResult(ok=True, external_message_id="om-e2e"))
+    channel_tools.reset_channel_adapters()
+
+    tools = builtin_registry()
+    capabilities = CapabilityRegistry()
+    capabilities.register(NotificationCapability())
+    capabilities.register(ChannelCapability(adapter=adapter))
+    monkeypatch.setattr(action_engine, "get_capability_registry", lambda: capabilities)
+    monkeypatch.setattr(action_engine, "get_tool_registry", lambda: tools)
+    monkeypatch.setattr(planner_module, "get_tool_registry", lambda: tools)
+
+    params = {"content": CONTENT, "recipient": EXTERNAL_ID}
+    intent_value = ActionIntent(
+        action_type="send_notification",
+        confidence="confident",
+        params=params,
+        dedupe_key=make_dedupe_key("send_notification", params),
+    )
+
+    record = await action_engine.run_action_planning(USER, intent_value)
+
+    assert record is not None
+    assert record.status == "planned"
+    assert record.gate_reason == "pending_confirmation"
+    assert adapter.messages == []
+
+    pending = get_confirmation_service().pending(USER)
+    assert len(pending) == 1
+    request = pending[0]
+    assert request.tool_id == CHANNEL_TOOL_ID
+    assert request.dedupe_key == record.dedupe_key
+    assert request.invocation_snapshot["params"]["recipient"] == EXTERNAL_ID
+
+    resumed = await action_engine.run_confirmation_round(
+        USER, request.request_id, approved=True
+    )
+
+    assert resumed is not None
+    assert resumed.id == record.id
+    assert resumed.status == "succeeded"
+    assert resumed.gate_reason is None
+    assert len(action_repository.list_records(USER)) == 1
+    assert resumed.steps[0]["tool_id"] == CHANNEL_TOOL_ID
+    assert resumed.steps[0]["permission"]["reason"] == REASON_GRANT_MATCHED
+    assert len(adapter.messages) == 1
+    assert adapter.idempotency_keys == [record.dedupe_key]
+    assert adapter.texts == [CONTENT]
+    outgoing = adapter.messages[0]
+    assert outgoing.recipient.external_id == EXTERNAL_ID
+    assert outgoing.channel == CHANNEL_NAME
+
+
 # --- E2/E3 之外的声明面复核 --------------------------------------------------
 
 

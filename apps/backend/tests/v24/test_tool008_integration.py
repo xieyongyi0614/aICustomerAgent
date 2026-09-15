@@ -36,11 +36,11 @@ REMINDER_PARAMS = {"content": "开会", "due_at": "2026-09-20T08:00:00"}
 OBJECT_PARAMS = {"object": "牛奶"}
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/services/memory_policy.py": "e9fa1c3315680dbe746ced581d23a72ccb5883b40008053eabf9273d2217a169",
-    "app/repositories/memory_repository.py": "552dbef1e1203df17e6046ef05f5035b86e2ce12bde5e1cf4c06243c33084790",
-    "app/models/memory.py": "f4c0d4229b796af0a79ac64d56c3251542f30f9ab00381d7c3f1620b2c2fd7a6",
-    "app/services/world/memory_bridge.py": "134a854d4fc520bbd2cd183f3598e120ac439174bc34a69da89121b049963954",
-    "app/character/asuna/action.py": "209b61636d0e159a7ebb5285084cda0e0de5789b17fa808eebbe655c2f4674f9",
+    "app/services/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
+    "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
+    "app/models/memory.py": "4371cd849a76f8de2fcf7fcff9a1b1a4f66163329b56b59367d2a8d993591fa1",
+    "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
+    "app/character/asuna/action.py": "86d8080c29b29c2f2a88c6b804ac4b4500b4d8b75d92b8557cf8bb17425b6a8d",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 
@@ -85,6 +85,54 @@ def tool_memory_on(v24_tool_env, override_settings):
 
 def _tool_record(tool_id: str, params: dict, **kwargs):
     return record(tool_id, params=params, **kwargs)
+
+
+# --- P1-3 端到端：工具执行 → 候选 → R1~R8 通过 → 落库 -------------------------
+
+
+@pytest.mark.asyncio
+async def test_reminder_create_end_to_end_deposits_memory(
+    db_session_factory, v24_tool_env, override_settings, monkeypatch
+):
+    """`builtin.reminder.create` 真跑一遍：执行成功 → 候选 → R1~R8 通过 → `memories` +1。
+
+    链路：`run_action_planning`（六闸门 → 工具面选择 → ToolExecutor → 真实 reminder 能力）
+    → `integrate_result` → `memory_bridge.deliver`（工具记忆子闸 on）→ `memories` 表。
+    """
+    from app.application.action_engine import run_action_planning
+    from app.models.action import ActionIntent
+    from app.services.tool import registry as tool_registry
+    from tests.v24.tool007_support import seed_all
+
+    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_MEMORY_ENABLED=True)
+    override_settings(
+        action_enabled=True,
+        world_enabled=True,
+        v2_action_outbox_enabled=False,
+        world_household_autoseed_enabled=False,
+    )
+    seed_all(USER)
+    monkeypatch.setattr(tool_registry, "_registry", None)
+    assert memory_count(USER) == 0
+
+    intent_value = ActionIntent(
+        action_type="create_reminder",
+        confidence="confident",
+        params={"content": "开会", "due_at": "2026-09-20T08:00:00"},
+        dedupe_key="tool008:e2e-reminder",
+    )
+    rec = await run_action_planning(USER, intent_value, session_id="s-tool008-e2e")
+
+    assert rec is not None
+    assert rec.status == "succeeded"
+    assert rec.steps[0]["tool_id"] == "builtin.reminder.create"
+    assert memory_count(USER) == 1
+    memories = memory_repository.list_by_user(USER, limit=10)
+    assert [memory.content for memory in memories] == ["用户请我提醒：开会"]
+    assert memories[0].type == "important_event"
+    assert memories[0].importance == 0.7
+    assert memories[0].source == "user_derived"
+    monkeypatch.setattr(tool_registry, "_registry", None)
 
 
 # --- §6.1 分流：普通结果零写入 / 重要结果落库 ---------------------------------
@@ -141,15 +189,39 @@ def test_world_object_create_lands_as_user_preference(
     assert memory.importance == 0.5
 
 
-def test_candidate_reaching_gate_is_rejected_by_r8(
-    db_session_factory, tool_memory_on, caplog
+def test_reminder_create_candidate_passes_policy_and_lands(
+    db_session_factory, tool_memory_on
 ):
-    """reminder.create 候选（0.7 / important_event）被 R8 拒绝 → 零落库（零豁免实测）。"""
+    """P1-3：`builtin.reminder.create` 候选（0.7 / important_event）经 R1~R8 通过并落库。
+
+    文案去掉未消解人称代词后，该工具的记忆通道不再恒定零产出（默认 0.6 阈值即可放行）。
+    """
     rec = _tool_record("builtin.reminder.create", REMINDER_PARAMS)
     definition = tool_definition("builtin.reminder.create")
     candidates = tool_memory_policy.get_tool_memory_policy().to_candidates(rec, definition)
-    assert [candidate.content for candidate in candidates] == ["用户请我提醒他：开会"]
+    assert [candidate.content for candidate in candidates] == ["用户请我提醒：开会"]
     assert candidates[0].importance == 0.7
+    assert memory_policy.apply_policy(candidates).saved == candidates
+
+    payload = memory_bridge.deliver(rec, USER)
+
+    assert payload is not None
+    assert payload["content"] == "用户请我提醒：开会"
+    assert memory_count(USER) == 1
+    memories = memory_repository.list_by_user(USER, limit=10)
+    assert [memory.content for memory in memories] == ["用户请我提醒：开会"]
+    assert memories[0].type == "important_event"
+    assert memories[0].importance == 0.7
+    assert memories[0].source == "user_derived"
+
+
+def test_candidate_with_unresolved_reference_is_rejected_by_r8(
+    db_session_factory, tool_memory_on, caplog
+):
+    """R8 零豁免实测：候选内容含未消解指代（此处来自用户原文）→ 零落库。"""
+    rec = _tool_record(
+        "builtin.reminder.create", {"content": "它", "due_at": "2026-09-20T08:00:00"}
+    )
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
         assert memory_bridge.deliver(rec, USER) is None
     assert "R8" in caplog.text
@@ -191,19 +263,24 @@ def test_policy_gate_is_always_invoked(db_session_factory, tool_memory_on, monke
     monkeypatch.setattr(memory_policy, "apply_policy", _spy)
     memory_bridge.deliver(_tool_record("builtin.reminder.create", REMINDER_PARAMS), USER)
     assert len(seen) == 1
-    assert [candidate.content for candidate in seen[0]] == ["用户请我提醒他：开会"]
+    assert [candidate.content for candidate in seen[0]] == ["用户请我提醒：开会"]
 
 
 def test_policy_rejection_is_discarded_and_logged(
     db_session_factory, tool_memory_on, caplog
 ):
-    """E7：R1~R8 拒绝 → 丢弃并记日志；工具执行状态不变。"""
+    """E7：R1~R8 拒绝 → 丢弃并记日志；工具执行状态不变。
+
+    负例改由用户原文带未消解指代触发（P1-3 后模板本身已不含 R8 触发词）。
+    """
+    rec = _tool_record(
+        "builtin.reminder.create", {"content": "那个", "due_at": "2026-09-20T08:00:00"}
+    )
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
-        payload = memory_bridge.deliver(
-            _tool_record("builtin.reminder.create", REMINDER_PARAMS), USER
-        )
+        payload = memory_bridge.deliver(rec, USER)
     assert payload is None
     assert memory_count(USER) == 0
+    assert rec.status == "succeeded"
     assert "已丢弃" in caplog.text
     assert "R8" in caplog.text
 
@@ -493,7 +570,8 @@ def test_delivery_blocked_when_action_memory_switch_off(
 
 @pytest.mark.parametrize("relative,digest", sorted(FROZEN_SOURCES.items()))
 def test_frozen_sources_have_zero_diff(relative, digest):
-    data = (BACKEND_ROOT / relative).read_bytes()
+    """零 diff 冻结：比对前做**行尾归一（LF）**，CRLF 检出不应造成假失败（P2-4）。"""
+    data = (BACKEND_ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
     assert hashlib.sha256(data).hexdigest() == digest, (
         f"{relative} 被修改：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 模板资产在本任务内必须零 diff"
     )
