@@ -610,12 +610,12 @@ async def test_confirmation_round_trip_first_time_then_ttl_reuse_then_expired(
     assert still_pending.status == "pending_confirmation"
     assert adapter.messages == []
 
-    outcome = service.resolve(request.request_id, approved=True)
+    outcome = service.resolve(request.request_id, approved=True, now=NOW)
     assert outcome.status == STATUS_APPROVED
     assert outcome.migrated is True
 
     reused = await executor.run(
-        binding, inv, _ctx(settings, now=datetime.now() + timedelta(hours=1))
+        binding, inv, _ctx(settings, now=NOW + timedelta(hours=1))
     )
     assert reused.status == "succeeded"
     assert len(adapter.messages) == 1
@@ -624,7 +624,7 @@ async def test_confirmation_round_trip_first_time_then_ttl_reuse_then_expired(
     assert reused.permission["reason"] == REASON_GRANT_MATCHED
 
     expired = await executor.run(
-        binding, inv, _ctx(settings, now=datetime.now() + timedelta(hours=25))
+        binding, inv, _ctx(settings, now=NOW + timedelta(hours=25))
     )
     assert expired.status == "pending_confirmation"
     assert len(adapter.messages) == 1
@@ -637,10 +637,10 @@ async def test_e8_denying_a_pending_request_puts_it_to_denied(db_session_factory
     service = ConfirmationService(settings)
     _gate, _definition, decision = _channel_decision(settings)
     request = service.request(_invocation(), decision, _ctx(settings))
-    outcome = service.resolve(request.request_id, approved=False)
+    outcome = service.resolve(request.request_id, approved=False, now=NOW)
     assert outcome.status == STATUS_DENIED
     assert outcome.migrated is True
-    assert service.pending(USER) == []
+    assert service.pending(USER, NOW) == []
 
 
 @pytest.mark.asyncio
@@ -649,8 +649,11 @@ async def test_e8_denying_after_approval_does_not_revert(db_session_factory):
     service = ConfirmationService(settings)
     _gate, _definition, decision = _channel_decision(settings)
     request = service.request(_invocation(), decision, _ctx(settings))
-    assert service.resolve(request.request_id, approved=True).status == STATUS_APPROVED
-    replay = service.resolve(request.request_id, approved=False)
+    assert (
+        service.resolve(request.request_id, approved=True, now=NOW).status
+        == STATUS_APPROVED
+    )
+    replay = service.resolve(request.request_id, approved=False, now=NOW)
     assert replay.status == STATUS_APPROVED
     assert replay.migrated is False
     assert replay.reason == "already_resolved"

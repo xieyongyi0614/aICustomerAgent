@@ -309,10 +309,19 @@ class ConfirmationService:
         )
 
     def resolve(
-        self, request_id: str, *, approved: bool, source: str = "user_confirm"
+        self,
+        request_id: str,
+        *,
+        approved: bool,
+        source: str = "user_confirm",
+        now: datetime | None = None,
     ) -> ConfirmationOutcome:
-        """未决请求 → 批准 / 否定（非法迁移即已决态原样返回，不二次迁移）。"""
-        now = datetime.now()
+        """未决请求 → 批准 / 否定（非法迁移即已决态原样返回，不二次迁移）。
+
+        `now` 为调用方注入时钟（与 `grant_scope` / `expire_due` / `revoke` 同款）：
+        缺省取墙钟，生产行为不变；跨 TTL 判定的调用方（含测试）应显式注入。
+        """
+        now = now or datetime.now()
         request = self.get(request_id)
         if request is None:
             return ConfirmationOutcome(STATUS_NOT_FOUND, None, reason="request_not_found")
@@ -407,12 +416,18 @@ class ConfirmationService:
                     expired += 1
         return expired
 
-    def revoke_request(self, request_id: str, *, reason: str = "operator_revoke") -> bool:
-        """运维撤销未决请求（等价否定，不执行）。"""
+    def revoke_request(
+        self,
+        request_id: str,
+        *,
+        reason: str = "operator_revoke",
+        now: datetime | None = None,
+    ) -> bool:
+        """运维撤销未决请求（等价否定，不执行）；`now` 语义同 `resolve`。"""
         request = self.get(request_id)
         if request is None or not request.is_pending():
             return False
-        outcome = self.resolve(request_id, approved=False, source=reason)
+        outcome = self.resolve(request_id, approved=False, source=reason, now=now)
         return outcome.migrated
 
     def grant_scope(
