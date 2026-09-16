@@ -21,6 +21,21 @@
 计划步数与内容不变，只是暂不装配该步。两道闸门受 `v25_plan_step_binding_enabled` 门控，
 且可分别独立关闭（构造参数），用于单列验证。
 
+PLAN-006 补齐的判定细节（Task Detail §6.1 的两个内部接口，实现为模块级纯函数以便单列验证）
+
+```text
+_evaluate_tool_resolvable(steps, registry) -> str | None   # 闸门 5：不可解析的 tool_id
+_evaluate_tool_on_surface(steps, surface) -> str | None     # 闸门 6：不在面上的 tool_id
+```
+
+1. **判定对象收窄为 `kind="tool"` 且 `tool_id` 非空**的步骤（Task Detail §8 Step 1.1 / Step 1.2）：
+   与其判定面不相干的步骤（纯观测 / 复合父步）不参与——「`kind != tool` 却带 `tool_id`」属
+   PLAN-004 `PlanValidator.validate_binding` 的判定面（`invalid_step_binding`），本闸不越界。
+2. **闸门 6 零面重算**（D2）：只读 `surface.tool_ids`，**不自行调用 `ToolSurfaceResolver`**
+   （面由装配期提供，本模块零面解析）；`engine.py` 不导入 `services.tool.surface`。
+3. **闸门 5 零注册表改动**（D1）：只调 `ToolRegistry.resolve`（只读），注册表快照前后一致；
+   注册表不可得（工具系统总闸 off）时 **fail-closed**（判不可解析），不静默放行。
+
 契约纪律（Task Detail §6.1）
 
 - `plan` / `revise` 为 async（含 LLM 调用），受 `llm_gateway`（经 `goal_planning` 既有 profile）
@@ -50,11 +65,12 @@ from app.core.settings import get_settings
 from app.models.action import ACTION_TYPES
 from app.models.goal import GoalPlanRecord, GoalRecord, SubGoalSpec, validate_sub_goals
 from app.models.plan import PlanContext
+from app.models.tool import ToolSurface
 from app.repositories import goal_repository, loop_run_repository
 from app.services import goal_planning, life_loop_budget
 from app.services.planning.context import context_digest
 from app.services.planning.goal_contract import PLANNING_FAILURE_REASON_PLAN_EXHAUSTED
-from app.services.tool.registry import get_tool_registry
+from app.services.tool.registry import ToolRegistry, get_tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +94,15 @@ PLANNING_REASONS: tuple[str, ...] = (
 
 REASON_REVISION_EXHAUSTED = "plan_revision_exhausted"
 REASON_BUDGET_DEGRADED = "budget_degraded"
+
+STEP_KIND_TOOL = "tool"
+"""闸门 5/6 的判定对象类型：值域取自 `models/goal.py::StepKind`（`tool` / `observe` / `composite`）。
+
+本模块**不导入** PLAN-004 拆解模块的同名常量：PLAN-004 的静态红线是「引擎不接线拆解」
+（见 `tests/v25/test_plan004_static_scan.py` 的对应用例），即 PLAN-003 的引擎不得依赖
+PLAN-004 的产物方向。值域漂移由 `tests/v25/test_plan006_static_scan.py` 对模型值域的
+对照断言兜住（`SubGoalSpec.kind` 的默认值与 `STEP_KIND_VALUES`）。
+"""
 
 PLAN_STATUS_VALIDATED = "validated"
 PLAN_STATUS_REJECTED = "rejected"
@@ -329,7 +354,11 @@ class PlanningEngine:
     def _binding_gate(
         self, specs: list[SubGoalSpec], ctx: PlanContext, settings
     ) -> str | None:
-        """闸门 5 / 6：工具可解析（声明面）与工具在面上（运行时面），受绑定子闸门控。"""
+        """闸门 5 / 6：工具可解析（声明面）与工具在面上（运行时面），受绑定子闸门控。
+
+        两个判定各自委托模块级纯函数（§6.1 冻结签名），故「闸门 5 过、闸门 6 拒」
+        可单列验证（Task Detail §9.1 U4）：两道闸门按序独立判定，前一道不通过即短路。
+        """
         enabled = (
             settings.v25_plan_step_binding_enabled
             if self._tool_binding_enabled is None
@@ -337,12 +366,14 @@ class PlanningEngine:
         )
         if not enabled:
             return None
-        if self._tool_resolvable_gate and _unresolvable_tool(specs) is not None:
+        if self._tool_resolvable_gate and (
+            _evaluate_tool_resolvable(specs, get_tool_registry()) is not None
+        ):
             return REASON_TOOL_UNRESOLVABLE
-        if self._tool_surface_gate:
-            on_surface = set(ctx.tool_surface.tool_ids)
-            if any(spec.tool_id and spec.tool_id not in on_surface for spec in specs):
-                return REASON_TOOL_OFF_SURFACE
+        if self._tool_surface_gate and (
+            _evaluate_tool_on_surface(specs, ctx.tool_surface) is not None
+        ):
+            return REASON_TOOL_OFF_SURFACE
         return None
 
     @staticmethod
@@ -371,13 +402,59 @@ def get_planning_engine() -> PlanningEngine:
     return _ENGINE
 
 
-def _unresolvable_tool(specs: list[SubGoalSpec]) -> str | None:
-    """闸门 5 判定：任一 `tool_id` 不可解析即返回该 id（注册表不可得时 fail-closed）。"""
-    registry = get_tool_registry()
+def _evaluate_tool_resolvable(
+    specs: list[SubGoalSpec], registry: ToolRegistry | None
+) -> str | None:
+    """闸门 5 判定（Task Detail §6.1）：任一 `kind="tool"` 且 `tool_id` 非空的步骤
+    不可经 `ToolRegistry.resolve` 解析，即返回该 `tool_id`；全通过返回 `None`。
+
+    只读消费（D1）：本函数零注册表改动，唯一触达面是 `resolve`——不注册 / 不禁用 /
+    不熔断任何工具，也不读健康度与生命周期（快照前后逐层一致）。
+    `registry is None`（工具系统总闸 off）时 **fail-closed**：无法解析即判不可解析
+    （宁可不规划，也不让「不知道存不存在」的工具进计划）。
+    """
     for spec in specs:
-        if spec.tool_id and (registry is None or registry.resolve(spec.tool_id) is None):
-            return spec.tool_id
+        if not _is_tool_step(spec):
+            continue
+        if registry is None or registry.resolve(spec.tool_id) is None:
+            return str(spec.tool_id)
     return None
+
+
+def _evaluate_tool_on_surface(
+    specs: list[SubGoalSpec], surface: ToolSurface | None
+) -> str | None:
+    """闸门 6 判定（Task Detail §6.1）：任一 `kind="tool"` 且 `tool_id` 非空的步骤
+    不在 `surface.tool_ids` 上，即返回该 `tool_id`；全通过返回 `None`。
+
+    **零面重算**（D2）：只读调用方提供的面，不自行调用 `ToolSurfaceResolver`
+    （面属装配期产物，本模块零面解析）；`surface is None` 时视为空面（全部不在面上）。
+    """
+    on_surface = set(() if surface is None else surface.tool_ids)
+    for spec in specs:
+        if not _is_tool_step(spec):
+            continue
+        if str(spec.tool_id) not in on_surface:
+            return str(spec.tool_id)
+    return None
+
+
+def _is_tool_step(spec: SubGoalSpec) -> bool:
+    """闸门 5/6 的判定对象：`kind="tool"` 且 `tool_id` 非空（Task Detail §8 Step 1.1）。
+
+    父步（`composite`）与纯观测步（`observe`）不是工具步：其绑定合法性属 PLAN-004 的
+    形状 / 绑定闸，本模块不越界。
+    """
+    return bool(spec.tool_id) and spec.kind == STEP_KIND_TOOL
+
+
+def _unresolvable_tool(specs: list[SubGoalSpec]) -> str | None:
+    """PLAN-003 既有探针名（`test_plan003_engine.py` 按此名调用）：委托闸门 5 正体。
+
+    保留该名字是**契约兼容**而非第二套实现：PLAN-003 的单测把它当闸门 5 的只读探针用，
+    改名属既有测试的契约变更；正体已是 `_evaluate_tool_resolvable`（§6.1 冻结签名）。
+    """
+    return _evaluate_tool_resolvable(specs, get_tool_registry())
 
 
 async def _ask_proposal(

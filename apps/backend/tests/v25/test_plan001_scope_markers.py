@@ -32,6 +32,12 @@ PLAN-005 落地时按同一纪律改动本模块：`scheduler.py` / `executor_br
 `revision.py` 四者翻转为「已落地」，`revision_listener.py` **维持「不得预埋」**——反思监听器
 是 PLAN-010 的产物（Task Detail §5.5 边界：本任务只定义 `insight_driven` 理由码与判定入口，
 不读 Insight、不注册监听器），故本任务不预埋该模块。
+
+PLAN-006 落地时按同一纪律改动本模块：**无模块翻转**（Task Detail §4.1.1 明确「本任务不新建
+模块」，是对 PLAN-003 闸门 5/6 与 PLAN-005 执行桥的**契约补齐与断言加固**）。故本模块的
+「已落地 / 不得预埋」分界保持不变，只新增一条**接口级**标记：闸门 5/6 的两个判定函数
+（§6.1 冻结签名）以模块级纯函数形式落地于既有 `engine.py` 内，`revision_listener.py`
+**维持「不得预埋」**。
 """
 
 from pathlib import Path
@@ -106,6 +112,12 @@ PLAN_010_PENDING_MODULES = ("revision_listener.py",)
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
 PLAN_004_LANDED_MODULES = ("decompose.py",)
+
+PLAN_006_LANDED_INTERFACES = (
+    "_evaluate_tool_resolvable",
+    "_evaluate_tool_on_surface",
+)
+"""PLAN-006 §6.1 冻结的两个闸门判定接口（落于既有 `engine.py`，不新建模块）。"""
 
 
 def _backend_root() -> Path:
@@ -184,6 +196,18 @@ def test_planning_engine_modules_are_landed():
 def test_plan_decompose_module_is_landed():
     missing = [name for name in PLAN_004_LANDED_MODULES if not (_planning_dir() / name).exists()]
     assert missing == []
+
+
+def test_plan_006_lands_the_two_gate_predicates_without_a_new_module():
+    """PLAN-006 产物面：两个闸门判定接口在位，且**没有**为工具治理新建模块。"""
+    from app.services.planning import engine as engine_mod
+
+    missing = [
+        name for name in PLAN_006_LANDED_INTERFACES if not hasattr(engine_mod, name)
+    ]
+    assert missing == []
+    assert not (_planning_dir() / "tool.py").exists()
+    assert not (_planning_dir() / "tool_gate.py").exists()
 
 
 def test_planning_package_holds_only_landed_modules():

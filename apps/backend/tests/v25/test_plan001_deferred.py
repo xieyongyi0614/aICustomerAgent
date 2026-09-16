@@ -47,6 +47,15 @@ PLAN-005 落地时按同一纪律改动本模块：
      `GoalStatus` 的唯一写面迁移与归因，不改计划状态；且**目标终态一旦成立，其计划即刻退出
      推进候选集**（`list_active_plans` 的查询条件含 `GoalRow.status == "active"`）。把计划置
      `superseded` 需要改动既有 `_complete`（既有运行时语义），属本任务红线外，故不在本任务落。
+
+PLAN-006 落地时按同一纪律改动本模块：
+
+1. **`test_deferred_execution_single_entry_point` 去 `skip`**：G-EXEC（`executor_bridge` 零
+   `ToolExecutor` / `Capability` 依赖、`app.services.planning/` 唯一执行入口）已由 PLAN-006
+   的 `test_plan006_static_scan.py::TestGExecStaticAssertions` 系统化落地，本条 deferred 断言
+   即成为该 Gate 的最短可判定形式。
+2. **`revision_listener` 仍留在「待落地」清单**（PLAN-010 的产物），PLAN-006 不加模块、
+   不加值集、不改模型。
 """
 
 import importlib
@@ -158,11 +167,17 @@ def test_plan_face_writes_are_whitelisted_after_plan_003():
     )
 
 
-@pytest.mark.skip(reason="待 PLAN-006 落地：G-EXEC 执行唯一入口断言")
 def test_deferred_execution_single_entry_point():
+    """PLAN-006 契约演进（原 deferred，现落地）：G-EXEC 的执行唯一入口断言。
+
+    完整形式见 `test_plan006_static_scan.py::TestGExecStaticAssertions`（全包零执行器 token、
+    零 `run`/`execute`/`invoke` 调用、唯一 Action 层导入）。本断言是该 Gate 的最短形式。
+    """
     bridge = _import_later_module("app.services.planning.executor_bridge")
     assert bridge.PlanExecutorBridge is not None
     assert "ToolExecutor" not in dir(bridge)
+    assert "Capability" not in dir(bridge)
+    assert "run_action_planning" in dir(bridge)
 
 
 @pytest.mark.skip(reason="待 PLAN-010 落地：PlanningRevisionListener 唯一反思接线")
