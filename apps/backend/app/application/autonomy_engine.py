@@ -10,12 +10,20 @@ V2.4.0 TOOL-006：总闸开启时自治 tick 首次实传 `capabilities=surface.
 
 P2-3：工具面解析降级不再静默——异常次数记入进程级 `tool_surface_degrade_count()`
 （经 `/debug/tools` 的 `tool_surface_degrade_count` 字段暴露），返回 `None` + 日志的行为不变。
+
+V2.5.0 PLAN-007：`plan_facts`（计划运行态只读事实段）在**既有行动事实收集处同源扩展、
+一处装配**（`_collect_plan_facts` 的唯一调用点），关闭断层 B9——自治策略由此看得见
+「用户身上还有一个进行中的计划」。**编排关系不变**：`tick` 语句序列零改动（形状快照对照）、
+`_produce_autonomy_action` 原样复用、计划事实只读（`goal_repository.list_active_plans` +
+`PlanScheduler` 纯函数 + `decision_repository` 只读投影），子闸 off / 无计划 / 装配异常一律
+降级为 `{}` 且**不阻塞 tick**。
 """
 
 import logging
 import time
 import uuid
 from datetime import datetime
+from types import SimpleNamespace
 
 from app.core.settings import get_settings
 from app.application import observability, world_engine
@@ -29,6 +37,7 @@ from app.models.observability import (
 from app.models.tool import ToolBinding, ToolSurface
 from app.repositories import (
     conversation_repository,
+    decision_repository,
     goal_repository,
     proactive_repository,
 )
@@ -40,6 +49,7 @@ from app.services import (
     state_service,
     trigger_evaluator,
 )
+from app.services.planning import scheduler as plan_scheduler
 from app.services.trace_collector import TurnTraceSession, get_trace_collector
 from app.application.action_engine import collect_facts, run_action_planning
 from app.application.chat_pipeline import active_generations
@@ -72,6 +82,12 @@ TOOL_FACTS_RECORDS_SCAN_LIMIT = 50
 _TOOL_STEP_FAILED_STATUS = "failed"
 
 _TOOL_SURFACE_DEGRADE_COUNT = 0
+
+PLAN_FACTS_ADVANCE_SCAN_LIMIT = 50
+"""`last_advanced_at` 的审计扫描上限（既有 `decision_repository.search` 的既有 limit 语义）。"""
+
+PLAN_ADVANCE_DECISION_ADVANCED = "advanced"
+"""`PlanAdvance.decision` 的推进取值——必须落在 `app.models.plan` 的六值域内（用例对照）。"""
 
 
 def tool_surface_degrade_count() -> int:
@@ -234,6 +250,114 @@ def _collect_action_facts(user_id: str) -> dict:
     return facts
 
 
+def _latest_active_plan(user_id: str):
+    """最近 `updated_at` 的 active 计划（多计划时取最新）。
+
+    `goal_repository.list_active_plans` 按 `updated_at` 升序 + `id` 升序给出，
+    故**末位即最新**且同刻可复现（确定性取值规则，不引入第二套排序）。
+    """
+    pairs = goal_repository.list_active_plans(user_id)
+    return pairs[-1] if pairs else None
+
+
+def _plan_schedule_context(user_id: str, now: datetime):
+    """`PlanScheduler.blocked_reason` 的鸭子类型上下文（只读投影）。
+
+    工具面解析失败即降级为「无面」（`blocked_reason` 随之不判 `off_surface`）——
+    计划事实的装配不得因工具系统不可用而失败。
+    """
+    try:
+        surface = resolve_autonomy_surface(user_id, now)
+    except Exception:
+        logger.exception("自治工具面解析失败，计划阻塞判定按无面处理")
+        surface = None
+    return SimpleNamespace(now=now, settings=get_settings(), tool_surface=surface)
+
+
+def _blocked_steps(plan, user_id: str, now: datetime) -> int:
+    """被阻塞计数（§4.2.1「`PlanScheduler.blocked_reason` 计数」）：
+    `0` = 有可执行步，`1` = 三类阻塞之一（`off_surface` / `cooldown` / `predecessor_failed`）。
+
+    该纯函数对**一份计划**给出单一首个可判因（不是逐步计数），故本字段恒为 0 / 1——
+    有界且可判定，不臆造第二套阻塞判定。
+    """
+    reason = plan_scheduler.PlanScheduler.blocked_reason(
+        plan, _plan_schedule_context(user_id, now)
+    )
+    return 0 if reason is None else 1
+
+
+def _last_advanced_at(user_id: str, goal_id: str) -> str | None:
+    """最近一次 `advanced` 的推进时刻（`PlanAdvance.at`，既有 `decision_records` 只读投影）。
+
+    取扫描窗内命中行的**最大时刻**而非首行——审计行的 `created_at` 是落库时刻（同一批
+    推进可能同秒落库），按 `at` 求最大才是「最近一次推进」的确定性口径；无命中 → `None`
+    （降级为「无最近推进」，不影响其余字段）。
+    """
+    moments = [
+        _advance_moment(record.input_snapshot or {}, record.created_at)
+        for record in decision_repository.search(
+            user_id=user_id,
+            kind=DecisionKind.GOAL_LIFECYCLE,
+            limit=PLAN_FACTS_ADVANCE_SCAN_LIMIT,
+        )
+        if _is_advance_for(record, goal_id)
+    ]
+    return max(moments).isoformat() if moments else None
+
+
+def _is_advance_for(record, goal_id: str) -> bool:
+    """是否为目标 `goal_id` 的一次 `advanced` 推进审计。"""
+    if record.decision != PLAN_ADVANCE_DECISION_ADVANCED:
+        return False
+    return (record.input_snapshot or {}).get("goal_id") == goal_id
+
+
+def _advance_moment(snapshot: dict, fallback: datetime | None) -> datetime:
+    """审计行的推进时刻：`PlanAdvance.at`（ISO 字符串）优先，缺省回退落库时刻。"""
+    reported = snapshot.get("at")
+    if isinstance(reported, str) and reported:
+        try:
+            return datetime.fromisoformat(reported)
+        except ValueError:
+            logger.warning("推进审计的时刻不可解析，回退落库时刻：%s", reported)
+    return fallback if fallback is not None else datetime.min
+
+
+def _collect_plan_facts(user_id: str, now: datetime | None = None) -> dict:
+    """有界计划事实段（PLAN-007 §4.2.1 / §6.2）：固定七键、单目标、只读、失败降级为空包。
+
+    与既有事实段同款纪律：子闸 `v25_plan_autonomy_enabled` off → `{}`（原状）；
+    无 active 计划 → `{}`；任何异常 → `{}` + 日志，**不阻塞 tick**；整体经既有
+    `observability.bound_extra` 预算裁剪（不新增预算机制）。字段契约见
+    `autonomy_policy.PLAN_FACTS_KEYS`（唯一声明处）。
+    """
+    try:
+        settings = get_settings()
+        if not settings.v25_plan_autonomy_enabled:
+            return {}
+        pair = _latest_active_plan(user_id)
+        if pair is None:
+            return {}
+        goal, plan = pair
+        moment = now or datetime.now()
+        current = plan_scheduler.PlanScheduler.current_step(plan)
+        facts = {
+            "active_goal_id": goal.id,
+            "plan_version": plan.version,
+            "current_step": None if current is None else current.index,
+            "current_action_type": None if current is None else current.capability,
+            "steps_total": len(plan.sub_goals),
+            "blocked_steps": _blocked_steps(plan, user_id, moment),
+            "last_advanced_at": _last_advanced_at(user_id, goal.id),
+        }
+        payload, _ = bound_extra(facts, settings.observability_step_extra_max_chars)
+        return payload
+    except Exception:
+        logger.exception("计划事实收集失败，返回空包")
+        return {}
+
+
 def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
     """自治产行动参数模板（autonomy-integration.md §4）；无模板返回空参。"""
     return build_autonomy_action_params(
@@ -325,6 +449,7 @@ def _snapshot_for(
     except Exception:
         logger.exception("关系模式读取失败，闸门参考为空")
     action_facts = _collect_action_facts(user_id)
+    plan_facts = _collect_plan_facts(user_id, now)
     return autonomy_policy.PolicySnapshot(
         generating=active_generations.get(user_id, False),
         has_active_action=proactive_repository.has_non_terminal(user_id),
@@ -343,6 +468,7 @@ def _snapshot_for(
         action_facts=action_facts,
         tool_facts=action_facts.get("tool_facts") or {},
         tool_insights=action_facts.get("tool_insights") or {},
+        plan_facts=plan_facts,
         respect=getattr(relationship, "respect", 0.6),
         comfort=getattr(relationship, "comfort", 0.6),
         conflict_status=getattr(relationship, "conflict_status", "none") or "none",
@@ -494,6 +620,8 @@ def _decision_record(
     }
     if snapshot.tool_facts:
         audit_fields["tool_facts"] = snapshot.tool_facts
+    if snapshot.plan_facts:
+        audit_fields["plan_facts"] = snapshot.plan_facts
     payload, _ = bound_extra(
         audit_fields, get_settings().observability_step_extra_max_chars
     )

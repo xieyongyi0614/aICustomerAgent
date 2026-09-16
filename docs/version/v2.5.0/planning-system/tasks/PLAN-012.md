@@ -450,7 +450,7 @@ Flag 全 off 时：
 | PLAN-004 | `TaskDecomposer` + `PlanValidator` 三闸 | tiebreak 复现 + 白名单 + 纯函数 |
 | PLAN-005 | `PlanScheduler` + `PlanExecutorBridge` + `PlanObserver` + `PlanRevisionPolicy` | 搬运等价性 + 双层重试 + 保留步不重做 |
 | PLAN-006 | 闸门 5/6 + 执行链路 + 四类工具不进计划 | 链路断言 + 零外部调用 + G-EXEC |
-| PLAN-007 | `plan_facts` + 候选面 + 额度未放宽 | 六字段 + 快照对照 + 负例 |
+| PLAN-007 | `plan_facts` + 候选面 + 额度未放宽 | 七字段（六字段 + `current_action_type`）+ 快照对照 + 负例 |
 | PLAN-008 | 九类世界事实 + 三条合法路径 + 终态广播 | G-WORLD + outbox 幂等 + 修订不广播 |
 | PLAN-009 | 判据 A/B/C + R1 不误杀 | 零写入 + 三类终态 + G-MEMORY |
 | PLAN-010 | 三证据窗 + 监听器 + Q8 去重 | 三窗场景 + 三门槛负例 + 隔离 |

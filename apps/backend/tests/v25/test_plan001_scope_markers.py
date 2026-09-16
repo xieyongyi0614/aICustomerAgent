@@ -38,6 +38,13 @@ PLAN-006 落地时按同一纪律改动本模块：**无模块翻转**（Task De
 「已落地 / 不得预埋」分界保持不变，只新增一条**接口级**标记：闸门 5/6 的两个判定函数
 （§6.1 冻结签名）以模块级纯函数形式落地于既有 `engine.py` 内，`revision_listener.py`
 **维持「不得预埋」**。
+
+PLAN-007 落地时按同一纪律改动本模块：同样**无模块翻转**（本任务对既有
+`autonomy_policy.py` / `autonomy_engine.py` 做增量接线，`decision_pipeline.py` 零改动），
+只新增一条**接口级**标记：`plan_facts` 的调制函数与装配函数落地于两个既有模块内
+（§4.1.2 组件划分），`revision_listener.py` **维持「不得预埋」**。
+同一落地的契约演进项：`PolicySnapshot.plan_facts` 由原定六键扩为**七键**
+（新增标量 `current_action_type`，见 `autonomy_policy.PLAN_FACTS_KEYS` 的留痕）。
 """
 
 from pathlib import Path
@@ -118,6 +125,21 @@ PLAN_006_LANDED_INTERFACES = (
     "_evaluate_tool_on_surface",
 )
 """PLAN-006 §6.1 冻结的两个闸门判定接口（落于既有 `engine.py`，不新建模块）。"""
+
+PLAN_007_POLICY_INTERFACES = (
+    "_apply_plan_adjustments",
+    "_intention_action_type",
+)
+"""PLAN-007 §6.3 的调制接口（落于既有 `autonomy_policy.py`，不新建模块）。"""
+
+PLAN_007_ENGINE_INTERFACES = (
+    "_collect_plan_facts",
+    "_latest_active_plan",
+    "_plan_schedule_context",
+    "_blocked_steps",
+    "_last_advanced_at",
+)
+"""PLAN-007 §6.2 的装配接口（落于既有 `autonomy_engine.py`，装配点唯一）。"""
 
 
 def _backend_root() -> Path:
@@ -208,6 +230,41 @@ def test_plan_006_lands_the_two_gate_predicates_without_a_new_module():
     assert missing == []
     assert not (_planning_dir() / "tool.py").exists()
     assert not (_planning_dir() / "tool_gate.py").exists()
+
+
+def test_plan_007_lands_the_two_faces_without_a_new_module():
+    """PLAN-007 产物面：调制 + 装配函数在位，且**没有**为自治集成新建模块。"""
+    from app.application import autonomy_engine
+    from app.services import autonomy_policy
+
+    assert [
+        name
+        for name in PLAN_007_POLICY_INTERFACES
+        if not hasattr(autonomy_policy, name)
+    ] == []
+    assert [
+        name
+        for name in PLAN_007_ENGINE_INTERFACES
+        if not hasattr(autonomy_engine, name)
+    ] == []
+    assert not (_planning_dir() / "autonomy.py").exists()
+    assert not (_planning_dir() / "autonomy_feed.py").exists()
+
+
+def test_plan_007_packet_contract_is_seven_bounded_keys():
+    """PLAN-007 的契约演进留痕：`plan_facts` 七键（原六键 + 当前步动作身份）。"""
+    from app.services import autonomy_policy
+
+    assert autonomy_policy.PLAN_FACTS_KEYS == (
+        "active_goal_id",
+        "plan_version",
+        "current_step",
+        "current_action_type",
+        "steps_total",
+        "blocked_steps",
+        "last_advanced_at",
+    )
+    assert "plan_facts" in autonomy_policy.PolicySnapshot.__dataclass_fields__
 
 
 def test_planning_package_holds_only_landed_modules():

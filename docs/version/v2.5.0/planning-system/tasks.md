@@ -340,7 +340,7 @@ Goal: 让自治策略感知计划事实，并让计划推进意图经既有候�
 
 Description:
 
-- **计划事实进策略快照（B9 关闭点）**：`PolicySnapshot`（`app/services/autonomy_policy.py`）在既有 `world_facts` / `action_facts` / `tool_facts` / `tool_insights` 四段之外新增**有界第五段** `plan_facts`：`active_goal_id` / `plan_version` / `current_step` / `steps_total` / `blocked_steps` / `last_advanced_at`；由既有行动事实收集同源扩展、一处装配；装配失败降级为空包，**不阻塞 tick**（与 `tool_facts` 同款纪律）（对应 architecture §7.3 接线 1）。
+- **计划事实进策略快照（B9 关闭点）**：`PolicySnapshot`（`app/services/autonomy_policy.py`）在既有 `world_facts` / `action_facts` / `tool_facts` / `tool_insights` 四段之外新增**有界第五段** `plan_facts`（**七键**，实现期由六键扩为七键，见 PLAN-007 留痕）：`active_goal_id` / `plan_version` / `current_step` / `current_action_type` / `steps_total` / `blocked_steps` / `last_advanced_at`；由既有行动事实收集同源扩展、一处装配；装配失败降级为空包，**不阻塞 tick**（与 `tool_facts` 同款纪律）（对应 architecture §7.3 接线 1）。
   - 用途：自治策略避免「在计划正在推进时抢同一动作」导致额度被重复消耗。
 - **计划态参与决策候选**：计划推进产生的意图经**既有 `goal_compile` 候选面**进入 `decision_pipeline.collect_candidates`（`goal_compile` 优先级 P2 原样保留）；**不新增候选源、不改 `_SOURCE_PRIORITY` 数学、不改六维权重**。这样计划的「该做下一步了」与自治的「要不要主动」在同一张评分表上竞争（对应 architecture §7.3 接线 2）。
 - **额度不绕过（评审红线）**：计划触发的执行仍走 `action_engine.run_action_planning(source="autonomy")`，因此 `action_max_active_per_user` / `autonomy_action_daily_limit` / `autonomy_min_interval_minutes` 与冷却窗口原样生效；**计划不得成为绕过额度的后门**（对应 architecture §7.3 接线 3）。
@@ -648,7 +648,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | PLAN-004 | DONE | 任务拆解（四阶段）+ 三闸校验（validate_shape/binding/budget）+ 四级映射 L1~L4 与粒度判据 G1~G3 | `app/services/planning/decompose.py`、`app/services/planning/__init__.py`、`tests/v25/*`（新增 8 + 更新 4） | 2abc580 | tests/v25: 441 passed / 4 skipped；pylint decompose.py 9.97/10（仅 R0903，与既有规划模块同款）；compileall OK；tests/v24 工具侧 1579 passed；既有失败零新增 |
 | PLAN-005 | DONE | 计划执行引擎：Scheduler（搬运+等价性对照）/ExecutorBridge/Observer（四源+tool 判据）/RevisionPolicy + life_loop 观测接线（零迁移） | `app/services/planning/{scheduler,executor_bridge,observer,revision}.py`、`app/services/planning/__init__.py`、`app/application/life_loop.py`、`tests/v25/*`（新增 9 + 更新 3） | 0f8daa5 | tests/v25: 636 passed / 3 skipped；pylint 四新模块 9.86/10（W0718 house-style）；compileall OK；tests/v24 1579 passed；既有失败零新增 |
 | PLAN-006 | DONE | 工具系统集成：闸门 5/6 判定收窄（kind=tool）+ 工具治理链 T1~T4 + 执行链路六闸门五段断言 + G-EXEC 静态断言 + 结果契约归一（零迁移、工具侧零改动） | `app/services/planning/engine.py`、`tests/v25/*`（新增 5 + 更新 2） | 05fc46e | tests/v25: 748 passed / 2 skipped；pylint engine.py 9.85/10（零新增告警）；compileall OK；tests/v24 1579 passed；既有失败零新增 |
-| PLAN-007 | TODO | — | — | — | — |
+| PLAN-007 | DONE | 自治侧计划事实感知：`plan_facts` 有界第五段（七键）+ 同源一处装配 + 计划推进调制 + `goal_compile` 候选面 + 额度/冷却未放宽负例 + G-BOUNDARY + 四项零改动快照（零迁移、`decision_pipeline` 零改动） | `app/services/autonomy_policy.py`、`app/application/autonomy_engine.py`、`tests/v25/*`（新增 8 + 更新 1） | 未提交 | tests/v25: 889 passed / 2 skipped；pylint 两生产文件 10.00/10；compileall OK；既有 autonomy/goal/planning 子集零新增失败 |
 | PLAN-008 | TODO | — | — | — | — |
 | PLAN-009 | TODO | — | — | — | — |
 | PLAN-010 | TODO | — | — | — | — |

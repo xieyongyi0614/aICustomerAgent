@@ -1295,6 +1295,7 @@ PlanRevisionPolicy.should_replan(outcome, plan, ctx) → reason | None
      "active_goal_id": "g_xxx",             # 有进行中计划的目标
      "plan_version": 2,
      "current_step": 3,
+     "current_action_type": "create_reminder",  # 当前步的动作身份（实现期新增，见 PLAN-007 留痕）
      "steps_total": 4,
      "blocked_steps": 0,
      "last_advanced_at": "2026-09-15T20:10:00"

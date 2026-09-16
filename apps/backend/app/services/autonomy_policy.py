@@ -6,6 +6,12 @@ V2.4.0 TOOL-006：`tool_facts` 作为既有八步的**输入面**（只追加理
 不拆闸门）；缺省空 dict 时行为与 V2.3.0 逐字节一致。
 V2.4.0 TOOL-009：`tool_insights`（工具效能 Insight 只读信号）同为输入面——
 只追加"候选收缩"理由，不拆闸门；缺省空 dict 时行为与 V2.3.0 逐字节一致。
+
+V2.5.0 PLAN-007：`plan_facts`（计划运行态只读事实段，`PLAN_FACTS_KEYS` 七键）同为输入面——
+在既有调制链**末尾追加一环** `_apply_plan_adjustments`：计划正在推进且本 intent 与其当前步
+**同动作**时收紧为 `wait`（不与计划抢同一动作，避免额度被重复消耗），其余情形原样返回。
+八步裁决顺序、`TRIGGER_PRIORITY` 数学与 `HIGH_PRIORITY_OVERRIDE`（P0 / P1 越过）一律未改；
+缺省空 dict 时行为与 V2.4.0 逐字节一致。
 """
 
 import logging
@@ -18,6 +24,7 @@ from app.models.autonomy import (
     AutonomyVerdict,
     TriggerSignal,
 )
+from app.character.asuna.action import PROACTIVE_ACTION_MAP
 from app.character.asuna.relationship_lexicon import INTENT_UNLOCK_REQUIREMENTS
 
 logger = logging.getLogger(__name__)
@@ -40,6 +47,28 @@ TRIGGER_PRIORITY: dict[str, str] = {
 }
 
 HIGH_PRIORITY_OVERRIDE = frozenset({"P0", "P1"})
+
+PLAN_FACTS_KEYS: tuple[str, ...] = (
+    "active_goal_id",
+    "plan_version",
+    "current_step",
+    "current_action_type",
+    "steps_total",
+    "blocked_steps",
+    "last_advanced_at",
+)
+"""`plan_facts` 的**有界契约**（PLAN-007 §4.2.1）：固定七键、无无界列表、无优先级 / 工具细节。
+
+第七键 `current_action_type` 是**契约演进留痕项**：§4.3.2 要求「本 intent 与计划当前步的
+`action_type` 相同」才收紧，而原六字段（`active_goal_id` / `plan_version` / `current_step` /
+`steps_total` / `blocked_steps` / `last_advanced_at`）不含当前步的动作身份，该判定不可实现
+（策略层是纯函数，不得为取动作身份而反读计划）。经裁决取「新增一个标量键」而非「放宽为
+同目标级抑制」：字段数 6 → 7（仍有界、仍为标量、仍不含 `tool_id` / 参数 / 优先级），
+§4.3.2 的动作级语义**原样保留**。
+
+本常量是契约的**唯一声明处**（键集与键序）：装配侧按同序字面量装配、调制侧按名取值，
+二者与 `tests/v25/test_plan007_plan_facts.py` 的键序对照共同受本常量约束。
+"""
 
 
 def trigger_priority(signal: TriggerSignal) -> str:
@@ -72,6 +101,7 @@ class PolicySnapshot:
     trust: float = 0.35
     stage: str = "friend"
     relationship_patterns: tuple[str, ...] = ()
+    plan_facts: dict = field(default_factory=dict)
 
 
 def _parse_hhmm(value: str) -> dt_time | None:
@@ -273,6 +303,40 @@ def _apply_tool_insight_adjustments(
     return verdict.model_copy(update={"reason": reason})
 
 
+def _intention_action_type(intention: str | None) -> str | None:
+    """自治意图 → 动作身份：`PROACTIVE_ACTION_MAP` 是唯一权威（与自治产行动分支同源）。"""
+    if not intention:
+        return None
+    return PROACTIVE_ACTION_MAP.get(intention)
+
+
+def _apply_plan_adjustments(
+    verdict: AutonomyVerdict, snapshot: PolicySnapshot
+) -> AutonomyVerdict:
+    """P1（PLAN-007 §4.3.2）：计划正在推进且与本 intent 抢**同一动作**时收紧为 `wait`。
+
+    只收紧不放行——空包 / `current_step is None` / 动作不同 / 非 `act` 一律原样返回；
+    本函数不改变八步裁决顺序、不改 `TRIGGER_PRIORITY` 数学；`HIGH_PRIORITY_OVERRIDE` 语义
+    原样保留（P0 / P1 触发器仍越过本抑制）。
+    """
+    facts = snapshot.plan_facts or {}
+    if not facts or facts.get("current_step") is None:
+        return verdict
+    if verdict.decision != "act":
+        return verdict
+    priority = trigger_priority(verdict.trigger) if verdict.trigger is not None else "P3"
+    if priority in HIGH_PRIORITY_OVERRIDE:
+        return verdict
+    action_type = _intention_action_type(verdict.intention)
+    if action_type is None or action_type != facts.get("current_action_type"):
+        return verdict
+    return AutonomyVerdict(
+        decision="wait",
+        reason=f"{verdict.reason}；计划推进中，暂不抢同一动作"[:60],
+        trigger=verdict.trigger,
+    )
+
+
 def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
@@ -317,4 +381,5 @@ def evaluate(
     verdict = _apply_action_adjustments(verdict, snapshot)
     verdict = _apply_tool_adjustments(verdict, snapshot)
     verdict = _apply_tool_insight_adjustments(verdict, snapshot)
+    verdict = _apply_plan_adjustments(verdict, snapshot)
     return _apply_relationship_rules(verdict, snapshot, config)

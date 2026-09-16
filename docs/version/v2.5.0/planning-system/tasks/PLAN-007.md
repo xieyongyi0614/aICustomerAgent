@@ -1,7 +1,14 @@
 # PLAN-007 Task Detail — Autonomy Integration
 
 > 上游：[../architecture.md](../architecture.md) §7.3（与 Autonomy 2.0 集成）、§7.8（Life Loop 集成）、§7.9（Autonomy 契约行）、§3.2.3（Goal Priority 复用）；[../tasks.md](../tasks.md) PLAN-007
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现）
+> 契约演进留痕（实现期裁决，2026-09-16）：`plan_facts` 由原定**六字段**扩为**七字段**
+> —— 新增标量 `current_action_type`（计划当前步的动作身份）。理由：§4.3.2 / §6.3 / §8 Step 3.2
+> 要求「本 intent 与计划当前步的 `action_type` 相同」才抑制，而六字段不含动作身份，该判定不可实现
+> （策略层是纯函数，不得为取动作身份而反读计划）。裁决取「新增一个标量键」而非「放宽为同目标级
+> 抑制」：字段数 6 → 7（仍有界、仍为标量、仍不含 `tool_id` / 参数 / 优先级），§4.3.2 的动作级语义
+> 原样保留。同步改动：§1.1 / §4.1.2 / §4.2.1 / §4.3.1 / §6.1 / §6.2 / §8 Step 1~2 / §9.1 U2~U3 /
+> §10.1 / §10.3 与 PLAN-012 §11 的任务行。唯一契约入口：`autonomy_policy.PLAN_FACTS_KEYS`。
 > 范围红线：**Autonomy 决定「此刻做什么」/ Planning 决定「怎么做」/ Tool 负责执行**，三者串联且职责不重叠；不新建自治执行器、不新增候选源、不改六维权重、不新建 LLM 决策循环、**不让计划成为绕过额度的后门**。
 
 ---
@@ -21,7 +28,7 @@
 
 让自治策略**感知计划事实**，并让计划推进意图经**既有候选面**进入决策：
 
-1. **计划事实进策略快照（B9 关闭点）**：`PolicySnapshot` 新增**有界第五段** `plan_facts`（`active_goal_id` / `plan_version` / `current_step` / `steps_total` / `blocked_steps` / `last_advanced_at`），由既有行动事实收集**同源扩展、一处装配**；装配失败降级为空包，**不阻塞 tick**。
+1. **计划事实进策略快照（B9 关闭点）**：`PolicySnapshot` 新增**有界第五段** `plan_facts`（`active_goal_id` / `plan_version` / `current_step` / `current_action_type` / `steps_total` / `blocked_steps` / `last_advanced_at`），由既有行动事实收集**同源扩展、一处装配**；装配失败降级为空包，**不阻塞 tick**。
 2. **计划态参与决策候选**：计划推进产生的意图经**既有 `goal_compile` 候选面**进入 `decision_pipeline.collect_candidates`；**不新增候选源、不改 `_SOURCE_PRIORITY` 数学、不改六维权重**。
 3. **额度不绕过（评审红线）**：计划触发的执行仍走 `action_engine.run_action_planning(source="autonomy")`，因此 `action_max_active_per_user` / `autonomy_action_daily_limit` / `autonomy_min_interval_minutes` 与冷却窗口原样生效。
 
@@ -158,8 +165,8 @@ app/services/autonomy_policy.py（既有，增量扩展）
 
 app/application/autonomy_engine.py（既有，最小接线）
 ├── _collect_plan_facts(user_id) -> dict     ← 新增，与既有 _collect_action_facts 同源
-│     active_goal_id / plan_version / current_step / steps_total
-│     / blocked_steps / last_advanced_at
+│     active_goal_id / plan_version / current_step / current_action_type
+│     / steps_total / blocked_steps / last_advanced_at
 │     失败 → {}（不阻塞 tick）
 └── tick（二十步序列零改动，plan_facts 在既有收集点装配一次）
 
@@ -207,9 +214,10 @@ app/services/decision_pipeline.py（零改动）
 | `active_goal_id` | str \| None | `goal_repository.list_active_plans(user_id)` | 有进行中计划的目标 id |
 | `plan_version` | int \| None | `GoalPlanRecord.version` | 当前生效版本 |
 | `current_step` | int \| None | `PlanScheduler.current_step(plan).index` | 下一个待执行步（无则 `None`） |
+| **`current_action_type`** | str \| None | `PlanScheduler.current_step(plan).capability` | 当前步的动作身份（**契约演进新增键**，见文首留痕；非工具细节，不含 `tool_id` / 参数） |
 | `steps_total` | int | `len(plan.sub_goals)` | 步骤总数 |
 | `blocked_steps` | int | `PlanScheduler.blocked_reason` 计数 | 被阻塞步数（`off_surface` / `cooldown` / `predecessor_failed`） |
-| `last_advanced_at` | str \| None | `PlanAdvance.at`（最近一次 `advanced`） | ISO 时刻字符串 |
+| `last_advanced_at` | str \| None | `PlanAdvance.at`（最近一次 `advanced`，经既有 `decision_records`（`kind='goal_lifecycle'`）只读投影） | ISO 时刻字符串 |
 
 **示例形态（architecture §7.3 接线 1）**
 
@@ -218,6 +226,7 @@ plan_facts = {
   "active_goal_id": "g_xxx",             # 有进行中计划的目标
   "plan_version": 2,
   "current_step": 3,
+  "current_action_type": "create_reminder",
   "steps_total": 4,
   "blocked_steps": 0,
   "last_advanced_at": "2026-09-15T20:10:00"
@@ -228,7 +237,7 @@ plan_facts = {
 
 | 纪律 | 要求 |
 |---|---|
-| 有界 | 字段数固定为 6；不做无界列表展开（不把全部步骤塞进 `plan_facts`） |
+| 有界 | 字段数固定为 **7**（六字段 + `current_action_type`，见文首契约演进留痕）；不做无界列表展开（不把全部步骤塞进 `plan_facts`） |
 | 单目标 | 只反映**一个** active 计划（取值规则：最近 `updated_at` 的 active 计划；多计划时取最新） |
 | 降级 | 装配失败 → `{}`（与既有四段默认空 dict 一致）；**不阻塞 tick** |
 | 只读 | 装配只经 `goal_repository` 只读接口 + `PlanScheduler` 纯函数 |
@@ -278,8 +287,8 @@ plan_facts = {
 | 计划状态 | `plan_facts` 形态 | 对自治裁决的影响 |
 |---|---|---|
 | 无 active 计划 | `{}`（空包） | 无影响（既有行为逐字节一致） |
-| 有 active 计划，推进正常 | 六字段齐全，`blocked_steps=0` | `_apply_plan_adjustments` 抑制「抢同一动作」的主动性 |
-| 有 active 计划，步骤阻塞 | `blocked_steps > 0` | 同上；不额外放宽 |
+| 有 active 计划，推进正常 | 七字段齐全，`blocked_steps=0` | `_apply_plan_adjustments` 抑制「抢同一动作」的主动性 |
+| 有 active 计划，步骤阻塞 | `blocked_steps > 0`（`PlanScheduler.blocked_reason` 的 0/1 计数） | 同上；不额外放宽（`blocked_steps` 不参与调制） |
 | 有 active 计划，全部步骤终态 | `current_step=None` | 视为无推进中的计划 |
 | `v25_plan_autonomy_enabled` off | `{}` | 无影响（原状） |
 
@@ -401,8 +410,8 @@ autonomy_engine.tick（既有，二十步）
 ```text
 @dataclass
 class PolicySnapshot:
-    ...既有 24 字段...
-    plan_facts: dict = field(default_factory=dict)      # 本任务新增（有界第五段，默认空包）
+    ...既有 23 字段...
+    plan_facts: dict = field(default_factory=dict)      # 本任务新增（有界第五段，默认空包，位于既有字段之后）
 ```
 
 **契约纪律**
@@ -410,7 +419,7 @@ class PolicySnapshot:
 | # | 纪律 | 验证方式 |
 |---|---|---|
 | D1 | `plan_facts` 默认 `{}`；Flag off 时**不存在**（保持 `{}` 原状） | 快照对照 |
-| D2 | 字段数固定为 6，不做无界展开 | 结构断言 |
+| D2 | 字段数固定为 7（六字段 + `current_action_type`），不做无界展开 | 结构断言（`autonomy_policy.PLAN_FACTS_KEYS` 为唯一声明处） |
 | D3 | `autonomy_policy.py` 保持纯函数 + 纯数据：不 import 仓储 | 静态断言 |
 | D4 | `plan_facts` **不携带优先级 / 工具细节**（避免职责外溢） | 字段快照对照 |
 
@@ -419,8 +428,8 @@ class PolicySnapshot:
 ```text
 _collect_plan_facts(user_id: str) -> dict
     # 单目标取值规则：最近 updated_at 的 active 计划
-    # 六字段：active_goal_id / plan_version / current_step / steps_total
-    #         blocked_steps / last_advanced_at
+    # 七字段：active_goal_id / plan_version / current_step / current_action_type
+    #         steps_total / blocked_steps / last_advanced_at
     # 装配失败 → {}（不抛错、不阻塞 tick）
 ```
 
@@ -499,16 +508,16 @@ _apply_plan_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> A
 
 1. 在 `app/services/autonomy_policy.py` 的 `PolicySnapshot` 末尾追加 `plan_facts: dict = field(default_factory=dict)`（**位置在 `tool_insights` 之后，保证既有字段顺序不变**）。
 2. `v25_plan_autonomy_enabled` off → 装配器不写入（保持 `{}`）。
-3. 单测：默认值、字段数固定为 6、Flag off 时为空包。
+3. 单测：默认值、字段数固定为 7、Flag off 时为空包（且 off 时零读取）。
 
 ## Step 2 — `plan_facts` 装配（一处，同源扩展）
 
 1. 在 `autonomy_engine` 的既有行动事实收集处新增 `_collect_plan_facts(user_id)`，与既有事实收集**同源、同时刻、同一处**调用。
 2. 取「最近 `updated_at` 的 active 计划」：`goal_repository.list_active_plans(user_id)` + `get_latest_plan`。
-3. 计算六字段：`current_step` 与 `blocked_steps` 由 `PlanScheduler.current_step` / `blocked_reason` 纯函数得出。
-4. `last_advanced_at` 取最近一次 `PlanAdvance`（`decision` 为 `advanced`）的时刻。
+3. 计算七字段：`current_step` / `current_action_type` 由 `PlanScheduler.current_step` 得出，`blocked_steps` 由 `blocked_reason` 得出（均为纯函数）。
+4. `last_advanced_at` 取最近一次 `PlanAdvance`（`decision` 为 `advanced`）的时刻（扫描窗内按 `at` 求最大，缺省回退落库时刻）。
 5. 装配失败 → `{}`，log，**不阻塞 tick**。
-6. 单测：六字段正确；多计划取最新；无计划为空包；装配失败降级；装配点唯一（静态）。
+6. 单测：七字段正确；多计划取最新；无计划为空包；装配失败降级且不阻塞 tick；装配点唯一（静态）。
 
 ## Step 3 — `_apply_plan_adjustments` 调制
 
@@ -556,8 +565,8 @@ _apply_plan_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> A
 | # | 用例 | 断言 |
 |---|---|---|
 | U1 | `PolicySnapshot.plan_facts` 默认值 | `{}`；既有字段顺序与默认值未变 |
-| U2 | `plan_facts` 字段数 | 恰 6 个；无无界列表 |
-| U3 | 六字段取值正确 | `active_goal_id` / `plan_version` / `current_step` / `steps_total` / `blocked_steps` / `last_advanced_at` 各可追溯 |
+| U2 | `plan_facts` 字段数 | 恰 7 个；全部标量；无无界列表 |
+| U3 | 七字段取值正确 | `active_goal_id` / `plan_version` / `current_step` / `current_action_type` / `steps_total` / `blocked_steps` / `last_advanced_at` 各可追溯 |
 | U4 | 多计划取最新 | 两个 active 计划 → 取 `updated_at` 最新者 |
 | U5 | 无 active 计划 | `{}` |
 | U6 | 装配失败降级 | 注入异常 → `{}`；**tick 正常完成** |
@@ -608,7 +617,7 @@ _apply_plan_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> A
 - 六维权重数学与候选优先级表未改（快照对照零差异）；未新增候选源；计划推进意图确实经既有 `goal_compile` 面进入（优先级 P2 原样保留）。
 - `autonomy_engine.tick` 步数与顺序不变（形状快照对照）；`_produce_autonomy_action` 形态未变。
 - `autonomy_policy.evaluate` 八步裁决顺序不变；`TRIGGER_PRIORITY` 数学未改；`HIGH_PRIORITY_OVERRIDE`（P0 / P1）仍可越过。
-- `plan_facts` 字段数固定为 6，不含优先级与工具细节；装配点唯一（静态断言）。
+- `plan_facts` 字段数固定为 7（六字段 + `current_action_type`），不含优先级与工具细节；装配点唯一（静态断言）。
 - **G-BOUNDARY 输出契约断言**：Autonomy 只出 `AutonomyVerdict` + intention、Planning 只出 `GoalPlanRecord` + `PlanStepSpec[]`、Tool 只出 `ToolResult`（各自静态与运行时断言）；三者无交叉写面。
 - 行为差异只在 Flag on 时出现；Flag off 时 `PolicySnapshot.plan_facts` 不存在（`{}` 原状），与 V2.4.0 逐字节一致。
 
@@ -627,6 +636,6 @@ _apply_plan_adjustments(verdict: AutonomyVerdict, snapshot: PolicySnapshot) -> A
 - **零迁移**：无新表 / 新列 / 新索引 / 新 CHECK 值；迁移链头仍为 `0046`。
 - **零新建自治执行器**：`_produce_autonomy_action` 原样复用；不新增 LLM 决策循环；`llm_gateway` 预算数学不变。
 - **增量接线可举证**：四项「零改动」断言（tick 二十步 / evaluate 八步 / 六维权重 / `_SOURCE_PRIORITY`）各有快照对照证据。
-- **B9 关闭可举证**：`plan_facts` 六字段各可追溯到具体读取入口；「计划推进时自治不抢同一动作」有端到端用例。
+- **B9 关闭可举证**：`plan_facts` 七字段各可追溯到具体读取入口；「计划推进时自治不抢同一动作」有端到端用例（含 Flag on / off 对照面）。
 - **职责不重叠可举证**：§4.2.2 对照表逐行对应 §6.4 的输出契约断言（B1~B4）。
 - **文档一致**：本文件与 architecture §7.3 / §7.8 / §7.9 / §3.2.3 及 tasks.md PLAN-007 Acceptance Criteria 逐条对应，无自相矛盾。
