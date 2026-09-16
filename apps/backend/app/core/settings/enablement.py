@@ -5,6 +5,36 @@
   执行经 outbox + Life Loop 消费 + V9 行动总闸）。
 - v2_action_outbox_enabled 依赖 v2_life_loop_enabled（无消费器的 outbox 会死信堆积）。
 
+V2.5.0 段（PLAN-002，architecture.md §7.10）**八条链**：
+
+| # | 链 |
+|---|---|
+| ① | 任一 v25_* 子闸开启 ⇒ `v25_planning_enabled` |
+| ② | `v25_planning_enabled` ⇒ `v2_autonomy_advanced_enabled` AND `v2_life_loop_enabled` |
+| ③ | `v25_plan_execution_enabled` ⇒ `v25_plan_scheduler_enabled` AND `action_enabled` |
+| ④ | `v25_plan_step_binding_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v24_tool_system_enabled` |
+| ⑤ | `v25_plan_tool_required` ⇒ `v25_plan_step_binding_enabled` AND `v24_tool_system_enabled` |
+| ⑥ | `v25_plan_reflection_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v2_reflection_enabled` |
+| ⑦ | `v25_plan_memory_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v2_memory_enabled` |
+| ⑧ | `v25_plan_autonomy_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v21_agent_runtime_enabled` |
+
+计数口径留痕：architecture.md §7.10 列八条，PLAN-002 Task Detail 与 tasks.md 描述为
+「七条串行链」。差异来自①「子闸 → 总闸」这条通用条目——architecture 把它计入八条，
+而 tasks.md 只数②~⑧这七条**跨版本依赖**条目。本实现以 architecture §7.10 的八条为准
+（与 PLAN-012 对 GATE 计数差异的处理同款纪律）。
+
+两处判定口径（均为「让默认配置自洽」的必要裁决，已在 Task Detail §4.5.3 留痕）：
+
+1. `v25_plan_tool_required` **不进①的子闸循环**：它默认为 on，若按其字面量参与①，默认
+   配置会立刻自我否决（总闸 off 而子闸 on）。它的语义是「计划编排启用后强制要求工具面」
+   的策略修饰位，故以**有效闸值**参与判定：`v25_planning_enabled AND
+   v25_plan_tool_required`，⑤随之只在总闸开启时生效。
+2. ②~⑧的跨版本条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
+   ①拦下，要么本就是 off，跨版本依赖无判定意义。
+
+②~⑧以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
+v24 段的子闸表同款；①为 `V25_SUB_FLAGS` 上的子闸循环。
+
 仅在启动边界调用（main.lifespan / 运维脚本），不做为模型级校验，
 以保留子域隔离单测使用部分 Flag 组合的自由度。
 """
@@ -14,6 +44,74 @@ import logging
 from app.core.settings._shared import SettingsError
 
 _logger = logging.getLogger(__name__)
+
+V25_MASTER_FLAG = "v25_planning_enabled"
+V25_TOOL_REQUIRED_FLAG = "v25_plan_tool_required"
+
+V25_SUB_FLAGS: tuple[str, ...] = (
+    "v25_plan_context_enabled",
+    "v25_plan_step_binding_enabled",
+    "v25_plan_scheduler_enabled",
+    "v25_plan_execution_enabled",
+    "v25_plan_observation_enabled",
+    "v25_plan_revision_enabled",
+    "v25_plan_memory_enabled",
+    "v25_plan_reflection_enabled",
+    "v25_plan_world_feedback_enabled",
+    "v25_plan_autonomy_enabled",
+    "v25_plan_debug_enabled",
+)
+
+V25_GATE_FLAGS: tuple[str, ...] = (
+    V25_MASTER_FLAG,
+    V25_TOOL_REQUIRED_FLAG,
+    *V25_SUB_FLAGS,
+)
+
+V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
+    (
+        V25_MASTER_FLAG,
+        "v2_autonomy_advanced_enabled",
+        "（计划编排寄生在自治通路之上）",
+    ),
+    (
+        V25_MASTER_FLAG,
+        "v2_life_loop_enabled",
+        "（规划入队与步骤推进由 Life Loop 驱动）",
+    ),
+    ("v25_plan_execution_enabled", "v25_plan_scheduler_enabled", "（先开调度子闸）"),
+    ("v25_plan_execution_enabled", "action_enabled", "（步骤执行经 V9 行动引擎）"),
+    (
+        "v25_plan_step_binding_enabled",
+        "v24_tool_system_enabled",
+        "（tool_id 指向 V2.4.0 工具定义）",
+    ),
+    (
+        V25_TOOL_REQUIRED_FLAG,
+        "v25_plan_step_binding_enabled",
+        "（要求工具面可用时步骤必须绑定工具；无面规划请关掉本开关）",
+    ),
+    (
+        V25_TOOL_REQUIRED_FLAG,
+        "v24_tool_system_enabled",
+        "（可用工具面来自 V2.4.0 工具系统）",
+    ),
+    (
+        "v25_plan_reflection_enabled",
+        "v2_reflection_enabled",
+        "（计划证据窗读取既有反思结论）",
+    ),
+    (
+        "v25_plan_memory_enabled",
+        "v2_memory_enabled",
+        "（计划终态记忆经既有记忆策略写入）",
+    ),
+    (
+        "v25_plan_autonomy_enabled",
+        "v21_agent_runtime_enabled",
+        "（plan_facts 经统一 Run 模型进自治决策）",
+    ),
+)
 
 
 def enablement_violations(settings) -> list[str]:
@@ -128,6 +226,22 @@ def enablement_violations(settings) -> list[str]:
             "v24_tool_channel_enabled 要求 feishu_enabled"
             "（channel.* 工具包装依赖飞书通道）"
         )
+    v25_gates = {flag: getattr(settings, flag, False) for flag in V25_GATE_FLAGS}
+    v25_effective_gates = {
+        **v25_gates,
+        V25_TOOL_REQUIRED_FLAG: v25_gates[V25_MASTER_FLAG]
+        and v25_gates[V25_TOOL_REQUIRED_FLAG],
+    }
+    for sub_flag in V25_SUB_FLAGS:
+        if v25_gates[sub_flag] and not v25_gates[V25_MASTER_FLAG]:
+            violations.append(
+                f"{sub_flag} 要求 {V25_MASTER_FLAG}（V2.5.0 总闸先开）"
+            )
+    for required_flag, dependency, reason in V25_DEPENDENCIES:
+        if v25_effective_gates[required_flag] and not getattr(
+            settings, dependency, False
+        ):
+            violations.append(f"{required_flag} 要求 {dependency}{reason}")
     return violations
 
 

@@ -25,6 +25,7 @@ from app.core.settings.llm import LlmProfile, LlmSettings
 from app.core.settings.memory import MemorySettings
 from app.core.settings.observability import ObservabilitySettings
 from app.core.settings.pipeline import PipelineSettings
+from app.core.settings.plan import PlanSettings
 from app.core.settings.reflection_development import (
     DevelopmentSettings,
     ReflectionSettings,
@@ -59,6 +60,7 @@ class Settings(
     WorldSettings,
     WorldSimulationSettings,
     ToolSettings,
+    PlanSettings,
     BaseSettings,
 ):
     model_config = DOMAIN_MODEL_CONFIG

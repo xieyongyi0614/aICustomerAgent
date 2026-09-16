@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.tool import TOOL_EFFECT_KINDS, TOOL_EFFECT_KIND_VALUES
 
 GoalType = Literal["user_care", "relationship", "conversation", "scene"]
 
@@ -27,6 +29,32 @@ GoalDomain = Literal["personal", "relationship", "world"]
 GoalPlanStatus = Literal["draft", "validated", "active", "rejected", "superseded"]
 
 SubGoalStatus = Literal["pending", "in_progress", "done", "failed"]
+
+StepKind = Literal["tool", "observe", "composite"]
+
+STEP_KINDS: tuple[str, ...] = ("tool", "observe", "composite")
+
+STEP_KIND_VALUES: frozenset[str] = frozenset(get_args(StepKind))
+
+RetryMode = Literal["none", "once", "until_budget"]
+
+RETRY_MODES: tuple[str, ...] = ("none", "once", "until_budget")
+
+RETRY_MODE_VALUES: frozenset[str] = frozenset(get_args(RetryMode))
+
+OnFailureMode = Literal["abort", "skip", "replan", "continue"]
+
+ON_FAILURE_MODES: tuple[str, ...] = ("abort", "skip", "replan", "continue")
+
+ON_FAILURE_MODE_VALUES: frozenset[str] = frozenset(get_args(OnFailureMode))
+
+PlanningTrigger = Literal["goal_created", "goal_blocked", "goal_replan"]
+
+PLANNING_TRIGGER_VALUES: tuple[str, ...] = (
+    "goal_created",
+    "goal_blocked",
+    "goal_replan",
+)
 
 LAYER_VALUES: tuple[str, ...] = ("short_term", "medium", "long_term")
 GOAL_ORIGINS: tuple[str, ...] = (
@@ -86,7 +114,13 @@ CRITERION_TYPES: tuple[str, ...] = (
     "any_of",
 )
 COMPOSITE_CRITERION_TYPES: tuple[str, ...] = ("all_of", "any_of")
-CRITERION_FACT_SOURCES: tuple[str, ...] = ("world", "state", "memory")
+CRITERION_TOOL_FACT_SOURCE: str = "tool"
+CRITERION_FACT_SOURCES: tuple[str, ...] = (
+    "world",
+    "state",
+    "memory",
+    CRITERION_TOOL_FACT_SOURCE,
+)
 CRITERION_METRIC_PATHS: tuple[str, ...] = (
     "tension",
     "intimacy",
@@ -166,6 +200,18 @@ class IllegalGoalTransition(ValueError):
 
 
 class SubGoalSpec(BaseModel):
+    """计划步骤规范（落 `goal_plans.sub_goals`）。
+
+    V2.5.0 扩展的 7 个字段一律**显式声明在此**：本模型未声明 `extra="forbid"`，Pydantic
+    默认 `ignore` 会静默丢弃 JSON 未知键，靠「在 `sub_goals` 里多塞字段」不会生效，
+    且把 `extra` 改成 `forbid` 会让旧代码读新 JSON 直接报错——两个方向都禁止
+    （Task Detail §4.4.2 Q3 裁决）。7 个新字段全部带默认值，故旧 JSON 解析后新字段取
+    默认值、新 JSON 对旧读取方为可忽略的未知键，**双向兼容成立**。
+
+    `on_failure` 默认取 `skip` 而非 `abort`：默认值不得放大失败影响（`abort` 会使计划
+    整体失败）。
+    """
+
     index: int = Field(ge=1)
     description: str = Field(max_length=GOAL_DESCRIPTION_MAX_LENGTH)
     capability: str = Field(min_length=1)
@@ -178,6 +224,24 @@ class SubGoalSpec(BaseModel):
     last_observed_at: datetime | None = None
     last_attempt_at: datetime | None = None
     failure_note: str | None = None
+    tool_id: str | None = None
+    kind: StepKind = "tool"
+    retry_policy: RetryMode = "once"
+    on_failure: OnFailureMode = "skip"
+    expected_effects: tuple[str, ...] = ()
+    observation_keys: tuple[str, ...] = ()
+    binding_reason: str | None = None
+
+    @field_validator("expected_effects")
+    @classmethod
+    def _validate_expected_effects(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        illegal = [item for item in value if item not in TOOL_EFFECT_KIND_VALUES]
+        if illegal:
+            raise ValueError(
+                f"expected_effects 取值越出 TOOL_EFFECT_KINDS：{illegal}；"
+                f"合法值集: {', '.join(TOOL_EFFECT_KINDS)}"
+            )
+        return value
 
     @staticmethod
     def validate_criteria(criteria: dict, depth: int = 0) -> None:
@@ -205,6 +269,11 @@ class SubGoalSpec(BaseModel):
         if criterion_type == "threshold_reached":
             if criteria.get("source") not in CRITERION_FACT_SOURCES:
                 raise ValueError(f"事实源不在白名单：{criteria.get('source')!r}")
+            if criteria.get("source") == CRITERION_TOOL_FACT_SOURCE:
+                raise ValueError(
+                    "threshold_reached 判据不支持事实源 'tool'"
+                    "（工具观测只提供键值等值判定，保持值集最小）"
+                )
             if criteria.get("path") not in CRITERION_METRIC_PATHS:
                 raise ValueError(f"指标路径不在白名单：{criteria.get('path')!r}")
             if criteria.get("op") not in CRITERION_OPS:
@@ -259,6 +328,14 @@ def validate_sub_goals(sub_goals: list[dict], max_depth: int = 2) -> list["SubGo
 
 
 class GoalPlanRecord(BaseModel):
+    """计划本体（落 `goal_plans`）。
+
+    V2.5.0 扩展的 4 个字段（`trigger` / `context_digest` / `revision_of` / `evidence_refs`）
+    只作**模型字段**：`GoalPlanRow` 无对应列，落库复用 `decision_records.input_snapshot`
+    （既有 JSON 列），**不加列**——加列会使「零迁移」强断言失效（Task Detail §4.4.1 Q2 裁决）。
+    4 个字段全部带默认值，故旧 JSON / 旧构造调用解析结果不变。
+    """
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     goal_id: str
     version: int = Field(ge=1)
@@ -267,3 +344,7 @@ class GoalPlanRecord(BaseModel):
     rejection_reason: str | None = None
     created_at: datetime
     updated_at: datetime
+    trigger: PlanningTrigger = "goal_created"
+    context_digest: str | None = None
+    revision_of: int | None = Field(default=None, ge=1)
+    evidence_refs: tuple[str, ...] = ()

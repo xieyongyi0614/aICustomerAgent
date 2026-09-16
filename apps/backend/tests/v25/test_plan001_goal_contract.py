@@ -2,6 +2,10 @@
 
 口径：快照为**字面量冻结**——每个断言把期望值写死在用例里（而非从被测模块反推），
 被测源码与快照的任何差异都会让用例失败。这正是「差异必须为空」的可判定形式。
+
+PLAN-002 交接留痕：`CRITERION_FACT_SOURCES` 的快照由 PLAN-002 从三值扩为四值
+（新增 `"tool"`，`fact_source="tool"` 下 `threshold_reached` 被拒），本模块随之更新该
+字面量与对应边界用例；其余值集与表结构快照仍由 PLAN-001 冻结，本任务零改动。
 """
 
 import importlib
@@ -79,7 +83,7 @@ TUPLE_SNAPSHOT = {
         "all_of",
         "any_of",
     ),
-    "CRITERION_FACT_SOURCES": ("world", "state", "memory"),
+    "CRITERION_FACT_SOURCES": ("world", "state", "memory", "tool"),
     "CRITERION_METRIC_PATHS": (
         "tension",
         "intimacy",
@@ -302,19 +306,28 @@ def test_u4_illegal_transition_error_is_a_value_error():
     assert issubclass(IllegalGoalTransition, ValueError)
 
 
-def test_u5_criterion_whitelist_is_frozen_at_five_three_four_two():
+def test_u5_criterion_whitelist_is_frozen_at_five_four_four_two():
     assert len(CRITERION_TYPES) == 5
-    assert len(CRITERION_FACT_SOURCES) == 3
+    assert len(CRITERION_FACT_SOURCES) == 4
     assert len(CRITERION_METRIC_PATHS) == 4
     assert len(CRITERION_OPS) == 2
     assert COMPOSITE_CRITERION_TYPES == ("all_of", "any_of")
 
 
-def test_u5_tool_fact_source_is_not_part_of_this_freeze():
-    assert "tool" not in CRITERION_FACT_SOURCES
+def test_u5_tool_fact_source_boundary_is_the_plan_002_freeze():
+    """第四事实源由 PLAN-002 引入：`field_equals` 放行、`threshold_reached` 拒绝。"""
+    SubGoalSpec.validate_criteria(
+        {"type": "field_equals", "source": "tool", "path": "reminder_id", "value": "rem-1"}
+    )
     with pytest.raises(ValueError):
         SubGoalSpec.validate_criteria(
-            {"type": "field_equals", "source": "tool", "path": "probe", "value": 1}
+            {
+                "type": "threshold_reached",
+                "source": "tool",
+                "path": "tension",
+                "op": ">=",
+                "value": 0.5,
+            }
         )
 
 
