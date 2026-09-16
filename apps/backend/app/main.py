@@ -23,6 +23,9 @@ from app.services.development.policy import (
 )
 from app.services.goal_planning import register_runtime as register_goal_runtime
 from app.services.memory2.job_worker import run_job_worker_loop
+from app.services.planning.revision_listener import (
+    register_runtime as register_plan_revision_listener,
+)
 from app.services.reflection.reflector import register_executor
 from app.services.reflection.triggers import register_with_job_worker
 from app.services.relationship_narrative import register_narrative_listener
@@ -60,6 +63,8 @@ async def lifespan(application: FastAPI):
     if get_settings().v2_reflection_enabled:
         register_with_job_worker()
         register_executor()
+    if get_settings().v25_plan_reflection_enabled:
+        register_plan_revision_listener()
     if get_settings().v2_development_enabled:
         register_development_runtime()
         register_rollback_listener()

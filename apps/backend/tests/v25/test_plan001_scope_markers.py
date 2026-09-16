@@ -14,7 +14,7 @@
 | 计划域装配 / 引擎模块（`context.py` / `engine.py`） | PLAN-003 | ✅ 已落地 |
 | 计划域拆解模块（`decompose.py`） | PLAN-004 | ✅ 已落地 |
 | 计划域调度 / 执行 / 观测 / 修订模块（四模块） | PLAN-005 | ✅ 已落地 |
-| 重规划监听器（`revision_listener.py`） | PLAN-010 | ⛔ 仍不得预埋 |
+| 重规划监听器（`revision_listener.py`） | PLAN-010 | ✅ 已落地 |
 
 PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
 快照（原计划见 PLAN-001 Task Detail 的标记表）。
@@ -63,6 +63,20 @@ PLAN-009 落地时按同一纪律改动本模块：`memory_policy.py` 由「不�
 `revision_listener.py` **维持「不得预埋」**；包模块清单同步收编该模块名。
 同一落地的契约演进项：终态记忆映射 `TERMINAL_MEMORY_EVENTS`（落于既有 `observer.py`，
 与 PLAN-008 的 `TERMINAL_BROADCAST_OUTCOMES` 并列——广播与记忆是两条独立的终态通道）。
+
+PLAN-010 落地时按同一纪律改动本模块：`revision_listener.py` 由「仍不得预埋」翻转为
+**「已落地」**（§4.1.1 明确本任务新建该模块：`PlanningRevisionListener` / 三门槛 / 幂等键），
+包模块清单同步收编该模块名。同一落地的契约演进项（三条，均属「扩源而非新建」）：
+
+- `models/reflection.py::EVIDENCE_CHANNELS` 由两值扩为**三值**（追加 `plan`，既有两值顺序不变），
+  并新增 `PlanEvidenceWindow` / `PLAN_EVIDENCE_KIND`。
+- `services/reflection/evidence.py` 新增三个计划证据窗与 `plan_evidence_enabled` 子闸；
+  计划窗由既有 `aggregate_evidence_windows` 在子闸开启时**追加**（既有窗口顺序不变）。
+- `goal_planning._build_messages` / `propose_plan` 增 `evidence_refs` 可选入参（空值即
+  既有形态，prompt 逐字节不变）。`trigger_for_user` 与 `reflector` **零改动**。
+
+PLAN-011 / PLAN-012 的产物（调试端点 / 版本级验收）仍不在本包新增模块：
+`test_plan_reflection_listener_is_landed` 的负向断言把这一点一并钉住。
 """
 
 from pathlib import Path
@@ -132,7 +146,8 @@ PLAN_005_LANDED_MODULES = (
     "revision.py",
 )
 
-PLAN_010_PENDING_MODULES = ("revision_listener.py",)
+PLAN_010_LANDED_MODULES = ("revision_listener.py",)
+"""PLAN-010 契约演进（原「不得预埋」翻转为「已落地」）：Plan 侧反思监听器。"""
 
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
@@ -231,10 +246,23 @@ def test_plan_execution_modules_are_landed():
     assert missing == []
 
 
-def test_plan_reflection_listener_stays_unplanted():
-    """PLAN-010 的产物：本任务只定义 `insight_driven` 理由码，不预埋监听器。"""
-    present = [name for name in PLAN_010_PENDING_MODULES if (_planning_dir() / name).exists()]
-    assert present == []
+def test_plan_reflection_listener_is_landed():
+    """PLAN-010 契约演进（原「不得预埋」翻转为「已落地」）：Plan 侧反思监听器。
+
+    PLAN-010 §4.1.1 明确本任务**新建** `revision_listener.py`（`PlanningRevisionListener` +
+    幂等入队 + 第四注册点），故此处以显式清单翻转；同一落地**不新建**任何其他模块
+    （计划证据窗落在既有 `services/reflection/evidence.py`，证据通道值集落在既有
+    `models/reflection.py`）。
+    """
+    missing = [
+        name
+        for name in PLAN_010_LANDED_MODULES
+        if not (_planning_dir() / name).exists()
+    ]
+    assert missing == []
+    assert not (_planning_dir() / "reflection.py").exists()
+    assert not (_planning_dir() / "reflection_listener.py").exists()
+    assert not (_planning_dir() / "evidence.py").exists()
 
 
 def test_planning_engine_modules_are_landed():
@@ -363,6 +391,7 @@ def test_planning_package_holds_only_landed_modules():
         "memory_policy.py",
         "observer.py",
         "revision.py",
+        "revision_listener.py",
         "scheduler.py",
     ]
 

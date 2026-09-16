@@ -307,6 +307,7 @@ class TestZeroMigration:
             "memory_policy.py",
             "observer.py",
             "revision.py",
+            "revision_listener.py",
             "scheduler.py",
         ]
 

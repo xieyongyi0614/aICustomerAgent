@@ -460,17 +460,29 @@ def _unresolvable_tool(specs: list[SubGoalSpec]) -> str | None:
 async def _ask_proposal(
     draft: _Draft, settings
 ) -> "goal_planning.PlanningProposal | None":
-    """规划提案：复用既有 prompt 与重试语义（不重复实现 LLM 调用）；失败返回 None。"""
+    """规划提案：复用既有 prompt 与重试语义（不重复实现 LLM 调用）；失败返回 None。
+
+    PLAN-010 §8 Step 5：`ctx.evidence_refs`（本轮 Run 携带的反思 / 记忆证据 id）进 prompt，
+    使新轮次看得见「上次这么做没成」。**空证据时沿用既有三参调用形态**（prompt 与
+    调用面都逐字节不变）。
+    """
     try:
         return await asyncio.to_thread(
             goal_planning.propose_plan,
             draft.goal,
             dict(draft.ctx.world),
             _llm_settings(settings),
+            *_proposal_evidence(draft),
         )
     except Exception as exc:
         logger.warning("规划 LLM 调用失败：%s", exc.__class__.__name__)
         return None
+
+
+def _proposal_evidence(draft: _Draft) -> tuple:
+    """提案的证据引用实参：`()`（无证据，既有形态）或 `(evidence_refs,)`（PLAN-010 扩源）。"""
+    refs = tuple(draft.ctx.evidence_refs)
+    return (refs,) if refs else ()
 
 
 def _llm_settings(settings):

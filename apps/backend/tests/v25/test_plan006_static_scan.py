@@ -43,6 +43,7 @@ PLANNING_PACKAGE_MODULES = (
     "memory_policy.py",
     "observer.py",
     "revision.py",
+    "revision_listener.py",
     "scheduler.py",
 )
 

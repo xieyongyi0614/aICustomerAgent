@@ -11,6 +11,12 @@ TOOL-009 §2.3：追加工具效能证据源。`trigger_for_user(channel=tool)` 
 （`reflect:tool:user:日桶`，与既有日桶各自独立入队、共享既有额度语义）。
 工具证据 reinforce 计数入口独立成桶（同 tool_id 同 failure_kind），复用既有
 阈值与冷却窗机制；触发机制本身（周期 + 事件双触发）零改动。
+
+PLAN-010 §4.1.3 ②：追加计划效能证据源（`CHANNEL_PLAN`）。**本函数零改动**——计划通道
+不新增分支、不新增闸门、不新增幂等键：计划窗由 `evidence.aggregate_evidence_windows`
+在 `v25_plan_reflection_enabled` 开启时**扩源**进既有窗口列表，故它与用户证据走的是
+同一个 `channel=memory` 闸门序列（门槛 / 当日额度 / 幂等入队三层一字不差）。
+这就是本任务的「三道闸零豁免」：不是「也过一遍闸门」，而是**同一条路径**。
 """
 
 import logging
@@ -20,7 +26,11 @@ from datetime import datetime, timedelta
 
 from app.core.db import Memory, ReflectionRunRow, SessionLocal
 from app.core.settings import get_settings
-from app.models.reflection import EVIDENCE_CHANNEL_MEMORY, EVIDENCE_CHANNEL_TOOL
+from app.models.reflection import (
+    EVIDENCE_CHANNEL_MEMORY,
+    EVIDENCE_CHANNEL_PLAN,
+    EVIDENCE_CHANNEL_TOOL,
+)
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
 from app.services.memory2 import job_worker as memory2_job_worker
@@ -37,6 +47,12 @@ TRIGGER_EVENT = "event"
 
 CHANNEL_MEMORY = EVIDENCE_CHANNEL_MEMORY
 CHANNEL_TOOL = EVIDENCE_CHANNEL_TOOL
+CHANNEL_PLAN = EVIDENCE_CHANNEL_PLAN
+"""三个证据通道的入口别名（PLAN-010 增第三值）。
+
+`CHANNEL_PLAN` 传进 `trigger_for_user` 即走**与 `CHANNEL_MEMORY` 完全相同**的分支
+（同一证据源、同一幂等键、同一额度）——计划通道的差别只在证据源（计划窗）本身，不在闸门。
+"""
 
 OUTCOME_QUEUED = "queued"
 OUTCOME_SKIPPED = "skipped"

@@ -11,6 +11,18 @@ TOOL-009 §2.1/§4.1 追加三个工具效能证据窗（工具使用效果 / Ac
 `action_records` 投影读取（`memory2.sources.fetch_action_records`），**不读**
 `ToolRegistry` 状态、**不读**健康度内存态——反思看的是"历史执行事实"，不是
 "当前运维状态"。既有四个窗口（对话/记忆/世界/关系）聚合逻辑零改动。
+
+PLAN-010 §4.1.3 ① 再追加一路**计划效能**证据通道（`EVIDENCE_CHANNEL_PLAN`），
+三窗与工具侧**同构**：计划成功率（按目标类型）/ 步骤失败模式（按工具 × 失败类）/
+判据可判定性（按判据类型）。数据来源纪律同样只有两条只读投影：`goal_plans`
+（`goal_repository.list_active_plans` + `list_plans`）与 `action_records`
+（`action_repository.list_records`）——**零新表、零写入**（证据即投影）。
+上限常量（`TOOL_EVIDENCE_WINDOW_DAYS` / `TOOL_EVIDENCE_MAX_MEMBERS` /
+`TOOL_EVIDENCE_RECORD_SCAN_LIMIT`）、分组键范式（`GROUP_KIND_*`）、证据 id 形态
+（`PLAN_STEP_DEDUPE_KEY_TEMPLATE` 渲染的 `plan:<goal_id>:<version>:<step_index>`）
+与门槛函数（`passes_tool_gate` / `tool_gate_reasons`）一律**复用**，本任务不自造
+门槛数学。计划窗由 `aggregate_evidence_windows` 在子闸开启时追加，
+故三道闸 / 幂等入队 / 额度**与用户证据走完全相同的一条路径**。
 """
 
 import json
@@ -23,14 +35,17 @@ from datetime import datetime, timedelta
 from app.character.asuna import evaluation as asuna_evaluation
 from app.core.db import Memory, Message, SessionLocal
 from app.core.settings import get_settings
+from app.models.plan import PLAN_STEP_DEDUPE_KEY_TEMPLATE
 from app.models.reflection import (
+    EVIDENCE_CHANNEL_PLAN,
     TOOL_EVIDENCE_KIND,
     EvidenceMember,
     EvidenceWindow,
+    PlanEvidenceWindow,
     ToolEvidenceWindow,
     WindowStats,
 )
-from app.repositories import memory_repository
+from app.repositories import action_repository, goal_repository, memory_repository
 from app.services.memory2 import sources as memory_sources
 from app.services.memory_conflict import _lcs_length, same_topic
 
@@ -265,7 +280,12 @@ def aggregate_evidence_windows(
     now: datetime | None = None,
     trace=None,
 ) -> list[EvidenceWindow]:
-    """主入口：候选池 → 聚类 → 组统计 → 门槛判定；异常/空池返回空列表。"""
+    """主入口：候选池 → 聚类 → 组统计 → 门槛判定；异常/空池返回空列表。
+
+    PLAN-010 §4.1.3 ①：计划效能通道在此**扩源**（子闸 off 时零调用零读取）——三道闸、
+    幂等入队与额度由既有 `trigger_for_user` 承担，故计划证据与用户证据走**完全相同**
+    的一条路径（零豁免、零旁路）。
+    """
     started = time.perf_counter()
     now = now or datetime.now()
     try:
@@ -283,7 +303,7 @@ def aggregate_evidence_windows(
         degraded=result["degraded"],
         windows=[_window_digest(window) for window in result["windows"]],
     )
-    return result["windows"]
+    return result["windows"] + _plan_channel_windows(user_id, now, trace)
 
 
 def _aggregate(user_id: str, character_id: str, now: datetime) -> dict:
@@ -388,6 +408,24 @@ def _trace(trace, started: float, *, status: str = "ok", **extra) -> None:
         return
     duration = (time.perf_counter() - started) * 1000
     trace.record(STEP_NAME, duration, status, **extra)
+
+
+def _plan_channel_windows(
+    user_id: str, now: datetime, trace
+) -> list[PlanEvidenceWindow]:
+    """计划通道扩源（PLAN-010 §4.1.3 ①）：子闸 off 时零调用零读取。
+
+    计划窗**追加在既有窗口之后**：既有优先序纪律（既有窗口优先、取不到才回退）与
+    `reflector._select_evidence` 的用户通道同款；本任务不改变既有窗口的相对顺序。
+    计划窗的聚合异常只降级为空窗（不拉垮既有窗口）。
+    """
+    if not plan_evidence_enabled():
+        return []
+    try:
+        return list(aggregate_plan_evidence(user_id, now=now, trace=trace).windows)
+    except Exception:
+        logger.exception("计划效能证据窗聚合异常，降级为空窗：%s", user_id)
+        return []
 
 
 # --- TOOL-009：三个工具效能证据窗 ---------------------------------------------
@@ -1082,4 +1120,745 @@ def _tool_trace(trace, started: float, *, status: str = "ok", **extra) -> None:
         return
     duration = (time.perf_counter() - started) * 1000
     trace.record(TOOL_EVIDENCE_STEP_NAME, duration, status, **extra)
+
+
+# --- PLAN-010：三个计划效能证据窗 ---------------------------------------------
+
+PLAN_EVIDENCE_STEP_NAME = "reflection_plan_evidence"
+
+PLAN_STEP_SOURCE = "plan_step"
+"""计划证据成员的来源标记（`WindowStats.source_type_mix` 与反哺侧判别用）。"""
+
+PLAN_EVIDENCE_NAMESPACE = EVIDENCE_CHANNEL_PLAN
+"""计划证据 id 命名空间（取值与通道常量同源；id 形态的唯一声明处是
+`models/plan.py::PLAN_STEP_DEDUPE_KEY_TEMPLATE`）。"""
+
+PLAN_STEP_EVIDENCE_PREFIX = PLAN_STEP_DEDUPE_KEY_TEMPLATE.split("{", 1)[0]
+"""计划证据 id 前缀（`plan:`）：由模板字面段推导，零硬编码。"""
+
+GROUP_KIND_PLAN = "plan_kind"
+GROUP_KIND_STEP = "step_kind"
+GROUP_KIND_CRITERIA = "criteria_kind"
+"""新增分组键（沿用既有 `GROUP_KIND_*` 命名范式，§4.2.1）。
+
+`GROUP_KIND_FAILURE` 复用工具侧的既有常量（同义同形，不新造第二份）。
+"""
+
+PLAN_WINDOW_SUCCESS_RATE = "plan_success_rate"
+PLAN_WINDOW_STEP_FAILURE = "step_failure_mode"
+PLAN_WINDOW_CRITERIA_DECIDABILITY = "criteria_decidability"
+
+PLAN_WINDOW_KINDS: tuple[str, ...] = (
+    PLAN_WINDOW_SUCCESS_RATE,
+    PLAN_WINDOW_STEP_FAILURE,
+    PLAN_WINDOW_CRITERIA_DECIDABILITY,
+)
+"""三个计划效能证据窗（§4.2.1 表序 = 本元组序）。"""
+
+PLAN_WINDOW_PRIORITY: tuple[str, ...] = PLAN_WINDOW_KINDS
+"""同门槛时的确定性选择顺序（形态对齐 `asuna_evaluation.TOOL_WINDOW_PRIORITY`）。"""
+
+PLAN_WINDOW_ALLOWED_INSIGHTS: dict[str, tuple[str, ...]] = {
+    PLAN_WINDOW_SUCCESS_RATE: ("capability_note",),
+    PLAN_WINDOW_STEP_FAILURE: ("capability_note", "usage_preference"),
+    PLAN_WINDOW_CRITERIA_DECIDABILITY: ("pattern",),
+}
+"""窗口 → 允许的 Insight 类型（§4.2.1 表）。类型闸由既有 reflector 的
+`_window_insight_types` 机制消费：计划窗**结构性**不可能产出性格 / 人格类 Insight。"""
+
+PLAN_WINDOW_FAILURE_DRIVEN_KINDS: tuple[str, ...] = PLAN_WINDOW_KINDS
+"""受 `min_failures`（负样本下限）约束的窗口——三窗**全部**是失败/异常驱动的。
+
+与工具侧 `TOOL_WINDOW_THRESHOLDS[ACTION_SUCCESS_RATE]` 的 `min_failures` 同款纪律：
+计划效能窗只在「确实出了问题」时才成窗（一个 100% 顺利的计划不构成可学的认知，
+也就没有理由占用当日反思额度）。负样本口径逐窗见各聚合器：成功率 = 失败步，
+失败模式 = 失败执行，可判定性 = 判不出来的步。
+"""
+
+STEP_STATUS_DONE = "done"
+STEP_STATUS_FAILED = "failed"
+
+PLAN_STEP_STATUS_WORDS: dict[str, str] = {
+    STEP_STATUS_DONE: "已完成",
+    STEP_STATUS_FAILED: "已失败",
+    "pending": "待执行",
+    "in_progress": "进行中",
+    STATUS_SUCCEEDED: "执行成功",
+    STATUS_TIMEOUT: "执行超时",
+    "unavailable": "不可用",
+}
+
+PLAN_WINDOW_LABELS: dict[str, str] = {
+    PLAN_WINDOW_SUCCESS_RATE: "计划成功率",
+    PLAN_WINDOW_STEP_FAILURE: "步骤失败模式",
+    PLAN_WINDOW_CRITERIA_DECIDABILITY: "判据可判定性",
+}
+
+PLAN_WINDOW_METRICS: dict[str, str] = {
+    PLAN_WINDOW_SUCCESS_RATE: "这类计划的步骤做成率",
+    PLAN_WINDOW_STEP_FAILURE: "这一步反复失败的方式",
+    PLAN_WINDOW_CRITERIA_DECIDABILITY: "这类判据常年判不出来",
+}
+
+_UNKNOWN_GROUP_KEY = "unknown"
+
+
+def plan_evidence_id(goal_id: str, version: int, step_index: int) -> str:
+    """计划证据 id（`evidence_links.memory_id` 落库口径）：`plan:<goal_id>:<version>:<step_index>`。
+
+    形态的唯一声明处是 `models/plan.py::PLAN_STEP_DEDUPE_KEY_TEMPLATE`（与步骤幂等键同源）：
+    证据 id 因此与「哪一步」一一对应，可供反哺侧（记忆 / 自治）直接还原目标与步序号。
+    """
+    return PLAN_STEP_DEDUPE_KEY_TEMPLATE.format(
+        goal_id=goal_id, version=int(version), index=int(step_index)
+    )
+
+
+def plan_evidence_id_of(dedupe_key: str) -> tuple[str, int, int] | None:
+    """证据 id / 步级幂等键 → `(goal_id, version, step_index)`；非计划域键返回 `None`。"""
+    text = str(dedupe_key or "")
+    if not text.startswith(PLAN_STEP_EVIDENCE_PREFIX):
+        return None
+    parts = text.split(":")
+    if len(parts) != 4:
+        return None
+    try:
+        return parts[1], int(parts[2]), int(parts[3])
+    except ValueError:
+        return None
+
+
+def plan_thresholds(window_kind: str = "", settings=None) -> dict[str, float]:
+    """计划证据窗门槛（复用既有 settings 语义与既有门槛函数，不新造数学）。
+
+    | 项 | 取值 | 对齐来源 |
+    |---|---|---|
+    | `min_samples` | `v25_plan_reflection_min_samples`（3） | `v2_reflection_min_evidence` |
+    | `min_span_hours` | `v2_reflection_min_span_hours`（24.0） | 既有反思窗跨度纪律 |
+    | `min_failures` | 同 `min_samples`，**仅失败驱动窗** | `TOOL_WINDOW_THRESHOLDS` 的 `min_failures` |
+
+    形状与 `asuna_evaluation.TOOL_WINDOW_THRESHOLDS` 同构，直接喂既有 `passes_tool_gate` /
+    `tool_gate_reasons`。
+    """
+    resolved = settings if settings is not None else get_settings()
+    min_samples = int(resolved.v25_plan_reflection_min_samples)
+    thresholds: dict[str, float] = {
+        "min_samples": min_samples,
+        "min_span_hours": float(resolved.v2_reflection_min_span_hours),
+    }
+    if window_kind in PLAN_WINDOW_FAILURE_DRIVEN_KINDS:
+        thresholds["min_failures"] = min_samples
+    return thresholds
+
+
+def plan_evidence_enabled(settings=None) -> bool:
+    """计划证据通道子闸：总闸（`v2_reflection_enabled`）之外的 `v25_plan_reflection_enabled`。
+
+    与 `triggers.tool_channel_enabled` 同款纪律：子闸 off 时**零计划窗、零额外读取**
+    （`aggregate_evidence_windows` 的两通道行为与 V2.4.0 逐字节一致）。
+    """
+    resolved = settings if settings is not None else get_settings()
+    return bool(
+        getattr(resolved, "v2_reflection_enabled", False)
+        and getattr(resolved, "v25_plan_reflection_enabled", False)
+    )
+
+
+@dataclass(frozen=True)
+class PlanStepFact:
+    """一步计划执行的只读事实（`goal_plans.sub_goals` / `action_records` 投影）。
+
+    `evidence_id` 恒为 `plan_evidence_id(...)` 形态；结构事实（`goal_plans`）带
+    `criteria_kind` / `step_status`，执行事实（`action_records`）带 `tool_id` /
+    `failure_kind`；两者都只带事实，不带判断。
+    """
+
+    evidence_id: str
+    goal_id: str
+    version: int
+    step_index: int
+    observed_at: datetime
+    source: str = PLAN_STEP_SOURCE
+    goal_type: str = ""
+    plan_status: str = ""
+    step_status: str = ""
+    tool_id: str | None = None
+    failure_kind: str | None = None
+    criteria_kind: str = ""
+    undecided: bool = False
+
+
+@dataclass
+class PlanEvidencePackage:
+    """计划效能证据包（§4.2.1）：三窗的聚合结果 + 达门槛的窗口。"""
+
+    plan_windows: dict[str, dict[str, dict]] = field(default_factory=dict)
+    windows: list[PlanEvidenceWindow] = field(default_factory=list)
+    passing: int = 0
+    steps: int = 0
+    executions: int = 0
+
+    @property
+    def judged(self) -> int:
+        """参与门槛判定的分组数（含未达门槛者；审计用窗口计数）。"""
+        return sum(len(groups) for groups in self.plan_windows.values())
+
+    def summary(self) -> dict:
+        """证据摘要（落 `reflection_runs.evidence_summary` 的 `plan_windows` 段）。"""
+        return {
+            "channel": PLAN_EVIDENCE_NAMESPACE,
+            "window_kinds": {
+                kind: {
+                    "groups": len(groups),
+                    "passing": sum(
+                        1
+                        for entry in groups.values()
+                        if passes_tool_gate(entry, plan_thresholds(kind))
+                    ),
+                }
+                for kind, groups in self.plan_windows.items()
+            },
+            "passing": self.passing,
+            "steps": self.steps,
+            "executions": self.executions,
+        }
+
+
+def aggregate_plan_success_rate(
+    user_id: str,
+    *,
+    now: datetime,
+    window_days: int = TOOL_EVIDENCE_WINDOW_DAYS,
+    facts: list[PlanStepFact] | None = None,
+) -> dict[str, dict]:
+    """窗口一（计划成功率）：`goal_plans` 按目标类型（`plan_kind`）聚合步骤终态。
+
+    样本 = **已到终态的步骤**（`done` / `failed`），成功率 = done / 样本数；
+    同时记录所选计划版本的状态分布（`plan.status`，即 §4.2.1 的「按 status 聚合」），
+    使「这类计划 4 步做不完」这类认知有可判定的数据来源。
+    """
+    try:
+        facts = _resolve_plan_facts(
+            user_id, now, window_days, facts, _plan_structure_facts
+        )
+        groups: dict[str, dict] = {}
+        for fact in facts:
+            if fact.step_status not in (STEP_STATUS_DONE, STEP_STATUS_FAILED):
+                continue
+            entry = groups.setdefault(
+                fact.goal_type or _UNKNOWN_GROUP_KEY,
+                {
+                    "group_kind": GROUP_KIND_PLAN,
+                    "group_key": fact.goal_type or _UNKNOWN_GROUP_KEY,
+                    "samples": 0,
+                    "success": 0,
+                    "failed": 0,
+                    "success_rate": 0.0,
+                    "plan_status_counts": {},
+                    "first_at": fact.observed_at,
+                    "last_at": fact.observed_at,
+                },
+            )
+            entry["samples"] += 1
+            if fact.step_status == STEP_STATUS_DONE:
+                entry["success"] += 1
+            else:
+                entry["failed"] += 1
+            status = fact.plan_status or "unknown"
+            entry["plan_status_counts"][status] = (
+                entry["plan_status_counts"].get(status, 0) + 1
+            )
+            entry["first_at"] = min(entry["first_at"], fact.observed_at)
+            entry["last_at"] = max(entry["last_at"], fact.observed_at)
+            entry["success_rate"] = round(entry["success"] / entry["samples"], 4)
+        for entry in groups.values():
+            entry["span_hours"] = _span_hours(entry["first_at"], entry["last_at"])
+        return groups
+    except Exception:
+        logger.exception("计划成功率聚合异常，按门槛未过处理：%s", user_id)
+        return {}
+
+
+def aggregate_step_failure_modes(
+    user_id: str,
+    *,
+    now: datetime,
+    window_days: int = TOOL_EVIDENCE_WINDOW_DAYS,
+    facts: list[PlanStepFact] | None = None,
+) -> dict[str, dict]:
+    """窗口二（步骤失败模式）：`action_records.steps` 按 `tool_id` × `failure_kind` 聚合。
+
+    两个分组键：`step_kind`（按工具）与 `failure_kind`（按「工具|失败类」各自成组，
+    同工具不同失败原因不合并）——与既有工具成功率窗的组形态同构。
+    """
+    try:
+        facts = _resolve_plan_facts(user_id, now, window_days, facts, _plan_action_facts)
+        groups: dict[str, dict] = {}
+        for fact in facts:
+            if not fact.tool_id:
+                continue
+            _accumulate_plan_step_group(groups, GROUP_KIND_STEP, str(fact.tool_id), fact)
+        for fact in facts:
+            if not fact.tool_id or fact.failure_kind is None:
+                continue
+            _accumulate_plan_step_group(
+                groups,
+                GROUP_KIND_FAILURE,
+                f"{fact.tool_id}|{fact.failure_kind}",
+                fact,
+                parent_tool_id=str(fact.tool_id),
+                failure_kind=fact.failure_kind,
+            )
+        return groups
+    except Exception:
+        logger.exception("步骤失败模式聚合异常，按门槛未过处理：%s", user_id)
+        return {}
+
+
+def aggregate_criteria_decidability(
+    user_id: str,
+    *,
+    now: datetime,
+    window_days: int = TOOL_EVIDENCE_WINDOW_DAYS,
+    facts: list[PlanStepFact] | None = None,
+) -> dict[str, dict]:
+    """窗口三（判据可判定性）：按判据类型（`criteria_kind`）聚合「判不出来」的步占比。
+
+    样本 = 已被观测过的步骤（`last_observed_at` 非空）；`undecided` 的判别见
+    `_step_undecided`（`goal_plans.sub_goals` 上唯一可投影的不可判定痕迹）。
+    负样本口径：`undecided`（同时以 `failed` 键暴露给既有门槛函数的 `min_failures`——
+    「判不出来」就是本窗的失败语义，成功率窗的 `failed`、失败模式窗的 `failed` 同理）。
+    """
+    try:
+        facts = _resolve_plan_facts(
+            user_id, now, window_days, facts, _plan_structure_facts
+        )
+        groups: dict[str, dict] = {}
+        for fact in facts:
+            key = fact.criteria_kind or _UNKNOWN_GROUP_KEY
+            entry = groups.setdefault(
+                key,
+                {
+                    "group_kind": GROUP_KIND_CRITERIA,
+                    "group_key": key,
+                    "samples": 0,
+                    "decided": 0,
+                    "undecided": 0,
+                    "failed": 0,
+                    "undecided_rate": 0.0,
+                    "first_at": fact.observed_at,
+                    "last_at": fact.observed_at,
+                },
+            )
+            entry["samples"] += 1
+            if fact.undecided:
+                entry["undecided"] += 1
+                entry["failed"] += 1
+            else:
+                entry["decided"] += 1
+            entry["first_at"] = min(entry["first_at"], fact.observed_at)
+            entry["last_at"] = max(entry["last_at"], fact.observed_at)
+            entry["undecided_rate"] = round(entry["undecided"] / entry["samples"], 4)
+        for entry in groups.values():
+            entry["span_hours"] = _span_hours(entry["first_at"], entry["last_at"])
+        return groups
+    except Exception:
+        logger.exception("判据可判定性聚合异常，按门槛未过处理：%s", user_id)
+        return {}
+
+
+def aggregate_plan_windows(
+    user_id: str,
+    *,
+    now: datetime,
+    window_days: int = TOOL_EVIDENCE_WINDOW_DAYS,
+    structure_facts: list[PlanStepFact] | None = None,
+    action_facts: list[PlanStepFact] | None = None,
+) -> dict[str, dict[str, dict]]:
+    """三窗聚合总入口（异常按门槛未过处理，各自返回空 dict + 日志）。"""
+    resolved_structure = _resolve_plan_facts(
+        user_id, now, window_days, structure_facts, _plan_structure_facts
+    )
+    resolved_action = _resolve_plan_facts(
+        user_id, now, window_days, action_facts, _plan_action_facts
+    )
+    return {
+        PLAN_WINDOW_SUCCESS_RATE: aggregate_plan_success_rate(
+            user_id, now=now, window_days=window_days, facts=resolved_structure
+        ),
+        PLAN_WINDOW_STEP_FAILURE: aggregate_step_failure_modes(
+            user_id, now=now, window_days=window_days, facts=resolved_action
+        ),
+        PLAN_WINDOW_CRITERIA_DECIDABILITY: aggregate_criteria_decidability(
+            user_id, now=now, window_days=window_days, facts=resolved_structure
+        ),
+    }
+
+
+def aggregate_plan_evidence(
+    user_id: str,
+    *,
+    now: datetime | None = None,
+    window_days: int = TOOL_EVIDENCE_WINDOW_DAYS,
+    trace=None,
+) -> PlanEvidencePackage:
+    """计划效能证据包：三窗聚合 → 逐组门槛 → 达门槛窗口（纯读、零 LLM、零写入）。
+
+    子闸 off 时直接返回空包（**零计划窗、零额外读取**：Flag off 下与 V2.4.0 逐字节一致）。
+    证据不足（样本 < `v25_plan_reflection_min_samples` 或跨度不足）→ 该组不成窗，
+    故不产 Insight：调用链上不存在「证据不足仍调 LLM」的路径。
+    """
+    started = time.perf_counter()
+    now = now or datetime.now()
+    settings = get_settings()
+    if not plan_evidence_enabled(settings):
+        return PlanEvidencePackage()
+    try:
+        structure_facts, action_facts = _plan_facts(user_id, now, window_days)
+        plan_windows = aggregate_plan_windows(
+            user_id,
+            now=now,
+            window_days=window_days,
+            structure_facts=structure_facts,
+            action_facts=action_facts,
+        )
+        windows = build_plan_evidence_windows(
+            plan_windows, structure_facts + action_facts, now=now, settings=settings
+        )
+        package = PlanEvidencePackage(
+            plan_windows=plan_windows,
+            windows=windows,
+            passing=len(windows),
+            steps=len(structure_facts),
+            executions=len(action_facts),
+        )
+    except Exception as exc:
+        logger.exception("计划效能证据聚合异常，按门槛未过处理：%s", user_id)
+        _plan_trace(
+            trace,
+            started,
+            status="error",
+            error=f"{exc.__class__.__name__}: {exc}",
+        )
+        return PlanEvidencePackage()
+    _plan_trace(
+        trace,
+        started,
+        steps=package.steps,
+        executions=package.executions,
+        passing=package.passing,
+        windows=[
+            {
+                "window_kind": window.window_kind,
+                "group_key": window.group_key,
+                "member_count": window.stats.member_count,
+                "span_hours": window.stats.span_hours,
+            }
+            for window in package.windows
+        ],
+    )
+    return package
+
+
+def build_plan_evidence_windows(
+    plan_windows: dict[str, dict[str, dict]],
+    facts: list[PlanStepFact],
+    *,
+    now: datetime,
+    settings=None,
+) -> list[PlanEvidenceWindow]:
+    """逐组过门槛 → 达门槛组转为 `PlanEvidenceWindow`（复用既有闸门语义与成员结构）。"""
+    windows: list[PlanEvidenceWindow] = []
+    for kind in PLAN_WINDOW_KINDS:
+        thresholds = plan_thresholds(kind, settings)
+        for entry in (plan_windows.get(kind) or {}).values():
+            if not passes_tool_gate(entry, thresholds):
+                continue
+            members = _plan_window_members(kind, entry, facts, now)
+            if len(members) < int(thresholds.get("min_samples", 0) or 0):
+                continue
+            windows.append(_build_plan_window(kind, entry, members, thresholds))
+    windows.sort(
+        key=lambda window: (
+            _plan_kind_priority(window.window_kind),
+            -window.stats.member_count,
+            window.group_key,
+        )
+    )
+    return windows
+
+
+def _plan_kind_priority(window_kind: str) -> int:
+    return (
+        PLAN_WINDOW_PRIORITY.index(window_kind)
+        if window_kind in PLAN_WINDOW_PRIORITY
+        else len(PLAN_WINDOW_PRIORITY)
+    )
+
+
+def _resolve_plan_facts(
+    user_id: str,
+    now: datetime,
+    window_days: int,
+    facts: list[PlanStepFact] | None,
+    resolver,
+) -> list[PlanStepFact]:
+    """注入式事实（同一批事实供多窗复用）；未注入则按窗口只读投影。"""
+    if facts is not None:
+        return facts
+    return resolver(user_id, now, window_days)
+
+
+def _plan_facts(
+    user_id: str, now: datetime, window_days: int
+) -> tuple[list[PlanStepFact], list[PlanStepFact]]:
+    """计划事实投影总入口：`(结构事实, 执行事实)`（两者都只读、都异常降级为空）。"""
+    return (
+        _plan_structure_facts(user_id, now, window_days),
+        _plan_action_facts(user_id, now, window_days),
+    )
+
+
+def _plan_structure_facts(
+    user_id: str, now: datetime, window_days: int
+) -> list[PlanStepFact]:
+    """`goal_plans` 投影：活跃目标及其计划版本链的步级事实（只读、零写入）。
+
+    读取面只有既有两个函数：`list_active_plans`（活跃目标 × 活跃计划）与
+    `list_plans`（该目标的版本链）；超出时间窗的步按窗口纪律丢弃。
+    """
+    start = now - timedelta(days=window_days)
+    facts: list[PlanStepFact] = []
+    for goal, _plan in goal_repository.list_active_plans(user_id):
+        for plan in goal_repository.list_plans(goal.id):
+            reference = _naive(plan.updated_at) or _naive(plan.created_at)
+            for spec in plan.sub_goals:
+                observed = _naive(spec.last_observed_at) or reference
+                if observed is None or observed < start or observed > now:
+                    continue
+                facts.append(
+                    PlanStepFact(
+                        evidence_id=plan_evidence_id(goal.id, plan.version, spec.index),
+                        goal_id=str(goal.id),
+                        version=int(plan.version),
+                        step_index=int(spec.index),
+                        observed_at=observed,
+                        goal_type=str(goal.type or ""),
+                        plan_status=str(plan.status or ""),
+                        step_status=str(spec.status or ""),
+                        tool_id=spec.tool_id,
+                        criteria_kind=_criteria_kind(spec.criteria),
+                        undecided=_step_undecided(spec),
+                    )
+                )
+    facts.sort(key=lambda fact: fact.observed_at)
+    return facts
+
+
+def _plan_action_facts(
+    user_id: str, now: datetime, window_days: int
+) -> list[PlanStepFact]:
+    """`action_records` 投影：计划域步骤的执行事实（只读、零写入）。
+
+    计划域台账按幂等键前缀收敛（`plan:<goal_id>:`，即执行桥渲染的步级幂等键）；
+    记录恒为单步记录（执行桥一次一 intent），故证据 id 即记录级 `dedupe_key`——
+    与 `PLAN_STEP_DEDUPE_KEY_TEMPLATE` 同源，零硬编码。
+    """
+    records = action_repository.list_records(
+        user_id, limit=TOOL_EVIDENCE_RECORD_SCAN_LIMIT
+    )
+    start = now - timedelta(days=window_days)
+    facts: list[PlanStepFact] = []
+    for record in records:
+        parsed = plan_evidence_id_of(str(record.dedupe_key or ""))
+        if parsed is None:
+            continue
+        reference = _record_reference_time(record)
+        if reference is None or reference < start or reference > now:
+            continue
+        step = (record.steps or [{}])[0]
+        tool_id = step.get("tool_id")
+        if not tool_id:
+            continue
+        goal_id, version, index = parsed
+        facts.append(
+            PlanStepFact(
+                evidence_id=str(record.dedupe_key),
+                goal_id=goal_id,
+                version=version,
+                step_index=index,
+                observed_at=reference,
+                step_status=_step_status(step),
+                tool_id=str(tool_id),
+                failure_kind=_step_failure_kind(step),
+            )
+        )
+    facts.sort(key=lambda fact: fact.observed_at)
+    return facts
+
+
+def _criteria_kind(criteria) -> str:
+    """判据类型（分组键 `criteria_kind`）：缺失 / 非法形状一律归 `unknown`（不猜测）。"""
+    if not isinstance(criteria, dict):
+        return ""
+    return str(criteria.get("type") or "")
+
+
+def _step_undecided(spec) -> bool:
+    """该步的判据是否「判不出来」（`goal_plans.sub_goals` 上唯一可投影的痕迹）。
+
+    `goal_observation.advance_goal` 在 `evaluate_criteria` 返回 `None` 时只做两件事：
+    推进 `last_observed_at` 与保存进度——**状态不变、尝试计数不增**。故
+    「已观测过 ∧ 未到终态 ∧ 从未计数」即当步判据在观测中判不出来。
+    （判据结果本身只出现在 `decision_records` 的 `facts_digest`，而计划证据的数据源
+    纪律只有 `goal_plans` 与 `action_records` 两张表，故不从那里取。）
+    """
+    return bool(
+        spec.last_observed_at is not None
+        and str(spec.status or "") not in (STEP_STATUS_DONE, STEP_STATUS_FAILED)
+        and int(spec.attempt_count or 0) == 0
+    )
+
+
+def _accumulate_plan_step_group(
+    groups: dict[str, dict],
+    group_kind: str,
+    group_key: str,
+    fact: PlanStepFact,
+    *,
+    parent_tool_id: str | None = None,
+    failure_kind: str | None = None,
+) -> None:
+    """步骤失败模式的组累加（形态同构既有 `_accumulate_rate_group`）。"""
+    entry = groups.setdefault(
+        f"{group_kind}:{group_key}",
+        {
+            "group_kind": group_kind,
+            "group_key": group_key,
+            "parent_tool_id": parent_tool_id,
+            "failure_kind": failure_kind,
+            "samples": 0,
+            "success": 0,
+            "failed": 0,
+            "timeout": 0,
+            "failure_kinds": {},
+            "first_at": fact.observed_at,
+            "last_at": fact.observed_at,
+        },
+    )
+    entry["samples"] += 1
+    entry["first_at"] = min(entry["first_at"], fact.observed_at)
+    entry["last_at"] = max(entry["last_at"], fact.observed_at)
+    if fact.step_status == STATUS_SUCCEEDED:
+        entry["success"] += 1
+    else:
+        entry["failed"] += 1
+        if fact.step_status == STATUS_TIMEOUT:
+            entry["timeout"] += 1
+        if fact.failure_kind:
+            entry["failure_kinds"][fact.failure_kind] = (
+                entry["failure_kinds"].get(fact.failure_kind, 0) + 1
+            )
+    entry["failure_rate"] = round(entry["failed"] / entry["samples"], 4)
+    entry["span_hours"] = _span_hours(entry["first_at"], entry["last_at"])
+
+
+def _plan_window_members(
+    kind: str,
+    entry: dict,
+    facts: list[PlanStepFact],
+    now: datetime,
+) -> list[EvidenceMember]:
+    """窗口成员（有界：`TOOL_EVIDENCE_MAX_MEMBERS`，取最近者）。"""
+    selected = [fact for fact in facts if _plan_fact_in_group(kind, entry, fact)]
+    selected = selected[-TOOL_EVIDENCE_MAX_MEMBERS:]
+    return [
+        EvidenceMember(
+            memory_id=fact.evidence_id,
+            content=_plan_fact_content(fact),
+            created_at=fact.observed_at,
+            source=PLAN_STEP_SOURCE,
+            source_ref=fact.evidence_id,
+            salience=_TOOL_FACT_SALIENCE,
+            weight=_member_weight(_TOOL_FACT_SALIENCE, fact.observed_at, now),
+        )
+        for fact in selected
+    ]
+
+
+def _plan_fact_in_group(kind: str, entry: dict, fact: PlanStepFact) -> bool:
+    """组归属判定：按聚合键（目标类型 / tool_id / tool|failure_kind / 判据类型）精确匹配。"""
+    if kind == PLAN_WINDOW_SUCCESS_RATE:
+        return (
+            (fact.goal_type or _UNKNOWN_GROUP_KEY) == entry["group_key"]
+            and fact.step_status in (STEP_STATUS_DONE, STEP_STATUS_FAILED)
+        )
+    if kind == PLAN_WINDOW_STEP_FAILURE:
+        if entry.get("group_kind") == GROUP_KIND_FAILURE:
+            return (
+                str(fact.tool_id or "") == str(entry.get("parent_tool_id") or "")
+                and fact.failure_kind == entry.get("failure_kind")
+            )
+        return str(fact.tool_id or "") == entry["group_key"]
+    if kind == PLAN_WINDOW_CRITERIA_DECIDABILITY:
+        return (fact.criteria_kind or _UNKNOWN_GROUP_KEY) == entry["group_key"]
+    return False
+
+
+def _plan_fact_content(fact: PlanStepFact) -> str:
+    """成员内容（有界；只陈述事实，不给结论——结论一律由 LLM 提案 + 代码校准产生）。"""
+    parts = [f"计划（{fact.goal_type or '未知'}）第 {fact.step_index} 步"]
+    if fact.tool_id:
+        parts.append(f"工具 {fact.tool_id}")
+    parts.append(PLAN_STEP_STATUS_WORDS.get(fact.step_status, fact.step_status or "未观测"))
+    if fact.criteria_kind:
+        parts.append(f"判据 {fact.criteria_kind}")
+    if fact.undecided:
+        parts.append("判据未判出")
+    if fact.failure_kind:
+        parts.append(f"failure_kind={fact.failure_kind}")
+    if fact.plan_status:
+        parts.append(f"计划版本状态 {fact.plan_status}")
+    parts.append(f"（{fact.observed_at:%Y-%m-%d %H:%M}）")
+    return "；".join(parts)[: asuna_evaluation.TOOL_EVIDENCE_CONTENT_MAX_CHARS]
+
+
+def _build_plan_window(
+    kind: str,
+    entry: dict,
+    members: list[EvidenceMember],
+    thresholds: dict,
+) -> PlanEvidenceWindow:
+    """成员 + 组统计 → `PlanEvidenceWindow`（门槛理由复用既有 `tool_gate_reasons`）。"""
+    created = [member.created_at for member in members]
+    span_hours = _span_hours(min(created), max(created)) if len(created) > 1 else 0.0
+    group_key = str(entry.get("group_key"))
+    stats = WindowStats(
+        member_count=len(members),
+        span_hours=round(span_hours, 4),
+        distinct_source_refs=len({member.source_ref for member in members}),
+        source_type_mix={PLAN_STEP_SOURCE: len(members)},
+        coherence=1.0,
+    )
+    window = PlanEvidenceWindow(
+        topic_digest=(
+            f"计划效能（{PLAN_WINDOW_LABELS.get(kind, kind)}·{group_key}）："
+            f"{PLAN_WINDOW_METRICS.get(kind, '')}"
+        )[: _TOPIC_DIGEST_CHARS],
+        members=members,
+        stats=stats,
+        degraded=None,
+        window_kind=kind,
+        group_key=group_key,
+        insight_types=PLAN_WINDOW_ALLOWED_INSIGHTS.get(kind, ()),
+    )
+    window.gate_reasons = tool_gate_reasons(entry, thresholds)
+    return window
+
+
+def _plan_trace(trace, started: float, *, status: str = "ok", **extra) -> None:
+    if trace is None:
+        return
+    duration = (time.perf_counter() - started) * 1000
+    trace.record(PLAN_EVIDENCE_STEP_NAME, duration, status, **extra)
 

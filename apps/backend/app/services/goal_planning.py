@@ -64,6 +64,20 @@ REASON_LLM_FAILED = "llm_failed"
 _WORLD_IMPORTANCE_HIGH = "high"
 _WORLD_TITLE_MAX_CHARS = GOAL_DESCRIPTION_MAX_LENGTH - 2
 
+EVIDENCE_REFS_KEY = "evidence_refs"
+"""规划 prompt 的证据引用键（PLAN-010 §4.2.5 下游契约）。
+
+**只在非空时出现**：空证据时 prompt 与 V2.4.0 逐字节一致（Flag off / 无反思证据的
+既有路径零差异）。
+"""
+
+EVIDENCE_NOTE_KEY = "evidence_note"
+
+EVIDENCE_NOTE = (
+    "以上是上一轮规划留下的反思证据（这类做法没成 / 判据判不出来）："
+    "本轮必须换一种做法或调整步骤粒度，不得原样重复。"
+)
+
 
 class PlanningProposal(BaseModel):
     sub_goals: list[dict] = Field(default_factory=list)
@@ -252,7 +266,13 @@ def register_runtime() -> None:
     job_worker.register_job_type(JOB_TYPE_PLANNING, run_planning_jobs)
 
 
-def _build_messages(goal: GoalRecord, overlay, world_facts: dict, settings) -> list[tuple]:
+def _build_messages(
+    goal: GoalRecord,
+    overlay,
+    world_facts: dict,
+    settings,
+    evidence_refs: tuple = (),
+) -> list[tuple]:
     system = (
         "你是角色目标规划器，把一个目标拆解为可执行的 Sub-Goal 步骤，只输出 JSON。"
         "每步字段：index(从1连续)、description(不超过"
@@ -285,6 +305,10 @@ def _build_messages(goal: GoalRecord, overlay, world_facts: dict, settings) -> l
         ),
         "world_facts": world_facts or {},
     }
+    refs = [str(ref) for ref in (evidence_refs or ())]
+    if refs:
+        constraints[EVIDENCE_REFS_KEY] = refs
+        constraints[EVIDENCE_NOTE_KEY] = EVIDENCE_NOTE
     human = json.dumps(constraints, ensure_ascii=False, default=str)
     return [("system", system), ("human", human)]
 
@@ -319,7 +343,10 @@ def _ask_llm_with_retry(messages: list[tuple], settings) -> PlanningProposal:
 
 
 def propose_plan(
-    goal: GoalRecord, world_facts: dict | None = None, settings=None
+    goal: GoalRecord,
+    world_facts: dict | None = None,
+    settings=None,
+    evidence_refs: list[str] | tuple[str, ...] | None = None,
 ) -> PlanningProposal:
     """规划本体前半段（V2.5.0 PLAN-003 复用入口）：既有 prompt 装配 + 既有重试语义。
 
@@ -330,10 +357,15 @@ def propose_plan(
 
     `plan_goal` 原有三步编排（overlay → 建消息 → 重试）**保持不动**，故本函数是增量入口
     而非既有路径的改写：零运行时语义变更，prompt 逐字节不变。
+
+    `evidence_refs`（PLAN-010 §8 Step 5）：重规划轮次携带的反思证据 id 列表（`PlanContext`
+    透传）。空值即不注入任何键——prompt 与 V2.4.0 逐字节一致。
     """
     resolved = settings if settings is not None else get_settings()
     overlay = development_aggregate.read_overlay(goal.user_id)
-    messages = _build_messages(goal, overlay, world_facts or {}, resolved)
+    messages = _build_messages(
+        goal, overlay, world_facts or {}, resolved, evidence_refs or ()
+    )
     return _ask_llm_with_retry(messages, resolved)
 
 

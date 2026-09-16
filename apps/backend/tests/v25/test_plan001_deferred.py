@@ -56,6 +56,19 @@ PLAN-006 落地时按同一纪律改动本模块：
    即成为该 Gate 的最短可判定形式。
 2. **`revision_listener` 仍留在「待落地」清单**（PLAN-010 的产物），PLAN-006 不加模块、
    不加值集、不改模型。
+
+PLAN-010 落地时按同一纪律改动本模块：
+
+1. `revision_listener` 移出「待落地」清单并进 `PLAN_010_LANDED_MODULES`：
+   `test_deferred_targets_are_absent_today` 的清单随之**清空**（PLAN-011 / PLAN-012 不在
+   `app/services/planning/` 新增模块：前者是调试端点与只读扩展，后者是版本级验收），
+   断言机制保留（空清单下退化为恒定成立，由 `test_plan_reflection_listener_is_landed`
+   的正向断言承担产物面）。
+2. **`test_deferred_reflection_listener_registration` 去 `skip`**：`PlanningRevisionListener`
+   已落地（本任务唯一 Planning 侧反思接线），断言代码即成为该接线的证据。
+3. `test_deferred_goal_terminal_moves_latest_plan_out_of_active` **保持 `skip`**：其阻塞项
+   （把计划置 `superseded` 需改动既有 `_complete` 运行时语义）与本任务无关，PLAN-010 只投
+   幂等重规划触发、不改计划状态。
 """
 
 import importlib
@@ -68,9 +81,7 @@ from app.services.planning import goal_contract
 
 from .conftest import V25_NOW, V25_USER
 
-PLANNING_MODULES_FOR_LATER_TASKS = (
-    "app.services.planning.revision_listener",
-)
+PLANNING_MODULES_FOR_LATER_TASKS: tuple[str, ...] = ()
 
 PLAN_003_LANDED_MODULES = (
     "app.services.planning.context",
@@ -86,15 +97,24 @@ PLAN_005_LANDED_MODULES = (
     "app.services.planning.revision",
 )
 
+PLAN_010_LANDED_MODULES = ("app.services.planning.revision_listener",)
+
 
 def _import_later_module(module_path: str):
     return importlib.import_module(module_path)
 
 
 def test_deferred_targets_are_absent_today():
+    """清单在 PLAN-010 落地后**为空**（本包后续任务不再新增模块）；机制保留。
+
+    PLAN-011（调试端点 / 只读扩展）与 PLAN-012（版本级验收）都不在 `app/services/planning/`
+    新增模块，故「不得预埋」清单已无条目；产物面的正向断言见
+    `test_plan001_scope_markers.py::test_plan_reflection_listener_is_landed`。
+    """
     for module_path in PLANNING_MODULES_FOR_LATER_TASKS:
         with pytest.raises(ImportError):
             _import_later_module(module_path)
+    assert PLANNING_MODULES_FOR_LATER_TASKS == ()
     assert goal_repository.list_active_plans(V25_USER) == []
 
 
@@ -109,6 +129,11 @@ def test_plan_004_decompose_module_is_landed():
 
 def test_plan_005_execution_modules_are_landed():
     for module_path in PLAN_005_LANDED_MODULES:
+        assert _import_later_module(module_path) is not None
+
+
+def test_plan_010_revision_listener_is_landed():
+    for module_path in PLAN_010_LANDED_MODULES:
         assert _import_later_module(module_path) is not None
 
 
@@ -180,7 +205,13 @@ def test_deferred_execution_single_entry_point():
     assert "run_action_planning" in dir(bridge)
 
 
-@pytest.mark.skip(reason="待 PLAN-010 落地：PlanningRevisionListener 唯一反思接线")
 def test_deferred_reflection_listener_registration():
+    """PLAN-010 契约演进（原 deferred，现落地）：`PlanningRevisionListener` 唯一反思接线。
+
+    完整形式见 `tests/v25/test_plan010_listener.py`（三门槛负例 / 幂等键 / 注册点 /
+    隔离断言）与 `tests/v25/test_plan010_static_scan.py`（唯一动作的静态断言）。
+    """
     listener = _import_later_module("app.services.planning.revision_listener")
     assert listener.PlanningRevisionListener is not None
+    assert listener.on_insight_created is not None
+    assert listener.enqueue_replan is not None

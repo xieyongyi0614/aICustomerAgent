@@ -203,5 +203,6 @@ def test_plan_002_adds_no_module_to_the_planning_package():
         "memory_policy.py",
         "observer.py",
         "revision.py",
+        "revision_listener.py",
         "scheduler.py",
     ]
