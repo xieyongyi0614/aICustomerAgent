@@ -277,6 +277,9 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(
                 run.id, steps, "world_experience", _step_world_experience, user_id, now
             )
+            _record_step(
+                run.id, steps, "action_schedule", _step_action_schedule, user_id, now
+            )
     except Exception as exc:
         logger.exception("life loop 用户周期中止：%s", user_id)
         status = "aborted"
@@ -737,6 +740,12 @@ def _step_world_experience(user_id: str, now: datetime) -> dict:
         return {"status": "skipped", "skip_reason": "world_disabled"}
     applied = world_engine.run_maintenance(user_id=user_id)
     return {"status": "ok", "applied": applied}
+
+
+def _step_action_schedule(user_id: str, now: datetime) -> dict:
+    from app.services.action import scheduler as action_scheduler
+
+    return action_scheduler.step_action_schedule(now)
 
 
 async def _run_maintenance(now: datetime) -> int:
