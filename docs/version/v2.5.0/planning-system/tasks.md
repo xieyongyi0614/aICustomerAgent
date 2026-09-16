@@ -650,7 +650,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | PLAN-006 | DONE | 工具系统集成：闸门 5/6 判定收窄（kind=tool）+ 工具治理链 T1~T4 + 执行链路六闸门五段断言 + G-EXEC 静态断言 + 结果契约归一（零迁移、工具侧零改动） | `app/services/planning/engine.py`、`tests/v25/*`（新增 5 + 更新 2） | 05fc46e | tests/v25: 748 passed / 2 skipped；pylint engine.py 9.85/10（零新增告警）；compileall OK；tests/v24 1579 passed；既有失败零新增 |
 | PLAN-007 | DONE | 自治侧计划事实感知：`plan_facts` 有界第五段（七键）+ 同源一处装配 + 计划推进调制 + `goal_compile` 候选面 + 额度/冷却未放宽负例 + G-BOUNDARY + 四项零改动快照（零迁移、`decision_pipeline` 零改动） | `app/services/autonomy_policy.py`、`app/application/autonomy_engine.py`、`tests/v25/*`（新增 8 + 更新 1） | 7879456 | tests/v25: 889 passed / 2 skipped；pylint 两生产文件 10.00/10；compileall OK；既有 autonomy/goal/planning 子集零新增失败 |
 | PLAN-008 | DONE | 世界模拟集成：World 源九类事实只读装配 + `goal_opportunity` 并入 + 终态广播（复用 event_bridge，failed 不广播）+ 白名单七 op/outbox 幂等 + G-WORLD 静态护栏 + Q5/Q9 留痕（零迁移） | `app/services/planning/context.py`、`app/services/planning/observer.py`、`tests/v25/*`（新增 6 + 更新 2） | 03c1fba | tests/v25: 988 passed / 2 skipped；pylint 两文件 9.64/10；compileall OK；世界侧既有测试零新增失败 |
-| PLAN-009 | TODO | — | — | — | — |
+| PLAN-009 | DONE | 记忆集成：判据 A（计划本体落库）+ 判据 B（PlanMemoryPolicy 七行边界表，失败/放弃 source=user_derived）+ 判据 C（工具侧不被覆盖）+ R1~R8 零豁免 + 幂等（零迁移） | `app/services/planning/memory_policy.py`、`app/services/planning/observer.py`、`app/services/planning/__init__.py`、`tests/v25/*`（新增 8 + 更新 5） | c48d964 | tests/v25: 1131 passed / 2 skipped；pylint 新模块 9.74/10；compileall OK；memory 侧既有测试零新增失败 |
 | PLAN-010 | TODO | — | — | — | — |
 | PLAN-011 | TODO | — | — | — | — |
 | PLAN-012 | TODO | — | — | — | — |
