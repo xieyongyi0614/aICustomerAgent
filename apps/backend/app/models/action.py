@@ -1,7 +1,8 @@
 """V9 Action 域模型（action-model.md）。
 
 纯数据定义与纯函数：ActionIntent / ActionPlan / ActionStep / ActionResult /
-ActionEffect / ActionRecord / CapabilityResult + 六态状态机 transition_action。
+ActionEffect / Action / ActionRecord / CapabilityResult + 六态状态机 transition_action。
+V2.6.0：Action 统一抽象 / ExecutionKind 映射 / ActionSource 扩展。
 不绑定数据库、HTTP 与 LLM；非法状态迁移返回 None（V8 物品状态机同款纪律）。
 """
 
@@ -35,7 +36,40 @@ ACTION_TYPES: tuple[str, ...] = (
     "send_notification",
 )
 
-ActionSource = Literal["conversation", "autonomy", "cancel"]
+ActionSource = Literal["conversation", "autonomy", "cancel", "plan", "event_driven"]
+
+ACTION_SOURCES: tuple[str, ...] = (
+    "conversation",
+    "autonomy",
+    "cancel",
+    "plan",
+    "event_driven",
+)
+
+ExecutionKind = Literal["internal", "tool", "external"]
+
+ACTION_EXECUTION_MAP: dict[str, ExecutionKind] = {
+    "create_reminder": "internal",
+    "cancel_reminder": "internal",
+    "remember_fact": "internal",
+    "create_object": "internal",
+    "move_object": "internal",
+    "use_object": "internal",
+    "query_environment": "tool",
+    "query_search": "tool",
+    "send_notification": "external",
+}
+
+ACTION_STATUS_SEMANTICS: dict[str, str] = {
+    "created": "已创建未调度",
+    "planned": "已排期待执行",
+    "executing": "执行中",
+    "succeeded": "成功终态出度0",
+    "failed": "失败终态可由Manager.retry回planned受action_retry_max_attempts约束",
+    "cancelled": "取消终态出度0",
+}
+
+RETRY_BACK_EDGE: tuple[str, str] = ("failed", "planned")
 
 ActionStatus = Literal[
     "created", "planned", "executing", "succeeded", "failed", "cancelled"
@@ -193,6 +227,27 @@ class ActionResult(BaseModel):
     effects: list[ActionEffect] = []
     error: str | None = None
     failure_kind: FailureKind | None = None
+
+
+class Action(BaseModel):
+    id: str
+    type: ActionType
+    target: str | None = None
+    parameters: dict[str, Any] = {}
+    priority: int = 100
+    status: ActionStatus = "created"
+    result: ActionResult | None = None
+    created_at: datetime | None = None
+    scheduled_at: datetime | None = None
+    executed_at: datetime | None = None
+    source: ActionSource = "conversation"
+    goal_id: str | None = None
+    plan_step: str | None = None
+    dedupe_key: str = ""
+    run_id: str | None = None
+
+    def is_terminal(self) -> bool:
+        return self.status in TERMINAL_STATUSES
 
 
 class CapabilityResult(BaseModel):
