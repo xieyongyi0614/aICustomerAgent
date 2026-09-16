@@ -45,6 +45,18 @@ PLAN-007 落地时按同一纪律改动本模块：同样**无模块翻转**（�
 （§4.1.2 组件划分），`revision_listener.py` **维持「不得预埋」**。
 同一落地的契约演进项：`PolicySnapshot.plan_facts` 由原定六键扩为**七键**
 （新增标量 `current_action_type`，见 `autonomy_policy.PLAN_FACTS_KEYS` 的留痕）。
+
+PLAN-008 落地时按同一纪律改动本模块：同样**无模块翻转**（§4.1.1 明确「本任务不新建模块」：
+World 源九段补进既有 `context.py`、终态广播补进既有 `observer.py`，`world_engine` /
+`world_repository` / `outbox_consumer` / `event_bridge` 零改动），只新增两条**接口级**标记：
+World 读白名单 `WORLD_READ_ENTRIES` 与终态广播映射 `TERMINAL_BROADCAST_OUTCOMES`。
+同一落地的契约演进项（两条，均属「逐段可降级」的直接后果）：
+
+- `PLAN_DEGRADED_REASONS` 由六值扩为**十三值**：World 源由三段一体细化为九段逐段可降级，
+  插入七条世界段标记（见 `context.WORLD_READ_ENTRIES` 与 `test_plan003_context.py`
+  `TestDegradedRegistry` 的留痕）。
+- `_WorldSource` 由三元组扩为**五字段**（新增 ① 时间上下文与逐段降级清单）：
+  `_assemble_world` 的返回值由 `(source, degraded)` 收成单一载体（内部结构，非公开契约）。
 """
 
 from pathlib import Path
@@ -140,6 +152,12 @@ PLAN_007_ENGINE_INTERFACES = (
     "_last_advanced_at",
 )
 """PLAN-007 §6.2 的装配接口（落于既有 `autonomy_engine.py`，装配点唯一）。"""
+
+PLAN_008_CONTEXT_INTERFACES = ("WORLD_READ_ENTRIES",)
+"""PLAN-008 §6.1 的世界只读白名单（落于既有 `context.py`，九段装配的触达面）。"""
+
+PLAN_008_OBSERVER_INTERFACES = ("TERMINAL_BROADCAST_OUTCOMES", "broadcast_goal_terminal")
+"""PLAN-008 §6.3 的终态广播接口（落于既有 `observer.py`，迁移路径唯一调用点）。"""
 
 
 def _backend_root() -> Path:
@@ -265,6 +283,47 @@ def test_plan_007_packet_contract_is_seven_bounded_keys():
         "last_advanced_at",
     )
     assert "plan_facts" in autonomy_policy.PolicySnapshot.__dataclass_fields__
+
+
+def test_plan_008_lands_the_two_faces_without_a_new_module():
+    """PLAN-008 产物面：世界只读白名单 + 终态广播接口在位，且**没有**为世界集成新建模块。"""
+    from app.services.planning import context as context_mod
+    from app.services.planning import observer as observer_mod
+
+    assert [
+        name for name in PLAN_008_CONTEXT_INTERFACES if not hasattr(context_mod, name)
+    ] == []
+    assert [
+        name for name in PLAN_008_OBSERVER_INTERFACES if not hasattr(observer_mod, name)
+    ] == []
+    assert not (_planning_dir() / "world.py").exists()
+    assert not (_planning_dir() / "world_integration.py").exists()
+    assert not (_planning_dir() / "world_broadcast.py").exists()
+
+
+def test_plan_008_degraded_registry_adds_only_world_segment_codes():
+    """PLAN-008 的契约演进留痕：`degraded` 值集扩七条世界段标记，其余逐字不变。"""
+    from app.services.planning import context as context_mod
+
+    codes = context_mod.PLAN_DEGRADED_REASONS
+    assert len(codes) == 13
+    assert codes[0] == "world_disabled"
+    assert codes[1:8] == (
+        "world_time_unavailable",
+        "world_environment_unavailable",
+        "world_location_unavailable",
+        "world_objects_unavailable",
+        "world_events_unavailable",
+        "world_brief_unavailable",
+        "world_context_unavailable",
+    )
+    assert codes[8:] == (
+        "scene_unavailable",
+        "situation_unavailable",
+        "memory_unavailable",
+        "reflection_unavailable",
+        "surface_unavailable",
+    )
 
 
 def test_planning_package_holds_only_landed_modules():

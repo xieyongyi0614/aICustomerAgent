@@ -8,7 +8,7 @@
 | 源 | 读取入口 | 不可用形态（`degraded` 标记） |
 |---|---|---|
 | Goal | `goal_repository.get_goal` | **硬依赖**：缺失即 `PlanUnavailable("goal_missing")` |
-| World | `world_engine.collect_facts` / `build_context` | 空包 / `world_disabled` |
+| World | `WORLD_READ_ENTRIES`（五项只读入口，九段装配） | 逐段空包 / `world_disabled` + 七条世界段标记 |
 | Context | `scene_profile_for` / `get_active_situation` / 关系投影 | 空包 / `scene_unavailable` 等 |
 | Memory | `memory2.retriever.retrieve` | 空列表 / `memory_unavailable` |
 | Reflection | `list_user_active_insights` / `interest_signal` | 空列表 / `reflection_unavailable` |
@@ -37,6 +37,25 @@ ToolSurface 的三态：`v25_plan_tool_required` on 且工具系统可用 → �
 3. `_assemble_world` / `_gather_sources` 不接 `now`：世界源的既有入口不接时刻参数（时刻由
    `TimeProvider` 从世界时钟取），`now` 仅用于工具面装配。装配中间态用 `_WorldSource` /
    `_PlanSources` 两个内部载体承载（§6.3 的裸 tuple 不便承载逐源降级清单）。
+
+**World 源的九段装配（PLAN-008 §4.2.1，逐段可降级）**
+
+| # | 世界事实 | 只读入口 | `PlanContext` 字段 |
+|---|---|---|---|
+| ① | 时间 / 日时段 | `TimeProvider.context(world)` | `world.part_of_day` |
+| ② | 天气 / 环境 | `world_engine.collect_facts` | `world.weather` / `salient_events` |
+| ③ | 地点 / 可用动作 | `build_location_context(world)` | `world.location` / `location_name` / 可用动作 |
+| ④ | 库存 / 附近物 | `world_engine.get_objects_by_location` | `world.nearby_objects` |
+| ⑤ | 显著事件 | `world_engine.list_active_events` + `event_impact` | `world.active_events` |
+| ⑥ | 用户处境 | `world_simulation_repository.get_active_situation` | `situations` |
+| ⑦ | 场景画像 | `scene_profiles.scene_profile_for` | `scene` |
+| ⑧ | 世界简报 | `world_brief.build_world_brief`（≤ `world_brief_char_budget`） | `world_brief` |
+| ⑨ | 完整世界切片 | `world_engine.build_context` | `world_context` |
+
+①③ 不走 `world_engine` 的同名包装：`build_time_context` / `get_location_context` 内部
+`ensure_world` 是写路径（缺世界记录即建档），与「世界事实装配全程只读」冲突；故取同一事实的
+只读内核 `TimeProvider.context(world)` / `build_location_context(world)`。任一源失败 → 空包 +
+`degraded` 登记；`world_enabled=False` 或无世界记录 → 九项全空 + `world_disabled` 一条。
 """
 
 from __future__ import annotations
@@ -72,7 +91,10 @@ from app.services.tool.context import ToolContext
 from app.services.tool.registry import get_tool_registry
 from app.services.tool.surface import ToolSurfaceResolver
 from app.services.tool.world_context import WorldContextBuilder, build_tool_context
+from app.services.world import event_impact as event_impact_rules
 from app.services.world import world_brief as world_brief_service
+from app.services.world.locations import build_location_context
+from app.services.world.time_provider import TimeProvider
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +109,13 @@ PLAN_UNAVAILABLE_REASONS: tuple[str, ...] = (
 )
 
 DEGRADED_WORLD_DISABLED = "world_disabled"
+DEGRADED_WORLD_TIME_UNAVAILABLE = "world_time_unavailable"
+DEGRADED_WORLD_ENVIRONMENT_UNAVAILABLE = "world_environment_unavailable"
+DEGRADED_WORLD_LOCATION_UNAVAILABLE = "world_location_unavailable"
+DEGRADED_WORLD_OBJECTS_UNAVAILABLE = "world_objects_unavailable"
+DEGRADED_WORLD_EVENTS_UNAVAILABLE = "world_events_unavailable"
+DEGRADED_WORLD_BRIEF_UNAVAILABLE = "world_brief_unavailable"
+DEGRADED_WORLD_CONTEXT_UNAVAILABLE = "world_context_unavailable"
 DEGRADED_SCENE_UNAVAILABLE = "scene_unavailable"
 DEGRADED_SITUATION_UNAVAILABLE = "situation_unavailable"
 DEGRADED_MEMORY_UNAVAILABLE = "memory_unavailable"
@@ -95,12 +124,37 @@ DEGRADED_SURFACE_UNAVAILABLE = "surface_unavailable"
 
 PLAN_DEGRADED_REASONS: tuple[str, ...] = (
     DEGRADED_WORLD_DISABLED,
+    DEGRADED_WORLD_TIME_UNAVAILABLE,
+    DEGRADED_WORLD_ENVIRONMENT_UNAVAILABLE,
+    DEGRADED_WORLD_LOCATION_UNAVAILABLE,
+    DEGRADED_WORLD_OBJECTS_UNAVAILABLE,
+    DEGRADED_WORLD_EVENTS_UNAVAILABLE,
+    DEGRADED_WORLD_BRIEF_UNAVAILABLE,
+    DEGRADED_WORLD_CONTEXT_UNAVAILABLE,
     DEGRADED_SCENE_UNAVAILABLE,
     DEGRADED_SITUATION_UNAVAILABLE,
     DEGRADED_MEMORY_UNAVAILABLE,
     DEGRADED_REFLECTION_UNAVAILABLE,
     DEGRADED_SURFACE_UNAVAILABLE,
 )
+
+WORLD_READ_ENTRIES: tuple[str, ...] = (
+    "get_world",
+    "collect_facts",
+    "get_objects_by_location",
+    "list_active_events",
+    "build_context",
+)
+"""World 源的**只读白名单**（PLAN-008 §4.2.1 / §6.1 D1 / G-WORLD）。
+
+`world_engine` 在本包的触达面必须 ⊆ 此白名单：写函数（`create_*` / `move_*` / `set_*` /
+`advance_time` / `run_*` / `seed_*` / `expire_*` / `trigger_*`）一个都不在内——计划层对世界的
+直接写入量为 0。①③ 的事实不走 `world_engine` 的同名包装（其内部 `ensure_world` 是写路径），
+取同一事实的只读内核（`TimeProvider` / `build_location_context`）。
+"""
+
+WORLD_ACTIVE_EVENTS_LIMIT = 3
+"""显著事件（⑤）的条数上限：刻意不新增 settings（零参数扩张），与既有世界侧显著事件上限同量级。"""
 
 PLAN_BUDGET_KEYS: tuple[str, ...] = (
     "max_steps",
@@ -306,11 +360,13 @@ class PlanContextAssembler:
 
 @dataclass
 class _WorldSource:
-    """World 源的三段产物：事实包 / `WorldContext` / 世界简报（逐段可缺省）。"""
+    """World 源的九段产物（逐段可缺省）+ 逐段降级清单（单一载体，`_assemble_world` 的返回）。"""
 
     facts: dict[str, Any] = field(default_factory=dict)
     context: Any = None
     brief: WorldBrief | None = None
+    time: Any = None
+    degraded: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -326,63 +382,171 @@ class _PlanSources:
     degraded: list[str] = field(default_factory=list)
 
 
-async def _assemble_world(user_id: str) -> tuple[_WorldSource, list[str]]:
-    """World 源（可降级）：事实包 + `WorldContext` + 简报；世界关闭或无世界记录即空包。
+async def _assemble_world(user_id: str) -> _WorldSource:
+    """World 源（九段逐段可降级）：世界关闭或无世界记录即空包 + `world_disabled` 一条。
 
     **不触发建档**：`world_engine.get_world` 为只读判定，为 None 时直接降级——不由本模块
-    创建世界记录（`ensure_world` 是写路径）。`build_context` 内部的既有通读在世界上存在时
-    零写入（世界建档 / 家庭默认物播种是其既有前置，属世界侧 Flag 的既有行为）。
+    创建世界记录（`ensure_world` 是写路径）。九段的读入口全在 `WORLD_READ_ENTRIES` 内，
+    装配全程零写库（写面探针断言见 PLAN-008 §9.2 I3）。
     """
     settings = get_settings()
-    empty = (_WorldSource(), [DEGRADED_WORLD_DISABLED])
     if not settings.world_enabled:
-        return empty
+        return _WorldSource(degraded=[DEGRADED_WORLD_DISABLED])
     try:
-        world = world_engine.get_world(user_id)
-    except Exception:
-        logger.exception("世界读取失败，规划上下文世界源降级：%s", user_id)
-        return empty
-    if world is None:
-        return empty
-    try:
-        facts = await asyncio.to_thread(world_engine.collect_facts, user_id)
-        world_context = await asyncio.to_thread(world_engine.build_context, user_id)
+        return await asyncio.to_thread(_read_world_source, user_id, settings)
     except Exception:
         logger.exception("世界事实装配失败，规划上下文世界源降级：%s", user_id)
-        return empty
-    source = _WorldSource(
-        facts=facts or {},
-        context=world_context,
-        brief=_world_brief(world_context, world, settings),
-    )
-    return source, []
+        return _WorldSource(degraded=[DEGRADED_WORLD_DISABLED])
 
 
-def _world_brief(world_context: Any, world: Any, settings) -> WorldBrief | None:
-    """世界简报：`build_context` 已装配时直接取用，否则用既有纯函数按预算装配一次。"""
-    if world_context is None:
-        return None
-    if world_context.brief is not None:
-        return world_context.brief
+def _read_world_source(user_id: str, settings) -> _WorldSource:
+    """九段顺序装配（①~⑤、⑨ + ⑧ 简报）：同步只读，由 `_assemble_world` 卸载到线程。"""
+    source = _WorldSource()
+    world = _read_world(user_id)
+    if world is None:
+        source.degraded.append(DEGRADED_WORLD_DISABLED)
+        return source
+    _time_segment(source, world)
+    _environment_segment(source, user_id)
+    location_id = _location_segment(source, world, user_id)
+    _objects_segment(source, user_id, location_id)
+    _events_segment(source, user_id)
+    _context_segment(source, user_id)
+    source.brief = _world_brief(source, world, settings)
+    return source
+
+
+def _read_world(user_id: str) -> Any:
+    """世界记录（只读判定）：读取异常与「无世界记录」同处置——空包 + `world_disabled`。"""
     try:
-        return world_brief_service.build_world_brief(
-            world_context.time,
+        return world_engine.get_world(user_id)
+    except Exception:
+        logger.exception("世界读取失败，规划上下文世界源降级：%s", user_id)
+        return None
+
+
+def _time_segment(source: _WorldSource, world) -> None:
+    """① 时间 / 日时段：世界时钟（`TimeProvider`）为唯一权威，调用方 `now` 不参与。"""
+    try:
+        time_context = TimeProvider().context(world)
+    except Exception:
+        logger.exception("世界时间上下文装配失败，规划上下文旅段降级")
+        source.degraded.append(DEGRADED_WORLD_TIME_UNAVAILABLE)
+        return
+    source.time = time_context
+    source.facts["part_of_day"] = time_context.part_of_day
+
+
+def _environment_segment(source: _WorldSource, user_id: str) -> None:
+    """② 天气 / 环境：既有自治事实包（`part_of_day` / `location` / `weather` / 显著事件）。"""
+    facts = _read(lambda: world_engine.collect_facts(user_id))
+    if not facts:
+        source.degraded.append(DEGRADED_WORLD_ENVIRONMENT_UNAVAILABLE)
+        return
+    source.facts.update(facts)
+
+
+def _location_segment(source: _WorldSource, world, user_id: str) -> str | None:
+    """③ 地点 / 可用动作：返回地点 id 供 ④ 复用（地点不可得时回退世界记录的当前位置）。"""
+    try:
+        location = build_location_context(world)
+    except Exception:
+        logger.exception("地点上下文装配失败，规划上下文地点段降级：%s", user_id)
+        location = None
+    if location is None:
+        source.degraded.append(DEGRADED_WORLD_LOCATION_UNAVAILABLE)
+        return world.current_location
+    source.facts["location"] = location.current
+    source.facts["location_name"] = location.current_name
+    source.facts["available_actions"] = list(location.available_actions)
+    return location.current
+
+
+def _objects_segment(source: _WorldSource, user_id: str, location_id: str | None) -> None:
+    """④ 库存 / 附近物：空清单是**可用态**（数据面判定），读取失败才是降级态。"""
+    if not location_id:
+        source.degraded.append(DEGRADED_WORLD_OBJECTS_UNAVAILABLE)
+        return
+    objects = _read(lambda: world_engine.get_objects_by_location(user_id, location_id))
+    if objects is None:
+        source.degraded.append(DEGRADED_WORLD_OBJECTS_UNAVAILABLE)
+        return
+    source.facts["nearby_objects"] = [obj.name for obj in objects]
+    source.facts["nearby_object_count"] = len(objects)
+
+
+def _events_segment(source: _WorldSource, user_id: str) -> None:
+    """⑤ 显著事件：既有影响裁决（`EventImpact.goal_opportunity` 即规划素材），有界且按紧迫度排序。"""
+    events = _read(lambda: world_engine.list_active_events(user_id))
+    if events is None:
+        source.degraded.append(DEGRADED_WORLD_EVENTS_UNAVAILABLE)
+        return
+    context = {"part_of_day": source.facts.get("part_of_day")}
+    try:
+        impacts = event_impact_rules.evaluate_batch(events, context)
+    except Exception:
+        logger.exception("显著事件影响裁决失败，规划上下文事件段降级：%s", user_id)
+        source.degraded.append(DEGRADED_WORLD_EVENTS_UNAVAILABLE)
+        return
+    source.facts["active_events"] = [
+        impact.to_dict() for impact in impacts[:WORLD_ACTIVE_EVENTS_LIMIT]
+    ]
+
+
+def _context_segment(source: _WorldSource, user_id: str) -> None:
+    """⑨ 完整世界切片：既有 `build_context`（只读；其内部简报与本模块 ⑧ 同源）。"""
+    context = _read(lambda: world_engine.build_context(user_id))
+    if context is None:
+        source.degraded.append(DEGRADED_WORLD_CONTEXT_UNAVAILABLE)
+        return
+    source.context = context
+
+
+def _read(call):
+    """只读入口的统一兜底：异常 → `None`（由各段登记降级码，不抛错、不阻塞规划）。"""
+    try:
+        return call()
+    except Exception:
+        logger.exception("世界只读入口异常，该段降级")
+        return None
+
+
+def _world_brief(source: _WorldSource, world, settings) -> WorldBrief | None:
+    """⑧ 世界简报：复用 `build_context` 已装配的简报；超预算或缺失时按预算重装一次。
+
+    预算是硬约束（§6.1 D5）：重装仍空/失败即降级为 `None` + `world_brief_unavailable`。
+    """
+    if source.context is None:
+        source.degraded.append(DEGRADED_WORLD_BRIEF_UNAVAILABLE)
+        return None
+    budget = settings.world_brief_char_budget
+    existing = source.context.brief
+    if existing is not None and existing.text and len(existing.text) <= budget:
+        return existing
+    try:
+        rebuilt = world_brief_service.build_world_brief(
+            source.context.time,
             world,
             None,
             None,
-            world_context.salient_events,
-            budget=settings.world_brief_char_budget,
+            source.context.salient_events,
+            budget=budget,
         )
     except Exception:
-        logger.exception("世界简报装配失败，规划上下文简报段缺省")
+        logger.exception("世界简报装配失败，规划上下文简报段降级")
+        source.degraded.append(DEGRADED_WORLD_BRIEF_UNAVAILABLE)
         return None
+    if not rebuilt.text:
+        source.degraded.append(DEGRADED_WORLD_BRIEF_UNAVAILABLE)
+        return None
+    return rebuilt
 
 
 async def _gather_sources(goal: GoalRecord, settings) -> _PlanSources:
     """四源顺序装配（Task Detail §4.1.3）：World → Context → Memory → Reflection。"""
     sources = _PlanSources()
-    sources.world, world_degraded = await _assemble_world(goal.user_id)
-    sources.degraded.extend(world_degraded)
+    sources.world = await _assemble_world(goal.user_id)
+    sources.degraded.extend(sources.world.degraded)
     scene, situations, relationship, context_degraded = _assemble_context(
         goal.user_id, sources.world.facts, settings
     )

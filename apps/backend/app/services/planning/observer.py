@@ -34,6 +34,13 @@
 避免同一转换两行归因），并把 `PlanAdvance` 落 `decision_records`
 （`kind='goal_lifecycle'`，**不新增 kind**，D12）。
 
+**终态广播（PLAN-008 §4.2.5 / §6.3）**：`_transition` 在迁移成功后调 `broadcast_goal_terminal`
+（映射表 `TERMINAL_BROADCAST_OUTCOMES`，只含 `completed` / `abandoned`），经既有
+`event_bridge.register_goal_event` → outbox → `world_events(type=goal_completed, source=character)`，
+从而自动获得既有重要事件升级链路；`failed` 不广播，计划修订不产生终态迁移故结构上不可能广播；
+广播失败只 log，**不回滚计划终态**（D15）。既有写面 `goal_observation._complete` 与
+`goal_arbitration.check_abandonment` 各自的广播未改动（`settle` 只在「既有写面没结算」时迁移）。
+
 与 Task Detail 的两处实现核对（已在测试留痕）
 
 1. **§8.5 的 `settle(...) -> PlanOutcome` 改名为 `PlanSettlement`**：`PlanOutcome` 已被
@@ -68,6 +75,7 @@ from app.models.plan import (
 from app.repositories import action_repository, goal_repository, memory_repository
 from app.services import goal_arbitration, goal_observation, state_service
 from app.services.planning import goal_contract, scheduler as plan_scheduler
+from app.services.world import event_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +149,17 @@ DECISION_REASONS: dict[str, str] = {
 
 REASON_MAX_LENGTH = 60
 
+TERMINAL_BROADCAST_OUTCOMES: dict[str, str] = {
+    "completed": "completed",
+    "abandoned": "abandoned",
+}
+"""终态广播的 `GoalStatus` → `outcome` 映射（PLAN-008 §4.3.2）。
+
+`failed` **不在表内**（失败不是世界事实）；计划修订不产生终态迁移，结构上不可能广播。
+`abandoned` 的计划侧迁移在本版本不发生（放弃由既有 `goal_arbitration.check_abandonment`
+裁决并广播），映射表仍然显式列出，使计划侧若执行该迁移时广播语义与既有路径一致。
+"""
+
 __all__ = [
     "DECISION_OUTCOMES",
     "DECISION_REASONS",
@@ -160,6 +179,8 @@ __all__ = [
     "REASON_OBSERVATION_ERROR",
     "REASON_PLAN_WRITE_REFUSED",
     "STEP_NAME",
+    "TERMINAL_BROADCAST_OUTCOMES",
+    "broadcast_goal_terminal",
 ]
 
 
@@ -345,7 +366,9 @@ class PlanObserver:
             return PlanSettlement(
                 advance.decision, goal.status, False, advance.reason
             )
-        self._record_lifecycle(record or goal, plan, advance, target)
+        settled = record or goal
+        self._record_lifecycle(settled, plan, advance, target)
+        broadcast_goal_terminal(settled, target)
         return PlanSettlement(
             advance.decision,
             None if record is None else record.status,
@@ -412,6 +435,28 @@ class PlanObserver:
         )
         resolved = _declared_keys(pairs, goal_id) if keys is None else keys
         return _prefixes(goal_ids), resolved
+
+
+def broadcast_goal_terminal(goal, outcome: str) -> bool:
+    """终态广播（PLAN-008 §4.2.5 / §6.3）：计划层的**唯一**世界事件表达。
+
+    只调既有 `event_bridge.register_goal_event`（复用既有 `goal_completed` 类型与既有
+    outbox → `world_engine` 链路，不新增事件类型、不新增写入路径）；`outcome` 不在映射表内
+    （`failed` 等）即零调用返回 `False`。广播失败（抛错 / Flag off / 幂等键命中）**只 log**：
+    不回滚计划终态（§6.5 D15，与 V9「投递失败不回滚执行」同款纪律）。
+    """
+    mapped = TERMINAL_BROADCAST_OUTCOMES.get(outcome)
+    if mapped is None:
+        return False
+    try:
+        return bool(
+            event_bridge.register_goal_event(
+                goal.user_id, goal.id, goal.description, mapped
+            )
+        )
+    except Exception:
+        logger.exception("计划终态广播失败（goal=%s → %s）", goal.id, mapped)
+        return False
 
 
 def _unsupported_tool_criterion(criteria: dict, depth: int = 0) -> bool:

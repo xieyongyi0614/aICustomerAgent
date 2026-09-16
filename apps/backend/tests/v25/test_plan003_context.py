@@ -667,11 +667,24 @@ def _stub_out(module, name: str, sink: list):
 
 
 class TestDegradedRegistry:
-    """U3：`degraded` 清单元素为稳定字符串，且逐源可读。"""
+    """U3：`degraded` 清单元素为稳定字符串，且逐源可读。
+
+    PLAN-008 契约演进（本模块的必要改动，留痕）：World 源由「三段一体」细化为 §4.2.1 的
+    **九段逐段可降级**，故 `PLAN_DEGRADED_REASONS` 在原六值之后（`world_disabled` 之后）
+    插入七条世界段标记。整体不可用（`world_enabled=False` / 无世界记录）仍只登记
+    `world_disabled` 一条，其余断言不变。
+    """
 
     def test_degraded_codes_are_frozen_and_stable(self):
         assert plan_context.PLAN_DEGRADED_REASONS == (
             "world_disabled",
+            "world_time_unavailable",
+            "world_environment_unavailable",
+            "world_location_unavailable",
+            "world_objects_unavailable",
+            "world_events_unavailable",
+            "world_brief_unavailable",
+            "world_context_unavailable",
             "scene_unavailable",
             "situation_unavailable",
             "memory_unavailable",
