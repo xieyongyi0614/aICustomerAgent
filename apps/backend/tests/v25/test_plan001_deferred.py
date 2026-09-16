@@ -1,0 +1,112 @@
+"""PLAN-001 deferred 断言台账：依赖后续任务产物的断言，本任务**不编造实现**。
+
+Task Detail §8 Step 5.2 引用了 PLAN-005 的 `PlanScheduler.order`、§9.2 I4 引用了
+`PlanObserver.settle` 把计划置 `superseded` 的形态；这些产物在 PLAN-001 阶段不存在，
+因此本模块用 `pytest.mark.skip` 显式登记「待某任务落地」的断言，并写明未来的判定方式
+与依据（而非留空或伪造通过）。落地时去掉对应 `skip` 标记，断言代码即成为该任务证据。
+
+已核对差异台账（Task Detail ↔ 真实源码，均已按源码冻结并在用例中断言）：
+
+1. §6.2 写面表列的 `finish_goal(goal_id, status, failure_reason=None, arbitration_state=None)`
+   多了一个 `arbitration_state`：真实签名只到 `failure_reason`（`arbitration_state` 仅
+   `set_status` 有）。本任务按源码冻结，**不新增参数**（见 `test_plan001_goal_contract.py`
+   的 `test_goal_repository_state_write_face_signatures_are_frozen`）。
+2. §4.3.1 / §6.5 称非法迁移抛 `IllegalGoalTransition`：真实写面抛的是 `ValueError` 本身
+   （`IllegalGoalTransition` 是 `ValueError` 子类但从未被 `goal_repository` 抛出）。本任务按
+   「可观察契约 = `ValueError`」冻结，并断言子类关系，使两种写法都兼容。
+3. §4.4 I2 的「计划同时进终态（`superseded`）」形态今日不成立（既有 `_complete` 只改目标状态）；
+   今日成立的是「冻结」形态——目标终态即退出推进候选集（断言见
+   `test_plan001_invariants.py::test_i2_terminal_goal_stops_advancing_its_plan`）。
+4. §7 称 `GoalRecord` 20 个字段、`GoalPlanRow` 8 个列：真实为 19 个字段（列数与 8 一致）。
+5. §10.3 的白名单为 §6.1 ∪ §6.2（12 项），不含计划面四函数（`create_plan` /
+   `set_plan_status` / `set_plan_rejection` / `update_plan_progress`）；PLAN-003 落地时必须
+   显式扩白名单，见 `test_deferred_plan_face_writes_need_whitelist_extension`。
+"""
+
+import importlib
+
+import pytest
+
+from app.repositories import goal_repository
+from app.services import goal_observation
+from app.services.planning import goal_contract
+
+from .conftest import V25_NOW, V25_USER
+
+PLANNING_MODULES_FOR_LATER_TASKS = (
+    "app.services.planning.context",
+    "app.services.planning.engine",
+    "app.services.planning.decompose",
+    "app.services.planning.scheduler",
+    "app.services.planning.executor_bridge",
+    "app.services.planning.observer",
+    "app.services.planning.revision",
+    "app.services.planning.revision_listener",
+)
+
+
+def _import_later_module(module_path: str):
+    return importlib.import_module(module_path)
+
+
+def test_deferred_targets_are_absent_today():
+    for module_path in PLANNING_MODULES_FOR_LATER_TASKS:
+        with pytest.raises(ImportError):
+            _import_later_module(module_path)
+    assert goal_repository.list_active_plans(V25_USER) == []
+
+
+@pytest.mark.skip(reason="待 PLAN-005 落地：PlanScheduler.order 就绪排序（结构序）")
+def test_deferred_structural_order_via_plan_scheduler(make_goal, make_plan, make_spec):
+    scheduler = _import_later_module("app.services.planning.scheduler")
+    goal = make_goal(description="结构序目标", priority=5, domain="world")
+    plan = make_plan(
+        goal.id,
+        [
+            make_spec(index=1, capability="query_environment"),
+            make_spec(index=2, depends_on=[1]),
+        ],
+    )
+    indexes = [spec.index for spec in scheduler.PlanScheduler.order(plan, goal)]
+    assert indexes.index(1) < indexes.index(2)
+
+
+@pytest.mark.skip(reason="待 PLAN-005 落地：PlanObserver.settle 将计划置 superseded")
+def test_deferred_goal_terminal_moves_latest_plan_out_of_active(
+    make_goal, make_plan, goal_facts
+):
+    goal = make_goal(description="终态结算目标")
+    plan = make_plan(goal.id)
+    goal_observation.advance_goal(
+        goal, plan, goal_facts(succeeded=["create_reminder"]), V25_NOW
+    )
+    assert goal_repository.get_goal(goal.id).status == "completed"
+    assert goal_repository.get_latest_plan(goal.id).status == "superseded"
+
+
+@pytest.mark.skip(reason="待 PLAN-003 落地：计划面写面白名单需显式扩展（见模块文档 §5）")
+def test_deferred_plan_face_writes_need_whitelist_extension():
+    plan_face_writes = (
+        "create_plan",
+        "set_plan_status",
+        "set_plan_rejection",
+        "update_plan_progress",
+    )
+    assert [
+        name
+        for name in plan_face_writes
+        if name not in goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS
+    ] == []
+
+
+@pytest.mark.skip(reason="待 PLAN-006 落地：G-EXEC 执行唯一入口断言")
+def test_deferred_execution_single_entry_point():
+    bridge = _import_later_module("app.services.planning.executor_bridge")
+    assert bridge.PlanExecutorBridge is not None
+    assert "ToolExecutor" not in dir(bridge)
+
+
+@pytest.mark.skip(reason="待 PLAN-010 落地：PlanningRevisionListener 唯一反思接线")
+def test_deferred_reflection_listener_registration():
+    listener = _import_later_module("app.services.planning.revision_listener")
+    assert listener.PlanningRevisionListener is not None
