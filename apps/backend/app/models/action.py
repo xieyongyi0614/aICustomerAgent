@@ -297,6 +297,7 @@ class ActionRecord(BaseModel):
     steps: list[dict[str, Any]] = []
     result: dict[str, Any] | None = None
     attempt: int = 1
+    priority: int = 100
     next_retry_at: datetime | None = None
     scheduled_at: datetime | None = None
     created_at: datetime | None = None
@@ -305,3 +306,28 @@ class ActionRecord(BaseModel):
 
     def is_terminal(self) -> bool:
         return self.status in TERMINAL_STATUSES
+
+
+ActionScheduleWhenType = Literal["immediate", "delay", "cron"]
+
+ActionScheduleStatus = Literal["scheduled", "due", "executed", "cancelled"]
+
+ACTION_SCHEDULE_WHEN_TYPES: tuple[str, ...] = ("immediate", "delay", "cron")
+
+ACTION_SCHEDULE_STATUSES: tuple[str, ...] = (
+    "scheduled",
+    "due",
+    "executed",
+    "cancelled",
+)
+
+
+class ActionSchedule(BaseModel):
+    id: str
+    action_id: str
+    when_type: ActionScheduleWhenType
+    scheduled_at: datetime
+    priority: int = 100
+    status: ActionScheduleStatus = "scheduled"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

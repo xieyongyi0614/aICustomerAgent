@@ -1,4 +1,4 @@
-"""V9 action_records 仓储（V9-004，M11）。沿用模块级函数仓储惯例。"""
+"""V9 action_records + V2.6.0 action_schedules 仓储（模块级函数仓储惯例）。"""
 
 import logging
 import uuid
@@ -7,15 +7,19 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.db import ActionRecordRow, OutboxEventRow, SessionLocal
+from app.core.db import ActionRecordRow, ActionScheduleRow, OutboxEventRow, SessionLocal
 from app.core.settings import get_settings
-from app.models.action import ActionRecord
+from app.models.action import ActionRecord, ActionSchedule
 
 logger = logging.getLogger(__name__)
 
 
 def new_record_id() -> str:
     return f"act_{uuid.uuid4().hex[:8]}"
+
+
+def new_schedule_id() -> str:
+    return f"sch_{uuid.uuid4().hex[:8]}"
 
 
 def _to_record(row: ActionRecordRow) -> ActionRecord:
@@ -36,12 +40,46 @@ def _to_record(row: ActionRecordRow) -> ActionRecord:
         steps=row.steps or [],
         result=row.result,
         attempt=row.attempt,
+        priority=row.priority,
         next_retry_at=row.next_retry_at,
         scheduled_at=row.scheduled_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
         executed_at=row.executed_at,
     )
+
+
+def _to_schedule(row: ActionScheduleRow) -> ActionSchedule:
+    return ActionSchedule(
+        id=row.id,
+        action_id=row.action_id,
+        when_type=row.when_type,
+        scheduled_at=row.scheduled_at,
+        priority=row.priority,
+        status=row.status,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _record_upsert(row: ActionRecordRow, record: ActionRecord, now: datetime) -> None:
+    if row is None:
+        return
+    for field in (
+        "status",
+        "gate_reason",
+        "steps",
+        "result",
+        "attempt",
+        "priority",
+        "next_retry_at",
+        "scheduled_at",
+        "params",
+        "goal_id",
+        "executed_at",
+    ):
+        setattr(row, field, getattr(record, field))
+    row.updated_at = record.updated_at or now
 
 
 def save_record(record: ActionRecord) -> ActionRecord:
@@ -66,6 +104,7 @@ def save_record(record: ActionRecord) -> ActionRecord:
                 steps=record.steps,
                 result=record.result,
                 attempt=record.attempt,
+                priority=record.priority,
                 next_retry_at=record.next_retry_at,
                 scheduled_at=record.scheduled_at,
                 created_at=record.created_at or now,
@@ -74,20 +113,7 @@ def save_record(record: ActionRecord) -> ActionRecord:
             )
             session.add(row)
         else:
-            for field in (
-                "status",
-                "gate_reason",
-                "steps",
-                "result",
-                "attempt",
-                "next_retry_at",
-                "scheduled_at",
-                "params",
-                "goal_id",
-                "executed_at",
-            ):
-                setattr(row, field, getattr(record, field))
-            row.updated_at = record.updated_at or now
+            _record_upsert(row, record, now)
         session.commit()
         return _to_record(row)
 
@@ -210,6 +236,7 @@ def save_record_with_outbox(
                 steps=record.steps,
                 result=record.result,
                 attempt=record.attempt,
+                priority=record.priority,
                 next_retry_at=record.next_retry_at,
                 scheduled_at=record.scheduled_at,
                 created_at=record.created_at or now,
@@ -218,20 +245,7 @@ def save_record_with_outbox(
             )
             session.add(row)
         else:
-            for field in (
-                "status",
-                "gate_reason",
-                "steps",
-                "result",
-                "attempt",
-                "next_retry_at",
-                "scheduled_at",
-                "params",
-                "goal_id",
-                "executed_at",
-            ):
-                setattr(row, field, getattr(record, field))
-            row.updated_at = record.updated_at or now
+            _record_upsert(row, record, now)
         session.add(
             OutboxEventRow(
                 id=str(uuid.uuid4()),
@@ -247,8 +261,81 @@ def save_record_with_outbox(
         try:
             session.commit()
         except IntegrityError:
-            # 同 action_id 重放：outbox 已登记，按幂等吞掉（行动终态照常持久化）
             session.rollback()
             return get_record(record.id)
         session.refresh(row)
         return _to_record(row)
+
+
+def save_schedule(schedule: ActionSchedule) -> ActionSchedule:
+    now = datetime.now()
+    with SessionLocal() as session:
+        row = session.get(ActionScheduleRow, schedule.id)
+        if row is None:
+            row = ActionScheduleRow(
+                id=schedule.id,
+                action_id=schedule.action_id,
+                when_type=schedule.when_type,
+                scheduled_at=schedule.scheduled_at,
+                priority=schedule.priority,
+                status=schedule.status,
+                created_at=schedule.created_at or now,
+                updated_at=schedule.updated_at or now,
+            )
+            session.add(row)
+        else:
+            row.when_type = schedule.when_type
+            row.scheduled_at = schedule.scheduled_at
+            row.priority = schedule.priority
+            row.status = schedule.status
+            row.updated_at = schedule.updated_at or now
+        session.commit()
+        session.refresh(row)
+        return _to_schedule(row)
+
+
+def get_schedule(action_id: str) -> ActionSchedule | None:
+    with SessionLocal() as session:
+        row = session.scalars(
+            select(ActionScheduleRow).where(ActionScheduleRow.action_id == action_id)
+        ).first()
+        return _to_schedule(row) if row is not None else None
+
+
+def list_due_schedules(now: datetime, limit: int = 50) -> list[ActionSchedule]:
+    stmt = (
+        select(ActionScheduleRow)
+        .where(ActionScheduleRow.status.in_(("scheduled", "due")))
+        .where(ActionScheduleRow.scheduled_at <= now)
+        .order_by(
+            ActionScheduleRow.priority.desc(),
+            ActionScheduleRow.scheduled_at,
+            ActionScheduleRow.id,
+        )
+        .limit(limit)
+    )
+    with SessionLocal() as session:
+        return [_to_schedule(row) for row in session.scalars(stmt)]
+
+
+def mark_schedule_executed(action_id: str) -> ActionSchedule | None:
+    return _mark_schedule_status(action_id, "executed")
+
+
+def mark_schedule_cancelled(action_id: str) -> ActionSchedule | None:
+    return _mark_schedule_status(action_id, "cancelled")
+
+
+def _mark_schedule_status(action_id: str, status: str) -> ActionSchedule | None:
+    now = datetime.now()
+    with SessionLocal() as session:
+        row = session.scalars(
+            select(ActionScheduleRow).where(ActionScheduleRow.action_id == action_id)
+        ).first()
+        if row is None:
+            return None
+        row.status = status
+        row.updated_at = now
+        session.commit()
+        session.refresh(row)
+        return _to_schedule(row)

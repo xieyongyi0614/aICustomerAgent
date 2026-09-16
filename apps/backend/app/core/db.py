@@ -666,6 +666,7 @@ class ActionRecordRow(Base):
     steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -678,11 +679,44 @@ class ActionRecordRow(Base):
             name="ck_action_records_status",
         ),
         CheckConstraint(
-            "source IN ('conversation', 'autonomy', 'cancel')",
+            "source IN ('conversation', 'autonomy', 'cancel', 'plan', 'event_driven')",
             name="ck_action_records_source",
         ),
         Index("idx_action_records_user_status", "user_id", "status"),
         Index("idx_action_records_user_dedupe", "user_id", "dedupe_key"),
+    )
+
+
+class ActionScheduleRow(Base):
+    __tablename__ = "action_schedules"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    action_id: Mapped[str] = mapped_column(
+        String, nullable=False, unique=True, index=True
+    )
+    when_type: Mapped[str] = mapped_column(String, nullable=False)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="scheduled")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "when_type IN ('immediate', 'delay', 'cron')",
+            name="ck_action_schedules_when_type",
+        ),
+        CheckConstraint(
+            "status IN ('scheduled', 'due', 'executed', 'cancelled')",
+            name="ck_action_schedules_status",
+        ),
+        UniqueConstraint("action_id", name="uq_action_schedules_action"),
+        Index(
+            "idx_action_schedules_due",
+            "status",
+            "scheduled_at",
+            "priority",
+        ),
     )
 
 

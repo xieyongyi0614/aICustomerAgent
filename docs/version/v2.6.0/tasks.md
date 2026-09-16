@@ -505,7 +505,7 @@ Architecture 14 章与本文档 9 任务的对应关系：
 | Task | 状态 | 完成内容 | 修改文件 | commit | 测试结果 |
 |---|---|---|---|---|---|
 | TASK-001 | DONE | Action 统一抽象 / ExecutionKind 映射 / ActionSource 五值 / 六态语义表 | `app/models/action.py`、`tests/v26/test_task001_action_core_model.py` | (pending) | 47 passed |
-| TASK-002 | TODO | | | | |
+| TASK-002 | DONE | action_schedules 新表 / priority 加列 / source 五值 CHECK / 5 个 schedule 仓储函数 | `app/models/action.py`、`app/core/db.py`、`app/repositories/action_repository.py`、`migrations/versions/0047_action_schedules_priority.py`、`tests/v26/test_task002_persistence.py` | (pending) | 14 passed + 既有仓储 6 passed |
 | TASK-003 | TODO | | | | |
 | TASK-004 | TODO | | | | |
 | TASK-005 | TODO | | | | |
