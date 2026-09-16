@@ -1,7 +1,7 @@
 # PLAN-002 Task Detail — Planning Domain Model
 
 > 上游：[../architecture.md](../architecture.md) §4.1 ~ §4.9、§5.6、§7.10、§7.11、§9.7 Q2 / Q3；[../tasks.md](../tasks.md) PLAN-002
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit ed80000，2026-09-16）
 > 范围红线：**纯值对象 + 配置骨架**；零 IO、零执行、零治理逻辑；不新建任何表、不加任何列、不扩任何 CHECK；`SubGoalSpec` 扩展字段必须显式加入模型定义（不能靠 JSON 多塞字段）。
 
 ---

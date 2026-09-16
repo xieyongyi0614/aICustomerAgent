@@ -643,7 +643,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | Task | 状态 | 完成内容 | 修改文件 | commit | 测试结果 |
 |---|---|---|---|---|---|
 | PLAN-001 | DONE | Goal 域契约冻结与生命周期边界（零迁移、零新增字段/值集） | `app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`tests/v25/*`（共 12 文件） | 8e4ba52 | tests/v25: 75 passed / 5 skipped；pylint app/services/planning: 10.00/10；compileall OK；既有 goal 子集零新增失败 |
-| PLAN-002 | TODO | — | — | — | — |
+| PLAN-002 | DONE | 计划域值对象 + 配置骨架（零迁移；Q2/Q3 落点裁决落地） | `app/models/plan.py`、`app/core/settings/plan.py`、`app/models/goal.py`、`app/core/settings/enablement.py`、`app/core/settings/__init__.py`、`tests/v25/*`（新增 6 + 更新 2） | ed80000 | tests/v25: 231 passed / 5 skipped；pylint 新模块 10.00/10；compileall OK；既有 goal 子集零新增失败 |
 | PLAN-003 | TODO | — | — | — | — |
 | PLAN-004 | TODO | — | — | — | — |
 | PLAN-005 | TODO | — | — | — | — |
