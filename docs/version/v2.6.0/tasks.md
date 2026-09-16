@@ -510,6 +510,6 @@ Architecture 14 章与本文档 9 任务的对应关系：
 | TASK-004 | DONE | ActionExecutor 三分派 + 异常归一 + 结果必产 | `app/services/action/executor.py`、`tests/v26/test_task004_executor.py`、`tests/v24/test_tool003_action_engine.py`（冻结断言同步） | (pending) | 37 passed |
 | TASK-005 | DONE | ActionScheduler 三种 when + 排序/队列 + life_loop 挂载 | `app/services/action/scheduler.py`、`app/application/life_loop.py`、`tests/v26/test_task005_scheduler.py` | (pending) | 14 passed |
 | TASK-006 | DONE | ActionResult 统一契约 + 投影映射 + 旧读键双写 | `app/models/action.py`、`app/services/action/result.py`、`tests/v26/test_task006_result.py` | (pending) | 16 passed |
-| TASK-007 | TODO | | | | |
+| TASK-007 | DONE | Planning/World/Relationship/Memory 四路接线 + 反馈闭环 | `app/services/action/integration.py`、`tests/v26/test_task007_integration.py` | (pending) | 9 passed |
 | TASK-008 | TODO | | | | |
 | TASK-009 | TODO | | | | |
