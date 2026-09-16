@@ -223,10 +223,36 @@ class ActionEffect(BaseModel):
 
 
 class ActionResult(BaseModel):
-    status: Literal["succeeded", "failed", "partial"]
+    id: str = ""
+    action_id: str = ""
+    status: Literal["succeeded", "failed", "partial", "timeout"]
     effects: list[ActionEffect] = []
     error: str | None = None
     failure_kind: FailureKind | None = None
+    output: dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
+    observations: dict[str, Any] = {}
+    created_at: datetime | None = None
+
+    def has_memory_effect(self) -> bool:
+        return any(effect.kind == "memory" for effect in self.effects)
+
+    def has_world_effect(self) -> bool:
+        return any(effect.kind == "world" for effect in self.effects)
+
+    def has_relationship_effect(self) -> bool:
+        return any(effect.kind == "relationship" for effect in self.effects)
+
+    def dual_write_legacy_keys(self) -> dict[str, Any]:
+        """V2.6.0 双写窗口：旧读键与新契约并存，供 V2.4.0 下游读取。"""
+        payload = self.model_dump(mode="json")
+        if self.output.get("world_event_id") is not None:
+            payload["world_event_id"] = self.output["world_event_id"]
+        if self.output.get("memory_id") is not None:
+            payload["memory_id"] = self.output["memory_id"]
+        if self.failure_kind is not None:
+            payload["legacy_failure_kind"] = self.failure_kind
+        return payload
 
 
 class Action(BaseModel):
