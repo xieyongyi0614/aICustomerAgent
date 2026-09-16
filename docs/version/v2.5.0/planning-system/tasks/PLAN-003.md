@@ -1,7 +1,7 @@
 # PLAN-003 Task Detail — Planning Engine Core
 
 > 上游：[../architecture.md](../architecture.md) §3.3（PlanContextAssembler）、§3.4（PlanningEngine）、§6.3（输入装配流程）、§7.8（Life Loop 挂载）、§8.1 / §8.2（接口）、§9.7 Q6；[../tasks.md](../tasks.md) PLAN-003
-> 状态：DONE（已实现，待提交）
+> 状态：DONE（已实现，commit e14bac8，2026-09-16）
 > 范围红线：**包装既有 `goal_planning`，不新建规划器**；`plan` / `revise` 不直接落库；拒绝路径不抛异常；除 `assemble` 外组件零 IO；不新增 `life_loop` stage；不新增 `llm_gateway` capability 位。
 
 ---
