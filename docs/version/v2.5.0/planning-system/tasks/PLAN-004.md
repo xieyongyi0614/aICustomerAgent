@@ -1,7 +1,7 @@
 # PLAN-004 Task Detail — Task Decomposition System
 
 > 上游：[../architecture.md](../architecture.md) §3.5（TaskDecomposer）、§3.1（层图，含 `PlanValidator`）、§7.7（工具绑定与不新增选择逻辑）、§8.6（校验接口）、§9.7 Q4；[../tasks.md](../tasks.md) PLAN-004
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 2abc580，2026-09-16）
 > 范围红线：**纯拆解与纯校验**——`TaskDecomposer` 做四阶段转换，`PlanValidator` 三闸为纯函数；不新增工具选择逻辑；不执行、不落库、零 LLM（校验段）。
 
 ---

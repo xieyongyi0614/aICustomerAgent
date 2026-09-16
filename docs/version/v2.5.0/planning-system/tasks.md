@@ -645,7 +645,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | PLAN-001 | DONE | Goal 域契约冻结与生命周期边界（零迁移、零新增字段/值集） | `app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`tests/v25/*`（共 12 文件） | 8e4ba52 | tests/v25: 75 passed / 5 skipped；pylint app/services/planning: 10.00/10；compileall OK；既有 goal 子集零新增失败 |
 | PLAN-002 | DONE | 计划域值对象 + 配置骨架（零迁移；Q2/Q3 落点裁决落地） | `app/models/plan.py`、`app/core/settings/plan.py`、`app/models/goal.py`、`app/core/settings/enablement.py`、`app/core/settings/__init__.py`、`tests/v25/*`（新增 6 + 更新 2） | ed80000 | tests/v25: 231 passed / 5 skipped；pylint 新模块 10.00/10；compileall OK；既有 goal 子集零新增失败 |
 | PLAN-003 | DONE | 六源装配（两源硬依赖、四源可降级）+ 七道闸规划引擎（闸门 5/6 新增）+ `revise` 版本语义 + `goal_supply` 挂载接线（零迁移、零新 stage） | `app/services/planning/context.py`、`app/services/planning/engine.py`、`app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`app/services/goal_planning.py`、`app/application/life_loop.py`、`tests/v25/*`（新增 3 + 更新 5） | e14bac8 | tests/v25: 315 passed / 4 skipped；pylint app/services/planning: 9.71/10（余项为逐源降级捕获与冻结接口结构后果）；compileall OK；goal/life_loop/autonomy 子集零新增失败；prompt golden 9 passed |
-| PLAN-004 | TODO | — | — | — | — |
+| PLAN-004 | DONE | 任务拆解（四阶段）+ 三闸校验（validate_shape/binding/budget）+ 四级映射 L1~L4 与粒度判据 G1~G3 | `app/services/planning/decompose.py`、`app/services/planning/__init__.py`、`tests/v25/*`（新增 8 + 更新 4） | 2abc580 | tests/v25: 441 passed / 4 skipped；pylint decompose.py 9.97/10（仅 R0903，与既有规划模块同款）；compileall OK；tests/v24 工具侧 1579 passed；既有失败零新增 |
 | PLAN-005 | TODO | — | — | — | — |
 | PLAN-006 | TODO | — | — | — | — |
 | PLAN-007 | TODO | — | — | — | — |
