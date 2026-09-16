@@ -1,7 +1,7 @@
 # V2.6.0 Action Execution System Tasks
 
 > **上游**：`docs/version/v2.6.0/architecture.md`
-> **状态**：已实现（TASK-001 ~ TASK-009 DONE）
+> **状态**：已实现并通过验收（acceptance-report.md；Flag 默认 off）
 > **主干**：TASK-001 ~ TASK-009（依赖顺序即文档顺序）
 > **说明**：本文档只做任务级拆分；各任务 Task Detail 见 `tasks/TASK-XXX.md`（TASK-001 ~ TASK-009），不含代码、不含 DDL 与迁移脚本。
 > **定位复述**：Action Execution System = **行动执行层**。把 V9 遗留的「单次动作执行」（`action_engine.run_action_planning`）升级为一个统一 Action 抽象 + 执行引擎 + 调度器 + 结果系统，打通 Plan → Action → Execution → Result → State Update → Feedback 闭环。
