@@ -404,3 +404,93 @@ class ToolUserDefinedRevokeOut(BaseModel):
     tool_id: str | None = None
     revoked: bool = False
     registered: list[str] = []
+
+
+class PlanSummaryOut(BaseModel):
+    """计划清单行（PLAN-011 §6.3）：`goal_id` 相同的多行即该目标的版本链。"""
+
+    plan_id: str
+    goal_id: str
+    version: int
+    status: str
+    step_count: int = 0
+    updated_at: datetime | None = None
+
+
+class PlansOut(BaseModel):
+    """计划清单（`/debug/plans`）：Flag off 时端点不可见，故无 `enabled` 字段。"""
+
+    plans: list[PlanSummaryOut] = []
+
+
+class PlanStepRowOut(BaseModel):
+    """步骤视图行：绑定（`tool_id` / `binding_reason`）与调度阻塞原因逐条可读。"""
+
+    index: int
+    description: str = ""
+    kind: str = "tool"
+    tool_id: str | None = None
+    binding_reason: str | None = None
+    status: str
+    attempt_count: int = 0
+    blocked_reason: str | None = None
+
+
+class PlanDetailOut(BaseModel):
+    """单计划详情：本体 + 步骤 + 绑定 + 判据 + 推进历史（`decision_records` 投影）。"""
+
+    plan: dict | None = None
+    steps: list[PlanStepRowOut] = []
+    bindings: list[dict] = []
+    criteria: list[dict] = []
+    advance_history: list[dict] = []
+
+
+class PlanStepsOut(BaseModel):
+    """步骤视图（`/debug/plans/{plan_id}/steps`）。"""
+
+    steps: list[PlanStepRowOut] = []
+
+
+class PlanContextOut(BaseModel):
+    """`PlanContext` 装配结果投影：六源 + `degraded` 清单。
+
+    脱敏纪律：记忆与洞察只给**计数与 id**（不回显记忆正文与洞察陈述）。
+    """
+
+    sources: dict[str, dict] = {}
+    degraded: list[str] = []
+
+
+class PlanRevisionRowOut(BaseModel):
+    """修订链行（§4.2.4 六字段 + `at`）：六项逐条可读即链可重建。"""
+
+    from_version: int
+    to_version: int
+    reason: str
+    trigger_source: str
+    evidence_refs: list[str] = []
+    kept_steps: list[int] = []
+    at: datetime | None = None
+
+
+class PlanRevisionsOut(BaseModel):
+    """修订链（`/debug/plans/revisions`）：由 `goal_plans` 版本行与 `plan_revised` 审计共同成立。"""
+
+    revisions: list[PlanRevisionRowOut] = []
+
+
+class PlanPendingRowOut(BaseModel):
+    """待推进步行：`reason` ∈ `off_surface` / `cooldown` / `predecessor_failed`。"""
+
+    goal_id: str
+    plan_id: str
+    step_index: int
+    tool_id: str | None = None
+    reason: str
+
+
+class PlanPendingOut(BaseModel):
+    """待推进步骤（`/debug/plans/pending`）：每个被阻塞的活跃计划一行。"""
+
+    pending: list[PlanPendingRowOut] = []

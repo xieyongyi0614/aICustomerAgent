@@ -77,6 +77,20 @@ PLAN-010 落地时按同一纪律改动本模块：`revision_listener.py` 由「
 
 PLAN-011 / PLAN-012 的产物（调试端点 / 版本级验收）仍不在本包新增模块：
 `test_plan_reflection_listener_is_landed` 的负向断言把这一点一并钉住。
+
+PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（§4.1.1 明确「不新建仓储模块」：
+三个只读扩展落在既有 `goal_repository`、审计写入面与投影口落在既有 `observer.py`、6 个调试端点
+落在既有 `api/v1/debug.py`），只新增两条**接口级 / 负向**标记：
+
+- `PLAN_011_OBSERVER_INTERFACES`：审计写入面与投影口（`record_plan_advance` /
+  `record_plan_revision` / `project_plan_advance` / `project_plan_revision`）落于既有模块。
+- 负向：本包**不得**为接口 / 可观测层新增模块（`api.py` / `debug.py` / `interface.py` /
+  `audit.py` 一律不存在；包模块清单仍为 11 个文件）。
+
+同一落地的契约演进项（两条，均在既有模块内）：①
+`PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 由 16 项扩为 **19 项**（三个只读扩展，见
+`goal_contract` 模块文档 §10）；② `goal_repository.PLAN_TERMINAL_STATUSES = ("rejected",
+"superseded")` 是零迁移下的终态投影（计划级**无** `completed` 取值，扩值需改 CHECK = 需迁移）。
 """
 
 from pathlib import Path
@@ -182,6 +196,23 @@ PLAN_008_CONTEXT_INTERFACES = ("WORLD_READ_ENTRIES",)
 
 PLAN_008_OBSERVER_INTERFACES = ("TERMINAL_BROADCAST_OUTCOMES", "broadcast_goal_terminal")
 """PLAN-008 §6.3 的终态广播接口（落于既有 `observer.py`，迁移路径唯一调用点）。"""
+
+PLAN_011_OBSERVER_INTERFACES = (
+    "record_plan_advance",
+    "record_plan_revision",
+    "project_plan_advance",
+    "project_plan_revision",
+)
+"""PLAN-011 §6.2 的审计写入面与投影口（落于既有 `observer.py`，**不新建模块**）。"""
+
+PLAN_011_FORBIDDEN_MODULES = (
+    "api.py",
+    "debug.py",
+    "interface.py",
+    "audit.py",
+    "observability.py",
+)
+"""本包不得存在的「接口层 / 可观测层」模块：管理面与审计面都落在既有模块内。"""
 
 
 def _backend_root() -> Path:
@@ -375,6 +406,34 @@ def test_plan_008_degraded_registry_adds_only_world_segment_codes():
         "reflection_unavailable",
         "surface_unavailable",
     )
+
+
+def test_plan_011_lands_the_audit_faces_without_a_new_module():
+    """PLAN-011 产物面：审计写入面 / 投影口在位，且**没有**为接口层新建模块。"""
+    from app.repositories import goal_repository
+    from app.services.planning import observer as observer_mod
+
+    assert [
+        name
+        for name in PLAN_011_OBSERVER_INTERFACES
+        if not hasattr(observer_mod, name)
+    ] == []
+    assert [
+        name
+        for name in (
+            "list_plans_by_status",
+            "count_plan_versions",
+            "list_terminal_plans_since",
+        )
+        if not hasattr(goal_repository, name)
+    ] == []
+    assert goal_repository.PLAN_TERMINAL_STATUSES == ("rejected", "superseded")
+    missing = [
+        name
+        for name in PLAN_011_FORBIDDEN_MODULES
+        if (_planning_dir() / name).exists()
+    ]
+    assert missing == []
 
 
 def test_planning_package_holds_only_landed_modules():

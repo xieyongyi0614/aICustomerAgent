@@ -451,6 +451,19 @@ PLAN_FACE_WRITE_CALLS = (
 状态写面，计划被拒仍不改 `GoalStatus`。
 """
 
+PLAN_011_READ_EXTENSIONS = (
+    "list_plans_by_status",
+    "count_plan_versions",
+    "list_terminal_plans_since",
+)
+"""PLAN-011 契约演进：三个**只读**扩展进入 `goal_repository` 调用白名单。
+
+口径由「§6.1 ∪ §6.2 ∪ 计划面四函数（16 项）」扩为 19 项（Task Detail §6.1 冻结的计划读契约）。
+三者与 `PLANNING_READ_INTERFACES`（Goal 域只读消费面）分属两段：前者是计划面读出口，
+后者是 Goal 域读面，故本文件按「计划面写面 + PLAN-011 只读扩展」两段并集判定。
+演进留痕见 `goal_contract` 模块文档 §10 与 `tests/v25/test_plan011_regression.py`。
+"""
+
 
 def test_declared_goal_repository_whitelist_is_read_face_plus_write_face():
     goal_repository_calls = {
@@ -463,8 +476,10 @@ def test_declared_goal_repository_whitelist_is_read_face_plus_write_face():
     }
     allowed = set(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS)
     assert goal_repository_calls <= allowed
-    assert allowed - goal_repository_calls == set(PLAN_FACE_WRITE_CALLS)
-    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 16
+    assert allowed - goal_repository_calls == set(PLAN_FACE_WRITE_CALLS) | set(
+        PLAN_011_READ_EXTENSIONS
+    )
+    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 19
 
 
 def test_goal_repository_plan_face_signatures_are_frozen():

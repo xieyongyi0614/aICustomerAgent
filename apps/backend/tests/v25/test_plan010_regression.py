@@ -22,6 +22,7 @@ from app.services import goal_planning
 from app.services.development.policy import on_insight_created as development_consumer
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
+from app.services.planning import goal_contract
 from app.services.planning import revision_listener as listener_mod
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import lifecycle as reflection_lifecycle
@@ -462,6 +463,13 @@ class TestFrozenSurfaces:
     """§10.2：既有面零改动（计划面九函数 / 反思闸门 / 三个既有消费者文件）。"""
 
     def test_plan_repository_face_keeps_its_nine_functions(self):
+        """计划面九函数零改动（PLAN-010 冻结）。
+
+        PLAN-011 契约演进留痕：本类原以 `not hasattr(goal_repository,
+        "list_terminal_plans_since")` 钉住「PLAN-011 的只读扩展今日不存在」；该扩展已落地
+        （Task Detail §6.1 的三个只读函数），故翻转为**正向 + 计数**断言——九函数仍逐条可调用，
+        新增的恰好是那三个只读扩展（不多不少）。
+        """
         for name in (
             "create_plan",
             "get_plan",
@@ -474,7 +482,12 @@ class TestFrozenSurfaces:
             "list_active_plans",
         ):
             assert callable(getattr(goal_repository, name)), name
-        assert not hasattr(goal_repository, "list_terminal_plans_since")
+        assert goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS[16:] == (
+            "list_plans_by_status",
+            "count_plan_versions",
+            "list_terminal_plans_since",
+        )
+        assert callable(goal_repository.list_terminal_plans_since)
 
     def test_trigger_gate_helpers_are_frozen(self):
         assert triggers.OUTCOME_QUEUED == "queued"

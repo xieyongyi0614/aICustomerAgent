@@ -69,6 +69,17 @@ PLAN-010 落地时按同一纪律改动本模块：
 3. `test_deferred_goal_terminal_moves_latest_plan_out_of_active` **保持 `skip`**：其阻塞项
    （把计划置 `superseded` 需改动既有 `_complete` 运行时语义）与本任务无关，PLAN-010 只投
    幂等重规划触发、不改计划状态。
+
+PLAN-011 落地时按同一纪律改动本模块：
+
+1. **无模块翻转**（待落地清单已为空且保持为空）：本任务冻结六个模块的既有签名、在既有
+   `goal_repository` 内加三个**只读**扩展、把计划可观测面落在既有 `decision_records` /
+   `api/v1/debug.py`，`app/services/planning/` **零新增模块**（负向断言未放松）。
+2. **白名单计数演进（16 → 19）**：`goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS`
+   按 Task Detail §6.1 收编三个只读扩展（`list_plans_by_status` / `count_plan_versions` /
+   `list_terminal_plans_since`），本模块的计数断言随之更新（留痕见 `goal_contract` §10）。
+3. `test_deferred_goal_terminal_moves_latest_plan_out_of_active` **保持 `skip`**：PLAN-011 是
+   契约冻结与可观测面交付，不触碰既有 `_complete` 运行时语义，故其阻塞项不变。
 """
 
 import importlib
@@ -170,19 +181,25 @@ def test_deferred_goal_terminal_moves_latest_plan_out_of_active(
 
 
 def test_plan_face_writes_are_whitelisted_after_plan_003():
-    """PLAN-003 契约演进（原 deferred，现落地）：计划面四函数进入调用白名单。"""
+    """PLAN-003 契约演进（原 deferred，现落地）：计划面四函数进入调用白名单。
+
+    PLAN-011 再扩一次：三个只读扩展使白名单达 19 项（本模块只更新计数，判定口径不变）。
+    """
     plan_face_writes = (
         "create_plan",
         "set_plan_status",
         "set_plan_rejection",
         "update_plan_progress",
+        "list_plans_by_status",
+        "count_plan_versions",
+        "list_terminal_plans_since",
     )
     assert [
         name
         for name in plan_face_writes
         if name not in goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS
     ] == []
-    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 16
+    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 19
     assert goal_contract.PLANNING_WRITE_FUNCTION_NAMES == (
         "set_status",
         "finish_goal",

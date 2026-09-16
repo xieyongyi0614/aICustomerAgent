@@ -34,6 +34,18 @@
 避免同一转换两行归因），并把 `PlanAdvance` 落 `decision_records`
 （`kind='goal_lifecycle'`，**不新增 kind**，D12）。
 
+**审计写入面与投影口（PLAN-011 §4.2.3 / §4.2.4 / §6.2）**：两条审计各有一个模块级公共写入面，
+`settle` 经前者落地，故运行时语义零变化：
+
+| 写入面 | `decision` | `trigger` | `input_snapshot` |
+|---|---|---|---|
+| `record_plan_advance` | `PlanAdvance.decision`（六值） | `plan_observer` | `PlanAdvance` 整体 |
+| `record_plan_revision` | `plan_revised` | `plan_revision` | 修订链六字段 + `at` + 归属键 |
+
+两者的 `kind` 恒为既有 `goal_lifecycle`；反向的 `project_plan_advance` /
+`project_plan_revision` 是**唯一**的读回口径（形态不符即 `None`，绝不猜测）——修订链因此
+可从 `decision_records` 与 `goal_plans` 两张既有表重建，零新表、零新列。
+
 **终态广播（PLAN-008 §4.2.5 / §6.3）**：`_transition` 在迁移成功后调 `broadcast_goal_terminal`
 （映射表 `TERMINAL_BROADCAST_OUTCOMES`，只含 `completed` / `abandoned`），经既有
 `event_bridge.register_goal_event` → outbox → `world_events(type=goal_completed, source=character)`，
@@ -72,6 +84,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from pydantic import ValidationError
+
 from app.application import observability, world_engine
 from app.core.settings import get_settings
 from app.models.goal import GoalStatus
@@ -80,6 +94,7 @@ from app.models.plan import (
     PLAN_ACTION_DEDUPE_KEY_TEMPLATE,
     PLAN_STEP_DEDUPE_KEY_TEMPLATE,
     PlanAdvance,
+    PlanRevision,
 )
 from app.repositories import action_repository, goal_repository, memory_repository
 from app.services import goal_arbitration, goal_observation, state_service
@@ -159,6 +174,12 @@ DECISION_REASONS: dict[str, str] = {
 
 REASON_MAX_LENGTH = 60
 
+DECISION_PLAN_REVISED = "plan_revised"
+"""修订审计的 `decision` 取值（§4.2.4；`kind` 仍为既有 `goal_lifecycle`，不新增 kind）。"""
+
+DECISION_TRIGGER_REVISION = "plan_revision"
+"""修订审计行的 `trigger`（与推进行的 `STEP_NAME` 区分，使两张审计投影互不串行）。"""
+
 TERMINAL_BROADCAST_OUTCOMES: dict[str, str] = {
     "completed": "completed",
     "abandoned": "abandoned",
@@ -184,7 +205,9 @@ TERMINAL_MEMORY_EVENTS: dict[str, str] = {
 
 __all__ = [
     "DECISION_OUTCOMES",
+    "DECISION_PLAN_REVISED",
     "DECISION_REASONS",
+    "DECISION_TRIGGER_REVISION",
     "FACT_ACTION_HISTORY",
     "FACT_ACTION_RESULTS",
     "FACT_SALIENT_MEMORIES",
@@ -205,6 +228,10 @@ __all__ = [
     "TERMINAL_MEMORY_EVENTS",
     "broadcast_goal_terminal",
     "deliver_goal_terminal_memory",
+    "project_plan_advance",
+    "project_plan_revision",
+    "record_plan_advance",
+    "record_plan_revision",
 ]
 
 
@@ -421,22 +448,12 @@ class PlanObserver:
 
     @staticmethod
     def _record_advance(goal, advance: PlanAdvance) -> None:
-        """`PlanAdvance` → `decision_records`（复用 `kind='goal_lifecycle'`，B8 可观测面）。"""
-        try:
-            observability.on_decision(
-                DecisionRecord(
-                    kind=DecisionKind.GOAL_LIFECYCLE,
-                    user_id=goal.user_id,
-                    conversation_id=None,
-                    action_id=None,
-                    trigger=STEP_NAME,
-                    input_snapshot=advance.model_dump(mode="json"),
-                    decision=advance.decision,
-                    reason=advance.reason,
-                )
-            )
-        except Exception:
-            logger.exception("计划推进审计落库失败，已忽略（goal=%s）", advance.goal_id)
+        """`PlanAdvance` → `decision_records`（复用 `kind='goal_lifecycle'`，B8 可观测面）。
+
+        委托模块级公共写入面 `record_plan_advance`（§6.2）。`user_id` 由此处已知的目标注入，
+        故 settle 热路径的读取面与 V2.4.0 逐一相同（不新增目标读取）。
+        """
+        record_plan_advance(advance, user_id=goal.user_id)
 
     @staticmethod
     def _resolve_keys(observation_keys, ctx) -> tuple[str, ...] | None:
@@ -460,6 +477,129 @@ class PlanObserver:
         )
         resolved = _declared_keys(pairs, goal_id) if keys is None else keys
         return _prefixes(goal_ids), resolved
+
+
+def record_plan_advance(advance: PlanAdvance, *, user_id: str | None = None) -> None:
+    """推进审计写入面（§6.2）：`decision_records` 一行，`kind` 恒为既有 `goal_lifecycle`。
+
+    列承载（§4.2.3）：`kind=DecisionKind.GOAL_LIFECYCLE` / `decision=advance.decision` /
+    `input_snapshot=PlanAdvance` 整体 / `reason=advance.reason`；`trigger=STEP_NAME` 与
+    `settle` 路径同源（既有用例按该 trigger 断言推进行）。
+
+    `PlanAdvance` 自身不带归属字段而 `DecisionRecord.user_id` 必填，故归属按
+    「注入优先、否则读目标」解析；注入缺失且目标不可得 → 只 log、**零写入**
+    （审计写入异常一律不影响计划推进，§6.5）。
+    """
+    owner = user_id or _goal_owner(advance.goal_id)
+    if not owner:
+        logger.warning("计划推进审计缺少归属，已忽略（plan=%s）", advance.plan_id)
+        return
+    _emit_plan_decision(
+        DecisionRecord(
+            kind=DecisionKind.GOAL_LIFECYCLE,
+            user_id=owner,
+            conversation_id=None,
+            action_id=None,
+            trigger=STEP_NAME,
+            input_snapshot=advance.model_dump(mode="json"),
+            decision=advance.decision,
+            reason=advance.reason,
+        ),
+        f"计划推进审计（plan={advance.plan_id}）",
+    )
+
+
+def record_plan_revision(
+    revision: PlanRevision, *, plan=None, user_id: str | None = None
+) -> None:
+    """修订审计写入面（§4.2.4 / §6.2）：`decision_records` 一行，`decision="plan_revised"`。
+
+    `kind` 仍为既有 `goal_lifecycle`（新增 kind 需改 CHECK = 需迁移，红线）；
+    `input_snapshot` 承载修订链六字段 `from_version` / `to_version` / `reason` /
+    `trigger_source` / `evidence_refs` / `kept_steps`，并附 `at`（链行需要时刻）与归属键
+    `goal_id` / `plan_id`（`PlanRevision` 无归属字段，`?goal_id=` 的链过滤依赖它；两个附加键
+    对 `PlanRevision.model_validate` 是安全未知键）。`plan` 只用于归属与归属键，不读取不改写。
+    """
+    owner = user_id or _plan_owner(plan)
+    if not owner:
+        logger.warning(
+            "计划修订审计缺少归属，已忽略（to_version=%s）", revision.to_version
+        )
+        return
+    snapshot = revision.model_dump(mode="json")
+    snapshot["goal_id"] = str(getattr(plan, "goal_id", "") or "")
+    snapshot["plan_id"] = str(getattr(plan, "id", "") or "")
+    _emit_plan_decision(
+        DecisionRecord(
+            kind=DecisionKind.GOAL_LIFECYCLE,
+            user_id=owner,
+            conversation_id=None,
+            action_id=None,
+            trigger=DECISION_TRIGGER_REVISION,
+            input_snapshot=snapshot,
+            decision=DECISION_PLAN_REVISED,
+            reason=revision.reason,
+        ),
+        f"计划修订审计（v{revision.from_version}→v{revision.to_version}）",
+    )
+
+
+def project_plan_advance(record: DecisionRecord) -> PlanAdvance | None:
+    """审计行 → `PlanAdvance`（推进历史的重建口）。
+
+    非计划推进审计行一律 `None`（**绝不猜测**）：非 `goal_lifecycle` kind、修订行、以及
+    `input_snapshot` 无法还原为 `PlanAdvance` 的行（既有 `goal_observation` /
+    `goal_arbitration` 的 lifecycle 归因行只带 `{"goal_id": ...}`）。
+    """
+    if not _is_plan_audit(record) or record.decision == DECISION_PLAN_REVISED:
+        return None
+    return _validate(PlanAdvance, record.input_snapshot)
+
+
+def project_plan_revision(record: DecisionRecord) -> PlanRevision | None:
+    """审计行 → `PlanRevision`（修订链的重建口）；非修订行或形态不符一律 `None`。"""
+    if not _is_plan_audit(record) or record.decision != DECISION_PLAN_REVISED:
+        return None
+    return _validate(PlanRevision, record.input_snapshot)
+
+
+def _emit_plan_decision(record: DecisionRecord, what: str) -> None:
+    """计划审计的唯一落库点（行形态由调用方按 §4.2.3 / §4.2.4 构造，此处只做隔离）。"""
+    try:
+        observability.on_decision(record)
+    except Exception:
+        logger.exception("%s 落库失败，已忽略", what)
+
+
+def _is_plan_audit(record: DecisionRecord) -> bool:
+    """是否计划审计行（`goal_lifecycle` kind）——值集单一来源是 `DecisionKind`。"""
+    return getattr(record, "kind", None) == DecisionKind.GOAL_LIFECYCLE
+
+
+def _validate(model, payload):
+    """`input_snapshot` → 值对象；形态不符返回 `None`（投影失败不抛错）。"""
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return model.model_validate(payload)
+    except ValidationError:
+        return None
+
+
+def _goal_owner(goal_id: str) -> str | None:
+    """归属解析（只读）：目标行 → `user_id`；缺失或读取失败即 `None`。"""
+    if not goal_id:
+        return None
+    try:
+        goal = goal_repository.get_goal(str(goal_id))
+    except Exception:
+        logger.exception("计划审计归属解析失败：%s", goal_id)
+        return None
+    return None if goal is None else goal.user_id
+
+
+def _plan_owner(plan) -> str | None:
+    return _goal_owner(str(getattr(plan, "goal_id", "") or ""))
 
 
 def broadcast_goal_terminal(goal, outcome: str) -> bool:

@@ -119,6 +119,28 @@ Task Detail §10.3 的白名单原为 §6.1 ∪ §6.2（12 项，Goal 状态读�
 - 同步更新三处冻结快照（均属留痕而非放松）：`test_plan001_static_scan.py` 的白名单口径、
   `test_plan001_goal_contract.py` 的白名单计数与集合断言、`test_plan001_scope_markers.py`
   的「已落地 / 仍不得预埋」标记。
+
+十、PLAN-011 契约演进留痕（**预期的越界评审点**，第二次白名单扩张）
+
+Task Detail（PLAN-011 §6.1）在计划面九函数之上冻结**三个只读扩展**，故
+`PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 由 **16 项扩为 19 项**，演进范围精确且最小：
+
+| 新增项 | 性质 | 用途 |
+|---|---|---|
+| `list_plans_by_status(user_id, statuses)` | 只读 | 调试面 / 运维的按状态批量查询 |
+| `count_plan_versions(goal_id)` | 只读 | 版本链长度（修订预算判定与调试展示） |
+| `list_terminal_plans_since(user_id, since)` | 只读 | 终态计划窗口投影（PLAN-010 证据窗基础设施） |
+
+- 三者的**零写库**由会话级写探针断言（`tests/v25/test_plan011_repository.py`），`statuses`
+  取值受 `PLAN_STATUS_VALUES` 守卫（越界即 `ValueError`）。
+- `PLANNING_WRITE_INTERFACES`（恰好 5 个 Goal 状态写面）**仍不变**：三个新函数都不写
+  `character_goals`，故「计划被拒不改 `GoalStatus`」等四条联动不变量不受影响。
+- `expire_goal` / `cancel_goal` / `create_goal` / `seed_goals` / `create_hierarchical_goal` /
+  `list_layered*` 等既有旁路调用**仍不在白名单**（越界断言未放松）。
+- 同任务的**审计投影**（`PlanAdvance` / 修订链 → `decision_records`）复用既有
+  `DecisionKind.GOAL_LIFECYCLE` + 差异化 `decision`，**不新增 kind**（新增需改 CHECK = 需迁移）。
+- 计划调试端点落既有 `app/api/v1/debug.py` 的 `debug_router`，**不在本包新增模块**
+  （包模块清单仍为 11 个文件，负向断言未放松）。
 """
 
 PLANNING_READ_INTERFACES: tuple[tuple[str, str], ...] = (
@@ -189,7 +211,19 @@ PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS: tuple[str, ...] = (
     "set_plan_status",
     "set_plan_rejection",
     "update_plan_progress",
+    "list_plans_by_status",
+    "count_plan_versions",
+    "list_terminal_plans_since",
 )
+"""`goal_repository` 调用白名单（19 项 = Goal 状态读写面 12 + 计划面 4 + 只读扩展 3）。
+
+两次契约演进（均为**预期内的越界评审点**，见模块文档 §9）：
+
+- PLAN-003：12 → 16，加计划面四函数（`create_plan` / `set_plan_status` /
+  `set_plan_rejection` / `update_plan_progress`）——引擎必须经既有计划面落库。
+- PLAN-011：16 → 19，加三个**只读**扩展（`list_plans_by_status` / `count_plan_versions` /
+  `list_terminal_plans_since`）——计划读契约的冻结面（§6.1），三者零写库（打桩断言）。
+"""
 
 PLANNING_FAILURE_REASON_PLAN_EXHAUSTED = "plan_exhausted"
 PLANNING_FAILURE_REASON_CRITERIA_UNDECIDABLE = "criteria_undecidable"

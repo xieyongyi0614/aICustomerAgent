@@ -5,6 +5,7 @@ from app.core.db import GoalPlanRow, GoalRow, SessionLocal
 from app.models.goal import (
     DOMAIN_VALUES,
     GOAL_DESCRIPTION_MAX_LENGTH,
+    PLAN_STATUS_VALUES,
     GoalPlanRecord,
     GoalRecord,
     GoalSeed,
@@ -17,6 +18,14 @@ from app.models.goal import (
 )
 
 _HIERARCHICAL_HORIZON = "persistent"
+
+PLAN_TERMINAL_STATUSES: tuple[str, ...] = ("rejected", "superseded")
+"""计划终态（`ck_goal_plans_status` 五值中不可再推进的两个）。
+
+计划级**没有** `completed` 取值：`GoalPlanStatus` 与 CHECK 均为 draft / validated / active /
+rejected / superseded，计划的「完成」由目标域表达（`GoalStatus.completed` + 步骤 `done`）。
+扩展该值集需改 CHECK = 需迁移，与本版本「零迁移」红线冲突（PLAN-011 Task Detail §7）。
+"""
 
 
 def _to_record(row: GoalRow) -> GoalRecord:
@@ -512,3 +521,69 @@ def list_active_plans(user_id: str) -> list[tuple[GoalRecord, GoalPlanRecord]]:
             .all()
         )
         return [(_to_record(goal_row), _to_plan_record(plan_row)) for plan_row, goal_row in rows]
+
+
+def list_plans_by_status(
+    user_id: str, statuses: tuple[str, ...]
+) -> list[GoalPlanRecord]:
+    """按用户 + 状态集合批量取计划（只读；`goal_plans` 无 `user_id` 列，经 `character_goals` 归属）。
+
+    `statuses` 取值必须 ⊆ `PLAN_STATUS_VALUES`（越界即 `ValueError`，不做静默过滤）；
+    空集合返回空列表（不生成恒假条件）。排序按 `updated_at` 倒序 + `id` 升序，确定性可复现。
+    """
+    resolved = tuple(statuses or ())
+    _validate_plan_statuses(resolved)
+    if not resolved:
+        return []
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalPlanRow)
+            .join(GoalRow, GoalRow.id == GoalPlanRow.goal_id)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalPlanRow.status.in_(resolved),
+            )
+            .order_by(GoalPlanRow.updated_at.desc(), GoalPlanRow.id.asc())
+            .all()
+        )
+        return [_to_plan_record(row) for row in rows]
+
+
+def count_plan_versions(goal_id: str) -> int:
+    """该目标的版本链长度（只读，供修订预算判定与调试展示）。
+
+    与既有 `count_plans` 同源同义：`goal_plans` 的 `version` 在 `(goal_id, version)` 上唯一
+    且自 1 起单调，故版本行数即版本链长度。本函数是 Planning 读契约下的**独立可读出口**
+    （`PLAN-011` §6.1），既有九函数的签名与行为零改动。
+    """
+    return count_plans(goal_id)
+
+
+def list_terminal_plans_since(user_id: str, since: datetime) -> list[GoalPlanRecord]:
+    """终态计划的窗口投影（只读）：`rejected` / `superseded` 且 `updated_at >= since`。
+
+    窗口键取 `updated_at`（终态写入时刻即 `updated_at`，`created_at` 是计划生成时刻）；
+    返回空列表而非 `None`，调用方无需分支。供计划证据窗与调试面投影（PLAN-010 / PLAN-011）。
+    """
+    with SessionLocal() as session:
+        rows = (
+            session.query(GoalPlanRow)
+            .join(GoalRow, GoalRow.id == GoalPlanRow.goal_id)
+            .filter(
+                GoalRow.user_id == user_id,
+                GoalPlanRow.status.in_(PLAN_TERMINAL_STATUSES),
+                GoalPlanRow.updated_at >= since,
+            )
+            .order_by(GoalPlanRow.updated_at.desc(), GoalPlanRow.id.asc())
+            .all()
+        )
+        return [_to_plan_record(row) for row in rows]
+
+
+def _validate_plan_statuses(statuses: tuple[str, ...]) -> None:
+    """状态取值校验（§6.1 D3）：越出 `PLAN_STATUS_VALUES` 即拒，不做静默收敛。"""
+    illegal = [status for status in statuses if status not in PLAN_STATUS_VALUES]
+    if illegal:
+        raise ValueError(
+            f"计划状态取值非法：{illegal}；合法值集: {', '.join(PLAN_STATUS_VALUES)}"
+        )

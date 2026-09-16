@@ -388,7 +388,8 @@ class TestZeroMigrationAndContracts:
         )
 
     def test_planning_contract_whitelist_evolution_is_recorded(self):
-        assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 16
+        """PLAN-003 落地 12 → 16；PLAN-011 再扩三个只读扩展 → 19（判定口径不变）。"""
+        assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 19
         assert goal_contract.PLANNING_WRITE_FUNCTION_NAMES == (
             "set_status",
             "finish_goal",
