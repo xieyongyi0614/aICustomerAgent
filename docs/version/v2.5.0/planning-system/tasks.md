@@ -633,3 +633,24 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 2. Flag 全 off 时与 V2.4.0 逐字节一致（prompt + 行为快照 + 维护步骤序列）。
 3. 计划只编排：不直接执行工具、不直接写世界、不直接写 Character 域、不直接写记忆。
 4. 反思只管认知：不直接改写计划、不自动熔断工具、不产出性格类 Insight。
+
+---
+
+## 8. 执行状态台账
+
+> 状态流转：TODO → DOING → DONE（由 Coding Agent 逐任务更新，记录完成内容 / 修改文件 / commit / 测试结果）。
+
+| Task | 状态 | 完成内容 | 修改文件 | commit | 测试结果 |
+|---|---|---|---|---|---|
+| PLAN-001 | DONE | Goal 域契约冻结与生命周期边界（零迁移、零新增字段/值集） | `app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`tests/v25/*`（共 12 文件） | 8e4ba52 | tests/v25: 75 passed / 5 skipped；pylint app/services/planning: 10.00/10；compileall OK；既有 goal 子集零新增失败 |
+| PLAN-002 | TODO | — | — | — | — |
+| PLAN-003 | TODO | — | — | — | — |
+| PLAN-004 | TODO | — | — | — | — |
+| PLAN-005 | TODO | — | — | — | — |
+| PLAN-006 | TODO | — | — | — | — |
+| PLAN-007 | TODO | — | — | — | — |
+| PLAN-008 | TODO | — | — | — | — |
+| PLAN-009 | TODO | — | — | — | — |
+| PLAN-010 | TODO | — | — | — | — |
+| PLAN-011 | TODO | — | — | — | — |
+| PLAN-012 | TODO | — | — | — | — |

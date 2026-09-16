@@ -1,7 +1,7 @@
 # PLAN-001 Task Detail — Goal Model & Lifecycle
 
 > 上游：[../architecture.md](../architecture.md) §3.2（§3.2.1 ~ §3.2.4）、§5.1、§5.4、§7.2；[../tasks.md](../tasks.md) PLAN-001
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 8e4ba52，2026-09-16）
 > 范围红线：**冻结 Goal 域契约为 Planning 的只读消费面 + 单一状态写回面**；零新增字段、零新增状态值、零迁移；不新建第二套 Goal 系统、不新建第二套优先级算法。
 
 ---
