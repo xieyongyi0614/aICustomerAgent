@@ -647,7 +647,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | PLAN-003 | DONE | 六源装配（两源硬依赖、四源可降级）+ 七道闸规划引擎（闸门 5/6 新增）+ `revise` 版本语义 + `goal_supply` 挂载接线（零迁移、零新 stage） | `app/services/planning/context.py`、`app/services/planning/engine.py`、`app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`app/services/goal_planning.py`、`app/application/life_loop.py`、`tests/v25/*`（新增 3 + 更新 5） | e14bac8 | tests/v25: 315 passed / 4 skipped；pylint app/services/planning: 9.71/10（余项为逐源降级捕获与冻结接口结构后果）；compileall OK；goal/life_loop/autonomy 子集零新增失败；prompt golden 9 passed |
 | PLAN-004 | DONE | 任务拆解（四阶段）+ 三闸校验（validate_shape/binding/budget）+ 四级映射 L1~L4 与粒度判据 G1~G3 | `app/services/planning/decompose.py`、`app/services/planning/__init__.py`、`tests/v25/*`（新增 8 + 更新 4） | 2abc580 | tests/v25: 441 passed / 4 skipped；pylint decompose.py 9.97/10（仅 R0903，与既有规划模块同款）；compileall OK；tests/v24 工具侧 1579 passed；既有失败零新增 |
 | PLAN-005 | DONE | 计划执行引擎：Scheduler（搬运+等价性对照）/ExecutorBridge/Observer（四源+tool 判据）/RevisionPolicy + life_loop 观测接线（零迁移） | `app/services/planning/{scheduler,executor_bridge,observer,revision}.py`、`app/services/planning/__init__.py`、`app/application/life_loop.py`、`tests/v25/*`（新增 9 + 更新 3） | 0f8daa5 | tests/v25: 636 passed / 3 skipped；pylint 四新模块 9.86/10（W0718 house-style）；compileall OK；tests/v24 1579 passed；既有失败零新增 |
-| PLAN-006 | TODO | — | — | — | — |
+| PLAN-006 | DONE | 工具系统集成：闸门 5/6 判定收窄（kind=tool）+ 工具治理链 T1~T4 + 执行链路六闸门五段断言 + G-EXEC 静态断言 + 结果契约归一（零迁移、工具侧零改动） | `app/services/planning/engine.py`、`tests/v25/*`（新增 5 + 更新 2） | 05fc46e | tests/v25: 748 passed / 2 skipped；pylint engine.py 9.85/10（零新增告警）；compileall OK；tests/v24 1579 passed；既有失败零新增 |
 | PLAN-007 | TODO | — | — | — | — |
 | PLAN-008 | TODO | — | — | — | — |
 | PLAN-009 | TODO | — | — | — | — |

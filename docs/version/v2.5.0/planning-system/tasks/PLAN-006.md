@@ -1,7 +1,7 @@
 # PLAN-006 Task Detail — Tool System Integration
 
 > 上游：[../architecture.md](../architecture.md) §3.4（闸门 5/6）、§3.7（执行链）、§6.3（工具面装配）、§7.7（与 Tool System 集成）、§7.9（Action / Tool 契约行）、§5.6（状态映射）；[../tasks.md](../tasks.md) PLAN-006
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 05fc46e，2026-09-16）
 > 范围红线：**Planning 不新增任何工具选择逻辑，不绕过任何治理闸**；工具面与执行器**零改动**；`confirm_required` 不自动绕过；V2.4.0 工具侧既有测试零失败。
 
 ---
