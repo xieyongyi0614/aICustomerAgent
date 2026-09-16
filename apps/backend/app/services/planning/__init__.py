@@ -1,12 +1,16 @@
 """V2.5.0 Planning System 计划编排层（计划=Goal → Task → Action 的编排层）。
 
-本包自 PLAN-001 起建立。PLAN-001 阶段**只承载 Goal 域契约声明**
-（`app.services.planning.goal_contract`）：零业务逻辑、零函数、零 IO、零落库。
+本包自 PLAN-001 起建立，按任务逐段落地。**公开面**（Task Detail §6.3：对外只暴露公开面，
+模块导入按需进行——本文件不做急切实导入，避免在包级导入时拉起仓储 / LLM / 世界链路）：
+
+| 模块 | 公开面 | 归属 |
+|---|---|---|
+| `goal_contract` | Goal 域契约常量（只读消费面 / 写回面 / 禁止事项） | PLAN-001 ✅ |
+| `context` | `PlanContextAssembler` / `PlanContextProbe` / `PlanUnavailable` | PLAN-003 ✅ |
+| `engine` | `PlanningEngine` / `PlanOutcome` / `get_planning_engine` / 七道闸理由码 | PLAN-003 ✅ |
 
 后续任务的落点（本任务不实现、不预埋）：
 
-- PLAN-002：计划域运行期值对象（`app/models/plan.py`）与 `v25_*` Flag（`app/core/settings/plan.py`）。
-- PLAN-003：`app/services/planning/context.py`（六源装配）与 `engine.py`（规划引擎）。
 - PLAN-004：`app/services/planning/decompose.py`（Goal → Task → Action 拆解与三闸）。
 - PLAN-005：`app/services/planning/` 下的 `scheduler.py` / `executor_bridge.py` /
   `observer.py` / `revision.py`。

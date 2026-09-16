@@ -573,7 +573,7 @@ Architecture §9.7 登记十项，按任务归属挂载，**在对应任务内�
 | Q3 | `SubGoalSpec` 的 Pydantic `extra` 策略 | PLAN-002 | 任务内裁决并补双向兼容测试 |
 | Q4 | `fact_source="tool"` 与 `threshold_reached` 的组合语义 | PLAN-004 | 任务内冻结（当前裁决：拒绝，保持值集最小） |
 | Q5 | `WorldIntentSubmitter`（`WIRED=False`）的接线 | PLAN-008 | 任务内记录（本版本仍不接线） |
-| Q6 | `PlanContext` 装配的 LLM 成本与延迟 | PLAN-003 | 任务内记录，压测后决定是否给规划单独预算位 |
+| Q6 | `PlanContext` 装配的 LLM 成本与延迟 | PLAN-003 | **已记录并裁决（PLAN-003 §11.4）**：装配侧零 LLM、嵌入调用为既有 `retriever` 行为、周期步骤数不变 ⇒ 本版本**不新增** capability 位 / 预算位；若压测显示挤占再于 PLAN-011 / PLAN-012 追加并同步 architecture §7.8 |
 | Q7 | 计划与 `daily_plans`（V2.3.0 日程）的语义收敛 | 不在本版本（互不引用） | 独立评估 |
 | Q8 | Reflection Insight 与 `PlanRevisionPolicy` 优先级 | PLAN-010 | 任务内裁决（须保证只入队一次） |
 | Q9 | 计划完成对 Character State 的间接影响路径 | PLAN-008 | 任务内记录（涉及关系域，需与 V8.5 / V2.2 一并评估） |
@@ -644,7 +644,7 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 |---|---|---|---|---|---|
 | PLAN-001 | DONE | Goal 域契约冻结与生命周期边界（零迁移、零新增字段/值集） | `app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`tests/v25/*`（共 12 文件） | 8e4ba52 | tests/v25: 75 passed / 5 skipped；pylint app/services/planning: 10.00/10；compileall OK；既有 goal 子集零新增失败 |
 | PLAN-002 | DONE | 计划域值对象 + 配置骨架（零迁移；Q2/Q3 落点裁决落地） | `app/models/plan.py`、`app/core/settings/plan.py`、`app/models/goal.py`、`app/core/settings/enablement.py`、`app/core/settings/__init__.py`、`tests/v25/*`（新增 6 + 更新 2） | ed80000 | tests/v25: 231 passed / 5 skipped；pylint 新模块 10.00/10；compileall OK；既有 goal 子集零新增失败 |
-| PLAN-003 | TODO | — | — | — | — |
+| PLAN-003 | DONE | 六源装配（两源硬依赖、四源可降级）+ 七道闸规划引擎（闸门 5/6 新增）+ `revise` 版本语义 + `goal_supply` 挂载接线（零迁移、零新 stage） | `app/services/planning/context.py`、`app/services/planning/engine.py`、`app/services/planning/__init__.py`、`app/services/planning/goal_contract.py`、`app/services/goal_planning.py`、`app/application/life_loop.py`、`tests/v25/*`（新增 3 + 更新 5） | （待提交） | tests/v25: 315 passed / 4 skipped；pylint app/services/planning: 9.71/10（余项为逐源降级捕获与冻结接口结构后果）；compileall OK；goal/life_loop/autonomy 子集零新增失败；prompt golden 9 passed |
 | PLAN-004 | TODO | — | — | — | — |
 | PLAN-005 | TODO | — | — | — | — |
 | PLAN-006 | TODO | — | — | — | — |

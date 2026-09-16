@@ -17,6 +17,14 @@ PLANNING_MODULES = scan.planning_modules()
 
 DECLARATION_MODULE = scan.PLANNING_PACKAGE_DIR / "goal_contract.py"
 
+ALLOWED_CHARACTER_IMPORT_MODULES = ("app.character.asuna.scene_profiles",)
+"""PLAN-003 契约演进：唯一允许的角色资产导入（场景画像，**非**优先级资产）。
+
+Task Detail §4.1.3 要求 `PlanContext.scene` 取 `scene_profile_for`；PLAN-001 的
+`character_priority_asset_import` 禁令针对**优先级资产**，此处按模块逐条枚举放行，
+不得扩成前缀（改动留痕见 `goal_contract` 模块文档 §9）。
+"""
+
 
 def _mismatches(check, tokens):
     found = {}
@@ -39,12 +47,20 @@ def test_step3_no_character_priority_asset_imports():
         scan.module_name(path): sorted(
             module
             for module in scan.imported_modules(path)
-            if module == scan.FORBIDDEN_CHARACTER_IMPORT_PREFIX
-            or module.startswith(scan.FORBIDDEN_CHARACTER_IMPORT_PREFIX + ".")
+            if (
+                module == scan.FORBIDDEN_CHARACTER_IMPORT_PREFIX
+                or module.startswith(scan.FORBIDDEN_CHARACTER_IMPORT_PREFIX + ".")
+            )
+            and module not in ALLOWED_CHARACTER_IMPORT_MODULES
         )
         for path in PLANNING_MODULES
     }
     assert not {name: hits for name, hits in offenders.items() if hits}
+
+
+def test_step3_character_asset_allowlist_is_one_explicit_module():
+    """放行面必须逐模块枚举（防「一次放行一个前缀」的隐性扩大）。"""
+    assert ALLOWED_CHARACTER_IMPORT_MODULES == ("app.character.asuna.scene_profiles",)
 
 
 def test_step3_code_contains_no_tier_or_orm_row_names():

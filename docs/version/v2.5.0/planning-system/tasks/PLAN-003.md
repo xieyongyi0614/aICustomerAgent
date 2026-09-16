@@ -1,7 +1,7 @@
 # PLAN-003 Task Detail — Planning Engine Core
 
 > 上游：[../architecture.md](../architecture.md) §3.3（PlanContextAssembler）、§3.4（PlanningEngine）、§6.3（输入装配流程）、§7.8（Life Loop 挂载）、§8.1 / §8.2（接口）、§9.7 Q6；[../tasks.md](../tasks.md) PLAN-003
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，待提交）
 > 范围红线：**包装既有 `goal_planning`，不新建规划器**；`plan` / `revise` 不直接落库；拒绝路径不抛异常；除 `assemble` 外组件零 IO；不新增 `life_loop` stage；不新增 `llm_gateway` capability 位。
 
 ---
@@ -715,3 +715,78 @@ agent_runtime/profiles.py::autonomous_tick.stages                    # 阶段元
 - **纯只读装配纪律**：`context.py` 只读六源，零写库；`PlanContextProbe` 三个方法零 IO。
 - **Q6 记录留痕**：`PlanContext` 装配的嵌入调用与规划 LLM 叠加对 `v2_life_loop_cycle_llm_budget=1` 的压力在本任务内记录，压测结论与「是否新增预算位」的裁决一并留痕；若最终新增 capability 位，须同步 architecture §7.8 预算数学说明（本任务范围内不新增）。
 - **文档一致**：本文件与 architecture §3.3 / §3.4 / §6.3 / §7.8 / §8.1 / §8.2 / §9.7 Q6 及 tasks.md PLAN-003 Acceptance Criteria 逐条对应，无自相矛盾。
+
+---
+
+# 11. 实现留痕（PLAN-003 落地记录）
+
+## 11.1 交付清单
+
+| 文件 | 性质 | 作用 |
+|---|---|---|
+| `apps/backend/app/services/planning/context.py` | 新增 | `PlanContextAssembler`（六源装配、逐源降级、两源硬依赖）、`PlanContextProbe`（只读探测）、`PlanUnavailable`、`context_digest`、`plan_budget` |
+| `apps/backend/app/services/planning/engine.py` | 新增 | `PlanningEngine`（`plan` / `revise` / `enqueue` / `run_jobs` / `register_runtime`）、七道闸、`PlanOutcome`、`get_planning_engine` |
+| `apps/backend/app/services/goal_planning.py` | 增补 | `propose_plan(goal, world_facts, settings)`：规划 LLM 面的**增量复用入口**（同 prompt、同 `_LLM_RETRY_ATTEMPTS`），使 LLM / prompt 面仍只有一处实现；`plan_goal` 原三步编排未改 |
+| `apps/backend/app/application/life_loop.py` | 最小接线 | `_step_goal_supply` 内部新增 `_route_planning_jobs`（Flag 门控）；签名与返回 dict 字段集不变 |
+| `apps/backend/app/services/planning/__init__.py` | 文档 | 公开面登记（保持零急切实导入，避免包级导入拉起仓储 / LLM / 世界链路） |
+| `apps/backend/tests/v25/test_plan003_context.py` | 新增 | U1 ~ U7、U11、U12、I1、I2（27 例） |
+| `apps/backend/tests/v25/test_plan003_engine.py` | 新增 | U8 ~ U10、U13、I3 ~ I6（35 例） |
+| `apps/backend/tests/v25/test_plan003_mount.py` | 新增 | I7 ~ I12 与 S1 / S3 / S4 / S7（18 例） |
+
+## 11.2 契约演进留痕（PLAN-001 已预告的越界评审点）
+
+| # | 演进 | 精确范围 | 依据 |
+|---|---|---|---|
+| 1 | `goal_repository` 调用白名单 **12 → 16** | 只加计划面四函数（`create_plan` / `set_plan_status` / `set_plan_rejection` / `update_plan_progress`） | Task Detail §7 写入面表：计划引擎必须经既有计划面落库；`PLANNING_WRITE_INTERFACES`（Goal 状态写面 5 个）不变 |
+| 2 | 角色资产导入禁令的**唯一窄例外** | 只放行 `app.character.asuna.scene_profiles`（逐模块枚举，不得扩成前缀） | Task Detail §4.1.3 要求 `PlanContext.scene` 取 `scene_profile_for`；PLAN-001 禁令的语义是「优先级资产」 |
+| 3 | `test_plan001_scope_markers.py` 标记翻转 | `context.py` / `engine.py` 由「仍不得预埋」→「已落地」；`decompose.py` 与 PLAN-005 五模块维持「不得预埋」 | 范围标记的既定纪律（标记翻转本身即越界评审证据） |
+| 4 | `test_plan001_deferred.py` 清单更新 | `context` / `engine` 移出「今日不存在」清单，白名单断言去 `skip` | 同上 |
+
+以上改动**仅限相应测试文件 + `goal_contract` 模块文档 §9**；PLAN-001 的其余冻结快照（Goal 状态机 / 迁移表 / 失败理由词表 / 五写面签名 / 禁止事项清单）零变更。
+
+## 11.3 与 Task Detail 的偏差（均已在代码与测试留痕）
+
+| # | Task Detail 表述 | 实现 | 理由 |
+|---|---|---|---|
+| 1 | §4.1.4 闸门顺序「2 步数 → 3 形状」 | 实现序为「形状 → 步数 → 能力」 | 步数必须在 `validate_sub_goals` 解析出 specs 之后才可数；与既有 AUT-002 实现同序，闸门集合与理由码不变 |
+| 2 | §8.2 / §10.1「`degraded` 以子步骤记入 `loop_runs.steps`」与 §7「`assemble` 零写库」冲突 | 子步骤（`plan_assemble` / `plan_generate` / `plan_revise`）由**引擎**在 `ctx.run["run_id"]` 存在时写；`assemble` 保持严格只读 | 零写库是本任务的硬断言，冲突时以零写库为准 |
+| 3 | §6.2 D6「除 `assemble` 外组件零 IO」 | Probe 三方法读 `assemble` 写下的**内存快照**（零 IO），并以静态 + 运行期断言固定 | `world_available(user_id)` 等签名（architecture §8.2）要求按 user 查询；内存投影是唯一同时满足「签名不变」与「零 IO」的形态 |
+| 4 | §4.2.1「`degraded` 进 `PlanContext`」 | 已进（`PlanContext.degraded` + `PlanContextProbe.degraded_sources` + `loop_runs.steps` 子步骤） | 无偏差，此处登记读面 |
+| 5 | §6.3 `_assemble_world(user_id, now)` | 去掉未使用的 `now` 形参（`_gather_sources(goal, settings)` 同） | 世界源的既有入口不接时刻参数（时刻由 `TimeProvider` 从世界时钟取）；`now` 仅在工具面装配使用 |
+| 6 | §6.3 `_assemble_context(user_id, world)` 第 2 返回值 `UserSituation \| None` | 返回 `list[UserSituation]`；第 2 参数为**世界事实包** | `PlanContext.situations` 是列表，且 `get_active_situation` 真实签名要求 dimension（故逐维装配）；场景画像按 `world["location"]` 取地点 id |
+| 7 | §3.4 注释「`plan_goal` 包装」+ §9.3 S1 期望 `status=validated` | `plan` / `revise` 复用 `goal_planning.propose_plan`（LLM 面）+ 七道闸 + `create_plan(validated)`；`run_jobs` 按 §3.4 **委托** `run_planning_jobs`（保持「处理 running 载荷并置 `active`」的既有语义） | 若让挂载的 `run_jobs` 走引擎路径，计划将停在 `validated` 而**永不被激活**（激活属 PLAN-005），既有 `goal_advance` 链路立即回退——不可接受。故 S1 的 `validated` 由 `PlanningEngine.plan` 交付（引擎用例），挂载点交付「步内把规划处理完」 |
+| 8 | §4.1.3「`world_engine.build_context`」与 §7「装配零写库」 | 用 `world_engine.get_world` 前置判定，**不建档**；`build_context` 内部 `ensure_world` 的建档 / 家庭默认物播种是其既有前置，测试以「世界预播种 + 全表行数前后一致 + 世界写面零调用」三重断言覆盖 | 见 `context.py::_assemble_world` 文档；`assemble` 自身不触发任何写路径 |
+
+实现形态说明：`propose_plan` 是 `goal_planning` 的**增量**入口（`plan_goal` 原编排未改，prompt 逐字节不变），因为 `app/services/planning/` 零 prompt / LLM 面由 PLAN-001 静态扫描强制——引擎取提案只能在 `goal_planning` 内开口。
+
+## 11.4 Q6 记录（Step 7 交付项）
+
+**问题**：六源装配中 Memory 检索可能触发嵌入调用（`memory2.embeddings.embed_query`），与规划 LLM 叠加对 `v2_life_loop_cycle_llm_budget=1` 的压力。
+
+**本任务的核对事实**：
+
+| 观测点 | 事实 |
+|---|---|
+| 嵌入调用条件 | `memory2.retriever.retrieve` 仅在 `v2_memory_vector_enabled` on **且**查询文本非空时调 `embed_query`；否则走结构化打分（零网络） |
+| 装配侧 LLM 调用 | `assemble` **零 LLM**（`PlanContextAssembler` 不触达 `llm_gateway` / `get_llm` / prompt 面；由 `test_plan003_context.py::TestHardDependencies` 三处打桩断言） |
+| 规划 LLM | 规划是本模块唯一的 LLM 面（`plan` / `revise`），受 `life_loop_budget.is_degraded()` 前置闸；日额度熔断时优雅跳过（`status="skipped"`，不落库、不消耗版本号） |
+| 计划阶段是否记入 `llm_capable` | 否：`planning` 不进 `autonomous_tick` 的阶段序列，`llm_capable` 仍只有 `decision`（`v2_life_loop_cycle_llm_budget` 数学不变） |
+
+**裁决（本任务内）**：**不新增 `llm_gateway` capability 位，不加 `v2_life_loop_cycle_llm_budget` 预算位**。理由：
+
+1. 装配侧的嵌入调用是**既有** `memory2.retriever` 行为（前台对话同样发生），本任务未新增调用点，也未把它升级为周期步骤（周期步骤数不变 ⇒ 预算数学不变）。
+2. 规划 LLM 已受「日额度熔断 + `v25_plan_revision_budget`（版本数）+ 既有 `enqueue` 幂等」三重约束，无新增绕过路径。
+3. 若后续压测显示规划 LLM 与嵌入叠加确实挤占周期预算，应在 PLAN-011 / PLAN-012 增加**独立预算位**并同步 architecture §7.8 的预算数学说明（本任务范围内不做）。
+
+**回归覆盖**：`test_plan003_mount.py::TestShapeSnapshots` 断言 `autonomous_tick.stages` / `llm_capable` / `_CAPABILITY_DEFAULTS` 三处快照零差异。
+
+## 11.5 自检结果
+
+| 命令 | 结果 |
+|---|---|
+| `python -m pytest tests/v25 -q` | 315 passed / 4 skipped（新增 80 例） |
+| `python -m pytest tests -q -k "goal or life_loop or autonomy"` | 449 passed（1 例 `test_aut005_goal_evaluation::test_clean_slice_passes_all` 为**改动前既有失败**，已在干净工作区复核） |
+| `python -m pytest -m "(unit or api) and not slow" -q` | 1424 passed |
+| `python -m pytest tests/unit/test_prompt_golden.py -q` | 9 passed（prompt 逐字节未变） |
+| `python -m pylint app/services/planning` | 9.71/10（余项：11× `broad-exception-caught` = D8 要求的逐源降级捕获；1× `too-few-public-methods` = §6.2 冻结的「装配器单一公开入口」结构后果） |
+| `python -m compileall <新增/修改的生产文件>` | exit 0 |

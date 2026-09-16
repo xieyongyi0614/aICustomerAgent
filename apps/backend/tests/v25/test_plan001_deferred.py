@@ -19,8 +19,13 @@ Task Detail §8 Step 5.2 引用了 PLAN-005 的 `PlanScheduler.order`、§9.2 I4
    `test_plan001_invariants.py::test_i2_terminal_goal_stops_advancing_its_plan`）。
 4. §7 称 `GoalRecord` 20 个字段、`GoalPlanRow` 8 个列：真实为 19 个字段（列数与 8 一致）。
 5. §10.3 的白名单为 §6.1 ∪ §6.2（12 项），不含计划面四函数（`create_plan` /
-   `set_plan_status` / `set_plan_rejection` / `update_plan_progress`）；PLAN-003 落地时必须
-   显式扩白名单，见 `test_deferred_plan_face_writes_need_whitelist_extension`。
+   `set_plan_status` / `set_plan_rejection` / `update_plan_progress`）；PLAN-003 落地时已
+   **显式扩白名单**（12 → 16），见 `test_plan_face_writes_are_whitelisted_after_plan_003`
+   与 `goal_contract` 模块文档 §9。
+
+PLAN-003 落地时的改动仅限本模块的「待落地」清单与对应断言翻转为「已落地」：`context` /
+`engine` 移出 `PLANNING_MODULES_FOR_LATER_TASKS`，白名单断言去 `skip`；PLAN-004 ~ PLAN-011
+的产物仍保持「今日不存在」。
 """
 
 import importlib
@@ -34,14 +39,17 @@ from app.services.planning import goal_contract
 from .conftest import V25_NOW, V25_USER
 
 PLANNING_MODULES_FOR_LATER_TASKS = (
-    "app.services.planning.context",
-    "app.services.planning.engine",
     "app.services.planning.decompose",
     "app.services.planning.scheduler",
     "app.services.planning.executor_bridge",
     "app.services.planning.observer",
     "app.services.planning.revision",
     "app.services.planning.revision_listener",
+)
+
+PLAN_003_LANDED_MODULES = (
+    "app.services.planning.context",
+    "app.services.planning.engine",
 )
 
 
@@ -54,6 +62,11 @@ def test_deferred_targets_are_absent_today():
         with pytest.raises(ImportError):
             _import_later_module(module_path)
     assert goal_repository.list_active_plans(V25_USER) == []
+
+
+def test_plan_003_modules_are_landed():
+    for module_path in PLAN_003_LANDED_MODULES:
+        assert _import_later_module(module_path) is not None
 
 
 @pytest.mark.skip(reason="待 PLAN-005 落地：PlanScheduler.order 就绪排序（结构序）")
@@ -84,8 +97,8 @@ def test_deferred_goal_terminal_moves_latest_plan_out_of_active(
     assert goal_repository.get_latest_plan(goal.id).status == "superseded"
 
 
-@pytest.mark.skip(reason="待 PLAN-003 落地：计划面写面白名单需显式扩展（见模块文档 §5）")
-def test_deferred_plan_face_writes_need_whitelist_extension():
+def test_plan_face_writes_are_whitelisted_after_plan_003():
+    """PLAN-003 契约演进（原 deferred，现落地）：计划面四函数进入调用白名单。"""
     plan_face_writes = (
         "create_plan",
         "set_plan_status",
@@ -97,6 +110,14 @@ def test_deferred_plan_face_writes_need_whitelist_extension():
         for name in plan_face_writes
         if name not in goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS
     ] == []
+    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 16
+    assert goal_contract.PLANNING_WRITE_FUNCTION_NAMES == (
+        "set_status",
+        "finish_goal",
+        "complete_goal",
+        "fail_goal",
+        "reactivate_goal",
+    )
 
 
 @pytest.mark.skip(reason="待 PLAN-006 落地：G-EXEC 执行唯一入口断言")

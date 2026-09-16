@@ -43,6 +43,7 @@ from app.services import (
     goal_execution,
     goal_observation,
 )
+from app.services.planning import engine as planning_engine
 from app.application.worker_loop import run_worker_loop
 from app.models.observability import TraceKind
 from app.repositories import action_repository, memory_repository, outbox_repository
@@ -421,7 +422,13 @@ def _expire_due_goals(user_id: str) -> list:
 
 def _step_goal_supply(user_id: str, now: datetime) -> dict:
     """AUT-002 供给装配（纯规则 0 LLM）：三来源候选→层级 goal→规划 job 入队。
-    World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。"""
+    World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。
+
+    V2.5.0 PLAN-003 接线：`v25_planning_enabled` on 时本步内部改走
+    `PlanningEngine.enqueue` / `run_jobs`（规划在供给步内被处理完，不再只依赖后台
+    job worker）。入队幂等（`idempotency_key` 含 trigger），故对 `materialize` 已入队的
+    目标重复入队返回 False、不产生第二个 job；Flag off 时本步与 V2.4.0 逐字节一致。
+    """
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:
@@ -438,7 +445,22 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
         world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
     )
     result = goal_planning.materialize(user_id, world_facts=world_facts, now=now)
+    _route_planning_jobs(user_id, result, settings)
     return {"status": result.get("status", "ok"), **result}
+
+
+def _route_planning_jobs(user_id: str, result: dict, settings) -> None:
+    """V2.5.0 规划接线（Flag 门控）：规划入队经引擎 + 本步内处理本类型 job。
+
+    入队幂等：`materialize` 已入队的目标在此重复入队返回 False，不产生第二个 job
+    （`job_type` 仍为既有 `goal_planning`，`idempotency_key` 含 trigger）。
+    """
+    if not settings.v25_planning_enabled:
+        return
+    engine = planning_engine.get_planning_engine()
+    for goal_id in result.get("created") or []:
+        engine.enqueue(user_id, str(goal_id), goal_planning.TRIGGER_CREATED)
+    engine.run_jobs()
 
 
 def _observation_facts(user_id: str, now: datetime) -> dict:

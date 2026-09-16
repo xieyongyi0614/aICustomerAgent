@@ -11,11 +11,16 @@
 | `GoalPlanRecord` 4 个新字段 | PLAN-002 | ✅ 已落地（12 字段快照） |
 | `CRITERION_FACT_SOURCES` 第四值 | PLAN-002 | ✅ 已落地（四值） |
 | `app/models/plan.py` / `settings/plan.py` | PLAN-002 | ✅ 已落地 |
-| 计划域装配 / 引擎 / 拆解模块 | PLAN-003 / PLAN-004 | ⛔ 仍不得预埋 |
+| 计划域装配 / 引擎模块（`context.py` / `engine.py`） | PLAN-003 | ✅ 已落地 |
+| 计划域拆解模块（`decompose.py`） | PLAN-004 | ⛔ 仍不得预埋 |
 | 计划域调度 / 执行 / 观测 / 修订模块 | PLAN-005 | ⛔ 仍不得预埋 |
 
 PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
 快照（原计划见 PLAN-001 Task Detail 的标记表）。
+
+PLAN-003 落地时按同一纪律改动本模块：`context.py` / `engine.py` 由「仍不得预埋」翻转为
+「已落地」，`decompose.py` 与 PLAN-005 五模块维持「不得预埋」（计划面四函数进 `goal_repository`
+调用白名单的留痕见 `goal_contract` 模块文档 §9）。
 """
 
 from pathlib import Path
@@ -86,7 +91,9 @@ PLAN_005_EXECUTION_MODULES = (
     "revision_listener.py",
 )
 
-PLAN_003_004_MODULES = ("context.py", "engine.py", "decompose.py")
+PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
+
+PLAN_004_DEFERRED_MODULES = ("decompose.py",)
 
 
 def _backend_root() -> Path:
@@ -150,16 +157,26 @@ def test_plan_execution_modules_are_absent():
     assert present == []
 
 
-def test_planning_engine_modules_are_absent():
-    present = [name for name in PLAN_003_004_MODULES if (_planning_dir() / name).exists()]
+def test_planning_engine_modules_are_landed():
+    missing = [name for name in PLAN_003_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+
+
+def test_plan_decompose_module_is_still_absent():
+    present = [name for name in PLAN_004_DEFERRED_MODULES if (_planning_dir() / name).exists()]
     assert present == []
 
 
-def test_planning_package_holds_only_the_declaration_module():
+def test_planning_package_holds_only_landed_modules():
     modules = sorted(
         path.name for path in _planning_dir().rglob("*.py") if "__pycache__" not in path.parts
     )
-    assert modules == ["__init__.py", "goal_contract.py"]
+    assert modules == [
+        "__init__.py",
+        "context.py",
+        "engine.py",
+        "goal_contract.py",
+    ]
 
 
 def test_plan_002_fourth_criterion_source_is_embedded():

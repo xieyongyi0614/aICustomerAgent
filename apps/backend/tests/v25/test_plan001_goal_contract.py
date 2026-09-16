@@ -437,6 +437,21 @@ def test_write_face_is_exactly_five_functions_and_excludes_other_goal_mutations(
         assert name not in declared
 
 
+PLAN_FACE_WRITE_CALLS = (
+    "create_plan",
+    "set_plan_status",
+    "set_plan_rejection",
+    "update_plan_progress",
+)
+"""PLAN-003 契约演进：计划面四函数进入 `goal_repository` 调用白名单。
+
+口径由「§6.1 ∪ §6.2（12 项）」扩为「§6.1 ∪ §6.2 ∪ 计划面四函数（16 项）」——这是 PLAN-001
+已预告的越界评审点（Task Detail §10.3），演进留痕见 `goal_contract` 模块文档 §9。
+`PLANNING_WRITE_INTERFACES`（Goal 状态写面恰好 5 个）不受影响：计划面四函数不是 Goal
+状态写面，计划被拒仍不改 `GoalStatus`。
+"""
+
+
 def test_declared_goal_repository_whitelist_is_read_face_plus_write_face():
     goal_repository_calls = {
         attribute
@@ -446,10 +461,10 @@ def test_declared_goal_repository_whitelist_is_read_face_plus_write_face():
         )
         if module_path == "app.repositories.goal_repository"
     }
-    assert goal_repository_calls == set(
-        goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS
-    )
-    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 12
+    allowed = set(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS)
+    assert goal_repository_calls <= allowed
+    assert allowed - goal_repository_calls == set(PLAN_FACE_WRITE_CALLS)
+    assert len(goal_contract.PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS) == 16
 
 
 def test_goal_repository_plan_face_signatures_are_frozen():

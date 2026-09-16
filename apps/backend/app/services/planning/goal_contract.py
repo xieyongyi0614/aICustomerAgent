@@ -35,8 +35,8 @@
 `seed_goals` —— Planning 不得调用；计划被拒（`GoalPlanStatus.rejected`）**不改变** `GoalStatus`。
 
 计划本体的落库面（`create_plan` / `set_plan_status` / `set_plan_rejection` /
-`update_plan_progress`）属既有「计划面九函数」，由后续任务的契约对照（PLAN-011）冻结；
-本任务严格只冻结 §6.1 ∪ §6.2 给出的 Goal 状态读写面（见 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS`）。
+`update_plan_progress`）属既有「计划面九函数」；**PLAN-003 起这四者进入调用白名单**
+（见下方「九、PLAN-003 契约演进留痕」），由 PLAN-011 做完整契约对照。
 
 三、归因面（每次计划终态调一次，来源 Task Detail §6.3）
 
@@ -75,6 +75,10 @@
 1. `second_priority_algorithm`：重算优先级，或按目标 tier / 显式 priority 对**计划步骤**重排
    （计划步骤顺序只由 `depends_on` DAG + `index` 升序决定，即结构序）。
 2. `character_priority_asset_import`：导入角色优先级资产（`app/character/**`）。
+   **PLAN-003 起的唯一窄例外**：`app.character.asuna.scene_profiles`（场景画像资产，
+   非优先级资产）——`PlanContext.scene` 按 Task Detail §4.1.3 取 `scene_profile_for`；
+   例外范围由 `tests/v25/test_plan001_static_scan.py::ALLOWED_CHARACTER_IMPORT_MODULES`
+   逐模块枚举，不得扩成前缀。
 3. `direct_goal_row_persistence`：直构 ORM 行对象或直接构造写语句写 `character_goals`，
    绕过 `goal_repository` 写面。
 4. `new_goal_status_value`：新增 `GoalStatus` 取值。
@@ -99,6 +103,22 @@
 2. **进终态（待 PLAN-005 落地）**：`PlanObserver.settle` 在结算目标终态的同时把该计划置
    `superseded`。PLAN-001 只冻结契约，不实现 `settle`；对应断言在 `tests/v25/test_plan001_deferred.py`
    中显式登记为 deferred（不得以编造实现来满足）。
+
+────────────────────────────────────────────────────────────────────────────
+九、PLAN-003 契约演进留痕（**预期的越界评审点**，PLAN-001 已预告）
+
+Task Detail §10.3 的白名单原为 §6.1 ∪ §6.2（12 项，Goal 状态读写面）。PLAN-003 的计划引擎
+必须经既有计划面四函数落库（`create_plan` / `set_plan_status` / `set_plan_rejection` /
+`update_plan_progress`），故 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 由 **12 项扩为 16 项**。
+演进范围精确且最小：
+
+- 只加这四者——`expire_goal` / `cancel_goal` / `seed_goals` / `create_goal` /
+  `create_hierarchical_goal` / `list_layered*` 等既有旁路调用**仍不在白名单**。
+- `PLANNING_WRITE_INTERFACES`（恰好 5 个 Goal 状态写面）**不变**：计划面四函数不属 Goal
+  状态写面，计划被拒仍不改 `GoalStatus`。
+- 同步更新三处冻结快照（均属留痕而非放松）：`test_plan001_static_scan.py` 的白名单口径、
+  `test_plan001_goal_contract.py` 的白名单计数与集合断言、`test_plan001_scope_markers.py`
+  的「已落地 / 仍不得预埋」标记。
 """
 
 PLANNING_READ_INTERFACES: tuple[tuple[str, str], ...] = (
@@ -165,6 +185,10 @@ PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS: tuple[str, ...] = (
     "complete_goal",
     "fail_goal",
     "reactivate_goal",
+    "create_plan",
+    "set_plan_status",
+    "set_plan_rejection",
+    "update_plan_progress",
 )
 
 PLANNING_FAILURE_REASON_PLAN_EXHAUSTED = "plan_exhausted"

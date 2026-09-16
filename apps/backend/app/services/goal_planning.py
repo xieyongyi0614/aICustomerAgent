@@ -318,6 +318,25 @@ def _ask_llm_with_retry(messages: list[tuple], settings) -> PlanningProposal:
     raise last_exc
 
 
+def propose_plan(
+    goal: GoalRecord, world_facts: dict | None = None, settings=None
+) -> PlanningProposal:
+    """规划本体前半段（V2.5.0 PLAN-003 复用入口）：既有 prompt 装配 + 既有重试语义。
+
+    只出提案、不落库、不判闸——V2.5.0 规划引擎（`app/services/planning/engine.py`）经本函数
+    取提案，与 `plan_goal` 共用同一对原语（`_build_messages` + `_ask_llm_with_retry`），
+    使 prompt 装配与 `_LLM_RETRY_ATTEMPTS` 重试语义在仓库内**只有一处实现**
+    （`app/services/planning/` 零 prompt / LLM 面由静态扫描强制）。
+
+    `plan_goal` 原有三步编排（overlay → 建消息 → 重试）**保持不动**，故本函数是增量入口
+    而非既有路径的改写：零运行时语义变更，prompt 逐字节不变。
+    """
+    resolved = settings if settings is not None else get_settings()
+    overlay = development_aggregate.read_overlay(goal.user_id)
+    messages = _build_messages(goal, overlay, world_facts or {}, resolved)
+    return _ask_llm_with_retry(messages, resolved)
+
+
 def _persist_trace(trace, user_id: str) -> None:
     try:
         observability.on_turn_finished(
