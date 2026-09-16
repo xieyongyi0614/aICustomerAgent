@@ -3,7 +3,7 @@
 > 上游：[architecture.md](./architecture.md) §3.2（六设计原则）、§14（六风险）、附（五遗留问题）、§12（可观测）；[tasks.md](./tasks.md)
 > 用途：版本发布判据 + 真实模型人工回归执行单
 > 配套自动化：`apps/backend/tests/v26/`（实现期建立）
-> 状态：待实现（TASK-001 ~ TASK-009 尚未排期；本清单为 TASK-009 交付物预置）
+> 状态：实现完成（TASK-001 ~ TASK-009 DONE；自动化入口 `uv run pytest tests/v26 -q`）
 
 ---
 

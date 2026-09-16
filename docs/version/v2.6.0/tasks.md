@@ -1,7 +1,7 @@
 # V2.6.0 Action Execution System Tasks
 
 > **上游**：`docs/version/v2.6.0/architecture.md`
-> **状态**：架构设计稿（仅设计，未排期、未实现）
+> **状态**：已实现（TASK-001 ~ TASK-009 DONE）
 > **主干**：TASK-001 ~ TASK-009（依赖顺序即文档顺序）
 > **说明**：本文档只做任务级拆分；各任务 Task Detail 见 `tasks/TASK-XXX.md`（TASK-001 ~ TASK-009），不含代码、不含 DDL 与迁移脚本。
 > **定位复述**：Action Execution System = **行动执行层**。把 V9 遗留的「单次动作执行」（`action_engine.run_action_planning`）升级为一个统一 Action 抽象 + 执行引擎 + 调度器 + 结果系统，打通 Plan → Action → Execution → Result → State Update → Feedback 闭环。
@@ -504,12 +504,12 @@ Architecture 14 章与本文档 9 任务的对应关系：
 
 | Task | 状态 | 完成内容 | 修改文件 | commit | 测试结果 |
 |---|---|---|---|---|---|
-| TASK-001 | DONE | Action 统一抽象 / ExecutionKind 映射 / ActionSource 五值 / 六态语义表 | `app/models/action.py`、`tests/v26/test_task001_action_core_model.py` | (pending) | 47 passed |
-| TASK-002 | DONE | action_schedules 新表 / priority 加列 / source 五值 CHECK / 5 个 schedule 仓储函数 | `app/models/action.py`、`app/core/db.py`、`app/repositories/action_repository.py`、`migrations/versions/0047_action_schedules_priority.py`、`tests/v26/test_task002_persistence.py` | (pending) | 14 passed + 既有仓储 6 passed |
-| TASK-003 | DONE | ActionManager 六能力 + v26 Flag 设置 | `app/services/action/manager.py`、`app/core/settings/action_execution.py`、`app/core/settings/__init__.py`、`tests/v26/test_task003_manager.py` | (pending) | 22 passed |
-| TASK-004 | DONE | ActionExecutor 三分派 + 异常归一 + 结果必产 | `app/services/action/executor.py`、`tests/v26/test_task004_executor.py`、`tests/v24/test_tool003_action_engine.py`（冻结断言同步） | (pending) | 37 passed |
-| TASK-005 | DONE | ActionScheduler 三种 when + 排序/队列 + life_loop 挂载 | `app/services/action/scheduler.py`、`app/application/life_loop.py`、`tests/v26/test_task005_scheduler.py` | (pending) | 14 passed |
-| TASK-006 | DONE | ActionResult 统一契约 + 投影映射 + 旧读键双写 | `app/models/action.py`、`app/services/action/result.py`、`tests/v26/test_task006_result.py` | (pending) | 16 passed |
-| TASK-007 | DONE | Planning/World/Relationship/Memory 四路接线 + 反馈闭环 | `app/services/action/integration.py`、`tests/v26/test_task007_integration.py` | (pending) | 9 passed |
-| TASK-008 | DONE | 契约冻结 + 4 调试端点 + 事件日志 | `app/api/v1/action_execution.py`、`app/api/v1/router.py`、`app/services/action/contracts.py`、`tests/v26/test_task008_api.py` | (pending) | 7 passed |
-| TASK-009 | TODO | | | | |
+| TASK-001 | DONE | Action 统一抽象 / ExecutionKind 映射 / ActionSource 五值 / 六态语义表 | `app/models/action.py`、`tests/v26/test_task001_action_core_model.py` | b75ce93 | 47 passed |
+| TASK-002 | DONE | action_schedules 新表 / priority 加列 / source 五值 CHECK / 5 个 schedule 仓储函数 | `app/models/action.py`、`app/core/db.py`、`app/repositories/action_repository.py`、`migrations/versions/0047_action_schedules_priority.py`、`tests/v26/test_task002_persistence.py` | 7b4ec1e | 14 passed + 既有仓储 6 passed |
+| TASK-003 | DONE | ActionManager 六能力 + v26 Flag 设置 | `app/services/action/manager.py`、`app/core/settings/action_execution.py`、`app/core/settings/__init__.py`、`tests/v26/test_task003_manager.py` | 459cd6a | 22 passed |
+| TASK-004 | DONE | ActionExecutor 三分派 + 异常归一 + 结果必产 | `app/services/action/executor.py`、`tests/v26/test_task004_executor.py`、`tests/v24/test_tool003_action_engine.py`（冻结断言同步） | 672cf7f | 37 passed |
+| TASK-005 | DONE | ActionScheduler 三种 when + 排序/队列 + life_loop 挂载 | `app/services/action/scheduler.py`、`app/application/life_loop.py`、`tests/v26/test_task005_scheduler.py` | 7313858 | 14 passed |
+| TASK-006 | DONE | ActionResult 统一契约 + 投影映射 + 旧读键双写 | `app/models/action.py`、`app/services/action/result.py`、`tests/v26/test_task006_result.py` | 531d1cb | 16 passed |
+| TASK-007 | DONE | Planning/World/Relationship/Memory 四路接线 + 反馈闭环 | `app/services/action/integration.py`、`tests/v26/test_task007_integration.py` | fea2713 | 9 passed |
+| TASK-008 | DONE | 契约冻结 + 4 调试端点 + 事件日志 | `app/api/v1/action_execution.py`、`app/api/v1/router.py`、`app/services/action/contracts.py`、`tests/v26/test_task008_api.py` | b5e53d0 | 7 passed |
+| TASK-009 | DONE | 四类验收 + Flag 矩阵 + 六原则/六风险/遗留收口 | `tests/v26/test_task009_validation.py`、`docs/version/v2.6.0/regression-checklist.md` | (本提交) | 148 v26 passed |
