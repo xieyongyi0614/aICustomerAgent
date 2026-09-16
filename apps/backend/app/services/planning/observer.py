@@ -41,6 +41,15 @@
 广播失败只 log，**不回滚计划终态**（D15）。既有写面 `goal_observation._complete` 与
 `goal_arbitration.check_abandonment` 各自的广播未改动（`settle` 只在「既有写面没结算」时迁移）。
 
+**终态记忆（PLAN-009 §4.2.1 / §7.5.5）**：`_transition` 在迁移成功后调
+`deliver_goal_terminal_memory`（映射表 `TERMINAL_MEMORY_EVENTS`，含 `completed` / `failed` /
+`abandoned`），委托 `planning/memory_policy.py` 完成判据 B → 候选构造 → `memory_policy`
+R1~R8 → `memories`（零新列）→ 幂等标记；子闸 `v25_plan_memory_enabled` off 时零调用零写入。
+与广播的差别只在**覆盖面**：`failed` 不广播但**要**沉淀（「想帮用户做一件事但没做成」本身是
+用户可感知的事实）；投递失败只 log，**不回滚计划终态**（D10 / D15 同款纪律）。计划本体与中间
+步骤一律不进记忆（判据 B 的 ❌ 四行），步骤是否沉淀由该步的工具按 V2.4.0 边界表独立决定
+（判据 C：两层正交，本模块不覆盖工具侧决策）。
+
 与 Task Detail 的两处实现核对（已在测试留痕）
 
 1. **§8.5 的 `settle(...) -> PlanOutcome` 改名为 `PlanSettlement`**：`PlanOutcome` 已被
@@ -74,7 +83,8 @@ from app.models.plan import (
 )
 from app.repositories import action_repository, goal_repository, memory_repository
 from app.services import goal_arbitration, goal_observation, state_service
-from app.services.planning import goal_contract, scheduler as plan_scheduler
+from app.services.planning import goal_contract, memory_policy as plan_memory_policy
+from app.services.planning import scheduler as plan_scheduler
 from app.services.world import event_bridge
 
 logger = logging.getLogger(__name__)
@@ -160,6 +170,18 @@ TERMINAL_BROADCAST_OUTCOMES: dict[str, str] = {
 裁决并广播），映射表仍然显式列出，使计划侧若执行该迁移时广播语义与既有路径一致。
 """
 
+TERMINAL_MEMORY_EVENTS: dict[str, str] = {
+    "completed": plan_memory_policy.EVENT_PLAN_COMPLETED,
+    "failed": plan_memory_policy.EVENT_PLAN_FAILED,
+    "abandoned": plan_memory_policy.EVENT_PLAN_ABANDONED,
+}
+"""终态记忆的 `GoalStatus` → `event_kind` 映射（PLAN-009 §4.3.2）。
+
+三类终态**都**沉淀（与广播表的关键差别：`failed` 不广播但**要**沉淀，失败语义本身是用户可感知
+的事实）。同 `TERMINAL_BROADCAST_OUTCOMES`：`abandoned` 的计划侧迁移本版本不发生，映射表显式
+列出使语义完整（既有 `check_abandonment` 路径端到端兑现）。
+"""
+
 __all__ = [
     "DECISION_OUTCOMES",
     "DECISION_REASONS",
@@ -180,7 +202,9 @@ __all__ = [
     "REASON_PLAN_WRITE_REFUSED",
     "STEP_NAME",
     "TERMINAL_BROADCAST_OUTCOMES",
+    "TERMINAL_MEMORY_EVENTS",
     "broadcast_goal_terminal",
+    "deliver_goal_terminal_memory",
 ]
 
 
@@ -369,6 +393,7 @@ class PlanObserver:
         settled = record or goal
         self._record_lifecycle(settled, plan, advance, target)
         broadcast_goal_terminal(settled, target)
+        deliver_goal_terminal_memory(settled, plan, target)
         return PlanSettlement(
             advance.decision,
             None if record is None else record.status,
@@ -457,6 +482,24 @@ def broadcast_goal_terminal(goal, outcome: str) -> bool:
     except Exception:
         logger.exception("计划终态广播失败（goal=%s → %s）", goal.id, mapped)
         return False
+
+
+def deliver_goal_terminal_memory(goal, plan, outcome: str, *, policy=None) -> dict | None:
+    """终态记忆投递（PLAN-009 §4.2.1 / §7.5.5）：计划层的**唯一**记忆表达。
+
+    只做 `GoalStatus` → `event_kind` 映射并委托 `memory_policy.deliver_plan_memory`（判据 B、
+    候选构造、R1~R8、落库、幂等全在彼处）；子闸 `v25_plan_memory_enabled` off 时零调用零写入
+    （记忆通道走既有原路径，行为与 V2.4.0 逐字节一致）。投递失败只 log：**不回滚计划终态**
+    （同款纪律）；`plan is None` 时不投递（隐私判别与幂等标记都以计划域台账为面）。
+    """
+    event_kind = TERMINAL_MEMORY_EVENTS.get(outcome)
+    if event_kind is None or plan is None:
+        return None
+    if not get_settings().v25_plan_memory_enabled:
+        return None
+    return plan_memory_policy.deliver_plan_memory(
+        goal, plan, event_kind, policy=policy
+    )
 
 
 def _unsupported_tool_criterion(criteria: dict, depth: int = 0) -> bool:

@@ -1,7 +1,7 @@
 # PLAN-009 Task Detail — Memory Integration
 
 > 上游：[../architecture.md](../architecture.md) §7.5（§7.5.1 ~ §7.5.5）、§6.2 ⑦、§6.7 ⑩、§9.6 G-MEMORY；[../tasks.md](../tasks.md) PLAN-009
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，2026-09-16；commit 待提交）
 > 范围红线：**计划本体与中间步骤不进 `memories`**；计划结果进记忆必须经 `memory_policy.apply_policy`（R1~R8 零豁免）；**不新建记忆系统、不覆盖工具侧 deposit 决策、不新增 `memories` 列**。
 
 ---

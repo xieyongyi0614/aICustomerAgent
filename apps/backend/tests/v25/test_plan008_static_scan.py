@@ -288,7 +288,10 @@ class TestZeroMigration:
         )
 
     def test_planning_package_holds_no_new_module_for_world_integration(self):
-        """§4.1.1：本任务**不新建模块**（增量接线于既有 `context.py` / `observer.py`）。"""
+        """§4.1.1：本任务**不新建模块**（增量接线于既有 `context.py` / `observer.py`）。
+
+        PLAN-009 落地后按同一纪律收编 `memory_policy.py`（该任务新建记忆边界表模块）。
+        """
         names = sorted(
             path.name
             for path in scan.PLANNING_PACKAGE_DIR.rglob("*.py")
@@ -301,6 +304,7 @@ class TestZeroMigration:
             "engine.py",
             "executor_bridge.py",
             "goal_contract.py",
+            "memory_policy.py",
             "observer.py",
             "revision.py",
             "scheduler.py",

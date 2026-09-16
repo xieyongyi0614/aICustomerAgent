@@ -55,8 +55,14 @@ World 读白名单 `WORLD_READ_ENTRIES` 与终态广播映射 `TERMINAL_BROADCAS
 - `PLAN_DEGRADED_REASONS` 由六值扩为**十三值**：World 源由三段一体细化为九段逐段可降级，
   插入七条世界段标记（见 `context.WORLD_READ_ENTRIES` 与 `test_plan003_context.py`
   `TestDegradedRegistry` 的留痕）。
-- `_WorldSource` 由三元组扩为**五字段**（新增 ① 时间上下文与逐段降级清单）：
+- `_WorldSource` 由三元组扩为**五字段**（新增 ① 时间上下文与逐段可降级清单）：
   `_assemble_world` 的返回值由 `(source, degraded)` 收成单一载体（内部结构，非公开契约）。
+
+PLAN-009 落地时按同一纪律改动本模块：`memory_policy.py` 由「不存在」翻转为**「已落地」**
+（§4.1.1 明确本任务新建该模块：判据 A / `PlanMemoryPolicy` 边界表 / 候选构造 / 记忆通道），
+`revision_listener.py` **维持「不得预埋」**；包模块清单同步收编该模块名。
+同一落地的契约演进项：终态记忆映射 `TERMINAL_MEMORY_EVENTS`（落于既有 `observer.py`，
+与 PLAN-008 的 `TERMINAL_BROADCAST_OUTCOMES` 并列——广播与记忆是两条独立的终态通道）。
 """
 
 from pathlib import Path
@@ -131,6 +137,9 @@ PLAN_010_PENDING_MODULES = ("revision_listener.py",)
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
 PLAN_004_LANDED_MODULES = ("decompose.py",)
+
+PLAN_009_LANDED_MODULES = ("memory_policy.py",)
+"""PLAN-009 落地：计划终态记忆边界表模块（§4.1.1 本任务**新建**该模块）。"""
 
 PLAN_006_LANDED_INTERFACES = (
     "_evaluate_tool_resolvable",
@@ -238,6 +247,20 @@ def test_plan_decompose_module_is_landed():
     assert missing == []
 
 
+def test_plan_009_lands_the_memory_boundary_table_module():
+    """PLAN-009 产物面：记忆边界表模块在位，且**没有**为记忆集成预埋别的模块。
+
+    Task Detail §4.1.1 明确本任务**新建** `memory_policy.py`（判据 A / 边界表 / 候选构造）；
+    故本任务与 PLAN-006 ~ PLAN-008 的「零新建模块」形态不同，此处以显式清单翻转，
+    `test_planning_package_holds_only_landed_modules` 同步收编该模块名。
+    """
+    missing = [name for name in PLAN_009_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+    assert not (_planning_dir() / "memory.py").exists()
+    assert not (_planning_dir() / "memory_bridge.py").exists()
+    assert not (_planning_dir() / "memory_gate.py").exists()
+
+
 def test_plan_006_lands_the_two_gate_predicates_without_a_new_module():
     """PLAN-006 产物面：两个闸门判定接口在位，且**没有**为工具治理新建模块。"""
     from app.services.planning import engine as engine_mod
@@ -337,6 +360,7 @@ def test_planning_package_holds_only_landed_modules():
         "engine.py",
         "executor_bridge.py",
         "goal_contract.py",
+        "memory_policy.py",
         "observer.py",
         "revision.py",
         "scheduler.py",

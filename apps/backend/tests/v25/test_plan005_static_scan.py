@@ -58,6 +58,7 @@ PLANNING_PACKAGE_MODULES = (
     "engine.py",
     "executor_bridge.py",
     "goal_contract.py",
+    "memory_policy.py",
     "observer.py",
     "revision.py",
     "scheduler.py",
@@ -75,7 +76,10 @@ def _attributes(path: Path, base: str) -> set[str]:
 
 
 class TestModuleInventory:
-    """范围标记的产物面：本任务新增四个模块，`revision_listener` 仍属 PLAN-010。"""
+    """范围标记的产物面：本任务新增四个模块，`revision_listener` 仍属 PLAN-010。
+
+    PLAN-009 落地后按同一纪律把 `memory_policy.py` 收进 `PLANNING_PACKAGE_MODULES`。
+    """
 
     def test_planning_package_holds_exactly_the_landed_modules(self):
         names = sorted(

@@ -9,6 +9,9 @@
 包级扫描（`goal_repository` 调用白名单、零 ORM 直写、角色资产放行面）见
 `test_plan001_static_scan.py`；PLAN-005 四模块的纯函数纪律见 `test_plan005_static_scan.py`。
 本模块只补 PLAN-006 的工具治理面。
+
+清单留痕：`PLANNING_PACKAGE_MODULES` 在 PLAN-009 落地后按同一纪律收编
+`memory_policy.py`（计划终态记忆边界表模块），其余条目逐字未动。
 """
 
 import ast
@@ -37,6 +40,7 @@ PLANNING_PACKAGE_MODULES = (
     "engine.py",
     "executor_bridge.py",
     "goal_contract.py",
+    "memory_policy.py",
     "observer.py",
     "revision.py",
     "scheduler.py",
