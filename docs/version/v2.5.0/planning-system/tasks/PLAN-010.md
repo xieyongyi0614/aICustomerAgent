@@ -1,7 +1,7 @@
 # PLAN-010 Task Detail — Reflection Integration
 
 > 上游：[../architecture.md](../architecture.md) §7.6（执行结果 → Reflection → Planning 闭环）、§7.5.4（判据 D）、§6.1 ⑦、§8.6（`PlanningRevisionListener`）、§9.6 G-REFLECT、§9.7 Q8；[../tasks.md](../tasks.md) PLAN-010
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 777c8ee，2026-09-16）
 > 范围红线：**反思分析计划效能，但不改写计划**；只投一个幂等的重规划触发；三道闸零豁免；不在 `foreground` 关键路径做计划反思；不产出「性格类」Insight。
 
 ---
