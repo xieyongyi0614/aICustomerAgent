@@ -1,7 +1,7 @@
 # PLAN-008 Task Detail — World Simulation Integration
 
 > 上游：[../architecture.md](../architecture.md) §7.4（与 World Simulation 集成）、§6.7（⑨ 世界广播）、§2.3（红线 5）、§7.1（集成总则）、§9.7 Q5 / Q9；[../tasks.md](../tasks.md) PLAN-008
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 03c1fba，2026-09-16）
 > 范围红线：**世界事实只经预读注入规划；计划永不直接修改世界状态**；`services/planning/` 零 `world_repository` 导入；零 `character_state` / `personality_state` / `relationship_*` 写入；`WorldIntentSubmitter` 本版本仍 `WIRED=False`。
 
 ---
