@@ -9,12 +9,15 @@
 | `context` | `PlanContextAssembler` / `PlanContextProbe` / `PlanUnavailable` | PLAN-003 ✅ |
 | `engine` | `PlanningEngine` / `PlanOutcome` / `get_planning_engine` / 七道闸理由码 | PLAN-003 ✅ |
 | `decompose` | `TaskDecomposer` / `PlanValidator` / `DecompositionResult` | PLAN-004 ✅ |
+| `scheduler` | `PlanScheduler` / `FailurePropagation` / 阻塞与矩阵常量 | PLAN-005 ✅ |
+| `executor_bridge` | `PlanExecutorBridge` / `PlanBridgeDefect` / 归一映射表 | PLAN-005 ✅ |
+| `observer` | `PlanObserver` / `PlanSettlement` / `ObservationContext` / 四源常量 | PLAN-005 ✅ |
+| `revision` | `PlanRevisionPolicy` / 四个重规划理由码 | PLAN-005 ✅ |
 
 后续任务的落点（本任务不实现、不预埋）：
 
-- PLAN-005：`app/services/planning/` 下的 `scheduler.py` / `executor_bridge.py` /
-  `observer.py` / `revision.py`（+ `revision_listener.py`）。
-- PLAN-006 ~ PLAN-012：工具 / 自治 / 世界 / 记忆 / 反思集成与接口冻结。
+- PLAN-006 ~ PLAN-012：工具 / 自治 / 世界 / 记忆 / 反思集成与接口冻结；
+  `revision_listener.py` 属 PLAN-010（本任务只定义 `insight_driven` 理由码与判定入口）。
 
 对 Goal System 的纪律（本包任何模块都必须遵守，见 `goal_contract` 模块文档）：
 Goal System 说「想要什么、谁更重要」；Planning 只说「这件事分几步做」。

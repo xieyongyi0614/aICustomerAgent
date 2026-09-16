@@ -13,7 +13,7 @@ trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅�
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.core.settings import get_settings
 from app.application import (
@@ -44,9 +44,10 @@ from app.services import (
     goal_observation,
 )
 from app.services.planning import engine as planning_engine
+from app.services.planning import observer as plan_observer
 from app.application.worker_loop import run_worker_loop
 from app.models.observability import TraceKind
-from app.repositories import action_repository, memory_repository, outbox_repository
+from app.repositories import memory_repository, outbox_repository
 from app.services.reflection import triggers as reflection_triggers
 from app.services.trace_collector import TurnTraceSession
 
@@ -464,72 +465,56 @@ def _route_planning_jobs(user_id: str, result: dict, settings) -> None:
 
 
 def _observation_facts(user_id: str, now: datetime) -> dict:
-    """AUT-003 观察事实编排投影（GAP-AUT-02）：action 窗口/world/state/memory。"""
+    """AUT-003 观察事实编排投影（GAP-AUT-02）：action 窗口/world/state/memory。
 
+    V2.5.0 PLAN-005：投影本体搬运到 `PlanObserver.collect_facts`（第四源 `tool` 在同一处装配，
+    避免两套事实装配）；本函数保留一个版本窗口作为既有调用点（`life_loop` 与 V2.0.0 用例）的
+    兼容出口，`observation_keys=()`（显式空白名单）使本路径**零额外读取**——查询面与 V2.4.0 逐一相同。
+    """
+
+    return plan_observer.PlanObserver().collect_facts(
+        user_id,
+        plan_observer.ObservationContext(now=now),
+        observation_keys=(),
+    )
+
+
+def _plan_observation_enabled(settings) -> bool:
+    """V2.5.0 观测接线闸（总闸 + 观测子闸；串行链由 `settings/enablement.py` 在启动边界校验）。"""
+    return bool(settings.v25_planning_enabled) and bool(
+        settings.v25_plan_observation_enabled
+    )
+
+
+def _observe_goals(user_id: str, now: datetime) -> tuple[dict, dict, dict]:
+    """观察事实与推进裁决（PLAN-005 接线点，§5.6）。
+
+    on：`PlanObserver.collect_facts`（四源）+ `observe_user_goals`（推进裁决落
+    `decision_records`、终态经 `settle` 单一写面）；off：既有 `_observation_facts` +
+    `goal_observation.advance_user_goals` 原路径（行为与 V2.4.0 一致）。
+    """
     settings = get_settings()
-    facts: dict = {"now": now, "world": {}, "state": {}, "memory": {}}
-    try:
-        window_start = now - timedelta(
-            minutes=settings.v2_autonomy_observation_window_minutes
-        )
-        records = action_repository.list_records(user_id, limit=50)
-        facts["action_results"] = [
-            {
-                "capability": record.action_type,
-                "status": record.status,
-                "created_at": record.created_at,
-            }
-            for record in records
-            if record.created_at is not None and record.created_at >= window_start
-        ]
-        history_start = now - timedelta(
-            days=settings.v2_autonomy_abandon_min_progress_days
-        )
-        facts["action_history"] = [
-            {
-                "capability": record.action_type,
-                "created_at": record.created_at,
-            }
-            for record in records
-            if record.created_at is not None and record.created_at >= history_start
-        ]
-    except Exception:
-        logger.exception("行动事实采集失败，判据按不可判定处理")
-        facts["action_results"] = []
-        facts["action_history"] = []
-    try:
-        facts["world"] = (
-            world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
-        )
-    except Exception:
-        logger.exception("world 事实采集失败，判据按不可判定处理")
-    try:
-        character, relationship = state_service.load_states(user_id)
-        facts["state"] = {
-            "tension": relationship.tension,
-            "intimacy": relationship.intimacy,
-            "mood": character.mood,
-            "intensity": character.intensity,
-        }
-    except Exception:
-        logger.exception("状态事实采集失败，判据按不可判定处理")
-    if settings.v2_memory_enabled:
-        try:
-            salient = memory_repository.list_top_salience(
-                user_id,
-                min_salience=settings.v2_life_loop_memory_min_salience,
-                limit=settings.v2_life_loop_memory_limit,
-            )
-            facts["memory"] = {"salient_memory_count": len(salient)}
-            facts["salient_memories"] = salient
-        except Exception:
-            logger.exception("记忆事实采集失败，判据按不可判定处理")
-    return facts
+    if not _plan_observation_enabled(settings):
+        facts = _observation_facts(user_id, now)
+        return facts, goal_observation.advance_user_goals(user_id, facts, now), {}
+    observer = plan_observer.PlanObserver()
+    facts = observer.collect_facts(user_id, plan_observer.ObservationContext(now=now))
+    advance = observer.observe_user_goals(user_id, facts, now=now)
+    return facts, advance, {
+        "goals": advance.get("goals", 0),
+        "settled": advance.get("settled", 0),
+    }
 
 
 async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     """AUT-004 仲裁（复活/冲突/放弃）→ AUT-003 观察调整 → Sub-Goal 执行尝试。
-    仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。"""
+    仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。
+
+    V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测与推进经 `_observe_goals` 分派（Flag
+    `v25_plan_observation_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段的
+    子步骤以 `plan_observe` 字段记入 `loop_runs.steps`（受既有 `budget_state` 约束：
+    观测为 0 LLM，故不额外占用周期 LLM 预算）。
+    """
 
     settings = get_settings()
     if not settings.v2_autonomy_advanced_enabled:
@@ -538,9 +523,8 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     if not pairs:
         return {"status": "ok", "goals": 0, "observations": 0, "executions": 0}
     started = time.perf_counter()
-    facts = _observation_facts(user_id, now)
+    facts, advance, plan_observe = _observe_goals(user_id, now)
     arbitration = goal_arbitration.run_user_arbitration(user_id, facts, now)
-    advance = goal_observation.advance_user_goals(user_id, facts, now)
     executions: list[dict] = []
     for goal, plan in goal_repository.list_active_plans(user_id):
         executions.append(await goal_execution.attempt_current_step(goal, plan, now))
@@ -567,6 +551,7 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
         "executions": len(executions),
         "arbitration_changes": len(arbitration.get("arbitration_changes", [])),
         "abandoned": len(arbitration.get("abandoned", [])),
+        **({"plan_observe": plan_observe} if plan_observe else {}),
     }
 
 

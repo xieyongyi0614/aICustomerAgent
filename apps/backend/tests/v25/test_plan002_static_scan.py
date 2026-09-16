@@ -187,7 +187,7 @@ def test_i7_no_new_plan_table_exists():
 
 
 def test_plan_002_adds_no_module_to_the_planning_package():
-    """原 PLAN-002 断言「计划包只有声明模块」；PLAN-003 / PLAN-004 落地后按同一纪律更新清单。"""
+    """原 PLAN-002 断言「计划包只有声明模块」；PLAN-003 / PLAN-004 / PLAN-005 落地后按同一纪律更新清单。"""
     names = sorted(
         path.name
         for path in scan.PLANNING_PACKAGE_DIR.rglob("*.py")
@@ -198,5 +198,9 @@ def test_plan_002_adds_no_module_to_the_planning_package():
         "context.py",
         "decompose.py",
         "engine.py",
+        "executor_bridge.py",
         "goal_contract.py",
+        "observer.py",
+        "revision.py",
+        "scheduler.py",
     ]

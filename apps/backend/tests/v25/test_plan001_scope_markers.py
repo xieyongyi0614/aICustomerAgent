@@ -13,7 +13,8 @@
 | `app/models/plan.py` / `settings/plan.py` | PLAN-002 | ✅ 已落地 |
 | 计划域装配 / 引擎模块（`context.py` / `engine.py`） | PLAN-003 | ✅ 已落地 |
 | 计划域拆解模块（`decompose.py`） | PLAN-004 | ✅ 已落地 |
-| 计划域调度 / 执行 / 观测 / 修订模块 | PLAN-005 | ⛔ 仍不得预埋 |
+| 计划域调度 / 执行 / 观测 / 修订模块（四模块） | PLAN-005 | ✅ 已落地 |
+| 重规划监听器（`revision_listener.py`） | PLAN-010 | ⛔ 仍不得预埋 |
 
 PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
 快照（原计划见 PLAN-001 Task Detail 的标记表）。
@@ -26,6 +27,11 @@ PLAN-004 落地时按同一纪律改动本模块：`decompose.py` 翻转为「�
 **维持「不得预埋」**（拆解不调度 / 不执行 / 不观测 / 不修订——Task Detail §1.2 Non-Scope）。
 同任务的角色资产放行面扩容（`app.character.asuna.action`）见
 `test_plan001_static_scan.py::ALLOWED_CHARACTER_IMPORT_MODULES`。
+
+PLAN-005 落地时按同一纪律改动本模块：`scheduler.py` / `executor_bridge.py` / `observer.py` /
+`revision.py` 四者翻转为「已落地」，`revision_listener.py` **维持「不得预埋」**——反思监听器
+是 PLAN-010 的产物（Task Detail §5.5 边界：本任务只定义 `insight_driven` 理由码与判定入口，
+不读 Insight、不注册监听器），故本任务不预埋该模块。
 """
 
 from pathlib import Path
@@ -88,13 +94,14 @@ PLAN_002_GOAL_PLAN_FIELDS = (
     "evidence_refs",
 )
 
-PLAN_005_EXECUTION_MODULES = (
+PLAN_005_LANDED_MODULES = (
     "scheduler.py",
     "executor_bridge.py",
     "observer.py",
     "revision.py",
-    "revision_listener.py",
 )
+
+PLAN_010_PENDING_MODULES = ("revision_listener.py",)
 
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
@@ -157,8 +164,15 @@ def test_plan_domain_model_module_is_present():
     assert (_backend_root() / "app" / "models" / "plan.py").exists()
 
 
-def test_plan_execution_modules_are_absent():
-    present = [name for name in PLAN_005_EXECUTION_MODULES if (_planning_dir() / name).exists()]
+def test_plan_execution_modules_are_landed():
+    """PLAN-005 契约演进（原「不得预埋」翻转为「已落地」）：四模块存在。"""
+    missing = [name for name in PLAN_005_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+
+
+def test_plan_reflection_listener_stays_unplanted():
+    """PLAN-010 的产物：本任务只定义 `insight_driven` 理由码，不预埋监听器。"""
+    present = [name for name in PLAN_010_PENDING_MODULES if (_planning_dir() / name).exists()]
     assert present == []
 
 
@@ -181,7 +195,11 @@ def test_planning_package_holds_only_landed_modules():
         "context.py",
         "decompose.py",
         "engine.py",
+        "executor_bridge.py",
         "goal_contract.py",
+        "observer.py",
+        "revision.py",
+        "scheduler.py",
     ]
 
 

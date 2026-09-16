@@ -30,6 +30,23 @@ PLAN-003 落地时的改动仅限本模块的「待落地」清单与对应断�
 PLAN-004 落地时按同一纪律改动：`decompose` 移出「待落地」清单并进 `PLAN_004_LANDED_MODULES`；
 PLAN-005 的五个模块（`scheduler` / `executor_bridge` / `observer` / `revision` /
 `revision_listener`）**仍在「待落地」清单内**——拆解不调度、不执行、不观测、不修订。
+
+PLAN-005 落地时按同一纪律改动本模块：
+
+1. `scheduler` / `executor_bridge` / `observer` / `revision` 四者移出「待落地」清单并进
+   `PLAN_005_LANDED_MODULES`；`revision_listener` **留在「待落地」清单**（PLAN-010 的反思接线，
+   本任务只定义 `insight_driven` 理由码与判定入口，见 Task Detail §5.5 边界）。
+2. 两条 PLAN-005 归属的 deferred 断言处理如下（**不编造实现**原则不变）：
+   - `test_deferred_structural_order_via_plan_scheduler`：**去 `skip`**，`PlanScheduler.order`
+     已落地（本任务 Step 1 的搬运出口）；该断言按 `order(plan, goal)` 调用，本实现的签名是
+     `order(plan, goal=None)`——第二形参是这条 deferred 断言的既有调用形态，冻结接口
+     `order(plan)` 仍成立（§8.4 的单参调用不变）。
+   - `test_deferred_goal_terminal_moves_latest_plan_out_of_active`：**保持 `skip`** 并更新理由。
+     它要求 `goal_observation.advance_goal` 在目标转终态时把最新计划置 `superseded`（§4.4 I2 的
+     「进终态」形态）。PLAN-005 的实现选择是 I2 的**另一种允许形态**——「冻结」：`settle` 只做
+     `GoalStatus` 的唯一写面迁移与归因，不改计划状态；且**目标终态一旦成立，其计划即刻退出
+     推进候选集**（`list_active_plans` 的查询条件含 `GoalRow.status == "active"`）。把计划置
+     `superseded` 需要改动既有 `_complete`（既有运行时语义），属本任务红线外，故不在本任务落。
 """
 
 import importlib
@@ -43,10 +60,6 @@ from app.services.planning import goal_contract
 from .conftest import V25_NOW, V25_USER
 
 PLANNING_MODULES_FOR_LATER_TASKS = (
-    "app.services.planning.scheduler",
-    "app.services.planning.executor_bridge",
-    "app.services.planning.observer",
-    "app.services.planning.revision",
     "app.services.planning.revision_listener",
 )
 
@@ -56,6 +69,13 @@ PLAN_003_LANDED_MODULES = (
 )
 
 PLAN_004_LANDED_MODULES = ("app.services.planning.decompose",)
+
+PLAN_005_LANDED_MODULES = (
+    "app.services.planning.scheduler",
+    "app.services.planning.executor_bridge",
+    "app.services.planning.observer",
+    "app.services.planning.revision",
+)
 
 
 def _import_later_module(module_path: str):
@@ -78,7 +98,11 @@ def test_plan_004_decompose_module_is_landed():
     assert _import_later_module("app.services.planning.decompose") is not None
 
 
-@pytest.mark.skip(reason="待 PLAN-005 落地：PlanScheduler.order 就绪排序（结构序）")
+def test_plan_005_execution_modules_are_landed():
+    for module_path in PLAN_005_LANDED_MODULES:
+        assert _import_later_module(module_path) is not None
+
+
 def test_deferred_structural_order_via_plan_scheduler(make_goal, make_plan, make_spec):
     scheduler = _import_later_module("app.services.planning.scheduler")
     goal = make_goal(description="结构序目标", priority=5, domain="world")
@@ -93,7 +117,12 @@ def test_deferred_structural_order_via_plan_scheduler(make_goal, make_plan, make
     assert indexes.index(1) < indexes.index(2)
 
 
-@pytest.mark.skip(reason="待 PLAN-005 落地：PlanObserver.settle 将计划置 superseded")
+@pytest.mark.skip(
+    reason=(
+        "待 PLAN-010 或专项任务：把计划置 superseded 需改动既有 `_complete` 运行时语义；"
+        "PLAN-005 采用 I2 的「冻结」形态（目标终态即退出推进候选集），settle 不改计划状态"
+    )
+)
 def test_deferred_goal_terminal_moves_latest_plan_out_of_active(
     make_goal, make_plan, goal_facts
 ):
