@@ -1,6 +1,6 @@
 # V2.5.0 Planning System Architecture
 
-> **状态**：架构设计稿（仅设计，未排期、未实现）
+> **状态**：已实现（PLAN-001 ~ PLAN-012 全部完成；Flag 默认全 off，回滚即 V2.4.0）
 > **前置**：V2.0.0 Memory V2 / Reflection / Life Loop；V2.1.0 Agent Runtime / Goal Stack / Decision Pipeline / Action Engine；V2.2.0 Character Experience；V2.3.0 World Simulation；V2.4.0 Tool System
 > **定位**：Planning System = **计划编排层（Plan Orchestration Layer）**。它**不是**第二套 Goal 系统，**不是**第二套 Action 引擎。它把已经存在但彼此断线的两半——「目标分解」（`goal_planning` + `GoalPlanRecord` + `SubGoalSpec`）与「工具执行」（`ToolRegistry` + `ToolExecutor`）——用一层**可观测、可失败、可修订的多步计划**焊起来。
 > **铁律**：零新建 Agent / Memory / Session / Event 系统；零新建表、零迁移；Goal 仍是"想要什么"的唯一权威；Autonomy 仍决定"此刻做什么"；Tool 仍是唯一执行面；世界仍由 `world_engine` 唯一写入；记忆仍由 `memory_policy` R1~R8 唯一裁决。

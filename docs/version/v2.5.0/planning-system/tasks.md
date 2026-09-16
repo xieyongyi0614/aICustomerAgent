@@ -1,7 +1,7 @@
 # V2.5.0 Planning System Tasks
 
 > **上游**：`docs/version/v2.5.0/planning-system/architecture.md`
-> **状态**：任务拆分稿（仅拆分，未排期、未实现）
+> **状态**：已实现（PLAN-001 ~ PLAN-012 全部 DONE；验收 P1 修复见 `test_plan012_acceptance_fixes.py`）
 > **主干**：PLAN-001 ~ PLAN-012（依赖顺序即文档顺序）
 > **说明**：本文档只做任务级拆分，不展开 Task Detail、不含代码、不含 DDL 与迁移脚本。
 > **定位复述**：Planning System = **计划编排层**。把已存在的「目标分解」（`goal_planning` + `GoalPlanRecord` + `SubGoalSpec`）与「工具执行」（`ToolRegistry` + `ToolExecutor`）用一层可观测、可失败、可修订的多步计划焊起来。
@@ -653,4 +653,4 @@ Architecture §9.2 定义 14 项任务，本文档按推荐方向重组为 12 �
 | PLAN-009 | DONE | 记忆集成：判据 A（计划本体落库）+ 判据 B（PlanMemoryPolicy 七行边界表，失败/放弃 source=user_derived）+ 判据 C（工具侧不被覆盖）+ R1~R8 零豁免 + 幂等（零迁移） | `app/services/planning/memory_policy.py`、`app/services/planning/observer.py`、`app/services/planning/__init__.py`、`tests/v25/*`（新增 8 + 更新 5） | c48d964 | tests/v25: 1131 passed / 2 skipped；pylint 新模块 9.74/10；compileall OK；memory 侧既有测试零新增失败 |
 | PLAN-010 | DONE | 反思集成：`EVIDENCE_CHANNELS` 增 `plan` 通道 + 三个计划证据窗聚合 + `PlanningRevisionListener`（三门槛/幂等/唯一动作）+ Q8 四判据去重 + `evidence_refs` 闭环（零迁移） | `app/services/planning/revision_listener.py`、`app/services/planning/engine.py`、`app/models/reflection.py`、`app/services/reflection/{evidence,triggers}.py`、`app/services/goal_planning.py`、`app/main.py`、`tests/v25/*`（新增 5 + 更新 6） | 777c8ee | tests/v25: 1255 passed / 1 skipped / 0 failed；pylint listener 9.67/10；compileall OK；既有消费者回归零差异 |
 | PLAN-011 | DONE | 接口层：`goal_repository` 三个只读扩展 + 审计写/投影（`record_plan_advance`/`record_plan_revision`）+ 修订链重建 + `loop_runs` 子步骤记账验证 + 6 个只读调试端点（三闸门控/脱敏）+ 契约签名快照 + Q10 留痕（零迁移） | `app/repositories/goal_repository.py`、`app/services/planning/{observer,goal_contract}.py`、`app/api/v1/{debug,schemas}.py`、`tests/v25/*`（新增 7 + 更新 6） | 248836f | tests/v25: 1351 passed / 1 skipped；pylint 8.92/10（仅 house-style W0718 新增）；compileall OK；tests/v24 1579 passed |
-| PLAN-012 | DONE | 版本验收：四类场景集（A/B/C/D）+ Flag 矩阵（13 默认值/八条串行链/总闸 off 三重对照）+ 十一 Gate 扇入 + Q1~Q10 收口 + 十条红线 + 零迁移（链头 0046）+ `regression-checklist.md` | `apps/backend/tests/v25/test_plan012_{scenario_a_single_goal,scenario_b_multi_step,scenario_c_tool_chain,scenario_d_failure_recovery,flag_matrix,gates_and_invariants}.py`、`tests/v25/plan012_support.py`、`docs/version/v2.5.0/planning-system/regression-checklist.md` | 70344a4 | tests/v25: 1405 passed / 1 skipped；compileall OK |
+| PLAN-012 | DONE | 版本验收：四类场景集（A/B/C/D）+ Flag 矩阵 + 十一 Gate 扇入 + Q1~Q10 收口 + 十条红线 + 零迁移 + `regression-checklist.md`；**验收 P1 修复**：执行桥挂载 `life_loop` + 四子闸真实门控 | `tests/v25/test_plan012_*`、`tests/v25/plan012_support.py`、`app/application/life_loop.py`、`app/services/planning/observer.py`、`docs/version/v2.5.0/planning-system/regression-checklist.md` | (pending) | tests/v25: 1415 passed / 1 skipped；tests/v24: 1579 passed；compileall OK |
