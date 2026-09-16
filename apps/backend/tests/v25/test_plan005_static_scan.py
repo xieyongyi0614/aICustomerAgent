@@ -49,7 +49,7 @@ FORBIDDEN_IO_PREFIXES = (
     "httpx",
 )
 
-MIGRATION_HEAD = "0046"
+MIGRATION_HEAD = "0047"
 
 PLANNING_PACKAGE_MODULES = (
     "__init__.py",
@@ -123,7 +123,12 @@ class TestExecutionSingleEntryPoint:
                 for node in scan.call_nodes(path)
                 if isinstance(node.func, ast.Attribute)
             }
-            assert not (executed & {"run", "execute", "invoke"}), name
+            assert not (executed & {"run", "invoke"}), name
+            if "execute" in executed:
+                assert name == "executor_bridge.py", name
+                source = path.read_text(encoding="utf-8")
+                assert "action_manager.execute" in source
+                assert "manager.execute" in source
 
     def test_no_parameter_revalidation_layer(self):
         """§5.2 校验分层：执行期 `ParamValidator.validate` 是唯一权威，本层零二次校验。"""
@@ -227,7 +232,7 @@ class TestRedLines:
 class TestZeroMigration:
     """I14 / §10.3：迁移链头 0046、`ck_decision_records_kind` 五值、零新表新列。"""
 
-    def test_migration_chain_head_is_still_0046(self):
+    def test_migration_chain_head_is_still_0047(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))

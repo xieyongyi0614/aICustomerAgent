@@ -1,6 +1,6 @@
 """V2.6.0 ActionManager：Action 生命周期唯一管理者（architecture.md §8.1）。
 
-六能力：create / update / query / cancel / retry / get_status。
+六能力 + execute：create / update / query / cancel / retry / execute / get_status。
 不决策（G3）、不编排（G2）、不写世界/记忆/关系。
 """
 
@@ -18,13 +18,15 @@ from app.models.action import (
     ActionSource,
     ActionType,
     make_dedupe_key,
+    transition_action,
 )
 from app.repositories import action_repository
 
 logger = logging.getLogger(__name__)
 
-UPDATABLE_FIELDS = frozenset({"status", "params", "priority", "scheduled_at"})
-IMMUTABLE_FIELDS = frozenset({"id", "user_id", "action_type", "dedupe_key"})
+UPDATABLE_FIELDS = frozenset({"params", "priority", "scheduled_at"})
+IMMUTABLE_FIELDS = frozenset({"id", "user_id", "action_type", "dedupe_key", "status"})
+CANCELLABLE_STATUSES = ("created", "planned")
 
 
 def _now() -> datetime:
@@ -51,6 +53,7 @@ def _record_to_action(record: ActionRecord) -> Action:
         executed_at=record.executed_at,
         source=record.source,
         goal_id=record.goal_id,
+        plan_step=(record.intent or {}).get("plan_step"),
         dedupe_key=record.dedupe_key,
         run_id=record.session_id,
     )
@@ -66,7 +69,7 @@ def create(
     goal_id: str | None = None,
     priority: int = 100,
     intent: ActionIntent | None = None,
-    target: str | None = None,
+    plan_step: str | None = None,
 ) -> Action:
     """创建 Action（status=created）。不决策、不编排。"""
     params = dict(params or {})
@@ -83,6 +86,8 @@ def create(
             "params": params,
             "dedupe_key": dedupe_key,
         }
+    if plan_step:
+        intent_payload["plan_step"] = plan_step
     now = _now()
     record = ActionRecord(
         id=action_repository.new_record_id(),
@@ -107,7 +112,7 @@ def create(
 
 
 def update(action_id: str, **fields: Any) -> Action | None:
-    """受控字段更新；不可变字段或未知字段拒绝。"""
+    """受控字段更新；不可变/状态字段拒绝（状态迁移走 cancel/retry/execute）。"""
     illegal = IMMUTABLE_FIELDS & set(fields)
     unknown = set(fields) - UPDATABLE_FIELDS
     if illegal or unknown:
@@ -144,11 +149,14 @@ def query(
 
 
 def cancel(action_id: str, *, reason: str = "cancel_requested") -> bool:
-    """仅 created/planned 可取消；不写世界/记忆/关系。"""
+    """仅 created/planned 可取消；经 transition_action；不写世界/记忆/关系。"""
     record = action_repository.get_record(action_id)
-    if record is None or record.status not in ("created", "planned"):
+    if record is None or record.status not in CANCELLABLE_STATUSES:
         return False
-    record.status = "cancelled"
+    new_status = transition_action(record.status, "cancel_requested")
+    if new_status is None:
+        return False
+    record.status = new_status
     record.gate_reason = reason
     record.updated_at = _now()
     action_repository.save_record(record)
@@ -156,11 +164,26 @@ def cancel(action_id: str, *, reason: str = "cancel_requested") -> bool:
     return True
 
 
+async def execute(action_id: str, *, session_id: str | None = None) -> ActionResult | None:
+    """复用既有记录执行（唯一编排器 action_engine），不新建第二条 ActionRecord。"""
+    from app.application import action_engine
+
+    record = action_repository.get_record(action_id)
+    if record is None:
+        return None
+    if record.status in ("succeeded", "cancelled"):
+        return None
+    if record.status == "failed":
+        return None
+    if session_id is not None and record.session_id is None:
+        record.session_id = session_id
+        action_repository.save_record(record)
+    return await action_engine.execute_existing_record(record)
+
+
 async def retry(action_id: str) -> ActionResult | None:
     """仅 failed 可重试；受 max_attempts 约束；复用原 dedupe_key。"""
     from app.application import action_engine
-    from app.services.action.planner import assemble_plan
-    from app.services.action.registry import ExecutionContext
 
     record = action_repository.get_record(action_id)
     if record is None or record.status != "failed":
@@ -168,53 +191,23 @@ async def retry(action_id: str) -> ActionResult | None:
     settings = get_settings()
     if record.attempt >= settings.action_retry_max_attempts:
         return None
+    planned = transition_action("failed", "gate_pass")
+    if planned is None:
+        planned = "planned"
     record.attempt += 1
-    record.status = "planned"
+    record.status = planned
     record.gate_reason = None
     record.updated_at = _now()
     action_repository.save_record(record)
     logger.info("Action Retried action_id=%s attempt=%s", action_id, record.attempt)
-
     if not settings.action_enabled:
-        return ActionResult(status="partial", error="retry_reset_only")
-
-    intent_data = record.intent or {}
-    if not intent_data:
-        record.status = "failed"
-        action_repository.save_record(record)
-        return ActionResult(
-            status="failed", error="missing_intent", failure_kind="permanent"
-        )
-    intent = ActionIntent.model_validate(intent_data)
-    snapshot = action_engine._build_snapshot(record.user_id, settings)
-    plan = assemble_plan(intent, snapshot, action_engine._now(), goal_id=record.goal_id)
-    if plan is None:
-        record.status = "failed"
-        record.gate_reason = "capability_unavailable"
-        record.updated_at = _now()
-        action_repository.save_record(record)
         return ActionResult(
             status="failed",
-            error="capability_unavailable",
-            failure_kind="permanent",
+            error="retry_reset_only",
+            failure_kind="transient",
+            metadata={"retry_reset_only": True},
         )
-    ctx = ExecutionContext(
-        user_id=record.user_id,
-        character_id=record.character_id,
-        record_id=record.id,
-        now=action_engine._now(),
-        settings=settings,
-    )
-    result = await action_engine.execute_plan(
-        record,
-        plan,
-        ctx,
-        permission_snapshot=action_engine._build_permission_snapshot(
-            record.user_id, settings
-        ),
-        tool_context=snapshot.tool_context,
-    )
-    return result
+    return await action_engine.execute_existing_record(record)
 
 
 def get_status(action_id: str) -> ActionStatus | None:

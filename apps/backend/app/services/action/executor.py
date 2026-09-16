@@ -132,10 +132,14 @@ class ActionExecutor:
         timeout_seconds: float = 10.0,
         tool_executor: Any = None,
         tool_resolver: Any = None,
+        permission_snapshot: Any = None,
+        tool_context: Any = None,
     ):
         self.capability_executor = CapabilityExecutor(registry, timeout_seconds)
         self.tool_executor = tool_executor
         self.tool_resolver = tool_resolver
+        self.permission_snapshot = permission_snapshot
+        self.tool_context = tool_context
 
     def dispatch(self, action: Action) -> ExecutionKind | None:
         return dispatch(action)
@@ -176,7 +180,18 @@ class ActionExecutor:
                 error="tool_binding_unavailable",
                 failure_kind="unavailable",
             )
-        execution = await self.tool_executor.run(binding, invocation, ctx)
+        exec_ctx = ctx
+        if self.tool_context is not None:
+            exec_ctx = self.tool_context
+        run_kwargs: dict[str, Any] = {}
+        if self.permission_snapshot is not None:
+            run_kwargs["permission_snapshot"] = self.permission_snapshot
+        execution = await self.tool_executor.run(
+            binding,
+            invocation,
+            exec_ctx,
+            **run_kwargs,
+        )
         return _tool_execution_to_result(execution, action_id=action.id)
 
     async def execute_external(

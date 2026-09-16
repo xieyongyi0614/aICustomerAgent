@@ -2,10 +2,10 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Iterable, Sequence
+from typing import Sequence
 
 from app.core.settings import get_settings
-from app.models.action import Action, ActionSchedule, ActionSource, make_dedupe_key
+from app.models.action import Action, ActionSchedule
 from app.repositories import action_repository, trigger_registry_repository
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,16 @@ def schedule(
         updated_at=now,
     )
     saved = action_repository.save_schedule(schedule_row)
-    owner = user_id or action.target or action.run_id or "system"
+    record = action_repository.get_record(action.id)
+    owner = user_id or (record.user_id if record is not None else None) or "system"
+    if record is not None and record.scheduled_at is None:
+        record.scheduled_at = due_at
+        if record.status == "created":
+            from app.models.action import transition_action
+
+            record.status = transition_action("created", "gate_pass") or "planned"
+        record.updated_at = now
+        action_repository.save_record(record)
     try:
         trigger_registry_repository.register(
             user_id=owner,

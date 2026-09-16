@@ -63,11 +63,11 @@ def execution_metrics(window_hours: float = 24):
     _require_debug()
     since = datetime.now() - timedelta(hours=window_hours)
     statuses = ("created", "planned", "executing", "succeeded", "failed", "cancelled")
-    buckets: dict[str, list] = {}
+    buckets: dict[str, int] = {}
     total = 0
     succeeded = 0
     cancelled = 0
-    failed = 0
+    retried = 0
     by_type: dict[str, int] = {}
     durations: list[float] = []
     for status in statuses:
@@ -79,16 +79,15 @@ def execution_metrics(window_hours: float = 24):
             succeeded += len(recent)
         if status == "cancelled":
             cancelled += len(recent)
-        if status == "failed":
-            failed += len(recent)
         for record in recent:
             by_type[record.action_type] = by_type.get(record.action_type, 0) + 1
+            if record.attempt > 1:
+                retried += 1
             if record.executed_at and record.created_at:
                 durations.append((record.executed_at - record.created_at).total_seconds())
     success_rate = (succeeded / total) if total else 0.0
     cancel_rate = (cancelled / total) if total else 0.0
-    failed_count = buckets.get("failed", 0)
-    retry_rate = (failed_count / total) if total else 0.0
+    retry_rate = (retried / total) if total else 0.0
     avg_duration = sum(durations) / len(durations) if durations else 0.0
     return {
         "window_hours": window_hours,

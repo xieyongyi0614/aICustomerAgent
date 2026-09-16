@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 from app.models.action import Action, ActionResult, ActionIntent
+from app.repositories import action_repository
 from app.services.action import manager
 
 
@@ -77,6 +78,8 @@ class TestUpdate:
             manager.update(action.id, dedupe_key="newkey")
         with pytest.raises(ValueError):
             manager.update(action.id, id="other")
+        with pytest.raises(ValueError):
+            manager.update(action.id, status="failed")
 
     def test_update_unknown_rejected(self):
         action = _create()
@@ -127,12 +130,11 @@ class TestCancel:
 
     def test_cancel_terminal_false(self):
         action = _create()
-        manager.update(action.id, status="succeeded")
-        assert manager.cancel(action.id) is False
-        manager.update(action.id, status="failed")
-        assert manager.cancel(action.id) is False
-        manager.update(action.id, status="executing")
-        assert manager.cancel(action.id) is False
+        record = action_repository.get_record(action.id)
+        for status in ("succeeded", "failed", "executing"):
+            record.status = status
+            action_repository.save_record(record)
+            assert manager.cancel(action.id) is False
 
     def test_cancel_missing_false(self):
         assert manager.cancel("act_missing") is False
@@ -173,8 +175,9 @@ class TestRetry:
 
     def test_retry_resets_failed_when_action_disabled(self):
         action = _create()
-        manager.update(action.id, status="failed", params=action.parameters)
-        # force attempt=1 via update not possible (attempt not in UPDATABLE)
+        record = action_repository.get_record(action.id)
+        record.status = "failed"
+        action_repository.save_record(record)
         record_action = manager.query(action.id)
         assert record_action.status == "failed"
         import asyncio
@@ -186,7 +189,9 @@ class TestRetry:
 
     def test_retry_reuses_dedupe_key(self):
         action = _create(content="重试测试")
-        manager.update(action.id, status="failed")
+        record = action_repository.get_record(action.id)
+        record.status = "failed"
+        action_repository.save_record(record)
         import asyncio
 
         asyncio.run(manager.retry(action.id))

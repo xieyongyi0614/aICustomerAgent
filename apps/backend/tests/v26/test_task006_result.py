@@ -108,7 +108,11 @@ class TestFourOutcomes:
             params={"content": "开会"},
         )
         assert action.dedupe_key == key
-        manager.update(action.id, status="failed")
+        from app.repositories import action_repository
+
+        record = action_repository.get_record(action.id)
+        record.status = "failed"
+        action_repository.save_record(record)
         import asyncio
 
         asyncio.run(manager.retry(action.id))

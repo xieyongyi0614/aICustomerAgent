@@ -228,7 +228,7 @@ NON_PLANNING_WRITE_FACE = (
     "seed_goals",
 )
 
-MIGRATION_HEAD = "0046"
+MIGRATION_HEAD = "0047"
 
 
 def _check_names(table) -> tuple[str, ...]:
@@ -533,7 +533,7 @@ def test_existing_planning_and_observation_reason_codes_are_frozen():
             assert getattr(module, attribute) == value, (module_name, attribute)
 
 
-def test_migration_chain_head_is_still_0046():
+def test_migration_chain_head_is_still_0047():
     versions_dir = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
     numbered = sorted(
         int(match.group(1))

@@ -18,6 +18,13 @@ from app.services.action import contracts, integration, manager, result as resul
 
 
 class TestLifecycle:
+    def _set_status(self, action_id: str, status: str) -> None:
+        from app.repositories import action_repository
+
+        record = action_repository.get_record(action_id)
+        record.status = status
+        action_repository.save_record(record)
+
     def test_created_to_cancelled(self):
         action = manager.create(user_id="u_lc", action_type="create_reminder", params={"content": "a"})
         assert manager.get_status(action.id) == "created"
@@ -30,7 +37,7 @@ class TestLifecycle:
             action_type="remember_fact",
             params={"fact": "x"},
         )
-        manager.update(action.id, status="failed")
+        self._set_status(action.id, "failed")
         result = asyncio.run(manager.retry(action.id))
         assert result is not None
         assert manager.get_status(action.id) == "planned"
@@ -52,17 +59,23 @@ class TestLifecycle:
 
 
 class TestFailureScenarios:
+    def _set_status(self, action_id: str, status: str) -> None:
+        from app.repositories import action_repository
+
+        record = action_repository.get_record(action_id)
+        record.status = status
+        action_repository.save_record(record)
+
     def test_retry_max_attempts(self):
         action = manager.create(
             user_id="u_fr",
             action_type="create_reminder",
             params={"content": "max"},
         )
-        manager.update(action.id, status="failed")
+        self._set_status(action.id, "failed")
         first = asyncio.run(manager.retry(action.id))
         assert first is not None
-        manager.update(action.id, status="failed")
-        # attempt now 2, max default 2 → second retry returns None
+        self._set_status(action.id, "failed")
         second = asyncio.run(manager.retry(action.id))
         assert second is None
 

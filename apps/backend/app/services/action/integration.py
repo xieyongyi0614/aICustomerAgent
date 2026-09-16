@@ -42,7 +42,7 @@ def create_from_plan_intent(
     plan_step: str | None = None,
     priority: int = 100,
 ) -> Action:
-    action = manager.create(
+    return manager.create(
         user_id=user_id,
         action_type=intent.action_type,
         params=dict(intent.params or {}),
@@ -51,46 +51,14 @@ def create_from_plan_intent(
         goal_id=goal_id,
         intent=intent,
         priority=priority,
+        plan_step=plan_step,
     )
-    if plan_step:
-        record = action_repository.get_record(action.id)
-        if record is not None:
-            record.intent = dict(record.intent or {})
-            record.intent["plan_step"] = plan_step
-            action_repository.save_record(record)
-            action = manager.query(action.id)
-    return action
 
 
 async def execute_plan_action(
     action: Action, *, session_id: str | None = None
 ) -> ActionResult | None:
-    from app.application import action_engine
-
-    intent_data = None
-    record = action_repository.get_record(action.id)
-    if record is not None:
-        intent_data = record.intent
-    if not intent_data:
-        intent = ActionIntent(
-            action_type=action.type,
-            confidence="confident",
-            params=dict(action.parameters or {}),
-            dedupe_key=action.dedupe_key,
-        )
-    else:
-        intent = ActionIntent.model_validate(intent_data)
-    user_id = action.target or (record.user_id if record else "unknown")
-    executed = await action_engine.run_action_planning(
-        user_id=user_id,
-        intent=intent,
-        session_id=session_id,
-        goal_id=action.goal_id,
-        source="plan",
-    )
-    if executed is None or executed.result is None:
-        return None
-    return ActionResult.model_validate(executed.result)
+    return await manager.execute(action.id, session_id=session_id)
 
 
 def to_plan_step_outcome(

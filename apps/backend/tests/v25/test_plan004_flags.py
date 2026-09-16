@@ -23,7 +23,7 @@ from .plan004_support import (
     tool_criteria,
 )
 
-MIGRATION_HEAD = "0046"
+MIGRATION_HEAD = "0047"
 
 VERSIONS_DIR = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
 
@@ -174,7 +174,7 @@ class TestQ4FreezeIsRecorded:
 class TestZeroMigrationAndZeroWrite:
     """I11：迁移链头 `0046`；本任务零写入（拆解只产内存态结果）。"""
 
-    def test_migration_chain_head_is_still_0046(self):
+    def test_migration_chain_head_is_still_0047(self):
         numbered = sorted(
             int(match.group(1))
             for path in VERSIONS_DIR.glob("*.py")
@@ -182,7 +182,7 @@ class TestZeroMigrationAndZeroWrite:
         )
         assert numbered, "未找到迁移文件"
         assert f"{max(numbered):04d}" == MIGRATION_HEAD
-        assert max(numbered) == 46
+        assert max(numbered) == 47
 
     def test_decompose_writes_nothing_to_the_plan_face(
         self, db_session_factory, make_goal

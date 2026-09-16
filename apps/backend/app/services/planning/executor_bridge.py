@@ -263,7 +263,27 @@ class PlanExecutorBridge:
         )
 
     async def _dispatch(self, goal, intent: ActionIntent):
-        """既有编排器入口（唯一）：`source="autonomy"` 使额度与冷却结构性生效（§5.1）。"""
+        """既有编排器入口（唯一）：`source="autonomy"` 使额度与冷却结构性生效（§5.1）。
+
+        V2.6.0：总闸 on 时经 ActionManager.create(source=plan) + execute，保持
+        PlanStep 与 Action 1:1（不新建第二条记录）。
+        """
+        settings = get_settings()
+        if getattr(settings, "v26_action_execution_enabled", False):
+            from app.repositories import action_repository
+            from app.services.action import manager as action_manager
+
+            action = action_manager.create(
+                user_id=goal.user_id,
+                action_type=intent.action_type,
+                params=dict(intent.params or {}),
+                source="plan",
+                session_id=self._session_id(goal.user_id),
+                goal_id=goal.id,
+                intent=intent,
+            )
+            await action_manager.execute(action.id)
+            return action_repository.get_record(action.id)
         runner = run_action_planning if self._runner is None else self._runner
         return await runner(
             goal.user_id,

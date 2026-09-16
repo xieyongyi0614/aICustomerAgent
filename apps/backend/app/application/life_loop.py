@@ -277,9 +277,13 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
             _record_step(
                 run.id, steps, "world_experience", _step_world_experience, user_id, now
             )
-            _record_step(
-                run.id, steps, "action_schedule", _step_action_schedule, user_id, now
-            )
+            if (
+                settings.v26_action_execution_enabled
+                and settings.v26_action_scheduler_enabled
+            ):
+                _record_step(
+                    run.id, steps, "action_schedule", _step_action_schedule, user_id, now
+                )
     except Exception as exc:
         logger.exception("life loop 用户周期中止：%s", user_id)
         status = "aborted"

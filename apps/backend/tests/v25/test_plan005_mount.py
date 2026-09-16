@@ -31,6 +31,7 @@ LIFE_LOOP_STEPS = (
     "reflection_check",
     "decision",
     "world_experience",
+    "action_schedule",
 )
 
 AUTONOMOUS_TICK_STAGES = (

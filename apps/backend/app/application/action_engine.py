@@ -24,6 +24,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
+from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
 from app.models.action import (
     ActionEffect,
@@ -31,6 +32,7 @@ from app.models.action import (
     ActionPlan,
     ActionRecord,
     ActionIntent,
+    ActionStep,
     transition_action,
 )
 from app.models.tool import ToolInvocation
@@ -123,7 +125,12 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
     """
     snapshot = GateSnapshot(settings=settings, registry=get_capability_registry(), now=_now())
     snapshot.records = [
-        {"dedupe_key": r.dedupe_key, "status": r.status, "created_at": r.created_at}
+        {
+            "id": r.id,
+            "dedupe_key": r.dedupe_key,
+            "status": r.status,
+            "created_at": r.created_at,
+        }
         for r in action_repository.list_records(user_id, limit=200)
     ]
     snapshot.active_count = sum(1 for r in snapshot.records if r["status"] in ACTIVE_STATUSES)
@@ -187,6 +194,7 @@ async def execute_plan(
 
     `tool_context`（TOOL-007）：`_build_snapshot` 预读的世界事实快照；缺省时按执行上下文
     重建（世界事实留空）——总闸 off 的路径行为与 V2.3.0 逐字节一致。
+    V2.6.0：总闸 on 时经 ActionExecutor 统一分派；off 时保持既有路径。
     """
     settings = get_settings()
     storage = get_capability_registry()
@@ -195,6 +203,18 @@ async def execute_plan(
     record.executed_at = _now()
     record.updated_at = _now()
     action_repository.save_record(record)
+
+    if _v26_action_execution_enabled(settings):
+        return await _execute_plan_via_action_executor(
+            record,
+            plan,
+            ctx,
+            settings,
+            storage,
+            executor,
+            permission_snapshot=permission_snapshot,
+            tool_context=tool_context,
+        )
 
     tool_registry = get_tool_registry() if settings.v24_tool_system_enabled else None
     if tool_registry is not None:
@@ -243,11 +263,229 @@ async def execute_plan(
             backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
             record.next_retry_at = _now() + timedelta(seconds=backoff)
         else:
-            record.status = "failed"
+            record.status = transition_action(
+                "executing",
+                "step_retryable_failed"
+                if failure_kind in RETRYABLE_FAILURES
+                else "step_permanent_failed",
+                attempts_exceeded=True,
+            ) or "failed"
     record.result = result_out.model_dump(mode="json")
     record.updated_at = _now()
     action_repository.save_record(record)
     return result_out
+
+
+def _v26_action_execution_enabled(settings) -> bool:
+    return bool(getattr(settings, "v26_action_execution_enabled", False))
+
+
+async def _execute_plan_via_action_executor(
+    record: ActionRecord,
+    plan: ActionPlan,
+    ctx: ExecutionContext,
+    settings,
+    storage,
+    capability_executor: CapabilityExecutor,
+    *,
+    permission_snapshot: PermissionSnapshot | None = None,
+    tool_context: ToolContext | None = None,
+) -> ActionResult:
+    """V2.6.0 主路径：ActionExecutor 统一分派 Internal/Tool/External。"""
+    from app.models.action import Action
+    from app.services.action.executor import ActionExecutor
+    from app.services.tool.executor import ToolExecutor
+    from app.services.tool.health import ToolHealthTracker
+
+    tool_executor = None
+    tool_resolver = None
+    exec_tool_ctx = tool_context
+    if settings.v24_tool_system_enabled:
+        tool_registry = get_tool_registry()
+        tool_executor = ToolExecutor(
+            tool_registry,
+            capability_executor,
+            settings=settings,
+            health=ToolHealthTracker(tool_registry, settings),
+        )
+
+        def tool_resolver(action: Action):
+            step = ActionStep(
+                index=0,
+                capability="",
+                action="",
+                params=dict(action.parameters or {}),
+            )
+            if plan.steps:
+                step = plan.steps[0]
+            binding = resolve_step_binding(tool_registry, step)
+            if binding is None:
+                return None, None
+            intent = (
+                ActionIntent.model_validate(record.intent)
+                if record.intent
+                else plan.intent
+            )
+            invocation = ToolInvocation(
+                tool_id=binding.tool_id,
+                params=dict(step.params if plan.steps else action.parameters or {}),
+                rationale=str((record.intent or {}).get("evidence", "")),
+                source=record.source,
+                intent=intent,
+                goal_id=record.goal_id,
+                dedupe_key=record.dedupe_key,
+            )
+            return binding, invocation
+
+        if exec_tool_ctx is None:
+            exec_tool_ctx = _tool_context_for_execution(ctx, tool_context)
+
+    action_executor = ActionExecutor(
+        storage,
+        timeout_seconds=settings.action_execution_timeout_seconds,
+        tool_executor=tool_executor,
+        tool_resolver=tool_resolver,
+        permission_snapshot=permission_snapshot,
+        tool_context=exec_tool_ctx,
+    )
+    action = Action(
+        id=record.id,
+        type=record.action_type,
+        target=record.user_id,
+        parameters=dict(record.params or {}),
+        priority=record.priority,
+        status=record.status,
+        created_at=record.created_at,
+        source=record.source,
+        goal_id=record.goal_id,
+        dedupe_key=record.dedupe_key,
+        run_id=record.session_id,
+    )
+    result_out = await action_executor.run(action, ctx)
+    step_dicts = [
+        {
+            "index": 0,
+            "capability": ACTION_CAPABILITY_MAP.get(record.action_type, ("", ""))[0],
+            "action": ACTION_CAPABILITY_MAP.get(record.action_type, ("", ""))[1],
+            "params": dict(record.params or {}),
+            "status": "succeeded" if result_out.status == "succeeded" else "failed",
+            "result": result_out.model_dump(mode="json"),
+        }
+    ]
+    record.steps = step_dicts
+    _apply_action_result_to_record(record, result_out, settings)
+    record.result = result_out.model_dump(mode="json")
+    record.updated_at = _now()
+    action_repository.save_record(record)
+    return result_out
+
+
+def _apply_action_result_to_record(record: ActionRecord, result_out: ActionResult, settings) -> None:
+    if result_out.status in ("succeeded", "partial"):
+        if result_out.status == "succeeded":
+            record.status = transition_action("executing", "step_all_succeeded") or record.status
+        return
+    failure_kind = result_out.failure_kind or "transient"
+    if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
+        record.status = "executing"
+        record.attempt += 1
+        backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
+        record.next_retry_at = _now() + timedelta(seconds=backoff)
+        return
+    event = (
+        "step_retryable_failed"
+        if failure_kind in RETRYABLE_FAILURES
+        else "step_permanent_failed"
+    )
+    record.status = transition_action("executing", event, attempts_exceeded=True) or "failed"
+
+
+async def execute_existing_record(
+    record: ActionRecord, *, session_id: str | None = None
+) -> ActionResult | None:
+    """复用既有 ActionRecord 执行（Manager.execute 唯一委托入口，不新建记录）。"""
+    settings = get_settings()
+    if not settings.action_enabled:
+        return None
+    if record.status not in ("created", "planned", "executing"):
+        return None
+    intent_data = record.intent or {}
+    if not intent_data:
+        record.status = transition_action(
+            record.status if record.status != "executing" else "executing",
+            "step_permanent_failed",
+            attempts_exceeded=True,
+        ) or "failed"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return ActionResult(
+            status="failed", error="missing_intent", failure_kind="permanent"
+        )
+    intent = ActionIntent.model_validate(intent_data)
+    if record.status == "created":
+        snapshot = _build_snapshot(record.user_id, settings)
+        snapshot.records = [r for r in snapshot.records if r.get("id") != record.id]
+        snapshot.active_count = sum(
+            1 for r in snapshot.records if r["status"] in ACTIVE_STATUSES
+        )
+        decision = evaluate_gates(intent, snapshot)
+        if not decision.allowed:
+            record.status = transition_action("created", "gate_reject") or "cancelled"
+            record.gate_reason = decision.reason
+            record.updated_at = _now()
+            action_repository.save_record(record)
+            return ActionResult(
+                status="failed",
+                error=str(decision.reason or "gate_reject"),
+                failure_kind="permanent",
+            )
+        record.status = transition_action("created", "gate_pass") or "planned"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    else:
+        snapshot = _build_snapshot(record.user_id, settings)
+
+    if record.status == "planned":
+        started = transition_action("planned", "execute_start")
+        if started is None:
+            return None
+        record.status = started
+        record.updated_at = _now()
+        action_repository.save_record(record)
+
+    plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
+    if plan is None:
+        record.status = "cancelled"
+        record.gate_reason = "capability_unavailable"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return ActionResult(
+            status="failed",
+            error="capability_unavailable",
+            failure_kind="unavailable",
+        )
+    if session_id is not None and record.session_id is None:
+        record.session_id = session_id
+    ctx = ExecutionContext(
+        user_id=record.user_id,
+        character_id=record.character_id,
+        record_id=record.id,
+        now=_now(),
+        settings=settings,
+    )
+    result = await execute_plan(
+        record,
+        plan,
+        ctx,
+        permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+        tool_context=snapshot.tool_context,
+    )
+    if record.status != "failed":
+        integrate_result(record, result)
+    else:
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    return result
 
 
 async def _execute_plan_via_tools(
@@ -394,7 +632,13 @@ def _settle_executed_record(
         backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
         record.next_retry_at = _now() + timedelta(seconds=backoff)
     else:
-        record.status = "failed"
+        record.status = transition_action(
+            "executing",
+            "step_retryable_failed"
+            if failure_kind in RETRYABLE_FAILURES
+            else "step_permanent_failed",
+            attempts_exceeded=True,
+        ) or "failed"
     return result_out
 
 
@@ -484,6 +728,7 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
     V2.4.0：效果引用读 `steps[].result.effects`（新键）优先，`payload` 旧键兜底——
     兼容窗口 ≥ 一个版本，Flag off 时等价于 V9 原路径。
     V2.4.0 TOOL-008：记忆投递经 `_deliver_memory` 路由，子闸 off 时调用与参数不变。
+    V2.6.0：反馈子闸 on 时经 apply_result_feedback 统一入口产出反馈投影。
     """
     settings = get_settings()
 
@@ -501,9 +746,30 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
             if memory_id:
                 effects.append(ActionEffect(kind="memory", ref=memory_id, detail="已记住"))
 
-    record.result = ActionResult(
-        status=result.status, effects=effects, error=result.error, failure_kind=result.failure_kind
-    ).model_dump(mode="json")
+    if (
+        _v26_action_execution_enabled(settings)
+        and getattr(settings, "v26_action_feedback_enabled", False)
+    ):
+        from app.services.action import integration as action_integration
+        from app.services.action import result as action_result_service
+
+        enriched = action_result_service.ensure_result_identity(result, record.id)
+        if effects is not result.effects and effects:
+            enriched = enriched.model_copy(update={"effects": effects})
+        record.result = action_result_service.feedback_payload(enriched)
+        logger.info(
+            "Action Feedback action_id=%s status=%s kinds=%s",
+            record.id,
+            enriched.status,
+            sorted({e.kind for e in enriched.effects}),
+        )
+    else:
+        record.result = ActionResult(
+            status=result.status,
+            effects=effects,
+            error=result.error,
+            failure_kind=result.failure_kind,
+        ).model_dump(mode="json")
 
     if settings.v2_action_outbox_enabled:
         _integrate_via_outbox(record)

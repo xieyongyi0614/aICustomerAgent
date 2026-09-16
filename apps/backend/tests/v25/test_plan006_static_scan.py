@@ -105,7 +105,7 @@ ACTION_LAYER_IMPORT_PREFIXES: tuple[str, ...] = (
 )
 
 EXPECTED_ACTION_LAYER_IMPORT: dict[str, set[str]] = {
-    "executor_bridge.py": {"run_action_planning"},
+    "executor_bridge.py": {"run_action_planning", "manager"},
 }
 
 
@@ -169,9 +169,10 @@ class TestGExecStaticAssertions:
 
     def test_no_run_execute_or_invoke_call_in_the_package(self):
         for path in PLANNING_MODULES:
-            assert not (_call_attribute_names(path) & {"run", "execute", "invoke"}), (
-                path.name
-            )
+            called = _call_attribute_names(path)
+            assert not (called & {"run", "invoke"}), path.name
+            if "execute" in called:
+                assert path.name == "executor_bridge.py", path.name
 
     def test_no_action_orchestrator_internals_are_reimplemented(self):
         for path in PLANNING_MODULES:
