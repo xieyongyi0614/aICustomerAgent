@@ -1,7 +1,7 @@
 # PLAN-011 Task Detail — Planning API / Interface
 
 > 上游：[../architecture.md](../architecture.md) §8.1 ~ §8.7（API Interface）、§4.6（`PlanAdvance`）、§4.9（零迁移裁决）、§7.8（Life Loop）、§7.9（逐系统契约）、§9.7 Q10；[../tasks.md](../tasks.md) PLAN-011
-> 状态：**已实现**（PLAN-011 落地）。Q10 记录：计划可观测面**不纳入** `apps/frontend/` 调试控制台，本版本只交付后端 6 个只读调试端点（`api/v1/debug.py`），前端接入推后续版本评估（留痕见 `tests/v25/test_plan011_regression.py` 模块文档与 `TestQ10FrontendIsNotImplemented`）。
+> 状态：DONE（已实现，commit 248836f，2026-09-16）
 > 范围红线：**冻结内部接口契约，不新建仓储模块**；`goal_repository` 既有九函数零改动、只加三个只读扩展；审计**复用既有 `kind='goal_lifecycle'`**（不新增 `DecisionKind`）；6 个调试端点全部受总闸 + 调试子闸门控；可观测面全部投影自四张既有表。
 
 ---
