@@ -12,7 +12,7 @@
 | `CRITERION_FACT_SOURCES` 第四值 | PLAN-002 | ✅ 已落地（四值） |
 | `app/models/plan.py` / `settings/plan.py` | PLAN-002 | ✅ 已落地 |
 | 计划域装配 / 引擎模块（`context.py` / `engine.py`） | PLAN-003 | ✅ 已落地 |
-| 计划域拆解模块（`decompose.py`） | PLAN-004 | ⛔ 仍不得预埋 |
+| 计划域拆解模块（`decompose.py`） | PLAN-004 | ✅ 已落地 |
 | 计划域调度 / 执行 / 观测 / 修订模块 | PLAN-005 | ⛔ 仍不得预埋 |
 
 PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
@@ -21,6 +21,11 @@ PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转�
 PLAN-003 落地时按同一纪律改动本模块：`context.py` / `engine.py` 由「仍不得预埋」翻转为
 「已落地」，`decompose.py` 与 PLAN-005 五模块维持「不得预埋」（计划面四函数进 `goal_repository`
 调用白名单的留痕见 `goal_contract` 模块文档 §9）。
+
+PLAN-004 落地时按同一纪律改动本模块：`decompose.py` 翻转为「已落地」，PLAN-005 五模块
+**维持「不得预埋」**（拆解不调度 / 不执行 / 不观测 / 不修订——Task Detail §1.2 Non-Scope）。
+同任务的角色资产放行面扩容（`app.character.asuna.action`）见
+`test_plan001_static_scan.py::ALLOWED_CHARACTER_IMPORT_MODULES`。
 """
 
 from pathlib import Path
@@ -93,7 +98,7 @@ PLAN_005_EXECUTION_MODULES = (
 
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
-PLAN_004_DEFERRED_MODULES = ("decompose.py",)
+PLAN_004_LANDED_MODULES = ("decompose.py",)
 
 
 def _backend_root() -> Path:
@@ -162,9 +167,9 @@ def test_planning_engine_modules_are_landed():
     assert missing == []
 
 
-def test_plan_decompose_module_is_still_absent():
-    present = [name for name in PLAN_004_DEFERRED_MODULES if (_planning_dir() / name).exists()]
-    assert present == []
+def test_plan_decompose_module_is_landed():
+    missing = [name for name in PLAN_004_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
 
 
 def test_planning_package_holds_only_landed_modules():
@@ -174,6 +179,7 @@ def test_planning_package_holds_only_landed_modules():
     assert modules == [
         "__init__.py",
         "context.py",
+        "decompose.py",
         "engine.py",
         "goal_contract.py",
     ]

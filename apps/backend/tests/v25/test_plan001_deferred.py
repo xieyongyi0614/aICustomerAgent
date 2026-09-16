@@ -26,6 +26,10 @@ Task Detail §8 Step 5.2 引用了 PLAN-005 的 `PlanScheduler.order`、§9.2 I4
 PLAN-003 落地时的改动仅限本模块的「待落地」清单与对应断言翻转为「已落地」：`context` /
 `engine` 移出 `PLANNING_MODULES_FOR_LATER_TASKS`，白名单断言去 `skip`；PLAN-004 ~ PLAN-011
 的产物仍保持「今日不存在」。
+
+PLAN-004 落地时按同一纪律改动：`decompose` 移出「待落地」清单并进 `PLAN_004_LANDED_MODULES`；
+PLAN-005 的五个模块（`scheduler` / `executor_bridge` / `observer` / `revision` /
+`revision_listener`）**仍在「待落地」清单内**——拆解不调度、不执行、不观测、不修订。
 """
 
 import importlib
@@ -39,7 +43,6 @@ from app.services.planning import goal_contract
 from .conftest import V25_NOW, V25_USER
 
 PLANNING_MODULES_FOR_LATER_TASKS = (
-    "app.services.planning.decompose",
     "app.services.planning.scheduler",
     "app.services.planning.executor_bridge",
     "app.services.planning.observer",
@@ -51,6 +54,8 @@ PLAN_003_LANDED_MODULES = (
     "app.services.planning.context",
     "app.services.planning.engine",
 )
+
+PLAN_004_LANDED_MODULES = ("app.services.planning.decompose",)
 
 
 def _import_later_module(module_path: str):
@@ -67,6 +72,10 @@ def test_deferred_targets_are_absent_today():
 def test_plan_003_modules_are_landed():
     for module_path in PLAN_003_LANDED_MODULES:
         assert _import_later_module(module_path) is not None
+
+
+def test_plan_004_decompose_module_is_landed():
+    assert _import_later_module("app.services.planning.decompose") is not None
 
 
 @pytest.mark.skip(reason="待 PLAN-005 落地：PlanScheduler.order 就绪排序（结构序）")

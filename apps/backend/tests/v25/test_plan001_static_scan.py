@@ -17,12 +17,20 @@ PLANNING_MODULES = scan.planning_modules()
 
 DECLARATION_MODULE = scan.PLANNING_PACKAGE_DIR / "goal_contract.py"
 
-ALLOWED_CHARACTER_IMPORT_MODULES = ("app.character.asuna.scene_profiles",)
-"""PLAN-003 契约演进：唯一允许的角色资产导入（场景画像，**非**优先级资产）。
+ALLOWED_CHARACTER_IMPORT_MODULES = (
+    "app.character.asuna.action",
+    "app.character.asuna.scene_profiles",
+)
+"""PLAN-003 / PLAN-004 契约演进：逐一枚举允许的角色资产导入（**均非优先级资产**）。
 
-Task Detail §4.1.3 要求 `PlanContext.scene` 取 `scene_profile_for`；PLAN-001 的
-`character_priority_asset_import` 禁令针对**优先级资产**，此处按模块逐条枚举放行，
-不得扩成前缀（改动留痕见 `goal_contract` 模块文档 §9）。
+- `app.character.asuna.scene_profiles`（PLAN-003）：Task Detail §4.1.3 要求
+  `PlanContext.scene` 取 `scene_profile_for`。
+- `app.character.asuna.action`（PLAN-004）：Task Detail §4.1.1 / §5.6 要求能力 ↔ 工具反查
+  复用 `ACTION_TOOL_MAP` / `ACTION_CAPABILITY_MAP`——它们是这两张映射表的**唯一声明处**。
+
+PLAN-001 的 `character_priority_asset_import` 禁令针对**优先级资产**（`asuna/goals.py` 等）；
+此处按模块逐条枚举放行，**不得扩成前缀**（改动留痕见 `goal_contract` 模块文档 §9 与
+`app/services/planning/decompose.py` 模块文档「契约演进留痕」）。
 """
 
 
@@ -58,9 +66,20 @@ def test_step3_no_character_priority_asset_imports():
     assert not {name: hits for name, hits in offenders.items() if hits}
 
 
-def test_step3_character_asset_allowlist_is_one_explicit_module():
-    """放行面必须逐模块枚举（防「一次放行一个前缀」的隐性扩大）。"""
-    assert ALLOWED_CHARACTER_IMPORT_MODULES == ("app.character.asuna.scene_profiles",)
+def test_step3_character_asset_allowlist_is_explicitly_enumerated():
+    """放行面必须逐模块枚举（防「一次放行一个前缀」的隐性扩大）。
+
+    PLAN-003 落地 1 项（场景画像），PLAN-004 落地 1 项（能力 ↔ 工具映射表声明处）：
+    扩容由任务显式写入本断言，增量即「范围越界已评审」的证据。
+    """
+    assert ALLOWED_CHARACTER_IMPORT_MODULES == (
+        "app.character.asuna.action",
+        "app.character.asuna.scene_profiles",
+    )
+    assert all(
+        module.count(".") >= 2 and not module.endswith("asuna")
+        for module in ALLOWED_CHARACTER_IMPORT_MODULES
+    )
 
 
 def test_step3_code_contains_no_tier_or_orm_row_names():

@@ -8,13 +8,13 @@
 | `goal_contract` | Goal 域契约常量（只读消费面 / 写回面 / 禁止事项） | PLAN-001 ✅ |
 | `context` | `PlanContextAssembler` / `PlanContextProbe` / `PlanUnavailable` | PLAN-003 ✅ |
 | `engine` | `PlanningEngine` / `PlanOutcome` / `get_planning_engine` / 七道闸理由码 | PLAN-003 ✅ |
+| `decompose` | `TaskDecomposer` / `PlanValidator` / `DecompositionResult` | PLAN-004 ✅ |
 
 后续任务的落点（本任务不实现、不预埋）：
 
-- PLAN-004：`app/services/planning/decompose.py`（Goal → Task → Action 拆解与三闸）。
 - PLAN-005：`app/services/planning/` 下的 `scheduler.py` / `executor_bridge.py` /
-  `observer.py` / `revision.py`。
-- PLAN-006 ~ PLAN-011：工具 / 自治 / 世界 / 记忆 / 反思集成与接口冻结。
+  `observer.py` / `revision.py`（+ `revision_listener.py`）。
+- PLAN-006 ~ PLAN-012：工具 / 自治 / 世界 / 记忆 / 反思集成与接口冻结。
 
 对 Goal System 的纪律（本包任何模块都必须遵守，见 `goal_contract` 模块文档）：
 Goal System 说「想要什么、谁更重要」；Planning 只说「这件事分几步做」。
