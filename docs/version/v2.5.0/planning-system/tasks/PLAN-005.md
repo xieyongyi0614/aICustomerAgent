@@ -1,7 +1,7 @@
 # PLAN-005 Task Detail — Plan Execution Engine
 
 > 上游：[../architecture.md](../architecture.md) §3.6（PlanScheduler）、§3.7（PlanExecutorBridge）、§3.8（PlanObserver）、§3.9（PlanRevision）、§5.3（Task 状态机）、§5.5（双层重试）、§5.6（ActionStatus 映射）、§6.4 / §6.5 / §6.6、§7.8、§8.4 / §8.5；[../tasks.md](../tasks.md) PLAN-005
-> 状态：设计稿（未实现）
+> 状态：DONE（已实现，commit 0f8daa5，2026-09-16）
 > 范围红线：**先搬后改**（`PlanScheduler` 搬运既有私有函数，行为零变更）；步骤执行**唯一入口**为 `action_engine.run_action_planning`；Planning 目录零直调 `ToolExecutor` / `Capability.execute`；Plan 层**零退避**；`settle` 是**唯一**改 `GoalStatus` 的入口。
 
 ---
