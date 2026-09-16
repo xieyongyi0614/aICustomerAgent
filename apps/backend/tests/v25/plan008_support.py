@@ -281,6 +281,7 @@ def planning_world_on(override_settings):
         v25_plan_execution_enabled="true",
         v25_plan_step_binding_enabled="true",
         v25_plan_tool_required="true",
+        v25_plan_world_feedback_enabled="true",
         v24_tool_system_enabled="true",
         v2_autonomy_advanced_enabled="true",
         action_enabled="true",

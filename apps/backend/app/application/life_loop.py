@@ -10,10 +10,10 @@ trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅�
 于 decision 步骤内部的既有 proactive 链，受 LIFE-003 预算约束）。
 """
 
-import asyncio
 import logging
 import time
 from datetime import datetime
+from types import SimpleNamespace
 
 from app.core.settings import get_settings
 from app.application import (
@@ -42,9 +42,13 @@ from app.services import (
     goal_arbitration,
     goal_execution,
     goal_observation,
+    autonomy_policy,
 )
 from app.services.planning import engine as planning_engine
 from app.services.planning import observer as plan_observer
+from app.services.planning import executor_bridge as plan_executor_bridge
+from app.services.planning import revision as plan_revision
+from app.services.planning import scheduler as plan_scheduler
 from app.application.worker_loop import run_worker_loop
 from app.models.observability import TraceKind
 from app.repositories import memory_repository, outbox_repository
@@ -486,6 +490,116 @@ def _plan_observation_enabled(settings) -> bool:
     )
 
 
+def _plan_scheduler_enabled(settings) -> bool:
+    """调度子闸：on 时就绪步取自 `PlanScheduler`（否则回退既有 `_current_step`）。"""
+    return bool(settings.v25_planning_enabled) and bool(
+        settings.v25_plan_scheduler_enabled
+    )
+
+
+def _plan_execution_enabled(settings) -> bool:
+    """执行子闸：on 时步骤执行走 `PlanExecutorBridge`（否则走既有 `goal_execution`）。"""
+    return bool(settings.v25_planning_enabled) and bool(
+        settings.v25_plan_execution_enabled
+    ) and bool(settings.action_enabled)
+
+
+def _plan_revision_enabled(settings) -> bool:
+    """重规划子闸：on 时执行后经 `PlanRevisionPolicy` 判定并入队 `TRIGGER_REPLAN`。"""
+    return bool(settings.v25_planning_enabled) and bool(
+        settings.v25_plan_revision_enabled
+    )
+
+
+def _current_plan_step(goal, plan, settings):
+    """当前可执行步：调度子闸 on 走 `PlanScheduler.current_step`，否则既有私有实现。"""
+    if _plan_scheduler_enabled(settings):
+        return plan_scheduler.PlanScheduler.current_step(plan)
+    return goal_observation._current_step(list(plan.sub_goals))  # pylint: disable=protected-access
+
+
+def _execution_ctx(now: datetime, facts: dict):
+    """执行桥上下文（鸭子类型）：只需 `now` 与规划期世界事实投影。"""
+    return SimpleNamespace(now=now, world=dict(facts.get("world") or {}))
+
+
+def _should_skip_user_facing(step, now, settings) -> dict | None:
+    """静音时段克制（编排规则，与既有 `goal_execution` 同款，不入 Policy）。"""
+    if step.capability not in goal_execution._USER_FACING_CAPABILITIES:  # pylint: disable=protected-access
+        return None
+    if not autonomy_policy.in_quiet_hours(
+        now,
+        settings.autonomy_quiet_hours_start,
+        settings.autonomy_quiet_hours_end,
+    ):
+        return None
+    return {"status": "skipped", "skip_reason": "quiet_hours"}
+
+
+def _revision_ctx(settings) -> SimpleNamespace:
+    return SimpleNamespace(
+        step_max_attempts=settings.v25_plan_step_max_attempts,
+        off_surface_streak=0,
+        undecidable_streak=0,
+        insight_driven=False,
+    )
+
+
+async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -> dict:
+    """V2.5.0 执行桥接线（总闸 + `v25_plan_execution_enabled`）：一步走 `execute_step`。
+
+    链路：`current_step` → `execute_step`（两道防御性断言 + 六闸门）→ `reconcile`
+    → `update_plan_progress`；重规划子闸 on 时追加 `PlanRevisionPolicy` 裁决入队。
+    落库仍只经 `goal_repository` 计划面（单一写面）。
+    """
+    step = _current_plan_step(goal, plan, settings)
+    if step is None:
+        return {"status": "skipped", "skip_reason": "no_current_step", "goal_id": goal.id}
+    quiet = _should_skip_user_facing(step, now, settings)
+    if quiet is not None:
+        return {**quiet, "goal_id": goal.id}
+    bridge = plan_executor_bridge.PlanExecutorBridge()
+    ctx = _execution_ctx(now, facts)
+    outcome = await bridge.execute_step(goal, plan, step, ctx)
+    updated = bridge.reconcile(outcome, step)
+    specs = list(plan.sub_goals)
+    for position, existing in enumerate(specs):
+        if existing.index == updated.index:
+            specs[position] = updated
+            break
+    goal_repository.update_plan_progress(plan.id, specs)
+    if _plan_revision_enabled(settings):
+        revised_plan = plan.model_copy(update={"sub_goals": specs})
+        reason = plan_revision.PlanRevisionPolicy().should_replan(
+            outcome, revised_plan, _revision_ctx(settings)
+        )
+        if reason:
+            goal_planning.enqueue_planning(
+                goal.user_id, goal.id, goal_planning.TRIGGER_REPLAN
+            )
+    return {
+        "status": "ok",
+        "goal_id": goal.id,
+        "step_index": updated.index,
+        "outcome": outcome.status,
+        "step_status": updated.status,
+        "action_id": outcome.action_id,
+        "failure_kind": outcome.failure_kind,
+    }
+
+
+async def _execute_active_plans(user_id: str, now: datetime, facts: dict) -> list[dict]:
+    """步骤执行分派：执行子闸 on → 计划执行桥；off → 既有 `goal_execution` 原路径。"""
+    settings = get_settings()
+    pairs = goal_repository.list_active_plans(user_id)
+    if not _plan_execution_enabled(settings):
+        return [
+            await goal_execution.attempt_current_step(goal, plan, now)
+            for goal, plan in pairs
+        ]
+    return [await _execute_plan_step(goal, plan, now, facts, settings) for goal, plan in pairs]
+
+
 def _observe_goals(user_id: str, now: datetime) -> tuple[dict, dict, dict]:
     """观察事实与推进裁决（PLAN-005 接线点，§5.6）。
 
@@ -510,10 +624,10 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     """AUT-004 仲裁（复活/冲突/放弃）→ AUT-003 观察调整 → Sub-Goal 执行尝试。
     仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。
 
-    V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测与推进经 `_observe_goals` 分派（Flag
-    `v25_plan_observation_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段的
-    子步骤以 `plan_observe` 字段记入 `loop_runs.steps`（受既有 `budget_state` 约束：
-    观测为 0 LLM，故不额外占用周期 LLM 预算）。
+    V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测经 `_observe_goals` 分派、执行经
+    `_execute_active_plans` 分派（分别受 `v25_plan_observation_enabled` /
+    `v25_plan_execution_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段
+    子步骤以 `plan_observe` / `plan_execute` 记入返回投影。
     """
 
     settings = get_settings()
@@ -525,9 +639,13 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     started = time.perf_counter()
     facts, advance, plan_observe = _observe_goals(user_id, now)
     arbitration = goal_arbitration.run_user_arbitration(user_id, facts, now)
-    executions: list[dict] = []
-    for goal, plan in goal_repository.list_active_plans(user_id):
-        executions.append(await goal_execution.attempt_current_step(goal, plan, now))
+    executions = await _execute_active_plans(user_id, now, facts)
+    plan_execute = None
+    if _plan_execution_enabled(settings):
+        plan_execute = {
+            "steps": len(executions),
+            "outcomes": [item.get("outcome") for item in executions],
+        }
     trace = TurnTraceSession()
     trace.record(
         "goal_observation",
@@ -552,6 +670,7 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
         "arbitration_changes": len(arbitration.get("arbitration_changes", [])),
         "abandoned": len(arbitration.get("abandoned", [])),
         **({"plan_observe": plan_observe} if plan_observe else {}),
+        **({"plan_execute": plan_execute} if plan_execute else {}),
     }
 
 

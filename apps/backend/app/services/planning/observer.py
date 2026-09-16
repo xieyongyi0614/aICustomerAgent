@@ -605,11 +605,15 @@ def _plan_owner(plan) -> str | None:
 def broadcast_goal_terminal(goal, outcome: str) -> bool:
     """终态广播（PLAN-008 §4.2.5 / §6.3）：计划层的**唯一**世界事件表达。
 
+    门控：`v25_planning_enabled` + `v25_plan_world_feedback_enabled`（世界反馈子闸）。
     只调既有 `event_bridge.register_goal_event`（复用既有 `goal_completed` 类型与既有
     outbox → `world_engine` 链路，不新增事件类型、不新增写入路径）；`outcome` 不在映射表内
     （`failed` 等）即零调用返回 `False`。广播失败（抛错 / Flag off / 幂等键命中）**只 log**：
     不回滚计划终态（§6.5 D15，与 V9「投递失败不回滚执行」同款纪律）。
     """
+    settings = get_settings()
+    if not settings.v25_planning_enabled or not settings.v25_plan_world_feedback_enabled:
+        return False
     mapped = TERMINAL_BROADCAST_OUTCOMES.get(outcome)
     if mapped is None:
         return False
