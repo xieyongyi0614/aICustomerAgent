@@ -339,6 +339,22 @@ def mark_schedule_cancelled(action_id: str) -> ActionSchedule | None:
     return _mark_schedule_status(action_id, "cancelled")
 
 
+def claim_due_schedule(action_id: str, now: datetime | None = None) -> ActionSchedule | None:
+    """CAS：scheduled/due → due（消费端原子认领）。非可认领态返回 None。"""
+    now = now or datetime.now()
+    with SessionLocal() as session:
+        row = session.scalars(
+            select(ActionScheduleRow).where(ActionScheduleRow.action_id == action_id)
+        ).first()
+        if row is None or row.status not in ("scheduled", "due"):
+            return None
+        row.status = "due"
+        row.updated_at = now
+        session.commit()
+        session.refresh(row)
+        return _to_schedule(row)
+
+
 def _mark_schedule_status(action_id: str, status: str) -> ActionSchedule | None:
     now = datetime.now()
     with SessionLocal() as session:

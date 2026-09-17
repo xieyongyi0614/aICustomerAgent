@@ -92,6 +92,17 @@ def register(
             if payload:
                 row.payload = payload
             if row.status in TERMINAL_STATUSES:
+                is_action_schedule = (
+                    trigger_type == "action_due"
+                    and str(trigger_key).startswith("action_schedule:")
+                ) or (payload or {}).get("kind") == "action_schedule"
+                if is_action_schedule:
+                    logger.info(
+                        "action_schedule 终态不复活 trigger_key=%s status=%s",
+                        trigger_key,
+                        row.status,
+                    )
+                    return row.status
                 row.status = "pending"
             status = row.status
             row.updated_at = now
@@ -220,6 +231,38 @@ def complete(trigger_key: str, now: datetime | None = None) -> bool:
                 TriggerRegistryRow.status.in_(("due", "fired")),
             )
             .update({"status": "done", "updated_at": now})
+        )
+        session.commit()
+        return bool(updated)
+
+
+def force_done(trigger_key: str, now: datetime | None = None) -> bool:
+    """任意非终态 → done（action_schedule 执行成功收口）。"""
+    now = _now(now)
+    with SessionLocal() as session:
+        updated = (
+            session.query(TriggerRegistryRow)
+            .filter(
+                TriggerRegistryRow.trigger_key == trigger_key,
+                TriggerRegistryRow.status.notin_(TERMINAL_STATUSES),
+            )
+            .update({"status": "done", "updated_at": now})
+        )
+        session.commit()
+        return bool(updated)
+
+
+def force_cancelled(trigger_key: str, now: datetime | None = None) -> bool:
+    """任意非终态 → cancelled（action_schedule 放弃收口）。"""
+    now = _now(now)
+    with SessionLocal() as session:
+        updated = (
+            session.query(TriggerRegistryRow)
+            .filter(
+                TriggerRegistryRow.trigger_key == trigger_key,
+                TriggerRegistryRow.status.notin_(TERMINAL_STATUSES),
+            )
+            .update({"status": "cancelled", "updated_at": now})
         )
         session.commit()
         return bool(updated)

@@ -281,8 +281,11 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
                 settings.v26_action_execution_enabled
                 and settings.v26_action_scheduler_enabled
             ):
-                _record_step(
-                    run.id, steps, "action_schedule", _step_action_schedule, user_id, now
+                await _record_step_async(
+                    run.id,
+                    steps,
+                    "action_schedule",
+                    lambda: _step_action_schedule(user_id, now),
                 )
     except Exception as exc:
         logger.exception("life loop 用户周期中止：%s", user_id)
@@ -746,10 +749,10 @@ def _step_world_experience(user_id: str, now: datetime) -> dict:
     return {"status": "ok", "applied": applied}
 
 
-def _step_action_schedule(user_id: str, now: datetime) -> dict:
+async def _step_action_schedule(user_id: str, now: datetime) -> dict:
     from app.services.action import scheduler as action_scheduler
 
-    return action_scheduler.step_action_schedule(now)
+    return await action_scheduler.step_action_schedule(now)
 
 
 async def _run_maintenance(now: datetime) -> int:

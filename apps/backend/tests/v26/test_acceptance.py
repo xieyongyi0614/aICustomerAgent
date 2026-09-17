@@ -272,7 +272,7 @@ class TestRegressionCheck:
         assert settings.v26_action_result_enabled is False
 
     def test_flag_off_no_schedule_step(self):
-        result = scheduler.step_action_schedule(datetime.now())
+        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
 
     def test_flag_off_feedback_legacy(self):

@@ -109,7 +109,7 @@ class TestQueue:
 
 class TestLifeLoopStep:
     def test_flag_off_skips(self):
-        result = scheduler.step_action_schedule(datetime.now())
+        result = __import__("asyncio").run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
         assert result["skip_reason"] == "flag_off"
 
@@ -121,7 +121,7 @@ class TestLifeLoopStep:
         monkeypatch.setattr(settings, "v26_action_scheduler_enabled", True)
         action = _action("到期")
         scheduler.schedule(action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1))
-        result = scheduler.step_action_schedule(datetime.now())
+        result = __import__("asyncio").run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "done"
         assert result["due"] >= 1
 

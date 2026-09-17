@@ -153,8 +153,26 @@ def cancel_schedule(action_id: str) -> ActionSchedule | None:
     return action_repository.mark_schedule_cancelled(action_id)
 
 
-def step_action_schedule(now: datetime | None = None) -> dict:
-    """life_loop 维护步：扫描到期调度并登记 action_due 触发。"""
+def _trigger_key(action_id: str) -> str:
+    return f"action_schedule:{action_id}"
+
+
+def _close_trigger(action_id: str, *, cancelled: bool, now: datetime) -> None:
+    key = _trigger_key(action_id)
+    try:
+        if cancelled:
+            trigger_registry_repository.force_cancelled(key, now=now)
+        else:
+            trigger_registry_repository.force_done(key, now=now)
+    except Exception:
+        logger.exception("action_schedule trigger 收口失败 action_id=%s", action_id)
+
+
+async def step_action_schedule(now: datetime | None = None) -> dict:
+    """life_loop 维护步：到期调度认领 → 执行 → schedule/trigger 终态收口。
+
+    V2.6.1 REF-004/005：消费端接线；成功后 trigger `done` 且终态不复活。
+    """
     settings = get_settings()
     if not (
         getattr(settings, "v26_action_execution_enabled", False)
@@ -164,19 +182,37 @@ def step_action_schedule(now: datetime | None = None) -> dict:
     when = now or _now()
     due = action_repository.list_due_schedules(when, limit=20)
     claimed = 0
+    executed = 0
+    failed = 0
+    closed = 0
     for item in due:
-        if item.status == "scheduled":
-            action_repository.save_schedule(
-                item.model_copy(update={"status": "due", "updated_at": when})
-            )
-            claimed += 1
         record = action_repository.get_record(item.action_id)
-        owner = record.user_id if record is not None else "system"
+        if record is not None and record.status in ("succeeded", "cancelled"):
+            if record.status == "succeeded":
+                action_repository.mark_schedule_executed(item.action_id)
+                _close_trigger(item.action_id, cancelled=False, now=when)
+            else:
+                action_repository.mark_schedule_cancelled(item.action_id)
+                _close_trigger(item.action_id, cancelled=True, now=when)
+            closed += 1
+            continue
+        if record is None:
+            action_repository.mark_schedule_cancelled(item.action_id)
+            _close_trigger(item.action_id, cancelled=True, now=when)
+            closed += 1
+            continue
+
+        claimed_row = action_repository.claim_due_schedule(item.action_id, when)
+        if claimed_row is None:
+            continue
+        claimed += 1
+
+        owner = record.user_id
         try:
             trigger_registry_repository.register(
                 user_id=owner,
                 trigger_type="action_due",
-                trigger_key=f"action_schedule:{item.action_id}",
+                trigger_key=_trigger_key(item.action_id),
                 due_at=item.scheduled_at,
                 payload={
                     "kind": "action_schedule",
@@ -187,4 +223,36 @@ def step_action_schedule(now: datetime | None = None) -> dict:
             )
         except Exception:
             logger.exception("到期调度触发登记失败 action_id=%s", item.action_id)
-    return {"status": "done", "due": len(due), "claimed": claimed}
+
+        from app.services.action import manager as action_manager
+
+        try:
+            await action_manager.execute(item.action_id)
+        except Exception:
+            logger.exception("到期调度执行失败 action_id=%s", item.action_id)
+            failed += 1
+            continue
+
+        reloaded = action_repository.get_record(item.action_id)
+        if reloaded is None:
+            failed += 1
+            continue
+        if reloaded.status == "succeeded":
+            action_repository.mark_schedule_executed(item.action_id)
+            _close_trigger(item.action_id, cancelled=False, now=when)
+            executed += 1
+        elif reloaded.status == "cancelled":
+            action_repository.mark_schedule_cancelled(item.action_id)
+            _close_trigger(item.action_id, cancelled=True, now=when)
+            closed += 1
+        else:
+            # failed/executing：schedule 保持 due，下一轮按退避/重试策略再消费
+            failed += 1
+    return {
+        "status": "done",
+        "due": len(due),
+        "claimed": claimed,
+        "executed": executed,
+        "failed": failed,
+        "closed": closed,
+    }

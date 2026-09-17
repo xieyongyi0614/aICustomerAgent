@@ -20,7 +20,7 @@ class TestFlagOffLifeLoopDrift:
         settings = get_settings()
         assert settings.v26_action_execution_enabled is False
         assert settings.v26_action_scheduler_enabled is False
-        result = scheduler.step_action_schedule(datetime.now())
+        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
 
     def test_flag_on_records_step(self, monkeypatch):
@@ -34,7 +34,7 @@ class TestFlagOffLifeLoopDrift:
                 "run_x",
                 steps,
                 "action_schedule",
-                life_loop._step_action_schedule,
+                lambda *a: {"status": "ok"},
                 "u1",
                 datetime.now(),
             )

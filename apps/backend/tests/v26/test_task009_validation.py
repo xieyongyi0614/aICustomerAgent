@@ -131,7 +131,9 @@ class TestFlagMatrix:
         assert integration.feedback_enabled() is False
 
     def test_schedule_step_flag_off(self):
-        result = scheduler.step_action_schedule(datetime.now())
+        import asyncio
+
+        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
 
 
