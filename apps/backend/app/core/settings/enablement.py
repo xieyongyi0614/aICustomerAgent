@@ -242,6 +242,20 @@ def enablement_violations(settings) -> list[str]:
             settings, dependency, False
         ):
             violations.append(f"{required_flag} 要求 {dependency}{reason}")
+
+    from app.core.settings.action_execution import V26_MASTER_FLAG, V26_SUB_FLAGS
+
+    v26_master = getattr(settings, V26_MASTER_FLAG, False)
+    if v26_master and not getattr(settings, "action_enabled", False):
+        violations.append(
+            "v26_action_execution_enabled 要求 action_enabled"
+            "（执行层依赖 V9 行动总闸）"
+        )
+    for sub_flag in V26_SUB_FLAGS:
+        if getattr(settings, sub_flag, False) and not v26_master:
+            violations.append(
+                f"{sub_flag} 要求 {V26_MASTER_FLAG}（V2.6.0 总闸先开）"
+            )
     return violations
 
 
@@ -253,6 +267,24 @@ def v23_reserved_flag_warnings(settings) -> list[str]:
     if not getattr(settings, "v23_world_simulation_enabled", False):
         return warnings
     for flag in RESERVED_V23_SUB_FLAGS:
+        if getattr(settings, flag, False):
+            warnings.append(
+                f"{flag} 为 RESERVED 开关：当前版本尚未接线，开启不会产生行为变化"
+            )
+    return warnings
+
+
+def v26_reserved_flag_warnings(settings) -> list[str]:
+    """V2.6.0 RESERVED 子闸提示：对齐 v23 先例，死 Flag 可发现。"""
+    from app.core.settings.action_execution import (
+        RESERVED_V26_SUB_FLAGS,
+        V26_MASTER_FLAG,
+    )
+
+    warnings: list[str] = []
+    if not getattr(settings, V26_MASTER_FLAG, False):
+        return warnings
+    for flag in RESERVED_V26_SUB_FLAGS:
         if getattr(settings, flag, False):
             warnings.append(
                 f"{flag} 为 RESERVED 开关：当前版本尚未接线，开启不会产生行为变化"
@@ -286,5 +318,7 @@ def validate_enablement_chain(settings) -> None:
         raise SettingsError("V2 启用链配置错误：" + "；".join(violations))
     for message in v23_reserved_flag_warnings(settings):
         _logger.warning("V2.3.0 开关提示：%s", message)
+    for message in v26_reserved_flag_warnings(settings):
+        _logger.warning("V2.6.0 开关提示：%s", message)
     for message in v24_permission_sub_layer_warnings(settings):
         _logger.warning("V2.4.0 开关提示：%s", message)

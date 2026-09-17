@@ -165,7 +165,10 @@ def cancel(action_id: str, *, reason: str = "cancel_requested") -> bool:
 
 
 async def execute(action_id: str, *, session_id: str | None = None) -> ActionResult | None:
-    """复用既有记录执行（唯一编排器 action_engine），不新建第二条 ActionRecord。"""
+    """复用既有记录执行（唯一编排器 action_engine），不新建第二条 ActionRecord。
+
+    V2.6.1：`executing` 且 `next_retry_at` 未到时拒绝立即执行（退避窗口守卫）。
+    """
     from app.application import action_engine
 
     record = action_repository.get_record(action_id)
@@ -175,6 +178,14 @@ async def execute(action_id: str, *, session_id: str | None = None) -> ActionRes
         return None
     if record.status == "failed":
         return None
+    if record.status == "executing" and record.next_retry_at is not None:
+        if record.next_retry_at > _now():
+            logger.info(
+                "Action Execute Hold action_id=%s next_retry_at=%s",
+                action_id,
+                record.next_retry_at.isoformat(),
+            )
+            return None
     if session_id is not None and record.session_id is None:
         record.session_id = session_id
         action_repository.save_record(record)

@@ -35,8 +35,14 @@
 | REF-005 | Schedule / Trigger Consistency | P0 | D03 | REF-004 | 5 |
 | REF-006 | Recovery & Terminal States | P0 | D06 / M4 | REF-001 | 6 |
 | REF-007 | P0 Verification Gate | P0 | — | REF-001~006 | 7 |
+| REF-101 | Flag Governance | P1 | D08 / D16 | REF-007 | 8 |
+| REF-102 | Execute Backoff Guard | P1 | D13 | REF-007 | 9 |
+| REF-103 | State Machine Authority Sweep | P1 | D12 | REF-007 | 10 |
+| REF-104 | Traceability Fields | P1 | D10 / M1 / M2 | REF-007 | 11 |
+| REF-105 | Multistep Decision | P1 | D09 / F7 | REF-007 | 12 |
+| REF-106 | Layering & Docs Convergence | P1 | D14 / D15 / D11 收尾 | REF-007 | 13 |
 
-**Priority 语义**：P0 = Flag on 前必须清零；本批次无 P1/P2 卡（P1 见 audit §11.2，P2 见 §11.3，另行立项）。
+**Priority 语义**：P0 = Flag on 前必须清零（已完成）；P1 = 工程收敛，可与 V2.7 设计并行。
 
 ### 1.2 阶段划分
 
@@ -106,7 +112,13 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 | REF-005 | **DONE（代码+测）** | 成功后 trigger `done`；终态 `action_schedule` 不复活 |
 | REF-006 | **DONE（代码+测）** | `_recover_stale_executing` 已挂 `_expire_planned`；`partial→failed`；T5/T6 测试绿 |
 | REF-007 | **DONE（P0 复核通过）** | 1744 回归绿；E3 已修；audit 附录 C 留痕 |
-| 全部 | **批次关闭** | 可进入 Flag on 灰度准备 |
+| REF-101 | **DONE** | `.env.example` 登记 V26 闸；`enablement_violations` 总闸⇒action_enabled；RESERVED 告警 |
+| REF-102 | **DONE** | `Manager.execute` 退避窗口守卫；恢复步经 `transition_action` |
+| REF-103 | **TODO** | 全量裸赋值清扫 + 静态断言 |
+| REF-104 | **TODO** | `run_id` 语义 / `plan_step` 落列回填 |
+| REF-105 | **TODO** | 多步交付或 RESERVED 裁决 |
+| REF-106 | **TODO** | 分层拆分与文档对齐 |
+| 全部 | **P0 关闭；P1 进行中** | 可进入 Flag on 灰度准备 |
 
 **执行建议**：先为 WIP 项补红/绿测（不改生产代码），再推进 TODO 项；提交前按 REF 卡拆分 commit，避免「一锅端」。
 

@@ -1118,7 +1118,8 @@ def _recover_stale_executing() -> int:
         records = action_repository.list_stale_executing(cutoff, limit=50)
         recovered = 0
         for record in records:
-            record.status = "failed"
+            next_status = transition_action("executing", "step_permanent_failed") or "failed"
+            record.status = next_status
             record.gate_reason = "timeout"
             if record.attempt < settings.action_retry_max_attempts:
                 record.next_retry_at = _now() + timedelta(
