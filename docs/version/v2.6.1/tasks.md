@@ -105,7 +105,8 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 | REF-004 | **DONE（代码+测）** | 维护步 CAS 认领 → `Manager.execute` → `mark_schedule_executed`；端到端提醒可跑 |
 | REF-005 | **DONE（代码+测）** | 成功后 trigger `done`；终态 `action_schedule` 不复活 |
 | REF-006 | **DONE（代码+测）** | `_recover_stale_executing` 已挂 `_expire_planned`；`partial→failed`；T5/T6 测试绿 |
-| 全部 | **测试已补 T1/T2/T5/T6/T7** | `tests/v26` 205 绿；`v9`+`v24 tool003` 98 绿 |
+| REF-007 | **DONE（P0 复核通过）** | 1744 回归绿；E3 已修；audit 附录 C 留痕 |
+| 全部 | **批次关闭** | 可进入 Flag on 灰度准备 |
 
 **执行建议**：先为 WIP 项补红/绿测（不改生产代码），再推进 TODO 项；提交前按 REF 卡拆分 commit，避免「一锅端」。
 
