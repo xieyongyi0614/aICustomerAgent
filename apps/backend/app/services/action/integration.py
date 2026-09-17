@@ -109,45 +109,68 @@ def is_temporary_execution(record: ActionRecord) -> bool:
 
 
 def apply_result_feedback(record: ActionRecord, result: ActionResult) -> dict[str, Any]:
-    """统一反馈入口：四通道回写 + 三面反馈投影。复用 integrate_result，不新建机制。"""
+    """统一反馈入口：四通道回写 + 三面反馈投影。复用 integrate_result，不新建机制。
+
+    V2.6.1：主路径唯一入口。feedback off 时仅委托 integrate_result；on 时在四通道
+    落库后把 `feedback_kinds` / `temporary_execution` / `plan_step` 扩写进 `record.result`。
+    """
     from app.application import action_engine
 
+    action_engine.integrate_result(record, result)
+
     if not feedback_enabled():
-        action_engine.integrate_result(record, result)
         routed = route_effects(result)
         return {
             "mode": "legacy",
             "channels": {k: len(v) for k, v in routed.items()},
         }
 
-    enriched = result_service.ensure_result_identity(result, record.id)
-    routed = route_effects(enriched)
-    enhanced = ActionResult(
-        id=enriched.id,
-        action_id=enriched.action_id,
-        status=enriched.status,
-        effects=enriched.effects,
-        error=enriched.error,
-        failure_kind=enriched.failure_kind,
-        output=enriched.output,
-        metadata=enriched.metadata,
-        observations=enriched.observations,
-        created_at=enriched.created_at or _now(),
+    stored = record.result if isinstance(record.result, dict) else {}
+    effects = stored.get("effects") if isinstance(stored.get("effects"), list) else []
+    kinds: set[str] = set()
+    rebuilt_effects: list[ActionEffect] = []
+    for effect in effects:
+        if isinstance(effect, dict):
+            rebuilt_effects.append(
+                ActionEffect(
+                    kind=effect.get("kind", "note"),
+                    ref=str(effect.get("ref", "")),
+                    detail=str(effect.get("detail", "")),
+                )
+            )
+        elif isinstance(effect, ActionEffect):
+            rebuilt_effects.append(effect)
+    for effect in rebuilt_effects:
+        if effect.kind:
+            kinds.add(effect.kind)
+    for effect in result.effects:
+        if effect.kind:
+            kinds.add(effect.kind)
+    dual = result_service.feedback_payload(
+        result.model_copy(update={"effects": rebuilt_effects})
     )
-    action_engine.integrate_result(record, enhanced)
-    payload = result_service.feedback_payload(enhanced)
-    payload["temporary_execution"] = is_temporary_execution(record)
-    payload["plan_step"] = (record.intent or {}).get("plan_step")
+    feedback = dict(stored)
+    for key, value in dual.items():
+        if key not in feedback:
+            feedback[key] = value
+    if rebuilt_effects:
+        feedback["effects"] = [e.model_dump(mode="json") for e in rebuilt_effects]
+    feedback["feedback_kinds"] = sorted(kinds)
+    feedback["temporary_execution"] = is_temporary_execution(record)
+    feedback["plan_step"] = (record.intent or {}).get("plan_step")
+    record.result = feedback
+    record.updated_at = _now()
+    action_repository.save_record(record)
     logger.info(
         "Action Feedback action_id=%s status=%s kinds=%s",
         record.id,
-        enhanced.status,
-        payload.get("feedback_kinds"),
+        feedback.get("status"),
+        feedback["feedback_kinds"],
     )
     return {
         "mode": "v26",
-        "feedback": payload,
-        "channels": {k: len(v) for k, v in routed.items()},
+        "feedback": feedback,
+        "channels": {k: len(v) for k, v in route_effects(result).items()},
     }
 
 

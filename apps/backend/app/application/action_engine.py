@@ -496,7 +496,7 @@ async def execute_existing_record(
         tool_context=snapshot.tool_context,
     )
     if record.status != "failed":
-        integrate_result(record, result)
+        _apply_feedback(record, result)
     else:
         record.updated_at = _now()
         action_repository.save_record(record)
@@ -743,7 +743,7 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
     V2.4.0：效果引用读 `steps[].result.effects`（新键）优先，`payload` 旧键兜底——
     兼容窗口 ≥ 一个版本，Flag off 时等价于 V9 原路径。
     V2.4.0 TOOL-008：记忆投递经 `_deliver_memory` 路由，子闸 off 时调用与参数不变。
-    V2.6.0：反馈子闸 on 时经 apply_result_feedback 统一入口产出反馈投影。
+    V2.6.1：反馈投影不在本函数内联——唯一入口为 `integration.apply_result_feedback`。
     """
     settings = get_settings()
 
@@ -761,44 +761,26 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
             if memory_id:
                 effects.append(ActionEffect(kind="memory", ref=memory_id, detail="已记住"))
 
-    if (
-        _v26_action_execution_enabled(settings)
-        and getattr(settings, "v26_action_feedback_enabled", False)
-    ):
-        from app.services.action import integration as action_integration
-        from app.services.action import result as action_result_service
-
-        enriched = action_result_service.ensure_result_identity(result, record.id)
-        if effects is not result.effects and effects:
-            enriched = enriched.model_copy(update={"effects": effects})
-        record.result = action_result_service.feedback_payload(enriched)
-        logger.info(
-            "Action Feedback action_id=%s status=%s kinds=%s",
-            record.id,
-            enriched.status,
-            sorted({e.kind for e in enriched.effects}),
+    minimal = ActionResult(
+        status=result.status,
+        effects=effects,
+        error=result.error,
+        failure_kind=result.failure_kind,
+    ).model_dump(mode="json")
+    existing = record.result if isinstance(record.result, dict) else None
+    if existing and "payload" in existing:
+        merged = dict(existing)
+        merged.update(
+            {
+                "status": minimal["status"],
+                "effects": minimal["effects"],
+                "error": minimal["error"],
+                "failure_kind": minimal["failure_kind"],
+            }
         )
+        record.result = merged
     else:
-        minimal = ActionResult(
-            status=result.status,
-            effects=effects,
-            error=result.error,
-            failure_kind=result.failure_kind,
-        ).model_dump(mode="json")
-        existing = record.result if isinstance(record.result, dict) else None
-        if existing and "payload" in existing:
-            merged = dict(existing)
-            merged.update(
-                {
-                    "status": minimal["status"],
-                    "effects": minimal["effects"],
-                    "error": minimal["error"],
-                    "failure_kind": minimal["failure_kind"],
-                }
-            )
-            record.result = merged
-        else:
-            record.result = minimal
+        record.result = minimal
 
     if settings.v2_action_outbox_enabled:
         _integrate_via_outbox(record)
@@ -812,6 +794,13 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
 
     record.updated_at = _now()
     action_repository.save_record(record)
+
+
+def _apply_feedback(record: ActionRecord, result: ActionResult) -> None:
+    """主路径唯一反馈入口：委托 `integration.apply_result_feedback`。"""
+    from app.services.action import integration as action_integration
+
+    action_integration.apply_result_feedback(record, result)
 
 
 def _integrate_via_outbox(record: ActionRecord) -> None:
@@ -882,7 +871,7 @@ async def run_action_planning(
         tool_context=snapshot.tool_context,
     )
     if record.status != "failed":
-        integrate_result(record, result)
+        _apply_feedback(record, result)
     else:
         record.updated_at = _now()
         action_repository.save_record(record)
@@ -965,7 +954,7 @@ async def _resume_confirmed_record(
         tool_context=snapshot.tool_context,
     )
     if record.status != "failed":
-        integrate_result(record, result)
+        _apply_feedback(record, result)
     else:
         record.updated_at = _now()
         action_repository.save_record(record)
@@ -1029,10 +1018,27 @@ def collect_facts(user_id: str) -> dict:
             for r in records
             if r.status == "failed"
         ][:3]
+        recent_feedback = []
+        for r in records:
+            stored = r.result if isinstance(r.result, dict) else None
+            if not stored or stored.get("feedback_kinds") is None:
+                continue
+            recent_feedback.append(
+                {
+                    "action": r.action_type,
+                    "status": r.status,
+                    "feedback_kinds": list(stored.get("feedback_kinds") or []),
+                    "temporary_execution": bool(stored.get("temporary_execution", False)),
+                    "plan_step": stored.get("plan_step"),
+                }
+            )
+            if len(recent_feedback) >= 5:
+                break
         return {
             "active_plans": len(active),
             "pending_reminders": pending_reminders[:5],
             "recent_failures": recent_failures,
+            "recent_feedback": recent_feedback,
             "last_action_at": (
                 records[0].updated_at.isoformat() if records and records[0].updated_at else None
             ),
@@ -1078,7 +1084,7 @@ async def _process_due_retries():
                     tool_context=snapshot.tool_context,
                 )
                 if record.status != "failed":
-                    integrate_result(record, result)
+                    _apply_feedback(record, result)
             except Exception:
                 logger.exception("行动重试失败，保持执行中状态")
     except Exception:

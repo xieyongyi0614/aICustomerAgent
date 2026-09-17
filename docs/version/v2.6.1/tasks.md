@@ -101,7 +101,7 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 |---|---|---|
 | REF-001 | **DONE（代码+测）** | `executor.py` 改调 `result.from_*`；`step_result_payload` 双形态；`integrate_result` 不再覆盖已有 payload；T1/T2 测试绿 |
 | REF-002 | **DONE（代码+测）** | 关系映射 `plan` 行；额度计 `plan`；`relationship_bridge` 修复 `session_id=None`；T7 测试绿 |
-| REF-003 | **TODO** | `apply_result_feedback` 仍未进主路径；三面消费者未接 |
+| REF-003 | **DONE（代码+测）** | 主路径 `_apply_feedback` → `apply_result_feedback`；Autonomy `recent_feedback`；Reflection 证据窗反馈键；Planning `to_plan_step_outcome` 生产投影 |
 | REF-004 | **TODO** | `step_action_schedule` 仍只登记 trigger，无执行消费 |
 | REF-005 | **TODO** | trigger 每 tick 复登记；终态可复活 |
 | REF-006 | **DONE（代码+测）** | `_recover_stale_executing` 已挂 `_expire_planned`；`partial→failed`；T5/T6 测试绿 |

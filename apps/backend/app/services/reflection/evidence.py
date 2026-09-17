@@ -820,6 +820,16 @@ def _window_facts(
             tool_id = step.get("tool_id")
             if not tool_id:
                 continue
+            observations = _step_observations(step)
+            stored_result = record.result if isinstance(record.result, dict) else {}
+            if stored_result.get("feedback_kinds") is not None:
+                observations = {
+                    **observations,
+                    "feedback_kinds": list(stored_result.get("feedback_kinds") or []),
+                    "temporary_execution": bool(
+                        stored_result.get("temporary_execution", False)
+                    ),
+                }
             facts.append(
                 ToolExecutionFact(
                     evidence_id=tool_evidence_id(str(tool_id), record.id, index),
@@ -832,7 +842,7 @@ def _window_facts(
                     source=str(record.source),
                     session_id=record.session_id,
                     target_record_id=record.target_record_id,
-                    observations=_step_observations(step),
+                    observations=observations,
                 )
             )
     facts.sort(key=lambda fact: fact.observed_at)

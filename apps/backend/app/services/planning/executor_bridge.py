@@ -414,9 +414,13 @@ def _normalize(step, record, at: datetime) -> PlanStepOutcome:
 
     `record is None`（`action_enabled` off，编排器未建记录）→ `hold`：本步没被执行，也不该
     被判失败（既有的行动总闸语义）。
+    V2.6.1：存在全形态 `record.result` 时经 `integration.to_plan_step_outcome` 投影。
     """
     if record is None:
         return _plain_outcome(step, OUTCOME_HOLD, at)
+    projected = _outcome_from_result_projection(step, record, at)
+    if projected is not None:
+        return projected
     step_dict = record.steps[0] if record.steps else {}
     result = dict(step_dict.get("result") or {})
     status, failure_kind = _record_outcome(record, result)
@@ -432,6 +436,42 @@ def _normalize(step, record, at: datetime) -> PlanStepOutcome:
         observations=_observations(result, step),
         duration_ms=_duration_ms(step_dict),
     )
+
+
+def _outcome_from_result_projection(step, record, at: datetime) -> PlanStepOutcome | None:
+    """V2.6 主路径全形态结果 → `to_plan_step_outcome` 生产投影；不适用返回 None。"""
+    stored = record.result if isinstance(record.result, dict) else None
+    if not stored or "status" not in stored:
+        return None
+    from app.models.action import ActionResult
+    from app.services.action import integration as action_integration
+
+    payload_keys = (
+        "id",
+        "action_id",
+        "status",
+        "effects",
+        "error",
+        "failure_kind",
+        "output",
+        "metadata",
+        "observations",
+        "created_at",
+    )
+    candidate = {k: stored[k] for k in payload_keys if k in stored}
+    try:
+        result = ActionResult.model_validate(candidate)
+    except Exception:
+        return None
+    step_dict = record.steps[0] if record.steps else {}
+    outcome = action_integration.to_plan_step_outcome(
+        result,
+        action_id=record.id,
+        step_index=step.index,
+        tool_id=str(step_dict.get("tool_id") or step.tool_id or ""),
+        duration_ms=int(step_dict.get("duration_ms") or 0),
+    )
+    return outcome.model_copy(update={"attempt": int(record.attempt or 0)})
 
 
 def _record_outcome(record, result: dict) -> tuple[PlanStepOutcomeStatus, str | None]:
