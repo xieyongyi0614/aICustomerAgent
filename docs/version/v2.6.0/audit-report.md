@@ -706,4 +706,39 @@ V2.7 Memory Evolution 立项（数据基线已可信）
 
 ---
 
-**报告结束**（V2.6.0 System Audit / 只读审查 / 未修改任何代码）
+## 附录 C：P0 复核结论（V2.6.1）
+
+> **日期**：2026-09-17  
+> **执行批次**：`docs/version/v2.6.1/`（REF-001 ~ REF-007）  
+> **分支提交**：`5137ce9` / `425a0c6` / `866826f` / `40ec615` + 本复核
+
+### C.1 一票否决项核对
+
+| # | 否决项 | 关联 | 结果 | 证据 |
+|---|---|---|---|---|
+| 1 | 无「成功但世界无副作用」路径 | D01/D07 | **PASS** | `test_v26_step_result_contract` / `test_v26_outbox_world_write` |
+| 2 | 无「永久非终态」 | D06 | **PASS** | `test_v26_recovery`；`_recover_stale_executing` |
+| 3 | 无「产出但无消费者的反馈契约」 | D05 | **PASS** | 主路径 `_apply_feedback`；Autonomy/Reflection/Planning 消费者 |
+| 4 | 无「双来源静默丢信号」 | D04 | **PASS** | `test_v26_source_semantics`；plan 关系行 + 额度口径 |
+| 5 | P0 范围内「文档宣称未实现」 | D02/D03 | **PASS** | 调度消费端 + trigger 收口；附录 B 六文件已落地 |
+
+### C.2 回归门禁
+
+| 套件 | 结果 |
+|---|---|
+| `tests/v26` + `tests/v9` + `tests/v24/test_tool003` + `tests/v25` + `tests/v2/test_life004_outbox` | **1744 passed, 1 skipped** |
+| E3 `node_modules` 脆弱扫描 | **已修**（排除 `node_modules`/`dist` + PermissionError） |
+
+### C.3 结论
+
+**P0 批次通过。** 允许进入 Flag on 灰度准备（真实 PostgreSQL 迁移验收 + 真实模型人工回归 A~D 仍属灰度阶段，不在本复核内）。
+
+残留风险（不阻塞 P0）：
+
+- P1 未做：多步交付、Flag `.env.example` 登记、`run_id` 语义、状态机唯一权威全量收口、分层拆分
+- I1/I2 既有 v23/v21 缺陷仍红（独立台账，非本批引入）
+- Flag 仍默认 off，线上安全
+
+---
+
+**报告结束**（V2.6.0 System Audit / 只读审查 + V2.6.1 P0 复核留痕）

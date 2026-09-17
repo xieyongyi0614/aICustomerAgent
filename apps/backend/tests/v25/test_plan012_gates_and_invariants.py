@@ -129,9 +129,11 @@ class TestOpenQuestionsClosed:
         for path in FRONTEND_ROOT.rglob("*"):
             if path.suffix not in {".ts", ".tsx", ".js", ".jsx"}:
                 continue
+            if "node_modules" in path.parts or "dist" in path.parts:
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (UnicodeDecodeError, PermissionError, OSError):
                 continue
             if "/debug/plans" in text or "PlanDebugPanel" in text:
                 hits.append(str(path))

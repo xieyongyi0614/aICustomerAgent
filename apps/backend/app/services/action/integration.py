@@ -94,6 +94,41 @@ def to_plan_step_outcome(
     )
 
 
+def to_plan_step_outcome_from_mapping(
+    stored: dict[str, Any],
+    *,
+    action_id: str,
+    step_index: int = 1,
+    tool_id: str = "",
+    duration_ms: int = 0,
+) -> PlanStepOutcome | None:
+    """`record.result` 全形态 dict → `PlanStepOutcome`（规划侧生产投影）。"""
+    payload_keys = (
+        "id",
+        "action_id",
+        "status",
+        "effects",
+        "error",
+        "failure_kind",
+        "output",
+        "metadata",
+        "observations",
+        "created_at",
+    )
+    candidate = {k: stored[k] for k in payload_keys if k in stored}
+    try:
+        result = ActionResult(**candidate)
+    except Exception:
+        return None
+    return to_plan_step_outcome(
+        result,
+        action_id=action_id,
+        step_index=step_index,
+        tool_id=tool_id,
+        duration_ms=duration_ms,
+    )
+
+
 def route_effects(result: ActionResult) -> dict[str, list[ActionEffect]]:
     routed: dict[str, list[ActionEffect]] = {kind: [] for kind in EFFECT_CHANNELS}
     for effect in result.effects:

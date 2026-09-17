@@ -439,39 +439,40 @@ def _normalize(step, record, at: datetime) -> PlanStepOutcome:
 
 
 def _outcome_from_result_projection(step, record, at: datetime) -> PlanStepOutcome | None:
-    """V2.6 主路径全形态结果 → `to_plan_step_outcome` 生产投影；不适用返回 None。"""
+    """V2.6 主路径全形态结果 → `to_plan_step_outcome` 生产投影；不适用返回 None。
+
+    仅在总闸 on 且 `record.result` 为全形态时启用；观测仍按 `step.observation_keys` 裁剪。
+    """
+    from app.core.settings import get_settings
+
+    if not getattr(get_settings(), "v26_action_execution_enabled", False):
+        return None
     stored = record.result if isinstance(record.result, dict) else None
     if not stored or "status" not in stored:
         return None
-    from app.models.action import ActionResult
+    if "output" not in stored and "observations" not in stored:
+        return None
     from app.services.action import integration as action_integration
 
-    payload_keys = (
-        "id",
-        "action_id",
-        "status",
-        "effects",
-        "error",
-        "failure_kind",
-        "output",
-        "metadata",
-        "observations",
-        "created_at",
-    )
-    candidate = {k: stored[k] for k in payload_keys if k in stored}
-    try:
-        result = ActionResult.model_validate(candidate)
-    except Exception:
-        return None
     step_dict = record.steps[0] if record.steps else {}
-    outcome = action_integration.to_plan_step_outcome(
-        result,
+    outcome = action_integration.to_plan_step_outcome_from_mapping(
+        stored,
         action_id=record.id,
         step_index=step.index,
         tool_id=str(step_dict.get("tool_id") or step.tool_id or ""),
         duration_ms=int(step_dict.get("duration_ms") or 0),
     )
-    return outcome.model_copy(update={"attempt": int(record.attempt or 0)})
+    if outcome is None:
+        return None
+    obs_source = (
+        stored
+        if isinstance(stored.get("observations"), dict)
+        else (step_dict.get("result") or {})
+    )
+    clipped = _observations(obs_source if isinstance(obs_source, dict) else {}, step)
+    return outcome.model_copy(
+        update={"attempt": int(record.attempt or 0), "observations": clipped}
+    )
 
 
 def _record_outcome(record, result: dict) -> tuple[PlanStepOutcomeStatus, str | None]:
