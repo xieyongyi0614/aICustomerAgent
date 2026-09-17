@@ -114,8 +114,8 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 | REF-007 | **DONE（P0 复核通过）** | 1744 回归绿；E3 已修；audit 附录 C 留痕 |
 | REF-101 | **DONE** | `.env.example` 登记 V26 闸；`enablement_violations` 总闸⇒action_enabled；RESERVED 告警 |
 | REF-102 | **DONE** | `Manager.execute` 退避窗口守卫；恢复步经 `transition_action` |
-| REF-103 | **TODO** | 全量裸赋值清扫 + 静态断言 |
-| REF-104 | **TODO** | `run_id` 语义 / `plan_step` 落列回填 |
+| REF-103 | **DONE（关键路径）** | 恢复步经 `transition_action`；partial 不滞留；权威断言测试 |
+| REF-104 | **DONE（plan_step；run_id 债务登记）** | 桥回填 `plan_step=step_<i>`；`run_id` 仍别名 session_id（D10 已知，待迁移） |
 | REF-105 | **TODO** | 多步交付或 RESERVED 裁决 |
 | REF-106 | **TODO** | 分层拆分与文档对齐 |
 | 全部 | **P0 关闭；P1 进行中** | 可进入 Flag on 灰度准备 |

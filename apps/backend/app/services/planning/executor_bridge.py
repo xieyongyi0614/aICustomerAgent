@@ -225,7 +225,9 @@ class PlanExecutorBridge:
             )
         intent = self.to_intent(goal, plan, step, ctx)
         try:
-            record = await self._dispatch(goal, intent)
+            record = await self._dispatch(
+                goal, intent, plan_step=f"step_{step.index}"
+            )
         except Exception:
             logger.exception(
                 "计划步骤执行异常，判为永久失败（goal=%s step=%s）", goal.id, step.index
@@ -262,11 +264,12 @@ class PlanExecutorBridge:
             }
         )
 
-    async def _dispatch(self, goal, intent: ActionIntent):
+    async def _dispatch(self, goal, intent: ActionIntent, *, plan_step: str | None = None):
         """既有编排器入口（唯一）：`source="autonomy"` 使额度与冷却结构性生效（§5.1）。
 
         V2.6.0：总闸 on 时经 ActionManager.create(source=plan) + execute，保持
         PlanStep 与 Action 1:1（不新建第二条记录）。
+        V2.6.1：回填 `plan_step`（`step_<index>`），保证计划↔行动 1:1 可溯源。
         """
         settings = get_settings()
         if getattr(settings, "v26_action_execution_enabled", False):
@@ -281,6 +284,7 @@ class PlanExecutorBridge:
                 session_id=self._session_id(goal.user_id),
                 goal_id=goal.id,
                 intent=intent,
+                plan_step=plan_step,
             )
             await action_manager.execute(action.id)
             return action_repository.get_record(action.id)
