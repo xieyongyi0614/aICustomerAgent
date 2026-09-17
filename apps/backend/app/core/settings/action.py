@@ -13,6 +13,7 @@ class ActionSettings(BaseSettings):
 
     action_enabled: bool = False
     action_detector_enabled: bool = True
+    # V2.6.1 裁决：多步未交付；保持 1。多步 Flag（v26_action_multistep_enabled）为 RESERVED。
     action_plan_max_steps: int = 1
     action_plan_expires_minutes: int = 5
     action_plan_expiry_hours: int = 24

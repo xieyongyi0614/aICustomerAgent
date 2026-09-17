@@ -372,14 +372,17 @@ ACTION_EXECUTION_MAP = {
     "create_reminder":    ExecutionKind.INTERNAL,
     "cancel_reminder":    ExecutionKind.INTERNAL,
     "remember_fact":      ExecutionKind.INTERNAL,
-    "world_action":       ExecutionKind.INTERNAL,
+    "create_object":      ExecutionKind.INTERNAL,
+    "move_object":        ExecutionKind.INTERNAL,
+    "use_object":         ExecutionKind.INTERNAL,
     "query_environment":  ExecutionKind.TOOL,
+    "query_search":       ExecutionKind.TOOL,
     "send_notification":  ExecutionKind.EXTERNAL,   # 经 Tool Adapter
-    "search":             ExecutionKind.TOOL,
 }
 ```
 
 > **扩展点**：新增 Action Type = 在 `ACTION_EXECUTION_MAP` 加一行 + 注册对应执行方式，不改 Action 抽象、不改 Executor。
+> **V2.6.1 校正**：与 `app/models/action.py` 九类型对齐；文档中曾出现的 `world_action` / `search` 非 `ActionType` 字面量，已移除。
 
 ### 6.3 Action Lifecycle
 
@@ -866,7 +869,7 @@ ActionResult
 | `v26_action_execution_enabled` | **总闸**：Action 统一抽象、执行层、调度器、结果系统 | — | off |
 | `v26_action_abstraction_enabled` | Action 值对象 + 六态生命周期 | 总闸 | off |
 | `v26_action_scheduler_enabled` | ActionScheduler（延迟/定时/优先级/队列） | 总闸 | off |
-| `v26_action_multistep_enabled` | 多步执行（`action_plan_max_steps` > 1） | 总闸 | off |
+| `v26_action_multistep_enabled` | 多步执行（`action_plan_max_steps` > 1） | 总闸 | off | **RESERVED**（V2.6.1 裁决：多步未交付；开启仅告警，无行为变化） |
 | `v26_action_result_enabled` | ActionResult 统一契约 + 旧读键退役 | 总闸 | off |
 | `v26_action_feedback_enabled` | 反馈闭环（执行结果回写决策面） | 总闸 | off |
 

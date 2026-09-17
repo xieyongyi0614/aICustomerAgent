@@ -96,6 +96,24 @@ class TestEnablementChain:
         assert set(RESERVED_V26_SUB_FLAGS).issubset(set(V26_SUB_FLAGS))
 
 
+class TestMultistepReservedDecision:
+    def test_plan_max_steps_stays_one(self):
+        assert get_settings().action_plan_max_steps == 1
+
+    def test_multistep_flag_is_reserved(self):
+        assert "v26_action_multistep_enabled" in RESERVED_V26_SUB_FLAGS
+
+    def test_env_example_marks_multistep_reserved(self):
+        from pathlib import Path
+
+        example = Path(__file__).resolve().parents[2] / ".env.example"
+        text = example.read_text(encoding="utf-8")
+        assert "V26_ACTION_MULTISTEP_ENABLED" in text
+        idx = text.index("V26_ACTION_MULTISTEP_ENABLED")
+        window = text[max(0, idx - 200) : idx + 80]
+        assert "RESERVED" in window
+
+
 class TestExecuteBackoffGuard:
     def test_execute_holds_when_next_retry_in_future(self, monkeypatch):
         settings = get_settings()

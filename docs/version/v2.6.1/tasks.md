@@ -116,9 +116,9 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 | REF-102 | **DONE** | `Manager.execute` 退避窗口守卫；恢复步经 `transition_action` |
 | REF-103 | **DONE（关键路径）** | 恢复步经 `transition_action`；partial 不滞留；权威断言测试 |
 | REF-104 | **DONE（plan_step；run_id 债务登记）** | 桥回填 `plan_step=step_<i>`；`run_id` 仍别名 session_id（D10 已知，待迁移） |
-| REF-105 | **TODO** | 多步交付或 RESERVED 裁决 |
-| REF-106 | **TODO** | 分层拆分与文档对齐 |
-| 全部 | **P0 关闭；P1 进行中** | 可进入 Flag on 灰度准备 |
+| REF-105 | **DONE（RESERVED 裁决）** | `action_plan_max_steps=1`；multistep Flag RESERVED + 告警 + 文档 |
+| REF-106 | **DONE（文档对齐）** | 回归清单文件名对齐；architecture 映射表与代码一致；分层拆分仍留 P2 |
+| 全部 | **P0+P1 关闭（分层拆分与 run_id 迁移留后续）** | 可进入 Flag on 灰度准备 |
 
 **执行建议**：先为 WIP 项补红/绿测（不改生产代码），再推进 TODO 项；提交前按 REF 卡拆分 commit，避免「一锅端」。
 

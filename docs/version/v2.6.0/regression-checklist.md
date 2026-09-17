@@ -21,12 +21,12 @@
 
 ## 2. 四类端到端场景清单
 
-| 类 | 名称 | 判据 | 自动化 |
+| 类 | 名称 | 判据 | 自动化（真实文件） |
 |---|---|---|---|
-| **A** | 单 Action 执行 | `ActionIntent → Action → execute → ActionResult`；六态生命周期完整；执行方式分派正确 | `test_v26_scenario_a_single_action.py` |
-| **B** | 调度执行 | 「明天早上提醒我学习」→ Plan → Action → Schedule → 到期执行 → 反馈；`action_schedules` 队列 SoT | `test_v26_scenario_b_schedule.py` |
-| **C** | 失败重试 | 执行失败 → `retry` → 成功；`attempt` 对齐；`dedupe_key` 幂等 | `test_v26_scenario_c_failure_retry.py` |
-| **D** | 状态恢复 | 进程崩溃后孤儿 `RUNNING` 超时置 `FAILED` 可重试；调度丢失幂等重建 | `test_v26_scenario_d_recovery.py` |
+| **A** | 单 Action 执行 | `ActionIntent → Action → execute → ActionResult`；六态生命周期完整；执行方式分派正确 | `test_acceptance.py` + `test_task004_executor.py` + `test_v26_step_result_contract.py` |
+| **B** | 调度执行 | 「明天早上提醒我学习」→ Plan → Action → Schedule → 到期执行 → 反馈；`action_schedules` 队列 SoT | `test_v26_schedule_execution.py` + `test_v26_outbox_world_write.py` |
+| **C** | 失败重试 | 执行失败 → `retry` → 成功；`attempt` 对齐；`dedupe_key` 幂等 | `test_task003_manager.py` + `test_v26_recovery.py` |
+| **D** | 状态恢复 | 进程崩溃后孤儿 `executing` 超时置 `failed` 可重试；调度丢失幂等重建 | `test_v26_recovery.py` |
 
 ### 人工补充（真实模型）
 
@@ -70,15 +70,15 @@
 
 | Gate | 判定 | 证据归属 |
 |---|---|---|
-| **G-ABSTRACT** | Action 六问可答；零 Goal/Plan/Tool 语义依赖；值集零变化 | `test_v26_task001_model.py` |
-| **G-PERSIST** | 复用 `action_records`（不新建 actions/action_results）；唯一新表 `action_schedules`；唯一加列 `priority` | `test_v26_task002_persistence.py` |
-| **G-MANAGE** | 六能力可判定；唯一生命周期入口；不决策（G3）不编排（G2） | `test_v26_task003_manager.py` |
-| **G-EXEC** | 九 ActionType 分派正确；三执行方式；Executor 不决策；不绕过五段短路 | `test_v26_task004_executor.py` |
-| **G-SCHEDULE** | 延迟/定时/优先级/队列；复用三设施；不新建调度循环 | `test_v26_task005_scheduler.py` |
-| **G-RESULT** | ActionResult 统一契约；旧读键退役（双写窗口）；四类结果 | `test_v26_task006_result.py` |
-| **G-INTEGRATE** | Planning/World/Relationship/Memory 四路接线；反馈闭环；职责不重叠 | `test_v26_task007_integration.py` |
-| **G-OBSERVE** | 七日志事件 + 五指标；零新建指标表 | `test_v26_task008_api.py` |
-| **G-COMPAT** | Flag 全 off：prompt 逐字节一致；既有测试零修改；原路径生效 | `test_v26_flag_matrix.py` |
+| **G-ABSTRACT** | Action 六问可答；零 Goal/Plan/Tool 语义依赖；值集零变化 | `test_task001_action_core_model.py` |
+| **G-PERSIST** | 复用 `action_records`（不新建 actions/action_results）；唯一新表 `action_schedules`；唯一加列 `priority` | `test_task002_persistence.py` |
+| **G-MANAGE** | 六能力可判定；唯一生命周期入口；不决策（G3）不编排（G2） | `test_task003_manager.py` |
+| **G-EXEC** | 九 ActionType 分派正确；三执行方式；Executor 不决策；不绕过五段短路 | `test_task004_executor.py` |
+| **G-SCHEDULE** | 延迟/定时/优先级/队列；复用三设施；不新建调度循环 | `test_task005_scheduler.py` + `test_v26_schedule_execution.py` |
+| **G-RESULT** | ActionResult 统一契约；旧读键退役（双写窗口）；四类结果 | `test_task006_result.py` + `test_v26_step_result_contract.py` |
+| **G-INTEGRATE** | Planning/World/Relationship/Memory 四路接线；反馈闭环；职责不重叠 | `test_task007_integration.py` + `test_v26_feedback_consumers.py` |
+| **G-OBSERVE** | 七日志事件 + 五指标；零新建指标表 | `test_task008_api.py` |
+| **G-COMPAT** | Flag 全 off：prompt 逐字节一致；既有测试零修改；原路径生效 | `test_acceptance.py` + `test_task009_validation.py` |
 
 ---
 
@@ -133,7 +133,12 @@
 
 ## 9. 上线前待办
 
-- [ ] TASK-001 ~ TASK-008 实现（各 Task Detail 的 Implementation Plan）
-- [ ] TASK-009 四类测试 + Flag 矩阵 + 本清单自动化落地
+> V2.6.1 P0/P1 部分已关闭；下列为灰度与后续项。
+
+- [x] TASK-001 ~ TASK-008 实现（V2.6.0）
+- [x] TASK-009 四类测试 + Flag 矩阵 + 本清单自动化落地（V2.6.0 + V2.6.1 补齐真实文件名）
+- [x] V2.6.1 P0：结果全形态 / 调度执行 / 反馈闭环 / 来源语义 / 恢复终态
+- [x] V2.6.1 P1（部分）：Flag 治理、退避守卫、`plan_step` 溯源、多步 RESERVED 裁决
 - [ ] 旧读键退役：Flag on 且全量测试通过后，退役 `world_event_id` / `memory_id` / `failure_kind` 旧位置（architecture §14 R2）
 - [ ] 真实模型人工回归（本清单 §2 人工补充项）
+- [ ] P1 残留：`run_id` 独立列迁移、`action_engine` 分层拆分、多步真正交付（非 RESERVED）
