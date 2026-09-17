@@ -92,12 +92,32 @@ class TestPlanStepTraceability:
         assert record.source == "plan"
         assert (record.intent or {}).get("plan_step") == "step_2"
 
-    def test_run_id_aliases_session_id_until_migration(self):
-        """D10 已知：run_id 当前 = session_id；独立 loop_runs.id 需迁移后关闭。"""
-        action = manager.create(
-            user_id="u_runid",
-            action_type="remember_fact",
-            params={"fact": "run"},
-            session_id="sess_abc",
+    def test_run_id_independent_column(self, monkeypatch):
+        from app.models.action import ActionIntent
+
+        s = get_settings()
+        monkeypatch.setattr(s, "action_enabled", True)
+        record = action_engine.new_record(
+            ActionIntent(
+                action_type="remember_fact",
+                confidence="confident",
+                params={"fact": "run"},
+                dedupe_key="run_id_col_1",
+            ),
+            "u_runid",
+            "sess_abc",
+            run_id="run_loop_1",
         )
-        assert action.run_id == "sess_abc"
+        saved = action_repository.save_record(record)
+        loaded = action_repository.get_record(saved.id)
+        assert loaded is not None
+        assert loaded.run_id == "run_loop_1"
+        assert loaded.session_id == "sess_abc"
+        action = manager.create(
+            user_id="u_runid2",
+            action_type="remember_fact",
+            params={"fact": "run2"},
+            session_id="sess_x",
+        )
+        # create 未显式传 run_id 时回退 session_id（兼容窗口）
+        assert action.run_id == "sess_x"

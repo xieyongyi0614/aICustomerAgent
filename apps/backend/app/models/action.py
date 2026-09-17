@@ -311,6 +311,8 @@ class ActionRecord(BaseModel):
     user_id: str
     character_id: str = "asuna"
     session_id: str | None = None
+    # V2.6.1：独立于 session_id；可空。loop_runs.id（有则写入，无则 None）
+    run_id: str | None = None
     source: ActionSource = "conversation"
     action_type: ActionType
     intent: dict[str, Any] = {}

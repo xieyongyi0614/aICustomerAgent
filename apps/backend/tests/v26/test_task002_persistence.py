@@ -220,4 +220,5 @@ class TestOrmShape:
     def test_action_record_row_has_priority_only_new_column(self):
         columns = {c.name for c in ActionRecordRow.__table__.columns}
         assert "priority" in columns
-        assert len(columns) == 22
+        assert "run_id" in columns
+        assert len(columns) == 23

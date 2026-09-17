@@ -100,11 +100,19 @@ def _now() -> datetime:
     return datetime.now()
 
 
-def new_record(intent: ActionIntent, user_id: str, session_id: str | None, source: str = "conversation") -> ActionRecord:
+def new_record(
+    intent: ActionIntent,
+    user_id: str,
+    session_id: str | None,
+    source: str = "conversation",
+    *,
+    run_id: str | None = None,
+) -> ActionRecord:
     return ActionRecord(
         id=action_repository.new_record_id(),
         user_id=user_id,
         session_id=session_id,
+        run_id=run_id,
         source=source,
         action_type=intent.action_type,
         intent=intent.model_dump(mode="json"),

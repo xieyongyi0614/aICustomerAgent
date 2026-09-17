@@ -115,7 +115,7 @@ REF-001~006 ──► REF-007 门禁（T1~T7 全绿 + off 面回归 + P0 复核�
 | REF-101 | **DONE** | `.env.example` 登记 V26 闸；`enablement_violations` 总闸⇒action_enabled；RESERVED 告警 |
 | REF-102 | **DONE** | `Manager.execute` 退避窗口守卫；恢复步经 `transition_action` |
 | REF-103 | **DONE（关键路径）** | 恢复步经 `transition_action`；partial 不滞留；权威断言测试 |
-| REF-104 | **DONE（plan_step；run_id 债务登记）** | 桥回填 `plan_step=step_<i>`；`run_id` 仍别名 session_id（D10 已知，待迁移） |
+| REF-104 | **DONE** | `plan_step` 桥回填；`run_id` 独立列（迁移 0048）+ 模型/仓储/Manager |
 | REF-105 | **DONE（RESERVED 裁决）** | `action_plan_max_steps=1`；multistep Flag RESERVED + 告警 + 文档 |
 | REF-106 | **DONE（文档对齐）** | 回归清单文件名对齐；architecture 映射表与代码一致；分层拆分仍留 P2 |
 | 全部 | **P0+P1 关闭（分层拆分与 run_id 迁移留后续）** | 可进入 Flag on 灰度准备 |

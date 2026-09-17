@@ -168,19 +168,19 @@ class TestBoundaryRedLines:
 
 
 class TestZeroMigration:
-    """Z1~Z8：零迁移断言（迁移链头 0047；值集未扩）。"""
+    """Z1~Z8：零迁移断言（迁移链头 0048；值集未扩）。"""
 
-    def test_migration_head_is_0047(self):
-        heads = sorted(path.name for path in MIGRATIONS_DIR.glob("0047_*.py"))
-        assert heads == ["0047_action_schedules_priority.py"]
+    def test_migration_head_is_0048(self):
+        heads = sorted(path.name for path in MIGRATIONS_DIR.glob("0048_*.py"))
+        assert heads == ["0048_action_records_run_id.py"]
 
-    def test_no_newer_revision_after_0047(self):
+    def test_no_newer_revision_after_0048(self):
         numeric = sorted(
             int(match.group(1))
             for path in MIGRATIONS_DIR.glob("*.py")
             if (match := re.match(r"(\d+)_", path.name))
         )
-        assert max(numeric) == 47
+        assert max(numeric) == 48
 
     def test_decision_kind_stays_five_values(self):
         kinds = tuple(kind.value for kind in DecisionKindEnum)

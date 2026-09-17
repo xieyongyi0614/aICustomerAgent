@@ -292,13 +292,13 @@ class TestRegressionCheck:
         assert "relationship_bridge." not in source
         assert "memory_repository." not in source
 
-    def test_v25_migration_head_0047_documented(self):
+    def test_v25_migration_head_0048_documented(self):
         from pathlib import Path
 
         migrations = sorted(
             p.name for p in Path("migrations/versions").glob("*.py")
         )
-        assert migrations[-1].startswith("0047_")
+        assert migrations[-1].startswith("0048_")
 
     def test_debug_flag_off_404(self, monkeypatch):
         settings = get_settings()

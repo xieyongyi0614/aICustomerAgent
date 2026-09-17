@@ -679,7 +679,7 @@ class TestDebugSurfaceDiscipline:
             assert table in tables, table
         assert "plan_debug_projection" not in tables
 
-    def test_migration_chain_head_is_still_0047(self):
+    def test_migration_chain_head_is_still_0048(self):
         import re
 
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
@@ -688,5 +688,5 @@ class TestDebugSurfaceDiscipline:
             for path in versions.glob("*.py")
             if (match := re.match(r"(\d+)_", path.name))
         )
-        assert max(numbered) == 47
-        assert f"{max(numbered):04d}" == "0047"
+        assert max(numbered) == 48
+        assert f"{max(numbered):04d}" == "0048"

@@ -654,6 +654,7 @@ class ActionRecordRow(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    run_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     source: Mapped[str] = mapped_column(String, nullable=False, default="conversation")
     action_type: Mapped[str] = mapped_column(String, nullable=False)
     intent: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

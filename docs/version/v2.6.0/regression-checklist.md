@@ -138,7 +138,7 @@
 - [x] TASK-001 ~ TASK-008 实现（V2.6.0）
 - [x] TASK-009 四类测试 + Flag 矩阵 + 本清单自动化落地（V2.6.0 + V2.6.1 补齐真实文件名）
 - [x] V2.6.1 P0：结果全形态 / 调度执行 / 反馈闭环 / 来源语义 / 恢复终态
-- [x] V2.6.1 P1（部分）：Flag 治理、退避守卫、`plan_step` 溯源、多步 RESERVED 裁决
+- [x] V2.6.1 P1：Flag 治理、退避守卫、`plan_step` 溯源、`run_id` 列、多步 RESERVED、文档对齐
 - [ ] 旧读键退役：Flag on 且全量测试通过后，退役 `world_event_id` / `memory_id` / `failure_kind` 旧位置（architecture §14 R2）
 - [ ] 真实模型人工回归（本清单 §2 人工补充项）
-- [ ] P1 残留：`run_id` 独立列迁移、`action_engine` 分层拆分、多步真正交付（非 RESERVED）
+- [ ] P2 残留：`action_engine` 分层拆分、Queue/Worker 化、多角色就绪、多步真正交付（非 RESERVED）

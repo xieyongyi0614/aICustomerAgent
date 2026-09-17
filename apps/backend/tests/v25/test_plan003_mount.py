@@ -65,7 +65,7 @@ CAPABILITY_BITS = (
     "reflection",
 )
 
-MIGRATION_HEAD = "0047"
+MIGRATION_HEAD = "0048"
 
 PLAN_FACE_SIGNATURES = (
     "create_plan",
@@ -358,7 +358,7 @@ class TestZeroMigrationAndContracts:
         ]
         assert list(inspect.signature(goal_repository.count_plans).parameters) == ["goal_id"]
 
-    def test_migration_head_is_still_0047(self):
+    def test_migration_head_is_still_0048(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))
@@ -366,7 +366,7 @@ class TestZeroMigrationAndContracts:
             if (match := re.match(r"(\d+)_", path.name))
         )
         assert f"{max(numbered):04d}" == MIGRATION_HEAD
-        assert max(numbered) == 47
+        assert max(numbered) == 48
 
     def test_goal_plans_status_values_are_unchanged(self):
         checks = {

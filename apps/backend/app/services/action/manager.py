@@ -55,8 +55,7 @@ def _record_to_action(record: ActionRecord) -> Action:
         goal_id=record.goal_id,
         plan_step=(record.intent or {}).get("plan_step"),
         dedupe_key=record.dedupe_key,
-        # 已知债务（D10）：run_id 当前别名 session_id；真 loop_runs.id 需加列后迁出
-        run_id=record.session_id,
+        run_id=record.run_id or record.session_id,
     )
 
 
