@@ -371,7 +371,9 @@ def _autonomy_action_today(user_id: str, now: datetime) -> int:
     return sum(
         1
         for r in records
-        if r.source == "autonomy" and r.created_at is not None and r.created_at >= start
+        if r.source in ("autonomy", "plan")
+        and r.created_at is not None
+        and r.created_at >= start
     )
 
 

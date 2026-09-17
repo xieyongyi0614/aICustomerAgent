@@ -362,28 +362,43 @@ async def _execute_plan_via_action_executor(
         run_id=record.session_id,
     )
     result_out = await action_executor.run(action, ctx)
+    from app.services.action.executor import step_extras_from_result, step_result_payload
+
+    capability_name, capability_action = ACTION_CAPABILITY_MAP.get(
+        record.action_type, ("", "")
+    )
+    extras = step_extras_from_result(result_out)
+    step_status = (
+        "succeeded"
+        if result_out.status == "succeeded"
+        else ("partial" if result_out.status == "partial" else "failed")
+    )
     step_dicts = [
         {
             "index": 0,
-            "capability": ACTION_CAPABILITY_MAP.get(record.action_type, ("", ""))[0],
-            "action": ACTION_CAPABILITY_MAP.get(record.action_type, ("", ""))[1],
+            "capability": capability_name,
+            "action": capability_action,
             "params": dict(record.params or {}),
-            "status": "succeeded" if result_out.status == "succeeded" else "failed",
-            "result": result_out.model_dump(mode="json"),
+            "status": step_status,
+            "result": step_result_payload(result_out),
+            **extras,
         }
     ]
     record.steps = step_dicts
     _apply_action_result_to_record(record, result_out, settings)
-    record.result = result_out.model_dump(mode="json")
+    record.result = step_result_payload(result_out)
     record.updated_at = _now()
     action_repository.save_record(record)
     return result_out
 
 
 def _apply_action_result_to_record(record: ActionRecord, result_out: ActionResult, settings) -> None:
-    if result_out.status in ("succeeded", "partial"):
-        if result_out.status == "succeeded":
-            record.status = transition_action("executing", "step_all_succeeded") or record.status
+    if result_out.status == "succeeded":
+        record.status = transition_action("executing", "step_all_succeeded") or record.status
+        return
+    if result_out.status == "partial":
+        record.status = "failed"
+        record.gate_reason = result_out.failure_kind or "partial"
         return
     failure_kind = result_out.failure_kind or "transient"
     if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
@@ -764,12 +779,26 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
             sorted({e.kind for e in enriched.effects}),
         )
     else:
-        record.result = ActionResult(
+        minimal = ActionResult(
             status=result.status,
             effects=effects,
             error=result.error,
             failure_kind=result.failure_kind,
         ).model_dump(mode="json")
+        existing = record.result if isinstance(record.result, dict) else None
+        if existing and "payload" in existing:
+            merged = dict(existing)
+            merged.update(
+                {
+                    "status": minimal["status"],
+                    "effects": minimal["effects"],
+                    "error": minimal["error"],
+                    "failure_kind": minimal["failure_kind"],
+                }
+            )
+            record.result = merged
+        else:
+            record.result = minimal
 
     if settings.v2_action_outbox_enabled:
         _integrate_via_outbox(record)
@@ -1070,6 +1099,34 @@ def _expire_planned():
     except Exception:
         logger.exception("行动过期扫描失败")
     _expire_pending_confirmations()
+    _recover_stale_executing()
+
+
+def _recover_stale_executing() -> int:
+    """architecture §11.4：孤儿 executing 超时置 failed，避免永久非终态。"""
+    settings = get_settings()
+    if not getattr(settings, "v26_action_execution_enabled", False):
+        return 0
+    try:
+        cutoff = _now() - timedelta(minutes=settings.action_executing_timeout_minutes)
+        records = action_repository.list_stale_executing(cutoff, limit=50)
+        recovered = 0
+        for record in records:
+            record.status = "failed"
+            record.gate_reason = "timeout"
+            if record.attempt < settings.action_retry_max_attempts:
+                record.next_retry_at = _now() + timedelta(
+                    seconds=settings.action_retry_backoff_seconds
+                )
+            record.updated_at = _now()
+            action_repository.save_record(record)
+            recovered += 1
+        if recovered:
+            logger.info("孤儿 executing 恢复：%d 条", recovered)
+        return recovered
+    except Exception:
+        logger.exception("孤儿 executing 恢复扫描失败")
+        return 0
 
 
 def _expire_pending_confirmations() -> int:

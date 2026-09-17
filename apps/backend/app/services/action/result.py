@@ -35,6 +35,63 @@ def ensure_result_identity(result: ActionResult, action_id: str) -> ActionResult
     return result
 
 
+def _coerce_effects(raw_effects: Any) -> list[ActionEffect]:
+    effects: list[ActionEffect] = []
+    if not isinstance(raw_effects, list):
+        return effects
+    for item in raw_effects:
+        if isinstance(item, ActionEffect):
+            effects.append(item)
+        elif isinstance(item, dict):
+            effects.append(
+                ActionEffect(
+                    kind=item.get("kind", "note"),
+                    ref=str(item.get("ref", "")),
+                    detail=str(item.get("detail", "")),
+                )
+            )
+    return effects
+
+
+def _extract_output_and_payload(result_payload: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    """从工具/能力结果字典取出新契约 output 与旧读键 payload（outbox 依赖）。"""
+    output: dict[str, Any] = {}
+    legacy_payload: dict[str, Any] = {}
+    if isinstance(result_payload, dict):
+        nested = result_payload.get("payload")
+        if isinstance(nested, dict):
+            output = dict(nested)
+            legacy_payload = dict(nested)
+        else:
+            output = {k: v for k, v in result_payload.items() if k != "failure_kind"}
+            legacy_payload = {
+                k: v for k, v in result_payload.items() if k != "failure_kind"
+            }
+    elif result_payload is not None and hasattr(result_payload, "model_dump"):
+        dumped = result_payload.model_dump(mode="json")
+        nested = dumped.get("payload")
+        if isinstance(nested, dict):
+            output = dict(nested)
+            legacy_payload = dict(nested)
+        else:
+            output = dict(dumped)
+            legacy_payload = dict(dumped)
+    return output, legacy_payload
+
+
+def _whitelist_observations(output: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    observations = {
+        k: output[k]
+        for k in ("world_event_id", "memory_id", "entity_id", "note")
+        if k in output
+    }
+    if extra:
+        for key, value in extra.items():
+            if value is not None:
+                observations[key] = value
+    return observations
+
+
 def from_capability_result(
     result: CapabilityResult,
     *,
@@ -64,15 +121,14 @@ def from_capability_result(
     else:
         status = "failed"
         failure_kind = failure_kind or "transient"
-    observations = {
-        k: output[k]
-        for k in ("world_event_id", "memory_id", "entity_id", "note")
-        if k in output
-    }
+    resolved_effects = list(effects) if effects is not None else _coerce_effects(
+        payload.get("effects")
+    )
+    observations = _whitelist_observations(output)
     return ensure_result_identity(
         ActionResult(
             status=status,  # type: ignore[arg-type]
-            effects=list(effects or []),
+            effects=resolved_effects,
             error=result.error,
             failure_kind=failure_kind,
             output=output,
@@ -87,22 +143,26 @@ def from_tool_execution(execution: Any, *, action_id: str) -> ActionResult:
     status_raw = getattr(execution, "status", "failed")
     error = getattr(execution, "error", None)
     result_payload = getattr(execution, "result", None)
-    output: dict[str, Any] = {}
+    tool_id = getattr(execution, "tool_id", "") or ""
+    duration_ms = getattr(execution, "duration_ms", None)
+    permission = getattr(execution, "permission", None) or {}
+    validation = getattr(execution, "validation", None)
+
+    output, _legacy_payload = _extract_output_and_payload(result_payload)
+    raw_effects: Any = []
+    tool_observations: dict[str, Any] = {}
     if isinstance(result_payload, dict):
-        nested = result_payload.get("payload")
-        if isinstance(nested, dict):
-            output = dict(nested)
-        else:
-            output = {
-                k: v for k, v in result_payload.items() if k != "failure_kind"
-            }
+        raw_effects = result_payload.get("effects") or []
+        obs = result_payload.get("observations")
+        if isinstance(obs, dict):
+            tool_observations = dict(obs)
     elif result_payload is not None and hasattr(result_payload, "model_dump"):
         dumped = result_payload.model_dump(mode="json")
-        nested = dumped.get("payload")
-        if isinstance(nested, dict):
-            output = dict(nested)
-        else:
-            output = dict(dumped)
+        raw_effects = dumped.get("effects") or []
+        obs = dumped.get("observations")
+        if isinstance(obs, dict):
+            tool_observations = dict(obs)
+
     if status_raw == "succeeded":
         status = "succeeded"
         failure_kind = None
@@ -115,18 +175,25 @@ def from_tool_execution(execution: Any, *, action_id: str) -> ActionResult:
     else:
         status = "failed"
         failure_kind = "permanent" if status_raw in ("denied", "invalid") else "transient"
-    observations = {
-        k: output[k]
-        for k in ("world_event_id", "memory_id", "entity_id", "note")
-        if k in output
+
+    observations = _whitelist_observations(output, tool_observations)
+    metadata: dict[str, Any] = {
+        "tool_status": status_raw,
+        "source": "tool",
+        "tool_id": tool_id,
+        "permission": permission,
+        "validation": validation,
     }
+    if duration_ms is not None:
+        metadata["duration_ms"] = duration_ms
     return ensure_result_identity(
         ActionResult(
             status=status,  # type: ignore[arg-type]
+            effects=_coerce_effects(raw_effects),
             error=str(error)[:120] if error else None,
             failure_kind=failure_kind,  # type: ignore[arg-type]
             output=output,
-            metadata={"tool_status": status_raw, "source": "tool"},
+            metadata=metadata,
             observations=observations,
         ),
         action_id=action_id,

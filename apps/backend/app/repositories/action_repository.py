@@ -168,6 +168,19 @@ def list_planned(now: datetime, limit: int = 50) -> list[ActionRecord]:
         return [_to_record(row) for row in session.scalars(stmt)]
 
 
+def list_stale_executing(updated_before: datetime, limit: int = 50) -> list[ActionRecord]:
+    stmt = (
+        select(ActionRecordRow)
+        .where(ActionRecordRow.status == "executing")
+        .where(ActionRecordRow.updated_at.is_not(None))
+        .where(ActionRecordRow.updated_at <= updated_before)
+        .order_by(ActionRecordRow.updated_at)
+        .limit(limit)
+    )
+    with SessionLocal() as session:
+        return [_to_record(row) for row in session.scalars(stmt)]
+
+
 def list_by_dedupe(user_id: str, dedupe_key: str, since: datetime) -> list[ActionRecord]:
     stmt = (
         select(ActionRecordRow)

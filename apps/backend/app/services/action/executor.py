@@ -13,23 +13,15 @@ from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.models.action import (
     ACTION_EXECUTION_MAP,
     Action,
-    ActionEffect,
     ActionResult,
     ActionStep,
     CapabilityResult,
     ExecutionKind,
 )
 from app.services.action.registry import CapabilityRegistry, ExecutionContext
+from app.services.action import result as result_service
 
 logger = logging.getLogger(__name__)
-
-_ERROR_MAP: dict[str, tuple[str, str]] = {
-    "timeout": ("failed", "timeout"),
-    "unavailable": ("failed", "unavailable"),
-    "permanent": ("failed", "permanent"),
-    "denied": ("failed", "permanent"),
-    "invalid": ("failed", "permanent"),
-}
 
 
 class CapabilityExecutor:
@@ -71,55 +63,27 @@ def dispatch(action: Action) -> ExecutionKind | None:
     return ACTION_EXECUTION_MAP.get(action.type)
 
 
-def _normalize_capability_result(
-    result: CapabilityResult, *, action_id: str
-) -> ActionResult:
-    failure_kind = None
-    if result.payload:
-        failure_kind = result.payload.get("failure_kind")
-    if result.status == "succeeded":
-        effects: list[ActionEffect] = []
-        raw_effects = (result.payload or {}).get("effects") or []
-        for item in raw_effects:
-            if isinstance(item, dict):
-                effects.append(
-                    ActionEffect(
-                        kind=item.get("kind", "note"),
-                        ref=str(item.get("ref", "")),
-                        detail=str(item.get("detail", "")),
-                    )
-                )
-        return ActionResult(status="succeeded", effects=effects)
-    if result.status == "timeout":
-        return ActionResult(
-            status="failed",
-            error=result.error,
-            failure_kind="timeout",
-        )
-    if result.status == "unavailable":
-        return ActionResult(
-            status="failed",
-            error=result.error,
-            failure_kind="unavailable",
-        )
-    return ActionResult(
-        status="failed",
-        error=result.error,
-        failure_kind=failure_kind or "transient",
-    )
+def step_result_payload(result: ActionResult) -> dict[str, Any]:
+    """steps[].result 全形态：新契约 + 旧读键 payload（outbox / 证据窗依赖）。"""
+    dumped = result.dual_write_legacy_keys()
+    payload = dict(result.output or {})
+    if result.failure_kind is not None:
+        payload.setdefault("failure_kind", result.failure_kind)
+    dumped["payload"] = payload
+    return dumped
 
 
-def _tool_execution_to_result(execution: Any, *, action_id: str) -> ActionResult:
-    status = getattr(execution, "status", "failed")
-    error = getattr(execution, "error", None)
-    if status == "succeeded":
-        return ActionResult(status="succeeded", effects=[])
-    mapped = _ERROR_MAP.get(status, ("failed", "transient"))
-    return ActionResult(
-        status=mapped[0],
-        error=str(error)[:120] if error else status,
-        failure_kind=mapped[1],
-    )
+def step_extras_from_result(result: ActionResult) -> dict[str, Any]:
+    meta = result.metadata or {}
+    usage = meta.get("usage") if isinstance(meta.get("usage"), dict) else {}
+    return {
+        "tool_id": meta.get("tool_id"),
+        "permission": meta.get("permission") or {},
+        "validation": meta.get("validation"),
+        "duration_ms": meta.get("duration_ms")
+        or (usage.get("duration_ms") if usage else 0)
+        or 0,
+    }
 
 
 class ActionExecutor:
@@ -162,7 +126,7 @@ class ActionExecutor:
             params=dict(action.parameters or {}),
         )
         result = await self.capability_executor.run(step, ctx)
-        return _normalize_capability_result(result, action_id=action.id)
+        return result_service.from_capability_result(result, action_id=action.id)
 
     async def execute_tool(
         self, action: Action, ctx: ExecutionContext
@@ -192,7 +156,7 @@ class ActionExecutor:
             exec_ctx,
             **run_kwargs,
         )
-        return _tool_execution_to_result(execution, action_id=action.id)
+        return result_service.from_tool_execution(execution, action_id=action.id)
 
     async def execute_external(
         self, action: Action, ctx: ExecutionContext

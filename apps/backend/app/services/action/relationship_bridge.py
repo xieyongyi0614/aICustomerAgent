@@ -63,7 +63,7 @@ def deliver_action_signal(record: ActionRecord, user_id: str) -> dict | None:
         )
         event = RelationshipEvent(
             user_id=user_id,
-            session_id=record.session_id,
+            session_id=record.session_id or "",
             type=event_type,
             magnitude=magnitude,
             impact=applied if isinstance(applied, RelationshipDelta) else RelationshipDelta(),

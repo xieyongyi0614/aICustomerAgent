@@ -168,6 +168,9 @@ ACTION_RELATIONSHIP_MAP: dict[tuple[str, str, str], tuple[str, str]] = {
     ("create_reminder", "autonomy", "succeeded"): ("user_care", "weak"),
     ("cancel_reminder", "autonomy", "succeeded"): ("user_care", "weak"),
     ("remember_fact", "autonomy", "succeeded"): ("user_care", "weak"),
+    ("create_reminder", "plan", "succeeded"): ("user_care", "weak"),
+    ("cancel_reminder", "plan", "succeeded"): ("user_care", "weak"),
+    ("remember_fact", "plan", "succeeded"): ("user_care", "weak"),
 }
 
 # 完成时宣称模式表（tool-integration.md §5 ActionOverclaimRule，角色资产）。

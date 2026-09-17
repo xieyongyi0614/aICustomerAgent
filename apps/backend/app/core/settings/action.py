@@ -21,6 +21,7 @@ class ActionSettings(BaseSettings):
     action_execution_timeout_seconds: int = 10
     action_retry_max_attempts: int = 2
     action_retry_backoff_seconds: int = 30
+    action_executing_timeout_minutes: int = 30
     action_maintenance_interval_seconds: int = 60
     chat_rate_limit_per_minute: int = 30
     action_context_char_budget: int = 400
