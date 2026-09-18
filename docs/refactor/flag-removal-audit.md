@@ -1335,7 +1335,9 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 #### 未完成：测试同步（本批第 2 个提交）
 
 **全量**去门控后：**242 failed + 191 errors / 5970 passed**。
-**已完成一轮清理**（提交 `c77efb7` / `e7c5927`）后，`tests/v24` 单目录：**182 failed / 17 errors → 135 failed / 3 errors / 1408 passed**；`tests/` 全量 `compileall` 通过。
+**已完成两轮清理**（提交 `c77efb7` → `e7c5927` → `e8ecb62`）后，`tests/v24` 单目录：**182 failed / 17 errors → 113 failed / 3 errors / 1390 passed**；`tests/` 全量 `compileall` 通过。
+
+**第二轮（矩阵收敛，提交 `e8ecb62`）做了什么**：`tool012_support` 的 13 组总闸/子闸组合（`FLAG_MATRIX` + `EXPECTED_FINGERPRINTS`）整体收敛为唯一常开配置（`ALWAYS_ON_GROUP`）；`apply_flag_env` 不再显式置 off 已删开关；`test_tool_acceptance.py` 的 6 个「闸 on vs off 对比」用例改为常开断言、删掉 2 个已失效用例（g13 串行链、扩展闸双判据）。
 
 已做（均为可重放的脚本化操作，脚本留在 `.tmp/`，不入库）：
 
@@ -1344,19 +1346,20 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | 1 | 摘除字典条目 / 关键字实参 / `monkeypatch.setenv` 中的已删开关 | 30 文件 91 行 |
 | 2 | 摘除调用内 kwarg（`v24_tool_env(tool_system_enabled=True)` 一类） | 26 文件 115 处 |
 | 3 | 语义定点改写 6 处 + 删除 12 个「闸关即等价上一版本」的失效用例 | 7 文件 |
-| 4 | 契约/读面收口：`PERMISSION_ON_SETTINGS = ()`、`capability_registry_flags` 断言改用 `REGISTRY_FLAG_NAMES[0]`、`tool012_support.runtime_fingerprint` 常开化、`REGISTRY_FLAG_NAMES` 单键断言 | 6 文件 |
+| 4 | 契约/读面收口：`PERMISSION_ON_SETTINGS = ()`、`capability_registry_flags` 断言改用 `REGISTRY_FLAG_NAMES[0]`、`runtime_fingerprint` 常开化 | 6 文件 |
+| 5 | flag 矩阵收敛（13 组 → 1 组）+ 验收用例常开化 | 3 文件 |
 
-**剩余（`tests/v24` 135 failed + 3 errors，按文件）**：
+**剩余（`tests/v24` 113 failed + 3 errors，按文件）**：
 
 | 文件 | 剩余 | 性质与做法 |
 |---|---|---|
-| `test_tool_acceptance.py` | 34 | **flag 矩阵收敛**：`group_env(group)` 的 13 组开关组合 + `EXPECTED_FINGERPRINTS[group]` 已无意义，须整体收敛为「唯一常开配置」单行期望，并去掉 `parametrize` 的 group 维度 |
-| `test_tool003_executor.py` | 17 | 校验 / 观测闸的 OFF 形态断言 → 去掉 `tool_settings(...)` 开关注入后断言常开形态（`_persisted` 恒走 `persisted_result`、校验恒生效） |
-| `test_tool012_scenarios.py` | 12 | 同上矩阵收敛（`MASTER_ON` / `PERMISSION_ON` / `CHANNEL_ON` 常量语义已变） |
+| `test_tool003_executor.py` | 17 | 校验 / 观测闸的 OFF 形态断言 → 去掉 `tool_settings(...)` 开关注入后断言常开形态（`_persisted` 恒走 `persisted_result`、校验恒生效）；含 `test_observation_on_result_is_superset_of_v9_payload` 一类「闸关等价 V9」用例删除 |
+| `test_tool012_scenarios.py` | 13 | 场景常量 `MASTER_ON` / `PERMISSION_ON` / `CHANNEL_ON` / `FULL_ON` 与 `_env_reaching_capability` 已语义失效（写入即被忽略），须改写为常开语义并复核 S1~S10 期望 |
+| `test_tool_acceptance.py` | 11 | 剩余为非矩阵类断言（G-COMPAT 逐字节基线、V2.3.0 基线的 `apply_flag_env(monkeypatch, {})` 语义已变）——`test_g_compat_*` 三例的「Flag 全 off 与 V2.3.0 逐字节一致」前提已不存在，须改为常开基线或删除 |
 | `test_tool005_permission.py` | 9 | `REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 三个 reason 已不可达 → 对应用例删除；保留快照不可用 / 授权判定用例 |
 | `test_tool010_e2e.py` | 8 | 含 `ZERO_DIFF_HASHES` 重建（本批触碰 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`） |
-| `test_tool005_confirmation.py` / `test_tool005_integration.py` | 12 | `non_todo_payload_kinds()` 去参数后签名同步；`tool_channel_enabled` 断言失效 |
-| `test_tool002_builtins.py`（5）、`test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、其余 8 文件 | 25 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化 |
+| `test_tool005_confirmation.py`（6）/ `test_tool005_integration.py`（6） | 12 | `non_todo_payload_kinds()` 去参数后签名同步；`tool_channel_enabled` 断言失效 |
+| `test_tool012_bans.py`（4）、`test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、其余 ~13 文件 | 约 40 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化 |
 | `tests/v9`、`tests/unit`、`tests/v25` 的跨版本连带 | 约 18 | 见上一版清单 |
 
 #### H.11.1 过程事故与纪律补充
@@ -1366,6 +1369,10 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 处置：`git checkout -- apps/backend/tests` 回滚，随后**重放**前三遍脚本（全部是确定性的、留在 `.tmp/` 的脚本），并修正 `drop_function` 的边界判定（`async def` 的 `async` 半行也须吞掉）。修复后 `tests/` 全量编译通过，改动量与回滚前一致。
 
 **纪律补充（并入 H.7 §6）**：凡「按 AST/文本结构批量改测试」的脚本，改完**必须先 `compileall` 整树**再跑测试；判定条件宁可窄（只匹配已知模式），不要用「后面不是 def 就算孤儿」这类推断式规则。
+
+**第二次同型事故（矩阵收敛时）**：一个「清理悬空装饰器块」的脚本有两个缺陷——(a) 判定未接受 `class ` 目标，把 `@dataclass(frozen=True)` 误删；(b) 括号配平在**未闭合**的装饰器上会一路吃到文件尾，一次删掉 `test_tool_acceptance.py` 的 1073 行。处置：`git checkout` 精确回滚 5 个受影响文件，修正 `drop_function` 的边界判定（`strip()` 后再判、补 `]` / `'` / `class`），重放脚本。
+
+**教训升级**：这个「先回滚、再重放确定性脚本」的恢复路径之所以成立，前提是**所有批量改动都必须脚本化且保存在 `.tmp/`**——两次事故都因此把恢复成本从「手工重做」压到「重放三条命令」。之后每次批量改测试，改完立刻 `git status` 核对改动文件清单，与本脚本声明的目标文件集合逐一对齐。
 
 **改写纪律**（与 v21 / v22 / v23 批同款，勿机械删断言）：
 
