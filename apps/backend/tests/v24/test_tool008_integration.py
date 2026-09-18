@@ -68,9 +68,9 @@ MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
     "behavior_pattern",
 )
 
-MIGRATION_COUNT = 46
+MIGRATION_COUNT = 49
 
-TABLE_COUNT = 42
+TABLE_COUNT = 43
 
 MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 
@@ -328,41 +328,6 @@ def test_integrate_result_flag_on_uses_generalized_path(
     rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
     action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
     assert calls == [(rec.id, USER, "asuna")]
-
-
-def test_integrate_result_flag_off_uses_v9_action_type_path(
-    db_session_factory, v24_tool_env, override_settings, monkeypatch
-):
-    """Flag off：走 V9 `action_type` 键路径，投递函数与参数不变。"""
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
-    override_settings(action_enabled=True, memory_importance_threshold=0.5)
-    calls: list[tuple] = []
-    original = memory_bridge.deliver_action_memory
-
-    def _spy(record_, user_id, character_id="asuna"):
-        calls.append((record_.id, user_id, character_id))
-        return original(record_, user_id, character_id)
-
-    def _unexpected(*args, **kwargs):
-        raise AssertionError("总闸 off 时不应进入泛化路径")
-
-    monkeypatch.setattr(memory_bridge, "deliver_action_memory", _spy)
-    monkeypatch.setattr(memory_bridge, "deliver", _unexpected)
-    rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
-    action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
-    assert calls == [(rec.id, USER, "asuna")]
-    assert memory_contents(USER) == ["用户不想再被提醒：开会"]
-
-
-def test_deliver_falls_back_to_v9_path_when_sub_gate_off(
-    v24_tool_env, override_settings, monkeypatch
-):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
-    override_settings(action_enabled=True)
-    sentinel = {"memory_id": "mem-v9", "content": "用户不想再被提醒：开会"}
-    monkeypatch.setattr(memory_bridge, "deliver_action_memory", lambda *a, **k: sentinel)
-    rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
-    assert memory_bridge.deliver(rec, USER) is sentinel
 
 
 def test_delivery_failure_does_not_rollback_tool_execution(

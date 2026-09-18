@@ -193,33 +193,6 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
     assert step.extra["tool_ids"] == capabilities
 
 
-@pytest.mark.asyncio
-async def test_tick_keeps_capabilities_none_when_flag_off(
-    db_session_factory, fake_llm, monkeypatch, override_settings, v24_tool_env
-):
-    override_settings(
-        ACTION_ENABLED="true",
-        WORLD_ENABLED="true",
-        OBSERVABILITY_PERSIST_ENABLED="true",
-    )
-    v24_tool_env()
-    captured = _spy_pipeline(monkeypatch)
-    seed_tick_fixture()
-    llm = fake_llm(response=["忙完了吗？"])
-    llm_factory.set_llm(llm)
-    reset_user_write_locks()
-    try:
-        delivered = await autonomy_engine.tick(user_ids=[USER], llm=llm, now=NOW)
-    finally:
-        reset_user_write_locks()
-    assert len(delivered) == 1
-    assert captured[-1]["capabilities"] is None
-    session = __import__(
-        "app.services.trace_collector", fromlist=["get_trace_collector"]
-    ).get_trace_collector().get(delivered[0])
-    assert autonomy_engine.AUTONOMY_TOOL_SURFACE_STEP not in [s.name for s in session.steps]
-
-
 # --- §6.2 端到端链路 + 三账对齐 -------------------------------------------------
 
 

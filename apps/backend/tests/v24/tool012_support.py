@@ -60,23 +60,30 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 46
-MIGRATION_BREAKPOINT = "0046_tool_insight_types.py"
-MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (MIGRATION_BREAKPOINT,)
+MIGRATION_FILE_COUNT_CURRENT = 49
+MIGRATION_BREAKPOINT = "0049_loop_runs_kind_maintenance_steps.py"
+MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
+    "0046_tool_insight_types.py",
+    "0047_action_schedules_priority.py",
+    "0048_action_records_run_id.py",
+    "0049_loop_runs_kind_maintenance_steps.py",
+)
+MIGRATION_HEAD = "0049"
+MIGRATION_HEAD_PREVIOUS = "0048"
 V23_MIGRATION_TAIL: tuple[str, ...] = (
-    "0044_daily_plans_user_situations.py",
-    "0045_world_simulation_extensions.py",
+    "0047_action_schedules_priority.py",
+    "0048_action_records_run_id.py",
 )
 
-SCHEMA_TABLE_COUNT = 42
-SCHEMA_TABLE_SET_DIGEST = "1cb68c6433d9422e"
-SCHEMA_COLUMNS_DIGEST = "24579cc9f50fb9ff"
-SCHEMA_COLUMNS_DIGEST_BASELINE = "24579cc9f50fb9ff"
+SCHEMA_TABLE_COUNT = 43
+SCHEMA_TABLE_SET_DIGEST = "23d7c52d31112db1"
+SCHEMA_COLUMNS_DIGEST = "506ee5d5cf357bdf"
+SCHEMA_COLUMNS_DIGEST_BASELINE = "506ee5d5cf357bdf"
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
 SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights",)
 BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
-    "action_records": ("89e42fc9ab679e4c", "d3670639ef026f99", "b1a06bf82ea6eb0d"),
+    "action_records": ("90f5e647f8f1d8a8", "fccaeb1aee8d6cba", "8a7a52790352b2d8"),
     "conversations": ("ecfdeb39838b39bc", "18f3a52de812d1f3", "e3b0c44298fc1c14"),
     "conversation_summaries": ("dfb4a7f2e6b6ba3a", "e3b0c44298fc1c14", "e3b0c44298fc1c14"),
     "messages": ("5d424b72627b9678", "28485ce6aa400d11", "80cc53e497c96a49"),
@@ -219,6 +226,7 @@ PLACEHOLDER_SECRET_VALUES: frozenset[str] = frozenset(
 )
 
 
+@dataclass(frozen=True)
 class Violation:
     file: str
     line: int

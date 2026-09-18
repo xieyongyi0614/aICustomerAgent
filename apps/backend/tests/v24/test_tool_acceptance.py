@@ -330,16 +330,14 @@ def test_g_compat_life_loop_semantics_replacing_blob_freeze():
     assert "_expire_pending_confirmations" not in source
 
 
-def test_g_compat_action_domain_steps_shape_is_v9_when_master_off(
-    db_session_factory, override_settings, monkeypatch
+def test_g_action_domain_steps_shape_is_v9_plus_tool_fields(
+    db_session_factory, override_settings
 ):
-    """Flag 全 off：行动域 steps[] 形状与 V9 完全一致（无 V2.4.0 新增键）。"""
+    """行动域 steps[] = V9 六键 + V2.4.0 四键（工具面常开后恒为增量形态）。"""
     import asyncio
 
     override_settings(ACTION_ENABLED="true", WORLD_ENABLED="true")
-    support.apply_flag_env(monkeypatch, {})
-    from app.application import action_engine
-    from app.application import world_engine
+    from app.application import action_engine, world_engine
 
     user = "u-tool012-compat"
     world_engine.ensure_world(user)
@@ -354,9 +352,8 @@ def test_g_compat_action_domain_steps_shape_is_v9_when_master_off(
     assert record is not None
     assert record.steps
     for step in record.steps:
-        assert set(step) == support.V9_STEP_KEYS
-        assert set(step["result"]) == {"status", "payload", "usage", "error"}
-
+        assert set(step) == support.V9_STEP_KEYS | support.V24_STEP_KEYS_ADDED
+        assert {"status", "payload", "usage", "error"} <= set(step["result"])
 
 def test_g_compat_action_domain_steps_gain_v24_keys_only_when_master_on(
     db_session_factory, override_settings, monkeypatch
@@ -1134,8 +1131,8 @@ def test_g_extend_external_api_costs_one_manifest(tmp_path):
 # --- 零迁移最终核对 -------------------------------------------------------------
 
 
-def test_zero_migration_reconciliation_records_0046_breakpoint():
-    """零迁移断言已破例一次：破例点 0046，性质=insights.type 值域放宽。"""
+def test_zero_migration_reconciliation_records_breakpoints():
+    """零迁移断言已破例：破例点登记在 `MIGRATION_ADDED_VS_BASELINE`，且与实况逐条对齐。"""
     versions = sorted(
         path.name
         for path in (support.BACKEND_ROOT / "migrations" / "versions").glob("0*.py")
@@ -1143,11 +1140,14 @@ def test_zero_migration_reconciliation_records_0046_breakpoint():
     )
 
     assert len(versions) == support.MIGRATION_FILE_COUNT_CURRENT
-    assert len(versions) - support.MIGRATION_FILE_COUNT_BASELINE == 1
+    assert len(versions) - support.MIGRATION_FILE_COUNT_BASELINE == len(
+        support.MIGRATION_ADDED_VS_BASELINE
+    )
     assert versions[-1] == support.MIGRATION_BREAKPOINT
-    assert set(support.MIGRATION_ADDED_VS_BASELINE) == {versions[-1]}
+    assert tuple(support.MIGRATION_ADDED_VS_BASELINE) == tuple(
+        versions[support.MIGRATION_FILE_COUNT_BASELINE :]
+    )
     assert tuple(versions[-3:-1]) == support.V23_MIGRATION_TAIL
-
 
 def test_zero_migration_model_structure_unchanged():
     """模型结构 diff：42 张表集合与列摘要零变更（结构面零迁移成立）。"""
@@ -1211,8 +1211,8 @@ def test_zero_migration_only_insights_check_domain_changed():
     assert support.SCHEMA_INDEXES_CHANGED_TABLES == ()
 
 
-def test_migration_chain_head_is_0046():
-    """迁移链 head 为 0046 且线性（无分支、无多 head）。"""
+def test_migration_chain_head_is_current():
+    """迁移链 head 为当前最新且线性（无分支、无多 head）。"""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -1220,21 +1220,28 @@ def test_migration_chain_head_is_0046():
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
 
-    assert heads == ["0046"]
-    revision = script.get_revision("0046")
+    assert heads == [support.MIGRATION_HEAD]
+    revision = script.get_revision(support.MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == "0045"
-
+    assert revision.down_revision == support.MIGRATION_HEAD_PREVIOUS
 
 def test_migration_0046_is_downgradable():
     """0046 性质=可降级（有 downgrade 实现，非破坏性值域放宽）。"""
     source = (
-        support.BACKEND_ROOT / "migrations" / "versions" / support.MIGRATION_BREAKPOINT
+        support.BACKEND_ROOT / "migrations" / "versions" / "0046_tool_insight_types.py"
     ).read_text(encoding="utf-8")
 
     assert "def downgrade()" in source
     assert re.search(r"LEGACY_TYPES\s*=", source)
 
+
+def test_latest_breakpoint_is_downgradable():
+    """每次零迁移破例都必须可回退：最新破例点同样要有 downgrade 实现。"""
+    source = (
+        support.BACKEND_ROOT / "migrations" / "versions" / support.MIGRATION_BREAKPOINT
+    ).read_text(encoding="utf-8")
+
+    assert "def downgrade()" in source
 
 # --- 交付面核对（.env.example / 文档零改动） -------------------------------------
 

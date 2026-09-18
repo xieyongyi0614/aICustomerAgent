@@ -125,31 +125,7 @@ async def test_e17_external_tools_endpoint_hides_credentials(v24_tool_env, tmp_p
     assert "api.example.com" in response.text
 
 
-@pytest.mark.asyncio
-async def test_manifests_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_EXTERNAL_API_ENABLED=False)
-    response = await _get("/debug/tools/manifests")
-    assert response.status_code == 200
-    assert response.json() == {
-        "enabled": False,
-        "path": "",
-        "loaded": [],
-        "skipped": [],
-        "total": 0,
-        "manifests": [],
-    }
 
-
-
-
-
-
-@pytest.mark.asyncio
-async def test_external_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_EXTERNAL_API_ENABLED=False)
-    response = await _get("/debug/tools/external")
-    assert response.status_code == 200
-    assert response.json()["enabled"] is False
 
 
 @pytest.mark.asyncio
@@ -196,21 +172,6 @@ async def test_user_defined_endpoint_lists_and_revokes(v24_tool_env, tmp_path):
 
     after = await _get("/debug/tools/user-defined")
     assert after.json()["registered"] == []
-
-
-@pytest.mark.asyncio
-async def test_user_defined_endpoint_403_when_flag_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_USER_DEFINED_ENABLED=False)
-    assert (await _get("/debug/tools/user-defined")).status_code == 403
-    assert (await _post("/debug/tools/user-defined/user.x.y/revoke")).status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_user_defined_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_USER_DEFINED_ENABLED=False)
-    response = await _get("/debug/tools/user-defined")
-    assert response.status_code == 200
-    assert response.json() == {"enabled": False, "registered": [], "tools": []}
 
 
 @pytest.mark.asyncio

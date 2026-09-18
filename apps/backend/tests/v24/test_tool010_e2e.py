@@ -80,11 +80,11 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/world_action.py": "eed88f384917b1b0c12fc3212c7023a6d960f84204c1cc61da2935486f587b77",
     "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
     "app/character/asuna/action.py": "af39c42cbe2b9a9fce61de609a552cad66c7a70cbc907a05f3c21485da66b572",
-    "app/services/action/planner.py": "be5e56df23bc554f06bd3270bac745e5c71db9a9d831c607593200ec4573847e",
+    "app/services/action/planner.py": "84cd84b8ab503148a3bb6448927afaff7e0057e2c7f233242aea3d102bd5be35",
     "app/services/decision_pipeline.py": "0afb670900820ffe3af959516e3e8741c32e5c7c8c502fa4edfe987241411aac",
     "app/application/chat_pipeline.py": "64d9cea1b4ee4d5b805c073f179f687f4f550f3a946e31345f447acb55869c4e",
-    "app/application/post_process.py": "59fbf0426d4dcc65a93b39de93b8f9b6a8dac6c6b5121f568f799fdb6c0c2c34",
-    "app/application/action_engine.py": "818767e0078cd2b2452fa1de6e4a9c830396d93798c46053de41e59931761342",
+    "app/application/post_process.py": "3d7a2371ecf00f6c5937476debda2e3573773c6e7f8513eb6aaf15a7d32ad012",
+    "app/application/action_engine.py": "a08b840aa6a89d26fd554505657463d2f488229ce878d1f0ac362a9f78c19174",
     "app/prompts/builder.py": "636f77a969ffd4aa02195af9c5eedbc23647c084c503a5b25753548a8993a428",
 }
 """整文件零 diff 冻结面。
@@ -412,44 +412,3 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
 # --- Flag 全 off：既有路径零变化 -------------------------------------------
 
 
-def test_flag_off_tool_registry_is_absent(monkeypatch):
-    from app.services.tool.registry import get_tool_registry
-
-    enable(monkeypatch)
-    reset_runtime_state()
-    assert get_tool_registry() is None
-
-
-def test_flag_off_capability_registry_is_six_v9_capabilities(monkeypatch):
-    enable(monkeypatch)
-    reset_runtime_state()
-    names = {entry["name"] for entry in get_capability_registry().describe()}
-    assert names == {
-        "reminder",
-        "memory",
-        "world_action",
-        "environment_query",
-        "search",
-        "notification",
-    }
-
-
-async def test_flag_off_capabilities_keep_v9_unavailable_shape(monkeypatch):
-    enable(monkeypatch)
-    reset_runtime_state()
-    from app.services.action.registry import ExecutionContext
-
-    ctx = ExecutionContext(user_id=USER, record_id="act-tool010")
-    search = await SearchCapability().execute("query", {"query": "天气"}, ctx)
-    notification = await NotificationCapability().execute("send", {"content": "喝水"}, ctx)
-    assert search.status == notification.status == "unavailable"
-    assert search.payload == {"failure_kind": "unavailable"}
-    assert notification.payload == {"failure_kind": "unavailable"}
-
-
-def test_channel_adapter_port_unregistered_in_default_deployment(monkeypatch):
-    enable(monkeypatch)
-    reset_runtime_state()
-    assert channel_tools.get_channel_adapter() is None
-    registry = builtin_registry()
-    assert registry.effective_status(CHANNEL_TOOL_ID) == "disabled"

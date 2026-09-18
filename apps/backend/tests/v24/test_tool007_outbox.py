@@ -259,16 +259,3 @@ async def test_e9_replay_does_not_duplicate_world_event(db_session_factory):
 # --- 总闸 off：工具路径不接管，V9 直写路径保留（行为不变） --------------------
 
 
-@pytest.mark.asyncio
-async def test_flag_off_uses_v9_direct_path(db_session_factory, override_settings):
-    seed_all()
-    override_settings(action_outbox_enabled="false")
-    record = await run_action_planning(
-        USER,
-        _intent(CREATE_REMINDER, content="复查", due_at=(NOW.replace(year=2027)).isoformat()),
-        session_id="s-tool007-8",
-    )
-    assert record.status == "succeeded"
-    assert "tool_id" not in record.steps[0]
-    assert _outbox_row(record.id) is None
-    assert "复查" in world_event_titles(USER)

@@ -216,6 +216,7 @@ def test_declarations_touch_no_capability_implementation():
         "environment_query": ["query"],
         "search": ["query"],
         "notification": ["send"],
+        "external_api": ["call"],
     }
 
 

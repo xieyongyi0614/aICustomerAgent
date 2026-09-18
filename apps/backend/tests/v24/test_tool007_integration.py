@@ -134,33 +134,6 @@ def test_build_snapshot_assembles_world_facts_when_master_flag_on(db_session_fac
     assert tool_ctx.relationship_stage() == "friend"
 
 
-def test_build_snapshot_does_not_assemble_when_master_flag_off(db_session_factory, monkeypatch):
-    """Flag 全 off：不装配、零预读 IO（WorldContextBuilder.build 一次都不被调用）。"""
-    calls: list[str] = []
-    original = world_context_module.WorldContextBuilder.build
-
-    def recorder(self, *args, **kwargs):
-        calls.append(args[0] if args else "")
-        return original(self, *args, **kwargs)
-
-    monkeypatch.setattr(world_context_module.WorldContextBuilder, "build", recorder)
-    snapshot = action_engine._build_snapshot(USER, world_settings())
-    assert snapshot.tool_context is None
-    assert calls == []
-
-
-def test_build_snapshot_v23_shape_unchanged_when_flags_off(db_session_factory):
-    """总闸 off：六闸门快照字段与 V2.3.0 一致（世界现状 + 记录，无工具面）。"""
-    seed_all()
-    snapshot = action_engine._build_snapshot(USER, world_settings())
-    assert snapshot.world_available is True
-    assert sorted(snapshot.active_object_names) == ["牛奶", "苹果"]
-    assert snapshot.active_reminder_titles == ["复查"]
-    assert snapshot.active_count == 0
-    assert snapshot.tool_context is None
-    assert snapshot.tool_surface is None
-
-
 def test_build_snapshot_degrades_when_preread_crashes(db_session_factory, monkeypatch, override_settings):
     override_settings()
     monkeypatch.setattr(
@@ -359,7 +332,7 @@ def test_character_domain_tables_unchanged(table, columns):
 def test_no_new_tables_in_metadata():
     """零新建表：本任务不新增任何迁移/表（含"为 WorldIntent 建表"这一反模式）。"""
     assert set(WORLD_TABLES) <= set(Base.metadata.tables)
-    assert len(Base.metadata.tables) == 42
+    assert len(Base.metadata.tables) == 43
 
 
 def test_world_engine_has_no_tool_layer_dependency():

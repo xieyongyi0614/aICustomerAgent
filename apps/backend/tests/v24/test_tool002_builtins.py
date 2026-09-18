@@ -136,6 +136,7 @@ def test_builtin_declarations_do_not_touch_capability_implementations():
         "environment_query": {"query": []},
         "search": {"query": ["query"]},
         "notification": {"send": ["content"]},
+        "external_api": {"call": ["host"]},
     }
 
 
@@ -222,7 +223,7 @@ def test_capability_registry_exports_expected_methods():
     assert exported == {"register", "unregister", "get", "has", "describe"}
 
 
-def test_capability_registry_six_builtin_capabilities_behave_unchanged():
+def test_default_capability_registry_is_v9_six_plus_external():
     registry = get_capability_registry()
     assert {entry["name"] for entry in registry.describe()} == {
         "reminder",
@@ -231,6 +232,7 @@ def test_capability_registry_six_builtin_capabilities_behave_unchanged():
         "environment_query",
         "search",
         "notification",
+        "external_api",
     }
     assert registry.has("reminder", "create") is True
     assert registry.has("reminder", "purge") is False

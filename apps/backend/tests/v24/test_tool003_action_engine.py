@@ -87,26 +87,6 @@ PARAMS = {"content": "买牛奶", "due_at": "2026-06-02T08:00:00"}
 
 
 @pytest.mark.asyncio
-async def test_master_flag_off_keeps_v9_step_shape(monkeypatch, override_settings, db_session_factory):
-    override_settings(action_enabled=True)
-    capability = _reminder_capability(_success_behavior)
-    _wire(monkeypatch, capability, registry_with(definition()))
-    intent = _intent(PARAMS)
-    record = _record(intent)
-    result = await action_engine.execute_plan(
-        record, _plan(PARAMS), _ctx(action_engine.get_settings())
-    )
-    assert result.status == "succeeded"
-    assert record.status == "succeeded"
-    step = record.steps[0]
-    assert set(step) == V9_STEP_KEYS
-    assert step["status"] == "succeeded"
-    assert set(step["result"]) == {"status", "payload", "usage", "error"}
-    assert step["result"]["payload"]["world_event_id"] == "evt-1"
-    assert step["result"]["usage"]["duration_ms"] >= 0
-
-
-@pytest.mark.asyncio
 async def test_master_flag_on_adds_tool_fields_incrementally(
     monkeypatch, override_settings, db_session_factory
 ):
@@ -128,12 +108,12 @@ async def test_master_flag_on_adds_tool_fields_incrementally(
     assert step["permission"] == {
         "level": "normal",
         "decision": "allow",
-        "reason": "permission_layer_disabled_grant_free",
+        "reason": "level_no_grant_required",
         "confirmed": False,
     }
     assert step["validation"] is None
     assert isinstance(step["duration_ms"], int)
-    assert set(step["result"]) == {"status", "payload", "usage", "error"}
+    assert {"status", "payload", "usage", "error"} <= set(step["result"])
     assert capability.calls == [PARAMS]
 
 

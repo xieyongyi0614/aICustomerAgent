@@ -45,20 +45,6 @@ def registry_on(monkeypatch, v24_tool_env):
 # --- §4.2 自治工具面：总闸门控 -------------------------------------------------
 
 
-def test_surface_is_none_when_master_flag_off(monkeypatch, v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
-    monkeypatch.setattr(tool_registry_module, "_registry", None)
-    assert autonomy_engine.resolve_autonomy_surface(USER, NOW) is None
-
-
-def test_surface_off_keeps_capabilities_none_and_records_nothing(monkeypatch, v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
-    monkeypatch.setattr(tool_registry_module, "_registry", None)
-    trace = RecordingTrace()
-    assert autonomy_engine._resolve_tick_capabilities(USER, NOW, trace, {}) is None
-    assert trace.calls == []
-
-
 def test_surface_narrowed_by_run_profile_on_tick(registry_on):
     registry_on.register(
         tool_definition("channel.feishu.push", namespace="channel", priority=200)
@@ -200,15 +186,6 @@ def test_event_driven_profile_and_autonomous_stage_sequence_unchanged(registry_o
 
 
 # --- Flag off 冻结面 ----------------------------------------------------------
-
-
-def test_master_flag_off_keeps_v9_autonomy_path(monkeypatch, v24_tool_env):
-    """Flag 全 off：工具面与工具事实都不参与，capabilities 恒为 None（V2.3.0 原状）。"""
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
-    monkeypatch.setattr(tool_registry_module, "_registry", None)
-    assert autonomy_engine.resolve_autonomy_surface(USER, NOW) is None
-    assert autonomy_engine.collect_tool_facts(USER) == {}
-    assert autonomy_engine._autonomy_binding("create_reminder", NOW) is None
 
 
 def test_missing_world_facts_degrade_to_no_part_of_day_narrowing(registry_on):

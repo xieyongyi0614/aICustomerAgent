@@ -281,14 +281,6 @@ def test_e9_injection_text_is_marked_untrusted(loaded):
     assert result.payload["untrusted"] is True
 
 
-def test_disabled_flag_returns_unavailable(loaded):
-    _, index, _ = loaded
-    cap = capability(index, StubTransport(), settings=ext_settings())
-    result = _run(cap.execute("call", _params(city="东京"), ext_context()))
-    assert result.status == "unavailable"
-    assert result.payload["reason_kind"] == "external_api_disabled"
-
-
 def test_manifest_unresolved_returns_unavailable(loaded):
     _, _, cap = loaded
     cap._index = ext_api.ManifestIndex()

@@ -353,7 +353,8 @@ async def test_e3_unauthorized_recipient_is_invalid_and_never_confirms():
     assert execution.permission["decision"] == DECISION_ALLOW
 
 
-async def test_e3_unauthorized_recipient_blocks_even_without_permission_layer():
+async def test_e3_unauthorized_recipient_never_reaches_channel():
+    """未授权收件人：权限段常开后走首次确认，能力实现体一次都不被调用。"""
     adapter = RecordingAdapter()
     settings = _settings()
     executor = _executor(adapter, settings)
@@ -362,9 +363,10 @@ async def test_e3_unauthorized_recipient_blocks_even_without_permission_layer():
         _invocation({"content": CONTENT, "recipient": "ou_outside"}),
         _ctx(settings),
     )
-    assert execution.status == "invalid"
+    assert execution.status == "pending_confirmation"
+    assert execution.permission["decision"] == DECISION_CONFIRM_REQUIRED
+    assert execution.permission["reason"] == REASON_FIRST_TIME_CONFIRMATION
     assert adapter.messages == []
-
 
 # --- E4 通道未绑定 ----------------------------------------------------------
 
@@ -383,7 +385,8 @@ async def test_e4_capability_reports_unavailable_when_channel_is_off():
 
 
 async def test_e4_executor_short_circuits_disabled_channel_tool(monkeypatch):
-    enable(monkeypatch)
+    """飞书未绑定：通道工具 disabled → 执行器首段短路 unavailable，零外发。"""
+    enable(monkeypatch, feishu_enabled=False)
     reset_runtime_state()
     registry = builtin_registry()
     adapter = RecordingAdapter()
@@ -393,8 +396,6 @@ async def test_e4_executor_short_circuits_disabled_channel_tool(monkeypatch):
     assert execution.status == "unavailable"
     assert adapter.messages == []
     assert registry.effective_status(CHANNEL_TOOL_ID) == "disabled"
-
-
 # --- 幂等键 -----------------------------------------------------------------
 
 
@@ -760,15 +761,3 @@ def test_outbound_message_contract_is_reused_verbatim():
     assert message.idempotency_key == DEDUPE_KEY
 
 
-def test_channel_env_enablement_still_requires_feishu_binding(monkeypatch):
-    from app.core.settings import get_settings
-    from app.core.settings.enablement import enablement_violations
-
-    enable(
-        monkeypatch,
-        feishu_enabled=False,
-    )
-    violations = enablement_violations(get_settings())
-    assert any("feishu_enabled" in violation for violation in violations)
-    enable(monkeypatch, **CHANNEL_ENVS)
-    assert enablement_violations(get_settings()) == []

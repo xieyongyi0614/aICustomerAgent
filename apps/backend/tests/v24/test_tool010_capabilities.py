@@ -62,11 +62,12 @@ def _definition(tool_id: str):
 # --- search：路线 B（保持 unavailable，但不留空壳） ----------------------------
 
 
-async def test_search_flag_off_is_byte_identical_to_v9():
+async def test_search_is_unavailable_until_a_source_is_wired():
     result = await SearchCapability().execute("query", {"query": "天气"}, _ctx(False))
     assert result.status == "unavailable"
-    assert result.error == "该能力尚未接入"
-    assert result.payload == V9_UNAVAILABLE_PAYLOAD
+    assert result.error == "该能力尚未接入可用的检索来源"
+    assert result.payload["failure_kind"] == "unavailable"
+    assert result.payload["reason_kind"] == "source_not_configured"
 
 
 async def test_search_flag_on_reports_decidable_degradation():
@@ -109,13 +110,6 @@ async def test_search_unknown_action_fails_with_permanent_kind():
 
 
 # --- notification：行动 note -------------------------------------------------
-
-
-async def test_notification_flag_off_is_byte_identical_to_v9():
-    result = await NotificationCapability().execute("send", {"content": "喝水"}, _ctx(False))
-    assert result.status == "unavailable"
-    assert result.error == "该能力尚未接入"
-    assert result.payload == V9_UNAVAILABLE_PAYLOAD
 
 
 async def test_notification_flag_on_produces_action_note():

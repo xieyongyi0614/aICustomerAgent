@@ -178,22 +178,6 @@ def _snapshot(settings, *, world_available=True):
     )
 
 
-def test_plan_assembly_off_path_matches_v9(monkeypatch):
-    def _forbidden():
-        raise AssertionError("总闸 off 时不得触达工具注册表")
-
-    monkeypatch.setattr(planner, "get_tool_registry", _forbidden)
-    snapshot = _snapshot(tool_settings())
-    plan = planner.assemble_plan(intent(), snapshot, NOW, goal_id="g-1")
-    assert plan is not None
-    assert plan.goal_id == "g-1"
-    step = plan.steps[0]
-    assert step.capability == "reminder" and step.action == "create"
-    assert step.params == intent().params
-    assert set(step.model_dump()) == V9_STEP_KEYS
-    assert plan.expires_at > NOW
-
-
 def test_plan_assembly_off_path_rejects_invalid_params():
     snapshot = _snapshot(tool_settings())
     assert planner.assemble_plan(intent(params={"content": "开会"}), snapshot, NOW) is None

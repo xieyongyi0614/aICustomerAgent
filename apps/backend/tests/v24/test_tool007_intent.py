@@ -161,14 +161,6 @@ async def test_e14_debug_tools_exposes_not_wired(v24_tool_env):
 
 
 @pytest.mark.asyncio
-async def test_debug_tools_master_flag_off_hides_world_intent(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
-    payload = (await _get("/debug/tools")).json()
-    assert payload["enabled"] is False
-    assert payload["world_intent"] is None
-
-
-@pytest.mark.asyncio
 async def test_debug_world_intent_status_is_not_a_registered_tool(v24_tool_env):
     v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     payload = (await _get("/debug/tools")).json()

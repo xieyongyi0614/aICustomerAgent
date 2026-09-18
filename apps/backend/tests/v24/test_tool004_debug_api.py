@@ -116,21 +116,6 @@ def _custom_channel_registry() -> ToolRegistry:
 # --- 总闸 off 门控 ---------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_read_endpoints_report_disabled_when_master_flag_off():
-    for path, params in (
-        ("/debug/tools", {}),
-        (f"/debug/tools/{TOOL_ID}", {}),
-        ("/debug/tools/surface", {}),
-        ("/debug/tools/executions", {"user_id": EXEC_USER}),
-    ):
-        response = await _get(path, **params)
-        assert response.status_code == 200, path
-        body = response.json()
-        assert body["enabled"] is False, path
-
-
-
 
 @pytest.mark.asyncio
 async def test_tool_list_exposes_declaration_status_and_health(tools_on):
@@ -163,6 +148,7 @@ async def test_tool_list_exposes_capability_registry_build_flags(tools_on):
     )
     assert payload["capability_names"] == [
         "environment_query",
+        "external_api",
         "memory",
         "notification",
         "reminder",

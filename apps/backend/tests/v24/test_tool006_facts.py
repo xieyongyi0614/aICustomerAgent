@@ -194,12 +194,6 @@ def test_tool_facts_bounded_by_existing_char_budget(stub_registry_env, monkeypat
     assert json.loads(json.dumps(facts)) == facts
 
 
-def test_tool_facts_empty_when_master_flag_off(v24_tool_env, db_session_factory):
-    v24_tool_env()
-    _seed_tool_step(USER, "builtin.reminder.create", "timeout")
-    assert autonomy_engine.collect_tool_facts(USER) == {}
-
-
 def test_tool_facts_degrade_to_empty_on_surface_failure(
     registry_on, monkeypatch, db_session_factory
 ):
@@ -327,18 +321,6 @@ def test_binding_absent_for_tool_outside_surface(monkeypatch, v24_tool_env):
 
 
 # --- Flag off 行为快照对照 ------------------------------------------------------
-
-
-def test_collect_action_facts_identical_to_collect_facts_when_flag_off(
-    monkeypatch, override_settings, v24_tool_env
-):
-    """Flag 全 off：`_collect_action_facts` 输出与既有 `collect_facts` 逐字节一致。"""
-    override_settings(action_enabled="true")
-    v24_tool_env()
-    monkeypatch.setattr(
-        autonomy_engine, "collect_facts", lambda user_id: {"active_plans": 1}
-    )
-    assert autonomy_engine._collect_action_facts(USER) == {"active_plans": 1}
 
 
 def test_collect_action_facts_unchanged_when_tool_facts_empty(

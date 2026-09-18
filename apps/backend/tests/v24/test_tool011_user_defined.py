@@ -326,21 +326,6 @@ def test_composite_reports_timeout_status():
     assert result.payload["failure_kind"] == "timeout"
 
 
-def test_composite_is_unavailable_when_gate_off():
-    registry = _full_registry(ScriptedCapability("memory", {"save": ["fact"]}))
-    capability = user_defined.UserToolCapability(
-        USER_TOOL_ID,
-        "记录心情",
-        ({"capability": "memory", "action": "save"},),
-        (),
-        settings=ext_settings(),
-        capability_registry=registry,
-    )
-    result = asyncio.run(capability.execute("run", {}, _execution_context()))
-    assert result.status == "unavailable"
-    assert result.payload["failure_kind"] == "unavailable"
-
-
 def test_composite_unknown_action_is_permanent():
     registry = _full_registry(ScriptedCapability("memory", {"save": ["fact"]}))
     registrar = _registrar(capability_registry=registry)
