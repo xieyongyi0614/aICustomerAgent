@@ -1335,7 +1335,9 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 #### 未完成：测试同步（本批第 2 个提交）
 
 **全量**去门控后：**242 failed + 191 errors / 5970 passed**。
-**已完成两轮清理**（提交 `c77efb7` → `e7c5927` → `e8ecb62`）后，`tests/v24` 单目录：**182 failed / 17 errors → 113 failed / 3 errors / 1390 passed**；`tests/` 全量 `compileall` 通过。
+**已完成三轮清理**（提交 `c77efb7` → `e7c5927` → `e8ecb62` → `94d6d6e`）后，`tests/v24` 单目录：**182 failed / 17 errors → 77 failed / 2 errors / 1420 passed**；`tests/` 全量 `compileall` 通过。
+
+**第三轮（提交 `94d6d6e`）的关键认识**：**校验段转正常开后，配了「全键参数字典」的用例会被结构性拦下**。此前 `tool_settings()` 把校验闸置 off，测试可以拿一份含全部键的 `S1_PARAMS` 去打所有工具；现在 `_invocation()` 的默认空参、`S1_PARAMS` 的跨工具复用都会立刻 `invalid`（未声明键 → `unknown_param`；`importance` 字符串 vs schema 的 number → 类型不符）。处置：`test_tool003_executor._invocation()` 补 schema 必填默认值；`test_tool012_scenarios` 改为**按 `definition.input_schema.parameters` 逐工具造必填参**（`_declared_params`）。这是本批最容易被误判成「实现回归」的一类失败，后续批次务必先怀疑测试侧的参数假设。
 
 **第二轮（矩阵收敛，提交 `e8ecb62`）做了什么**：`tool012_support` 的 13 组总闸/子闸组合（`FLAG_MATRIX` + `EXPECTED_FINGERPRINTS`）整体收敛为唯一常开配置（`ALWAYS_ON_GROUP`）；`apply_flag_env` 不再显式置 off 已删开关；`test_tool_acceptance.py` 的 6 个「闸 on vs off 对比」用例改为常开断言、删掉 2 个已失效用例（g13 串行链、扩展闸双判据）。
 
@@ -1349,17 +1351,15 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | 4 | 契约/读面收口：`PERMISSION_ON_SETTINGS = ()`、`capability_registry_flags` 断言改用 `REGISTRY_FLAG_NAMES[0]`、`runtime_fingerprint` 常开化 | 6 文件 |
 | 5 | flag 矩阵收敛（13 组 → 1 组）+ 验收用例常开化 | 3 文件 |
 
-**剩余（`tests/v24` 113 failed + 3 errors，按文件）**：
+**剩余（`tests/v24` 77 failed + 2 errors，按文件）**：
 
 | 文件 | 剩余 | 性质与做法 |
 |---|---|---|
-| `test_tool003_executor.py` | 17 | 校验 / 观测闸的 OFF 形态断言 → 去掉 `tool_settings(...)` 开关注入后断言常开形态（`_persisted` 恒走 `persisted_result`、校验恒生效）；含 `test_observation_on_result_is_superset_of_v9_payload` 一类「闸关等价 V9」用例删除 |
-| `test_tool012_scenarios.py` | 13 | 场景常量 `MASTER_ON` / `PERMISSION_ON` / `CHANNEL_ON` / `FULL_ON` 与 `_env_reaching_capability` 已语义失效（写入即被忽略），须改写为常开语义并复核 S1~S10 期望 |
-| `test_tool_acceptance.py` | 11 | 剩余为非矩阵类断言（G-COMPAT 逐字节基线、V2.3.0 基线的 `apply_flag_env(monkeypatch, {})` 语义已变）——`test_g_compat_*` 三例的「Flag 全 off 与 V2.3.0 逐字节一致」前提已不存在，须改为常开基线或删除 |
 | `test_tool005_permission.py` | 9 | `REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 三个 reason 已不可达 → 对应用例删除；保留快照不可用 / 授权判定用例 |
 | `test_tool010_e2e.py` | 8 | 含 `ZERO_DIFF_HASHES` 重建（本批触碰 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`） |
 | `test_tool005_confirmation.py`（6）/ `test_tool005_integration.py`（6） | 12 | `non_todo_payload_kinds()` 去参数后签名同步；`tool_channel_enabled` 断言失效 |
-| `test_tool012_bans.py`（4）、`test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、其余 ~13 文件 | 约 40 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化 |
+| `test_tool_acceptance.py` | 5 | 剩余为非矩阵类断言：`test_g_compat_*` 的「Flag 全 off 与 V2.3.0 逐字节一致」前提已不存在，须改为常开基线或删除 |
+| `test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、`test_tool010_channel.py`（3）、`test_tool011_integration.py`（3）、`test_tool002_builtins.py`（2）、`test_tool012_scenarios.py`（2，s4/s5 的 outbox 账本） | 24 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化、冻结面重建 |
 | `tests/v9`、`tests/unit`、`tests/v25` 的跨版本连带 | 约 18 | 见上一版清单 |
 
 #### H.11.1 过程事故与纪律补充
