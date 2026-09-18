@@ -1289,6 +1289,24 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | feishu 14 条 | 裁决列为**豁免基线**（`feat/feishu_bot` 分支自身 WIP，与本重构无关） |
 | 验证 | 受影响 12 个文件：**407 passed / 8 failed → 修复后** 仅余 F.8 既存豁免 1 条（`v21/test_agent008::test_low_energy_suppresses_short_term`）与 5 条 tool012 时代的陈旧结构守卫 |
 
+**批次 5 开批基线（2026-09-18，基线修复后实测）**：
+
+```
+.venv/Scripts/python.exe -m pytest -q -n 4 --timeout=180 --basetemp=.tmp/pytest-bt
+=> 35 failed, 6368 passed, 22 skipped in 423.51s
+```
+
+由 47 → **35**（净修复 12 条）。剩余 35 条的构成即批次 5 的豁免清单：
+
+| 类别 | 数量 | 说明 |
+|---|---|---|
+| feishu WIP | 14 | `feat/feishu_bot` 分支自身，与本重构无关 |
+| tool012 时代陈旧结构守卫 | 5 | 见 H.10.1 |
+| `test_tool008` 结构 / 语义 | 4 | `test_no_new_migrations`、`test_no_new_tables_in_metadata`、`test_candidate_with_unresolved_reference_is_rejected_by_r8`、`test_policy_rejection_is_discarded_and_logged` |
+| 既存（F.8 清单内） | 3 | `v2/test_aut005_goal_evaluation`、`v21/test_agent008`、`v25/test_plan010_regression` |
+| 抖动池（e2e 4 + 计时 2） | 6 | 单跑因抖动翻转 |
+| 待复核 | 3 | `v24/test_tool009_evidence`、`v24/test_tool011_ext_api`、`v25/test_plan008_broadcast`（本轮出现，前一轮未见，属 v24 侧抖动） |
+
 #### H.10.1 未修项：tool012 时代的陈旧结构守卫（5 条）
 
 `tests/v24/` 的以下 5 条锚在 **TOOL-012 当时的快照**上，其常数（`MIGRATION_FILE_COUNT_CURRENT = 46`、`MIGRATION_BREAKPOINT = "0046_tool_insight_types.py"`、`SCHEMA_TABLE_COUNT = 42`、`SCHEMA_COLUMNS_DIGEST`）自 `0047` / `0048` 落地起即已失配，属 §G.3 第二类**既存失败**：
@@ -1296,4 +1314,46 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 `test_tool007_integration::test_no_new_tables_in_metadata`、`test_tool012_bans::test_session_tables_zero_structural_change`、`test_tool_acceptance::{test_migration_chain_head_is_0046, test_zero_migration_reconciliation_records_0046_breakpoint, test_zero_migration_model_structure_unchanged}`。
 
 **本次不动**：重建它们要重新推导整套表/列/索引摘要快照（`SCHEMA_TABLE_COUNT 42 → 43`、`columns_digest`、`table_set_digest`、`MIGRATION_BREAKPOINT` 语义），那是「给一个已完结任务的冻结快照重新定基线」，与开关去门控无关。**失败 ID 集合不变**，故不影响批次归因。建议单开一个清理任务：要么重定基线，要么把这类「零迁移」断言退役（其语义已被 v25 侧的 `MIGRATION_HEAD` 钉测取代）。
+
+### H.11 批次 5 执行记录（v24 工具系统，2026-09-18）
+
+#### 已完成：app 侧去门控（提交 `714a92d`）
+
+| 项 | 内容 |
+|---|---|
+| 删除的 10 个开关 | `tool_system_enabled`、`tool_permission_enabled`、`tool_schema_validation_enabled`、`tool_observation_enabled`、`tool_surface_enabled`、`tool_memory_enabled`、`tool_reflection_enabled`、`tool_channel_enabled`、`tool_external_api_enabled`、`tool_user_defined_enabled` |
+| 保留（裁决） | `tool_confirm_ttl_reuse`（策略位）+ 全部治理参数 |
+| 字段总数 | 405 → **395** |
+| 改动文件 | 27 个（app 26 + `.env.example`） |
+| 关键删除的 OFF 回退路径 | `execute_plan` 的裸 `executor.run` 循环（原 `action_engine.py:240-284`）、`get_tool_registry()` 的 `None` 门控、权限闸的 `permission_layer_off` / `permission_layer_disabled` 三段语义（`permission_sub_layer_disabled` / `_disabled_layer_decision` / `effective_level_without_snapshot` 三函数整体删除）、`_deliver_memory` 的 `deliver_action_memory` 回退、`_persisted` 的 V9 原始形态回退、`tool_feed.is_enabled`、`triggers.tool_channel_enabled` |
+| 契约层 | `registry.REGISTRY_FLAG_NAMES` 由 4 项收敛为 `("feishu_enabled",)`；`/debug/tools*` 的 7 个门控函数（含 4 个 403 分支）整体删除；`external_api_enabled` / `user_defined_enabled` / `GATE_DISABLED_REASON` / `is_enabled` / `non_todo_payload_kinds(settings)` 签名同步 |
+| `enablement.py` | v24 段整段删除；`V25_DEPENDENCIES` 摘掉两条 `⇒ tool_system_enabled`；`tool_permission_sub_layer_warnings` 删除（其判据已无字段可读） |
+| 验证 | `compileall app` 通过；`import app.main` 通过；`Settings.model_fields` 无 `vXX_` 前缀、无残留 v24 开关 |
+
+#### 未完成：测试同步（本批第 2 个提交）
+
+去门控后实测：**242 failed + 191 errors / 5970 passed**。按文件归集的破损面：
+
+| 文件 | 破损 | 性质 |
+|---|---|---|
+| `tests/v24/test_tool001_enablement.py` | 22 | ✅ **已改写**（转为「旧规则不再产生违规 + 旧 env 名不伪造违规」） |
+| `tests/v24/test_tool001_settings.py` | — | ✅ **已改写**（`test_v24_flags_removed_from_settings` + 参数默认值保持） |
+| `tests/v24/test_tool005_integration.py` | 18 | 待改：维护序列 + 权限三段语义断言 |
+| `tests/v24/test_tool003_executor.py` | 17 | 待改：校验/观测闸的 OFF 形态断言 → 转为常开形态 |
+| `tests/v24/test_tool003_action_engine.py` | 13 | 待改：`test_master_flag_off_keeps_v9_step_shape` 一类「闸关等价 V9」断言须删除或反转 |
+| `tests/v24/test_tool012_scenarios.py` | 12 | 待改 |
+| `tests/v24/test_tool005_permission.py` | 9 | 待改：`REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 断言失效 |
+| `tests/v24/test_tool010_e2e.py` | 8 | 待改（含 `ZERO_DIFF_HASHES` 重建） |
+| 其余 v24 | ~40 | 待改：`tool011_support` / `tool010_support` 等的 flag env 映射需摘除已删键 |
+| `tests/v9`（2 文件 5 条）、`tests/unit`（3 文件 3 条）、`tests/v25`（6 文件 10 条） | 18 | 待改：跨版本连带（V9 断言「能力注册表恒六能力」等） |
+
+**改写纪律**（与 v21 / v22 / v23 批同款，勿机械删断言）：
+
+1. 「闸 off ⇒ 与上一版本逐字节一致」这类断言**整体删除**——前提已不存在；
+2. 「闸 on ⇒ 新形态」这类断言**去掉开关注入、保留形态断言**（`_pin_v24_tool_env` / `v24_tool_env` 夹具的开关注入摘除，`TOOL_DISABLED_IDS` 隔离保留）；
+3. 支撑模块（`tool00X_support.py`）的 flag env 映射摘除已删键；
+4. `tests/v24/conftest.py::_pin_v24_tool_env` 只保留 `TOOL_DISABLED_IDS` 隔离；
+5. 冻结面（G.3 第一类）逐条重建 —— 本批触碰 `test_tool010_e2e.ZERO_DIFF_HASHES` 的 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`、`test_tool007_integration.FROZEN_SOURCES` 的 `world_engine.py`。
+
+**§4.2 #9 的收口状态**：`app/api/v1/debug.py` 的 `_autonomous_tool_surface` 已摘掉 `tool_system_enabled` 一侧，现为单闸 `plan_tool_required`；另一侧由批次 6 收口（与 H.2 的计划一致）。
 
