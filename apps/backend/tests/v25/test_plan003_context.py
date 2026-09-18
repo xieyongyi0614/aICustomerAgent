@@ -191,38 +191,6 @@ class TestHardDependencies:
         assert result.reason == plan_context.PLAN_UNAVAILABLE_GOAL_MISSING
         assert calls == []
 
-    @pytest.mark.asyncio
-    async def test_tool_system_off_returns_unavailable_without_llm(
-        self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
-    ):
-        goal = make_goal(description="工具系统关闭目标")
-        override_settings()
-        calls: list = []
-        monkeypatch.setattr(
-            "app.services.goal_planning._ask_llm_with_retry",
-            lambda messages, settings: calls.append("llm"),
-        )
-        result = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(result, plan_context.PlanUnavailable)
-        assert result.reason == plan_context.PLAN_UNAVAILABLE_TOOL_SYSTEM_DISABLED
-        assert calls == []
-
-    @pytest.mark.asyncio
-    async def test_registry_unavailable_returns_unavailable_without_llm(
-        self, db_session_factory, planning_on, assembler, make_goal, monkeypatch
-    ):
-        goal = make_goal(description="注册表不可得目标")
-        monkeypatch.setattr(plan_context, "get_tool_registry", lambda: None)
-        calls: list = []
-        monkeypatch.setattr(
-            "app.services.goal_planning._ask_llm_with_retry",
-            lambda messages, settings: calls.append("llm"),
-        )
-        result = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(result, plan_context.PlanUnavailable)
-        assert result.reason == plan_context.PLAN_UNAVAILABLE_REGISTRY_UNAVAILABLE
-        assert calls == []
-
     def test_unavailable_reason_codes_are_the_frozen_three(self):
         assert plan_context.PLAN_UNAVAILABLE_REASONS == (
             "goal_missing",

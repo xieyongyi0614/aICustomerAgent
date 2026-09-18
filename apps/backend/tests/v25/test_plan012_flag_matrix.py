@@ -94,7 +94,7 @@ class TestEnablementChainMatrix:
         assert "剩余条目" in docstring
         assert len(V25_SUB_FLAGS) == 11
         assert V25_GATE_FLAGS[0] == "planning_enabled"
-        assert len(V25_DEPENDENCIES) >= 5
+        assert len(V25_DEPENDENCIES) >= 3
 
 
 class TestAllOffBytewiseCompat:

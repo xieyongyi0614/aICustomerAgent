@@ -1,8 +1,9 @@
 """TOOL-001：v24 串行链已随开关删除移除（architecture.md §7.8 / TOOL-001 §6.2）。
 
 总闸与九个子闸已随 V2.4.0 转正删除，`enablement` 中不再有 v24 段，故原
-「子闸 ⇒ 总闸」「通道 ⇒ 飞书绑定」两类 fail-fast 规则整体消失。本文件保留两条
-反向断言：**旧规则不再产生任何违规**，且旧 env 名即使残留也不会伪造违规。
+「子闸 ⇒ 总闸」「通道 ⇒ 飞书绑定」两类 fail-fast 规则整体消失。本文件保留一条
+反向断言：**已删字段名不再产生任何违规**。（版本化旧 env 名的幽灵键由
+`tests/unit/test_settings_flag_guard.py` 的 `test_unknown_versioned_env_keys_reports_ghost` 守卫。）
 """
 
 from app.core.settings import get_settings
@@ -40,8 +41,6 @@ def test_no_v24_enablement_rules_remain():
 def test_legacy_v24_env_names_no_longer_produce_violations(monkeypatch):
     for flag in V24_REMOVED_FLAGS:
         monkeypatch.setenv(flag.upper(), "true")
-    monkeypatch.setenv("V24_TOOL_SYSTEM_ENABLED", "true")
-    monkeypatch.setenv("V24_TOOL_PERMISSION_ENABLED", "true")
     get_settings.cache_clear()
 
     try:

@@ -63,6 +63,29 @@ def _plan(intent, capability):
     )
 
 
+def _stub_tools(*implementations):
+    """V2.4.0 起步骤经工具面解析：为打桩能力补最小工具声明（实现体一并传入以过解析校验）。"""
+    from app.models.tool import PermissionProfile, ToolDefinition, ToolSchema
+    from app.services.tool.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    for implementation in implementations:
+        registry.register(
+            ToolDefinition(
+                id=f"stub.{implementation.name}.go",
+                name=implementation.name,
+                description=implementation.description,
+                namespace="builtin",
+                capability=implementation.name,
+                action="go",
+                input_schema=ToolSchema(),
+                permission=PermissionProfile(level="normal", scope=("world",)),
+                side_effects=("read",),
+            ),
+            capability=implementation,
+        )
+    return registry
+
 @pytest.mark.asyncio
 async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch, override_settings):
     override_settings(
@@ -73,6 +96,7 @@ async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch
     reg = CapabilityRegistry()
     reg.register(FlakyCapability())
     monkeypatch.setattr(action_engine, "get_capability_registry", lambda: reg)
+    monkeypatch.setattr(action_engine, "get_tool_registry", lambda: _stub_tools(FlakyCapability()))
     intent = _intent()
     record = new_record(intent, "rec-user", session_id=None)
     ctx = ExecutionContext(
@@ -99,6 +123,7 @@ async def test_transient_exceeded_attempts_terminal(db_session_factory, monkeypa
     reg = CapabilityRegistry()
     reg.register(FlakyCapability())
     monkeypatch.setattr(action_engine, "get_capability_registry", lambda: reg)
+    monkeypatch.setattr(action_engine, "get_tool_registry", lambda: _stub_tools(FlakyCapability()))
     intent = _intent()
     record = new_record(intent, "rec-user-2", session_id=None)
     record.attempt = 2  # 已达上限
@@ -117,6 +142,7 @@ async def test_permanent_no_retry_fails(db_session_factory, monkeypatch, overrid
     reg = CapabilityRegistry()
     reg.register(PermanentCapability())
     monkeypatch.setattr(action_engine, "get_capability_registry", lambda: reg)
+    monkeypatch.setattr(action_engine, "get_tool_registry", lambda: _stub_tools(PermanentCapability()))
     intent = _intent()
     record = new_record(intent, "rec-user-3", session_id=None)
     ctx = ExecutionContext(

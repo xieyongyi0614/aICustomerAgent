@@ -18,6 +18,20 @@ NOW = datetime(2026, 9, 3, 14, 0, 0)
 SCENARIO_DIR = Path(__file__).parent / "scenarios"
 
 
+@pytest.fixture(autouse=True)
+def _bind_scenario_clock():
+    """场景用固定 NOW 模拟某一时刻：周期外的行动域也须读同一口径。
+
+    否则工具层的 `future_datetime` 语义校验会拿真实时间比 `NOW + 1d` 的 `due_at`，
+    把合法提醒判成 `not_future`（V2.4.0 校验段转正常开后才会显形）。
+    """
+    from app.application import logical_clock
+
+    token = logical_clock.bind(NOW)
+    yield
+    logical_clock.unbind(token)
+
+
 def _load_scenarios():
     scenarios = []
     for path in sorted(SCENARIO_DIR.glob("*.json")):

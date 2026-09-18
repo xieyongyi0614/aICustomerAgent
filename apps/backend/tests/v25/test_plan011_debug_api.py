@@ -340,20 +340,6 @@ class TestPlanContextEndpoint:
         assert "world_disabled" in body["degraded"]
 
     @pytest.mark.asyncio
-    async def test_unavailable_hard_dependency_is_degraded_not_failed(
-        self, db_session_factory, make_goal, plan_panel_on
-    ):
-        goal = make_goal(user_id=support.USER, description="硬依赖缺失")
-
-        body = (
-            await support.plan_get(
-                support.plan_url("/context"), user_id=support.USER, goal_id=goal.id
-            )
-        ).json()
-        assert body["sources"] == {}
-        assert body["degraded"] == ["tool_system_disabled"]
-
-    @pytest.mark.asyncio
     async def test_unknown_or_mismatched_goal_returns_404(
         self, db_session_factory, make_goal, plan_panel_on
     ):

@@ -135,14 +135,17 @@ async def test_environment_query_readonly(ctx, override_settings):
     assert after.updated_at == before.updated_at
 
 
-@pytest.mark.asyncio
-async def test_search_and_notification_unavailable(ctx):
+async def test_search_unavailable_and_notification_wired(ctx):
+    """检索无可用来源（明确降级）；通知能力已接线（V2.4.0 起不再整体 unavailable）。"""
     from app.services.action.capabilities.notification import NotificationCapability
     from app.services.action.capabilities.search import SearchCapability
 
-    assert (await SearchCapability().execute("query", {"query": "x"}, ctx)).status == "unavailable"
-    assert (await NotificationCapability().execute("send", {"content": "x"}, ctx)).status == "unavailable"
-
+    search = await SearchCapability().execute("query", {"query": "x"}, ctx)
+    assert search.status == "unavailable"
+    assert search.payload["reason_kind"] == "source_not_configured"
+    assert (await NotificationCapability().execute("send", {"content": "x"}, ctx)).status == (
+        "succeeded"
+    )
 
 @pytest.mark.asyncio
 async def test_world_unavailable_when_disabled(override_settings):

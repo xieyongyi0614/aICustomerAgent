@@ -63,4 +63,12 @@ def test_builtin_registry_complete():
 
     registry = get_capability_registry()
     names = {entry["name"] for entry in registry.describe()}
-    assert names == {"reminder", "memory", "world_action", "environment_query", "search", "notification"}
+    assert names == {
+        "reminder",
+        "memory",
+        "world_action",
+        "environment_query",
+        "search",
+        "notification",
+        "external_api",
+    }

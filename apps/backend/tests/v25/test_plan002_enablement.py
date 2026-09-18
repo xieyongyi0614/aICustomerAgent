@@ -57,7 +57,7 @@ def _settings_with(monkeypatch, **envs):
         get_settings.cache_clear()
 
 
-def test_u13_the_chain_ledger_has_six_entries_and_the_module_records_the_gap():
+def test_u13_the_chain_ledger_records_the_intra_version_gap():
     docstring = enablement.__doc__
     for marker in ("①", "②", "③", "④", "⑤", "⑥"):
         assert marker in docstring, marker
@@ -69,11 +69,10 @@ def test_u13_the_chain_ledger_has_six_entries_and_the_module_records_the_gap():
         enablement.V25_TOOL_REQUIRED_FLAG,
         *V25_SUB_FLAGS,
     )
-    assert len(enablement.V25_DEPENDENCIES) == 5
+    assert len(enablement.V25_DEPENDENCIES) == 3
     sources = {source for source, _, _ in enablement.V25_DEPENDENCIES}
     assert sources == {
         "plan_execution_enabled",
-        "plan_step_binding_enabled",
         enablement.V25_TOOL_REQUIRED_FLAG,
     }
     intra_version = {
@@ -92,7 +91,6 @@ def test_u13_the_chain_ledger_has_six_entries_and_the_module_records_the_gap():
     }
     assert cross_version == {
         "action_enabled",
-        "tool_system_enabled",
     }
     for _, _, reason in enablement.V25_DEPENDENCIES:
         assert reason.startswith("（") and reason.endswith("）")
@@ -144,20 +142,7 @@ def test_u13_execution_requires_the_action_engine(monkeypatch):
     assert any("action_enabled" in item for item in violations)
 
 
-def test_u13_step_binding_requires_the_tool_system(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{
-            V25_MASTER: True,
-            "plan_step_binding_enabled": True,
-            "plan_tool_required": False,
-        },
-    )
-    violations = enablement_violations(settings)
-    assert any("tool_system_enabled" in item for item in violations)
-
-
-def test_u13_tool_required_requires_binding_and_the_tool_system(monkeypatch):
+def test_u13_tool_required_requires_binding(monkeypatch):
     settings = _settings_with(
         monkeypatch,
         **{
@@ -166,8 +151,6 @@ def test_u13_tool_required_requires_binding_and_the_tool_system(monkeypatch):
     )
     violations = enablement_violations(settings)
     assert any("plan_step_binding_enabled" in item for item in violations)
-    assert any("tool_system_enabled" in item for item in violations)
-
 
 def test_u13_tool_required_is_inert_while_the_master_is_off(monkeypatch):
     settings = _settings_with(monkeypatch, **{"plan_tool_required": True})
@@ -204,13 +187,10 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
     assert "总闸" in message
 
 
-def test_existing_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch)
-    assert any(
-        "feishu_enabled" in item for item in enablement_violations(settings)
-    )
-
-    settings = _settings_with(monkeypatch)
-    assert any(
-        "tool_system_enabled" in item for item in enablement_violations(settings)
-    )
+def test_v24_chain_rules_are_gone(monkeypatch):
+    """v24 段连同 `tool_system_enabled` 一并从链上消失：任何组合都不再报该依赖。"""
+    for envs in ({}, FULL_CHAIN_ENVS):
+        settings = _settings_with(monkeypatch, **envs)
+        violations = enablement_violations(settings)
+        assert not any("tool_system_enabled" in item for item in violations)
+        assert not any("feishu_enabled" in item for item in violations)
