@@ -258,8 +258,6 @@ def _promote(
 
 
 def _enqueue_embedding(memory_id: str, candidate: MemoryCandidateRow) -> None:
-    if not get_settings().v2_memory_vector_enabled:
-        return
     try:
         memory_embeddings.enqueue(memory_id, candidate.content or "")
     except Exception:
@@ -349,6 +347,10 @@ async def _decide_gray_zone(
             return Decision(
                 DECISION_REJECT, "llm_failed", score, llm_used=True, components=components
             )
+        return Decision(
+            DECISION_DEFER, "llm_unavailable", score, llm_used=True, components=components
+        )
+    if verdict is None:
         return Decision(
             DECISION_DEFER, "llm_unavailable", score, llm_used=True, components=components
         )
@@ -474,9 +476,7 @@ def _list_active_contents(user_id: str) -> list[str]:
 
 
 async def evaluate_pending(user_id: str, trace=None, llm=None) -> list[Decision]:
-    """评估该用户全部 pending 候选；Flag OFF 时不执行任何动作。"""
-    if not get_settings().v2_memory_enabled:
-        return []
+    """评估该用户全部 pending 候选。"""
     candidates = _list_pending(user_id)
     if not candidates:
         return []

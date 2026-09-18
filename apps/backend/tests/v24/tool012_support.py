@@ -699,7 +699,6 @@ def capability_fingerprint(settings) -> dict[str, Any]:
         "tool_feed": tool_feed.is_enabled(settings),
         "tool_insights_ready": bool(
             getattr(settings, "v24_tool_reflection_enabled", False)
-            and getattr(settings, "v2_reflection_enabled", False)
         ),
     }
 
@@ -722,7 +721,6 @@ def tool_settings(**overrides: Any):
         V24_MASTER_FLAG.lower(): True,
         **{flag.lower(): False for flag in V24_SUB_FLAGS},
         "feishu_enabled": False,
-        "v2_reflection_enabled": False,
         "v24_tool_disabled_ids": "",
         "v24_tool_surface_max_tools": 12,
         "v24_tool_breaker_threshold": 3,

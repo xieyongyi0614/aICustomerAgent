@@ -65,7 +65,7 @@ class TestEnvKeyGuard:
     def test_unknown_versioned_env_keys_reports_ghost(self):
         environ = {
             "V99_GHOST_ENABLED": "true",
-            "V2_MEMORY_ENABLED": "true",
+            "V25_PLANNING_ENABLED": "true",
             "PATH": "/usr/bin",
         }
         assert unknown_versioned_env_keys(environ) == ["V99_GHOST_ENABLED"]

@@ -88,13 +88,8 @@ def planning_on(override_settings):
         v25_plan_context_enabled="true",
         v25_plan_step_binding_enabled="true",
         v24_tool_system_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 def _claim_planning_job(goal_id: str, trigger: str = goal_planning.TRIGGER_CREATED) -> None:
@@ -125,10 +120,8 @@ class TestMountWiring:
         ]
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             v2_autonomy_supply_interval_minutes="0",
-            world_enabled="false",
-        )
+            world_enabled="false")
         monkeypatch.setattr(
             goal_planning,
             "materialize",
@@ -173,12 +166,10 @@ class TestMountWiring:
         """
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             v2_autonomy_supply_interval_minutes="0",
             v25_planning_enabled="true",
             v24_tool_system_enabled="true",
-            world_enabled="false",
-        )
+            world_enabled="false")
         goal = make_goal(description="供给步处理目标")
         _claim_planning_job(goal.id)
         stub_planning_llm(
@@ -216,10 +207,8 @@ class TestMountWiring:
     ):
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             v2_autonomy_supply_interval_minutes="0",
-            world_enabled="false",
-        )
+            world_enabled="false")
         monkeypatch.setattr(
             goal_planning,
             "materialize",
@@ -285,58 +274,6 @@ class TestShapeSnapshots:
     def test_planning_engine_adds_no_llm_capability_bit(self):
         assert "plan" not in _CAPABILITY_DEFAULTS
         assert "planning" not in _CAPABILITY_DEFAULTS
-
-
-class TestFlagOffParity:
-    """I11 / S8：Flag off 时走原路径，prompt 与 V2.4.0 逐字节一致。"""
-
-    def test_planning_prompt_bytes_are_still_identical(
-        self, db_session_factory, override_settings, make_goal, stub_planning_llm
-    ):
-        override_settings(
-            v2_autonomy_advanced_enabled="true",
-            world_enabled="false",
-            observability_persist_enabled="false",
-        )
-        recorder: dict = {}
-        stub_planning_llm(recorder=recorder)
-        goal = make_goal(description="prompt 快照目标", priority=4, domain="relationship")
-        proposal = goal_planning.propose_plan(goal, {}, None)
-        assert proposal.sub_goals
-        messages = recorder["messages"]
-        assert [pair[0] for pair in messages] == ["system", "human"]
-        assert _digest(messages) == FROZEN_PROMPT_DIGEST
-
-    def test_engine_stays_out_of_the_loop_when_flags_are_off(
-        self, db_session_factory, override_settings, make_goal, monkeypatch
-    ):
-        life_loop_budget.reset_cache()
-        override_settings(
-            v2_autonomy_advanced_enabled="true",
-            v2_autonomy_supply_interval_minutes="0",
-            world_enabled="false",
-        )
-        goal = make_goal(description="Flag off 原路径目标")
-        calls: list = []
-        monkeypatch.setattr(plan_engine, "get_planning_engine", lambda: _SpyEngine(None, calls))
-        life_loop._supply_last.clear()
-        detail = life_loop._step_goal_supply(V25_USER, V25_NOW)
-        life_loop._supply_last.clear()
-        assert calls == []
-        assert detail["status"] == "ok"
-        assert goal_repository.get_latest_plan(goal.id) is None
-
-    def test_engine_plan_is_unreachable_without_the_master_flag(
-        self, db_session_factory, override_settings, make_goal
-    ):
-        """总闸 off 时 `goal_planning` 原闸先短路（V2.4.0 行为不变）。"""
-        override_settings(v2_autonomy_advanced_enabled="false")
-        goal = make_goal(description="总闸关闭目标")
-        assert goal_planning.plan_goal(goal.id, goal_planning.TRIGGER_CREATED) == {
-            "status": "skipped",
-            "skip_reason": "flag_disabled",
-        }
-        assert goal_repository.count_plans(goal.id) == 0
 
 
 class TestZeroMigrationAndContracts:

@@ -384,8 +384,6 @@ class TestEvaluatorIntegration:
 
         monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
         monkeypatch.setattr(lifecycle, "SessionLocal", memory_repository.SessionLocal)
-        monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
         monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
         monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)

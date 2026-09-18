@@ -14,7 +14,7 @@ from app.core.settings.enablement import (
     enablement_violations,
     validate_enablement_chain,
 )
-from app.services import goal_arbitration, goal_observation, goal_planning
+from app.services import goal_planning
 
 from . import plan012_support as support
 from .test_plan001_flag_regression import FROZEN_PROMPT_DIGEST, _digest
@@ -85,30 +85,20 @@ class TestEnablementChainMatrix:
             validate_enablement_chain(settings)
         assert excinfo.value.args
 
-    def test_ledger_has_eight_chain_markers_and_records_the_gap(self):
+    def test_ledger_has_seven_chain_markers_and_records_the_gap(self):
         from app.core.settings import enablement
 
         docstring = enablement.__doc__
-        for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"):
+        for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦"):
             assert marker in docstring
-        assert "七条" in docstring
+        assert "剩余七条" in docstring
         assert len(V25_SUB_FLAGS) == 11
         assert V25_GATE_FLAGS[0] == "v25_planning_enabled"
-        assert len(V25_DEPENDENCIES) >= 8
+        assert len(V25_DEPENDENCIES) >= 6
 
 
 class TestAllOffBytewiseCompat:
-    """I1 / S6：总闸 off 三重对照——prompt / 原路径 / 维护序列。"""
-
-    def test_existing_gates_stay_closed(self, make_goal):
-        goal = make_goal(description="总闸 off 目标")
-        assert goal_planning.plan_goal(goal.id, goal_planning.TRIGGER_CREATED)[
-            "status"
-        ] == "skipped"
-        assert goal_observation.advance_user_goals("plan12-off-user", {}, None)[
-            "status"
-        ] == "skipped"
-        assert goal_arbitration.arbitrate_user("plan12-off-user", None)["status"] == "skipped"
+    """I1 / S6：总闸 off 对照——prompt / 维护序列。"""
 
     def test_planning_prompt_bytes_are_unchanged(
         self, make_goal, stub_planning_llm, autonomy_on

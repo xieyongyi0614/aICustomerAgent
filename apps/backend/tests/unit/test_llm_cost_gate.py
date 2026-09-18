@@ -51,16 +51,8 @@ async def test_foreground_llm_calls_full_v2_flags_on_stays_within_cap(
     db_session_factory, fake_llm, override_settings
 ):
     override_settings(
-        v2_memory_enabled="true",
-        v2_memory_vector_enabled="true",
-        v2_reflection_enabled="true",
-        v2_development_enabled="true",
-        v2_relationship_evolved_enabled="true",
-        v2_life_loop_enabled="true",
         v2_action_outbox_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        action_enabled="true",
-    )
+        action_enabled="true")
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     calls = await _run_turn(llm, "cost-on")
     assert calls <= round(V1_FOREGROUND_BASELINE * 1.2), calls

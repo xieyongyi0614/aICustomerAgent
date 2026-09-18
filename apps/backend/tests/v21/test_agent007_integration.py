@@ -127,8 +127,7 @@ class TestEvolutionLoopE2E:
     async     def test_goal_stack_and_snapshot_stages_present(
         self, db_session_factory, override_settings, fake_llm, monkeypatch
     ):
-        override_settings(
-            V2_LIFE_LOOP_ENABLED="true", world_enabled="false", **ALL_V21_FLAGS
+        override_settings( world_enabled="false", **ALL_V21_FLAGS
         )
         trigger_evaluator._followup_registry.clear()
         conversation_repository.get_or_create_conversation(SESSION, USER)
@@ -234,5 +233,5 @@ class TestEvolutionLoopE2E:
 
 class TestFlagOff:
     def test_all_flags_off_no_v21_writes(self, db_session_factory, override_settings):
-        override_settings(V2_LIFE_LOOP_ENABLED="false")
+        override_settings()
         assert enablement_violations(get_settings()) == []

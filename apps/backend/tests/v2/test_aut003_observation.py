@@ -64,12 +64,9 @@ def _facts(**overrides):
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     yield
 
 
@@ -251,10 +248,6 @@ class TestAdvanceGoal:
         assert record.status == "failed"
         assert record.failure_reason == "exec_period_exceeded"
 
-    def test_advance_user_goals_flag_off_skipped(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="false")
-        result = goal_observation.advance_user_goals(USER, _facts(), NOW)
-        assert result["skip_reason"] == "flag_disabled"
 
     def test_advance_user_goals_without_plans(self, aut_on):
         result = goal_observation.advance_user_goals(USER, _facts(), NOW)
@@ -314,7 +307,7 @@ def _planning_jobs():
 
 class TestExecutionAttempt:
     def test_action_disabled_skips(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="true", action_enabled="false")
+        override_settings( action_enabled="false")
         goal = _goal()
         plan = _plan(goal.id, [_spec(index=1)])
         result = _run_attempt(goal, plan)
@@ -404,14 +397,6 @@ class TestWorkDiscovery:
         goal_repository.update_plan_progress(plan.id, plan.sub_goals)
         assert life_loop._goal_work_due(USER, NOW) is False
 
-    def test_advance_step_flag_off_skipped(self, override_settings):
-        from app.application import life_loop
-
-        override_settings(v2_autonomy_advanced_enabled="false")
-        import asyncio
-
-        result = asyncio.run(life_loop._step_goal_advance(USER, NOW))
-        assert result["skip_reason"] == "flag_disabled"
 
     def test_advance_step_no_plans_is_noop(self, aut_on):
         from app.application import life_loop

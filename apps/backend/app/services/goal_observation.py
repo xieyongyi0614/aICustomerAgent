@@ -257,8 +257,6 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
 def advance_user_goals(user_id: str, facts: dict, now: datetime) -> dict:
     """编排入口：active plans 全量推进（观察先于执行尝试）。"""
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled", "goals": 0}
     pairs = goal_repository.list_active_plans(user_id)
     if not pairs:
         return {"status": "ok", "goals": 0, "results": []}

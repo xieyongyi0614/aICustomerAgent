@@ -620,7 +620,7 @@ class TestTriggerForUserIsUntouched:
     ):
         from app.models.reflection import EvidenceMember, EvidenceWindow, WindowStats
 
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
         window = EvidenceWindow(
             topic_digest="既有窗口",
             members=[

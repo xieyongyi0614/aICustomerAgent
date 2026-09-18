@@ -367,7 +367,7 @@ class PlanObserver:
     def observe_user_goals(self, user_id: str, facts: dict, *, now: datetime) -> dict:
         """编排入口：对用户当前 active 计划逐个 `observe` + `settle`（Step 8 的接线形态）。
 
-        门控由调用方承担（`v2_autonomy_advanced_enabled` + `v25_plan_observation_enabled`）；
+        门控由调用方承担（`v25_plan_observation_enabled`）；
         返回形状与既有 `goal_observation.advance_user_goals` 兼容（`goals` / `results`，
         `results[]` 带 `observations` 计数供既有编排步骤统计），并追加：
         `settled`（本次进入终态的**目标**数，含由既有写面 `_complete` 结算者）、
@@ -755,8 +755,6 @@ def _state_facts(user_id: str) -> dict:
 
 def _memory_facts(settings, user_id: str) -> tuple[dict, list]:
     """记忆源（可降级）：`salient_memory_count` + 显著记忆对象列表（`salient_memories`）。"""
-    if not settings.v2_memory_enabled:
-        return {}, []
     try:
         salient = memory_repository.list_top_salience(
             user_id,

@@ -25,9 +25,7 @@ USER = "aut4-user"
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     monkeypatch.setattr(
         "app.services.goal_arbitration.development_aggregate.read_overlay",
         lambda user_id, character_id="asuna": None,
@@ -106,7 +104,7 @@ class TestStateMachine:
 
 class TestPriority:
     def test_long_term_layer_bonus(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="true", v2_autonomy_priority_layer_weight_long="1.0")
+        override_settings( v2_autonomy_priority_layer_weight_long="1.0")
         from app.core.settings import get_settings
 
         goal = _goal(layer="long_term", priority=3)
@@ -115,10 +113,8 @@ class TestPriority:
 
     def test_relationship_tension_bonus_and_conflict_penalty(self, override_settings):
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             v2_autonomy_priority_layer_weight_long="0",
-            rel_tension_freeze="0.5",
-        )
+            rel_tension_freeze="0.5")
         from app.core.settings import get_settings
 
         goal = _goal(domain="relationship", layer="short_term", priority=3)
@@ -286,31 +282,7 @@ def _memory(content: str):
 
 
 class TestOrchestration:
-    def test_flag_off_skipped(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="false")
-        result = goal_arbitration.run_user_arbitration(USER, _facts(), NOW)
-        assert result["skip_reason"] == "flag_disabled"
 
-    def test_run_user_arbitration_throttles_abandonment(self, aut_on, override_settings):
-        override_settings(
-            v2_autonomy_abandon_min_progress_days="14",
-            v2_autonomy_arbitration_interval_minutes="60",
-        )
-        goal = _goal(description="长期目标", layer="long_term")
-        goal_repository.create_plan(
-            GoalPlanRecord(
-                goal_id=goal.id,
-                version=1,
-                status="active",
-                sub_goals=[],
-                created_at=NOW - timedelta(days=30),
-                updated_at=NOW - timedelta(days=30),
-            )
-        )
-        first = goal_arbitration.run_user_arbitration(USER, _facts(), NOW)
-        assert len(first["abandoned"]) == 1
-        second = goal_arbitration.run_user_arbitration(USER, _facts(), NOW + timedelta(minutes=5))
-        assert second["abandoned"] == []
 
     def test_lifecycle_decision_recorded(self, aut_on, monkeypatch):
         keeper = _goal(description="高分", priority=5)

@@ -74,7 +74,7 @@ def test_post_process_step_isolation(db_session_factory, monkeypatch):
     asyncio.run(run_memory_extract(ctx))
     steps = {s.name: s.status for s in ctx.trace.steps}
     assert steps.get("state_update") == "error"
-    assert steps.get("memory_extract") == "ok" or "memory_extract" in steps
+    assert steps.get("memory_extractor") == "ok" or "memory_extractor" in steps
 
 
 def test_user_write_lock_serializes_post_process(monkeypatch):

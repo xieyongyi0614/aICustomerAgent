@@ -201,7 +201,7 @@ def test_arbitration_tie_without_existing_insight_time_keeps_incumbent(
 
 @pytest.fixture
 def dev_on(override_settings):
-    override_settings(v2_reflection_enabled=True, v2_development_enabled=True)
+    override_settings()
 
 
 @pytest.fixture(autouse=True)
@@ -376,11 +376,11 @@ def test_flag_off_no_listener_no_compilation(
 
 @pytest.fixture
 def reflection_on(override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
 
 
 def test_runtime_registration_is_idempotent(override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     policy.register_runtime()
     policy.register_runtime()
     handlers = memory2_job_worker._JOB_HANDLERS

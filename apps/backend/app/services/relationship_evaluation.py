@@ -60,9 +60,7 @@ KIND_TO_METRIC = {
 
 
 def collect_narrative_slice(user_id: str) -> NarrativeSlice | None:
-    """EvaluationContext 只读切片：Flag OFF 或无叙事行 → None（规则跳过）。"""
-    if not get_settings().v2_relationship_evolved_enabled:
-        return None
+    """EvaluationContext 只读切片：无叙事行 → None（规则跳过）。"""
     with SessionLocal() as session:
         facts = (
             session.query(Memory.id, Memory.type, Memory.source_ref)
@@ -148,9 +146,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
 
 
 def build_db_report() -> dict:
-    """只读 DB 统计（offline_evaluator relationship 小节引用；Flag OFF 为空）。"""
-    if not get_settings().v2_relationship_evolved_enabled:
-        return {}
+    """只读 DB 统计（offline_evaluator relationship 小节引用）。"""
     with SessionLocal() as session:
         milestones = session.query(RelationshipMilestoneRow).all()
         facts = (

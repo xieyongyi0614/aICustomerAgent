@@ -6,7 +6,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 class LifeLoopSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v2_life_loop_enabled: bool = False
     v2_life_loop_tick_seconds: int = 60
     v2_life_loop_trigger_max_attempts: int = 3
     v2_life_loop_trigger_backoff_seconds: int = 300

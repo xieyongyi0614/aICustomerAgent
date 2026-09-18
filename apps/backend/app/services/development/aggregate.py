@@ -272,9 +272,7 @@ _SUMMARY_LABELS = {
 
 
 def read_overlay(user_id: str, character_id: str = "asuna") -> DevelopmentOverlay | None:
-    """DEV-003 叠加层读取：Flag OFF / 无 active / 读取失败 → None（fail-safe 到 v1）。"""
-    if not get_settings().v2_development_enabled:
-        return None
+    """DEV-003 叠加层读取：无 active / 读取失败 → None（fail-safe 到 v1）。"""
     try:
         rows = list_active_modulations(user_id, character_id)
     except Exception:

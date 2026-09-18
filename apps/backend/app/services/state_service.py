@@ -26,7 +26,6 @@ from app.services import (
     relationship_signal,
     state_engine,
     relationship_conflict,
-    relationship_memory,
     relationship_milestone,
 )
 from app.repositories import (
@@ -398,12 +397,6 @@ def _run_relationship_subsystems(
         (e for e in turn_events if e.source == "conversation" and e.type != "none"),
         None,
     )
-    if not get_settings().v2_relationship_evolved_enabled:
-        candidates = relationship_memory.to_memory_candidates(
-            conversation_event, worthy, conflict_outcome.transition, now
-        )
-        if candidates:
-            relationship_memory.deliver_candidates(candidates, user_id)
 
     _capture_snapshot_if_needed(
         user_id,

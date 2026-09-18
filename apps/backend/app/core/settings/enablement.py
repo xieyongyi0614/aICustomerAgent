@@ -1,38 +1,34 @@
-"""V2.0.0 Enablement 串行链校验（dependency-graph 串行链的部署时 fail-fast）。
+"""Enablement 串行链校验（dependency-graph 串行链的部署时 fail-fast）。
 
-规则（docs/version/v2.0.0/architecture/dependency-graph.md §1 + phase-6 附录）：
-- v2_autonomy_advanced_enabled 依赖 v2_life_loop_enabled 且 action_enabled（Sub-Goal
-  执行经 outbox + Life Loop 消费 + V9 行动总闸）。
-- v2_action_outbox_enabled 依赖 v2_life_loop_enabled（无消费器的 outbox 会死信堆积）。
+V2.0.0 段**已整体移除**：`v2_autonomy_advanced_enabled` / `v2_action_outbox_enabled` /
+`v2_life_loop_enabled` 三个字段随 `vXX_` 开关体系删除，其 ON 路径已转常开。
 
-V2.5.0 段（PLAN-002，architecture.md §7.10）**八条链**：
+V2.5.0 段（PLAN-002，architecture.md §7.10）：
 
 | # | 链 |
 |---|---|
 | ① | 任一 v25_* 子闸开启 ⇒ `v25_planning_enabled` |
-| ② | `v25_planning_enabled` ⇒ `v2_autonomy_advanced_enabled` AND `v2_life_loop_enabled` |
-| ③ | `v25_plan_execution_enabled` ⇒ `v25_plan_scheduler_enabled` AND `action_enabled` |
-| ④ | `v25_plan_step_binding_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v24_tool_system_enabled` |
-| ⑤ | `v25_plan_tool_required` ⇒ `v25_plan_step_binding_enabled` AND `v24_tool_system_enabled` |
-| ⑥ | `v25_plan_reflection_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v2_reflection_enabled` |
-| ⑦ | `v25_plan_memory_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v2_memory_enabled` |
-| ⑧ | `v25_plan_autonomy_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v21_agent_runtime_enabled` |
+| ② | `v25_plan_execution_enabled` ⇒ `v25_plan_scheduler_enabled` AND `action_enabled` |
+| ③ | `v25_plan_step_binding_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v24_tool_system_enabled` |
+| ④ | `v25_plan_tool_required` ⇒ `v25_plan_step_binding_enabled` AND `v24_tool_system_enabled` |
+| ⑤ | `v25_plan_reflection_enabled` ⇒ `v25_planning_enabled`（①已覆盖） |
+| ⑥ | `v25_plan_memory_enabled` ⇒ `v25_planning_enabled`（①已覆盖） |
+| ⑦ | `v25_plan_autonomy_enabled` ⇒ `v25_planning_enabled`（①已覆盖）AND `v21_agent_runtime_enabled` |
 
-计数口径留痕：architecture.md §7.10 列八条，PLAN-002 Task Detail 与 tasks.md 描述为
-「七条串行链」。差异来自①「子闸 → 总闸」这条通用条目——architecture 把它计入八条，
-而 tasks.md 只数②~⑧这七条**跨版本依赖**条目。本实现以 architecture §7.10 的八条为准
-（与 PLAN-012 对 GATE 计数差异的处理同款纪律）。
+原 architecture §7.10 八条中的跨版本依赖（⇒ `v2_autonomy_advanced_enabled` +
+`v2_life_loop_enabled`，以及 `v2_reflection_enabled` / `v2_memory_enabled`）随 V2.0.0 段
+字段删除而消失；剩余七条中①为通用条目，②~⑦为跨版本依赖条目。
 
-两处判定口径（均为「让默认配置自洽」的必要裁决，已在 Task Detail §4.5.3 留痕）：
+两处判定口径（均为「让默认配置自洽」的必要裁决）：
 
 1. `v25_plan_tool_required` **不进①的子闸循环**：它默认为 on，若按其字面量参与①，默认
    配置会立刻自我否决（总闸 off 而子闸 on）。它的语义是「计划编排启用后强制要求工具面」
    的策略修饰位，故以**有效闸值**参与判定：`v25_planning_enabled AND
-   v25_plan_tool_required`，⑤随之只在总闸开启时生效。
-2. ②~⑧的跨版本条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
+   v25_plan_tool_required`，④随之只在总闸开启时生效。
+2. ②~⑦的跨版本条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
    ①拦下，要么本就是 off，跨版本依赖无判定意义。
 
-②~⑧以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
+②~⑦以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
 v24 段的子闸表同款；①为 `V25_SUB_FLAGS` 上的子闸循环。
 
 仅在启动边界调用（main.lifespan / 运维脚本），不做为模型级校验，
@@ -69,16 +65,6 @@ V25_GATE_FLAGS: tuple[str, ...] = (
 )
 
 V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
-    (
-        V25_MASTER_FLAG,
-        "v2_autonomy_advanced_enabled",
-        "（计划编排寄生在自治通路之上）",
-    ),
-    (
-        V25_MASTER_FLAG,
-        "v2_life_loop_enabled",
-        "（规划入队与步骤推进由 Life Loop 驱动）",
-    ),
     ("v25_plan_execution_enabled", "v25_plan_scheduler_enabled", "（先开调度子闸）"),
     ("v25_plan_execution_enabled", "action_enabled", "（步骤执行经 V9 行动引擎）"),
     (
@@ -97,16 +83,6 @@ V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
         "（可用工具面来自 V2.4.0 工具系统）",
     ),
     (
-        "v25_plan_reflection_enabled",
-        "v2_reflection_enabled",
-        "（计划证据窗读取既有反思结论）",
-    ),
-    (
-        "v25_plan_memory_enabled",
-        "v2_memory_enabled",
-        "（计划终态记忆经既有记忆策略写入）",
-    ),
-    (
         "v25_plan_autonomy_enabled",
         "v21_agent_runtime_enabled",
         "（plan_facts 经统一 Run 模型进自治决策）",
@@ -116,22 +92,6 @@ V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
 
 def enablement_violations(settings) -> list[str]:
     violations: list[str] = []
-    if settings.v2_autonomy_advanced_enabled:
-        if not settings.v2_life_loop_enabled:
-            violations.append(
-                "v2_autonomy_advanced_enabled 要求 v2_life_loop_enabled"
-                "（Sub-Goal 执行依赖 Life Loop 消费 outbox）"
-            )
-        if not settings.action_enabled:
-            violations.append(
-                "v2_autonomy_advanced_enabled 要求 action_enabled"
-                "（Sub-Goal 执行依赖 V9 行动总闸）"
-            )
-    if settings.v2_action_outbox_enabled and not settings.v2_life_loop_enabled:
-        violations.append(
-            "v2_action_outbox_enabled 要求 v2_life_loop_enabled"
-            "（无消费器的 outbox 将死信堆积）"
-        )
     if settings.v21_unified_run_enabled and not settings.v21_agent_runtime_enabled:
         violations.append(
             "v21_unified_run_enabled 要求 v21_agent_runtime_enabled"

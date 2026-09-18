@@ -22,7 +22,6 @@ def retrieve_db(monkeypatch):
     monkeypatch.setattr(retriever, "SessionLocal", testing_session)
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(lifecycle, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -154,7 +153,6 @@ class TestScoring:
         assert retriever._detect_query_types("今天天气") == set()
 
     def test_hybrid_score_weighting(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         monkeypatch.setattr(get_settings(), "v2_memory_weight_semantic", 0.5)
         monkeypatch.setattr(get_settings(), "v2_memory_weight_structured", 0.3)
         monkeypatch.setattr(get_settings(), "v2_memory_weight_affinity", 0.2)
@@ -172,7 +170,6 @@ class TestScoring:
 
 class TestRecall:
     def test_paraphrase_recall_via_semantic(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "用户喜欢吃西瓜", embedding=json.dumps([0.9, 0.1]))
         _memory("m2", "用户在深圳工作", type="user_fact", embedding=json.dumps([0.0, 1.0]))
         _embed_stub(
@@ -184,17 +181,8 @@ class TestRecall:
         result2 = retriever.retrieve("u1", "在哪里上班", top_k=1)
         assert result2.items[0].memory.id == "m2"
 
-    def test_structured_only_when_vector_disabled(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
-        _memory("m1", "用户喜欢吃西瓜")
-        _embed_stub(monkeypatch, {"爱吃西瓜吗": [0.9, 0.1]})
-        result = retriever.retrieve("u1", "爱吃西瓜吗")
-        assert result.mode == "structured"
-        assert all(item.semantic == 0.0 for item in result.items)
-        assert result.items
 
     def test_degraded_when_embedding_unavailable(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "用户喜欢吃西瓜")
         _embed_stub(monkeypatch, {"爱吃西瓜吗": None})
         result = retriever.retrieve("u1", "爱吃西瓜吗")
@@ -202,7 +190,6 @@ class TestRecall:
         assert result.items[0].memory.id == "m1"
 
     def test_null_embedding_row_still_structured(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "无向量记忆", embedding=None)
         _embed_stub(monkeypatch, {"查询": [1.0, 0.0]})
         result = retriever.retrieve("u1", "查询")
@@ -307,7 +294,6 @@ class TestContextBuilderWiring:
         from app.models.relationship import RelationshipState
         from app.services import context_builder
 
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         _memory("m1", "用户喜欢吃西瓜")
 
         class _Conversation:

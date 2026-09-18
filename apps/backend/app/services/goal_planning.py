@@ -185,8 +185,6 @@ def materialize(
 ) -> dict:
     """候选去重落库并触发规划；long_term 每 (layer, domain) 活跃唯一。"""
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled", "created": 0}
     now = now or datetime.now()
     active_layered = goal_repository.list_layered_active(user_id)
     long_term_keys = {
@@ -392,8 +390,6 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
     """
 
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     goal = goal_repository.get_goal(goal_id)
     if goal is None or goal.layer is None:
         return {"status": "skipped", "skip_reason": "goal_not_plannable"}

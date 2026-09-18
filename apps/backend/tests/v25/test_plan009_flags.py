@@ -74,13 +74,9 @@ class TestFlagGating:
         override_settings(
             v25_planning_enabled="true",
             v25_plan_memory_enabled="false",
-            v2_autonomy_advanced_enabled="true",
-            v2_life_loop_enabled="true",
             action_enabled="true",
-            v2_memory_enabled="true",
             world_enabled="false",
-            observability_persist_enabled="false",
-        )
+            observability_persist_enabled="false")
         goal = make_goal(description=support.COMPLETED_DESCRIPTION)
         plan = support.plan(goal_id=goal.id)
 
@@ -136,13 +132,9 @@ class TestImportanceFloorParameter:
             v25_planning_enabled="true",
             v25_plan_memory_enabled="true",
             v25_plan_memory_importance_floor="0.9",
-            v2_autonomy_advanced_enabled="true",
-            v2_life_loop_enabled="true",
             action_enabled="true",
-            v2_memory_enabled="true",
             world_enabled="false",
-            observability_persist_enabled="false",
-        )
+            observability_persist_enabled="false")
         goal = make_goal(description=support.FAILED_DESCRIPTION)
         plan = support.plan(goal_id=goal.id)
         outcome = "failed" if event_kind == "plan_failed" else "abandoned"

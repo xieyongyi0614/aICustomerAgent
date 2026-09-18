@@ -24,7 +24,6 @@ def embed_db(monkeypatch):
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(background_job_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(embeddings, "EMBED_RETRY_BACKOFF_SECONDS", 0)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
     monkeypatch.setattr(get_settings(), "v2_embedding_model", "fake-embedding")
     yield testing_session
     Base.metadata.drop_all(engine)
@@ -250,7 +249,6 @@ class TestIdempotentUpdate:
         assert memory_repository.update_embedding("missing", [0.2] * 768) is False
 
     def test_flag_off_no_queue_no_scan(self, embed_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         client = _fake_client(monkeypatch)
         _memory("m1", "内容")
         embeddings.enqueue("m1", "内容")
@@ -284,7 +282,6 @@ def _approve_candidate(monkeypatch, id, content):
     from app.services.memory2 import evaluator
 
     monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
     monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
     monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
     for name, value in (
@@ -316,12 +313,3 @@ class TestEvaluatorWiring:
         assert client.calls == [["我在深圳工作"]]
         assert _memory_row(decision.memory_id).embedding is not None
 
-    def test_promotion_without_vector_flag_skips_enqueue(self, embed_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
-        client = _fake_client(monkeypatch)
-        decision = _approve_candidate(monkeypatch, "c1", "我在深圳工作")
-        assert decision.action == "approve"
-        assert embeddings._queue == []
-        embeddings._flush()
-        assert client.calls == []
-        assert _memory_row(decision.memory_id).embedding is None

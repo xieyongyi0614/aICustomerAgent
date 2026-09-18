@@ -265,7 +265,7 @@ class TestFivePointTrace:
         from app.repositories import goal_repository
         from app.models.autonomy import ProactiveAction as PA
 
-        override_settings(V2_MEMORY_ENABLED="false")
+        override_settings()
 
         async def fake_generate(
             goal_description, intention, recent_context, llm=None, trace=None

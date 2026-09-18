@@ -534,14 +534,12 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
     from tests.v24.tool006_support import NOW, await_until, seed_tick_fixture
 
     override_settings(
-        V2_LIFE_LOOP_ENABLED="true",
         V2_ACTION_OUTBOX_ENABLED="true",
         V21_AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
-        OBSERVABILITY_PERSIST_ENABLED="true",
-    )
+        OBSERVABILITY_PERSIST_ENABLED="true")
     support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
     seed_tick_fixture()
     world_engine.ensure_world("u-tool006")
@@ -616,9 +614,7 @@ def test_s5_tool_writes_world_only_through_outbox(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        V2_LIFE_LOOP_ENABLED="true",
-        V2_ACTION_OUTBOX_ENABLED="true",
-    )
+        V2_ACTION_OUTBOX_ENABLED="true")
     support.apply_flag_env(monkeypatch, MASTER_ON)
     from app.application import action_engine, outbox_consumer, world_engine
     from app.repositories import outbox_repository, world_repository
@@ -765,7 +761,7 @@ def test_s7_tool_failure_evidence_triggers_at_threshold(
     db_session_factory, override_settings, monkeypatch
 ):
     """失败证据达阈值才进窗：同 tool_id 同 failure_kind 连续计数触发。"""
-    override_settings(V2_REFLECTION_ENABLED="true")
+    override_settings()
     support.apply_flag_env(
         monkeypatch,
         {**MASTER_ON, "V24_TOOL_REFLECTION_ENABLED": True, "V2_REFLECTION_ENABLED": True},

@@ -114,8 +114,6 @@ def _load_context_insights(
     confidence DESC 取用（statement 截断），落选原因逐条 trace。
     """
     settings = get_settings()
-    if not settings.v2_reflection_enabled:
-        return [], {}
     try:
         candidates = reflection_lifecycle.list_active_insights(
             user_id,
@@ -256,25 +254,18 @@ def _build_sync(
     insights: list[InsightSummary] = []
     insight_payload: dict = {}
     try:
-        if get_settings().v2_memory_enabled:
-            ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
-            selected, retrieval_used, dropped = _select_retrieval_segment(ranked)
-            memories = [_with_time_anchor(m, datetime.now()) for m in selected]
-            insights, insight_payload = _load_context_insights(
-                user_id, retrieval_used, trace=trace
-            )
-        else:
-            recalled = memory_service.retrieve(user_id, current_input)
-            memories = [
-                _with_time_anchor(m, datetime.now())
-                for m in memory_service.select_for_context(recalled)
-            ]
+        ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
+        selected, retrieval_used, dropped = _select_retrieval_segment(ranked)
+        memories = [_with_time_anchor(m, datetime.now()) for m in selected]
+        insights, insight_payload = _load_context_insights(
+            user_id, retrieval_used, trace=trace
+        )
     except Exception:
         logger.exception("记忆检索失败，降级为空记忆")
         memories = []
     if trace is not None:
         trace.record("memory_retrieval", (time.perf_counter() - started) * 1000)
-    if get_settings().v2_memory_enabled and trace is not None:
+    if trace is not None:
         recent_window = _working_window(messages)
         trace.record(
             "context_assemble_v2",
@@ -298,15 +289,9 @@ def _build_sync(
         if get_settings().v21_goal_stack_enabled
         else []
     )
-    development_overlay = None
-    if get_settings().v2_development_enabled:
-        development_overlay = development_aggregate.read_overlay(user_id)
-    shared_experiences: list = []
-    if get_settings().v2_relationship_evolved_enabled:
-        shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
-        relationship_pattern_list, _ = _load_relationship_patterns(user_id, trace=trace)
-    else:
-        relationship_pattern_list: list = []
+    development_overlay = development_aggregate.read_overlay(user_id)
+    shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
+    relationship_pattern_list, _ = _load_relationship_patterns(user_id, trace=trace)
     mode = getattr(conversation_row, "mode", None) or "default"
     mode_entered_at = getattr(conversation_row, "mode_entered_at", None)
     return ConversationState(

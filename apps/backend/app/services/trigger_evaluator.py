@@ -41,17 +41,16 @@ def register_followup(
             "due_at": due_at,
             "summary": summary,
         }
-    if get_settings().v2_life_loop_enabled:
-        try:
-            trigger_registry_repository.register(
-                user_id=user_id,
-                trigger_type="scheduled_followup",
-                trigger_key=key,
-                due_at=due_at,
-                payload={"summary": summary},
-            )
-        except Exception:
-            logger.exception("followup 登记表写入失败，留存内存路径：%s", key)
+    try:
+        trigger_registry_repository.register(
+            user_id=user_id,
+            trigger_type="scheduled_followup",
+            trigger_key=key,
+            due_at=due_at,
+            payload={"summary": summary},
+        )
+    except Exception:
+        logger.exception("followup 登记表写入失败，留存内存路径：%s", key)
     return key
 
 
@@ -94,14 +93,13 @@ def poll_due_followup(user_id: str, now: datetime) -> TriggerSignal | None:
     Flag ON 时表通道优先（跨重启持久）；未命中或表异常回退内存路径
     （迁移窗口内 drain 遗留 dict 登记项）。
     """
-    if get_settings().v2_life_loop_enabled:
-        try:
-            signal = _poll_due_followup_registry(user_id, now)
-        except Exception:
-            logger.exception("followup 登记表轮询失败，回退内存路径")
-            signal = None
-        if signal is not None:
-            return signal
+    try:
+        signal = _poll_due_followup_registry(user_id, now)
+    except Exception:
+        logger.exception("followup 登记表轮询失败，回退内存路径")
+        signal = None
+    if signal is not None:
+        return signal
     due: str | None = None
     with _followup_lock:
         for key, item in _followup_registry.items():
@@ -144,25 +142,24 @@ def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
                 continue
             if (event.payload or {}).get("reported_by_autonomy"):
                 continue
-            if get_settings().v2_life_loop_enabled:
-                try:
-                    claimed = trigger_registry_repository.register_and_claim(
-                        user_id=user_id,
-                        trigger_type="action_due",
-                        trigger_key=f"action_due:{event.id}",
-                        due_at=now,
-                        payload={
-                            "event_id": event.id,
-                            "title": event.title,
-                            "due_at": event.due_at.isoformat(),
-                        },
-                        now=now,
-                    )
-                except Exception:
-                    logger.exception("action_due 登记领取失败，按 v1 行为放行")
-                    claimed = True
-                if not claimed:
-                    continue
+            try:
+                claimed = trigger_registry_repository.register_and_claim(
+                    user_id=user_id,
+                    trigger_type="action_due",
+                    trigger_key=f"action_due:{event.id}",
+                    due_at=now,
+                    payload={
+                        "event_id": event.id,
+                        "title": event.title,
+                        "due_at": event.due_at.isoformat(),
+                    },
+                    now=now,
+                )
+            except Exception:
+                logger.exception("action_due 登记领取失败，按 v1 行为放行")
+                claimed = True
+            if not claimed:
+                continue
             return TriggerSignal(
                 type="action_due",
                 user_id=user_id,
@@ -197,13 +194,12 @@ def mark_action_reported(user_id: str, event_id: str) -> None:
             event.payload = {**(event.payload or {}), "reported_by_autonomy": True}
             event.updated_at = now
             world_repository.save_event(event)
-            if get_settings().v2_life_loop_enabled:
-                try:
-                    trigger_registry_repository.complete(
-                        f"action_due:{event_id}", now=now
-                    )
-                except Exception:
-                    logger.exception("action_due trigger 完成标记失败（幂等可重入）")
+            try:
+                trigger_registry_repository.complete(
+                    f"action_due:{event_id}", now=now
+                )
+            except Exception:
+                logger.exception("action_due trigger 完成标记失败（幂等可重入）")
             return
     except Exception:
         logger.exception("到期行动汇报标记失败")
@@ -240,25 +236,24 @@ def evaluate_inactivity(
     dedupe_key = f"inactivity:{user_id}:{tail.last_user_message_id}"
     if dedupe_key in seen_keys:
         return None
-    if get_settings().v2_life_loop_enabled:
-        try:
-            claimed = trigger_registry_repository.register_and_claim(
-                user_id=user_id,
-                trigger_type="conversation_inactivity",
-                trigger_key=dedupe_key,
-                due_at=now,
-                payload={
-                    "idle_minutes": round(idle_minutes, 1),
-                    "last_role": tail.last_message_role,
-                    "last_user_message_id": tail.last_user_message_id,
-                },
-                now=now,
-            )
-        except Exception:
-            logger.exception("inactivity 登记领取失败，按 v1 行为放行")
-        else:
-            if claimed is None:
-                return None
+    try:
+        claimed = trigger_registry_repository.register_and_claim(
+            user_id=user_id,
+            trigger_type="conversation_inactivity",
+            trigger_key=dedupe_key,
+            due_at=now,
+            payload={
+                "idle_minutes": round(idle_minutes, 1),
+                "last_role": tail.last_message_role,
+                "last_user_message_id": tail.last_user_message_id,
+            },
+            now=now,
+        )
+    except Exception:
+        logger.exception("inactivity 登记领取失败，按 v1 行为放行")
+    else:
+        if claimed is None:
+            return None
     return TriggerSignal(
         type="conversation_inactivity",
         user_id=user_id,

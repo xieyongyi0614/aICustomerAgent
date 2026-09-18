@@ -132,12 +132,13 @@ class TestContextBuilderIntegration:
     @pytest.mark.asyncio
     async def test_build_memory_failure_degrades(self, db_session_factory, monkeypatch):
         from app.repositories import memory_repository as repo
+        from app.services.memory2 import retriever as memory2_retriever
 
         repo.create_memory("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
 
         def boom(*args, **kwargs):
             raise RuntimeError("db down")
 
-        monkeypatch.setattr(memory_service, "retrieve", boom)
+        monkeypatch.setattr(memory2_retriever, "retrieve", boom)
         state = await build_context("s1", "u1", "我喜欢吃西瓜")
         assert state.memories == []

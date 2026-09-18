@@ -39,7 +39,8 @@ NOW = datetime(2026, 9, 6, 12, 0, 0)
 
 @pytest.fixture
 def rel_flag(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
+    """v2 开关已删除，叙事通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _seed_insight(

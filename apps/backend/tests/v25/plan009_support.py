@@ -440,16 +440,11 @@ def planning_memory_on(override_settings):
         v25_plan_observation_enabled="true",
         v25_plan_memory_enabled="true",
         v25_plan_tool_required="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         v24_tool_system_enabled="true",
         action_enabled="true",
         action_memory_policy_enabled="true",
         action_relationship_enabled="false",
-        v2_memory_enabled="true",
-        v2_reflection_enabled="false",
         world_enabled="false",
         v2_action_outbox_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     return True

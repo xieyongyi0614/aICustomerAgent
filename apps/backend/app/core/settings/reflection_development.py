@@ -8,7 +8,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 class ReflectionSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v2_reflection_enabled: bool = False
     v2_reflection_min_confidence: float = 0.6
     v2_reflection_min_evidence: int = 3
     v2_reflection_window_days: int = 30
@@ -37,7 +36,6 @@ class ReflectionSettings(BaseSettings):
 class DevelopmentSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v2_development_enabled: bool = False
     v2_development_preference_max_token_delta: int = 200
     v2_development_preference_tone_rules_json: str = '{"简短": "更简练、直给，不绕弯子"}'
     v2_development_belief_topic_rules_json: str = (
@@ -56,7 +54,6 @@ class DevelopmentSettings(BaseSettings):
 class RelationshipEvolvedSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v2_relationship_evolved_enabled: bool = False
     v2_relationship_shared_budget_chars: int = 200
     v2_relationship_shared_limit: int = 3
     v2_relationship_shared_min_salience: float = 0.6

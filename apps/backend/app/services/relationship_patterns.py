@@ -3,8 +3,7 @@
 关系模式 ≡ active 且 kind='pattern' 且源 Insight scope='relationship' 的
 development_state 行——消费侧 join insights 过滤，Development 域表结构与
 编译器零改动。Relationship 只读 Development（domain-boundaries §3 合法方向）。
-双闸 Flag：v2_relationship_evolved_enabled ∩ v2_development_enabled；读取失败
-fail-safe 空列表。
+读取失败 fail-safe 空列表。
 """
 
 import logging
@@ -22,11 +21,6 @@ def read_relationship_patterns(
 ) -> tuple[list[RelationshipPattern], dict]:
     """返回 (入选模式[strength 降序、封顶 max_items], 落选原因 payload)。"""
     settings = get_settings()
-    if (
-        not settings.v2_relationship_evolved_enabled
-        or not settings.v2_development_enabled
-    ):
-        return [], {"reasons": {}, "selected": []}
     try:
         rows = [
             row

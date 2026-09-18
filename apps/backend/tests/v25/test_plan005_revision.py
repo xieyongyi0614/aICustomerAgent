@@ -242,12 +242,10 @@ class TestRevisionBudget:
         from app.services.planning import context as plan_context
         from app.services.planning import engine as plan_engine
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             v25_planning_enabled="true",
             v25_plan_revision_budget="1",
             world_enabled="false",
-            observability_persist_enabled="false",
-        )
+            observability_persist_enabled="false")
         goal = make_goal(user_id=V25_USER, description="预算耗尽")
         plan = make_plan(goal.id, version=1)
         assert POLICY.budget_exhausted(plan, revision_budget=1) is True

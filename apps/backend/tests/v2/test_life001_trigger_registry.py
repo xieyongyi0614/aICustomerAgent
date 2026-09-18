@@ -17,7 +17,7 @@ NOW = datetime(2026, 9, 7, 12, 0, 0)
 @pytest.fixture()
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(V2_LIFE_LOOP_ENABLED="true")
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
 
@@ -267,20 +267,3 @@ class TestTriggerEvaluatorFlagOn:
         assert repo.get(signal.dedupe_key).status == "done"
         assert trigger_evaluator.poll_due_actions("u1", NOW) is None
 
-
-class TestTriggerEvaluatorFlagOff:
-    def test_followup_memory_path_unchanged(self):
-        trigger_evaluator._followup_registry.clear()
-        due = NOW - timedelta(minutes=1)
-        trigger_evaluator.register_followup("u1", due, "复诊")
-        signal = trigger_evaluator.poll_due_followup("u1", NOW)
-        assert signal is not None and signal.dedupe_key.startswith("followup:u1:")
-        assert trigger_evaluator.poll_due_followup("u1", NOW) is None
-        assert trigger_evaluator._followup_registry == {}
-        assert repo.list_recent("u1") == []
-
-    def test_inactivity_pure_function_no_registry_write(self):
-        tail = _make_signal_tail()
-        signal = trigger_evaluator.evaluate_inactivity(tail, "u1", now=NOW)
-        assert signal is not None
-        assert repo.list_recent("u1") == []

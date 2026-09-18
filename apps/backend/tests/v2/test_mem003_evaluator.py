@@ -34,7 +34,8 @@ def _clean_evaluator_state():
 
 @pytest.fixture
 def enabled(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
+    """v2 开关已删除，评估通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _weights(monkeypatch, source=0.35, novelty=0.30, affinity=0.20, salience=0.15):
@@ -448,12 +449,6 @@ class TestPromoteIdempotency:
 
 
 class TestEvaluatePending:
-    async def test_flag_off_noop(self, eval_db):
-        _candidate("c1", "我喜欢吃西瓜")
-        decisions = await evaluator.evaluate_pending("u1")
-        assert decisions == []
-        assert _candidate_by_id("c1").status == "pending"
-        assert _memories() == []
 
     async def test_no_pending_returns_empty(self, eval_db, enabled):
         assert await evaluator.evaluate_pending("u1") == []

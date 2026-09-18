@@ -24,9 +24,7 @@ USER = "aut5-user"
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     monkeypatch.setattr(
         "app.services.goal_arbitration.development_aggregate.read_overlay",
         lambda user_id, character_id="asuna": None,

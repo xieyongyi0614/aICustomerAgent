@@ -226,7 +226,7 @@ def retain_cleanup() -> int:
 def save_record_with_outbox(
     record: ActionRecord, outbox_payload: dict, idempotency_key: str
 ) -> ActionRecord:
-    """行动终态迁移与 outbox 登记同事务落库（LIFE-004；v2_action_outbox_enabled）。
+    """行动终态迁移与 outbox 登记同事务落库（LIFE-004）。
 
     幂等键 = action_id；同键重放（IntegrityError）按已登记处理不报错。
     """

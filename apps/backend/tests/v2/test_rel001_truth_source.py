@@ -153,21 +153,11 @@ class TestV1BypassGate:
             now=NOW,
         )
 
-    def test_flag_off_keeps_v1_delivery(self, _offline_repos, subsystem_stubs, monkeypatch):
-        calls, relationship = subsystem_stubs
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        self._run(relationship)
-        assert "shape" in calls
-        assert "deliver:u-rel1" in calls
 
     def test_flag_on_skips_v1_delivery(self, _offline_repos, subsystem_stubs, monkeypatch):
         calls, relationship = subsystem_stubs
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
         self._run(relationship)
         assert calls == []
-
-    def test_flag_default_off(self):
-        assert get_settings().v2_relationship_evolved_enabled is False
 
 
 class TestLegacyMigration:

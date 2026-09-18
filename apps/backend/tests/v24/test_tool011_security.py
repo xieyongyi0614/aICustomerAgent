@@ -31,17 +31,17 @@ ALLOWED_IMPORT_ROOTS = frozenset({"__future__", "asyncio", "collections", "datac
 EXPECTED_TASK_GLOBALS = frozenset(
     {
         "_reclaim_task",
-        "_autonomy_task",
         "_observability_cleanup_task",
-        "_world_maintenance_task",
-        "_action_maintenance_task",
         "_v2_job_worker_task",
         "_life_loop_task",
         "_agent_evolution_task",
     }
 )
+"""vXX_ 开关删除后：`_autonomy_task` / `_world_maintenance_task` /
+`_action_maintenance_task` 三个兜底循环全局量已随 `main.py` 旧三循环一并移除
+（life_loop 为唯一周期入口），故常驻 task 数由 8 降至 5。"""
 
-EXPECTED_CREATE_TASK_COUNT = 8
+EXPECTED_CREATE_TASK_COUNT = 5
 
 
 def _tree(path: Path) -> ast.Module:

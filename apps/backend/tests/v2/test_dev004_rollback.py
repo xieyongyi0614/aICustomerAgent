@@ -195,7 +195,7 @@ def test_rollback_is_idempotent_on_repeat_events(db_session_factory):
 
 
 def test_refute_to_rollback_end_to_end(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True, v2_reflection_enabled=True)
+    override_settings()
     audit.register_rollback_listener()
     _seed_insight(db_session_factory, "ins-e2e", confidence=0.8)
     assert development_policy.compile_insight_by_id("ins-e2e") is True

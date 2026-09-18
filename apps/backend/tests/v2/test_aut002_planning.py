@@ -49,10 +49,8 @@ VALID_SUB_GOALS = [
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         observability_persist_enabled="false",
-        world_enabled="false",
-    )
+        world_enabled="false")
     monkeypatch.setattr(
         planning,
         "_ask_llm_with_retry",
@@ -178,12 +176,6 @@ class TestMaterialize:
         assert len(first["created"]) == 1
         assert second["created"] == []
 
-    def test_flag_off_skips(self, override_settings, monkeypatch):
-        override_settings(v2_autonomy_advanced_enabled="false")
-        result = planning.materialize(USER, now=NOW)
-        assert result["status"] == "skipped"
-        assert result["skip_reason"] == "flag_disabled"
-
 
 class TestEnqueueAndGate:
     def test_enqueue_idempotency_key_and_rejects_bad_trigger(self, aut_on):
@@ -194,7 +186,7 @@ class TestEnqueueAndGate:
             planning.enqueue_planning(USER, goal.id, "whenever")
 
     def test_plan_goal_flag_off_skipped(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="false")
+        override_settings()
         assert planning.plan_goal("ghost", planning.TRIGGER_CREATED)["status"] == "skipped"
 
     def test_plan_goal_rejects_non_layered_goal(self, aut_on):
@@ -315,7 +307,7 @@ class TestEnqueueAndGate:
 
 class TestJobHandler:
     def test_runtime_registration(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="true")
+        override_settings()
         planning.register_runtime()
         assert (
             memory2_job_worker._JOB_HANDLERS[planning.JOB_TYPE_PLANNING]
@@ -332,12 +324,6 @@ class TestJobHandler:
 
 
 class TestLifeLoopSupplyStep:
-    def test_step_flag_off_skipped(self, db_session_factory, override_settings):
-        from app.application import life_loop
-
-        override_settings(v2_autonomy_advanced_enabled="false")
-        detail = life_loop._step_goal_supply(USER, NOW)
-        assert detail["skip_reason"] == "flag_disabled"
 
     def test_step_throttled_within_interval(self, aut_on, monkeypatch):
         from app.application import life_loop

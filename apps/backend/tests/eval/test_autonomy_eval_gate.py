@@ -63,14 +63,11 @@ TWO_STEP_PLAN = [
 @pytest.fixture()
 def gate_env(db_session_factory, override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
         observability_persist_enabled="true",
         v2_autonomy_subgoal_failure_threshold="3",
-        v2_autonomy_planning_max_attempts="3",
-    )
+        v2_autonomy_planning_max_attempts="3")
 
     def _overlay(user_id, character_id="asuna"):
         from app.models.development import DevelopmentOverlay

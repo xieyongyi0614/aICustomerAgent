@@ -267,21 +267,11 @@ class TestAssemblyWiring:
 
     def test_flag_on_end_to_end(self, _offline_repos, monkeypatch):
         self._seed()
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
         from app.services import context_builder
 
         state = _run_build(context_builder)
         titles = [entry.title for entry in state.shared_experiences]
         assert "深夜长谈" in titles or "那天我们聊到凌晨" in titles
-
-    def test_flag_off_no_segment(self, _offline_repos, monkeypatch):
-        self._seed()
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        from app.services import context_builder
-
-        state = _run_build(context_builder)
-        assert state.shared_experiences == []
-        assert PromptBuilder.build_shared_experience_section(state) is None
 
 
 def _run_build(context_builder):

@@ -8,7 +8,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 class AutonomyAdvancedSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v2_autonomy_advanced_enabled: bool = False
     v2_autonomy_planning_llm_profile: str = ""
     v2_autonomy_planning_max_attempts: int = 3
     v2_autonomy_subgoal_max_count: int = 5

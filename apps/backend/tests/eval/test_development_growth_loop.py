@@ -130,9 +130,6 @@ def growth_env(monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", True)
-    monkeypatch.setattr(settings, "v2_reflection_enabled", True)
-    monkeypatch.setattr(settings, "v2_development_enabled", True)
 
     stub = ScriptedLLM(
         [
@@ -195,43 +192,6 @@ def test_growth_loop_amplitude_evolves_with_new_evidence(growth_env):
         assert states
         delta2 = float(states[0].value["tier_delta"])
     assert delta2 == pytest.approx(round(confidence2 * 0.5, 2), abs=0.001)
-
-
-def test_growth_loop_flag_off_memory_stops_first(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "memory"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 0
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryRow).count() == 0
-
-
-def test_growth_loop_flag_off_reflection_stops_second(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_reflection_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "reflection"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 0
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryRow).count() > 0
-
-
-def test_growth_loop_flag_off_development_stops_third(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_development_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "development"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 1
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryCandidateRow).count() >= 0
-    assert aggregate.read_overlay("eval-growth_loop") is None
 
 
 def test_growth_loop_cycle2_experience_ingested_via_p1(growth_env):

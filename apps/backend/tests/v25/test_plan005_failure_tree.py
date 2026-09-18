@@ -226,13 +226,10 @@ def _plan005_modules() -> tuple[str, ...]:
 @pytest.fixture
 def planning_on(override_settings):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         v25_planning_enabled="true",
         v25_plan_revision_budget="3",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 class TestGRetryNoDuplicateWorldEffects:

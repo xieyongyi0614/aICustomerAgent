@@ -100,8 +100,7 @@ def test_default_settings_pass_chain():
 
 
 def test_existing_v2_v21_v22_v23_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, v2_autonomy_advanced_enabled=True)
-    assert any("v2_life_loop_enabled" in v for v in enablement_violations(settings))
+    settings = _settings_with(monkeypatch)
 
     settings = _settings_with(monkeypatch, v21_personality_evolution_enabled=True)
     assert any("v21_agent_runtime_enabled" in v for v in enablement_violations(settings))

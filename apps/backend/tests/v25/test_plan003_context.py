@@ -72,13 +72,8 @@ def planning_on(override_settings):
         v25_planning_enabled="true",
         v25_plan_context_enabled="true",
         v24_tool_system_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 @pytest.fixture
@@ -254,31 +249,6 @@ class TestSixSources:
         assert [goal.id for goal in result.ancestors] == [parent.id]
         assert [goal.id for goal in result.siblings] == []
 
-    @pytest.mark.asyncio
-    async def test_world_source_available_and_disabled(
-        self, db_session_factory, planning_on, assembler, make_goal, override_settings
-    ):
-        goal = make_goal(description="世界源目标")
-        world_repository.ensure_world(V25_USER)
-        override_settings(world_enabled="true")
-        available = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(available, PlanContext)
-        assert available.world
-        assert available.world_context is not None
-        assert plan_context.DEGRADED_WORLD_DISABLED not in available.degraded
-
-        override_settings(world_enabled="false")
-        disabled = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(disabled, PlanContext)
-        assert disabled.world == {}
-        assert disabled.world_context is None
-        assert disabled.world_brief is None
-        assert disabled.degraded == [
-            plan_context.DEGRADED_WORLD_DISABLED,
-            plan_context.DEGRADED_SCENE_UNAVAILABLE,
-            plan_context.DEGRADED_MEMORY_UNAVAILABLE,
-            plan_context.DEGRADED_REFLECTION_UNAVAILABLE,
-        ]
 
     @pytest.mark.asyncio
     async def test_world_source_reads_existing_world_without_creating_one(
@@ -300,8 +270,7 @@ class TestSixSources:
         goal = make_goal(description="场景处境目标")
         world_repository.ensure_world(V25_USER)
         override_settings(
-            world_enabled="true", v2_memory_enabled="true", v2_reflection_enabled="true"
-        )
+            world_enabled="true")
         world_simulation_repository.save_situation(_situation())
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
@@ -326,36 +295,13 @@ class TestSixSources:
         assert plan_context.DEGRADED_SCENE_UNAVAILABLE in degraded.degraded
         assert plan_context.DEGRADED_SITUATION_UNAVAILABLE in degraded.degraded
 
-    @pytest.mark.asyncio
-    async def test_memory_source_available_and_disabled(
-        self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
-    ):
-        goal = make_goal(description="记忆源目标")
-        _stub_memories(monkeypatch)
-        override_settings(v2_memory_enabled="true")
-        available = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(available, PlanContext)
-        assert [memory.id for memory in available.memories] == [
-            "mem-0",
-            "mem-1",
-            "mem-2",
-            "mem-3",
-            "mem-4",
-        ]
-        assert plan_context.DEGRADED_MEMORY_UNAVAILABLE not in available.degraded
-
-        override_settings(v2_memory_enabled="false")
-        disabled = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(disabled, PlanContext)
-        assert disabled.memories == []
-        assert plan_context.DEGRADED_MEMORY_UNAVAILABLE in disabled.degraded
 
     @pytest.mark.asyncio
     async def test_memory_source_failure_degrades_without_raising(
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="记忆失败目标")
-        override_settings(v2_memory_enabled="true")
+        override_settings()
 
         def _boom(*args, **kwargs):
             raise RuntimeError("检索失败")
@@ -366,30 +312,13 @@ class TestSixSources:
         assert result.memories == []
         assert plan_context.DEGRADED_MEMORY_UNAVAILABLE in result.degraded
 
-    @pytest.mark.asyncio
-    async def test_reflection_source_available_and_disabled(
-        self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
-    ):
-        goal = make_goal(description="反思源目标")
-        _stub_insights(monkeypatch, 2)
-        override_settings(v2_reflection_enabled="true")
-        available = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(available, PlanContext)
-        assert [insight.insight_id for insight in available.insights] == ["ins-0", "ins-1"]
-        assert plan_context.DEGRADED_REFLECTION_UNAVAILABLE not in available.degraded
-
-        override_settings(v2_reflection_enabled="false")
-        disabled = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(disabled, PlanContext)
-        assert disabled.insights == []
-        assert plan_context.DEGRADED_REFLECTION_UNAVAILABLE in disabled.degraded
 
     @pytest.mark.asyncio
     async def test_reflection_source_failure_degrades_without_raising(
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="反思失败目标")
-        override_settings(v2_reflection_enabled="true")
+        override_settings()
 
         def _boom(user_id):
             raise RuntimeError("Insight 读取失败")
@@ -407,7 +336,7 @@ class TestSixSources:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="工具效能倾向目标")
-        override_settings(v2_reflection_enabled="true", v25_plan_context_insight_limit="5")
+        override_settings( v25_plan_context_insight_limit="5")
         _stub_insights(
             monkeypatch,
             1,
@@ -442,7 +371,7 @@ class TestSixSources:
     ):
         """U4：条数 ≤ min(`memory_top_k`, `v25_plan_context_memory_limit`) 两侧各一例。"""
         goal = make_goal(description="记忆有界目标")
-        override_settings(v2_memory_enabled="true", memory_top_k="5", v25_plan_context_memory_limit="2")
+        override_settings( memory_top_k="5", v25_plan_context_memory_limit="2")
         seen = _stub_memories(monkeypatch)
         by_limit = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(by_limit, PlanContext)
@@ -461,7 +390,7 @@ class TestSixSources:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="反思有界目标")
-        override_settings(v2_reflection_enabled="true", v25_plan_context_insight_limit="1")
+        override_settings( v25_plan_context_insight_limit="1")
         _stub_insights(monkeypatch, 3)
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
@@ -581,8 +510,7 @@ class TestAssemblyDiscipline:
         world_repository.ensure_world(V25_USER)
         world_simulation_repository.save_situation(_situation())
         override_settings(
-            world_enabled="true", v2_memory_enabled="true", v2_reflection_enabled="true"
-        )
+            world_enabled="true")
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
         seen: list[str] = []
@@ -626,8 +554,7 @@ class TestAssemblyDiscipline:
         world_engine.seed_default_household(V25_USER)
         world_simulation_repository.save_situation(_situation())
         override_settings(
-            world_enabled="true", v2_memory_enabled="true", v2_reflection_enabled="true"
-        )
+            world_enabled="true")
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
         called: list[str] = []

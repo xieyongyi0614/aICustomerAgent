@@ -79,8 +79,6 @@ async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> Non
 async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
     """单周期：工作发现（纯 SQL/规则，0 LLM）→ 用户周期 → 维护步骤。"""
     settings = get_settings()
-    if not settings.v2_life_loop_enabled:
-        return {"user_cycles": 0, "maintenance": 0, "aborted": 0, "idle": True}
     now = now or datetime.now()
     stats: dict = {"user_cycles": 0, "maintenance": 0, "aborted": 0, "idle": False}
     work_users = _collect_work_users(now)
@@ -446,8 +444,6 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     """
 
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     budget = life_loop_budget.check_daily_budget(now=now)
     if budget.status == life_loop_budget._STATUS_DEGRADED:
         return {"status": "skipped", "skip_reason": "quota_circuit_open"}
@@ -641,8 +637,6 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     """
 
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     pairs = goal_repository.list_active_plans(user_id)
     if not pairs:
         return {"status": "ok", "goals": 0, "observations": 0, "executions": 0}
@@ -703,8 +697,6 @@ def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict
     contextvar 注入 proactive 生成上下文（recent_context 追加段）。"""
 
     settings = get_settings()
-    if not settings.v2_memory_enabled:
-        return {"status": "skipped", "skip_reason": "memory_disabled"}
     rows = memory_repository.list_top_salience(
         user_id,
         min_salience=settings.v2_life_loop_memory_min_salience,
@@ -731,8 +723,6 @@ def _step_reflection_check(user_id: str, now: datetime) -> dict:
     本步骤只做频控调用；同周期/同日不重复入队由 REF-003 日桶键保证。"""
 
     settings = get_settings()
-    if not settings.v2_reflection_enabled:
-        return {"status": "skipped", "skip_reason": "reflection_disabled"}
     interval_minutes = settings.v2_life_loop_reflection_check_interval_minutes
     last = _reflection_check_last.get(user_id)
     if last is not None and (now - last).total_seconds() < interval_minutes * 60:

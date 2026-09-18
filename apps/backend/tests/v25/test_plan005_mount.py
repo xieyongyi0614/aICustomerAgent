@@ -64,11 +64,8 @@ FACT_KEYS = {
 def advance_on(override_settings):
     life_loop_budget.reset_cache()
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 @pytest.fixture
@@ -200,14 +197,6 @@ class TestFlagGatedWiring:
         make_plan(goal.id)
         await life_loop._step_goal_advance(V25_USER, V25_NOW)
         assert calls == {"collect": [()], "observe": 0}
-
-    @pytest.mark.asyncio
-    async def test_flag_off_keeps_the_existing_skip_short_circuits(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="false")
-        assert await life_loop._step_goal_advance(V25_USER, V25_NOW) == {
-            "status": "skipped",
-            "skip_reason": "flag_disabled",
-        }
 
 
 class TestFactProjectionParity:

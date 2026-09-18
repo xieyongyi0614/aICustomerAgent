@@ -291,7 +291,7 @@ def retrieve(
     pool = [m for m in pool if facts.get(m.id, {}).get("visibility") != VISIBILITY_HYPOTHETICAL]
     query_embedding = None
     mode = MODE_STRUCTURED
-    if settings.v2_memory_vector_enabled and query_text:
+    if query_text:
         query_embedding = memory_embeddings.embed_query(query_text)
         if query_embedding is not None:
             mode = MODE_HYBRID

@@ -24,8 +24,6 @@ def types_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (memory_repository, evaluator, lifecycle, retriever):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
     monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
     monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
     monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)

@@ -32,9 +32,7 @@ def tool_reflection_on(v24_tool_env):
     """反思总闸 + 工具反思子闸双开（V2.4.0 工具证据通道的最小开启面）。"""
     v24_tool_env(
         V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_REFLECTION_ENABLED=True,
-        V2_REFLECTION_ENABLED=True,
-    )
+        V24_TOOL_REFLECTION_ENABLED=True)
     triggers.reset_trigger_state()
     yield
     triggers.reset_trigger_state()
@@ -87,22 +85,12 @@ def _jobs(session_factory):
 
 def test_tool_channel_off_without_sub_flag(db_session_factory, v24_tool_env, monkeypatch):
     """工具反思子闸 off：工具通道返回 off 且零落行、零入队。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V2_REFLECTION_ENABLED=True)
+    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
     _patch_tool_package(monkeypatch, fake_tool_package([tool_evidence_window()]))
     assert triggers.tool_channel_enabled(get_settings()) is False
     assert triggers.trigger_for_user(USER, now=NOW, channel=triggers.CHANNEL_TOOL) == "off"
     assert _runs(db_session_factory) == []
     assert _jobs(db_session_factory) == []
-
-
-def test_tool_channel_off_without_master_flag(
-    db_session_factory, v24_tool_env, monkeypatch
-):
-    """反思总闸 off：两通道一律 off（既有语义不变）。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_REFLECTION_ENABLED=True)
-    assert triggers.trigger_for_user(USER, now=NOW, channel=triggers.CHANNEL_TOOL) == "off"
-    assert triggers.trigger_for_user(USER, now=NOW) == "off"
-    assert _runs(db_session_factory) == []
 
 
 # --- reinforce 计数 ----------------------------------------------------------
@@ -225,7 +213,7 @@ def test_records_projection_feeds_reinforce_once_per_evidence(
 
 
 def test_records_projection_skips_when_flag_off(db_session_factory, v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V2_REFLECTION_ENABLED=True)
+    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
     assert triggers.observe_tool_evidence_from_records(USER, now=NOW) == 0
 
 

@@ -321,7 +321,7 @@ def deliver_plan_memory(goal, plan, event_kind: str, *, policy=None) -> dict | N
     失败都**不回滚计划终态**（D10）。
     """
     settings = get_settings()
-    if not settings.v25_plan_memory_enabled or not settings.v2_memory_enabled:
+    if not settings.v25_plan_memory_enabled:
         return None
     try:
         return _deliver(goal, plan, event_kind, policy)

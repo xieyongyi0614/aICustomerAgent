@@ -30,10 +30,7 @@ TOOL_FEED_NOTE_LIMIT = 3
 def is_enabled(settings=None) -> bool:
     """反哺开关：工具反思子闸（默认 off）关闭时零读取、零信号。"""
     settings = settings or get_settings()
-    return bool(
-        getattr(settings, "v2_reflection_enabled", False)
-        and getattr(settings, "v24_tool_reflection_enabled", False)
-    )
+    return bool(getattr(settings, "v24_tool_reflection_enabled", False))
 
 
 def interest_signal(user_id: str, *, limit: int = TOOL_FEED_MAX_ITEMS) -> list[dict]:

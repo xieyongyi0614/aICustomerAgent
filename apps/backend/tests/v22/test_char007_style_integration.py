@@ -283,8 +283,6 @@ def test_pipeline_style_context_skipped_when_total_off(monkeypatch):
 
 def test_enablement_chain_requires_total_gate_for_sub_flags():
     base_flags = {
-        "v2_autonomy_advanced_enabled": False,
-        "v2_life_loop_enabled": False,
         "action_enabled": False,
         "v2_action_outbox_enabled": False,
         "v21_unified_run_enabled": False,

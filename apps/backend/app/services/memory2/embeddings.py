@@ -44,8 +44,6 @@ _queued_ids: set[str] = set()
 def enqueue(memory_id: str, content: str) -> None:
     """转正后入队（纯内存，不阻塞前台）；重复 memory_id 忽略，凑满批量即 flush。"""
     settings = get_settings()
-    if not settings.v2_memory_vector_enabled:
-        return
     if memory_id in _queued_ids:
         return
     _queued_ids.add(memory_id)
@@ -68,8 +66,6 @@ def flush_if_due(trace=None) -> int:
 def backfill_scan(trace=None) -> int:
     """存量补扫：active 且 embedding IS NULL 的行进批处理，覆盖中断积压与重启恢复。"""
     settings = get_settings()
-    if not settings.v2_memory_vector_enabled:
-        return 0
     rows = memory_repository.list_pending_embedding(
         limit=settings.v2_embedding_batch_size
     )

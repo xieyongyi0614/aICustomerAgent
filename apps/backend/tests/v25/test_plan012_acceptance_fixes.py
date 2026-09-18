@@ -32,12 +32,9 @@ def plan_path_on(override_settings):
         v25_plan_revision_enabled="true",
         v25_plan_world_feedback_enabled="true",
         v24_tool_system_enabled="true",
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 @pytest.fixture
@@ -48,12 +45,9 @@ def execution_on(override_settings):
         v25_plan_execution_enabled="true",
         v25_plan_scheduler_enabled="false",
         v25_plan_observation_enabled="false",
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 class TestExecutionBridgeIsMounted:
@@ -99,11 +93,9 @@ class TestExecutionBridgeIsMounted:
         self, db_session_factory, override_settings, make_goal, make_plan, monkeypatch
     ):
         override_settings(
-            v2_autonomy_advanced_enabled="true",
             action_enabled="true",
             world_enabled="false",
-            observability_persist_enabled="false",
-        )
+            observability_persist_enabled="false")
         monkeypatch.setattr(
             PlanExecutorBridge,
             "execute_step",

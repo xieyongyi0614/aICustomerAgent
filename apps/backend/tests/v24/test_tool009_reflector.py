@@ -42,9 +42,7 @@ WINDOW_FEEDBACK = asuna_evaluation.TOOL_WINDOW_USER_FEEDBACK
 def tool_reflection_on(v24_tool_env):
     v24_tool_env(
         V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_REFLECTION_ENABLED=True,
-        V2_REFLECTION_ENABLED=True,
-    )
+        V24_TOOL_REFLECTION_ENABLED=True)
     triggers.reset_trigger_state()
     yield
     triggers.reset_trigger_state()
@@ -490,9 +488,7 @@ def test_existing_windows_identical_with_tool_flag_on(
     )
     v24_tool_env(
         V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_REFLECTION_ENABLED=True,
-        V2_REFLECTION_ENABLED=True,
-    )
+        V24_TOOL_REFLECTION_ENABLED=True)
     digest_on = _window_digest(
         reflection_evidence.aggregate_evidence_windows(USER, CHARACTER, now=NOW)
     )
@@ -521,7 +517,7 @@ def test_tool_flag_off_keeps_trigger_behavior(
     db_session_factory, v24_tool_env, monkeypatch, _patch_llm
 ):
     """Flag 全 off：工具证据完全不参与，工具通道直接 off。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V2_REFLECTION_ENABLED=True)
+    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
     _seed_tool_failures(db_session_factory)
     assert triggers.tool_channel_enabled(get_settings()) is False
     assert triggers.observe_tool_evidence_from_records(USER, now=NOW) == 0

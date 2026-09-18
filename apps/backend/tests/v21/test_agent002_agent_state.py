@@ -69,10 +69,8 @@ def client(db_session_factory):
 def runtime_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V2_LIFE_LOOP_ENABLED="true",
         V21_AGENT_RUNTIME_ENABLED="true",
-        world_enabled="false",
-    )
+        world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -288,7 +286,7 @@ class TestFlagOff:
     async def test_legacy_cycle_has_no_snapshot_stage_or_rows(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(V2_LIFE_LOOP_ENABLED="true", world_enabled="false")
+        override_settings( world_enabled="false")
         trigger_evaluator._followup_registry.clear()
         conversation_repository.get_or_create_conversation(SESSION, USER)
         trigger_evaluator.register_followup(USER, NOW - timedelta(minutes=1), "下午面试")

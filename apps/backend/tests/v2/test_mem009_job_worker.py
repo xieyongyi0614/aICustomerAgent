@@ -25,8 +25,6 @@ def job_db(monkeypatch):
         memory_repository,
     ):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()

@@ -112,7 +112,7 @@ class TestAcquireMatrix:
         assert grant.granted is False
 
     def test_global_circuit_background_denies(self, monkeypatch, override_settings):
-        override_settings(V2_LIFE_LOOP_ENABLED="true")
+        override_settings()
         monkeypatch.setattr(life_loop_budget, "is_degraded", lambda **kwargs: True)
         grant = llm_gateway.acquire("u1", "proactive", _run(), now=NOW)
         assert grant.granted is False
@@ -121,7 +121,7 @@ class TestAcquireMatrix:
     def test_global_circuit_foreground_soft_by_default(
         self, monkeypatch, override_settings
     ):
-        override_settings(V2_LIFE_LOOP_ENABLED="true")
+        override_settings()
         monkeypatch.setattr(life_loop_budget, "is_degraded", lambda **kwargs: True)
         run = _run("foreground_chat")
         grant = llm_gateway.acquire("u1", "answer", run, now=NOW)
@@ -132,9 +132,7 @@ class TestAcquireMatrix:
         self, monkeypatch, override_settings
     ):
         override_settings(
-            V2_LIFE_LOOP_ENABLED="true",
-            V21_FOREGROUND_GATEWAY_ENFORCED="true",
-        )
+            V21_FOREGROUND_GATEWAY_ENFORCED="true")
         monkeypatch.setattr(life_loop_budget, "is_degraded", lambda **kwargs: True)
         grant = llm_gateway.acquire("u1", "answer", _run("foreground_chat"), now=NOW)
         assert grant.granted is False

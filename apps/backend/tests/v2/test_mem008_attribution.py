@@ -24,8 +24,6 @@ def attr_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (attribution, evaluator, lifecycle, memory_repository, trace_repository):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()

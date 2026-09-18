@@ -55,7 +55,7 @@ class PassJudgeStub:
 
 @pytest.fixture
 def env(monkeypatch, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -90,7 +90,7 @@ def test_three_rules_table_driven(override_settings):
     from app.services.evaluation_context import EvaluationContext, InsightRef, ReflectionSlice
     from app.services.evaluation_rules import run_rules
 
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
 
     def _ctx(reflection):
         return EvaluationContext(
@@ -336,11 +336,6 @@ def test_noise_scenarios_zero_llm(env):
         in (reflection_evaluation.SCENARIO_NOISE_MONTH, reflection_evaluation.SCENARIO_ISOLATED_SINGLE)
     ]
     assert all(r["passed"] for r in noise)
-
-
-def test_build_db_report_flag_off(override_settings):
-    override_settings(v2_reflection_enabled=False)
-    assert reflection_evaluation.build_db_report() == {}
 
 
 def test_trace_step_names_registered():

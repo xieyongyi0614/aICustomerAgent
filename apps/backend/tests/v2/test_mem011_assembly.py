@@ -22,7 +22,6 @@ def asm_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (memory_repository, retriever, lifecycle):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -148,7 +147,6 @@ class TestAssembleTrace:
         from app.models.conversation import ChatMessage
         from app.services import context_builder
 
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         _memory("m1", "用户喜欢吃西瓜")
 
         class _Step:

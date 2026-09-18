@@ -76,10 +76,8 @@ def register_executor() -> None:
 
 
 def run_queued_reflections(now: datetime | None = None, trace=None) -> int:
-    """调度循环入口：回收超时 running → 逐条认领 queued → 执行；Flag OFF 直接返回 0。"""
+    """调度循环入口：回收超时 running → 逐条认领 queued → 执行。"""
     now = now or datetime.now()
-    if not get_settings().v2_reflection_enabled:
-        return 0
     _recover_timed_out_runs(now)
     executed = 0
     for run_id in _list_queued_run_ids():

@@ -1,16 +1,19 @@
-"""PLAN-001 Step 6：Flag 全 off 回归（零新增 Flag / 零 prompt 差异 / 既有门控形状不变）。
+"""PLAN-001 Step 6：Flag 回归（零新增 Flag / 零 prompt 差异 / 静态面无污染）。
 
 本任务不新增任何 Flag，也不触碰任何 prompt 面；用例把这两条写成可判定断言：
 
-1. 既有自治 Flag 全 off 时，Goal 域四个入口的返回形状与 V2.4.0 一致（`flag_disabled` 短路）。
-2. 规划 prompt 逐字节不变（以「捕获入参 prompt + 摘要冻结」证明零差异）。
-3. `app/services/planning/` 零 prompt / LLM / 链条面（静态）。
+1. 规划 prompt 逐字节不变（以「捕获入参 prompt + 摘要冻结」证明零差异）。
+2. `app/services/planning/` 零 prompt / LLM / 链条面（静态）。
+
+原「既有自治 Flag 全 off 时 Goal 域四入口返回 `flag_disabled` 短路」两条用例已随
+`vXX_` 开关体系删除而移除——`v2_autonomy_advanced_enabled` 等字段不再存在，
+四入口改为常开执行，`flag_disabled` 短路路径已不存在。
 """
 
 import hashlib
 import json
 
-from app.services import goal_arbitration, goal_observation, goal_planning
+from app.services import goal_planning
 
 from . import _plan_scan as scan
 
@@ -38,32 +41,6 @@ PLANNING_FORBIDDEN_IMPORT_PREFIXES = (
 def _digest(messages: list) -> str:
     payload = json.dumps([list(pair) for pair in messages], ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def test_existing_autonomy_gates_stay_closed_when_flags_are_off(make_goal):
-    goal = make_goal(description="Flag off 目标")
-    assert goal_planning.materialize("plan1-off-user") == {
-        "status": "skipped",
-        "skip_reason": "flag_disabled",
-        "created": 0,
-    }
-    assert goal_planning.plan_goal(goal.id, goal_planning.TRIGGER_CREATED) == {
-        "status": "skipped",
-        "skip_reason": "flag_disabled",
-    }
-    assert goal_observation.advance_user_goals("plan1-off-user", {}, None) == {
-        "status": "skipped",
-        "skip_reason": "flag_disabled",
-        "goals": 0,
-    }
-
-
-def test_existing_arbitration_gate_stays_closed_when_flags_are_off():
-    assert goal_arbitration.arbitrate_user("plan1-off-user", None) == {
-        "status": "skipped",
-        "skip_reason": "flag_disabled",
-        "changes": [],
-    }
 
 
 def test_planning_prompt_bytes_are_unchanged(make_goal, stub_planning_llm, autonomy_on):

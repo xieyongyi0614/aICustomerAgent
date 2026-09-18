@@ -54,21 +54,13 @@ def _seed_modulation(
         session.commit()
 
 
-def test_read_overlay_flag_off_returns_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=False)
-    _seed_modulation(
-        db_session_factory, "response_style.length", {"max_tokens_delta": -150}
-    )
-    assert aggregate.read_overlay(USER) is None
-
-
 def test_read_overlay_empty_data_returns_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     assert aggregate.read_overlay(USER) is None
 
 
 def test_read_overlay_composes_all_rows(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     _seed_modulation(
         db_session_factory, "response_style.length", {"max_tokens_delta": -150}
     )
@@ -123,7 +115,7 @@ def test_read_overlay_composes_all_rows(db_session_factory, override_settings):
 def test_read_overlay_drops_duplicate_and_invalid_candidates(
     db_session_factory, override_settings
 ):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     _seed_modulation(
         db_session_factory,
         "behavior.habit_candidates",
@@ -166,7 +158,7 @@ def test_resolve_without_overlay_matches_v1_directive(db_session_factory):
 
 
 def test_resolve_applies_overlay_to_directive(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     overlay = DevelopmentOverlay(
         style=DevelopmentStyleParams(tone_hint="更简练、直给"),
         care_hint="最近特别在意他的休息",

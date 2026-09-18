@@ -159,7 +159,11 @@ def test_memories_endpoint_exposes_v4_lifecycle_fields(client):
             for m in memory_repository.list_by_user("default-user")
         )
     )
-    item = client.get("/api/v1/memories").json()["memories"][0]
+    item = next(
+        m
+        for m in client.get("/api/v1/memories").json()["memories"]
+        if m["memory"] == "用户喜欢寿司"
+    )
     assert item["type"] == "user_preference"
     assert item["memory_type"] == "user_preference"
     assert item["status"] == "active"

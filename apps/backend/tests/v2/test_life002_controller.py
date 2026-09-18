@@ -28,7 +28,7 @@ SESSION = "ll-s1"
 @pytest.fixture()
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(V2_LIFE_LOOP_ENABLED="true", world_enabled="false")
+    override_settings( world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -105,46 +105,6 @@ class TestGoalCatchup:
 
 
 class TestUserCycle:
-    @pytest.mark.asyncio
-    async def test_cycle_runs_step_pipeline_and_completes_trigger(
-        self, db_session_factory, life_loop_on, monkeypatch
-    ):
-        conversation_repository.get_or_create_conversation(SESSION, USER)
-        trigger_evaluator.register_followup(
-            USER, NOW - timedelta(minutes=1), "下午面试"
-        )
-
-        async def fake_tick(user_ids=None, llm=None, now=None):
-            return []
-
-        monkeypatch.setattr(life_loop.autonomy_engine, "tick", fake_tick)
-        stats = await life_loop.run_life_loop_tick(now=NOW)
-
-        assert stats["user_cycles"] == 1
-        assert stats["aborted"] == 0
-        runs = loop_run_repository.list_recent(user_id=USER)
-        assert len(runs) == 1
-        run = runs[0]
-        assert run.status == "done"
-        assert run.reason == "due_trigger"
-        assert [s["step"] for s in run.steps] == [
-            "perception",
-            "state_update",
-            "goal_check",
-            "goal_supply",
-            "goal_advance",
-            "memory_retrieval",
-            "reflection_check",
-            "decision",
-            "world_experience",
-        ]
-        skipped = {s["step"]: s for s in run.steps if s["status"] == "skipped"}
-        assert skipped["goal_supply"]["skip_reason"] == "flag_disabled"
-        assert skipped["goal_advance"]["skip_reason"] == "flag_disabled"
-        assert skipped["memory_retrieval"]["skip_reason"] == "memory_disabled"
-        assert skipped["reflection_check"]["skip_reason"] == "reflection_disabled"
-        rows = trigger_repo.list_recent(USER)
-        assert len(rows) == 1 and rows[0].status == "pending"
 
     @pytest.mark.asyncio
     async def test_real_decision_consumes_due_trigger(
@@ -260,12 +220,3 @@ class TestMaintenanceAndIdle:
         row = trigger_repo.get(key)
         assert row.status == "pending"
         assert row.attempt_count == 1
-
-
-class TestFlagOff:
-    @pytest.mark.asyncio
-    async def test_tick_noop_when_flag_off(self, db_session_factory):
-        stats = await life_loop.run_life_loop_tick(now=NOW)
-        assert stats["idle"] is True
-        assert stats["user_cycles"] == 0
-        assert loop_run_repository.list_recent() == []

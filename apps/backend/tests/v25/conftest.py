@@ -26,7 +26,6 @@ DEFAULT_PLANNED_STEP = {
 @pytest.fixture(autouse=True)
 def _pin_v25_planning_env(monkeypatch):
     """目录级隔离：既有自治通路取默认关闭（PLAN-001 零新增 Flag，V2.5.0 无 v25_* 项）。"""
-    monkeypatch.setenv("V2_AUTONOMY_ADVANCED_ENABLED", "false")
     monkeypatch.setenv("V24_TOOL_SYSTEM_ENABLED", "false")
     get_settings.cache_clear()
     yield
@@ -37,12 +36,9 @@ def _pin_v25_planning_env(monkeypatch):
 def autonomy_on(override_settings):
     """需要既有 AUT-002 / AUT-003 通路时显式开闸（开的是 V2.0.0 既有 Flag，非本任务新增）。"""
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     return True
 
 

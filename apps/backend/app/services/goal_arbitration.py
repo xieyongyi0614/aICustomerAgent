@@ -133,8 +133,6 @@ def _revive(goal, now: datetime) -> str | None:
 def arbitrate_user(user_id: str, now: datetime) -> dict:
     """复活先行（可能产生多 active）→ 同域互斥收敛（单 active）。"""
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled", "changes": []}
     goals = goal_repository.list_top_level_layered(
         user_id, statuses=("active", "suspended")
     )
@@ -210,8 +208,6 @@ def _low_relevance_signals(goal, facts: dict, min_days: int) -> tuple[bool, bool
 def check_abandonment(user_id: str, facts: dict, now: datetime) -> dict:
     """long_term active 顶层 goal 的放弃检查：双信号置信，保守阈值。"""
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled", "abandoned": []}
     min_days = settings.v2_autonomy_abandon_min_progress_days
     abandoned: list[dict] = []
     for goal in goal_repository.list_top_level_layered(user_id, statuses=("active",)):
@@ -271,8 +267,6 @@ def _last_progress_at(goal, facts: dict) -> datetime | None:
 def run_user_arbitration(user_id: str, facts: dict, now: datetime) -> dict:
     """编排入口：复活+冲突仲裁每次；abandonment 按节流窗口执行。"""
     settings = get_settings()
-    if not settings.v2_autonomy_advanced_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     result = arbitrate_user(user_id, now)
     interval = settings.v2_autonomy_arbitration_interval_minutes
     last = _abandon_last.get(user_id)

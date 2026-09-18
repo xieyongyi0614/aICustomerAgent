@@ -463,15 +463,10 @@ def code_text(path) -> str:
 def plan_reflection_env(override_settings):
     """计划反思子闸的最小开启面（反思总闸 + 计划子闸 + 层级目标通路）。"""
     override_settings(
-        v2_reflection_enabled="true",
         v25_plan_reflection_enabled="true",
         v25_planning_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 @pytest.fixture

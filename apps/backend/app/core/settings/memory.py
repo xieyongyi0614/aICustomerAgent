@@ -25,8 +25,6 @@ class MemorySettings(BaseSettings):
     memory_candidate_pool_limit: int = 200
     memory_reclaim_batch_limit: int = 500
 
-    v2_memory_enabled: bool = False
-    v2_memory_vector_enabled: bool = False
     v2_memory_eval_threshold_high: float = 0.75
     v2_memory_eval_threshold_low: float = 0.35
     v2_memory_eval_weight_source: float = 0.35

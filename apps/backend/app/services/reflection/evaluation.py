@@ -414,9 +414,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
 
 
 def build_db_report() -> dict:
-    """只读 DB 统计（offline_evaluator reflection 小节引用；Flag OFF 为空）。"""
-    if not get_settings().v2_reflection_enabled:
-        return {}
+    """只读 DB 统计（offline_evaluator reflection 小节引用）。"""
     with SessionLocal() as session:
         active = (
             session.query(InsightRow)

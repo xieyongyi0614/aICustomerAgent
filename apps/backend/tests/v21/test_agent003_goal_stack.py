@@ -43,11 +43,9 @@ def _goal(layer, description, priority=3, type_="conversation", age_days=0):
 def stack_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V2_LIFE_LOOP_ENABLED="true",
         V21_AGENT_RUNTIME_ENABLED="true",
         V21_GOAL_STACK_ENABLED="true",
-        world_enabled="false",
-    )
+        world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -141,8 +139,7 @@ class TestSupplyOrigin:
         assert "medium" in layers
 
     def test_materialize_persists_origin(self, db_session_factory, stack_on, override_settings):
-        override_settings(
-            V2_AUTONOMY_ADVANCED_ENABLED="true", ACTION_ENABLED="true"
+        override_settings( ACTION_ENABLED="true"
         )
         override = {"salient_events": [{"importance": "high", "title": "面试日"}]}
         result = __import__("app.services.goal_planning", fromlist=["materialize"]).materialize(

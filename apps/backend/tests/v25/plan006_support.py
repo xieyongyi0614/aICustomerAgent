@@ -124,17 +124,13 @@ def tools_on(monkeypatch, override_settings):
         v25_plan_tool_required="true",
         v24_tool_system_enabled="true",
         v24_tool_channel_enabled="true",
-        v2_autonomy_advanced_enabled="true",
         feishu_enabled="true",
         feishu_app_id="plan6-app",
         feishu_app_secret="plan6-secret",
         feishu_verification_token="plan6-token",
         feishu_encrypt_key="plan6-encrypt",
         world_enabled="false",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     return True
 
 
@@ -148,13 +144,8 @@ def planning_gates_on(monkeypatch, override_settings):
         v25_plan_step_binding_enabled="true",
         v25_plan_tool_required="true",
         v24_tool_system_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     return True
 
 
@@ -176,12 +167,9 @@ def action_chain_on(monkeypatch, override_settings):
         v24_tool_schema_validation_enabled="true",
         v24_tool_observation_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
         action_memory_policy_enabled="false",
-        v2_reflection_enabled="false",
         observability_persist_enabled="false",
-        v2_action_outbox_enabled="false",
-    )
+        v2_action_outbox_enabled="false")
     return True
 
 

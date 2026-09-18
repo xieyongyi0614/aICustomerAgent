@@ -283,18 +283,14 @@ def planning_world_on(override_settings):
         v25_plan_tool_required="true",
         v25_plan_world_feedback_enabled="true",
         v24_tool_system_enabled="true",
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="true",
         world_household_autoseed_enabled="false",
         v23_world_simulation_enabled="true",
         v23_event_detection_enabled="true",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
         action_relationship_enabled="false",
         v2_action_outbox_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     return True
 
 

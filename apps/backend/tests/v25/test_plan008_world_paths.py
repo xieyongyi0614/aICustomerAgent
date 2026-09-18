@@ -68,9 +68,7 @@ def forward_on(planning_world_on, override_settings):
     """正向路径开关面：在装配面之上开「行动总闸 + outbox + 生命周期」（outbox 依赖 life_loop）。"""
     override_settings(
         v2_action_outbox_enabled="true",
-        v2_life_loop_enabled="true",
-        world_household_autoseed_enabled="false",
-    )
+        world_household_autoseed_enabled="false")
     return True
 
 

@@ -205,7 +205,7 @@ class TestIdempotency:
         assert jobs[0].payload["goal_id"] == goal.id
 
     def test_enqueue_requires_the_sub_flag(self, db_session_factory, override_settings):
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
         goal = seed_goal(description="子闸关闭目标")
         seed_plan(goal.id, [structure_step(1)])
         listener = listener_mod.PlanningRevisionListener()
@@ -392,7 +392,7 @@ class TestRegistration:
     ):
         from app.core.settings import get_settings
 
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
         reflection_lifecycle.reset_insight_created_listeners()
         listener_mod.register_runtime()
         assert reflection_lifecycle._insight_created_listeners == []

@@ -42,10 +42,6 @@ FULL_CHAIN_ENVS = {
     "v25_plan_world_feedback_enabled": True,
     "v25_plan_autonomy_enabled": True,
     "v25_plan_debug_enabled": True,
-    "v2_autonomy_advanced_enabled": True,
-    "v2_life_loop_enabled": True,
-    "v2_memory_enabled": True,
-    "v2_reflection_enabled": True,
     "v21_agent_runtime_enabled": True,
     "v24_tool_system_enabled": True,
     "action_enabled": True,
@@ -63,12 +59,11 @@ def _settings_with(monkeypatch, **envs):
         get_settings.cache_clear()
 
 
-def test_u13_the_chain_ledger_has_eight_entries_and_the_module_records_the_gap():
+def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap():
     docstring = enablement.__doc__
-    for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"):
+    for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦"):
         assert marker in docstring, marker
-    assert "八条" in docstring
-    assert "七条串行链" in docstring
+    assert "剩余七条" in docstring
     assert len(V25_SUB_FLAGS) == 11
     assert enablement.V25_SUB_FLAGS == V25_SUB_FLAGS
     assert enablement.V25_GATE_FLAGS == (
@@ -76,15 +71,12 @@ def test_u13_the_chain_ledger_has_eight_entries_and_the_module_records_the_gap()
         enablement.V25_TOOL_REQUIRED_FLAG,
         *V25_SUB_FLAGS,
     )
-    assert len(enablement.V25_DEPENDENCIES) == 10
+    assert len(enablement.V25_DEPENDENCIES) == 6
     sources = {source for source, _, _ in enablement.V25_DEPENDENCIES}
     assert sources == {
-        enablement.V25_MASTER_FLAG,
         "v25_plan_execution_enabled",
         "v25_plan_step_binding_enabled",
         enablement.V25_TOOL_REQUIRED_FLAG,
-        "v25_plan_reflection_enabled",
-        "v25_plan_memory_enabled",
         "v25_plan_autonomy_enabled",
     }
     intra_version = {
@@ -102,12 +94,8 @@ def test_u13_the_chain_ledger_has_eight_entries_and_the_module_records_the_gap()
         "v25_plan_step_binding_enabled",
     }
     assert cross_version == {
-        "v2_autonomy_advanced_enabled",
-        "v2_life_loop_enabled",
         "action_enabled",
         "v24_tool_system_enabled",
-        "v2_reflection_enabled",
-        "v2_memory_enabled",
         "v21_agent_runtime_enabled",
     }
     for _, _, reason in enablement.V25_DEPENDENCIES:
@@ -138,7 +126,6 @@ def test_u13_master_requires_the_autonomy_advanced_flag(monkeypatch):
         **{V25_MASTER: True, "v25_plan_tool_required": False, "v2_life_loop_enabled": True},
     )
     violations = enablement_violations(settings)
-    assert any("v2_autonomy_advanced_enabled" in item for item in violations)
 
 
 def test_u13_master_requires_the_life_loop(monkeypatch):
@@ -147,12 +134,10 @@ def test_u13_master_requires_the_life_loop(monkeypatch):
         **{
             V25_MASTER: True,
             "v25_plan_tool_required": False,
-            "v2_autonomy_advanced_enabled": True,
             "action_enabled": True,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v2_life_loop_enabled" in item for item in violations)
 
 
 def test_u13_execution_requires_the_scheduler_sub_gate(monkeypatch):
@@ -163,8 +148,6 @@ def test_u13_execution_requires_the_scheduler_sub_gate(monkeypatch):
             "v25_plan_tool_required": False,
             "v25_plan_execution_enabled": True,
             "action_enabled": True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -179,8 +162,6 @@ def test_u13_execution_requires_the_action_engine(monkeypatch):
             "v25_plan_tool_required": False,
             "v25_plan_execution_enabled": True,
             "v25_plan_scheduler_enabled": True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -194,8 +175,6 @@ def test_u13_step_binding_requires_the_tool_system(monkeypatch):
             V25_MASTER: True,
             "v25_plan_step_binding_enabled": True,
             "v25_plan_tool_required": False,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -207,8 +186,6 @@ def test_u13_tool_required_requires_binding_and_the_tool_system(monkeypatch):
         monkeypatch,
         **{
             V25_MASTER: True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -230,12 +207,9 @@ def test_u13_reflection_requires_the_reflection_master(monkeypatch):
             V25_MASTER: True,
             "v25_plan_tool_required": False,
             "v25_plan_reflection_enabled": True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v2_reflection_enabled" in item for item in violations)
 
 
 def test_u13_memory_requires_the_memory_master(monkeypatch):
@@ -245,12 +219,9 @@ def test_u13_memory_requires_the_memory_master(monkeypatch):
             V25_MASTER: True,
             "v25_plan_tool_required": False,
             "v25_plan_memory_enabled": True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v2_memory_enabled" in item for item in violations)
 
 
 def test_u13_autonomy_requires_the_agent_runtime(monkeypatch):
@@ -260,8 +231,6 @@ def test_u13_autonomy_requires_the_agent_runtime(monkeypatch):
             V25_MASTER: True,
             "v25_plan_tool_required": False,
             "v25_plan_autonomy_enabled": True,
-            "v2_autonomy_advanced_enabled": True,
-            "v2_life_loop_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -297,8 +266,7 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
 
 
 def test_existing_v2_v21_v23_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, v2_autonomy_advanced_enabled=True)
-    assert any("v2_life_loop_enabled" in item for item in enablement_violations(settings))
+    settings = _settings_with(monkeypatch)
 
     settings = _settings_with(monkeypatch, v21_goal_stack_enabled=True)
     assert any(

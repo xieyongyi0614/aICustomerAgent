@@ -43,12 +43,9 @@ TOOL_STEP = {
 def observation_on(override_settings):
     """观测用例的既有 Flag 组合（本任务零新增 Flag：门控全用既有自治闸与 PLAN-002 子闸）。"""
     override_settings(
-        v2_autonomy_advanced_enabled="true",
         action_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
 
 
 def _ctx(*, now=V25_NOW, goal_id=None):

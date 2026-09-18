@@ -21,8 +21,8 @@ REPORT_DIR = Path(__file__).parent / "reports"
 
 @pytest.fixture
 def rel_eval_flags(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
+    """v2 开关已删除，开闸行为转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def test_relationship_eval_gate(db_session_factory, rel_eval_flags):
@@ -41,10 +41,6 @@ def test_relationship_eval_gate(db_session_factory, rel_eval_flags):
         encoding="utf-8",
     )
     assert report_path.exists()
-
-
-def test_build_db_report_flag_off(db_session_factory):
-    assert evaluation.build_db_report() == {}
 
 
 def test_build_db_report_flag_on(db_session_factory, rel_eval_flags):

@@ -611,8 +611,6 @@ def _relationship_projection(user_id: str, settings) -> tuple[dict[str, Any], li
 
 def _assemble_memory(goal: GoalRecord, settings) -> tuple[list[MemoryRef], list[str]]:
     """Memory 源（可降级、有界）：既有检索（含打分与拒绝冷却过滤器）后再二次裁剪。"""
-    if not settings.v2_memory_enabled:
-        return [], [DEGRADED_MEMORY_UNAVAILABLE]
     try:
         ranked = memory_retriever.retrieve(
             goal.user_id, query=goal.description, top_k=settings.memory_top_k
@@ -636,8 +634,6 @@ def _assemble_reflection(
     user_id: str, settings
 ) -> tuple[list[InsightSummary], list[str]]:
     """Reflection 源（可降级、有界）：活跃 Insight 投影 + 工具效能倾向并入后统一截断。"""
-    if not settings.v2_reflection_enabled:
-        return [], [DEGRADED_REFLECTION_UNAVAILABLE]
     try:
         summaries = [
             InsightSummary(

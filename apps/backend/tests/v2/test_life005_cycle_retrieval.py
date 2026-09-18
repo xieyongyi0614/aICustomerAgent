@@ -39,10 +39,7 @@ def _reset_budget_cache():
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V2_LIFE_LOOP_ENABLED="true",
-        world_enabled="false",
-        v2_memory_enabled="true",
-    )
+        world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -128,7 +125,7 @@ class TestProactiveDigestInjection:
         from app.models.autonomy import ProactiveAction
         from app.services import proactive_executor
 
-        override_settings(V2_MEMORY_ENABLED="false")
+        override_settings()
         token = memory_digest_var.set("重要记忆摘要")
         try:
             captured: dict = {}
@@ -225,15 +222,11 @@ class TestProactiveDigestInjection:
 
 
 class TestReflectionCheckStep:
-    def test_flag_off_skipped(self, db_session_factory, life_loop_on):
-        entry = life_loop._step_reflection_check(USER, NOW)
-        assert entry["status"] == "skipped"
-        assert entry["skip_reason"] == "reflection_disabled"
 
     def test_delegates_to_ref003_and_throttles(
         self, db_session_factory, life_loop_on, monkeypatch, override_settings
     ):
-        override_settings(v2_reflection_enabled="true")
+        override_settings()
         calls: list = []
 
         def fake_trigger(user_id, trigger="scheduled", now=None, trace=None):

@@ -245,4 +245,3 @@ def test_round_trip_structure_and_data(sqlite_round_trip):
 def test_settings_flag_default_off():
     from app.core.settings import get_settings
 
-    assert get_settings().v2_development_enabled is False

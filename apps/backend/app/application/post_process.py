@@ -149,23 +149,8 @@ async def run_summary(ctx: PostProcessContext) -> None:
 async def run_memory_extract(ctx: PostProcessContext) -> None:
     started = time.perf_counter()
     try:
-        if get_settings().v2_memory_enabled:
-            await _run_memory_ingest_v2(ctx)
-            await _run_memory_evaluate_v2(ctx)
-        else:
-            recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
-            recent_context = "\n".join(
-                f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
-                for m in recent_turns
-            )
-            await memory_service.extract_and_save(
-                ctx.user_id,
-                ctx.user_input,
-                ctx.ai_reply,
-                llm=ctx.llm,
-                trace=ctx.trace,
-                recent_context=recent_context,
-            )
+        await _run_memory_ingest_v2(ctx)
+        await _run_memory_evaluate_v2(ctx)
         if ctx.trace is not None:
             ctx.trace.record(
                 "memory_extractor", (time.perf_counter() - started) * 1000
@@ -248,10 +233,10 @@ async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
     Insight 失效匹配（MEM-005/Memory 侧 contradicts 并存语义零修改）。
     """
 
-    decisions = await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
+    decisions = await memory_evaluator.evaluate_pending(
+        ctx.user_id, trace=ctx.trace, llm=ctx.llm
+    )
 
-    if not get_settings().v2_reflection_enabled:
-        return
     try:
         flushed_ids = memory_lifecycle.flush_reinforce_buffer(trace=ctx.trace)
         if flushed_ids:
@@ -548,7 +533,7 @@ def _observe_pending_confirmation(record) -> dict:
 def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
     """工具证据反思接线（TOOL-009 §2.3）：只读 `action_records` 投影喂 reinforce 计数。
 
-    双闸（`v2_reflection_enabled` + `v24_tool_reflection_enabled`）任一关闭即零行为；
+    工具反思子闸（`v24_tool_reflection_enabled`）关闭即零行为；
     接线失败记日志、不影响行动规划（与 REF-003 既有接线同款纪律）。
     """
     settings = get_settings()

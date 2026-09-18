@@ -62,9 +62,7 @@ STATEMENT_PREFERENCE = "用户偏好简短的回复"
 
 
 def collect_slice(user_id: str) -> DevelopmentSlice | None:
-    """EvaluationContext 只读切片：Flag OFF 或无任何行 → None。"""
-    if not get_settings().v2_development_enabled:
-        return None
+    """EvaluationContext 只读切片：无任何行 → None。"""
     with SessionLocal() as session:
         states = (
             session.query(DevelopmentStateRow)
@@ -158,9 +156,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
 
 
 def build_db_report() -> dict:
-    """只读 DB 统计（offline_evaluator development 小节引用；Flag OFF 为空）。"""
-    if not get_settings().v2_development_enabled:
-        return {}
+    """只读 DB 统计（offline_evaluator development 小节引用）。"""
     with SessionLocal() as session:
         states = session.query(DevelopmentStateRow).all()
         changes = session.query(DevelopmentChangeRow).all()
@@ -464,16 +460,8 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
     failures: list[str] = []
     stats: dict = {"insight_ids": [], "state_keys": [], "cycles": 0}
 
-    if not settings.v2_memory_enabled:
-        stats["stopped_at"] = "memory"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
-
     _seed_cluster(session_factory, user_id, PRESSURE_CONTENTS, now)
     stats["cycles"] = 1
-
-    if not settings.v2_reflection_enabled:
-        stats["stopped_at"] = "reflection"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
 
     insight1 = _grow_reflect_once(
         session_factory, user_id, now, INSIGHT_STATEMENT_CYCLE1
@@ -483,10 +471,6 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
         return _result(SCENARIO_GROWTH_LOOP, failures, stats)
     stats["insight_ids"].append(insight1)
     stats["cycles"] = 2
-
-    if not settings.v2_development_enabled:
-        stats["stopped_at"] = "development"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
 
     if not _grow_compile(session_factory, user_id, insight1):
         failures.append("周期 1 调制未生效")

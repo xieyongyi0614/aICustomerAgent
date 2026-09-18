@@ -142,7 +142,7 @@ def _proposal(**overrides) -> ReflectionProposal:
 
 @pytest.fixture
 def reflection_on(override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
 
 
 @pytest.fixture(autouse=True)
@@ -204,7 +204,7 @@ def test_review_rejects_missing_counter_evidence():
 
 
 def test_review_rejects_below_min_confidence(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_min_confidence=0.99)
+    override_settings( v2_reflection_min_confidence=0.99)
     settings = reflector.get_settings()
     proposal = _proposal()
     accepted, rejected = reflector._calibrate_and_review(
@@ -223,13 +223,6 @@ def test_review_accepts_valid_draft():
     draft, resolved, final = accepted[0]
     assert resolved == [f"mem-ev-{i}" for i in range(3)]
     assert final > 0.6
-
-
-def test_flag_off_skips_execution(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=False)
-    _seed_run(db_session_factory, "run-off")
-    assert reflector.run_queued_reflections() == 0
-    assert _run_row(db_session_factory, "run-off").status == "queued"
 
 
 def test_evidence_gone_completes_without_llm(db_session_factory, reflection_on, _patch_llm):

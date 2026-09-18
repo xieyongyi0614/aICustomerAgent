@@ -301,7 +301,7 @@ class TestFlagOffRegression:
     def test_i13_no_plan_reads_when_the_sub_flag_is_off(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
 
         def _boom(*args, **kwargs):
             raise AssertionError("子闸 off 时不得读取计划数据")
@@ -316,7 +316,7 @@ class TestFlagOffRegression:
     def test_i13_no_listener_is_registered_when_off(
         self, db_session_factory, override_settings
     ):
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
         reflection_lifecycle.reset_insight_created_listeners()
         listener_mod.register_runtime()
         assert reflection_lifecycle._insight_created_listeners == []
@@ -335,7 +335,7 @@ class TestFlagOffRegression:
     def test_i13_plan_window_insight_types_are_not_consulted_when_off(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(v2_reflection_enabled="true", v25_plan_reflection_enabled="false")
+        override_settings( v25_plan_reflection_enabled="false")
         probe_calls = []
         original = reflection_evidence.plan_evidence_enabled
 

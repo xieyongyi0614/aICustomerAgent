@@ -83,8 +83,6 @@ def gate_env(monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", True)
-    monkeypatch.setattr(settings, "v2_memory_vector_enabled", True)
     monkeypatch.setattr(settings, "v2_memory_eval_threshold_high", 0.75)
     monkeypatch.setattr(settings, "v2_memory_eval_threshold_low", 0.35)
     monkeypatch.setattr(settings, "v2_memory_eval_weight_source", 0.35)

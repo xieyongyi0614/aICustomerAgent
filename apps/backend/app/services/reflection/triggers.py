@@ -98,9 +98,6 @@ def trigger_for_user(
     started = time.perf_counter()
     now = now or datetime.now()
     settings = get_settings()
-    if not settings.v2_reflection_enabled:
-        _trace(trace, started, trigger=trigger, decision=DECISION_OFF)
-        return OUTCOME_OFF
     if channel == CHANNEL_TOOL and not tool_channel_enabled(settings):
         _trace(
             trace,
@@ -266,12 +263,9 @@ def trigger_for_user(
 
 
 def tool_channel_enabled(settings=None) -> bool:
-    """工具证据通道开关：总闸（v2_reflection_enabled）之外的工具子闸（默认 off）。"""
+    """工具证据通道开关：工具反思子闸（默认 off）。"""
     settings = settings or get_settings()
-    return bool(
-        getattr(settings, "v2_reflection_enabled", False)
-        and getattr(settings, "v24_tool_reflection_enabled", False)
-    )
+    return bool(getattr(settings, "v24_tool_reflection_enabled", False))
 
 
 def observe_tool_evidence(
@@ -394,7 +388,7 @@ def observe_tool_evidence_from_records(
 
 def observe_reinforce(user_id: str, memory_ids: list[str], trace=None) -> None:
     """事件计数入口（post_process 喂入）：同主题计数 + 冷却 → 达阈值走触发判定。"""
-    if not memory_ids or not get_settings().v2_reflection_enabled:
+    if not memory_ids:
         return
     started = time.perf_counter()
     now = datetime.now()
@@ -442,8 +436,6 @@ def run_reflection_trigger_tick(now: datetime | None = None) -> int:
     """周期触发入口：job_worker tick 挂靠；每用户每日一次判定（Flag OFF 空转）。"""
     now = now or datetime.now()
     settings = get_settings()
-    if not settings.v2_reflection_enabled:
-        return 0
     if now.hour < settings.v2_reflection_schedule_hour:
         return 0
     judged = 0

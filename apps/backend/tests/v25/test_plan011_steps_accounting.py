@@ -43,13 +43,8 @@ def planning_on(override_settings):
         v25_planning_enabled="true",
         v25_plan_context_enabled="true",
         v25_plan_observation_enabled="true",
-        v2_autonomy_advanced_enabled="true",
-        v2_life_loop_enabled="true",
         world_enabled="false",
-        v2_memory_enabled="false",
-        v2_reflection_enabled="false",
-        observability_persist_enabled="false",
-    )
+        observability_persist_enabled="false")
     life_loop_budget.reset_cache()
     return True
 

@@ -218,13 +218,8 @@ def test_offline_scenarios_pass_gate(db_session_factory):
         assert report["metrics"][metric_id]["pass"] is True
 
 
-def test_build_db_report_flag_off_empty(override_settings):
-    override_settings(v2_development_enabled=False)
-    assert development_evaluation.build_db_report() == {}
-
-
 def test_build_db_report_counts(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     from app.core.db import InsightRow
 
     now = datetime.now()
@@ -254,5 +249,5 @@ def test_build_db_report_counts(db_session_factory, override_settings):
 
 
 def test_collect_slice_flag_off_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=False)
+    override_settings()
     assert development_evaluation.collect_slice(USER) is None

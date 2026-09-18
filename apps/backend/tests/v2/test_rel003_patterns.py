@@ -23,8 +23,8 @@ USER = "u-rel3"
 
 @pytest.fixture
 def rel_flags(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
+    """v2 开关已删除，关系模式通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _seed_insight(
@@ -107,17 +107,6 @@ class TestReadRelationshipPatterns:
         _seed_pattern("response_style.tone", 0.9, "ins-pref", kind="preference")
         patterns, _ = relationship_patterns.read_relationship_patterns(USER)
         assert patterns == []
-
-    def test_dual_flag_matrix(self, _offline_repos, monkeypatch):
-        _seed_insight("ins-rel")
-        _seed_pattern("goal.user_care.weight", 0.8, "ins-rel")
-        monkeypatch.setattr(get_settings(), "v2_development_enabled", False)
-        patterns, payload = relationship_patterns.read_relationship_patterns(USER)
-        assert (patterns, payload["selected"]) == ([], [])
-        monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        patterns, payload = relationship_patterns.read_relationship_patterns(USER)
-        assert (patterns, payload["selected"]) == ([], [])
 
 
 class TestAutonomyReference:

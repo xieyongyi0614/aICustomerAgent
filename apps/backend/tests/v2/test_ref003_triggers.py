@@ -102,17 +102,8 @@ def _reset_state():
 
 @pytest.fixture
 def reflection_on(override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     return True
-
-
-def test_flag_off_returns_off_and_writes_nothing(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=False)
-    result = triggers.trigger_for_user(USER, CHARACTER, now=datetime.now())
-    assert result == "off"
-    assert _runs(db_session_factory) == []
-    assert _jobs(db_session_factory) == []
-    assert triggers.run_reflection_trigger_tick(now=datetime.now()) == 0
 
 
 def test_no_evidence_day_skips_with_zero_llm(db_session_factory, reflection_on):
@@ -227,7 +218,7 @@ def test_event_storm_only_first_enqueues(db_session_factory, reflection_on):
 
 
 def test_event_cooldown_window_blocks_repeat(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_event_cooldown_hours=24.0)
+    override_settings( v2_reflection_event_cooldown_hours=24.0)
     now = _seed_passing_evidence(db_session_factory)
     ids = [f"mem-trg-{i}" for i in range(5)]
     triggers.observe_reinforce(USER, ids)
