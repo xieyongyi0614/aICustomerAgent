@@ -471,7 +471,7 @@ async def _run_confirmation_round(ctx: PostProcessContext) -> bool:
             get_confirmation_service,
         )
 
-        pending = get_confirmation_service(settings).pending(ctx.user_id)
+        pending = get_confirmation_service().pending(ctx.user_id)
         if not pending:
             return False
         detected = get_confirmation_detector().detect(ctx.user_input, pending)
@@ -588,7 +588,9 @@ def _run_tool_decision(
     result = decision_pipeline.run_pipeline(
         capabilities=list(surface.tool_ids),
         chat_response=True,
-        chat_response_intention=getattr(ctx.intention, "intention", None),
+        chat_response_intention=getattr(
+            getattr(ctx, "intention", None), "intention", None
+        ),
         chat_response_goal_id=goal_id,
         run=None,
         now=now,
