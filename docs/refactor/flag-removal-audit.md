@@ -548,3 +548,63 @@ cd apps/frontend && pnpm vitest run
 3. **先加 §6.2 的未知环境变量告警**，再改 env 名。
 4. **先补 `tests/v25/test_plan001_scope_markers.py` 的更新纪律**（该文件是"范围越界已评审"的证据链，不能当普通测试删）。
 5. **批次 1 单独作为一个可回滚的提交**，因为它删除的是当前生产实际运行的代码路径。
+
+> 前置动作 1~4 已完成（提交 `a74c5a6`），配套守卫见 `tests/unit/test_settings_flag_guard.py`。
+
+---
+
+## 附录 D：批次 1（v2 段）执行清单
+
+### D.1 已核实的技术前提
+
+**前提一：life_loop 确实覆盖了 `main.py` 旧三循环的全部职责。** 逐条证据：
+
+| 旧循环 | life_loop 中的对应实现 |
+|---|---|
+| `world_engine.run_world_maintenance_loop()` | `life_loop.py:762-767` `_run_maintenance` → `world_engine.run_maintenance` |
+| `run_action_retry_loop()` | `life_loop.py:778-805` `_run_maintenance` → action retry |
+| `autonomy_worker.run_autonomy_worker()` | `life_loop.py:338` → `autonomy_engine.tick(user_ids=[user_id])`（按用户粒度，替代旧的全量 tick） |
+| （另含）世界模拟维护 | `life_loop.py:770-776` → `world_engine.run_simulation_maintenance` |
+| （另含）trigger 对账 | `life_loop.py:817-824` `trigger_reconcile` |
+
+`autonomy_worker.py` 自身的 docstring（`:3-5`）也明确写着"life_loop 为唯一周期入口，本 worker 仅作为其关闭时的兜底 tick 源"。
+
+**前提二：`v2_life_loop_enabled` 的 OFF 回退路径依赖的 DB 表已存在。** `trigger_evaluator.py` 的 5 处 `v2_life_loop_enabled` 分支在 ON 时走 `trigger_registry_repository`（持久化登记表），OFF 时回退内存 dict（docstring 称"迁移窗口内 drain 遗留 dict 登记项"）。该表由 `migrations/versions/0028_trigger_registry.py` 建立，已在迁移链内，**无需新迁移**。
+
+### D.2 规模（脚本实测）
+
+| 维度 | 数量 |
+|---|---|
+| `app/` 门控点 | **63**（guard 33 / branch 27 / getattr 3） |
+| settings 字段定义 | **8**（分布在 4 个文件） |
+| 测试调用点 | **207**（`override_settings` kwarg 200 / `setenv` 3 / `settings.X` 4） |
+| 受影响测试文件 | **69** |
+
+### D.3 逐 Flag 站点分布
+
+| Flag | app 站点 | 测试 kwarg | 定义处 | OFF 路径性质 |
+|---|---|---|---|---|
+| `v2_life_loop_enabled` | 8 | 19 | `life_loop.py:9` | **删 3 个旧循环 + 整模块 `autonomy_worker.py` + trigger 内存回退** |
+| `v2_autonomy_advanced_enabled` | 9 | 56 | `autonomy_advanced.py:11` | 纯 guard（自治步转常开） |
+| `v2_action_outbox_enabled` | 8 | 14 | `life_loop.py:18` | 纯 branch（outbox 转常开） |
+| `v2_memory_enabled` | 9 | 33 | `memory.py:28` | **双路径 D3/D4：删 memory v1 的 ingest/retrieve** |
+| `v2_memory_vector_enabled` | 4 | 1 | `memory.py:29` | 纯 guard（向量召回转常开） |
+| `v2_reflection_enabled` | 14 | 64 | `reflection_development.py:11` | 纯 guard + 3 处 getattr |
+| `v2_development_enabled` | 6 | 12 | `reflection_development.py:40` | 纯 guard（成长层转常开） |
+| `v2_relationship_evolved_enabled` | 5 | 1 | `reflection_development.py:59` | **双路径 D5：删 `relationship_pattern_list=[]` 回退** |
+
+### D.4 执行顺序（4 步，不可只做一半）
+
+1. **app 侧去门控**（63 处）：`main.py` 结构改造（删 `else` 段三循环 + 3 个全局量 + cancel 循环）→ 删 `autonomy_worker.py` → 逐模块摘 guard/branch，双路径保留 ON 侧、删除 OFF 侧。
+2. **删 settings 字段**（8 个）+ 清理 `enablement.py` 的 v2 段（`v2_autonomy_advanced_enabled` / `v2_action_outbox_enabled` 的依赖判定）。
+3. **修测试**（207 处 / 69 文件）：`override_settings(v2_*=...)` 调用点逐个删除——新增的 `set_known_env` 守卫会**逐个报出**失效 env key，等于自带工作清单。断言 `skip_reason == "flag_disabled"` 与 `enabled=False` 契约的用例按 §7.4 改写或删除。
+4. **验证**：`pytest -q` 对比基线（§7 说明 HEAD 本就有 ~21 个既存失败），加 `grep` 残留扫描。
+
+### D.5 为什么不能只做一半
+
+`main.py` 的旧三循环是 `v2_life_loop_enabled` 的 `else` 分支。若只摘掉 `else` 而保留 `v2_life_loop_enabled`（默认 off），则**两个调度器都不启动**——应用会静默失去全部周期行为。因此第 1 步必须与「`v2_life_loop_enabled` 字段删除」同批完成。
+
+### D.6 本批次无法在此环境验证的部分
+
+- **真实模型行为回归**：`docs/version/v2.0.0/phases/*/regression-checklist.md` 各阶段清单必须人工执行。
+- **首次激活的写入路径**：`v2_memory_enabled` 固化 ON 后首次运行会走 memory V2 的 ingest/evaluate 与向量嵌入，这些路径在真实配置下**从未跑过**。建议在独立数据库上先跑一轮再切正式库。
