@@ -15,6 +15,7 @@
 | 计划域拆解模块（`decompose.py`） | PLAN-004 | ✅ 已落地 |
 | 计划域调度 / 执行 / 观测 / 修订模块（四模块） | PLAN-005 | ✅ 已落地 |
 | 重规划监听器（`revision_listener.py`） | PLAN-010 | ✅ 已落地 |
+| `vXX_` 开关体系删除 | 横切重构 | ⏳ 待办（受影响的断言清单见末节，**不得整体删除本模块**） |
 
 PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
 快照（原计划见 PLAN-001 Task Detail 的标记表）。
@@ -91,8 +92,29 @@ PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（�
 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 由 16 项扩为 **19 项**（三个只读扩展，见
 `goal_contract` 模块文档 §10）；② `goal_repository.PLAN_TERMINAL_STATUSES = ("rejected",
 "superseded")` 是零迁移下的终态投影（计划级**无** `completed` 取值，扩值需改 CHECK = 需迁移）。
+
+## vXX_ 开关体系删除（横切重构，`docs/refactor/flag-removal-audit.md`）
+
+本模块**不因开关消失而整体删除**——它是 PLAN-002 起各任务「范围越界已评审」的证据链，
+删掉即丢失评审留痕。开关删除按同一纪律处理：受影响的断言**显式改写**，未受影响的断言原样保留。
+
+受影响面只有一处：`test_plan_002_settings_are_embedded_and_the_master_stays_off`。
+`v25_*` 开关固化 ON / 去前缀后，`Settings.model_fields` 中不再存在 `v25_` 前缀项，故该用例的
+
+- `declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)`，
+- `len(PLAN_002_SETTINGS_FLAGS) == 13` 与 `len(PLAN_002_SETTINGS_PARAMS) == 14`，
+- `settings.v25_planning_enabled is False` 与 `settings.v25_plan_tool_required is True`
+
+都必须改为对**去前缀后字段名与默认值**的断言。两个常量 `PLAN_002_SETTINGS_FLAGS` /
+`PLAN_002_SETTINGS_PARAMS` 随字段改名同步去前缀（常量名与成员名都要改）；成员数是否变化
+取决于该批次的最终范围，须在改动时留痕。
+
+本纪律由 `test_plan_002_flag_contract_assertions_survive_flag_removal` 消费
+（`PLAN_002_FLAG_CONTRACT_ASSERTIONS`）：若有人用「删掉用例」来消除开关删除引发的失败，
+该守卫会失败。
 """
 
+import sys
 from pathlib import Path
 
 from app.core.settings import Settings, get_settings
@@ -135,6 +157,16 @@ PLAN_002_SETTINGS_PARAMS = (
     "v25_plan_memory_importance_floor",
     "v25_plan_context_digest_enabled",
 )
+
+PLAN_002_FLAG_CONTRACT_ASSERTIONS = (
+    "test_plan_002_settings_are_embedded_and_the_master_stays_off",
+)
+"""vXX_ 开关体系删除时必须**显式改写**而非删除的用例（见模块文档末节）。
+
+开关固化 ON / 去前缀后该用例必然失败；正确做法是按纪律改写其断言，删除即丢失
+PLAN-002 的「范围越界已评审」留痕。由
+`test_plan_002_flag_contract_assertions_survive_flag_removal` 守卫。
+"""
 
 PLAN_002_SUB_GOAL_FIELDS = (
     "tool_id",
@@ -232,6 +264,21 @@ def test_plan_002_settings_are_embedded_and_the_master_stays_off():
     assert settings.v25_planning_enabled is False
     assert settings.v25_plan_tool_required is True
     assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
+
+
+def test_plan_002_flag_contract_assertions_survive_flag_removal():
+    """vXX_ 开关删除纪律：受影响用例必须**改写**而非删除（见模块文档末节）。
+
+    开关固化 ON 后 `test_plan_002_settings_are_embedded_and_the_master_stays_off`
+    必然失败；本守卫把「用删用例来消除失败」这条捷径堵掉。
+    """
+    module = sys.modules[__name__]
+    missing = [
+        name for name in PLAN_002_FLAG_CONTRACT_ASSERTIONS if not hasattr(module, name)
+    ]
+    assert missing == [], (
+        f"vXX_ 开关删除纪律要求这些用例保留并按纪律改写，而非删除：{missing}"
+    )
 
 
 def test_sub_goal_spec_carries_the_plan_002_fields_in_declared_order():

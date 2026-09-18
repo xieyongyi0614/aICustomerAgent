@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from typing import Any
 
@@ -294,6 +295,43 @@ def db_session_factory(_offline_repos):
     return _offline_repos
 
 
+def _known_env_keys() -> frozenset:
+    """settings 字段名大写即环境变量名（`_shared.py` 无 `env_prefix` / alias 层）。"""
+    from app.core.settings import Settings
+
+    return frozenset(name.upper() for name in Settings.model_fields)
+
+
+_VERSIONED_ENV_KEY = re.compile(r"^V[0-9]+_")
+
+
+def set_known_env(monkeypatch, env_key: str, value) -> None:
+    """写入环境变量前校验其对应真实 settings 字段。
+
+    字段改名后旧 env 名会被 `extra="ignore"` 静默吞掉：用例照常通过，闸门却没开。
+    这里把那种静默失效改成显式失败——改名时必须同步改调用点，而不是让断言假通过。
+    """
+    if env_key.upper() not in _known_env_keys():
+        raise AssertionError(
+            f"未知设置项 {env_key}：不对应任何 settings 字段，"
+            "环境变量名 = 字段名大写（字段是否已改名？）"
+        )
+    monkeypatch.setenv(env_key, str(value))
+
+
+def set_known_flag_env(monkeypatch, env_key: str, value) -> None:
+    """写入环境变量；仅对版本号开关（`V2_*` / `V21_*` / …）校验字段存在。
+
+    `v24_tool_env` 除 `V24_*` 开关外还用于注入外部工具密钥（如
+    `EXT_API_WEATHER_TOKEN`）这类非 settings 字段的环境变量，故只守卫会被改名
+    影响的版本号开关，其余原样放行。
+    """
+    if _VERSIONED_ENV_KEY.match(env_key.upper()):
+        set_known_env(monkeypatch, env_key, value)
+    else:
+        monkeypatch.setenv(env_key, str(value))
+
+
 @pytest.fixture
 def override_settings(monkeypatch):
     def _apply(**kwargs):
@@ -374,10 +412,10 @@ def override_settings(monkeypatch):
         }
         for key, env in env_map.items():
             if key in kwargs:
-                monkeypatch.setenv(env, str(kwargs[key]))
+                set_known_env(monkeypatch, env, kwargs[key])
         for key, value in kwargs.items():
             if key not in env_map:
-                monkeypatch.setenv(key.upper(), str(value))
+                set_known_env(monkeypatch, key.upper(), value)
         get_settings.cache_clear()
 
     yield _apply

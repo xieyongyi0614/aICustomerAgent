@@ -5,6 +5,7 @@ import pytest
 from app.core.settings import get_settings
 from app.services.action import registry as capability_registry_module
 from app.services.tool import registry as tool_registry
+from tests.conftest import set_known_flag_env
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +46,7 @@ def v24_tool_env(monkeypatch):
     def _apply(**envs):
         for key, value in envs.items():
             text = str(value).lower() if isinstance(value, bool) else str(value)
-            monkeypatch.setenv(key.upper(), text)
+            set_known_flag_env(monkeypatch, key.upper(), text)
         get_settings.cache_clear()
 
     yield _apply

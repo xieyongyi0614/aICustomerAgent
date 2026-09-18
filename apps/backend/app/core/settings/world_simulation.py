@@ -9,11 +9,13 @@ RESERVED 子闸：已定义并纳入总闸校验，但当前版本尚无行为�
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
-RESERVED_V23_SUB_FLAGS = (
-    "v23_scene_expansion_enabled",
-    "v23_habit_time_enabled",
-)
-"""声明但未接线（WS-016 场景分层延后交付）：开启不会产生行为变化。"""
+RESERVED_V23_SUB_FLAGS = ("v23_habit_time_enabled",)
+"""声明但未接线（WS-016 习惯时段延后交付）：开启不会产生行为变化。
+
+`v23_scene_expansion_enabled` 原列于此，实际已接线——`world_engine.py` 的
+`movement.apply` 分支与 `services/tool/world_context.py` 的场景画像投影均读取它，
+与 RESERVED 的「开启不产生行为变化」语义不符，故移出。
+"""
 
 
 class WorldSimulationSettings(BaseSettings):
@@ -24,7 +26,7 @@ class WorldSimulationSettings(BaseSettings):
     v23_daily_life_enabled: bool = False
     v23_event_detection_enabled: bool = False
     v23_scene_expansion_enabled: bool = False
-    """RESERVED：场景 profile 尚未接入 brief/context 装配（WS-016）。"""
+    """已接线：gates 移动落点走 `movement.apply` 与场景画像投影（WS-016 部分交付）。"""
     v23_habit_time_enabled: bool = False
     """RESERVED：习惯时段信号尚未实现（WS-016）。"""
     v23_world_llm_assist_enabled: bool = False

@@ -10,7 +10,7 @@ from app.application import autonomy_worker, observability, world_engine
 from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
-from app.core.settings import get_settings
+from app.core.settings import get_settings, unknown_versioned_env_keys
 from app.core.settings.enablement import validate_enablement_chain
 from app.services import memory_service, proactive_delivery
 from app.services.tool import channel_tools
@@ -48,6 +48,11 @@ async def lifespan(application: FastAPI):
     global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
     global _life_loop_task, _agent_evolution_task
     validate_enablement_chain(get_settings())
+    for unknown_key in unknown_versioned_env_keys():
+        logging.getLogger(__name__).warning(
+            "环境变量 %s 不对应任何 settings 字段，已被静默忽略（字段是否已改名？）",
+            unknown_key,
+        )
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
     if (
