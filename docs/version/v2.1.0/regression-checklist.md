@@ -7,13 +7,14 @@
 ## 1. 生效确认（开关已删除，功能无条件生效）
 
 四个 Flag 的配置面已消失、ON 路径常开：`agent_runtime_enabled`、`goal_stack_enabled`、`agent_metrics_enabled`、`personality_evolution_enabled`。
-仍在场的只有两个：`unified_run_enabled`（前台收编，**尚未固化**，仍默认 false）与 `foreground_gateway_enforced`（按裁决保留门控，见 F.10）。
+`unified_run_enabled` 已随 F.12 固化删除：前台 chat 恒包裹为 `foreground_chat` Run 台账（无配置面）。
+仍在场的只有 `foreground_gateway_enforced`（按裁决保留门控，见 F.10）。
 
 | # | 动作 | 核对点 | 结果 |
 |---|---|---|---|
 | P1 | 起服务并看启动日志 | 出现 `agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）`——该 task 原受 `enabled()` 门控，现无条件注册 | ☐ |
-| P2 | 查部署侧 `.env` 副本 | **不得残留** `V21_*` 或 `AGENT_RUNTIME_ENABLED` / `GOAL_STACK_ENABLED` / `AGENT_METRICS_ENABLED` / `PERSONALITY_EVOLUTION_ENABLED`：`V21_*` 会触发启动告警，无前缀的旧键则**静默无效**，容易误判「还能用 env 关」 | ☐ |
-| P3 | 确认前台尚未收编 | `unified_run_enabled` 仍为 false → `loop_runs` 中**不应**出现 `run_kind=foreground_chat` 行；A1/A7 的台账核对留到该批 | ☐ |
+| P2 | 查部署侧 `.env` 副本 | **不得残留** `V21_*` 或 `AGENT_RUNTIME_ENABLED` / `GOAL_STACK_ENABLED` / `AGENT_METRICS_ENABLED` / `PERSONALITY_EVOLUTION_ENABLED` / `UNIFIED_RUN_ENABLED`：`V21_*` 会触发启动告警，无前缀的旧键则**静默无效** | ☐ |
+| P3 | 确认前台恒收编 | 每次 chat 后 `loop_runs` **应**出现 `run_kind=foreground_chat` 行（F.12 固化后无开关可关） | ☐ |
 | P4 | 后台自治已换实现 | `autonomous_tick` 台账行的 `run_kind` / `profile` 字段有值（v2.0.0 的 `life_loop._run_user_cycle` 已删除，唯一入口是 `agent_runtime.run_autonomous_cycle`） | ☐ |
 
 ## 2. 基础主线下钻

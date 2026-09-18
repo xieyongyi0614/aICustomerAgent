@@ -3,7 +3,7 @@
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
-> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。尚未开始的只有**轨道 B（去门控）**。
+> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 与 v21 段已完成**（F.9~F.12）；剩余 **v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
 
 ---
 
@@ -693,7 +693,7 @@ cd apps/frontend && pnpm vitest run
 | 批次 | 版本 | 开关数 | 其中默认 ON | app 引用 | 测试引用 | 待删 OFF 回退路径 | 状态 |
 |---|---|---|---|---|---|---|---|
 | 1 | v2 段 | 7（已删）+ 3（改名保留） | — | 63 处门控（见 D.2） | 207 调用点 | 5（§4.1 #1~#4 + D 段） | **已完成** |
-| 2 | v21 | 6 | 0 | 51 | 19 | 2（§4.2 #16、#17） | 待做 |
+| 2 | v21 | 6 | 0 | 51 | 19 | 2（§4.2 #16、#17） | **已完成**（F.10/F.11/F.12；`foreground_gateway_enforced` 保留门控） |
 | 3 | v22 | 5 | 0 | 19 | 15 | 0 | **已完成**（见 F.9） |
 | 4 | v23 | **8** | 0 | 79 | 47 | 3（§4.1 #5、§4.2 #14/#15） | 待做 |
 | 5 | v24 | 11 | 1（`v24_tool_confirm_ttl_reuse`） | 106 | 272 | 1（§4.2 #9） | 待做（测试量最大） |
@@ -710,7 +710,7 @@ cd apps/frontend && pnpm vitest run
 | 表内开关名 | `v24_tool_confirm_ttl_reuse` 等 | **全部已去前缀** | 按旧名 grep 现在 0 命中；导出清单请用 `flag-rename-map.md` §四 |
 | 轨道 A（去前缀） | 未列 | **已完成并提交** | 与批次划分正交，见 F.6 |
 
-**执行顺序**：G.5 已把「改名」与「去门控」拆成两条轨道，轨道 A 做完后轨道 B 不再受改名依赖约束，因此按**风险递增**而非 §8 的依赖序执行：**v22（热身，0 条 OFF 路径）→ v21 → v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
+**执行顺序**：G.5 已把「改名」与「去门控」拆成两条轨道，轨道 A 做完后轨道 B 不再受改名依赖约束，因此按**风险递增**而非 §8 的依赖序执行：**v22（热身，0 条 OFF 路径，已完成）→ v21（已完成）→ v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
 
 **批次 1 的实际边界**（与本报告 D.3 / E.5 的差异）：
 
@@ -912,6 +912,36 @@ v21 段按风险拆三批执行（F.11 = `agent_runtime_enabled`、F.12 = `unifi
 | 清单改写 | `docs/version/v2.1.0/regression-checklist.md`：原「用 env 开五 Flag / 逐档关闭回滚 / 链尾 0043」三处随固化失效，改写为「生效确认 P1~P4 + 回滚 = `git revert`」，并新增 **A5.1 专项**：连跑 ≥20 个自治周期统计 decision 的 `skip_reason`，`gateway_denied` 占比 > 5% 判 FAIL（这道 run 级闸是本次固化新引入的静默跳过来源，且软模式豁免不覆盖自治能力） |
 | 验证 | 目标 10 文件 **891 passed / 2 failed**（两条均属 F.8 既存豁免）；Fast Test **1449 全绿**；全量 **17 failed**，新增两条（`plan012_flag_matrix`、`v26/test_review_fixes`）均为本批依赖表/锚点问题，已在本批内修 |
 | env | v21 各键从未写入 `.env` / `.env.example` ⇒ 零 env 变更；部署侧若自行加过，删除后成**静默无效键**（无版本前缀 ⇒ 不触发启动告警） |
+
+### F.12 轨道 B 批次 v21-3（`unified_run_enabled`）去门控 —— 2026-09-18
+
+| 项 | 内容 |
+|---|---|
+| 删除字段 | `unified_run_enabled`（字段 413 → **412**；在存开关 39 → **38**） |
+| **批前发现的阻塞缺陷** | `agent_runtime/__init__.py` 仍 `from controller import unified_run_enabled`，但 `controller.py` 中该函数在 F.10/F.11 连带清理时已删——**import 断裂，`app.main` / 全部测试无法加载**。本批第一步即修复该 import |
+| 行为事实 | `chat_pipeline.run_chat_pipeline` 早已**无条件**调用 `open_foreground_run`，门控读取点在 app 侧为 0；字段本身已无行为分支。固化 = 删死字段 + 把「前台恒写 `foreground_chat` 台账」写成唯一语义 |
+| 测试 | 4 文件：删 `UNIFIED_RUN_ENABLED` 覆写；`test_unified_off_creates_no_run_row` / `test_chat_without_unified_creates_no_run_row` / `test_rollback_chain_downgrade_safe` 由「关闸不写台账」反转为「恒写台账」；`ALL_V21_FLAGS` 收敛为空 |
+| enablement | 无残留 v21 规则（F.10/F.11 已清）；grep 确认 `enablement.py` 无 `unified_run` 引用 |
+| 冻结面 | `chat_pipeline.py` docstring 去版本措辞 → `ZERO_DIFF_HASHES` 哈希重建（允许改动） |
+| 清单改写 | `docs/version/v2.1.0/regression-checklist.md` P3：由「尚未收编 / 不应出现 foreground_chat」改为「恒收编 / 应出现」 |
+| 验证 | `tests/v21/` **108 passed / 1 failed**；失败为 F.8 既存豁免 `test_agent008_review_fixes::test_low_energy_suppresses_short_term`，零新增归因 |
+| env | 本键从未写入 `.env` / `.env.example` ⇒ 零 env 变更；部署侧若自行加过 `UNIFIED_RUN_ENABLED` 则静默无效 |
+| 仍保留 | `foreground_gateway_enforced`（F.10 裁决）、`action_outbox_enabled`（附录 E 方案③） |
+
+**移交 v23**：在存开关 38 个；`world_context_char_budget_v23` 仍带**后缀式**版本号（轨道 A 只清 `vXX_` 前缀），属命名残留，与 `world_event_escalation_types` 等一并在 v23 批或命名一致性裁决中处理。
+
+### F.13 裁决：`action_schedule` 消费入口 —— 2026-09-18
+
+F.11 移交项已裁决并落地。
+
+| 项 | 内容 |
+|---|---|
+| **裁决** | 挂 `life_loop._run_maintenance`，**不**进 `autonomous_tick` Profile 阶段序列 |
+| 理由 | ① `scheduler.step_action_schedule` docstring 本就写明「life_loop 维护步」；② 到期认领→执行→收口是维护语义，不是感知/决策阶段；③ 进 profile 会改阶段契约、牵动多处钉测，且与 v25 plan 侧 profile 文本锚点耦合 |
+| 实现 | `_run_maintenance` 在 `action_retry` 之后新增 `action_schedule` 步：双闸（`action_execution_enabled` + `action_scheduler_enabled`）+ 与 action_retry 同间隔；`_maintenance_pending` 同步纳入；`step_action_schedule` 本体仍自门控 `flag_off` |
+| 当前行为 | 双闸默认 off ⇒ 挂载点零行为变化；v26 批固化 ON 后入口自动生效 |
+| 测试 | `tests/v26/test_review_fixes.py::TestActionScheduleConsumption`：钉「profile 无该阶段」+「maintenance 源码含挂载点」；`tests/v24/test_tool007_integration.py::EXPECTED_MAINTENANCE_STEPS` 同步插入 `action_schedule` |
+| 冻结面 | `life_loop.py` 已不在 tool007 `FROZEN_SOURCES`（文档注明），无需哈希重建 |
 
 ---
 
