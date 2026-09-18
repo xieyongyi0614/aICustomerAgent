@@ -1,12 +1,14 @@
-"""TOOL-001：v24 串行链校验（architecture.md §7.8 / TOOL-001 §6.2）。"""
+"""TOOL-001：v24 串行链已随开关删除移除（architecture.md §7.8 / TOOL-001 §6.2）。
 
-import pytest
+总闸与九个子闸已随 V2.4.0 转正删除，`enablement` 中不再有 v24 段，故原
+「子闸 ⇒ 总闸」「通道 ⇒ 飞书绑定」两类 fail-fast 规则整体消失。本文件保留两条
+反向断言：**旧规则不再产生任何违规**，且旧 env 名即使残留也不会伪造违规。
+"""
 
 from app.core.settings import get_settings
-from app.core.settings._shared import SettingsError
 from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 
-V24_FLAGS = (
+V24_REMOVED_FLAGS = (
     "tool_system_enabled",
     "tool_permission_enabled",
     "tool_schema_validation_enabled",
@@ -19,86 +21,35 @@ V24_FLAGS = (
     "tool_user_defined_enabled",
 )
 
-V24_SUB_FLAGS = V24_FLAGS[1:]
-
-FEISHU_BINDING_ENVS = {
-    "feishu_enabled": True,
-    "feishu_app_id": "cli_test",
-    "feishu_app_secret": "test_secret",
-    "feishu_verification_token": "test_token",
-}
+V24_REMOVED_TOKENS = V24_REMOVED_FLAGS + ("feishu_enabled",)
 
 
-def _settings_with(monkeypatch, **envs):
-    for key, value in envs.items():
-        text = str(value).lower() if isinstance(value, bool) else str(value)
-        monkeypatch.setenv(key.upper(), text)
+def _violating_tokens(violations: list[str]) -> list[str]:
+    return [
+        token
+        for violation in violations
+        for token in V24_REMOVED_TOKENS
+        if token in violation
+    ]
+
+
+def test_no_v24_enablement_rules_remain():
+    assert _violating_tokens(enablement_violations(get_settings())) == []
+
+
+def test_legacy_v24_env_names_no_longer_produce_violations(monkeypatch):
+    for flag in V24_REMOVED_FLAGS:
+        monkeypatch.setenv(flag.upper(), "true")
+    monkeypatch.setenv("V24_TOOL_SYSTEM_ENABLED", "true")
+    monkeypatch.setenv("V24_TOOL_PERMISSION_ENABLED", "true")
     get_settings.cache_clear()
+
     try:
-        return get_settings()
+        settings = get_settings()
+        assert _violating_tokens(enablement_violations(settings)) == []
     finally:
         get_settings.cache_clear()
 
 
-@pytest.mark.parametrize("flag", V24_SUB_FLAGS)
-def test_each_v24_sub_flag_without_master_is_violation(monkeypatch, flag):
-    settings = _settings_with(monkeypatch, **{flag: True})
-    violations = enablement_violations(settings)
-    assert any("tool_system_enabled" in violation for violation in violations), flag
-
-
-@pytest.mark.parametrize("flag", V24_SUB_FLAGS)
-def test_validate_chain_fail_fast_per_sub_flag(monkeypatch, flag):
-    settings = _settings_with(monkeypatch, **{flag: True})
-    with pytest.raises(SettingsError) as excinfo:
-        validate_enablement_chain(settings)
-    assert flag in str(excinfo.value)
-
-
-def test_all_v24_flags_with_master_is_clean(monkeypatch):
-    envs = {flag: True for flag in V24_FLAGS}
-    envs.update(FEISHU_BINDING_ENVS)
-    settings = _settings_with(monkeypatch, **envs)
-    assert enablement_violations(settings) == []
-
-
-def test_channel_requires_feishu_binding(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        tool_system_enabled=True,
-        tool_channel_enabled=True,
-    )
-    violations = enablement_violations(settings)
-    assert any("feishu_enabled" in violation for violation in violations)
-
-
-def test_channel_with_feishu_binding_is_clean(monkeypatch):
-    envs = dict(FEISHU_BINDING_ENVS)
-    envs.update(tool_system_enabled=True, tool_channel_enabled=True)
-    settings = _settings_with(monkeypatch, **envs)
-    assert enablement_violations(settings) == []
-
-
-def test_external_api_requires_master(monkeypatch):
-    settings = _settings_with(monkeypatch, tool_external_api_enabled=True)
-    violations = enablement_violations(settings)
-    assert any("tool_system_enabled" in violation for violation in violations)
-
-
-def test_violation_message_is_readable_chinese(monkeypatch):
-    settings = _settings_with(monkeypatch, tool_permission_enabled=True)
-    with pytest.raises(SettingsError) as excinfo:
-        validate_enablement_chain(settings)
-    message = str(excinfo.value)
-    assert "V2 启用链配置错误" in message
-    assert "tool_permission_enabled" in message
-    assert "总闸" in message
-
-
 def test_default_settings_pass_chain():
     validate_enablement_chain(get_settings())
-
-
-def test_existing_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, tool_channel_enabled=True)
-    assert any("feishu_enabled" in v for v in enablement_violations(settings))

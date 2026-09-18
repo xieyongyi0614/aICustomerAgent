@@ -1,12 +1,15 @@
-"""TOOL-001：ToolSettings Flag 体系、参数与 csv 解析（TOOL-001 §4.3 / §6 / E6 / E7 / E10）。"""
+"""TOOL-001：ToolSettings 治理参数与 csv 解析（TOOL-001 §4.3 / §6 / E6 / E7 / E10）。
+
+总闸与九个子闸已随 V2.4.0 转正删除，本文件转为「开关已移除 + 参数与校验不变」。
+"""
 
 import pytest
 
-from app.core.settings import get_settings
+from app.core.settings import Settings, get_settings
 from app.core.settings._shared import SettingsError
 from app.core.settings.tool import ToolSettings
 
-V24_FLAGS = (
+V24_REMOVED_FLAGS = (
     "tool_system_enabled",
     "tool_permission_enabled",
     "tool_schema_validation_enabled",
@@ -32,11 +35,10 @@ V24_PARAM_DEFAULTS = {
 }
 
 
-def test_v24_flags_default_off():
-    settings = get_settings()
-    assert len(V24_FLAGS) == 10
-    for flag in V24_FLAGS:
-        assert getattr(settings, flag) is False, flag
+def test_v24_flags_removed_from_settings():
+    for flag in V24_REMOVED_FLAGS:
+        assert flag not in ToolSettings.model_fields, flag
+        assert flag not in Settings.model_fields, flag
 
 
 def test_v24_params_defaults():
@@ -53,20 +55,19 @@ def test_tool_settings_merged_into_global_settings():
 
 
 def test_tool_settings_reads_from_environment(monkeypatch):
-    monkeypatch.setenv("TOOL_SYSTEM_ENABLED", "true")
     monkeypatch.setenv("TOOL_SURFACE_MAX_TOOLS", "7")
+    monkeypatch.setenv("TOOL_CONFIRM_TTL_REUSE", "false")
     get_settings.cache_clear()
     try:
         settings = get_settings()
-        assert settings.tool_system_enabled is True
         assert settings.tool_surface_max_tools == 7
+        assert settings.tool_confirm_ttl_reuse is False
     finally:
         get_settings.cache_clear()
 
 
-def test_e10_disabled_tool_ids_returns_empty_set_with_all_flags_off():
+def test_e10_disabled_tool_ids_defaults_to_empty_set():
     settings = get_settings()
-    assert settings.tool_system_enabled is False
     assert settings.disabled_tool_ids() == frozenset()
     assert settings.allowed_ext_hosts() == frozenset()
 
