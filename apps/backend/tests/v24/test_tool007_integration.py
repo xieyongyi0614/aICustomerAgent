@@ -46,12 +46,14 @@ EXPECTED_MAINTENANCE_STEPS: tuple[str, ...] = (
     "world_maintenance",
     "world_simulation",
     "action_retry",
+    "action_schedule",
     "outbox_consume",
     "trigger_reconcile",
 )
 """维护步序列（`_run_maintenance` 内按源码顺序的调度 kind）。
 `action_expire`（TOOL-005 过期确认清理挂接点所在函数）是 `action_retry` 条目的子步，
-见 `EXPECTED_ACTION_RETRY_SUBSTEPS`。"""
+见 `EXPECTED_ACTION_RETRY_SUBSTEPS`。`action_schedule` 为 v26 消费入口裁决（F.13）：
+挂维护步、不进 autonomous_tick Profile。"""
 
 EXPECTED_ACTION_RETRY_SUBSTEPS: tuple[str, ...] = ("action_retry", "action_expire")
 
@@ -326,7 +328,7 @@ def _maintenance_steps() -> tuple[str, ...]:
 
 
 def test_maintenance_step_sequence_is_unchanged():
-    """维护步序列零改动：本任务不新增维护步（TOOL-005 的挂接点在函数体内，不新增序列项）。"""
+    """维护步序列：含 F.13 裁决新增的 action_schedule 挂载点。"""
     assert _maintenance_steps() == EXPECTED_MAINTENANCE_STEPS
 
 

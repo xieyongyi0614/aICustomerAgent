@@ -1,6 +1,6 @@
 """AGENT-001 兼容回归测试。
 
-覆盖：合法 Flag 组合无 enablement 违规、unified 关闭时前台不产生 loop_runs 行。
+覆盖：前台收编常开后 chat 恒产生 foreground_chat 台账；enablement 无 v21 残留规则。
 """
 
 from app.core.settings import get_settings
@@ -9,18 +9,15 @@ from app.repositories import loop_run_repository
 
 
 class TestEnablement:
-    def test_legal_combo_has_no_v21_violations(self, override_settings):
-        override_settings(UNIFIED_RUN_ENABLED="true")
+    def test_no_v21_enablement_rules_remain(self, override_settings):
         violations = [
             v for v in enablement_violations(get_settings()) if "v21" in v
         ]
         assert violations == []
 
 
-class TestFlagOffBehavior:
-    def test_chat_without_unified_creates_no_run_row(
-        self, db_session_factory, fake_llm
-    ):
+class TestForegroundAlwaysOn:
+    def test_chat_creates_foreground_run_row(self, db_session_factory, fake_llm):
         from fastapi.testclient import TestClient
 
         from app.core import llm_factory
@@ -52,4 +49,6 @@ class TestFlagOffBehavior:
                 "/api/v1/chat/message", json={"content": "我很难过"}
             )
             assert resp.status_code == 200
-        assert loop_run_repository.list_recent(kind="chat") == []
+        runs = loop_run_repository.list_recent(kind="chat")
+        assert len(runs) == 1
+        assert runs[0].run_kind == "foreground_chat"

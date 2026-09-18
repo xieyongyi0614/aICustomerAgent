@@ -1,7 +1,7 @@
 """AGENT-001 前台收编集成测试（foreground_chat Run）。
 
-覆盖：unified 开启时 chat 消息产生 run_kind=foreground_chat 台账（profile/
-trigger_type/成本汇总）、预算软降级 → degraded 终态、unified 关闭时零台账。
+覆盖：chat 消息恒产生 run_kind=foreground_chat 台账（profile/trigger_type/成本汇总）、
+预算软降级 → degraded 终态。前台收编已常开，无配置开关。
 """
 
 import json
@@ -57,9 +57,8 @@ def _post(client, content="我很难过"):
 
 class TestForegroundRun:
     def test_chat_creates_foreground_run_row(
-        self, db_session_factory, override_settings, client, fake_llm
+        self, db_session_factory, client, fake_llm
     ):
-        override_settings(UNIFIED_RUN_ENABLED="true")
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         meta = _post(client)
@@ -78,10 +77,7 @@ class TestForegroundRun:
     def test_run_budget_soft_degradation_marks_terminal(
         self, db_session_factory, override_settings, client, fake_llm
     ):
-        override_settings(
-            UNIFIED_RUN_ENABLED="true",
-            FOREGROUND_RUN_LLM_BUDGET="0",
-        )
+        override_settings(FOREGROUND_RUN_LLM_BUDGET="0")
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         _post(client)
@@ -89,11 +85,14 @@ class TestForegroundRun:
         run = loop_run_repository.list_recent(run_kind="foreground_chat")[0]
         assert run.status == "degraded"
 
-    def test_unified_off_creates_no_run_row(
+    def test_chat_always_creates_foreground_run_row(
         self, db_session_factory, client, fake_llm
     ):
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         _post(client)
+        _post(client, content="在么")
 
-        assert loop_run_repository.list_recent(kind="chat") == []
+        runs = loop_run_repository.list_recent(kind="chat")
+        assert len(runs) == 2
+        assert all(r.run_kind == "foreground_chat" for r in runs)

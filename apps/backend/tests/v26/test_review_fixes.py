@@ -12,10 +12,10 @@ from app.services.action import manager, scheduler
 
 
 class TestActionScheduleConsumption:
-    """REF-004/005 的消费入口现状：调度步自门控，且不在 `autonomous_tick` 阶段序列内。
+    """REF-004/005 消费入口：挂 life_loop 维护步，不进 autonomous_tick Profile。
 
-    v2.0.0 的 `life_loop._run_user_cycle` 随开关体系删除下线后，周期内没有 `action_schedule`
-    挂载点——消费入口归属是 v26 批待裁决项（docs/refactor/flag-removal-audit.md F.11）。
+    裁决（docs/refactor/flag-removal-audit.md F.13）：到期调度认领是维护语义，
+    不进自治阶段序列；`step_action_schedule` 本体仍双闸自门控。
     """
 
     def test_flags_off_self_gate_in_scheduler(self):
@@ -31,6 +31,17 @@ class TestActionScheduleConsumption:
 
         spec = profiles.get_profile("autonomous_tick")
         assert "action_schedule" not in spec.stages
+
+    def test_maintenance_mounts_action_schedule(self):
+        import inspect
+
+        from app.application import life_loop
+
+        src = inspect.getsource(life_loop._run_maintenance)
+        assert "step_action_schedule" in src
+        assert 'step": "action_schedule"' in src or '"action_schedule"' in src
+        pending_src = inspect.getsource(life_loop._maintenance_pending)
+        assert "action_schedule" in pending_src
 
 
 class TestStateMachineAuthority:

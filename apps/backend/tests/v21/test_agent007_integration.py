@@ -1,8 +1,7 @@
-"""AGENT-007 Integration：Flag 组合矩阵 + Evolution Loop 全链收口验证。
+"""AGENT-007 Integration：Evolution Loop 全链收口验证。
 
-覆盖：五 Flag enablement 全组合、全 Flag 开启下的 Run 链路（前台 Run 台账 +
-Snapshot + Goal Stack + 决策审计 + 人格基线种子 + 指标快照 + Ledger）、
-逐档回滚行为面、全关对照（v2.0.0 行为）、版本回归清单文档存在性。
+覆盖：v21 功能常开后的 Run 链路（前台 Run 台账 + Snapshot + Goal Stack +
+决策审计 + 人格基线种子 + 指标快照 + Ledger）、前台恒台账行为面。
 """
 
 from datetime import datetime, timedelta
@@ -29,10 +28,6 @@ from app.services import evolution, trigger_evaluator
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "integration-user"
 SESSION = "int-s1"
-
-ALL_V21_FLAGS = {
-    "UNIFIED_RUN_ENABLED": "true",
-}
 
 
 @pytest.fixture
@@ -65,8 +60,8 @@ def _structured_llm(fake_llm):
 
 
 class TestEnablementMatrix:
-    def test_full_matrix_dependencies(self, override_settings):
-        override_settings(**ALL_V21_FLAGS)
+    def test_no_v21_rules_remain(self, override_settings):
+        override_settings()
         assert [
             v for v in enablement_violations(get_settings()) if "v21" in v
         ] == []
@@ -74,9 +69,8 @@ class TestEnablementMatrix:
 
 class TestEvolutionLoopE2E:
     def test_foreground_run_full_chain(
-        self, db_session_factory, override_settings, client, fake_llm
+        self, db_session_factory, client, fake_llm
     ):
-        override_settings(**ALL_V21_FLAGS)
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         resp = client.post("/api/v1/chat/message", json={"content": "我有点累"})
@@ -96,11 +90,10 @@ class TestEvolutionLoopE2E:
         assert all(anchors.values()), anchors
 
     @pytest.mark.asyncio
-    async     def test_goal_stack_and_snapshot_stages_present(
+    async def test_goal_stack_and_snapshot_stages_present(
         self, db_session_factory, override_settings, fake_llm, monkeypatch
     ):
-        override_settings( world_enabled="false", **ALL_V21_FLAGS
-        )
+        override_settings(world_enabled="false")
         trigger_evaluator._followup_registry.clear()
         conversation_repository.get_or_create_conversation(SESSION, USER)
         trigger_evaluator.register_followup(USER, NOW - timedelta(minutes=1), "下午面试")
@@ -121,7 +114,7 @@ class TestEvolutionLoopE2E:
         assert steps.index("goal_stack") == steps.index("goal_check") + 1
 
     def test_metrics_snapshot_and_ledger(self, db_session_factory, override_settings):
-        override_settings(**ALL_V21_FLAGS)
+        override_settings()
         personality_state_repository.seed_if_absent(USER, persona_evolution.PERSONALITY_AXES)
         from app.repositories import goal_repository
 
@@ -140,7 +133,7 @@ class TestEvolutionLoopE2E:
     def test_evolution_feedback_chain(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(**ALL_V21_FLAGS)
+        override_settings()
         personality_state_repository.seed_if_absent(USER, persona_evolution.PERSONALITY_AXES)
         from app.repositories import action_repository
 
@@ -181,23 +174,21 @@ class TestEvolutionLoopE2E:
         assert second["topics"], "趋势越限必须产生演化议题"
         assert fired == ["event"], "议题必须经 Reflection 既有触发通道"
 
-    def test_rollback_chain_downgrade_safe(
-        self, db_session_factory, override_settings, client, fake_llm
+    def test_foreground_ledger_grows_every_chat(
+        self, db_session_factory, client, fake_llm
     ):
-        override_settings(**ALL_V21_FLAGS)
         llm_factory.set_llm(_structured_llm(fake_llm))
         client.post("/api/v1/chat/message", json={"content": "嗨"})
-        assert loop_run_repository.list_recent(run_kind="foreground_chat")
+        first = len(loop_run_repository.list_recent(run_kind="foreground_chat"))
+        assert first == 1
 
-        override_settings(UNIFIED_RUN_ENABLED="false")
-        runs_before = len(loop_run_repository.list_recent(run_kind="foreground_chat"))
         client.post("/api/v1/chat/message", json={"content": "在么"})
         runs = loop_run_repository.list_recent(run_kind="foreground_chat")
-        assert len(runs) == runs_before, "Flag 全关后不得新增 foreground_chat 台账行"
+        assert len(runs) == first + 1
         assert all(r.status in ("done", "degraded") for r in runs)
 
 
-class TestFlagOff:
-    def test_all_flags_off_no_v21_writes(self, db_session_factory, override_settings):
+class TestEnablementBaseline:
+    def test_default_settings_have_no_violations(self, db_session_factory, override_settings):
         override_settings()
         assert enablement_violations(get_settings()) == []

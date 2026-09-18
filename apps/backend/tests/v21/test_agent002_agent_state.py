@@ -203,12 +203,11 @@ class TestBackgroundRunIntegration:
 
 class TestForegroundContextSegment:
     def test_prompt_carries_interest_section(
-        self, db_session_factory, override_settings, client, fake_llm, monkeypatch
+        self, db_session_factory, client, fake_llm, monkeypatch
     ):
         from app.application import agent_state_assembler as assembler_mod
         from app.core import llm_factory
 
-        override_settings(UNIFIED_RUN_ENABLED="true")
         monkeypatch.setattr(
             assembler_mod,
             "_load_preferences",
@@ -247,11 +246,10 @@ class TestForegroundContextSegment:
         assert "面试准备" in joined
 
     def test_snapshot_archived_for_foreground_run(
-        self, db_session_factory, override_settings, client, fake_llm
+        self, db_session_factory, client, fake_llm
     ):
         from app.core import llm_factory
 
-        override_settings(UNIFIED_RUN_ENABLED="true")
         llm = fake_llm(
             response="好呀。",
             structured_responses={
