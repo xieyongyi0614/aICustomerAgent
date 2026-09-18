@@ -59,9 +59,9 @@
 
 ---
 
-## 四、开关字段（51 个，已去前缀；其中 3 个已删除，在存 48）
+## 四、开关字段（51 个，已去前缀；3 个死开关已删 + v22 段 5 个已固化常开，在存 43）
 
-按版本段分组。这些字段同时是**门控**，去前缀已完成；**去门控**（固化 ON）仍按审查报告 §八 / 附录 F 的批次顺序推进。
+按版本段分组。这些字段同时是**门控**。去前缀（轨道 A）已全部完成；**去门控**（固化 ON）已完成 v22 段（5 个，报告 F.9），剩余 43 个按风险递增顺序推进：v21 → v23 → v24 → v25 → v26 → 收尾删 `enablement.py`。
 
 | 段 | 旧名 | 新名 | 旧 env | 默认 | 备注 |
 |---|---|---|---|---|---|
@@ -71,11 +71,11 @@
 | v21 | `v21_goal_stack_enabled` | `goal_stack_enabled` | `V21_GOAL_STACK_ENABLED` | `False` | 含 OFF 回退路径 |
 | v21 | `v21_personality_evolution_enabled` | `personality_evolution_enabled` | `V21_PERSONALITY_EVOLUTION_ENABLED` | `False` | — |
 | v21 | `v21_unified_run_enabled` | `unified_run_enabled` | `V21_UNIFIED_RUN_ENABLED` | `False` | — |
-| v22 | `v22_emotion_transition_enabled` | `emotion_transition_enabled` | `V22_EMOTION_TRANSITION_ENABLED` | `False` | — |
-| v22 | `v22_experience_enabled` | `experience_enabled` | `V22_EXPERIENCE_ENABLED` | `False` | — |
-| v22 | `v22_habit_runtime_enabled` | `habit_runtime_enabled` | `V22_HABIT_RUNTIME_ENABLED` | `False` | — |
-| v22 | `v22_relationship_addressing_enabled` | `relationship_addressing_enabled` | `V22_RELATIONSHIP_ADDRESSING_ENABLED` | `False` | — |
-| v22 | `v22_style_contract_enabled` | `style_contract_enabled` | `V22_STYLE_CONTRACT_ENABLED` | `False` | — |
+| v22 | `v22_emotion_transition_enabled` | `emotion_transition_enabled` | `V22_EMOTION_TRANSITION_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
+| v22 | `v22_experience_enabled` | `experience_enabled` | `V22_EXPERIENCE_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
+| v22 | `v22_habit_runtime_enabled` | `habit_runtime_enabled` | `V22_HABIT_RUNTIME_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
+| v22 | `v22_relationship_addressing_enabled` | `relationship_addressing_enabled` | `V22_RELATIONSHIP_ADDRESSING_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
+| v22 | `v22_style_contract_enabled` | `style_contract_enabled` | `V22_STYLE_CONTRACT_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
 | v23 | `v23_daily_life_enabled` | `daily_life_enabled` | `V23_DAILY_LIFE_ENABLED` | `False` | 含 OFF 回退路径 |
 | v23 | `v23_debug_tick_enabled` | `debug_tick_enabled` | `V23_DEBUG_TICK_ENABLED` | `False` | — |
 | v23 | `v23_event_detection_enabled` | `event_detection_enabled` | `V23_EVENT_DETECTION_ENABLED` | `False` | 含 OFF 回退路径 |
@@ -339,7 +339,7 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re; from app.core.setting
 cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; mods={'agent_runtime':'v21','experience':'v22','world_simulation':'v23','tool':'v24','plan':'v25','action_execution':'v26'}; f={n:mods[p.stem] for p in pathlib.Path('app/core/settings').glob('*.py') if p.stem in mods for n in re.findall(r'^\s{4}([a-z_0-9]+)\s*:\s*bool\s*=',p.read_text(encoding='utf-8'),re.M)}; t={p:p.read_text(encoding='utf-8') for p in pathlib.Path('app').rglob('*.py') if 'core/settings' not in p.as_posix()}; [print(f[n], n, sum(len(re.findall(r'\b'+n+r'\b',x)) for x in t.values())) for n in sorted(f, key=lambda k:(f[k],k))]"
 ```
 
-预期：48 行，按版本段汇总为 v21 6 / v22 5 / v23 7 / v24 11 / v25 14 / v26 5（2026-09-18 实测 app 引用合计 234 处 / 53 个模块）。
+预期（v22 段去门控后）：**43 行**，按版本段汇总为 v21 6 / v23 7 / v24 11 / v25 14 / v26 5；v22 一段应输出 0 行（`experience.py` 已随固化常开整体删除）。第 0 步时实测为 48 行 / app 引用 234 处 / 53 个模块。
 
 **再生成算法**（本表若需重建）：
 
@@ -385,9 +385,10 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; mods={'agent_
 | 批次 1 已处理 | 12（5 改名 + 7 删除） |
 | 轨道 A 处理 | 200 去前缀（51 开关 + 149 调参）+ 步骤 0 删 2 个未接线字段 |
 | 第 0 步删除死开关 | 3（见 §九 步骤 2） |
-| **当前** settings 字段总数 | **422** |
+| v22 段去门控删除 | 5（ON 转常开，见报告 F.9） |
+| **当前** settings 字段总数 | **417** |
 | 其中带 `vXX_` 前缀 | **0** |
-| 原带前缀、现仍在存的字段 | 197（**48 开关** + 149 调参） |
+| 原带前缀、现仍在存的字段 | 192（**43 开关** + 149 调参） |
 | 唯一性例外（撞名，见 §六） | 2 组（均已裁决并执行） |
 
-**对账**：`434 − 7 − 2 − 3 = 422`；`212 = 200 + 12`；`200 = 197 + 3`（3 个死开关未进入改名后在存清单）。
+**对账**：`434 − 7 − 2 − 3 − 5 = 417`；`212 = 200 + 12`；`200 = 192 + 3 + 5`（3 个死开关 + v22 段 5 个固化常开，均未进入在存清单）。

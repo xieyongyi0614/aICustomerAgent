@@ -694,7 +694,7 @@ cd apps/frontend && pnpm vitest run
 |---|---|---|---|---|---|---|---|
 | 1 | v2 段 | 7（已删）+ 3（改名保留） | — | 63 处门控（见 D.2） | 207 调用点 | 5（§4.1 #1~#4 + D 段） | **已完成** |
 | 2 | v21 | 6 | 0 | 51 | 19 | 2（§4.2 #16、#17） | 待做 |
-| 3 | v22 | 5 | 0 | 19 | 15 | 0 | 待做（可作热身批） |
+| 3 | v22 | 5 | 0 | 19 | 15 | 0 | **已完成**（见 F.9） |
 | 4 | v23 | **8** | 0 | 79 | 47 | 3（§4.1 #5、§4.2 #14/#15） | 待做 |
 | 5 | v24 | 11 | 1（`v24_tool_confirm_ttl_reuse`） | 106 | 272 | 1（§4.2 #9） | 待做（测试量最大） |
 | 6 | v25 | **14** | 2（`v25_plan_tool_required`、`v25_plan_context_digest_enabled`） | 103 | 266 | 6（§4.2 #7/#8/#10~#13） | 待做（依赖面最广） |
@@ -849,6 +849,25 @@ cd apps/frontend && pnpm vitest run
 | **flaky** | 4（浮动） | `e2e/test_chat_http_integration.py::test_http_chat_streams_chunks_incrementally`、`e2e/test_memory_e2e.py::test_extractor_failure_does_not_break_sse`、`e2e/test_turn_meta_stream.py::test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id`、`v7.8/test_performance.py::test_observability_overhead_within_budget`（`v8/test_world_performance.py` 与 `e2e/test_debug_trace_persist.py` 亦偶发） | **豁免**：单跑复现或三轮内翻转即判 flaky |
 
 跑法备忘（Windows）：必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（实测已踩两次）。
+
+### F.9 轨道 B 批次 v22（体验层）去门控 —— 2026-09-18
+
+提交 `52c6a87`。**首个真正的行为变更批**，但 §四 判定的 OFF 回退路径为 0 条——删的不是在跑的代码，而是「从未跑过的代码」的门控。
+
+| 项 | 内容 |
+|---|---|
+| 删除开关 | `experience_enabled` / `style_contract_enabled` / `emotion_transition_enabled` / `relationship_addressing_enabled` / `habit_runtime_enabled`（5 个，全部 off→常开） |
+| 整域文件消失 | `app/core/settings/experience.py` **只含这 5 个字段、无调参** → 整文件删除 + `Settings` 继承表去掉一项（25 领域类 → 24）；字段总数 422 → **417** |
+| 门控站点 | `chat_pipeline._build_style_context`（总闸早返回，删后 `settings` 局部量一并移除）、`style_context.build_style_context`（双闸早返回） |
+| 旋钮收口（裁决：彻底常开） | `assemble_style_contract` 的 `include_addressing/emotion/habits` 三形参与三处 `if` 删除；连带 `_apply_emotion` 的 `relationship_modulation` 与 `_resolve_conflicts` 的 `resolve_expressiveness` 也收成无条件。**依据**：全仓库无任何调用点传过非默认值，且三个默认值本就是 `True` |
+| enablement | v22 段（四子闸 → 总闸）循环删除 |
+| 测试 | 删 4 个门控矩阵用例（flags off / 仅总闸+风格闸 / relationship 闸关 / emotion 闸关）+ 1 个 skipped 用例 + 1 个 enablement 文案用例；改 3 个为无条件断言；`test_tool001_enablement` 的 v22 链断言删除（用例改名 `test_existing_v21_v23_chain_rules_intact`）。**净 -216 行** |
+| 冻结面 | `test_tool010_e2e.py::ZERO_DIFF_HASHES` 的 `chat_pipeline.py` 哈希重建（允许改动）；一条根因同时解释 `test_four_step_tool_addition_keeps_pipelines_untouched` 的失败 |
+| 验证 | v22/v24-tool001/v23-ws019 相关 **179 用例全绿**；Fast Test（`-m "(unit or api) and not slow"`）**1449 全绿**；全量 **16 failed / 6431 passed**，失败 ID 集合 **⊆ F.8 豁免清单，零新增归因**；前端无 v22 引用，零改动 |
+
+**行为变化与验证缺口（必读）**：固化后**前台每一轮回复的 prompt 恒带 `【本轮表达风格】` 段**，真实模型的称呼/语气/情绪强度/习惯指令全部进 prompt。单元测试与 golden 快照**都测不到**它（golden 用例不传 `style_ctx`，实测零命中），因此本批补建了 `docs/version/v2.2.0/regression-checklist.md`（同时关闭 `v2.2.0/acceptance-report.md` 四.4 的「建议补 regression-checklist」遗留项）。**该清单尚未执行——它是 v22 上线的前置条件，不是可选项。**
+
+部署侧注意：v22 的 5 个键从未出现在 `.env`，本批**零 env 变更**；但若运维副本里自行加过 `EXPERIENCE_ENABLED` 之类，删字段后它们变成**无前缀的未知键**，`unknown_versioned_env_keys()` 只识别 `^V<数字>_`，**不会告警**（F.4 已限定）。
 
 ---
 
