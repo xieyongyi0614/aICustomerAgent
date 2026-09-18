@@ -162,7 +162,7 @@ def _select_goal(
             or now.hour < settings.goal_late_night_end
         )
         goals_for_select = list(state.goals)
-        if get_settings().goal_stack_enabled and state.layered_goals:
+        if state.layered_goals:
             goals_for_select.extend(state.layered_goals)
         return goal_service.select(
             goals_for_select,
@@ -271,13 +271,8 @@ def _run_foreground_decision(
     try:
         from app.services import decision_pipeline, goal_stack as goal_stack_service
 
-        settings = get_settings()
-        stack = (
-            goal_stack_service.evaluate_stack(
-                user_id, now, retire_overdue_enabled=False
-            )
-            if settings.goal_stack_enabled
-            else None
+        stack = goal_stack_service.evaluate_stack(
+            user_id, now, retire_overdue_enabled=False
         )
         goal = getattr(selected_goal, "goal", None)
         result = decision_pipeline.run_pipeline(

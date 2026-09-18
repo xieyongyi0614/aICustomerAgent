@@ -93,7 +93,7 @@ class TestAutonomyWiring:
     def test_pipeline_intention_flag_on(self, db_session_factory, override_settings):
         from app.application import autonomy_engine
 
-        override_settings(AGENT_RUNTIME_ENABLED="true", GOAL_STACK_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         verdict = SimpleNamespace(intention="check_in", goal_id=None)
         intention, audit = autonomy_engine._pipeline_intention(verdict, USER, NOW)
         assert audit is not None and "candidates" in audit

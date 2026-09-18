@@ -12,14 +12,11 @@ class AgentRuntimeSettings(BaseSettings):
     foreground_gateway_enforced: bool = False
     light_llm_profile: str = ""
     agent_event_escalation_types: str = ""
-    goal_stack_enabled: bool = False
     goal_medium_timeout_days: int = 7
     goal_short_timeout_hours: int = 24
     decision_weight: float = 1.0
-    personality_evolution_enabled: bool = False
     evolution_window_days: int = 7
     evolution_max_drift_per_week: float = 0.05
-    agent_metrics_enabled: bool = False
     agent_evolution_interval_seconds: float = 3600.0
     metric_trend_windows: int = 7
     metric_breach_streak: int = 2

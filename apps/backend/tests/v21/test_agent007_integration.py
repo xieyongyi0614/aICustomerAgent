@@ -33,9 +33,6 @@ SESSION = "int-s1"
 ALL_V21_FLAGS = {
     "AGENT_RUNTIME_ENABLED": "true",
     "UNIFIED_RUN_ENABLED": "true",
-    "GOAL_STACK_ENABLED": "true",
-    "AGENT_METRICS_ENABLED": "true",
-    "PERSONALITY_EVOLUTION_ENABLED": "true",
 }
 
 
@@ -75,29 +72,10 @@ class TestEnablementMatrix:
             v for v in enablement_violations(get_settings()) if "v21" in v
         ] == []
 
-    def test_each_subflag_requires_runtime(self, override_settings):
-        for flag in (
-            "UNIFIED_RUN_ENABLED",
-            "GOAL_STACK_ENABLED",
-            "AGENT_METRICS_ENABLED",
-            "PERSONALITY_EVOLUTION_ENABLED",
-        ):
-            override_settings(**{flag: "true"}, AGENT_RUNTIME_ENABLED="false")
-            violations = enablement_violations(get_settings())
-            assert any("agent_runtime_enabled" in v for v in violations), flag
-
-    def test_personality_requires_metrics(self, override_settings):
-        override_settings(
-            AGENT_RUNTIME_ENABLED="true",
-            PERSONALITY_EVOLUTION_ENABLED="true",
-            AGENT_METRICS_ENABLED="false",
-        )
-        violations = [
-            v
-            for v in enablement_violations(get_settings())
-            if "personality_evolution_enabled" in v
-        ]
-        assert violations, "演化必须依赖反馈通道（架构 §9.2 顺序约束）"
+    def test_unified_run_requires_runtime(self, override_settings):
+        override_settings(UNIFIED_RUN_ENABLED="true", AGENT_RUNTIME_ENABLED="false")
+        violations = enablement_violations(get_settings())
+        assert any("agent_runtime_enabled" in v for v in violations)
 
 
 class TestEvolutionLoopE2E:
@@ -218,9 +196,6 @@ class TestEvolutionLoopE2E:
         assert loop_run_repository.list_recent(run_kind="foreground_chat")
 
         override_settings(
-            PERSONALITY_EVOLUTION_ENABLED="false",
-            AGENT_METRICS_ENABLED="false",
-            GOAL_STACK_ENABLED="false",
             UNIFIED_RUN_ENABLED="false",
             AGENT_RUNTIME_ENABLED="false",
         )

@@ -39,8 +39,6 @@ _REBALANCE_MAX_PRIORITY = 2
 def compile_personality(user_id: str, now: datetime | None = None) -> list[dict]:
     """窗口到期轴的编译：证据收集 → 漂移提案 → 限速/边界 → 写入 + 审计。"""
     settings = get_settings()
-    if not settings.personality_evolution_enabled:
-        return []
     now = now or datetime.now()
     window_days = max(settings.evolution_window_days, 1)
     window_start = now - timedelta(days=window_days)
@@ -108,8 +106,6 @@ def propose_rebalance(user_id: str, now: datetime | None = None) -> list[dict]:
     （整程），否则建议永远不可达（硬超时先退役，活跃集里已无该目标）。
     """
     settings = get_settings()
-    if not settings.personality_evolution_enabled:
-        return []
     now = now or datetime.now()
     proposals: list[dict] = []
     for goal in goal_repository.list_layered_active(user_id):

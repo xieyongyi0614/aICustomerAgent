@@ -97,30 +97,6 @@ def enablement_violations(settings) -> list[str]:
             "unified_run_enabled 要求 agent_runtime_enabled"
             "（前台收编依赖统一 Run 模型）"
         )
-    if (
-        settings.personality_evolution_enabled
-        and not settings.agent_runtime_enabled
-    ):
-        violations.append(
-            "personality_evolution_enabled 要求 agent_runtime_enabled"
-        )
-    if settings.agent_metrics_enabled and not settings.agent_runtime_enabled:
-        violations.append(
-            "agent_metrics_enabled 要求 agent_runtime_enabled"
-        )
-    if (
-        settings.personality_evolution_enabled
-        and not settings.agent_metrics_enabled
-    ):
-        violations.append(
-            "personality_evolution_enabled 要求 agent_metrics_enabled"
-            "（反馈通道先于它反馈的对象上线）"
-        )
-    if settings.goal_stack_enabled and not settings.agent_runtime_enabled:
-        violations.append(
-            "goal_stack_enabled 要求 agent_runtime_enabled"
-            "（Goal Stack 依赖 Run 阶段插槽）"
-        )
     v23_sub_flags = (
         "time_advance_enabled",
         "daily_life_enabled",

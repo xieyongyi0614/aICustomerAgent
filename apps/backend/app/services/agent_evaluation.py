@@ -31,8 +31,6 @@ METRIC_NAMES = (
 
 def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
     settings = get_settings()
-    if not settings.agent_metrics_enabled:
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     now = now or datetime.now()
     window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     metrics = _compute_metrics(user_id, now)

@@ -221,8 +221,8 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
     assert "总闸" in message
 
 
-def test_existing_v2_v21_v23_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, goal_stack_enabled=True)
+def test_existing_v21_v23_v24_chain_rules_intact(monkeypatch):
+    settings = _settings_with(monkeypatch, unified_run_enabled=True)
     assert any(
         "agent_runtime_enabled" in item for item in enablement_violations(settings)
     )

@@ -18,19 +18,8 @@ from app.application.worker_loop import run_worker_loop
 
 logger = logging.getLogger(__name__)
 
-def metrics_enabled() -> bool:
-    return get_settings().agent_metrics_enabled
-
-def evolution_enabled() -> bool:
-    return get_settings().personality_evolution_enabled
-
-
 def enabled() -> bool:
-    settings = get_settings()
-    return bool(
-        settings.agent_runtime_enabled
-        and (settings.agent_metrics_enabled or settings.personality_evolution_enabled)
-    )
+    return get_settings().agent_runtime_enabled
 
 
 def run_evolution_tick(now: datetime | None = None) -> dict:
@@ -46,21 +35,20 @@ def run_evolution_tick(now: datetime | None = None) -> dict:
     stats = {"users": 0, "snapshots": 0, "personality": 0, "rebalance": 0}
     for user_id in conversation_repository.list_user_ids():
         stats["users"] += 1
-        if metrics_enabled() and agent_metric_repository.get_window(user_id, window_start) is None:
+        if agent_metric_repository.get_window(user_id, window_start) is None:
             try:
                 agent_evaluation.run_daily_snapshot(user_id, now)
                 stats["snapshots"] += 1
             except Exception:
                 logger.exception("指标快照失败：%s", user_id)
-        if evolution_enabled():
-            try:
-                stats["personality"] += len(evolution.compile_personality(user_id, now))
-            except Exception:
-                logger.exception("人格编译失败：%s", user_id)
-            try:
-                stats["rebalance"] += len(evolution.rebalance_goals(user_id, now))
-            except Exception:
-                logger.exception("goal rebalance 失败：%s", user_id)
+        try:
+            stats["personality"] += len(evolution.compile_personality(user_id, now))
+        except Exception:
+            logger.exception("人格编译失败：%s", user_id)
+        try:
+            stats["rebalance"] += len(evolution.rebalance_goals(user_id, now))
+        except Exception:
+            logger.exception("goal rebalance 失败：%s", user_id)
     return {"status": "ok", **stats}
 
 

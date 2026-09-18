@@ -557,11 +557,7 @@ def _pipeline_intention(
         from app.application import agent_state_context
         from app.services import decision_pipeline, goal_stack as goal_stack_service
 
-        stack = (
-            goal_stack_service.evaluate_stack(user_id, now)
-            if settings.goal_stack_enabled
-            else None
-        )
+        stack = goal_stack_service.evaluate_stack(user_id, now)
         world_impacts = None
         world_schedule = None
         if settings.world_simulation_enabled and settings.event_detection_enabled:

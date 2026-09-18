@@ -1,8 +1,7 @@
 """AGENT-003 Goal Stack 测试。
 
 覆盖：栈裁决（主目标选举/能量抑制）、L2/L1 超时退役、对齐度评分契约、
-供给 origin 落库与 commitment 来源、上下文栈段（Flag on/off）、
-_select_goal 层级扩展、enablement 依赖。
+供给 origin 落库与 commitment 来源、上下文栈段、`_select_goal` 层级扩展。
 """
 
 from datetime import datetime, timedelta
@@ -42,21 +41,13 @@ def _goal(layer, description, priority=3, type_="conversation", age_days=0):
 @pytest.fixture()
 def stack_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(
-        AGENT_RUNTIME_ENABLED="true",
-        GOAL_STACK_ENABLED="true",
-        world_enabled="false")
+    override_settings(AGENT_RUNTIME_ENABLED="true", world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
 
 
 class TestGoalStackEvaluator:
-    def test_empty_stack_when_flag_off(self, db_session_factory, override_settings):
-        override_settings(GOAL_STACK_ENABLED="false")
-        stack = goal_stack.evaluate_stack(USER, NOW)
-        assert stack.primary() is None and stack.drives == {}
-
     def test_primary_selection_and_drives(self, db_session_factory, stack_on):
         goal_repository.create_hierarchical_goal(
             USER, "long_term", "relationship", "成为信任的伙伴", 2, origin="insight"
@@ -186,14 +177,3 @@ class TestRunIntegration:
         stack_step = next(s for s in run.steps if s["step"] == "goal_stack")
         assert "primary_goal" in stack_step
         assert "suppressed" in stack_step
-
-
-class TestEnablement:
-    def test_goal_stack_requires_runtime(self, override_settings):
-        from app.core.settings import get_settings
-        from app.core.settings.enablement import enablement_violations
-
-        override_settings(GOAL_STACK_ENABLED="true")
-        assert any(
-            "goal_stack_enabled" in v for v in enablement_violations(get_settings())
-        )

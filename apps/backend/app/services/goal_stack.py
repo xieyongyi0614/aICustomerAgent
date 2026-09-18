@@ -63,8 +63,6 @@ def evaluate_stack(
     长期化写入只发生在后台）。"""
     settings = get_settings()
     now = now or datetime.now()
-    if not settings.goal_stack_enabled:
-        return GoalStack()
     if retire_overdue_enabled:
         retire_overdue(user_id, now, settings)
     goals = goal_repository.list_layered_active(user_id)
@@ -137,9 +135,6 @@ def run_goal_stack_stage(user_id: str, run, now: datetime | None = None) -> dict
 
 
 def _apply_evolution_rebalance(user_id: str, now: datetime) -> list[str]:
-    settings = get_settings()
-    if not settings.personality_evolution_enabled:
-        return []
     try:
         from app.services import evolution
 

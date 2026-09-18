@@ -48,8 +48,8 @@ PLAN_AWARE_MODULES = ("app.services.planning",)
 
 @pytest.fixture
 def stack_on(override_settings):
-    """`goal_stack_enabled` 开启（`goal_compile` 候选面的唯一来源，非本任务新增 Flag）。"""
-    override_settings(goal_stack_enabled="true", world_enabled="false")
+    """目标栈常开（`goal_compile` 候选面来源）；本批仅关闭世界域依赖。"""
+    override_settings(world_enabled="false")
     return True
 
 

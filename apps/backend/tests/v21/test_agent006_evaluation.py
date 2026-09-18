@@ -24,11 +24,7 @@ USER = "metric-user"
 
 @pytest.fixture()
 def metrics_on(override_settings):
-    override_settings(
-        AGENT_RUNTIME_ENABLED="true",
-        AGENT_METRICS_ENABLED="true",
-        GOAL_STACK_ENABLED="true",
-    )
+    override_settings(AGENT_RUNTIME_ENABLED="true")
     yield
 
 
@@ -71,11 +67,6 @@ def _decision(candidates=None, outcome=None, created_at=NOW):
 
 
 class TestSnapshot:
-    def test_flag_off_skips(self, db_session_factory, override_settings):
-        override_settings(AGENT_METRICS_ENABLED="false")
-        result = agent_evaluation.run_daily_snapshot(USER, NOW)
-        assert result["status"] == "skipped"
-
     def test_snapshot_idempotent_per_window(self, db_session_factory, metrics_on):
         first = agent_evaluation.run_daily_snapshot(USER, NOW)
         second = agent_evaluation.run_daily_snapshot(USER, NOW + timedelta(hours=1))
@@ -131,15 +122,3 @@ class TestTrendAndTopics:
         second = agent_evaluation.run_daily_snapshot(USER, next_day)
         assert second["trend"]["action_quality"]["breached"] is True
         assert second["topics"] and fired == [(USER, "event")]
-
-
-class TestEnablement:
-    def test_metrics_requires_runtime(self, override_settings):
-        from app.core.settings import get_settings
-        from app.core.settings.enablement import enablement_violations
-
-        override_settings(AGENT_METRICS_ENABLED="true")
-        assert any(
-            "agent_metrics_enabled" in v
-            for v in enablement_violations(get_settings())
-        )

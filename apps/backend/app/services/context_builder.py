@@ -284,11 +284,7 @@ def _build_sync(
     character_state, relationship_state = _load_states_with_fallback(user_id)
     all_active_goals = goal_service.load_active(user_id)
     goals = [goal for goal in all_active_goals if goal.layer is None]
-    layered_goals = (
-        [goal for goal in all_active_goals if goal.layer is not None]
-        if get_settings().goal_stack_enabled
-        else []
-    )
+    layered_goals = [goal for goal in all_active_goals if goal.layer is not None]
     development_overlay = development_aggregate.read_overlay(user_id)
     shared_experiences, _ = _load_shared_experiences(user_id, trace=trace)
     relationship_pattern_list, _ = _load_relationship_patterns(user_id, trace=trace)

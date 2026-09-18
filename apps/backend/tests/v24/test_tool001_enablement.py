@@ -102,7 +102,7 @@ def test_default_settings_pass_chain():
 def test_existing_v21_v23_chain_rules_intact(monkeypatch):
     settings = _settings_with(monkeypatch)
 
-    settings = _settings_with(monkeypatch, personality_evolution_enabled=True)
+    settings = _settings_with(monkeypatch, unified_run_enabled=True)
     assert any("agent_runtime_enabled" in v for v in enablement_violations(settings))
 
     settings = _settings_with(monkeypatch, daily_life_enabled=True)
