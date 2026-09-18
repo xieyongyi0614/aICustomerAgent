@@ -61,7 +61,7 @@
 
 ## 四、开关字段（51 个，已去前缀；3 个死开关已删 + 9 个已固化常开，在存 39）
 
-按版本段分组。这些字段同时是**门控**。去前缀（轨道 A）已全部完成；**去门控**（固化 ON）已完成 v22 段（5 个，F.9）与 v21 全部可固化项（4 个 F.10/F.11 + `unified_run_enabled` F.12），在存 **38** 个按风险递增顺序推进：v23 → v24 → v25 → v26 → 收尾删 `enablement.py`；`foreground_gateway_enforced` 与 `action_outbox_enabled` 按裁决永久/暂留门控。
+按版本段分组。这些字段同时是**门控**。去前缀（轨道 A）已全部完成；**去门控**（固化 ON）已完成 v22、v21、v23（F.9~F.14），在存 **31** 个按风险递增顺序推进：v24 → v25 → v26 → 收尾删 `enablement.py`；`foreground_gateway_enforced` 与 `action_outbox_enabled` 按裁决永久/暂留门控。
 
 | 段 | 旧名 | 新名 | 旧 env | 默认 | 备注 |
 |---|---|---|---|---|---|
@@ -76,14 +76,14 @@
 | v22 | `v22_habit_runtime_enabled` | `habit_runtime_enabled` | `V22_HABIT_RUNTIME_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
 | v22 | `v22_relationship_addressing_enabled` | `relationship_addressing_enabled` | `V22_RELATIONSHIP_ADDRESSING_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
 | v22 | `v22_style_contract_enabled` | `style_contract_enabled` | `V22_STYLE_CONTRACT_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
-| v23 | `v23_daily_life_enabled` | `daily_life_enabled` | `V23_DAILY_LIFE_ENABLED` | `False` | 含 OFF 回退路径 |
-| v23 | `v23_debug_tick_enabled` | `debug_tick_enabled` | `V23_DEBUG_TICK_ENABLED` | `False` | — |
-| v23 | `v23_event_detection_enabled` | `event_detection_enabled` | `V23_EVENT_DETECTION_ENABLED` | `False` | 含 OFF 回退路径 |
+| v23 | `v23_daily_life_enabled` | `daily_life_enabled` | `V23_DAILY_LIFE_ENABLED` | `False` | ✅ 已固化删除（F.14） |
+| v23 | `v23_debug_tick_enabled` | `debug_tick_enabled` | `V23_DEBUG_TICK_ENABLED` | `False` | ✅ 已固化删除（F.14） |
+| v23 | `v23_event_detection_enabled` | `event_detection_enabled` | `V23_EVENT_DETECTION_ENABLED` | `False` | ✅ 已固化删除（F.14） |
 | v23 | `v23_habit_time_enabled` | `habit_time_enabled` | `V23_HABIT_TIME_ENABLED` | `False` | ✅ 已删除（第 0 步，见报告 F.7） |
-| v23 | `v23_scene_expansion_enabled` | `scene_expansion_enabled` | `V23_SCENE_EXPANSION_ENABLED` | `False` | 含 OFF 回退路径 |
-| v23 | `v23_time_advance_enabled` | `time_advance_enabled` | `V23_TIME_ADVANCE_ENABLED` | `False` | — |
-| v23 | `v23_world_llm_assist_enabled` | `world_llm_assist_enabled` | `V23_WORLD_LLM_ASSIST_ENABLED` | `False` | ⚠ 撞名，见 §6.1 |
-| v23 | `v23_world_simulation_enabled` | `world_simulation_enabled` | `V23_WORLD_SIMULATION_ENABLED` | `False` | 含 OFF 回退路径 |
+| v23 | `v23_scene_expansion_enabled` | `scene_expansion_enabled` | `V23_SCENE_EXPANSION_ENABLED` | `False` | ✅ 已固化删除（F.14） |
+| v23 | `v23_time_advance_enabled` | `time_advance_enabled` | `V23_TIME_ADVANCE_ENABLED` | `False` | ✅ 已固化删除（F.14） |
+| v23 | `v23_world_llm_assist_enabled` | `world_llm_assist_enabled` | `V23_WORLD_LLM_ASSIST_ENABLED` | `False` | ✅ 已固化删除（F.14；采样率调参保留） |
+| v23 | `v23_world_simulation_enabled` | `world_simulation_enabled` | `V23_WORLD_SIMULATION_ENABLED` | `False` | ✅ 已固化删除（F.14） |
 | v24 | `v24_tool_channel_enabled` | `tool_channel_enabled` | `V24_TOOL_CHANNEL_ENABLED` | `False` | — |
 | v24 | `v24_tool_confirm_ttl_reuse` | `tool_confirm_ttl_reuse` | `V24_TOOL_CONFIRM_TTL_REUSE` | `True` | 默认 ON（策略位） |
 | v24 | `v24_tool_external_api_enabled` | `tool_external_api_enabled` | `V24_TOOL_EXTERNAL_API_ENABLED` | `False` | — |
@@ -387,9 +387,10 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; mods={'agent_
 | 第 0 步删除死开关 | 3（见 §九 步骤 2） |
 | v22 段去门控删除 | 5（ON 转常开，见报告 F.9） |
 | v21 段去门控删除 | 5（F.10 三个 + F.11 一个 + F.12 `unified_run_enabled`；裁决保留的 `foreground_gateway_enforced` 仍在） |
-| **当前** settings 字段总数 | **412** |
+| v23 段去门控删除 | 7（F.14；`habit_time` 另计第 0 步） |
+| **当前** settings 字段总数 | **405** |
 | 其中带 `vXX_` 前缀 | **0** |
-| 原带前缀、现仍在存的字段 | 187（**38 开关** + 149 调参） |
+| 原带前缀、现仍在存的字段 | 180（**31 开关** + 149 调参） |
 | 唯一性例外（撞名，见 §六） | 2 组（均已裁决并执行） |
 
-**对账**：`434 − 7 − 2 − 3 − 5 − 4 − 1 = 412`；`212 = 200 + 12`；`200 = 187 + 13`（3 个死开关 + v22 段 5 个 + v21 段 5 个已固化常开或直删，均未进入在存清单）。
+**对账**：`434 − 7 − 2 − 3 − 5 − 4 − 1 − 7 = 405`；`212 = 200 + 12`；`200 = 180 + 20`（3 个死开关 + v22 段 5 个 + v21 段 5 个 + v23 段 7 个已固化常开或直删，均未进入在存清单）。

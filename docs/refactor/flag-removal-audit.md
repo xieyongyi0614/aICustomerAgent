@@ -3,7 +3,7 @@
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
-> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 与 v21 段已完成**（F.9~F.12）；剩余 **v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
+> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 已完成**（F.9~F.14）；剩余 **v24 → v25 → v26 → 收尾删 `enablement.py`**。
 
 ---
 
@@ -695,7 +695,7 @@ cd apps/frontend && pnpm vitest run
 | 1 | v2 段 | 7（已删）+ 3（改名保留） | — | 63 处门控（见 D.2） | 207 调用点 | 5（§4.1 #1~#4 + D 段） | **已完成** |
 | 2 | v21 | 6 | 0 | 51 | 19 | 2（§4.2 #16、#17） | **已完成**（F.10/F.11/F.12；`foreground_gateway_enforced` 保留门控） |
 | 3 | v22 | 5 | 0 | 19 | 15 | 0 | **已完成**（见 F.9） |
-| 4 | v23 | **8** | 0 | 79 | 47 | 3（§4.1 #5、§4.2 #14/#15） | 待做 |
+| 4 | v23 | **8** | 0 | 79 | 47 | 3（§4.1 #5、§4.2 #14/#15） | **已完成**（F.14） |
 | 5 | v24 | 11 | 1（`v24_tool_confirm_ttl_reuse`） | 106 | 272 | 1（§4.2 #9） | 待做（测试量最大） |
 | 6 | v25 | **14** | 2（`v25_plan_tool_required`、`v25_plan_context_digest_enabled`） | 103 | 266 | 6（§4.2 #7/#8/#10~#13） | 待做（依赖面最广） |
 | 7 | v26 | **7** | 0 | 35 | 76 | 1（§4.2 #6） | 待做 |
@@ -710,7 +710,7 @@ cd apps/frontend && pnpm vitest run
 | 表内开关名 | `v24_tool_confirm_ttl_reuse` 等 | **全部已去前缀** | 按旧名 grep 现在 0 命中；导出清单请用 `flag-rename-map.md` §四 |
 | 轨道 A（去前缀） | 未列 | **已完成并提交** | 与批次划分正交，见 F.6 |
 
-**执行顺序**：G.5 已把「改名」与「去门控」拆成两条轨道，轨道 A 做完后轨道 B 不再受改名依赖约束，因此按**风险递增**而非 §8 的依赖序执行：**v22（热身，0 条 OFF 路径，已完成）→ v21（已完成）→ v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
+**执行顺序**：G.5 已把「改名」与「去门控」拆成两条轨道，轨道 A 做完后轨道 B 不再受改名依赖约束，因此按**风险递增**而非 §8 的依赖序执行：**v22（已完成）→ v21（已完成）→ v23（已完成）→ v24 → v25 → v26 → 收尾删 `enablement.py`**。
 
 **批次 1 的实际边界**（与本报告 D.3 / E.5 的差异）：
 
@@ -942,6 +942,21 @@ F.11 移交项已裁决并落地。
 | 当前行为 | 双闸默认 off ⇒ 挂载点零行为变化；v26 批固化 ON 后入口自动生效 |
 | 测试 | `tests/v26/test_review_fixes.py::TestActionScheduleConsumption`：钉「profile 无该阶段」+「maintenance 源码含挂载点」；`tests/v24/test_tool007_integration.py::EXPECTED_MAINTENANCE_STEPS` 同步插入 `action_schedule` |
 | 冻结面 | `life_loop.py` 已不在 tool007 `FROZEN_SOURCES`（文档注明），无需哈希重建 |
+
+### F.14 轨道 B 批次 v23（世界模拟 7 开关）去门控 —— 2026-09-18
+
+| 项 | 内容 |
+|---|---|
+| 删除字段 | `world_simulation_enabled` / `time_advance_enabled` / `daily_life_enabled` / `event_detection_enabled` / `scene_expansion_enabled` / `world_llm_assist_enabled` / `debug_tick_enabled`（字段 412 → **405**；在存开关 38 → **31**） |
+| OFF 路径删除 | §4.1 #5 scene 双路径（保留 `movement.apply`）；§4.2 #14/#15 daily_life / event_detection 早返回；`build_context` 恒挂 brief；`run_simulation_maintenance` 仅依赖 `world_enabled`；`user_situation` 去 llm_assist 闸（保留 `world_llm_assist_sample_rate` 采样）；`world_context.build_scene` 恒投影场景 |
+| 契约层 | API 四端点去 `enabled=False` 早返回与 debug_tick 403；`flags` 恒 `{}`；删除 `_V23_FLAG_NAMES` / `v23_flag_snapshot`；前端 `WorldSimPanel` 去 master/debug 开关读取 |
+| enablement | v23 段依赖链整段删除（master/sub/daily_life/llm_assist） |
+| 命名残留 | `world_context_char_budget_v23` 仍带后缀版本号（调参，未删）；待命名一致性裁决 |
+| 测试 | `tests/v23/` 全量改写（矩阵/flag-off → 常开断言）；enablement/静态扫描/前端 world-sim mock 同步 |
+| 冻结面 | `world_engine.py` / `post_process.py` / `prompts/builder.py` 哈希重建 |
+| 验证 | `tests/v23/` **165 passed / 2 skipped**；Fast Test **1449 全绿**；前端 vitest 同步为常开断言 |
+| env | 部署侧需移除 `WORLD_SIMULATION_ENABLED` 等 7 键（删除后静默无效） |
+| 行为变化 | 世界模拟 / 日程 / 处境检出 / 场景投影 / 简报 **首次在生产配置下常开**；需执行 `docs/version/v2.3.0/regression-checklist.md`（尚未跑） |
 
 ---
 
