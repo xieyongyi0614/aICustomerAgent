@@ -6,7 +6,7 @@
 七步短路（判定顺序固定，每步一个独立私有函数，按序被调用且首命中即终止）：
 
 ```text
-⓪ 快照不可用 / 权限段未参与         → deny(snapshot_unavailable) / 三段语义（见下）
+⓪ 快照不可用                       → deny(snapshot_unavailable)
 ① 等级为 safe 或 normal            → allow(level_no_grant_required)
 ② 存在有效 grant（scope 覆盖）      → allow(grant_matched)
 ③ confirm == first_time 且无授权集  → confirm_required(kind=first_time)
@@ -19,17 +19,10 @@
 **默认拒绝（fail-closed）是硬纪律**：任何未明确 allow 的情况一律 deny——
 与 V9 detector"宁缺毋滥"同一价值观；判定函数不抛异常，编程级异常也归一为 deny。
 
-第 ⓪ 步的三段语义（§9.5-1「默认拒绝」在双闸部署下的完整表达）：
-
-| 总闸 | 权限子闸 | 判定 |
-|---|---|---|
-| off | — | `allow(permission_layer_off)`——权限段不参与（TOOL-003 交付态，逐字节不变） |
-| on | off | 免授权档（有效等级 safe / normal 且不是不受信命名空间）→ `allow(permission_layer_disabled_grant_free)`；其余 → `deny(permission_layer_disabled)` |
-| on | on | 继续 ①~⑦ 真实七步判定 |
-
-即"总闸开、权限子闸未开"**不等于放行一切**：此时没有可读的授权存储，特权工具
-（sensitive / dangerous / `user.*` / `ext.api.*`）只能默认拒绝——子闸未启用不得被读成
-"特权豁免"，否则 §9.5-1 的"无 grant 的 sensitive/dangerous 永不执行"会被部署开关绕过。
+第 ⓪ 步只判“授权快照是否可用”：不可用即 deny，可用则交 ①~⑦。原“总闸 / 权限子闸”
+三段语义（`permission_layer_off` / `permission_layer_disabled_grant_free` /
+`permission_layer_disabled`）已随 V2.4.0 开关体系删除而消失——权限段**转正常开**，
+不再存在“子闸未启用即特权豁免”的部署口子。
 
 纪律：`evaluate` 纯函数、零 IO；`build_snapshot` 是**唯一的读 IO 入口**，装配失败返回
 `None`，由 `evaluate` 保守拒绝（E1）。授权 / 确认请求 / 通道绑定的读面全部经既有仓储，
@@ -96,9 +89,8 @@ WILDCARD = "*"
 
 EXT_HOST_PARAM_KEYS: tuple[str, ...] = ("url", "endpoint", "host", "target")
 
-REASON_LAYER_OFF = "permission_layer_off"
-REASON_LAYER_DISABLED = "permission_layer_disabled"
-REASON_LAYER_DISABLED_GRANT_FREE = "permission_layer_disabled_grant_free"
+REASON_NOT_EVALUATED = "permission_not_evaluated"
+REASON_NOT_EVALUATED = "permission_not_evaluated"
 REASON_SNAPSHOT_UNAVAILABLE = "snapshot_unavailable"
 REASON_LEVEL_NO_GRANT_REQUIRED = "level_no_grant_required"
 REASON_GRANT_MATCHED = "grant_matched"

@@ -4,7 +4,7 @@
 
 ```text
 ① resolve    注册表无此 tool_id / effective_status != enabled → unavailable，终止
-② permission 权限段三段语义（见下）→ allow / deny → denied / confirm_required →
+② permission 真实七步判定 → allow / deny → denied / confirm_required →
              pending_confirmation
 ③ validate   校验闸 off → 跳过；失败 → invalid；通过 → params := normalized
 ④ invoke     CapabilityExecutor.run(step, ctx)   ← V9 既有：超时 / 异常归一 / usage 计时
@@ -20,11 +20,9 @@ V2.4.0 TOOL-005：权限段由占位实现替换为真实七步判定（`ToolPer
 调用方预读下传（`permission_snapshot`），缺省时由闸门自身装配（`build_snapshot` 是唯一
 读 IO 入口，装配失败 → `deny(snapshot_unavailable)`）。接口形状与 TOOL-003 完全一致。
 
-P0-1 修正：② 段是**三段语义**而非"off 即放行"——总闸 off 保持 TOOL-003 交付态
-（占位 allow，reason=`permission_layer_off`）；总闸 on + 权限子闸 off 时只有免授权档
-（safe / normal，非 `user.*` / `ext.api.*`）放行（`permission_layer_disabled_grant_free`），
-特权档一律 `deny(permission_layer_disabled)`；双闸 on 才走 ①~⑦ 真实判定。
-子闸 off 时执行器不装配快照（不产生读 IO），特权档因此没有任何放行依据。
+开关删除后 ② 段只有两态：快照可用走 ①~⑦ 真实判定，不可用即
+`deny(snapshot_unavailable)`（原“总闸 / 权限子闸”三段语义与三个 `permission_layer_*`
+reason 已随 V2.4.0 开关体系一并删除）。
 
 V2.4.0 TOOL-010：调用实现体前把 `ToolInvocation.dedupe_key` 填入上下文
 （`_with_dedupe_key`），供外发类能力直填 `OutboundMessage.idempotency_key`；
@@ -61,9 +59,7 @@ from app.services.tool.permission import (
     DECISION_CONFIRM_REQUIRED,
     DECISION_DENY,
     PERMISSION_DECISIONS,
-    REASON_LAYER_DISABLED,
-    REASON_LAYER_DISABLED_GRANT_FREE,
-    REASON_LAYER_OFF,
+    REASON_NOT_EVALUATED,
     PermissionDecision,
     PermissionSnapshot,
     ToolPermissionGate,
@@ -73,9 +69,7 @@ from app.services.tool.validator import ParamValidator
 
 logger = logging.getLogger(__name__)
 
-PERMISSION_LAYER_OFF_REASON = REASON_LAYER_OFF
-PERMISSION_LAYER_DISABLED_REASON = REASON_LAYER_DISABLED
-PERMISSION_LAYER_DISABLED_GRANT_FREE_REASON = REASON_LAYER_DISABLED_GRANT_FREE
+PERMISSION_NOT_EVALUATED_REASON = REASON_NOT_EVALUATED
 
 PERMISSION_ALLOW = DECISION_ALLOW
 PERMISSION_DENY = DECISION_DENY
@@ -303,7 +297,7 @@ class ToolExecutor:
                 else PermissionDecision(
                     decision=PERMISSION_ALLOW,
                     level=defn.permission.level,
-                    reason=PERMISSION_LAYER_OFF_REASON,
+                    reason=PERMISSION_NOT_EVALUATED_REASON,
                     scope_required=tuple(defn.permission.scope),
                 )
             ),
