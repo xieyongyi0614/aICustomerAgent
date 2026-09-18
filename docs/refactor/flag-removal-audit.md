@@ -4,6 +4,8 @@
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
 > 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 已完成**（F.9~F.14）；剩余 **v24 → v25 → v26 → 收尾删 `enablement.py`**。
+>
+> **剩余批次执行清单见 [附录 H](#附录-h剩余批次任务编排批次-58)**（2026-09-18 实测口径，替代 §8 表头的过时计数）。
 
 ---
 
@@ -1060,4 +1062,238 @@ grep -rn 'v2[1-6]_' apps/backend/app/api apps/frontend/src --include=*.py --incl
 
 1. 可选用一次性 alias 兼容窗口（pydantic `validation_alias=AliasChoices("新名","旧名")`）让旧 env 名继续生效一个版本——代价是破坏「env 名 = 字段名大写」这一不变式（§7.3 的守卫正依赖它），仅建议在部署侧 `.env` 无法同步修改时使用，且须同步放宽守卫；默认仍用 §6.2 的显式告警。
 2. **「旧名 → 新名」对照表已建**：见 `docs/refactor/flag-rename-map.md`（200 个待去前缀字段 + 批次 1 已处理的 12 个 + 2 处撞名裁决 + 命名一致性建议，附校验脚本）。§1.2 前提二选择不改写 `docs/` 的 1,589 处引用，代价是代码中已无版本次命名、文档中仍是旧名——对照表是把这个代价压到可接受的最低成本手段（与 §6.2 的告警同属护栏类改动）。
+
+---
+
+## 附录 H：剩余批次任务编排（批次 5~8）
+
+> **与 §8 的关系**：§8 是**改造前**的批次划分（依赖序 + 过时计数，F.2 已指明其五处需修订）。本附录是**当前实测**的剩余执行清单，**批次 5 起以本附录为准**。
+> **数据来源**：`.tmp/audit_remaining.py`（本地临时件，不入库，方法已沉淀在附录中）。口径 = `Settings.model_fields` 取 `bool` 字段（排除基闸）+ `app/`（排除 `core/settings`）逐行定位门控点 + `tests/` 全文计数。
+> **前序**：批次 1（v2）、轨道 A（去前缀）、第 0 步（死开关）、v22 / v21 / v23 已完成。HEAD = `29766ff`，工作区干净。
+
+### H.1 剩余盘子（2026-09-18 实测）
+
+「门控点」= `app/` 中该开关的**实际读取点**（guard / branch / getattr / 三联三元），已剔除 docstring 与注释提及；「app 引用」含文案提及，故大于门控点。
+
+| 批次 | 域 | 待办开关 | 门控点 | app 引用 | 测试引用 | OFF 回退路径 |
+|---|---|---|---|---|---|---|
+| 5 | v24 工具系统 | 11 | 70 | 81 | 278 | 1（§4.2 #9，需拆给批次 6） |
+| 6 | v25 计划编排 | 14 | 50 | 53 | 263 | 6（§4.2 #7、#8、#10~#13） |
+| 7 | v26 行动执行 | 5 | 17 | 17 | 65 | 1（§4.2 #6） |
+| 8 | 收尾 | — | — | — | 12 文件 / 84 处 | — |
+| **合计** | — | **30** | **137** | 151 | 606（+84） | 8 |
+
+**三处口径修正（覆盖此前附录的相应说法）**：
+
+1. F.14 记「在存开关 31」应为 **30**（v24 11 + v25 14 + v26 5）。
+2. **前端零改动**：`apps/frontend/src` 对 v24 / v25 / v26 的开关名**零引用**（实测）——批次 5~7 无前端任务；v23 批已把 `WorldSimPanel` 的开关读取清完。
+3. **收尾批多 3 个配置层/环境层件**（原 §8 未列）：`world_context_char_budget_v23` 的后缀式版本号（见 H.5）、本地 `.env` 的旧键漂移（见 H.5）、`REGISTRY_FLAG_NAMES` 契约收敛（见 H.2）。
+
+**明确不在本编排内**（裁决保留；均已去前缀，零污染）：
+
+| 字段 | 保留理由 |
+|---|---|
+| `foreground_gateway_enforced` | F.10 裁决：`light_llm_profile` 默认空串，固化 ON 会让预算耗尽那一轮的用户回复**直接失败** |
+| `action_outbox_enabled` | 附录 E 方案③：LIFE-004 灰度评审未通过；固化 ON 须先把 v26 的 world 反馈投影从 `integrate_result` 迁到 outbox 消费之后 |
+| `character_action_sync_enabled` / `inventory_grounding_enabled` | 批次 1 改名保留（附录 E.6） |
+
+**4 个不带版本段的基闸**（`world_enabled` / `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled`）**不在删除范围**——vXX_ 的 ON 路径运行时仍依赖它们（`world_enabled` 一个就有 31 处门控）。
+
+### H.2 批次 5 · v24 工具系统（11 个 / 70 门控点 / 测试 278 处 42 文件）
+
+**执行序**（总闸先行 → 子闸）：
+
+| 序 | 开关 | 门控点 | 主要站点 | 待删 OFF 路径 |
+|---|---|---|---|---|
+| 1 | `tool_system_enabled` | 27 | `action_engine.py`（166/227/311/626/1155）、`autonomy_engine.py:194`、`post_process.py:468,555`、`planner.py:135`、`planning/context.py:350`、`tool/{channel_tools,confirmation,ext_api}.py`、`main.py` | `execute_plan` 的 `_execute_plan_via_tools`（`action_engine.py:227-238`）与**裸 `executor.run` 循环**（`240-284`）；`_build_tool_context` 的 `None` 早返回（`166`）；`_build_permission_snapshot`（`625-629`）与 `_expire_pending_confirmations`（`1154-1158`）的双闸早返回 |
+| 2 | `tool_permission_enabled` | 9 | `permission.py:349,356,380`、`action_engine.py:627,1156`、`post_process.py:469`、`action/context.py:43`、`debug.py:149` | 权限网关 `permission_layer_disabled` fail-closed 档 → 恒读授权存储 |
+| 3 | `tool_schema_validation_enabled` | 1 | `executor.py:173` | 校验段跳过分支 |
+| 4 | `tool_observation_enabled` | 1 | `executor.py:279` | 观测段早返回 |
+| 5 | `tool_surface_enabled` | 3 | `post_process.py:555`、`debug.py:309` | `debug.py:309-313` 的 403 与 `enabled` 契约 |
+| 6 | `tool_memory_enabled` | 3 | `action_engine.py:743`、`memory_bridge.py:93` | `_deliver_memory` 的 `deliver_action_memory` 回退（`action_engine.py:745`） |
+| 7 | `tool_reflection_enabled` | 5 | `reflector.py:210`、`tool_feed.py:33`、`triggers.py:268`、`autonomy_engine.py:225` | 工具反思子闸早返回（零行为 → 常开） |
+| 8 | `tool_channel_enabled` | 8 | `main.py:75`、`channel_tools.py:91`、`triggers.py:101,265,285,364`、`post_process.py:538` | 条件注册 → 常注册（仍受基闸 `feishu_enabled` 约束） |
+| 9 | `tool_external_api_enabled` | 6 | `main.py:82`、`ext_api.py:232`、`debug.py:173` | 条件注册 → 常注册（仍受 `tool_ext_manifest_path` / `tool_ext_allowed_hosts` 约束） |
+| 10 | `tool_user_defined_enabled` | 5 | `services/tool/user_defined.py`、`action/registry.py` | 注册面恒开 |
+| 11 | `tool_confirm_ttl_reuse` | 2 | `confirmation.py:580` | **策略位**（默认 ON）→ 待裁决，见 H.6 |
+
+**契约层（G.1 第三层，必须同批清）**：`app/services/action/registry.py:95-100` 的 `REGISTRY_FLAG_NAMES` 现含 4 项（`tool_system_enabled` / `tool_channel_enabled` / `feishu_enabled` / `tool_external_api_enabled`），本批后应只剩 `feishu_enabled`；`debug.py:289` 的 `capability_registry_flags` 响应随之变化。
+
+**§4.2 #9 必须拆分处理**：`app/api/v1/debug.py:1115-1123` 同时读 `plan_tool_required`（v25）与 `tool_system_enabled`（v24）。批 5 只摘 `tool_system_enabled` 一侧（该处退化为单闸），批 6 收口另一侧。
+
+**enablement 同步（F.11 教训的直接复用：删任一开关前先 grep 依赖表）**：
+- `enablement.py:91-115` 的 v24 子闸表 + `tool_channel_enabled ⇒ feishu_enabled` 条目 → 整段删除；
+- `enablement.py:71-75` 的 `V25_DEPENDENCIES` 两条（`plan_step_binding_enabled ⇒ tool_system_enabled`、`plan_tool_required ⇒ tool_system_enabled`）→ **必须本批删除**，否则 `getattr(..., False)` 恒判配置错误——这正是 F.11 当场抓到的那个 bug 的同型；
+- `enablement.py:149-166` 的 `tool_permission_sub_layer_warnings` → 本批先删其 `tool_permission_enabled` 判据，函数本体随批次 8 删除。
+
+**测试侧要点**：`tests/v24/conftest.py:12` 的 `_pin_v24_tool_env` autouse 钉死、`:40-52` 的 `v24_tool_env`（164 次调用）需收敛；`tests/v24/test_tool001_enablement.py`（18 处）、`test_tool001_settings.py`、`tests/v26/test_v26_p1_flag_and_backoff.py::test_env_example_has_v26_flags` 整体失效或需重写。
+
+**冻结面（G.3 第一类，几乎全数触碰）**：`test_tool010_e2e.py::ZERO_DIFF_HASHES`（15 文件）、`test_tool008_integration.py::FROZEN_SOURCES`（5）、`test_tool007_integration.py::FROZEN_SOURCES`（4）、`test_tool002_builtins.py::FROZEN_SOURCE_HASHES`、`test_tool003_action_engine.py` 内联哈希——须逐条重建并在提交信息写明「属于允许的改动」。
+
+**行为变化（上线前置条件）**：工具系统在真实配置下**首次常开**。最需要人工回归的是权限面——`tool_permission_enabled` 固化后，此前因「无可读授权存储」一律 `deny(permission_layer_disabled)` 的 sensitive / dangerous / `user.*` / `ext.api.*` 工具转为**按真实授权判定**。需执行 `docs/version/v2.4.0/regression-checklist.md`。
+
+### H.3 批次 6 · v25 计划编排（14 个 / 50 门控点 / 测试 263 处 42 文件）
+
+**本批是依赖面最广、OFF 回退路径最多（6 条）的一批**，必须最后做（内部仍依赖 v24 与 v21）。
+
+| 序 | 开关 | 门控点 | 待删 OFF 路径 |
+|---|---|---|---|
+| 1 | `planning_enabled`（总闸） | 11 | `life_loop.py:352-358` 早返回（no-op）；`life_loop.py:377-399` 四个 `bool(planning_enabled) and …` 复合判据收敛为无条件 |
+| 2 | `plan_context_enabled` | 2 | **§4.2 #7**：`planning/context.py:305-306` → 空 `_PlanSources()`（**内容差异，非简单展开**）；`plan_context_digest_enabled` 分支在 `engine.py:309` |
+| 3 | `plan_step_binding_enabled` | 5 | `decompose.py:440` 复合判据 + `engine.py:363` 缺省取值 |
+| 4 | `plan_scheduler_enabled` | 1 | **§4.2 #11**：`life_loop.py:526-528` → `goal_observation._current_step(...)` |
+| 5 | `plan_execution_enabled` | 2 | **§4.2 #12**：`life_loop.py:605-610` → `goal_execution.attempt_current_step(...)` |
+| 6 | `plan_observation_enabled` | 3 | **§4.2 #13**：`life_loop.py:621-630` → `_observation_facts(...)` + `goal_observation.advance_user_goals(...)` |
+| 7 | `plan_revision_enabled` | 1 | `life_loop.py:399` 复合判据 |
+| 8 | `plan_memory_enabled` | 4 | `memory_policy.py:324`、`observer.py:642` 早返回 |
+| 9 | `plan_reflection_enabled` | 7 | `main.py:58` 条件注册、`revision_listener.py:138,153,277` 早返回、`evidence.py:1271` |
+| 10 | `plan_world_feedback_enabled` | 2 | `observer.py:615` 双闸早返回 |
+| 11 | `plan_autonomy_enabled` | 2 | `autonomy_engine.py:337` 早返回 |
+| 12 | `plan_debug_enabled` | 2 | `debug.py:1057,1070` 的 `enabled` 契约与 403 |
+| 13 | `plan_tool_required` | 7 | **§4.2 #8**：`planning/context.py:308,346` → `ToolSurfaceResolver(None, …)` 无面规划；`debug.py:1114` |
+| 14 | `plan_context_digest_enabled` | 1 | `engine.py:309` 摘要分支（**策略位**，默认 ON）→ 待裁决，见 H.6 |
+
+**enablement 同步**：`enablement.py` 的 `V25_MASTER_FLAG` / `V25_TOOL_REQUIRED_FLAG` / `V25_SUB_FLAGS` / `V25_GATE_FLAGS` / `V25_DEPENDENCIES` 五个常量与 `:116-131` 的判定段**整段删除**（批 5 已先摘掉其中两条跨域依赖）——此后该文件只剩 v26 段。
+
+**风险点（§4.2 #8 的连带）**：`plan_tool_required` 是**默认 ON 的策略位**。固化后 `PlanUnavailable("tool_system_disabled")` / `("registry_unavailable")` 成为**新的可达失败面**——工具面不可用时计划编排会硬失败而非退化。这一条必须在批 5（工具系统常开）之后做，且需要 §4.2 #9 的第三个读取点（`debug.py:1114`）一起收口。
+
+**测试侧要点**：`tests/v25/test_plan002_enablement.py`（93 处闸门名字面量，最大单文件）、`test_plan002_settings.py`（48 处）、`test_plan012_flag_matrix.py`（`TestFlagDefaults` / `TestEnablementChainMatrix`）整体失效；`tests/v25/conftest.py:26-33` 的 autouse 钉死需收敛。**`test_plan001_scope_markers.py`（29 处）不能删**——它是「范围越界已评审」的证据链，须按纪律显式更新。
+
+**冻结面**：`test_plan001_flag_regression.py::FROZEN_PROMPT_DIGEST`、`test_plan011_regression.py::FROZEN_PLAN_FACE_*`；另 F.11 记录过 3 个 v25 用例用 `source.split("async def …")` 做源码文本锚点，若再触碰 `life_loop.py` 结构需同步。
+
+**行为变化**：计划编排首次常开；§4.2 #7 的四源装配、#10~#13 四条路径替换会改变自治周期的观测/执行语义。需执行 `docs/version/v2.5.0/regression-checklist.md`。
+
+### H.4 批次 7 · v26 行动执行（5 个 / 17 门控点 / 测试 65 处 15 文件）
+
+| 序 | 开关 | 门控点 | 待删 OFF 路径 |
+|---|---|---|---|
+| 1 | `action_execution_enabled`（总闸） | 10 | **§4.2 #6**：`action_engine.py:215-284` 的 `_action_execution_enabled` 分派删掉后，**主路径恒为 `_execute_plan_via_action_executor`**；`tool_system_enabled` 分支在批 5 已清，届时 `311-349` 的 `ToolExecutor` 装配转常开；`action_engine.py:1122` 的孤儿 `executing` 恢复扫描早返回 |
+| 2 | `action_scheduler_enabled` | 3 | `life_loop.py:675,743` 与 `scheduler.py:179` 的双闸复合判据 |
+| 3 | `action_result_enabled` | 1 | `result.py:21` 判据 |
+| 4 | `action_feedback_enabled` | 1 | `integration.py:32` 判据 |
+| 5 | `action_debug_enabled` | 2 | `api/v1/action_execution.py:15-16,24` 的 403 契约 |
+
+**F.13 挂载点确认（本批必须验证）**：`life_loop._run_maintenance` 的 `action_schedule` 步当前是**双闸 off ⇒ 零行为**（`life_loop.py:674-675` / `742-743`）。本批固化后该入口**自动生效**——这是 F.11 移交项的落地验证点，`tests/v26/test_review_fixes.py::TestActionScheduleConsumption` 的断言需从「双闸 off 确实不跑」改为「常开确实跑」。
+
+**enablement 同步**：`enablement.py:133-145` 的 v26 段整段删除；`action_execution.py` 的 `V26_MASTER_FLAG` / `V26_SUB_FLAGS` 常量与 `validate_action_chain` 一并删除（`action_schedule_default_priority` 的 `>= 0` 校验迁到 `validate_plan_config` 同款写法保留）。
+
+**注意**：本批完成后 `enablement.py` 只剩 `tool_permission_sub_layer_warnings` 与空的 `enablement_violations`，即批次 8 的删除对象。
+
+**行为变化**：行动执行层首次常开（`action_execution_enabled ⇒ action_enabled` 仍受基闸约束）。需执行 `docs/version/v2.6.0/regression-checklist.md`。
+
+### H.5 批次 8 · 收尾（整文件删除 + 配置层清零）
+
+| 项 | 内容 | 依据 |
+|---|---|---|
+| 删 `app/core/settings/enablement.py` | 含 `tool_permission_sub_layer_warnings`、`enablement_violations`、`validate_enablement_chain` | §9.1 置信度高 |
+| 删 `app/main.py:14,46` | import 与启动校验调用 | 同上 |
+| 删 `app/core/settings/action_execution.py` 的 `V26_*` 常量与 `validate_action_chain` | 随批次 7 或本批 | §9.1 |
+| 同步 12 个测试文件的 `enablement` 引用 | `tests/{v21,v23,v24,v25,v26,unit,v2}`（84 处，含 `test_plan002_enablement.py` 整文件） | 实测 |
+| **命名残留清零**：`world_context_char_budget_v23` | 唯一带**后缀式**版本号的配置字段（`world_simulation.py:17`；读取点 `prompts/builder.py:334`；断言 `tests/v23/test_ws001_settings.py:28`、`test_ws012_world_brief.py:135`）。它与 `world.py:16` 的 `world_context_char_budget`（600）**不是同一物**（1000），需按 §七 命名一致性裁决改名为 `world_brief_char_budget` 之类，或与前者合并——**不得机械去后缀**（会撞名） | G.1 配置层要求 |
+| **`.env` 漂移修复** | 本地 `apps/backend/.env`（gitignored）仍写着 `V2_CHARACTER_ACTION_SYNC_ENABLED` / `V2_CHARACTER_ACTION_SYNC_CONTEXT_LINES` / `V23_WORLD_SIMULATION_ENABLED` / `V24_TOOL_*`（24 行）/ `V26_ACTION_*`（8 行）——**全部已被 `extra="ignore"` 静默吞掉**，实际取代码默认值。需按 `flag-rename-map.md`「旧 env」列逐条改名，并删掉已删字段的死键 | §6.2 / F.4 |
+| 残留扫描 | 按 §G.2 的 ①（二次过滤后 0 命中）、⑧（契约层 0 命中）执行 | G.1 |
+
+**收尾后的 done 判据**（G.1）：配置层与契约层不出现 `v[0-9]+_`；`app/`（除 `core/settings`）门控表达式清零；`pytest` 失败 ID 集合 ⊆ F.8 豁免清单。
+
+### H.6 裁决结果（2026-09-18 落定）
+
+| # | 事项 | 裁决 | 对批次范围的影响 |
+|---|---|---|---|
+| 1 | 三个**默认 ON 的策略位**：`tool_confirm_ttl_reuse`、`plan_tool_required`、`plan_context_digest_enabled` | **保留为常规配置项**（三者 OFF 态都是有效策略，且已去前缀、零污染） | 批次 5 由 11 → **10 个**；批次 6 由 14 → **12 个**；§4.2 #8 的 OFF 回退路径**保留**，`PlanUnavailable("tool_system_disabled")` / `("registry_unavailable")` 不做固化 |
+| 2 | `foreground_gateway_enforced` / `action_outbox_enabled` | **继续保留**（沿用 F.10 与附录 E 的既有裁决，本轮不重开） | 不在任何批次内 |
+| 3 | 本地 `.env` 旧键漂移 | **按 `flag-rename-map.md`「旧 env」列同步改名**，并删除已删字段的死键 | 新增到批次 8 的执行项（见 H.5） |
+| 4 | 提交授权 | **授权提交，不推送**：每批按 G.4 拆 3 个提交留在本地，不 push、不建 PR | 批次 5~8 各产出 3 个本地提交 |
+
+**修正后的剩余盘子**（替代 H.1 的批次列）：
+
+| 批次 | 域 | 待办开关 | 门控点 | 保留项 |
+|---|---|---|---|---|
+| 5 | v24 | **10** | 68 | `tool_confirm_ttl_reuse` |
+| 6 | v25 | **12** | 42 | `plan_tool_required`、`plan_context_digest_enabled` |
+| 7 | v26 | 5 | 17 | — |
+| 8 | 收尾 | — | — | — |
+| **合计** | — | **27** | **127** | 3 |
+
+### H.7 执行纪律（每批照做）
+
+1. **开批前**：回写本附录的实测计数（上一批会改变依赖表与清单）；跑一次全量基线 `pytest -q -n 4 --timeout=180 --basetemp=.tmp/pytest-bt`；判据是「失败 ID 集合 ⊆ F.8 三类的并集」，不是失败数相等。
+2. **删任一开关前**：先 grep `enablement.py` 的依赖表与子闸表（F.11 教训）。
+3. **提交拆分**：G.4 的 3 提交，禁止合并；去门控那个提交是唯一需要回滚的。
+4. **冻结面**：G.3 第一类逐条重建哈希，提交信息写明「属于允许的改动」。
+5. **收批后**：重跑全量 + 该版本 regression-checklist（真实模型人工回归，无法用单测替代）；部署侧 `.env` 副本同批改名。
+6. **环境坑**：Windows 上必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（已踩三次）。
+
+### H.8 开批前基线归因（2026-09-18 实测）
+
+**基线实测值与 F.8 记载严重不符**：
+
+```
+.venv/Scripts/python.exe -m pytest -q -n 4 --timeout=180 --basetemp=.tmp/pytest-bt
+=> 47 failed, 6356 passed, 22 skipped in 377.60s
+```
+
+F.8 记的是「15 failed / 6439 passed，抖动区间 15~18」。**F.14（v23 批）落地后从未记录全量基线**（其验证段只写了 `tests/v23/` 与 Fast Test），因此差额无人归因。逐条归因如下（合计 47）：
+
+| 类别 | 数量 | 用例 | 处置 |
+|---|---|---|---|
+| feishu 相关（本分支 WIP，与本次改造无关） | 14 | `e2e/test_feishu_webhook.py` 12 + `unit/test_feishu_settings.py` 2 | 豁免，加入本清单 |
+| 冻结面失配（G.3 第一类） | 6 | `test_tool007::test_frozen_sources_have_zero_diff[world_engine / outbox_consumer]`、`test_tool010_e2e::test_zero_diff_frozen_surfaces[chat_pipeline / post_process / action_engine / builder]` | **须重建**（v23 批重建不全） |
+| 表结构与迁移冻结（G.3 第二类） | 7 | `test_tool007::test_no_new_tables_in_metadata`、`test_tool008::{test_no_new_tables_in_metadata, test_no_new_migrations}`、`test_tool012_bans::test_session_tables_zero_structural_change`、`test_tool_acceptance::{test_migration_chain_head_is_0046, test_zero_migration_model_structure_unchanged, test_zero_migration_reconciliation_records_0046_breakpoint}` | 既存豁免（其中 3 个是「head 已到 0048 而断言写 0046」的陈旧守卫） |
+| **维护步序列钉测漏改（F.13 遗漏）** | 4 | `test_tool005_integration::test_life_loop_maintenance_sequence_unchanged`、`test_tool_acceptance::{test_g_compat_life_loop_maintenance_sequence_unchanged, test_g_compat_life_loop_semantics_replacing_blob_freeze}`、`test_tool012_bans::test_ban_no_second_agent_stage_sequence_unchanged` | **须修**：F.13 只更新了 `test_tool007_integration.EXPECTED_MAINTENANCE_STEPS`，另 4 份序列期望漏改（`At index 3 diff: 'action_schedule' != 'outbox_consume'`） |
+| **`loop_runs` kind 值域缺陷（F.14 暴露）** | 4 | `v2/test_life002_controller::test_world_maintenance_dispatched_when_enabled`、`v21/test_agent008::test_background_run_resets_snapshot`、`v24/test_tool012_scenarios::test_s4_autonomy_tick_three_ledgers_aligned`、`v24/test_tool006_integration::test_autonomy_decision_to_world_write_through_outbox` | **阻塞级，见下** |
+| 既存（F.8 清单内） | 3 | `v2/test_aut005_goal_evaluation::test_clean_slice_passes_all`、`v21/test_agent008::test_low_energy_suppresses_short_term`、`v25/test_plan010_regression::test_s1_plan_evidence…` | 豁免 |
+| 其它待归因 | 9 | `v24/test_tool011_manifests::test_e3_syntax_error_is_logged_without_aborting`、`test_tool010_e2e::test_four_step_tool_addition_keeps_pipelines_untouched`、`v25/test_plan008_broadcast::test_event_system_flags_off_write_nothing`、`e2e` 3 条、计时类 3 条 | 单跑复核（疑为抖动 / 冻结面连带） |
+
+#### H.8.1 阻塞级缺陷：`loop_runs.kind` 值域不含新增维护步
+
+`app/core/db.py:1218-1222` 的 `ck_loop_runs_kind` 值域为：
+
+```
+kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consume', 'trigger_reconcile')
+```
+
+而 `life_loop._run_maintenance` 实际写入了**两个不在值域内**的 kind：
+
+| 维护步 | 写入点 | 引入提交 | 当前状态 |
+|---|---|---|---|
+| `world_simulation` | `life_loop.py:642` `_record_maintenance_run("world_simulation", …)` | `e1c0bef`（WS-003 时间推进与模拟维护步） | **活缺陷**：F.14 把该步的门控固化常开后首次真正执行 → `IntegrityError: CHECK constraint failed: ck_loop_runs_kind`，**`run_life_loop_tick` 整轮崩溃** |
+| `action_schedule` | `life_loop.py:694` | `d2f431c`（F.13 挂维护步） | **休眠地雷**：双闸默认 off 故未触发；**批次 7 固化 v26 后必然引爆** |
+
+两处都是「新增了维护步、但没有同步扩 `loop_runs` 的 kind 值域」——WS-003 与 F.13 各自遗漏，前者被门控掩盖至 F.14 才暴露。
+
+**裁决见 H.9。在它落定前，批次 5 的失败增量无法干净归因**（该缺陷会让任何调用 `run_life_loop_tick` 的用例都失败，横跨 v2 / v21 / v24 / v25）。
+
+### H.9 阻塞缺陷裁决
+
+| 方案 | 内容 | 成本 | 风险 |
+|---|---|---|---|
+| **① 新增迁移扩值域**（推荐） | 新增迁移（head 0048 → 0049）扩 `ck_loop_runs_kind` 加 `world_simulation` + `action_schedule`，同步 `app/core/db.py:1218` | 触碰 `migrations/`（G.3 第二类声明不改）；`tests/v25/test_plan012_gates_and_invariants.py:175` 的 `heads == ["0048_action_records_run_id.py"]` **由绿转红**需同批改；`tool012_support.MIGRATION_BREAKPOINT` 等陈旧守卫一并校正 | 低（与 `0038` 扩 `chat` 同款先例） |
+| **② 归并到既有 kind** | `world_simulation` 记入 `world_maintenance` 行、`action_schedule` 记入 `action_retry` 行，靠 `steps[].step` 区分 | 零迁移 | 丢失 kind 维度的可观测性；`LIFE_LOOP_MAINTENANCE_SEQUENCE` 钉测与三账对齐语义需改写 |
+| **③ 只修钉测，缺陷单列待办** | 只做 F.13 遗漏的 4 处序列期望同步；schema 缺陷登记为独立待办 | 最低 | 批次 7 会再次引爆同一缺陷；且 H.8 的归因表长期带 4 条噪声 |
+
+**裁决结果（2026-09-18）**：采用 **①**。执行记录见 H.10。
+
+### H.10 基线修复执行记录（2026-09-18）
+
+「第 0.5 步」——批次 5 开动前的守卫修复，3 个本地提交。
+
+| 项 | 内容 |
+|---|---|
+| **阻塞缺陷根因** | `51c8892`（v23 批）把 `world_simulation` 维护步的门控由 `world_simulation_enabled and time_advance_enabled` 改为 `settings.world_enabled`，使一条**从未运行过**的维护步首次落地；该步写入的 `kind='world_simulation'` 不在 `ck_loop_runs_kind` 值域内 → 每次 tick `IntegrityError` |
+| **连带缺陷（同源，修一处才暴露）** | 该步把 `run_simulation_maintenance` 的返回值原样写进 `loop_runs.steps`（JSON 列），而它是 `TimeAdvanceResult`（dataclass，含 `datetime`）→ `TypeError: Object of type TimeAdvanceResult is not JSON serializable` |
+| 修 ①：扩 kind 值域 | `app/core/db.py` 的 `LoopRunRow.__table_args__` + 新增迁移 `0049_loop_runs_kind_maintenance_steps.py`（值域加 `world_simulation` / `action_schedule`；与 `0038` 扩 `chat` 同款先例） |
+| 修 ②：JSON 归一化 | `life_loop._json_safe()`，在 `_record_maintenance_run`（`loop_runs.steps` 唯一写入路径）统一收口；`action_schedule` 那颗休眠地雷一并拆掉（批次 7 固化 v26 时不再引爆） |
+| 迁移 head 钉测同步 | **14 个测试文件**把 `0048` 机械升到 `0049`（v24 ×1、v25 ×12、v26 ×1）——`MIGRATION_HEAD` 常量、`test_*_0048` 用例名、`max(numeric) == 48`、`startswith("0048_")` 等 |
+| F.13 遗漏的序列钉测 | `tool012_support.LIFE_LOOP_MAINTENANCE_SEQUENCE` 与 `test_tool005_integration.LIFE_LOOP_MAINTENANCE_SEQUENCE` 补入 `action_schedule`（**只有 2 份定义**，`test_tool_acceptance` 与 `test_tool012_bans` 共用 `tool012_support` 的那份） |
+| 冻结面重建 | 6 条（G.3 第一类）：`test_tool007_integration` 的 `world_engine` / `outbox_consumer`；`test_tool010_e2e` 的 `chat_pipeline` / `post_process` / `action_engine` / `prompts/builder` |
+| feishu 14 条 | 裁决列为**豁免基线**（`feat/feishu_bot` 分支自身 WIP，与本重构无关） |
+| 验证 | 受影响 12 个文件：**407 passed / 8 failed → 修复后** 仅余 F.8 既存豁免 1 条（`v21/test_agent008::test_low_energy_suppresses_short_term`）与 5 条 tool012 时代的陈旧结构守卫 |
+
+#### H.10.1 未修项：tool012 时代的陈旧结构守卫（5 条）
+
+`tests/v24/` 的以下 5 条锚在 **TOOL-012 当时的快照**上，其常数（`MIGRATION_FILE_COUNT_CURRENT = 46`、`MIGRATION_BREAKPOINT = "0046_tool_insight_types.py"`、`SCHEMA_TABLE_COUNT = 42`、`SCHEMA_COLUMNS_DIGEST`）自 `0047` / `0048` 落地起即已失配，属 §G.3 第二类**既存失败**：
+
+`test_tool007_integration::test_no_new_tables_in_metadata`、`test_tool012_bans::test_session_tables_zero_structural_change`、`test_tool_acceptance::{test_migration_chain_head_is_0046, test_zero_migration_reconciliation_records_0046_breakpoint, test_zero_migration_model_structure_unchanged}`。
+
+**本次不动**：重建它们要重新推导整套表/列/索引摘要快照（`SCHEMA_TABLE_COUNT 42 → 43`、`columns_digest`、`table_set_digest`、`MIGRATION_BREAKPOINT` 语义），那是「给一个已完结任务的冻结快照重新定基线」，与开关去门控无关。**失败 ID 集合不变**，故不影响批次归因。建议单开一个清理任务：要么重定基线，要么把这类「零迁移」断言退役（其语义已被 v25 侧的 `MIGRATION_HEAD` 钉测取代）。
 
