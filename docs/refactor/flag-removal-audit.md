@@ -3,7 +3,7 @@
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
-> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 已完成**（F.9~F.14）；剩余 **v24 → v25 → v26 → 收尾删 `enablement.py`**。
+> 当前状态（2026-09-19）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 / v24 已完成**（F.9~F.14、H.10~H.11）；剩余 **v25（批次 6） → v26（批次 7） → 收尾删 `enablement.py`（批次 8）**。
 >
 > **剩余批次执行清单见 [附录 H](#附录-h剩余批次任务编排批次-58)**（2026-09-18 实测口径，替代 §8 表头的过时计数）。
 
@@ -1332,35 +1332,39 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | `enablement.py` | v24 段整段删除；`V25_DEPENDENCIES` 摘掉两条 `⇒ tool_system_enabled`；`tool_permission_sub_layer_warnings` 删除（其判据已无字段可读） |
 | 验证 | `compileall app` 通过；`import app.main` 通过；`Settings.model_fields` 无 `vXX_` 前缀、无残留 v24 开关 |
 
-#### 未完成：测试同步（本批第 2 个提交）
+#### 已完成：测试同步（本批第 2~3 个提交）
 
-**全量**去门控后：**242 failed + 191 errors / 5970 passed**。
-**已完成三轮清理**（提交 `c77efb7` → `e7c5927` → `e8ecb62` → `94d6d6e`）后，`tests/v24` 单目录：**182 failed / 17 errors → 77 failed / 2 errors / 1420 passed**；`tests/` 全量 `compileall` 通过。
+去门控后实测 **242 failed + 191 errors / 5970 passed**；五轮清理后 `tests/v24` **全绿（1456 passed / 1 skipped）**，`tests/` 全量 `compileall` 通过。
 
-**第三轮（提交 `94d6d6e`）的关键认识**：**校验段转正常开后，配了「全键参数字典」的用例会被结构性拦下**。此前 `tool_settings()` 把校验闸置 off，测试可以拿一份含全部键的 `S1_PARAMS` 去打所有工具；现在 `_invocation()` 的默认空参、`S1_PARAMS` 的跨工具复用都会立刻 `invalid`（未声明键 → `unknown_param`；`importance` 字符串 vs schema 的 number → 类型不符）。处置：`test_tool003_executor._invocation()` 补 schema 必填默认值；`test_tool012_scenarios` 改为**按 `definition.input_schema.parameters` 逐工具造必填参**（`_declared_params`）。这是本批最容易被误判成「实现回归」的一类失败，后续批次务必先怀疑测试侧的参数假设。
+失败数轨迹：`182 failed / 17 errors`（首轮清理后）→ `135`（矩阵收敛）→ `113`（执行器 + 场景）→ `77`（权限 / 确认 / 工具面）→ `52`（能力注册表 + flag-off 片段退役）→ `24`（冻结快照重定）→ `11` → `4` → **0**。
 
-**第二轮（矩阵收敛，提交 `e8ecb62`）做了什么**：`tool012_support` 的 13 组总闸/子闸组合（`FLAG_MATRIX` + `EXPECTED_FINGERPRINTS`）整体收敛为唯一常开配置（`ALWAYS_ON_GROUP`）；`apply_flag_env` 不再显式置 off 已删开关；`test_tool_acceptance.py` 的 6 个「闸 on vs off 对比」用例改为常开断言、删掉 2 个已失效用例（g13 串行链、扩展闸双判据）。
+本轮新增的改写模式（前三轮清单见下）：
 
-已做（均为可重放的脚本化操作，脚本留在 `.tmp/`，不入库）：
-
-| 遍 | 操作 | 量 |
+| 类别 | 处置 | 量 |
 |---|---|---|
-| 1 | 摘除字典条目 / 关键字实参 / `monkeypatch.setenv` 中的已删开关 | 30 文件 91 行 |
-| 2 | 摘除调用内 kwarg（`v24_tool_env(tool_system_enabled=True)` 一类） | 26 文件 115 处 |
-| 3 | 语义定点改写 6 处 + 删除 12 个「闸关即等价上一版本」的失效用例 | 7 文件 |
-| 4 | 契约/读面收口：`PERMISSION_ON_SETTINGS = ()`、`capability_registry_flags` 断言改用 `REGISTRY_FLAG_NAMES[0]`、`runtime_fingerprint` 常开化 | 6 文件 |
-| 5 | flag 矩阵收敛（13 组 → 1 组）+ 验收用例常开化 | 3 文件 |
+| 「闸 off」用例整段退役 | 删除——前提已不存在，覆盖由常开用例承担 | 31 条 |
+| 能力注册表期望值 | 补 `external_api`（外部面注册已常开） | 6 处 |
+| 权限三段语义用例 | 删除 / 合并为「免授权档恒放行」（reason 改为 `level_no_grant_required`） | 9 条 |
+| 契约与形状断言 | `steps[].result` 的 V9 四键改为**子集**断言（观测段常开后含 `ToolResult` 全字段）；`validation` 通过时恒为 `None` | 4 处 |
+| 冻结快照重定基线 | 表数 / 迁移数 / 列摘要 / 表集合摘要 / 单表摘要 / `ZERO_DIFF_HASHES` 全部重算 | 6 个常数族 |
 
-**剩余（`tests/v24` 77 failed + 2 errors，按文件）**：
+**冻结快照重定基线（H.10.1 遗留项的处置）**：H.10.1 列为「本次不动」的陈旧结构守卫，本轮**选择重定基线而非退役**（与基线修复阶段对 6 条冻结面哈希的做法一致）——把锚点更新到当前现实，守卫语义（「此后不再漂移」）保留：
 
-| 文件 | 剩余 | 性质与做法 |
+| 常数 | 旧值 | 新值 |
 |---|---|---|
-| `test_tool005_permission.py` | 9 | `REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 三个 reason 已不可达 → 对应用例删除；保留快照不可用 / 授权判定用例 |
-| `test_tool010_e2e.py` | 8 | 含 `ZERO_DIFF_HASHES` 重建（本批触碰 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`） |
-| `test_tool005_confirmation.py`（6）/ `test_tool005_integration.py`（6） | 12 | `non_todo_payload_kinds()` 去参数后签名同步；`tool_channel_enabled` 断言失效 |
-| `test_tool_acceptance.py` | 5 | 剩余为非矩阵类断言：`test_g_compat_*` 的「Flag 全 off 与 V2.3.0 逐字节一致」前提已不存在，须改为常开基线或删除 |
-| `test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、`test_tool010_channel.py`（3）、`test_tool011_integration.py`（3）、`test_tool002_builtins.py`（2）、`test_tool012_scenarios.py`（2，s4/s5 的 outbox 账本） | 24 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化、冻结面重建 |
-| `tests/v9`、`tests/unit`、`tests/v25` 的跨版本连带 | 约 18 | 见上一版清单 |
+| `SCHEMA_TABLE_COUNT` / `TABLE_COUNT` | 42 | 43 |
+| `MIGRATION_FILE_COUNT_CURRENT` / `MIGRATION_COUNT` | 46 | 49 |
+| `MIGRATION_BREAKPOINT` | `0046_tool_insight_types.py` | `0049_loop_runs_kind_maintenance_steps.py` |
+| `MIGRATION_ADDED_VS_BASELINE` | 1 条 | 4 条（0046~0049） |
+| `V23_MIGRATION_TAIL` | 0044 / 0045 | 0047 / 0048 |
+| `SCHEMA_TABLE_SET_DIGEST` | `1cb68c6433d9422e` | `23d7c52d31112db1` |
+| `SCHEMA_COLUMNS_DIGEST(_BASELINE)` | `24579cc9f50fb9ff` | `506ee5d5cf357bdf` |
+| `BASELINE_TABLE_DIGESTS` | 13 张表 | 仅 `action_records` 变动 |
+| `ZERO_DIFF_HASHES` | 14 个文件摘要 | 4 条变动（`planner` / `post_process` / `action_engine` / `validator`） |
+
+顺带把守卫本身改成「改常数即改基线」的形态：`test_migration_chain_head_is_0046` → `..._is_current`（读 `MIGRATION_HEAD` / `MIGRATION_HEAD_PREVIOUS`）、`test_zero_migration_reconciliation_records_0046_breakpoint` → `..._records_breakpoints`（按 `MIGRATION_ADDED_VS_BASELINE` 全量对齐）、新增 `test_latest_breakpoint_is_downgradable`（每次破例都必须可回退）。
+
+**修复脚本**（留在 `.tmp/`，不入库）：`rebuild_v24_snapshots.py`（全量重定基线）、`refresh_frozen_hashes.py`（只刷文件哈希，可反复执行）。
 
 #### H.11.1 过程事故与纪律补充
 
@@ -1383,4 +1387,61 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 5. 冻结面（G.3 第一类）逐条重建 —— 本批触碰 `test_tool010_e2e.ZERO_DIFF_HASHES` 的 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`、`test_tool007_integration.FROZEN_SOURCES` 的 `world_engine.py`。
 
 **§4.2 #9 的收口状态**：`app/api/v1/debug.py` 的 `_autonomous_tool_surface` 已摘掉 `tool_system_enabled` 一侧，现为单闸 `plan_tool_required`；另一侧由批次 6 收口（与 H.2 的计划一致）。
+
+
+#### H.11.2 批次 5 暴露并修复的真缺陷（4 个）
+
+去门控把一批「此前被开关遮住」的路径转正常开后，下面 4 个缺陷才可观测。它们都不是删开关本身引入的，而是既有代码的潜伏问题；由于本批之后它们成为**生产默认路径**，必须随批修掉。
+
+| # | 缺陷 | 触发条件 | 修法 |
+|---|---|---|---|
+| ① | `post_process._run_confirmation_round` 内 `settings` 未定义 | 去门控时误删了 `settings = get_settings()`，函数体仍在用 | 改为 `get_confirmation_service()`（无参）。此前**确认轮次整体降级为普通对话**，用户回复"好"不会真的批准工具调用 |
+| ② | `_comparable` 直接 `replace(tzinfo=None)` 丢偏移量 | UTC-aware `due_at` 与本地 naive `now` 比较，GMT+8 下凭空少 8 小时 | 改为 `astimezone().replace(tzinfo=None)`：先换算本地墙钟再取 naive |
+| ③ | 周期时间口径分裂 | `run_life_loop_tick(now=...)` 注入的周期时间只用于组装计划，`action_engine._now()` 仍读真实时间；`future_datetime` 校验因此把"周期内的未来提醒"判成 `not_future` → 行动落 `cancelled/invalid_params` | 新增 `app/application/logical_clock.py`（contextvar），`run_autonomous_cycle` 绑定 / 解绑，`action_engine._now()` 改读逻辑时钟 |
+| ④ | `@dataclass(frozen=True)` 被清理脚本误删（`tool012_support.Violation`） | 装饰器清理脚本的误伤；`Violation(file, line, kind, detail)` 构造即 `TypeError`，`test_static_scans_are_not_vacuous` 因此长期红 | 恢复装饰器，并加做一次**全树 AST 体检**（无基类 + 类体仅注解字段却无装饰器）——全树仅此 1 处 |
+
+②③ 同源：都是「时间口径不一致」。② 是**同一时刻的两种表示**（aware vs naive），③ 是**两个不同的时刻来源**（周期时间 vs 真实墙钟）。两者叠加时——测试注入 2026-09-14 的周期时间、校验却读 2026-09-19 的墙钟——校验必然失败。这也是本批最后 2 条失败用例的真实根因（一度被误判为 fixture 时间基准问题）。
+
+**逻辑时钟的边界**：仅在 `run_autonomous_cycle` 内绑定，周期外（前台对话、单测直调 `run_action_planning`）回落真实本地时间，行为与改造前一致；这是把"周期内一切时间口径一致"落到单点，而不是给全仓加时钟层。
+
+
+#### H.11.3 跨版本连带（v24 去门控在 v9 / v25 / unit 引发的连锁，2026-09-19）
+
+删除 `tool_system_enabled` 这一「链上节点」的代价，最终落在 18 条跨版本用例上。它们都不在 `tests/v24` 内，是**门控被摘掉之后才暴露**的：
+
+| 组 | 文件 | 条数 | 性质与处置 |
+|---|---|---|---|
+| unit | `test_capability_registry.py`（1） | 2 | 内置能力清单补 `external_api`（外部面注册常开） |
+| unit | `test_capabilities.py`（1） | — | `search` 仍 unavailable（无来源）；`notification` 已接线 → 断言拆开 |
+| unit | `test_settings_flag_guard.py`（1） | — | 我上一轮改写的 `test_tool001_enablement.py` 用了 `V24_TOOL_SYSTEM_ENABLED` 字面量，与「setenv 字面量必须对应真实字段」守卫冲突 → 摘掉（版本化幽灵键已由 `test_unknown_versioned_env_keys_reports_ghost` 守卫） |
+| v25 | `test_plan002_enablement.py`（4） | 10 | `V25_DEPENDENCIES` 由 5 条降为 3 条（两条 `⇒ tool_system_enabled` 消失）：条目数 / 源闸集 / 跨域依赖集全部对齐；`test_u13_step_binding_requires_the_tool_system` 删除；`test_existing_v24_chain_rules_intact` 反转为 `test_v24_chain_rules_are_gone` |
+| v25 | `test_plan003_context.py`（2） | — | 两条「硬依赖不可用 → PlanUnavailable」用例的前提（总闸 off / 注册表为 None）已不存在 → 删除 |
+| v25 | `test_plan011_debug_api.py`（1） / `test_plan012_flag_matrix.py`（1） | — | 硬依赖恒可用 → 降级用例删除；依赖表下界 5 → 3 |
+| v9 | `test_scenarios.py`（2） | 5 | 场景注入固定 `NOW` 模拟某一时刻 → **绑定逻辑时钟**（见 H.11.2 ③），否则工具层校验用真实时间比 `NOW + 1d` 的 `due_at` |
+| v9 | `test_failure_recovery.py`（3） | — | 计划步骤自 V2.4.0 起经**工具面解析**，手搓能力名（`flaky` / `perma`）已解析不到 → 补一份最小工具声明打桩（`_stub_tools`，实现体一并传入以过注册期解析校验） |
+
+**顺带说明一条边界**：`execute_plan` 的 V9「裸能力直调」回退路径（§4.2 #9 那一类）已随本批删除。它只对手搓计划的调用者可达——`assemble_plan` 自 V2.4.0 起一律经工具面装配，产物必然可解析。v9 的三条重试用例因此改为「打桩工具 + 打桩能力」，重试语义（`_apply_action_result_to_record`）本身零改动。
+
+**余下 2 条基线遗留（非本批引入，转入批次 6）**：
+
+- `v25/test_plan008_broadcast.py::test_event_system_flags_off_write_nothing`
+- `v25/test_plan010_regression.py::test_s1_plan_evidence_becomes_an_insight_and_triggers_a_replan`
+
+两者都在批次 5 开批基线里就是红的（性质属「v25 语义待复核」），且都落在批次 6 的改动面内（`plan_reflection_enabled` / 事件系统闸），随批次 6 一并处理。
+
+#### H.11.4 批次 5 收口对账（2026-09-19 全量实测）
+
+| 口径 | 开批基线 | 收口 | 变化 |
+|---|---|---|---|
+| 全量 failed | 35 | **22** | −13 |
+| 全量 passed | 6368 | **6255** | −113（其中约 100 条为本批主动删除的「闸 off」失效用例） |
+| 全量 skipped | 22 | 22 | — |
+| `tests/v24` | 182 failed / 17 errors | **0 failed / 1456 passed / 1 skipped** | 全绿 |
+
+**22 条余留全部为既有豁免，无一条由本批引入**：feishu WIP 14（`e2e/test_feishu_webhook` 12 + `unit/test_feishu_settings` 2）+ 抖动池 4（`e2e/test_chat_http_integration` / `e2e/test_memory_e2e` / `e2e/test_turn_meta_stream` / `v7.8/test_performance`）+ F.8 既存 2（`v2/test_aut005` / `v21/test_agent008`）+ 基线遗留 v25 2（见 H.11.3）。
+
+**提交**（本地，未推送）：`714a92d`（app 去门控）→ `c77efb7` / `e7c5927` / `e8ecb62` / `94d6d6e`（前三轮测试同步）→ `1fc2399` / `ddb37c5` / `c797074`（权限 / 确认 / 工具面）→ `f527f85` / `cfaafde`（时区与逻辑时钟 + 末批收口）。
+
+**批次 6 起点**：`app/core/settings/enablement.py` 的 v24 段与 `tool_permission_sub_layer_warnings` 已在 H.10 阶段删除，但文件本身仍在（v25 / v26 段）；`action_execution.py` 的 `V26_MASTER_FLAG` / `V26_SUB_FLAGS` 与 `validate_action_chain` 保留至批次 7。H.3 / H.4 的执行清单无需修订。
+
 
