@@ -44,45 +44,31 @@ def _future_due_at() -> str:
     return (support._now() + timedelta(minutes=30)).isoformat()
 
 
-# --- Flag 矩阵（13 组） --------------------------------------------------------
+# --- 常开配置的运行期指纹与注册表 ----------------------------------------------
 
 
-@pytest.mark.parametrize("group", list(support.FLAG_MATRIX))
-def test_flag_matrix_twelve_gate_combinations(monkeypatch, group):
-    """矩阵第 1~12 组：注册表规模与六条闸门判据逐组合可判定。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_runtime_fingerprint_matches_always_on_config(monkeypatch):
+    """开关体系已删除：运行期指纹等于唯一常开配置的期望。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     settings = get_settings()
 
-    assert support.capability_fingerprint(settings) == support.EXPECTED_FINGERPRINTS[group]
+    assert support.capability_fingerprint(settings) == support.EXPECTED_FINGERPRINTS[
+        support.ALWAYS_ON_GROUP
+    ]
 
 
-@pytest.mark.parametrize("group", list(support.FLAG_MATRIX))
-def test_flag_matrix_registry_ids_stable(monkeypatch, group):
-    """注册表在总闸 on 时为固定 10 条声明；总闸 off 时不存在注册表。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_registry_ids_are_stable(monkeypatch):
+    """注册表恒为固定 10 条内置声明。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     from app.services.tool.registry import get_tool_registry
 
     registry = get_tool_registry()
-    if support.EXPECTED_FINGERPRINTS[group]["registry_size"] is None:
-        assert registry is None
-        return
+    assert registry is not None
     assert tuple(sorted(definition.id for definition in registry.list())) == (
         support.BUILTIN_TOOL_IDS
     )
 
 
-@pytest.mark.parametrize("flag", support.V24_SUB_FLAGS)
-def test_flag_matrix_group13_sub_gate_without_master_fails_fast(monkeypatch, flag):
-    """矩阵第 13 组：任一子闸 on 而总闸 off → 启动 fail-fast（串行链校验）。"""
-    support.apply_flag_env(monkeypatch, {flag: True})
-    settings = get_settings()
-
-    violations = enablement_violations(settings)
-    assert any(flag.lower() in message for message in violations), (
-        f"{flag} 开启而总闸关闭必须在 enablement_violations 中命中"
-    )
-    with pytest.raises(SettingsError):
-        validate_enablement_chain(settings)
 
 
 
@@ -133,10 +119,9 @@ def _grant_free_registry():
     return registry
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g03_only_schema_validation"])
-def test_flag_matrix_schema_validation_branch(monkeypatch, group):
-    """校验闸：仅 g03 拦下参数错误，g02 放行至能力实现。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_schema_validation_always_enforced(monkeypatch):
+    """校验段已转正常开：参数错误一律拦下。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     settings = get_settings()
     capability = notification_capability()
     executor = _executor_for(capability, settings, registry=_grant_free_registry())
@@ -147,19 +132,14 @@ def test_flag_matrix_schema_validation_branch(monkeypatch, group):
         settings,
     )
 
-    if group == "g03_only_schema_validation":
-        assert execution.status == "invalid"
-        assert execution.validation["structural"][0]["code"] == "unknown_param"
-        assert capability.calls == []
-    else:
-        assert execution.status == "succeeded"
-        assert capability.calls
+    assert execution.status == "invalid"
+    assert execution.validation["structural"][0]["code"] == "unknown_param"
+    assert capability.calls == []
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g04_only_permission"])
-def test_flag_matrix_permission_branch(monkeypatch, group):
-    """权限闸：仅 g04 进入七步判定（无授权 → 首次确认）；g02 特权档默认拒绝（P0-1）。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_permission_layer_always_evaluates(monkeypatch):
+    """权限层已转正常开：无授权 → 首次确认。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     settings = get_settings()
     capability = notification_capability()
     executor = _executor_for(capability, settings)
@@ -171,20 +151,14 @@ def test_flag_matrix_permission_branch(monkeypatch, group):
         permission_snapshot=snapshot(grants=[], settings=settings),
     )
 
-    if group == "g04_only_permission":
-        assert execution.status == "pending_confirmation"
-        assert execution.permission["reason"] == "first_time_confirmation"
-        assert capability.calls == []
-    else:
-        assert execution.status == "denied"
-        assert execution.permission["reason"] == "permission_layer_disabled"
-        assert capability.calls == []
+    assert execution.status == "pending_confirmation"
+    assert execution.permission["reason"] == "first_time_confirmation"
+    assert capability.calls == []
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g05_only_observation"])
-def test_flag_matrix_observation_branch(monkeypatch, group):
-    """观测闸：g05 落 ToolResult 结构化键，g02 落 V9 原始 CapabilityResult 形态。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_observation_persists_structured_keys(monkeypatch):
+    """观测结果恒走 ToolResult 结构化键，并保留旧 `payload` 读键。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     settings = get_settings()
     executor = _executor_for(
         notification_capability(), settings, registry=_grant_free_registry()
@@ -196,17 +170,13 @@ def test_flag_matrix_observation_branch(monkeypatch, group):
 
     assert execution.status == "succeeded"
     payload = execution.result
-    if group == "g05_only_observation":
-        assert {"status", "effects", "observations", "raw_error"} <= set(payload)
-        assert "payload" in payload, "兼容双写必须保留旧 payload 读键"
-    else:
-        assert set(payload) == {"status", "payload", "usage", "error"}
+    assert {"status", "effects", "observations", "raw_error"} <= set(payload)
+    assert "payload" in payload, "兼容双写必须保留旧 payload 读键"
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g07_only_memory"])
-def test_flag_matrix_memory_branch(monkeypatch, group):
-    """记忆闸：g07 走工具记忆边界表，g02 回退 action_type 键的 V9 投递。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_tool_memory_delivery_never_falls_back_to_legacy(monkeypatch):
+    """工具记忆子闸已转正删除：投递恒走工具路径，不回退 legacy。"""
+    support.apply_flag_env(monkeypatch, support.group_env())
     from app.services.action import memory_bridge
 
     calls: list[str] = []
@@ -229,51 +199,32 @@ def test_flag_matrix_memory_branch(monkeypatch, group):
     )
     memory_bridge.deliver(record, "u-tool012")
 
-    if group == "g07_only_memory":
-        assert calls == [], "子闸 on 时工具路径不得回退 legacy 投递"
-    else:
-        assert calls == ["legacy"], "子闸 off 时必须回退 V9 投递"
+    assert calls == [], "工具路径不得回退 legacy 投递"
 
 
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g09_only_channel"])
-def test_flag_matrix_channel_branch(monkeypatch, group):
-    """通道闸：g09 下通道工具 enabled，g02 下声明仍注册但状态 disabled。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
+def test_channel_tool_status_follows_feishu(monkeypatch):
+    """通道工具状态只由 `feishu_enabled` 决定（总闸与通道子闸已删除）。"""
+    support.apply_flag_env(monkeypatch, {**support.group_env(), 
+        "FEISHU_ENABLED": True})
     registry = builtin_registry()
-
-    status = registry.effective_status(CHANNEL_TOOL_ID)
-    if group == "g09_only_channel":
-        assert status == "enabled"
-    else:
-        assert status == "disabled"
+    assert registry.effective_status(CHANNEL_TOOL_ID) == "enabled"
     assert registry.get(CHANNEL_TOOL_ID).namespace == "channel"
 
-
-@pytest.mark.parametrize(
-    "group", ["g02_master_on_all_sub_off", "g10_only_external_api", "g11_only_user_defined"]
-)
-def test_flag_matrix_extension_branches(monkeypatch, group):
-    """扩展闸：外部 API 与自定义工具各自独立门控。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
-    settings = get_settings()
-    from app.services.tool import ext_api, user_defined
-
-    assert ext_api.external_api_enabled(settings) is (
-        group == "g10_only_external_api"
-    )
-    assert user_defined.user_defined_enabled(settings) is (
-        group == "g11_only_user_defined"
-    )
+    support.apply_flag_env(monkeypatch, support.group_env())
+    assert builtin_registry().effective_status(CHANNEL_TOOL_ID) == "disabled"
 
 
-def test_flag_matrix_autonomy_surface_follows_master(monkeypatch):
-    """自治工具面：总闸 off → None（V9 原状）；on → 非空且不含通道命名空间。"""
+
+
+def test_autonomy_surface_is_always_resolved(monkeypatch):
+    """自治工具面恒可解析（总闸已删除）。"""
     from app.application import autonomy_engine
 
     support.apply_flag_env(monkeypatch, {})
-    assert autonomy_engine.resolve_autonomy_surface("tool012", support._now()) is None
+    surface = autonomy_engine.resolve_autonomy_surface("tool012", support._now())
+    assert surface is not None
 
     support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     surface = autonomy_engine.resolve_autonomy_surface("tool012", support._now())

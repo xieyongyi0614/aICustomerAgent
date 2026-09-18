@@ -25,18 +25,6 @@ REPO_ROOT = BACKEND_ROOT.parents[1]
 BASELINE_COMMIT = "d67ebe7"
 BASELINE_LABEL = "V2.3.0"
 
-V24_MASTER_FLAG = "TOOL_SYSTEM_ENABLED"
-V24_SUB_FLAGS: tuple[str, ...] = (
-    "TOOL_PERMISSION_ENABLED",
-    "TOOL_SCHEMA_VALIDATION_ENABLED",
-    "TOOL_OBSERVATION_ENABLED",
-    "TOOL_SURFACE_ENABLED",
-    "TOOL_MEMORY_ENABLED",
-    "TOOL_REFLECTION_ENABLED",
-    "TOOL_CHANNEL_ENABLED",
-    "TOOL_EXTERNAL_API_ENABLED",
-    "TOOL_USER_DEFINED_ENABLED",
-)
 AUX_FLAGS: tuple[str, ...] = (
     "FEISHU_ENABLED",
 )
@@ -231,7 +219,6 @@ PLACEHOLDER_SECRET_VALUES: frozenset[str] = frozenset(
 )
 
 
-@dataclass(frozen=True)
 class Violation:
     file: str
     line: int
@@ -514,10 +501,12 @@ def reset_runtime_state() -> None:
 
 
 def apply_flag_env(monkeypatch, envs: dict[str, Any] | None = None) -> None:
-    """把 V2.4.0 Flag 全部显式置 off（含辅助闸）后套用给定组合。"""
-    values: dict[str, Any] = {V24_MASTER_FLAG: "false"}
-    for flag in V24_SUB_FLAGS:
-        values[flag] = "false"
+    """隔离基线：辅助闸置 off + 工具参数与飞书占位固定，再套用给定 env。
+
+    V2.4.0 工具总闸与九个子闸已随该版本转正删除，不再需要显式置 off；
+    `envs` 中若仍带这些已删键，写入即被静默忽略（无副作用）。
+    """
+    values: dict[str, Any] = {}
     for flag in AUX_FLAGS:
         values[flag] = "false"
     values.update(TOOL_PARAM_ENVS)
@@ -529,149 +518,24 @@ def apply_flag_env(monkeypatch, envs: dict[str, Any] | None = None) -> None:
     reset_runtime_state()
 
 
-def group_env(group: str) -> dict[str, Any]:
+ALWAYS_ON_GROUP = "always_on"
+
+
+def group_env(group: str = ALWAYS_ON_GROUP) -> dict[str, Any]:
+    """唯一配置下的环境增量（保留签名以兼容既有调用形态）。"""
     return dict(FLAG_MATRIX[group])
 
 
 FLAG_MATRIX: dict[str, dict[str, Any]] = {
-    "g01_master_off_all_sub_off": {},
-    "g02_master_on_all_sub_off": {V24_MASTER_FLAG: True},
-    "g03_only_schema_validation": {
-        V24_MASTER_FLAG: True,
-        "TOOL_SCHEMA_VALIDATION_ENABLED": True,
-    },
-    "g04_only_permission": {V24_MASTER_FLAG: True, "TOOL_PERMISSION_ENABLED": True},
-    "g05_only_observation": {V24_MASTER_FLAG: True, "TOOL_OBSERVATION_ENABLED": True},
-    "g06_only_surface": {V24_MASTER_FLAG: True, "TOOL_SURFACE_ENABLED": True},
-    "g07_only_memory": {V24_MASTER_FLAG: True, "TOOL_MEMORY_ENABLED": True},
-    "g08_only_reflection": {
-        V24_MASTER_FLAG: True,
-        "TOOL_REFLECTION_ENABLED": True,
-    },
-    "g09_only_channel": {
-        V24_MASTER_FLAG: True,
-        "TOOL_CHANNEL_ENABLED": True,
-        "FEISHU_ENABLED": True,
-    },
-    "g10_only_external_api": {
-        V24_MASTER_FLAG: True,
-        "TOOL_EXTERNAL_API_ENABLED": True,
-    },
-    "g11_only_user_defined": {
-        V24_MASTER_FLAG: True,
-        "TOOL_USER_DEFINED_ENABLED": True,
-    },
-    "g12_all_on": {
-        V24_MASTER_FLAG: True,
-        "FEISHU_ENABLED": True,
-        **{flag: True for flag in V24_SUB_FLAGS},
-    },
+    ALWAYS_ON_GROUP: {},
 }
+"""开关体系已删除：原本的总闸/子闸组合收敛为唯一配置。"""
 
 EXPECTED_FINGERPRINTS: dict[str, dict[str, Any]] = {
-    "g01_master_off_all_sub_off": {
-        "registry_size": None,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g02_master_on_all_sub_off": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g03_only_schema_validation": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g04_only_permission": {
+    ALWAYS_ON_GROUP: {
         "registry_size": BUILTIN_TOOL_COUNT,
         "permission_layer": True,
         "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g05_only_observation": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g06_only_surface": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g07_only_memory": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g08_only_reflection": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": True,
-        "tool_insights_ready": True,
-    },
-    "g09_only_channel": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": True,
-        "external_api": False,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g10_only_external_api": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": True,
-        "user_defined": False,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g11_only_user_defined": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": False,
-        "channel_tools": False,
-        "external_api": False,
-        "user_defined": True,
-        "tool_feed": False,
-        "tool_insights_ready": False,
-    },
-    "g12_all_on": {
-        "registry_size": BUILTIN_TOOL_COUNT,
-        "permission_layer": True,
-        "channel_tools": True,
         "external_api": True,
         "user_defined": True,
         "tool_feed": True,

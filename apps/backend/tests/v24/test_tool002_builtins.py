@@ -169,23 +169,12 @@ def test_describe_snapshot_is_stable_across_builds():
     assert len(set(payloads)) == 1
 
 
-def test_get_tool_registry_returns_none_when_master_flag_off(v24_tool_env, monkeypatch):
-    calls: list[str] = []
-    monkeypatch.setattr(
-        tool_registry, "register_builtin_tools", lambda registry: calls.append("built")
-    )
+def test_get_tool_registry_returns_prebuilt_instance(v24_tool_env, monkeypatch):
+    """注册表单例：已构建实例原样返回（总闸已删除，不再有「闸关 → None」）。"""
+    preset = ToolRegistry()
+    monkeypatch.setattr(tool_registry, "_registry", preset)
     v24_tool_env()
-    assert get_settings().tool_system_enabled is False
-    assert get_tool_registry() is None
-    assert calls == []
-
-
-def test_get_tool_registry_ignores_existing_instance_when_flag_off(
-    v24_tool_env, monkeypatch
-):
-    monkeypatch.setattr(tool_registry, "_registry", ToolRegistry())
-    v24_tool_env()
-    assert get_tool_registry() is None
+    assert get_tool_registry() is preset
 
 
 def test_get_tool_registry_builds_once_when_master_flag_on(v24_tool_env, monkeypatch):
@@ -282,8 +271,9 @@ def test_capability_registry_flags_snapshot_is_read_only_copy(v24_tool_env):
     registry = get_capability_registry()
 
     snapshot = action_registry.capability_registry_flags()
-    assert snapshot["tool_system_enabled"] is True
     assert set(snapshot) == set(action_registry.REGISTRY_FLAG_NAMES)
-    snapshot["tool_system_enabled"] = False
-    assert action_registry.capability_registry_flags()["tool_system_enabled"] is True
+    flag = action_registry.REGISTRY_FLAG_NAMES[0]
+    baseline = snapshot[flag]
+    snapshot[flag] = not baseline
+    assert action_registry.capability_registry_flags()[flag] is baseline
     assert action_registry.peek_capability_registry() is registry
