@@ -550,22 +550,17 @@ def _pipeline_intention(
     TOOL-006：`capabilities` 由调用方传入自治工具面（off 时为 None，管线行为不变）。
     TOOL-009：`tool_insights` 为只读反哺信号（缺省 None，interest 维行为不变）。
     """
-    settings = get_settings()
     try:
         from app.application import agent_state_context
         from app.services import decision_pipeline, goal_stack as goal_stack_service
 
         stack = goal_stack_service.evaluate_stack(user_id, now)
-        world_impacts = None
-        world_schedule = None
-        if settings.world_simulation_enabled and settings.event_detection_enabled:
-            facts = world_engine.collect_facts(user_id)
-            world_impacts = facts.get("impacts")
-            if settings.daily_life_enabled:
-                world_schedule = {
-                    "current_block": facts.get("current_block"),
-                    "part_of_day": facts.get("part_of_day"),
-                }
+        facts = world_engine.collect_facts(user_id)
+        world_impacts = facts.get("impacts")
+        world_schedule = {
+            "current_block": facts.get("current_block"),
+            "part_of_day": facts.get("part_of_day"),
+        }
         result = decision_pipeline.run_pipeline(
             stack=stack,
             snapshot=agent_state_context.get_snapshot(),

@@ -60,10 +60,9 @@ async def lifespan(application: FastAPI):
     register_development_runtime()
     register_rollback_listener()
     register_narrative_listener()
-    if get_settings().world_simulation_enabled and get_settings().event_detection_enabled:
-        from app.services.world.event_bridge import register_character_event_listeners
+    from app.services.world.event_bridge import register_character_event_listeners
 
-        register_character_event_listeners()
+    register_character_event_listeners()
     _life_loop_task = asyncio.create_task(run_life_loop_worker())
     logging.getLogger(__name__).info("life loop 已接管周期调度（归并 autonomy/world/action 三循环）")
     if get_settings().feishu_enabled:

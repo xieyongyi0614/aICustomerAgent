@@ -1049,8 +1049,7 @@ def rollback_relationship(user_id: str, target_version: int):
 def _plan_debug_enabled() -> bool:
     """计划调试面门控（总闸 + 调试子闸）。
 
-    「调试总闸」即本面所属子系统的总闸 `planning_enabled`——与 WS-018
-    （`world_simulation_enabled` + `debug_tick_enabled`）、TOOL-012
+    「调试总闸」即本面所属子系统的总闸 `planning_enabled`——与 TOOL-012
     （`tool_system_enabled`）同构；`PlanSettings` / `enablement` 中不存在第三个独立
     「调试总闸」Flag（PLAN-011 §4.2.6 / §6.3 D8 的三闸表述即此二闸）。
     """

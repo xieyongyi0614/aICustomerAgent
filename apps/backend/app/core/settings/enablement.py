@@ -1,8 +1,9 @@
 """Enablement 串行链校验（dependency-graph 串行链的部署时 fail-fast）。
 
-V2.0.0 / V2.1.0 / V2.2.0 三段**已整体移除**：随 `vXX_` 开关体系删除，其 ON 路径已转常开，
-无闸可校验。`action_outbox_enabled` 与 `foreground_gateway_enforced` 按裁决保留门控
-（已去版本前缀，见 flag-removal-audit.md 附录 E 与 F.10），它们不在任何依赖链上。
+V2.0.0 / V2.1.0 / V2.2.0 / V2.3.0 段**已整体移除**：随 `vXX_` 开关体系删除，
+其 ON 路径已转常开，无闸可校验。`action_outbox_enabled` 与
+`foreground_gateway_enforced` 按裁决保留门控（已去版本前缀，见
+flag-removal-audit.md 附录 E 与 F.10），它们不在任何依赖链上。
 
 V2.5.0 段（PLAN-002，architecture.md §7.10）：
 
@@ -28,8 +29,8 @@ V2.5.0 段（PLAN-002，architecture.md §7.10）：
 2. ②~⑥的跨域条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
    ①拦下，要么本就是 off，跨域依赖无判定意义。
 
-②~⑥以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
-v24 段的子闸表同款；①为 `V25_SUB_FLAGS` 上的子闸循环。
+②~⑥以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v24 段的子闸表
+同款；①为 `V25_SUB_FLAGS` 上的子闸循环。
 
 仅在启动边界调用（main.lifespan / 运维脚本），不做为模型级校验，
 以保留子域隔离单测使用部分 Flag 组合的自由度。
@@ -87,35 +88,6 @@ V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
 
 def enablement_violations(settings) -> list[str]:
     violations: list[str] = []
-    v23_sub_flags = (
-        "time_advance_enabled",
-        "daily_life_enabled",
-        "event_detection_enabled",
-        "scene_expansion_enabled",
-        "world_llm_assist_enabled",
-        "debug_tick_enabled",
-    )
-    v23_master = getattr(settings, "world_simulation_enabled", False)
-    v23_flags = {flag: getattr(settings, flag, False) for flag in v23_sub_flags}
-    for sub_flag, enabled in v23_flags.items():
-        if enabled and not v23_master:
-            violations.append(
-                f"{sub_flag} 要求 world_simulation_enabled（V2.3.0 总闸先开）"
-            )
-    if v23_flags["daily_life_enabled"] and not v23_flags[
-        "time_advance_enabled"
-    ]:
-        violations.append(
-            "daily_life_enabled 要求 time_advance_enabled"
-            "（日程依赖日循环标记）"
-        )
-    if v23_flags["world_llm_assist_enabled"] and not v23_flags[
-        "event_detection_enabled"
-    ]:
-        violations.append(
-            "world_llm_assist_enabled 要求 event_detection_enabled"
-            "（辅助服务于处境检出）"
-        )
     v24_sub_flags = (
         "tool_permission_enabled",
         "tool_schema_validation_enabled",

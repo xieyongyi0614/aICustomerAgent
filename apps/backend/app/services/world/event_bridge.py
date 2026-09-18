@@ -1,7 +1,7 @@
 """V2.3.0 CharacterEventBridge（architecture.md §5.4 角色事件源）。
 
 方向：角色域状态变更 → outbox（事务惯例）→ outbox_consumer → world_events。
-Flag 关闭时零登记；outbox 幂等键防重；消费失败走既有重试/死信。
+outbox 幂等键防重；消费失败走既有重试/死信。
 """
 
 import logging
@@ -12,11 +12,6 @@ from app.repositories import outbox_repository
 logger = logging.getLogger(__name__)
 
 
-def _enabled() -> bool:
-    settings = get_settings()
-    return settings.world_simulation_enabled and settings.event_detection_enabled
-
-
 def _register_world_op(
     user_id: str,
     event_type: str,
@@ -25,8 +20,6 @@ def _register_world_op(
     payload: dict,
     idempotency_key: str,
 ) -> bool:
-    if not _enabled():
-        return False
     op = {
         "op": "create_event",
         "args": [
@@ -100,9 +93,7 @@ def on_insight_created(user_id: str, created: list[dict]) -> None:
 
 
 def register_character_event_listeners() -> None:
-    """main.lifespan 注册入口；Flag 关闭即零注册零行为。"""
-    if not _enabled():
-        return
+    """main.lifespan 注册入口。"""
     from app.services.reflection import lifecycle as reflection_lifecycle
 
     reflection_lifecycle.register_insight_created_listener(on_insight_created)

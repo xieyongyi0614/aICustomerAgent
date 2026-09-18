@@ -1,6 +1,6 @@
-"""World Simulation 域设置（V2.3.0 WS-001）：世界模拟总闸与子闸及模拟参数。
+"""World Simulation 域设置（V2.3.0 WS-001）：世界模拟调参。
 
-总闸 + 子闸双开才生效；全部默认 off，关闭后行为与 V2.2.0 逐字节一致。
+开关已随 flag 体系删除固化常开；本模块仅保留模拟参数与预算旋钮。
 """
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
@@ -8,15 +8,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
 class WorldSimulationSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
-
-    world_simulation_enabled: bool = False
-    time_advance_enabled: bool = False
-    daily_life_enabled: bool = False
-    event_detection_enabled: bool = False
-    scene_expansion_enabled: bool = False
-    """已接线：gates 移动落点走 `movement.apply` 与场景画像投影（WS-016 部分交付）。"""
-    world_llm_assist_enabled: bool = False
-    debug_tick_enabled: bool = False
 
     world_sim_interval_seconds: int = 60
     sim_advance_max_minutes: int = 120

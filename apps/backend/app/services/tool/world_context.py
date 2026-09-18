@@ -140,8 +140,7 @@ def _event_order_key(event: Any) -> tuple[int, float, str]:
 class WorldContextBuilder:
     """世界事实预读装配器（TOOL-007 §4.1）：无共享可变状态，并发安全（E15）。
 
-    `settings` 可在构造或 `build()` 传入（后者优先）；只读 `world_enabled` 与
-    `scene_expansion_enabled` 两个既有开关，缺省时按"世界可用 / 场景未开启"处理。
+    `settings` 可在构造或 `build()` 传入（后者优先）；只读 `world_enabled`。
     """
 
     def __init__(self, settings: Any = None) -> None:
@@ -198,14 +197,9 @@ class WorldContextBuilder:
     def build_scene(
         self, user_id: str, *, world: Any = None, settings: Any = None
     ) -> dict[str, Any]:
-        """⑦ 场景画像 `{location_id, tone_bias, topic_affordances}`。
-
-        `scene_expansion_enabled` off（默认）→ `{}`：场景维度投影降级为不裁剪（E10）。
-        """
+        """⑦ 场景画像 `{location_id, tone_bias, topic_affordances}`。"""
         resolved = settings if settings is not None else self._settings
         try:
-            if not bool(getattr(resolved, "scene_expansion_enabled", False)):
-                return {}
             current = world if world is not None else world_engine.get_world(user_id)
             if current is None:
                 return {}

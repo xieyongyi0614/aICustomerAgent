@@ -27,12 +27,11 @@ def escalation_whitelist() -> frozenset[str]:
     settings = get_settings()
     raw = settings.agent_event_escalation_types
     types = {t.strip() for t in raw.split(",") if t.strip()}
-    if settings.world_simulation_enabled and settings.event_detection_enabled:
-        types |= {
-            t.strip()
-            for t in (settings.world_event_escalation_types or "").split(",")
-            if t.strip()
-        }
+    types |= {
+        t.strip()
+        for t in (settings.world_event_escalation_types or "").split(",")
+        if t.strip()
+    }
     return frozenset(types)
 
 

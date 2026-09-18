@@ -311,18 +311,16 @@ async def run_world_update(ctx: PostProcessContext) -> None:
         world_engine.run_turn_update(ctx.user_id, ctx.user_input, trace=ctx.trace)
     except Exception:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
-    settings = get_settings()
-    if settings.world_simulation_enabled and settings.event_detection_enabled:
-        try:
-            from app.services.world import user_situation
+    try:
+        from app.services.world import user_situation
 
-            user_situation.detect_from_message(
-                ctx.user_id,
-                ctx.user_input,
-                evidence={"session_id": ctx.session_id, "turn": ctx.current_turn},
-            )
-        except Exception:
-            logger.exception("用户处境检出异常")
+        user_situation.detect_from_message(
+            ctx.user_id,
+            ctx.user_input,
+            evidence={"session_id": ctx.session_id, "turn": ctx.current_turn},
+        )
+    except Exception:
+        logger.exception("用户处境检出异常")
 
 
 async def run_character_action_sync(ctx: PostProcessContext) -> None:

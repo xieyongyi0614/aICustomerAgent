@@ -229,9 +229,7 @@ def list_world_snapshots(user_id: str | None = None):
 
 @world_router.get("/debug/world/simulation", response_model=WorldSimulationOut)
 def get_world_simulation(user_id: str | None = None):
-    """WS-018：模拟总览（时间上下文 / 简报 / 当前日程块 / 活跃处境 / 近期模拟事件 / flags）。"""
-    if not get_settings().world_simulation_enabled:
-        return WorldSimulationOut(enabled=False)
+    """WS-018：模拟总览（时间上下文 / 简报 / 当前日程块 / 活跃处境 / 近期模拟事件）。"""
     data = world_engine.build_debug_simulation(_user(user_id))
     if data is None:
         raise HTTPException(status_code=404, detail="世界不可用")
@@ -244,8 +242,6 @@ def get_world_plan(
     date_str: str | None = Query(default=None, alias="date"),
 ):
     """WS-018：当日计划（缺省今日）；未生成时返回空列表，不落库。"""
-    if not get_settings().world_simulation_enabled:
-        return WorldPlanOut(enabled=False)
     user = _user(user_id)
     if world_engine.get_world(user) is None:
         raise HTTPException(status_code=404, detail="世界不可用")
@@ -260,8 +256,6 @@ def get_world_plan(
 @world_router.get("/debug/world/situations", response_model=WorldSituationsOut)
 def get_world_situations(user_id: str | None = None, include_expired: bool = False):
     """WS-018：用户处境（缺省仅 active；include_expired=True 含 expired/dismissed）。"""
-    if not get_settings().world_simulation_enabled:
-        return WorldSituationsOut(enabled=False)
     user = _user(user_id)
     if world_engine.get_world(user) is None:
         raise HTTPException(status_code=404, detail="世界不可用")
@@ -273,12 +267,7 @@ def get_world_situations(user_id: str | None = None, include_expired: bool = Fal
 
 @world_router.post("/debug/world/simulation/tick", response_model=WorldSimTickOut)
 def trigger_world_simulation_tick(body: WorldSimTickBody):
-    """WS-018：手动执行一次模拟维护步（双闸：总闸 + debug_tick_enabled）。"""
-    settings = get_settings()
-    if not settings.world_simulation_enabled:
-        return WorldSimTickOut(enabled=False)
-    if not settings.debug_tick_enabled:
-        raise HTTPException(status_code=403, detail="调试 tick 未启用（debug_tick_enabled=false）")
+    """WS-018：手动执行一次模拟维护步。"""
     user = _user(body.user_id)
     if world_engine.get_world(user) is None and world_engine.ensure_world(user) is None:
         raise HTTPException(status_code=404, detail="世界不可用")

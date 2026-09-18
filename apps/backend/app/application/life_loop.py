@@ -634,8 +634,7 @@ async def _run_maintenance(now: datetime) -> int:
         _record_maintenance_run("world_maintenance", [entry], now)
         executed += 1
     if (
-        settings.world_simulation_enabled
-        and settings.time_advance_enabled
+        settings.world_enabled
         and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
     ):
         _mark_maintenance("world_simulation")
@@ -731,10 +730,8 @@ def _maintenance_pending(settings) -> bool:
         "world_maintenance", settings.world_maintenance_interval_seconds
     ):
         return True
-    if (
-        settings.world_simulation_enabled
-        and settings.time_advance_enabled
-        and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
+    if settings.world_enabled and _maintenance_due(
+        "world_simulation", settings.world_sim_interval_seconds
     ):
         return True
     if settings.action_enabled and _maintenance_due(

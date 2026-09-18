@@ -857,17 +857,14 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
             if discard_object(user_id, object_id) is not None:
                 applied += 1
         if result.location_move is not None:
-            if settings.world_simulation_enabled and settings.scene_expansion_enabled:
-                move_result = movement.apply(
-                    user_id,
-                    result.location_move,
-                    source=movement.SOURCE_USER_NARRATIVE,
-                    reason="interpreter",
-                    now=now,
-                )
-                if move_result.applied:
-                    applied += 1
-            elif set_location(user_id, result.location_move) is not None:
+            move_result = movement.apply(
+                user_id,
+                result.location_move,
+                source=movement.SOURCE_USER_NARRATIVE,
+                reason="interpreter",
+                now=now,
+            )
+            if move_result.applied:
                 applied += 1
         if result.environment_updates:
             if set_environment(user_id, updated_by="interpreter", **result.environment_updates) is not None:
@@ -970,8 +967,7 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             change_events=change_events,
             changes_limit=settings.character_action_sync_context_lines,
         )
-        if settings.world_simulation_enabled:
-            context = _attach_world_brief(user_id, world, time_ctx, context, settings)
+        context = _attach_world_brief(user_id, world, time_ctx, context, settings)
         if trace is not None:
             trace.record(
                 "world_context",
@@ -990,26 +986,20 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
 
 
 def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
-    """V2.3.0 WorldBrief 装配（总闸内）；失败降级为无简报。"""
+    """WorldBrief 装配；失败降级为无简报。"""
     try:
         from app.models.world_simulation import DailyPlanStatus
         from app.services.world import daily_plan as daily_plan_service
         from app.services.world import user_situation as situation_service
         from app.services.world import world_brief as brief_service
 
-        block = None
-        if settings.daily_life_enabled:
-            minutes = time_ctx.now.hour * 60 + time_ctx.now.minute
-            plans = daily_plan_service.get_day_plan(
-                user_id, time_ctx.now.date()
-            )
-            active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
-            block = active[0] if active else None
-        situations = (
-            situation_service.active_situations(user_id)
-            if settings.event_detection_enabled
-            else []
+        minutes = time_ctx.now.hour * 60 + time_ctx.now.minute
+        plans = daily_plan_service.get_day_plan(
+            user_id, time_ctx.now.date()
         )
+        active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
+        block = active[0] if active else None
+        situations = situation_service.active_situations(user_id)
         brief = brief_service.build_world_brief(
             time_ctx,
             world,
@@ -1025,48 +1015,43 @@ def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
 
 
 def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
-    """V2.3.0 自治素材增强（v23 门控）：影响裁决包 + 当前日程块 + 活跃处境。"""
+    """自治素材增强：影响裁决包 + 当前日程块 + 活跃处境。"""
     try:
-        settings = get_settings()
-        if not settings.world_simulation_enabled:
-            return facts
         from app.models.world_simulation import DailyPlanStatus
         from app.services.world import daily_plan, event_impact, user_situation
 
         context: dict = {"part_of_day": facts.get("part_of_day")}
-        if settings.daily_life_enabled:
-            minutes = now.hour * 60 + now.minute
-            block = daily_plan.get_current_block(user_id, now.date(), minutes)
-            context["current_block"] = (
-                {
-                    "activity": block.activity,
-                    "part_of_day": block.part_of_day,
-                    "location_id": block.location_id,
-                }
-                if block is not None
-                else None
+        minutes = now.hour * 60 + now.minute
+        block = daily_plan.get_current_block(user_id, now.date(), minutes)
+        context["current_block"] = (
+            {
+                "activity": block.activity,
+                "part_of_day": block.part_of_day,
+                "location_id": block.location_id,
+            }
+            if block is not None
+            else None
+        )
+        situations = user_situation.active_situations(user_id)
+        context["active_situations"] = [
+            {"dimension": s.dimension.value, "summary": s.summary, "intensity": s.intensity}
+            for s in situations[:3]
+        ]
+        active_events = [
+            event
+            for event in world_repository.list_events(
+                world_repository.world_id_for(user_id),
+                statuses=["scheduled", "active"],
+                limit=10,
             )
-        if settings.event_detection_enabled:
-            situations = user_situation.active_situations(user_id)
-            context["active_situations"] = [
-                {"dimension": s.dimension.value, "summary": s.summary, "intensity": s.intensity}
-                for s in situations[:3]
-            ]
-            active_events = [
-                event
-                for event in world_repository.list_events(
-                    world_repository.world_id_for(user_id),
-                    statuses=["scheduled", "active"],
-                    limit=10,
-                )
-            ]
-            impacts = event_impact.evaluate_batch(active_events, context)[:3]
-            if impacts:
-                facts["impacts"] = [impact.to_dict() for impact in impacts]
-            if context.get("current_block"):
-                facts["current_block"] = context["current_block"]
-            if context.get("active_situations"):
-                facts["active_situations"] = context["active_situations"]
+        ]
+        impacts = event_impact.evaluate_batch(active_events, context)[:3]
+        if impacts:
+            facts["impacts"] = [impact.to_dict() for impact in impacts]
+        if context.get("current_block"):
+            facts["current_block"] = context["current_block"]
+        if context.get("active_situations"):
+            facts["active_situations"] = context["active_situations"]
         return facts
     except Exception:
         logger.exception("世界影响素材装配失败，返回基础事实包")
@@ -1212,20 +1197,18 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
     marker_keys = day_cycle.emit_time_markers(user_id, now)
     weather.evolve_daily_weather(user_id)
     user_situation.expire_and_notify(user_id, now)
-    settings = get_settings()
-    if settings.daily_life_enabled:
-        from app.services.world import daily_plan
+    from app.services.world import daily_plan
 
-        world = get_world(user_id)
-        if world is not None:
-            world_now = _default_provider.now(world)
-            plans = daily_plan.ensure_day_plan(user_id, world_now.date(), world_now)
-            if plans:
-                daily_plan.advance_daily_plan(user_id, world_now)
-            else:
-                logger.info("当日计划缺失且构建失败（user=%s）", user_id)
-            if _day_rolled_over(marker_keys):
-                daily_plan.prune_expired_plans(user_id, world_now.date())
+    world = get_world(user_id)
+    if world is not None:
+        world_now = _default_provider.now(world)
+        plans = daily_plan.ensure_day_plan(user_id, world_now.date(), world_now)
+        if plans:
+            daily_plan.advance_daily_plan(user_id, world_now)
+        else:
+            logger.info("当日计划缺失且构建失败（user=%s）", user_id)
+        if _day_rolled_over(marker_keys):
+            daily_plan.prune_expired_plans(user_id, world_now.date())
 
 
 def _day_rolled_over(marker_keys: list[str]) -> bool:
@@ -1234,16 +1217,12 @@ def _day_rolled_over(marker_keys: list[str]) -> bool:
 
 
 def run_simulation_maintenance(user_id: str | None = None, now: datetime | None = None):
-    """V2.3.0 world_simulation 维护步：时间推进 + 日循环/天气/日程等子步骤。
+    """world_simulation 维护步：时间推进 + 日循环/天气/日程等子步骤。
 
     全程 0 LLM；异常按世界旁路纪律降级，不中断其它维护步。
     """
     settings = get_settings()
-    if (
-        not settings.world_enabled
-        or not settings.world_simulation_enabled
-        or not settings.time_advance_enabled
-    ):
+    if not settings.world_enabled:
         return None
     worlds = (
         [ensure_world(user_id)]
@@ -1265,16 +1244,6 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
     return results
 
 
-_V23_FLAG_NAMES = (
-    "world_simulation_enabled",
-    "time_advance_enabled",
-    "daily_life_enabled",
-    "event_detection_enabled",
-    "scene_expansion_enabled",
-    "world_llm_assist_enabled",
-    "debug_tick_enabled",
-)
-
 _SIMULATION_EVENT_SOURCES = ("simulation",)
 _SIMULATION_EVENT_TYPES = (
     "world_digest",
@@ -1284,12 +1253,6 @@ _SIMULATION_EVENT_TYPES = (
     "life_event",
     "world_event",
 )
-
-
-def v23_flag_snapshot() -> dict:
-    """调试面：6+1 个 v23 开关当前取值（只读）。"""
-    settings = get_settings()
-    return {name: bool(getattr(settings, name, False)) for name in _V23_FLAG_NAMES}
 
 
 def build_debug_simulation(user_id: str) -> dict | None:
@@ -1305,20 +1268,18 @@ def build_debug_simulation(user_id: str) -> dict | None:
     block = None
     situations: list = []
     try:
-        if settings.daily_life_enabled:
-            from app.models.world_simulation import DailyPlanStatus
-            from app.services.world import daily_plan as daily_plan_service
+        from app.models.world_simulation import DailyPlanStatus
+        from app.services.world import daily_plan as daily_plan_service
 
-            plans = daily_plan_service.get_day_plan(user_id, time_ctx.now.date())
-            active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
-            block = active[0] if active else None
+        plans = daily_plan_service.get_day_plan(user_id, time_ctx.now.date())
+        active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
+        block = active[0] if active else None
     except Exception:
         logger.exception("调试总览日程块装配失败")
     try:
-        if settings.event_detection_enabled:
-            from app.services.world import user_situation as situation_service
+        from app.services.world import user_situation as situation_service
 
-            situations = situation_service.active_situations(user_id)
+        situations = situation_service.active_situations(user_id)
     except Exception:
         logger.exception("调试总览活跃处境装配失败")
 
@@ -1369,7 +1330,7 @@ def build_debug_simulation(user_id: str) -> dict | None:
         "current_block": block.brief() if block is not None else None,
         "active_situations": build_debug_situations(user_id),
         "recent_events": recent_events,
-        "flags": v23_flag_snapshot(),
+        "flags": {},
         "event_quota_drops": event_quota_drop_snapshot(),
     }
 
@@ -1430,7 +1391,7 @@ def run_debug_tick(user_id: str) -> dict:
         from app.services.world import daily_plan as daily_plan_service
 
         world = get_world(user_id)
-        if world is not None and get_settings().daily_life_enabled:
+        if world is not None:
             now = _default_provider.now(world)
             plans = daily_plan_service.get_day_plan(user_id, now.date())
             plan_summary = {

@@ -331,11 +331,7 @@ class PromptBuilder:
         style_ctx=None,
     ) -> ChatPromptTemplate:
         settings = get_settings()
-        world_budget = (
-            settings.world_context_char_budget_v23
-            if settings.world_simulation_enabled
-            else settings.world_context_char_budget
-        )
+        world_budget = settings.world_context_char_budget_v23
         brief = getattr(world_ctx, "brief", None) if world_ctx is not None else None
         world_text = render_world_section(world_ctx, world_budget, brief=brief)
 
