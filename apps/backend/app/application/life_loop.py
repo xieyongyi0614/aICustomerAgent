@@ -2,8 +2,8 @@
 
 Perception → State Update → Goal Check → Memory Retrieval / Reflection
 Check（LIFE-005 接入）→ Decision → World/Experience 的步骤管线；维护
-步骤归并 world maintenance / action retry / trigger reconcile 的调度
-入口（引擎函数原样复用，本体零改动）。
+步骤归并 world maintenance / action retry / action schedule / trigger
+reconcile 的调度入口（引擎函数原样复用，本体零改动）。
 
 只调度不持有业务语义：不写业务域表（唯一写面 = loop_runs +
 trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅出现
@@ -671,6 +671,29 @@ async def _run_maintenance(now: datetime) -> int:
         )
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
+    if (
+        getattr(settings, "action_execution_enabled", False)
+        and getattr(settings, "action_scheduler_enabled", False)
+        and _maintenance_due(
+            "action_schedule", settings.action_maintenance_interval_seconds
+        )
+    ):
+        _mark_maintenance("action_schedule")
+        from app.services.action import scheduler as action_scheduler
+
+        try:
+            result = await action_scheduler.step_action_schedule(now) or {}
+            entry = {"step": "action_schedule", **result}
+            entry.setdefault("status", "ok")
+        except Exception as exc:
+            logger.exception("action schedule 维护失败")
+            entry = {
+                "step": "action_schedule",
+                "status": "error",
+                "error": exc.__class__.__name__,
+            }
+        _record_maintenance_run("action_schedule", [entry], now)
+        executed += 1
     if settings.action_outbox_enabled:
         pending = outbox_repository.list_pending(now=now, limit=1)
         if pending:
@@ -716,6 +739,14 @@ def _maintenance_pending(settings) -> bool:
         return True
     if settings.action_enabled and _maintenance_due(
         "action_retry", settings.action_maintenance_interval_seconds
+    ):
+        return True
+    if (
+        getattr(settings, "action_execution_enabled", False)
+        and getattr(settings, "action_scheduler_enabled", False)
+        and _maintenance_due(
+            "action_schedule", settings.action_maintenance_interval_seconds
+        )
     ):
         return True
     if settings.action_outbox_enabled:
