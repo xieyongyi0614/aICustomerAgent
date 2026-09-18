@@ -138,11 +138,6 @@ def _isolate_singletons(monkeypatch):
 
 def _settings(**overrides):
     values = {
-        "tool_system_enabled": True,
-        "tool_permission_enabled": True,
-        "tool_schema_validation_enabled": True,
-        "tool_observation_enabled": True,
-        "tool_channel_enabled": True,
         "feishu_enabled": True,
         "tool_confirm_timeout_hours": 24,
         "tool_confirm_ttl_reuse": True,
@@ -420,13 +415,13 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
 def test_flag_off_tool_registry_is_absent(monkeypatch):
     from app.services.tool.registry import get_tool_registry
 
-    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
+    enable(monkeypatch)
     reset_runtime_state()
     assert get_tool_registry() is None
 
 
 def test_flag_off_capability_registry_is_six_v9_capabilities(monkeypatch):
-    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
+    enable(monkeypatch)
     reset_runtime_state()
     names = {entry["name"] for entry in get_capability_registry().describe()}
     assert names == {
@@ -440,7 +435,7 @@ def test_flag_off_capability_registry_is_six_v9_capabilities(monkeypatch):
 
 
 async def test_flag_off_capabilities_keep_v9_unavailable_shape(monkeypatch):
-    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
+    enable(monkeypatch)
     reset_runtime_state()
     from app.services.action.registry import ExecutionContext
 
@@ -453,7 +448,7 @@ async def test_flag_off_capabilities_keep_v9_unavailable_shape(monkeypatch):
 
 
 def test_channel_adapter_port_unregistered_in_default_deployment(monkeypatch):
-    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
+    enable(monkeypatch)
     reset_runtime_state()
     assert channel_tools.get_channel_adapter() is None
     registry = builtin_registry()

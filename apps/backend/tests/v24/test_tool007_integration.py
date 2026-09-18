@@ -119,9 +119,9 @@ def _pin_action_engine_clock(monkeypatch):
 
 
 def test_build_snapshot_assembles_world_facts_when_master_flag_on(db_session_factory, override_settings):
-    override_settings(tool_system_enabled="true", world_enabled="true")
+    override_settings(world_enabled="true")
     seed_all()
-    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
+    snapshot = action_engine._build_snapshot(USER, world_settings())
 
     tool_ctx = snapshot.tool_context
     assert isinstance(tool_ctx, ToolContext)
@@ -162,19 +162,19 @@ def test_build_snapshot_v23_shape_unchanged_when_flags_off(db_session_factory):
 
 
 def test_build_snapshot_degrades_when_preread_crashes(db_session_factory, monkeypatch, override_settings):
-    override_settings(tool_system_enabled="true")
+    override_settings()
     monkeypatch.setattr(
         world_context_module.WorldContextBuilder,
         "build",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("preread down")),
     )
-    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
+    snapshot = action_engine._build_snapshot(USER, world_settings())
     assert snapshot.tool_context is None
 
 
 def test_build_snapshot_survives_missing_world(db_session_factory, override_settings):
-    override_settings(tool_system_enabled="true", world_enabled="true")
-    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
+    override_settings(world_enabled="true")
+    snapshot = action_engine._build_snapshot(USER, world_settings())
     assert snapshot.tool_context is not None
     assert snapshot.tool_context.world["world_enabled"] is True
     assert snapshot.tool_context.world["location"] is None
@@ -185,7 +185,7 @@ def test_build_snapshot_survives_missing_world(db_session_factory, override_sett
 
 
 def test_tool_context_for_execution_keeps_identity_and_takes_world_facts(db_session_factory, override_settings):
-    override_settings(tool_system_enabled="true")
+    override_settings()
     from app.services.action.registry import ExecutionContext
 
     preloaded = tool_context(
@@ -224,9 +224,9 @@ def _snapshot_with_tool_context(tool_ctx: ToolContext, settings) -> GateSnapshot
 
 
 def test_resolve_surface_uses_preloaded_world_facts(db_session_factory, monkeypatch, override_settings):
-    override_settings(tool_system_enabled="true")
+    override_settings()
     seed_all()
-    settings = world_settings(tool_system_enabled=True)
+    settings = world_settings()
     snapshot = _snapshot_with_tool_context(
         action_engine._build_snapshot(USER, settings).tool_context, settings
     )
@@ -238,8 +238,8 @@ def test_resolve_surface_uses_preloaded_world_facts(db_session_factory, monkeypa
 
 
 def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_settings):
-    override_settings(tool_system_enabled="true", world_enabled="false")
-    settings = world_settings(tool_system_enabled=True, world_enabled=False)
+    override_settings(world_enabled="false")
+    settings = world_settings(world_enabled=False)
     facts = WorldContextBuilder(settings).build(USER, now=NOW, settings=settings)
     ctx = apply_world_facts(ToolContext(user_id=USER, now=NOW, settings=settings), facts)
     surface = resolve_surface(_snapshot_with_tool_context(ctx, settings))
@@ -252,10 +252,10 @@ def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_s
 
 def test_assemble_plan_uses_preloaded_facts_for_tool_choice(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        tool_system_enabled="true", world_enabled="true", action_enabled="true"
+        world_enabled="true", action_enabled="true"
     )
     seed_all()
-    settings = world_settings(tool_system_enabled=True, action_enabled=True)
+    settings = world_settings(action_enabled=True)
     snapshot = action_engine._build_snapshot(USER, settings)
     intent = ActionIntent(
         action_type="move_object",

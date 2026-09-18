@@ -36,8 +36,7 @@ EXPECTED_AUTONOMOUS_STAGES = (
 @pytest.fixture
 def registry_on(monkeypatch, v24_tool_env):
     """总闸 on：注入内置声明注册表（惰性单例按 env 语境重建）。"""
-    v24_tool_env(tool_system_enabled=True)
-    assert autonomy_engine.get_settings().tool_system_enabled is True
+    v24_tool_env()
     registry = builtin_registry()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry)
     return registry

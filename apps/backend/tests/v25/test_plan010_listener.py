@@ -54,7 +54,6 @@ def planning_reflection_on(override_settings):
     override_settings(
         plan_context_enabled="true",
         plan_step_binding_enabled="true",
-        tool_system_enabled="true",
     )
 
 

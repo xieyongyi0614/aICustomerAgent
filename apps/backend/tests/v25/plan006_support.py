@@ -122,8 +122,6 @@ def tools_on(monkeypatch, override_settings):
         plan_context_enabled="true",
         plan_step_binding_enabled="true",
         plan_tool_required="true",
-        tool_system_enabled="true",
-        tool_channel_enabled="true",
         feishu_enabled="true",
         feishu_app_id="plan6-app",
         feishu_app_secret="plan6-secret",
@@ -143,7 +141,6 @@ def planning_gates_on(monkeypatch, override_settings):
         plan_context_enabled="true",
         plan_step_binding_enabled="true",
         plan_tool_required="true",
-        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     return True
@@ -162,10 +159,6 @@ def action_chain_on(monkeypatch, override_settings):
         action_max_active_per_user="5",
         plan_step_binding_enabled="true",
         plan_tool_required="true",
-        tool_system_enabled="true",
-        tool_permission_enabled="true",
-        tool_schema_validation_enabled="true",
-        tool_observation_enabled="true",
         world_enabled="false",
         action_memory_policy_enabled="false",
         observability_persist_enabled="false",

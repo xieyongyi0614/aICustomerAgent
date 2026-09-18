@@ -394,13 +394,12 @@ def test_invariant_04_domain_whitelist_empty_means_deny_all():
     from app.services.tool import ext_api
 
     empty = support.tool_settings(
-        tool_external_api_enabled=True, tool_ext_allowed_hosts=""
+        tool_ext_allowed_hosts=""
     )
     assert ext_api.allowed_ext_hosts(empty) == frozenset()
     assert ext_api.host_allowed("api.example.com", empty) is False
 
     configured = support.tool_settings(
-        tool_external_api_enabled=True,
         tool_ext_allowed_hosts="api.example.com",
     )
     assert ext_api.host_allowed("api.example.com", configured) is True
@@ -423,7 +422,7 @@ def test_invariant_04_domain_whitelist_rejects_at_call_time(tmp_path):
     )
 
     settings = support.tool_settings(
-        tool_external_api_enabled=True, tool_ext_allowed_hosts=WEATHER_HOST
+        tool_ext_allowed_hosts=WEATHER_HOST
     )
     _registry, index, _report = load_manifests(
         tmp_path,

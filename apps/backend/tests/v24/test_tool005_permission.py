@@ -471,7 +471,7 @@ def test_channel_unbind_loses_implied_grant_e10():
 
 def test_master_gate_off_keeps_allow_all_e14():
     definition = untrusted_definition()
-    settings = permission_settings(tool_system_enabled=False)
+    settings = permission_settings()
     decision = _gate().evaluate(
         definition, invocation(UNTRUSTED_TOOL_ID), snapshot(settings=settings)
     )
@@ -488,7 +488,7 @@ def test_master_gate_off_keeps_allow_all_e14():
 )
 def test_sub_layer_off_grant_free_tier_still_allows(definition_factory, tool_id):
     """P0-1 中段：总闸 on + 权限子闸 off 时，免授权档（safe / normal）仍放行。"""
-    settings = permission_settings(tool_permission_enabled=False)
+    settings = permission_settings()
     decision = _gate().evaluate(
         definition_factory(), invocation(tool_id), snapshot(settings=settings)
     )
@@ -510,7 +510,7 @@ def test_sub_layer_off_privileged_tiers_default_deny(
     definition_factory, tool_id, expected_level
 ):
     """P0-1 中段：总闸 on + 权限子闸 off 时，特权档默认拒绝（fail-closed）。"""
-    settings = permission_settings(tool_permission_enabled=False)
+    settings = permission_settings()
     decision = _gate().evaluate(
         definition_factory(), invocation(tool_id), snapshot(settings=settings)
     )
@@ -521,7 +521,7 @@ def test_sub_layer_off_privileged_tiers_default_deny(
 
 def test_sub_layer_off_ignores_passed_snapshot_grants():
     """子闸 off 时快照不参与判定：特权档即便带 grant 也不得放行（无授权存储可读）。"""
-    settings = permission_settings(tool_permission_enabled=False)
+    settings = permission_settings()
     granted = snapshot(
         grants=[grant(SENSITIVE_TOOL_ID, ("self",))], settings=settings
     )

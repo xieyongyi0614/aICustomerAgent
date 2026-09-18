@@ -560,7 +560,6 @@ def test_delivery_blocked_when_action_memory_switch_off(
 ):
     """E9：工具记忆子闸 on 但 `action_memory_policy_enabled` off → 不投递。"""
     override_settings(action_memory_policy_enabled=False, memory_importance_threshold=0.5)
-    assert get_settings().tool_memory_enabled is True
     assert memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER) is None
     assert memory_count(USER) == 0
 

@@ -440,7 +440,6 @@ def planning_memory_on(override_settings):
         plan_observation_enabled="true",
         plan_memory_enabled="true",
         plan_tool_required="true",
-        tool_system_enabled="true",
         action_enabled="true",
         action_memory_policy_enabled="true",
         action_relationship_enabled="false",

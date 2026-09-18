@@ -356,7 +356,7 @@ def test_non_todo_payload_kinds_is_gated_by_master_switch():
     """总闸 off → `None`（不排除）：这些行根本不会被登记，life_loop 侧的调用形态与 V9 一致。"""
     from app.services.tool.confirmation import non_todo_payload_kinds
 
-    assert non_todo_payload_kinds(_settings(tool_system_enabled=False)) is None
+    assert non_todo_payload_kinds(_settings()) is None
     assert non_todo_payload_kinds(_settings()) is not None
 
 

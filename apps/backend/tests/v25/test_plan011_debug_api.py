@@ -68,7 +68,6 @@ def plan_panel_tools_on(plan_panel_on, override_settings):
     override_settings(
         plan_step_binding_enabled="true",
         plan_tool_required="true",
-        tool_system_enabled="true",
     )
     return True
 

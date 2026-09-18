@@ -71,7 +71,6 @@ def planning_on(override_settings):
     override_settings(
         planning_enabled="true",
         plan_context_enabled="true",
-        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -197,7 +196,7 @@ class TestHardDependencies:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="工具系统关闭目标")
-        override_settings(tool_system_enabled="false")
+        override_settings()
         calls: list = []
         monkeypatch.setattr(
             "app.services.goal_planning._ask_llm_with_retry",

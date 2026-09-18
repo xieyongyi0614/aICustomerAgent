@@ -74,7 +74,6 @@ def planning_on(override_settings):
         planning_enabled="true",
         plan_context_enabled="true",
         plan_step_binding_enabled="true",
-        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -155,7 +154,6 @@ class TestMountWiring:
         override_settings(
             autonomy_supply_interval_minutes="0",
             planning_enabled="true",
-            tool_system_enabled="true",
             world_enabled="false")
         goal = make_goal(description="供给步处理目标")
         _claim_planning_job(goal.id)

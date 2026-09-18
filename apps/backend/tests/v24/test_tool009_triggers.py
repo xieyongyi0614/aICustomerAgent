@@ -83,17 +83,6 @@ def _jobs(session_factory):
 # --- 子闸 / 总闸门控 ---------------------------------------------------------
 
 
-def test_tool_channel_off_without_sub_flag(db_session_factory, v24_tool_env, monkeypatch):
-    """工具反思子闸 off：工具通道返回 off 且零落行、零入队。"""
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
-    _patch_tool_package(monkeypatch, fake_tool_package([tool_evidence_window()]))
-    assert triggers.tool_channel_enabled(get_settings()) is False
-    assert triggers.trigger_for_user(USER, now=NOW, channel=triggers.CHANNEL_TOOL) == "off"
-    assert _runs(db_session_factory) == []
-    assert _jobs(db_session_factory) == []
-
-
-# --- reinforce 计数 ----------------------------------------------------------
 
 
 def test_reinforce_below_threshold_does_not_fire(

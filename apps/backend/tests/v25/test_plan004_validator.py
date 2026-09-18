@@ -372,7 +372,6 @@ class TestDecomposeFeedsTheEngine:
             planning_enabled="true",
             plan_context_enabled="true",
             plan_step_binding_enabled="true",
-            tool_system_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")
 

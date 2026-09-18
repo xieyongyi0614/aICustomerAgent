@@ -513,20 +513,6 @@ def test_memory_channel_run_unchanged_with_tool_flag_on(
     assert "channel" not in (links.evidence_summary or {})
 
 
-def test_tool_flag_off_keeps_trigger_behavior(
-    db_session_factory, v24_tool_env, monkeypatch, _patch_llm
-):
-    """Flag 全 off：工具证据完全不参与，工具通道直接 off。"""
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
-    _seed_tool_failures(db_session_factory)
-    assert triggers.tool_channel_enabled(get_settings()) is False
-    assert triggers.observe_tool_evidence_from_records(USER, now=NOW) == 0
-    assert triggers.trigger_for_user(USER, now=NOW, channel=triggers.CHANNEL_TOOL) == "off"
-    assert _runs(db_session_factory) == []
-    assert _insights(db_session_factory) == []
-
-
-# --- E13：离线评估场景 -------------------------------------------------------
 
 
 def _tool_seeder(session_factory, user_id, now):

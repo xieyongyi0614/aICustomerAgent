@@ -31,7 +31,6 @@ def plan_path_on(override_settings):
         plan_execution_enabled="true",
         plan_revision_enabled="true",
         plan_world_feedback_enabled="true",
-        tool_system_enabled="true",
         action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")

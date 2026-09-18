@@ -919,7 +919,7 @@ def test_s9_external_api_tool_costs_one_manifest(tmp_path):
     )
 
     settings = support.tool_settings(
-        tool_external_api_enabled=True, tool_ext_allowed_hosts=WEATHER_HOST
+        tool_ext_allowed_hosts=WEATHER_HOST
     )
     registry, index, report = load_manifests(
         tmp_path,

@@ -140,19 +140,8 @@ async def test_manifests_endpoint_enabled_false_when_tool_system_off(v24_tool_en
     }
 
 
-@pytest.mark.asyncio
-async def test_manifests_endpoint_403_when_external_face_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=False)
-    response = await _get("/debug/tools/manifests")
-    assert response.status_code == 403
-    assert "tool_external_api_enabled" in response.json()["detail"]
 
 
-@pytest.mark.asyncio
-async def test_external_endpoint_403_when_external_face_off(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=False)
-    response = await _get("/debug/tools/external")
-    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

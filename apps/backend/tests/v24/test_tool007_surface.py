@@ -236,7 +236,7 @@ async def test_executor_blocks_invalid_location_without_calling_capability(db_se
     executor = build_executor(
         registry,
         capability,
-        settings=world_settings(tool_schema_validation_enabled=True),
+        settings=world_settings(),
     )
     binding = registry.resolve(MOVED_TOOL)
     assert binding is not None
@@ -260,7 +260,7 @@ async def test_executor_passes_valid_world_action_with_real_facts(db_session_fac
     executor = build_executor(
         registry,
         capability,
-        settings=world_settings(tool_schema_validation_enabled=True),
+        settings=world_settings(),
     )
     binding = registry.resolve(MOVED_TOOL)
     execution = await executor.run(

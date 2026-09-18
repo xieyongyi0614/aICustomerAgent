@@ -27,8 +27,6 @@ EXT_SCOPE = ("external:api.example.com",)
 def permission_settings(**overrides: Any) -> SimpleNamespace:
     """权限闸设置替身：双闸默认 on，TTL 24 小时、复用开、白名单空。"""
     values: dict[str, Any] = {
-        "tool_system_enabled": True,
-        "tool_permission_enabled": True,
         "tool_confirm_timeout_hours": 24,
         "tool_confirm_ttl_reuse": True,
         "tool_ext_allowed_hosts": "",

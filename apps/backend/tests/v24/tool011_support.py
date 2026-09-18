@@ -50,13 +50,6 @@ def assert_no_secret(text: str) -> None:
 def ext_settings(**overrides: Any) -> SimpleNamespace:
     """外部/自定义面设置替身：双闸默认 on，白名单默认含两个示例域名。"""
     values: dict[str, Any] = {
-        "tool_system_enabled": True,
-        "tool_external_api_enabled": True,
-        "tool_user_defined_enabled": True,
-        "tool_permission_enabled": False,
-        "tool_schema_validation_enabled": False,
-        "tool_observation_enabled": True,
-        "tool_memory_enabled": True,
         "tool_ext_manifest_path": "",
         "tool_ext_allowed_hosts": f"{WEATHER_HOST},{HOOK_HOST}",
         "action_execution_timeout_seconds": 10,

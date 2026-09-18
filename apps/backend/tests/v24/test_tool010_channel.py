@@ -84,11 +84,6 @@ def _isolate_singletons(monkeypatch):
 
 def _settings(**overrides):
     values = {
-        "tool_system_enabled": True,
-        "tool_permission_enabled": True,
-        "tool_schema_validation_enabled": True,
-        "tool_observation_enabled": True,
-        "tool_channel_enabled": True,
         "feishu_enabled": True,
         "tool_confirm_timeout_hours": 24,
         "tool_confirm_ttl_reuse": True,
@@ -360,7 +355,7 @@ async def test_e3_unauthorized_recipient_is_invalid_and_never_confirms():
 
 async def test_e3_unauthorized_recipient_blocks_even_without_permission_layer():
     adapter = RecordingAdapter()
-    settings = _settings(tool_system_enabled=False, tool_permission_enabled=False)
+    settings = _settings()
     executor = _executor(adapter, settings)
     execution = await executor.run(
         builtin_registry().resolve(CHANNEL_TOOL_ID),
@@ -388,7 +383,7 @@ async def test_e4_capability_reports_unavailable_when_channel_is_off():
 
 
 async def test_e4_executor_short_circuits_disabled_channel_tool(monkeypatch):
-    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
+    enable(monkeypatch)
     reset_runtime_state()
     registry = builtin_registry()
     adapter = RecordingAdapter()
@@ -683,10 +678,6 @@ async def test_recipient_intent_reaches_channel_tool_through_confirmation(
     override_settings(
         action_enabled=True,
         world_enabled=False,
-        tool_system_enabled=True,
-        tool_permission_enabled=True,
-        tool_surface_enabled=False,
-        tool_channel_enabled=True,
         feishu_enabled=True,
         tool_confirm_ttl_reuse=True,
     )
@@ -775,8 +766,6 @@ def test_channel_env_enablement_still_requires_feishu_binding(monkeypatch):
 
     enable(
         monkeypatch,
-        tool_system_enabled=True,
-        tool_channel_enabled=True,
         feishu_enabled=False,
     )
     violations = enablement_violations(get_settings())

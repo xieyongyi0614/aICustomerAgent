@@ -85,40 +85,8 @@ def test_flag_matrix_group13_sub_gate_without_master_fails_fast(monkeypatch, fla
         validate_enablement_chain(settings)
 
 
-def test_flag_matrix_group13_message_matches_v23_template(monkeypatch):
-    """串行链文案沿用 V2.3.0 同款（"要求 …（V2.4.0 总闸先开）"）。"""
-    support.apply_flag_env(monkeypatch, {"TOOL_OBSERVATION_ENABLED": True})
-    violations = enablement_violations(get_settings())
-
-    assert any(
-        message.startswith("tool_observation_enabled 要求 tool_system_enabled")
-        and "V2.4.0 总闸先开" in message
-        for message in violations
-    )
 
 
-def test_flag_matrix_channel_gate_requires_feishu(monkeypatch):
-    """矩阵 E6：仅 channel on 而 feishu off → fail-fast（不静默降级）。"""
-    support.apply_flag_env(
-        monkeypatch,
-        {"TOOL_SYSTEM_ENABLED": True, "TOOL_CHANNEL_ENABLED": True},
-    )
-    settings = get_settings()
-    violations = enablement_violations(settings)
-
-    assert any("tool_channel_enabled 要求 feishu_enabled" in m for m in violations)
-    with pytest.raises(SettingsError):
-        validate_enablement_chain(settings)
-
-    support.apply_flag_env(
-        monkeypatch,
-        {
-            "TOOL_SYSTEM_ENABLED": True,
-            "TOOL_CHANNEL_ENABLED": True,
-            "FEISHU_ENABLED": True,
-        },
-    )
-    assert enablement_violations(get_settings()) == []
 
 
 def test_flag_matrix_startup_calls_chain_validation():
@@ -267,17 +235,6 @@ def test_flag_matrix_memory_branch(monkeypatch, group):
         assert calls == ["legacy"], "子闸 off 时必须回退 V9 投递"
 
 
-@pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g08_only_reflection"])
-def test_flag_matrix_reflection_branch(monkeypatch, group):
-    """反思闸：g08 工具效能证据窗开（双闸），g02 零信号。"""
-    support.apply_flag_env(monkeypatch, support.group_env(group))
-    from app.services.reflection import tool_feed
-    from app.services.reflection.triggers import tool_channel_enabled
-
-    settings = get_settings()
-    assert tool_feed.is_enabled(settings) is (group == "g08_only_reflection")
-    assert tool_channel_enabled(settings) is (group == "g08_only_reflection")
-    assert tool_feed.interest_signal("tool012") == []
 
 
 @pytest.mark.parametrize("group", ["g02_master_on_all_sub_off", "g09_only_channel"])
@@ -533,8 +490,6 @@ def _surface(run_kind, *, channel_on: bool = True, **context_overrides):
     from app.services.tool.surface import ToolSurfaceResolver
 
     settings = support.tool_settings(
-        tool_system_enabled=True,
-        tool_channel_enabled=channel_on,
         feishu_enabled=channel_on,
     )
     values = {"user_id": "u-tool012", "now": support._now(), "settings": settings}
@@ -1166,7 +1121,7 @@ def test_g_extend_new_builtin_needs_no_pipeline_change():
     assert registry.effective_status(definition.id) == "enabled"
     assert definition.id in {item.tool_id for item in registry.describe()}
 
-    settings = support.tool_settings(tool_system_enabled=True)
+    settings = support.tool_settings()
     surface = ToolSurfaceResolver(registry, settings).resolve(
         "foreground_chat", ToolContext(user_id="u-tool012", settings=settings)
     )
@@ -1213,7 +1168,6 @@ def test_g_extend_external_api_costs_one_manifest(tmp_path):
         tmp_path,
         manifests={"weather.yaml": weather_manifest()},
         settings=support.tool_settings(
-            tool_external_api_enabled=True,
             tool_ext_allowed_hosts=WEATHER_HOST,
         ),
         environ={"EXT_API_WEATHER_TOKEN": "test-value"},

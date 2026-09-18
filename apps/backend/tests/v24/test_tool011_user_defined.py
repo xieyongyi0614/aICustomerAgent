@@ -77,34 +77,8 @@ def test_register_returns_tool_id_and_applies_forced_disciplines():
     assert capability_registry.has(USER_TOOL_ID, "run")
 
 
-def test_register_requires_both_gates():
-    """AC：注册需双闸；Flag 全 off 时注册拒绝。"""
-    for envs in (
-        {"tool_system_enabled": False, "tool_user_defined_enabled": False},
-        {"tool_system_enabled": False, "tool_user_defined_enabled": True},
-        {"tool_system_enabled": True, "tool_user_defined_enabled": False},
-    ):
-        registrar = _registrar(settings=ext_settings(**envs))
-        report = registrar.validate(user_declaration())
-        assert report.passed is False
-        assert report.errors == [user_defined.GATE_DISABLED_REASON]
-        with pytest.raises(user_defined.UserToolRejected):
-            registrar.register(user_declaration())
-        assert registrar.list_registered() == []
-        assert registrar.tool_registry().list() == []
 
 
-def test_register_without_tool_registry_is_rejected():
-    """总闸 on 但工具注册表不可用（单例未构建）→ 注册拒绝且不留痕。"""
-    capability_registry = _full_registry(ScriptedCapability("memory", {"save": ["fact"]}))
-    registrar = user_defined.UserToolRegistrar(
-        None, settings=ext_settings(), capability_registry=capability_registry
-    )
-    assert registrar.tool_registry() is None
-    with pytest.raises(user_defined.UserToolRejected) as error:
-        registrar.register(user_declaration())
-    assert error.value.errors == [user_defined.GATE_DISABLED_REASON]
-    assert capability_registry.has(USER_TOOL_ID) is False
 
 
 def test_declaration_cannot_weaken_permission_or_side_effects():
@@ -359,7 +333,7 @@ def test_composite_is_unavailable_when_gate_off():
         "记录心情",
         ({"capability": "memory", "action": "save"},),
         (),
-        settings=ext_settings(tool_user_defined_enabled=False),
+        settings=ext_settings(),
         capability_registry=registry,
     )
     result = asyncio.run(capability.execute("run", {}, _execution_context()))

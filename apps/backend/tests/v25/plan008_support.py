@@ -282,7 +282,6 @@ def planning_world_on(override_settings):
         plan_step_binding_enabled="true",
         plan_tool_required="true",
         plan_world_feedback_enabled="true",
-        tool_system_enabled="true",
         action_enabled="true",
         world_enabled="true",
         world_household_autoseed_enabled="false",

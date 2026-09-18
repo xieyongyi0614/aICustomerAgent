@@ -172,9 +172,6 @@ def _read_only_definition(tool_id: str, namespace: str, *, policy_key: str):
 def test_ext_tool_runs_through_unified_executor(tmp_path):
     """AC：外部工具经统一执行器（权限 / 校验 / 超时 / 归一全部生效，无旁路）。"""
     settings = ext_settings(
-        tool_permission_enabled=True,
-        tool_schema_validation_enabled=True,
-        tool_observation_enabled=True,
     )
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
@@ -229,8 +226,6 @@ def test_ext_tool_runs_through_unified_executor(tmp_path):
 def test_ext_tool_invalid_params_are_rejected_before_request(tmp_path):
     """校验闸在能力之前：声明外参数被拒 → `invalid`，不发起请求。"""
     settings = ext_settings(
-        tool_permission_enabled=True,
-        tool_schema_validation_enabled=True,
     )
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
@@ -269,7 +264,7 @@ def test_ext_tool_invalid_params_are_rejected_before_request(tmp_path):
 
 def test_ext_tool_without_grant_waits_for_confirmation_and_never_calls(tmp_path):
     """未授权 → 首次确认（pending_confirmation），请求不发出（无旁路）。"""
-    settings = ext_settings(tool_permission_enabled=True)
+    settings = ext_settings()
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
     transport = StubTransport(response({"data": {}}))
@@ -311,9 +306,6 @@ def test_ext_tool_without_grant_waits_for_confirmation_and_never_calls(tmp_path)
 def test_user_tool_runs_through_unified_executor(tmp_path):
     """自定义工具同样经统一执行器：能力名 = tool_id，(capability, action) 唯一可解析。"""
     settings = ext_settings(
-        tool_permission_enabled=True,
-        tool_schema_validation_enabled=True,
-        tool_observation_enabled=True,
     )
     registry = ToolRegistry()
     memory = ScriptedCapability("memory", {"save": ["fact"]}, {"memory_id": "mem-42"})
@@ -355,7 +347,7 @@ def test_user_tool_runs_through_unified_executor(tmp_path):
 
 
 def test_user_tool_requires_grant_before_execution():
-    settings = ext_settings(tool_permission_enabled=True)
+    settings = ext_settings()
     registry = ToolRegistry()
     memory = ScriptedCapability("memory", {"save": ["fact"]}, {"memory_id": "mem-1"})
     capability_registry = CapabilityRegistry()
@@ -388,7 +380,7 @@ def test_user_tool_requires_grant_before_execution():
 
 
 def test_unregistered_user_tool_is_unavailable_through_executor():
-    settings = ext_settings(tool_permission_enabled=True)
+    settings = ext_settings()
     registry = ToolRegistry()
     capability_registry = CapabilityRegistry()
     capability_registry.register(

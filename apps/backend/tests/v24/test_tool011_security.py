@@ -236,15 +236,14 @@ def test_main_py_has_no_new_resident_task():
     assert len(create_task_calls) == EXPECTED_CREATE_TASK_COUNT
 
 
-def test_lifespan_loads_manifests_under_master_gate():
+def test_lifespan_loads_manifests():
     text = Path("app/main.py").read_text(encoding="utf-8")
-    assert "tool_external_api_enabled" in text
     assert "get_manifest_loader().load(" in text
 
 
-def test_capability_registry_registration_is_gated():
+def test_capability_registry_registration_is_constant_folded():
     text = Path("app/services/action/capabilities/__init__.py").read_text(encoding="utf-8")
-    assert "if external_api_enabled():" in text
+    assert "get_external_api_capability()" in text
     assert "if channel_tools_enabled():" in text
 
 

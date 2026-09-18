@@ -232,7 +232,7 @@ async def test_master_gate_off_is_placeholder_allow_for_every_tier():
     registry = registry_with(sensitive_definition())
     capability = StubCapability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_system_enabled=False)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(NOTIFICATION_ID),
@@ -250,7 +250,7 @@ async def test_permission_on_runs_real_gate_level_no_grant_required():
     """TOOL-005 同步：权限闸 on 时占位 allow 由真实七步判定取代（normal 免授权）。"""
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_permission_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
     assert execution.permission["decision"] == "allow"
@@ -343,7 +343,7 @@ async def test_validation_off_skips_validator():
 async def test_validation_on_invalid_params_short_circuits_e3():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(TOOL_ID),
@@ -361,7 +361,7 @@ async def test_validation_on_invalid_params_short_circuits_e3():
 async def test_validation_on_past_due_at_is_invalid_e5():
     registry, capability = _builtin_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(TOOL_ID),
@@ -378,7 +378,7 @@ async def test_validation_on_oversized_content_blocks_capability_e11():
     registry = registry_with(_budget_definition())
     capability = StubCapability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(NOTIFICATION_ID),
@@ -394,7 +394,7 @@ async def test_validation_on_oversized_content_blocks_capability_e11():
 async def test_validation_on_pass_normalizes_params_before_invoke():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(TOOL_ID),
@@ -440,7 +440,7 @@ async def test_success_persists_v9_shape_when_observation_off():
 async def test_success_persists_tool_result_when_observation_on():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_observation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
     assert execution.result["observations"] == {
@@ -571,7 +571,7 @@ async def test_index_is_passed_through():
 async def test_invocation_params_are_not_mutated():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     params = {"content": "  买  牛奶 ", "due_at": "2026-06-02T08:00:00"}
     invocation = _invocation(params=params)
@@ -588,7 +588,7 @@ async def test_sensitive_params_are_redacted_in_execution_params():
     registry = registry_with(sensitive_definition(permission=GRANT_FREE_PERMISSION))
     capability = StubCapability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_observation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(NOTIFICATION_ID),
@@ -605,7 +605,7 @@ async def test_empty_sensitive_param_is_not_redacted_e12():
     registry = registry_with(sensitive_definition(permission=GRANT_FREE_PERMISSION))
     capability = StubCapability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_observation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(NOTIFICATION_ID),
@@ -621,7 +621,7 @@ async def test_sensitive_param_is_redacted_on_short_circuit_paths():
     registry = registry_with(_budget_definition(sensitive=True))
     capability = StubCapability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(NOTIFICATION_ID),
@@ -672,7 +672,7 @@ async def test_five_stages_run_in_fixed_order():
     executor = build_executor(
         registry,
         capability,
-        settings=tool_settings(tool_schema_validation_enabled=True),
+        settings=tool_settings(),
         validator=validator,
         health=health,
         permission_gate=gate,
@@ -752,7 +752,7 @@ async def test_timeout_and_exception_results_match_v9_capability_executor():
 async def test_observation_on_result_is_superset_of_v9_payload():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_observation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
     assert execution.result["status"] == "succeeded"
@@ -804,7 +804,7 @@ async def test_resolve_step_binding_returns_binding_for_tripped_tool():
 async def test_environment_context_is_accepted_as_tool_context():
     registry, capability = _succeeding_registry_and_capability()
     executor = build_executor(
-        registry, capability, settings=tool_settings(tool_schema_validation_enabled=True)
+        registry, capability, settings=tool_settings()
     )
     execution = await executor.run(
         registry.resolve(TOOL_ID),

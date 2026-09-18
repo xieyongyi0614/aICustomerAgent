@@ -156,7 +156,7 @@ def test_describe_excludes_disabled_placeholder():
 
 def test_describe_enabled_only_false_includes_disabled_and_tripped(v24_tool_env):
     """P2-5：`enabled_only=False` 显式关闭过滤，disabled / 熔断条目带真实状态回归投影。"""
-    v24_tool_env(tool_system_enabled=True, tool_disabled_ids="world.object.move")
+    v24_tool_env(tool_disabled_ids="world.object.move")
     registry = _registry_with_builtins()
     registry.mark_tripped("world.object.use")
 
@@ -181,7 +181,7 @@ def test_describe_enabled_only_false_includes_disabled_and_tripped(v24_tool_env)
 
 def test_describe_enabled_only_false_respects_surface_order(v24_tool_env):
     """`enabled_only=False` 与 `surface` 组合：保 surface 序、去重、忽略未注册 id。"""
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",
@@ -193,7 +193,7 @@ def test_describe_enabled_only_false_respects_surface_order(v24_tool_env):
 
 
 def test_describe_with_surface_keeps_surface_order_and_ignores_unknown(v24_tool_env):
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",
@@ -211,13 +211,13 @@ def test_describe_with_surface_keeps_surface_order_and_ignores_unknown(v24_tool_
 
 
 def test_describe_empty_surface_returns_empty(v24_tool_env):
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     registry = _registry_with_builtins()
     assert registry.describe(surface=ToolSurface(run_kind="conversation")) == []
 
 
 def test_describe_surface_skips_disabled_tool(v24_tool_env):
-    v24_tool_env(tool_system_enabled=True, tool_disabled_ids="world.object.move")
+    v24_tool_env(tool_disabled_ids="world.object.move")
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",

@@ -24,7 +24,7 @@ V9_TEMPLATE = {"content": "休息一下", "due_at": (NOW + timedelta(minutes=30)
 
 @pytest.fixture
 def registry_on(monkeypatch, v24_tool_env):
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     registry = builtin_registry()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry)
     return registry
@@ -42,7 +42,7 @@ def test_binding_none_falls_back_to_v9_template():
 
 
 def test_engine_params_without_tool_system_match_v9(v24_tool_env, monkeypatch):
-    v24_tool_env(tool_system_enabled=False)
+    v24_tool_env()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: None)
     assert autonomy_engine._params_for_autonomy_action("create_reminder", NOW) == V9_TEMPLATE
 
@@ -68,7 +68,7 @@ def test_engine_params_with_tool_system_fill_importance(registry_on):
 
 
 def test_template_values_are_not_overwritten_by_defaults(monkeypatch, v24_tool_env):
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     registry = registry_with(
         tool_definition(
             "builtin.reminder.create",
@@ -121,7 +121,7 @@ def test_fill_declared_defaults_keeps_present_keys():
 
 def test_binding_none_for_tool_excluded_from_surface(monkeypatch, v24_tool_env):
     """E5：工具不在自治工具面内 → select 返回 None → 不抛错，回退 V9 固定模板。"""
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     monkeypatch.setattr(
         autonomy_engine,
         "get_tool_registry",
@@ -132,7 +132,7 @@ def test_binding_none_for_tool_excluded_from_surface(monkeypatch, v24_tool_env):
 
 
 def test_binding_none_when_registry_empty(monkeypatch, v24_tool_env):
-    v24_tool_env(tool_system_enabled=True)
+    v24_tool_env()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: ToolRegistry())
     assert autonomy_engine._autonomy_binding("create_reminder", NOW) is None
     assert autonomy_engine._params_for_autonomy_action("create_reminder", NOW) == V9_TEMPLATE

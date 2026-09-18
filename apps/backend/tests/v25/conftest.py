@@ -26,7 +26,6 @@ DEFAULT_PLANNED_STEP = {
 @pytest.fixture(autouse=True)
 def _pin_v25_planning_env(monkeypatch):
     """目录级隔离：既有自治通路取默认关闭（PLAN-001 零新增 Flag，V2.5.0 无 plan_* 项）。"""
-    monkeypatch.setenv("TOOL_SYSTEM_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

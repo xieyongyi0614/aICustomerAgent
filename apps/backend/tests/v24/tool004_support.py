@@ -20,11 +20,7 @@ NOW = datetime(2026, 9, 14, 21, 30, 0)
 def tool_settings(**overrides: Any) -> SimpleNamespace:
     """工具面投影级设置替身：默认总闸 + 工具面子闸 on、上限 12、世界可用。"""
     values: dict[str, Any] = {
-        "tool_system_enabled": True,
-        "tool_surface_enabled": True,
         "tool_surface_max_tools": 12,
-        "tool_schema_validation_enabled": False,
-        "tool_observation_enabled": False,
         "world_enabled": True,
         "action_enabled": True,
         "action_plan_expires_minutes": 5,

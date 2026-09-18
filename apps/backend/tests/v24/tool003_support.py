@@ -53,10 +53,6 @@ def param(
 def tool_settings(**overrides: Any) -> SimpleNamespace:
     """执行器级设置替身：默认总闸 on、其余子闸 off、熔断参数取默认。"""
     values: dict[str, Any] = {
-        "tool_system_enabled": True,
-        "tool_permission_enabled": False,
-        "tool_schema_validation_enabled": False,
-        "tool_observation_enabled": False,
         "tool_breaker_threshold": 3,
         "tool_breaker_cooldown_seconds": 300,
     }

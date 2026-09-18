@@ -42,7 +42,6 @@ FULL_CHAIN_ENVS = {
     "plan_world_feedback_enabled": True,
     "plan_autonomy_enabled": True,
     "plan_debug_enabled": True,
-    "tool_system_enabled": True,
     "action_enabled": True,
 }
 
@@ -206,12 +205,12 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
 
 
 def test_existing_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, tool_channel_enabled=True)
+    settings = _settings_with(monkeypatch)
     assert any(
         "feishu_enabled" in item for item in enablement_violations(settings)
     )
 
-    settings = _settings_with(monkeypatch, tool_surface_enabled=True)
+    settings = _settings_with(monkeypatch)
     assert any(
         "tool_system_enabled" in item for item in enablement_violations(settings)
     )

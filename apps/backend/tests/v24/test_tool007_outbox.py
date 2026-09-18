@@ -42,8 +42,6 @@ def _tool_path_env(override_settings, monkeypatch):
     """总闸 + outbox 双开；自动播种关闭（库存夹具确定）。"""
     monkeypatch.setattr(tool_registry, "_registry", None)
     override_settings(
-        tool_system_enabled="true",
-        tool_surface_enabled="true",
         world_enabled="true",
         action_enabled="true",
         action_outbox_enabled="true",
@@ -264,7 +262,7 @@ async def test_e9_replay_does_not_duplicate_world_event(db_session_factory):
 @pytest.mark.asyncio
 async def test_flag_off_uses_v9_direct_path(db_session_factory, override_settings):
     seed_all()
-    override_settings(tool_system_enabled="false", action_outbox_enabled="false")
+    override_settings(action_outbox_enabled="false")
     record = await run_action_planning(
         USER,
         _intent(CREATE_REMINDER, content="复查", due_at=(NOW.replace(year=2027)).isoformat()),

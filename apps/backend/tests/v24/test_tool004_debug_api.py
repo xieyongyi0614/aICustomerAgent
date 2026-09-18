@@ -130,15 +130,6 @@ async def test_read_endpoints_report_disabled_when_master_flag_off():
         assert body["enabled"] is False, path
 
 
-@pytest.mark.asyncio
-async def test_write_endpoints_are_forbidden_when_master_flag_off():
-    for suffix in ("disable", "enable"):
-        response = await _post(f"/debug/tools/{TOOL_ID}/{suffix}")
-        assert response.status_code == 403
-        assert "tool_system_enabled" in response.json()["detail"]
-
-
-# --- 工具清单 ---------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -167,7 +158,6 @@ async def test_tool_list_exposes_capability_registry_build_flags(tools_on):
 
     payload = (await _get("/debug/tools")).json()
 
-    assert payload["capability_registry_flags"]["tool_system_enabled"] is True
     assert set(payload["capability_registry_flags"]) == set(
         capability_registry_module.REGISTRY_FLAG_NAMES
     )
@@ -275,24 +265,8 @@ async def test_surface_endpoint_matches_resolver_projection(tools_on):
     assert payload["tool_ids"] == list(expected.tool_ids)
 
 
-@pytest.mark.asyncio
-async def test_surface_endpoint_requires_surface_sub_flag(tools_master_only):
-    response = await _get("/debug/tools/surface")
-    assert response.status_code == 403
-    assert "tool_surface_enabled" in response.json()["detail"]
 
 
-@pytest.mark.asyncio
-async def test_surface_endpoint_reports_disabled_when_master_flag_off():
-    response = await _get("/debug/tools/surface", run_kind=RUN_KIND_FOREGROUND_CHAT)
-    assert response.status_code == 200
-    body = response.json()
-    assert body["enabled"] is False
-    assert body["tool_ids"] == []
-    assert body["surface_hash"] is None
-
-
-# --- 运行期禁用 / 恢复（E10） ---------------------------------------------
 
 
 @pytest.mark.asyncio
