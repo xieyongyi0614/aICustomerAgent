@@ -65,11 +65,11 @@
 
 | 段 | 旧名 | 新名 | 旧 env | 默认 | 备注 |
 |---|---|---|---|---|---|
-| v21 | `v21_agent_metrics_enabled` | `agent_metrics_enabled` | `V21_AGENT_METRICS_ENABLED` | `False` | — |
+| v21 | `v21_agent_metrics_enabled` | `agent_metrics_enabled` | `V21_AGENT_METRICS_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
 | v21 | `v21_agent_runtime_enabled` | `agent_runtime_enabled` | `V21_AGENT_RUNTIME_ENABLED` | `False` | — |
-| v21 | `v21_foreground_gateway_enforced` | `foreground_gateway_enforced` | `V21_FOREGROUND_GATEWAY_ENFORCED` | `False` | — |
-| v21 | `v21_goal_stack_enabled` | `goal_stack_enabled` | `V21_GOAL_STACK_ENABLED` | `False` | 含 OFF 回退路径 |
-| v21 | `v21_personality_evolution_enabled` | `personality_evolution_enabled` | `V21_PERSONALITY_EVOLUTION_ENABLED` | `False` | — |
+| v21 | `v21_foreground_gateway_enforced` | `foreground_gateway_enforced` | `V21_FOREGROUND_GATEWAY_ENFORCED` | `False` | ⏸ 裁决保留门控（缺 light_llm_profile，见 F.10） |
+| v21 | `v21_goal_stack_enabled` | `goal_stack_enabled` | `V21_GOAL_STACK_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
+| v21 | `v21_personality_evolution_enabled` | `personality_evolution_enabled` | `V21_PERSONALITY_EVOLUTION_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
 | v21 | `v21_unified_run_enabled` | `unified_run_enabled` | `V21_UNIFIED_RUN_ENABLED` | `False` | — |
 | v22 | `v22_emotion_transition_enabled` | `emotion_transition_enabled` | `V22_EMOTION_TRANSITION_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |
 | v22 | `v22_experience_enabled` | `experience_enabled` | `V22_EXPERIENCE_ENABLED` | `False` | ✅ 已随 v22 批删除（ON 转常开） |

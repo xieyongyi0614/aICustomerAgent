@@ -850,6 +850,13 @@ cd apps/frontend && pnpm vitest run
 
 跑法备忘（Windows）：必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（实测已踩两次）。
 
+**抖动成员池（v22 批与 v21 批 1 四轮全量观测累计）**——失败数在 **15~20** 间浮动即视为正常，判据始终是「失败 ID 集合 ⊆ F.8 三类的并集」：
+
+- `tests/e2e/`：`test_chat_http_integration::test_http_chat_streams_chunks_incrementally`、`test_memory_e2e::test_extractor_failure_does_not_break_sse`、`test_turn_meta_stream::test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id`、`test_debug_trace_persist::test_lru_evicted_turn_falls_back_to_db`、`test_debug_state_history::test_state_reflects_turn_and_respects_limit`、`test_log_redaction::test_reply_not_logged_in_full_at_info_level`
+- 计时类：`v7.8/test_performance::test_observability_overhead_within_budget`、`v7.8/test_performance::test_capture_does_not_change_sent_prompt_bytes`、`v8/test_world_performance::test_world_assembly_overhead_within_budget`
+
+**e2e 目录不可串行判定**：`pytest tests/e2e -n 0` 会出 **12 条失败**（含 `test_v65_matrix.py` 整文件 6 条），而 `-n 4` 分片后只剩个位数——该目录用例之间存在状态泄漏，串行结果不能用作「新增失败」的证据。上面 6 条 e2e 抖动成员均满足「单跑必绿」，已逐条验证。
+
 ### F.9 轨道 B 批次 v22（体验层）去门控 —— 2026-09-18
 
 提交 `52c6a87`。**首个真正的行为变更批**，但 §四 判定的 OFF 回退路径为 0 条——删的不是在跑的代码，而是「从未跑过的代码」的门控。
@@ -868,6 +875,27 @@ cd apps/frontend && pnpm vitest run
 **行为变化与验证缺口（必读）**：固化后**前台每一轮回复的 prompt 恒带 `【本轮表达风格】` 段**，真实模型的称呼/语气/情绪强度/习惯指令全部进 prompt。单元测试与 golden 快照**都测不到**它（golden 用例不传 `style_ctx`，实测零命中），因此本批补建了 `docs/version/v2.2.0/regression-checklist.md`（同时关闭 `v2.2.0/acceptance-report.md` 四.4 的「建议补 regression-checklist」遗留项）。**该清单尚未执行——它是 v22 上线的前置条件，不是可选项。**
 
 部署侧注意：v22 的 5 个键从未出现在 `.env`，本批**零 env 变更**；但若运维副本里自行加过 `EXPERIENCE_ENABLED` 之类，删字段后它们变成**无前缀的未知键**，`unknown_versioned_env_keys()` 只识别 `^V<数字>_`，**不会告警**（F.4 已限定）。
+
+### F.10 轨道 B 批次 v21-1（目标栈 + 度量 + 演化）去门控 —— 2026-09-18
+
+v21 段按风险拆三批执行（F.11 = `agent_runtime_enabled`、F.12 = `unified_run_enabled`），本批先做**纯增量**的三个开关。
+
+| 项 | 内容 |
+|---|---|
+| 删除开关 | `goal_stack_enabled`、`agent_metrics_enabled`、`personality_evolution_enabled`；字段 417 → **414**；在存开关 43 → **40** |
+| 门控站点（7 处） | `goal_stack.evaluate_stack` 空栈早返回、`goal_stack._apply_evolution_rebalance`、`agent_evaluation.run_daily_snapshot`、`evolution.compile_personality` 与 `propose_rebalance`、`autonomy_engine` 的 `stack=` 三元、`chat_pipeline` 的 `layered_goals` 扩展与 `stack=` 三元、`context_builder` 的 `layered_goals=[]` |
+| 辅助量收口 | `agent_evolution_worker.metrics_enabled()` / `evolution_enabled()` 删除；`enabled()` 由三条件复合式简化为 `agent_runtime_enabled`（真正门控留到 F.11）；`chat_pipeline` 与 `goal_stack` 内失去用途的 `settings` 局部量一并移除 |
+| enablement | v21 段 5 条规则中删掉 4 条（涉及本批三字段的总闸依赖与「演化⇒度量」链），仅存 `unified_run_enabled ⇒ agent_runtime_enabled` |
+| 测试（9 文件） | 删 3 个 flag-off 用例（`test_empty_stack_when_flag_off`、`test_flag_off_no_drift`、`test_flag_off_skips`）与 2 个 enablement 用例类；`ALL_V21_FLAGS` 与 4 个 fixture 收敛为 `AGENT_RUNTIME_ENABLED` 一项；`test_plan007_candidates.stack_on` 只留 `world_enabled=false`；三处链用例改用 `unified_run_enabled` 作存活样本 |
+| 冻结面 | `chat_pipeline.py` 哈希第二次重建（本批摘掉其内两处 `goal_stack_enabled`） |
+| 验证 | v21/v24/v25 相关 **192 + 1449** 全绿；全量两轮 **20 → 18 failed**，稳定核心（7 表结构 + 4 既存）不变，新增项全部落在 F.8 抖动池（其中 2 条 tool010 由哈希重建消解，其余 e2e/perf 单跑必绿） |
+
+**批前复核的两点更正（重要，供后续批次与 §4 清单读者）**：
+
+1. **§4 漏记一条 v21 的字面 sibling `else`**：`life_loop.py:93-99` 是 `if agent_runtime.enabled(): run_autonomous_cycle(...) else: _run_user_cycle(...)`——`_run_user_cycle` 是**当前实际在跑**的 v2.0.0 自治循环，固化 `agent_runtime_enabled` 会删掉它并换用 `run_autonomous_cycle`。`controller.py:200-202` 自陈差异三处：台账多落 `run_kind`/`profile`、decision **新增第三道 Gateway 闸**、支持事件升级触发源。且软模式豁免只覆盖 `budget_type == "foreground"`（`llm_gateway.py:105,111`），自治能力不在其内 → decision 可能以 `skip_reason=gateway_denied` 被静默跳过（`controller.py:256`）。**裁决：接受为 V2.1.0 既定设计**，并在 v2.1.0 regression-checklist 增补「跑满自治周期、统计 `gateway_denied` 出现率」专项条目。
+2. 删 `_run_user_cycle` 还牵动 3 个 v25 测试的**源码文本锚点**（`test_plan003_mount.py:256`、`test_plan005_mount.py:91,103`、`test_plan011_steps_accounting.py:185` 用 `source.split("async def _run_user_cycle", 1)[1]` 断言步骤挂载），须迁到 `run_autonomous_cycle`。
+
+**`foreground_gateway_enforced` 裁决：保留门控，不固化**。理由：`light_llm_profile` 代码默认 `""` 且 `.env.example` 无该键，固化 ON 后 `resolve_answer_llm` 在预算耗尽时抛 `GatewayDeniedError`——**用户该轮回复直接失败**。与附录 E 的 `action_outbox_enabled` 同类：门控不是冗余，而是前置条件未满足。字段已无前缀（F.6），保留零污染；要推翻本裁决，须先让 `light_llm_profile` 成为必配项。
 
 ---
 
