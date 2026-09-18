@@ -99,14 +99,11 @@ def test_default_settings_pass_chain():
     validate_enablement_chain(get_settings())
 
 
-def test_existing_v2_v21_v22_v23_chain_rules_intact(monkeypatch):
+def test_existing_v21_v23_chain_rules_intact(monkeypatch):
     settings = _settings_with(monkeypatch)
 
     settings = _settings_with(monkeypatch, personality_evolution_enabled=True)
     assert any("agent_runtime_enabled" in v for v in enablement_violations(settings))
-
-    settings = _settings_with(monkeypatch, style_contract_enabled=True)
-    assert any("experience_enabled" in v for v in enablement_violations(settings))
 
     settings = _settings_with(monkeypatch, daily_life_enabled=True)
     assert any(

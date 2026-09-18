@@ -211,28 +211,9 @@ def _structured_responses():
     }
 
 
-def test_pipeline_flags_off_keeps_v210_prompt(
-    client_fixture, db_session_factory, fake_llm
+def test_pipeline_injects_style_contract(
+    client_fixture, db_session_factory, fake_llm, monkeypatch
 ):
-    llm = fake_llm(response=["好"], structured_responses=_structured_responses())
-    llm_factory.set_llm(llm)
-    resp = client_fixture.post("/api/v1/chat/message", json={"content": "最近工作很累"})
-    assert resp.status_code == 200
-    prompt_texts = [str(m) for m in llm.seen_messages]
-    assert prompt_texts
-    assert all("【本轮表达风格】" not in text for text in prompt_texts)
-
-
-def test_pipeline_flags_on_injects_style_contract(
-    client_fixture, db_session_factory, fake_llm, override_settings, monkeypatch
-):
-    override_settings(
-        experience_enabled=True,
-        style_contract_enabled=True,
-        emotion_transition_enabled=True,
-        relationship_addressing_enabled=True,
-        habit_runtime_enabled=True,
-    )
     captured = {}
     real_build = PromptBuilder.build
 

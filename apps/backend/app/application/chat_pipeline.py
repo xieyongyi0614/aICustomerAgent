@@ -307,10 +307,7 @@ def _run_foreground_decision(
 
 
 def _build_style_context(state: ConversationState, turn: TurnAnalysis, trace):
-    """V2.2.0 CHAR-007：StyleContext 构造与 trace 记录；总闸关闭时为 None。"""
-    settings = get_settings()
-    if not settings.experience_enabled:
-        return None
+    """V2.2.0 CHAR-007：StyleContext 构造与 trace 记录。"""
     started = time.perf_counter()
     personality_state = None
     try:

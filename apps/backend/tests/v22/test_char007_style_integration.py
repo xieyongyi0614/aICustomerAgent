@@ -1,13 +1,9 @@
-"""CHAR-007：PromptBuilder 集成、Flag 灰度与调用方接线测试。"""
-
-from types import SimpleNamespace
+"""CHAR-007：PromptBuilder 集成与调用方接线测试。"""
 
 import pytest
 
 from app.chains import answer_chain
 from app.core import llm_factory
-from app.core.settings import get_settings
-from app.core.settings.enablement import enablement_violations
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis, UserEmotion
@@ -22,25 +18,6 @@ from app.prompts.builder import PromptBuilder
 from app.services.experience import style_context
 from app.services.experience.style_context import build_style_context
 from app.services.trace_collector import TurnTraceSession
-
-
-FLAG_ENVS = {
-    "EXPERIENCE_ENABLED": "true",
-    "STYLE_CONTRACT_ENABLED": "true",
-    "EMOTION_TRANSITION_ENABLED": "true",
-    "RELATIONSHIP_ADDRESSING_ENABLED": "true",
-    "HABIT_RUNTIME_ENABLED": "true",
-}
-
-
-def _set_flags(monkeypatch, **overrides):
-    envs = dict(FLAG_ENVS)
-    for key, value in overrides.items():
-        envs[key] = value if value.startswith(("true", "false")) else "false"
-    for key, value in envs.items():
-        monkeypatch.setenv(key, value)
-    get_settings.cache_clear()
-    return get_settings.cache_clear()
 
 
 def _state() -> ConversationState:
@@ -84,52 +61,18 @@ def _rendered(prompt) -> str:
     return "\n".join(str(text) for text in texts)
 
 
-def test_build_style_context_returns_none_when_flags_off():
-    assert build_style_context(_state(), _analysis()) is None
+def test_build_style_context_assembles_three_projections():
+    contract = build_style_context(_state(), _analysis())
+    assert contract is not None
+    assert contract.addressing.term == "name"
+    assert contract.emotion_constraint.tone_directive != ""
+    assert contract.habits
+    assert contract.style_hint
+    assert contract.forbidden
+    assert contract.principles
 
 
-def test_build_style_context_requires_style_contract_gate(monkeypatch):
-    _set_flags(monkeypatch, STYLE_CONTRACT_ENABLED="false")
-    try:
-        assert build_style_context(_state(), _analysis()) is None
-    finally:
-        get_settings.cache_clear()
-
-
-def test_build_style_context_with_only_total_and_style_gates(monkeypatch):
-    _set_flags(
-        monkeypatch,
-        EMOTION_TRANSITION_ENABLED="false",
-        RELATIONSHIP_ADDRESSING_ENABLED="false",
-        HABIT_RUNTIME_ENABLED="false",
-    )
-    try:
-        contract = build_style_context(_state(), _analysis())
-        assert contract is not None
-        assert contract.addressing == Addressing()
-        assert contract.emotion_constraint == EmotionExpression()
-        assert contract.habits == []
-        assert contract.forbidden
-        assert contract.principles
-        assert contract.style_hint
-    finally:
-        get_settings.cache_clear()
-
-
-def test_build_style_context_all_gates_on(monkeypatch):
-    _set_flags(monkeypatch)
-    try:
-        contract = build_style_context(_state(), _analysis())
-        assert contract is not None
-        assert contract.addressing.term == "name"
-        assert contract.emotion_constraint.tone_directive != ""
-        assert contract.habits
-        assert contract.style_hint
-    finally:
-        get_settings.cache_clear()
-
-
-def test_build_style_context_relationship_gate_controls_boost(monkeypatch):
+def test_build_style_context_partner_stage_boosts_expressiveness():
     partner_state = ConversationState(
         session_id="s",
         user_id="u",
@@ -140,52 +83,17 @@ def test_build_style_context_relationship_gate_controls_boost(monkeypatch):
         character_state=CharacterState(mood="calm", intensity=0.45),
         relationship_state=RelationshipState(stage="partner"),
     )
-    _set_flags(monkeypatch, RELATIONSHIP_ADDRESSING_ENABLED="false")
-    try:
-        without_boost = build_style_context(partner_state, _analysis())
-        assert without_boost.emotion_constraint.expression_intensity == "natural"
-    finally:
-        get_settings.cache_clear()
-    _set_flags(monkeypatch)
-    try:
-        with_boost = build_style_context(partner_state, _analysis())
-        assert with_boost.emotion_constraint.expression_intensity == "rich"
-        assert with_boost.addressing.term == "intimate"
-    finally:
-        get_settings.cache_clear()
-
-
-def test_build_style_context_emotion_off_keeps_relationship_expressiveness(monkeypatch):
-    partner_state = ConversationState(
-        session_id="s",
-        user_id="u",
-        messages=[],
-        summary=None,
-        memories=[],
-        current_input="在吗",
-        character_state=CharacterState(mood="calm", intensity=0.2),
-        relationship_state=RelationshipState(stage="partner"),
-    )
-    _set_flags(monkeypatch, EMOTION_TRANSITION_ENABLED="false")
-    try:
-        contract = build_style_context(partner_state, _analysis())
-        assert contract.addressing.emotion_expressiveness == "open"
-        assert contract.emotion_constraint == EmotionExpression()
-    finally:
-        get_settings.cache_clear()
+    contract = build_style_context(partner_state, _analysis())
+    assert contract.emotion_constraint.expression_intensity == "rich"
+    assert contract.addressing.term == "intimate"
 
 
 def test_build_style_context_degrades_to_none_on_failure(monkeypatch):
-    _set_flags(monkeypatch)
-
     def _boom(*args, **kwargs):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(style_context, "assemble_style_contract", _boom)
-    try:
-        assert build_style_context(_state(), _analysis()) is None
-    finally:
-        get_settings.cache_clear()
+    assert build_style_context(_state(), _analysis()) is None
 
 
 def test_build_style_section_none_and_empty_contract():
@@ -256,53 +164,13 @@ async def test_astream_threads_style_ctx_to_builder(monkeypatch, fake_llm):
     assert captured["style_ctx"] is None
 
 
-def test_pipeline_style_context_records_trace_when_enabled(monkeypatch):
-    from app.application import chat_pipeline
-
-    _set_flags(monkeypatch)
-    try:
-        trace = TurnTraceSession()
-        style_ctx = chat_pipeline._build_style_context(_state(), _analysis(), trace)
-        assert style_ctx is not None
-        steps = [step for step in trace.steps if step.name == "style_contract"]
-        assert len(steps) == 1
-        assert steps[0].status == "ok"
-        assert steps[0].extra.get("style_hint")
-    finally:
-        get_settings.cache_clear()
-
-
-def test_pipeline_style_context_skipped_when_total_off(monkeypatch):
+def test_pipeline_style_context_records_trace():
     from app.application import chat_pipeline
 
     trace = TurnTraceSession()
     style_ctx = chat_pipeline._build_style_context(_state(), _analysis(), trace)
-    assert style_ctx is None
-    assert all(step.name != "style_contract" for step in trace.steps)
-
-
-def test_enablement_chain_requires_total_gate_for_sub_flags():
-    base_flags = {
-        "action_enabled": False,
-        "action_outbox_enabled": False,
-        "unified_run_enabled": False,
-        "agent_runtime_enabled": False,
-        "personality_evolution_enabled": False,
-        "agent_metrics_enabled": False,
-        "goal_stack_enabled": False,
-        "experience_enabled": False,
-        "emotion_transition_enabled": False,
-        "relationship_addressing_enabled": False,
-        "habit_runtime_enabled": False,
-        "style_contract_enabled": False,
-    }
-    settings = SimpleNamespace(**base_flags)
-    assert enablement_violations(settings) == []
-
-    settings.style_contract_enabled = True
-    violations = enablement_violations(settings)
-    assert len(violations) == 1
-    assert "experience_enabled" in violations[0]
-
-    settings.experience_enabled = True
-    assert enablement_violations(settings) == []
+    assert style_ctx is not None
+    steps = [step for step in trace.steps if step.name == "style_contract"]
+    assert len(steps) == 1
+    assert steps[0].status == "ok"
+    assert steps[0].extra.get("style_hint")
