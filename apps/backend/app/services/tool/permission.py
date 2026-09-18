@@ -342,64 +342,18 @@ def build_confirm_prompt(
     return text[:max_chars]
 
 
-def permission_layer_enabled(settings: Any) -> bool:
-    """双闸判定：总闸为上层门控，总闸 off 时权限段不参与（E14）。"""
-    if not bool(getattr(settings, "tool_system_enabled", False)):
-        return False
-    return bool(getattr(settings, "tool_permission_enabled", False))
-
-
-def permission_sub_layer_disabled(settings: Any) -> bool:
-    """"总闸 on 而权限子闸 off"：权限段既不参与七步判定，也不得放行特权工具。"""
-    if not bool(getattr(settings, "tool_system_enabled", False)):
-        return False
-    return not bool(getattr(settings, "tool_permission_enabled", False))
-
-
-_FLOOR_ONLY_SNAPSHOT = PermissionSnapshot()
-
-
-def effective_level_without_snapshot(definition: ToolDefinition) -> PermissionLevel:
-    """无授权快照时的生效等级：只按声明等级与命名空间下限判定（纯函数、零 IO）。"""
-    return effective_level(definition, _FLOOR_ONLY_SNAPSHOT)
-
-
-def _disabled_layer_decision(
-    definition: ToolDefinition, scope: tuple[str, ...]
-) -> PermissionDecision:
-    """子闸未启用（总闸 on）时的保守判定：只有免授权档可放行。
-
-    免授权档 = 有效等级 ∈ {safe, normal} 且命名空间不是不受信命名空间；其余
-    （sensitive / dangerous / `user.*` / `ext.api.*`）一律默认拒绝——此时没有可读的
-    授权存储，放行等于把"子闸未启用"当作特权豁免（§9.5-1 默认拒绝）。
-    """
-    level = effective_level_without_snapshot(definition)
-    if level in GRANT_FREE_LEVELS and not is_untrusted_namespace(definition):
-        return _allow(REASON_LAYER_DISABLED_GRANT_FREE, level, scope)
-    logger.warning(
-        "权限子闸未启用（tool_permission_enabled=false），特权工具默认拒绝："
-        "tool_id=%s level=%s",
-        definition.id,
-        level,
-    )
-    return _deny(REASON_LAYER_DISABLED, level, scope)
-
-
 def _step_snapshot_guard(
     definition: ToolDefinition,
-    invocation: ToolInvocation,
     snapshot: PermissionSnapshot | None,
-    settings: Any,
 ) -> PermissionDecision | None:
-    """⓪ 总闸 off → 占位 allow（TOOL-003 交付态）；子闸 off → 三段语义；快照不可用 → 拒绝。"""
-    scope = required_scope(definition)
-    if permission_layer_enabled(settings):
-        if snapshot is None:
-            return _deny(REASON_SNAPSHOT_UNAVAILABLE, definition.permission.level, scope)
+    """⓪ 快照不可用 → 拒绝；否则交后续步骤（权限层已随 V2.4.0 转正常开）。"""
+    if snapshot is not None:
         return None
-    if not permission_sub_layer_disabled(settings):
-        return _allow(REASON_LAYER_OFF, definition.permission.level, scope)
-    return _disabled_layer_decision(definition, scope)
+    return _deny(
+        REASON_SNAPSHOT_UNAVAILABLE,
+        definition.permission.level,
+        required_scope(definition),
+    )
 
 
 def _step_level_no_grant_required(
@@ -559,12 +513,7 @@ class ToolPermissionGate:
     ) -> PermissionDecision:
         scope = required_scope(defn)
         try:
-            settings = (
-                snapshot.settings
-                if snapshot is not None and snapshot.settings is not None
-                else self._settings
-            )
-            guard = _step_snapshot_guard(defn, inv, snapshot, settings)
+            guard = _step_snapshot_guard(defn, snapshot)
             if guard is not None:
                 return guard
             assert snapshot is not None

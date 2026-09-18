@@ -4,7 +4,7 @@
 memory_repository 落库；source 只用 user_stated / user_derived。
 
 V2.4.0 TOOL-008：新增 `deliver` 泛化路径（键从 action_type 升级为 memory_policy_key），
-工具记忆子闸 `tool_memory_enabled` off 时回退本模块既有的 `deliver_action_memory`。
+工具记忆投递走泛化键（工具记忆子闸已随 V2.4.0 转正删除，不再回退 `deliver_action_memory`）。
 两条路径共用同一政策闸与落库入口，幂等标记同为 `effects.kind == "memory"`。
 """
 
@@ -86,12 +86,10 @@ def _tool_definition(record: ActionRecord) -> ToolDefinition | None:
 def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> dict | None:
     """工具结果记忆投递（TOOL-008 §4.2）：门控 + 幂等 + 分类 + R1~R8 + 落库。
 
-    子闸 off → 回退 `deliver_action_memory`（action_type 键）；政策总开关 off → 不投递。
-    任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
+    工具记忆子闸已随 V2.4.0 转正删除（不再回退 `deliver_action_memory`）；
+    政策总开关 off → 不投递。任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
     """
     settings = get_settings()
-    if not settings.tool_memory_enabled:
-        return deliver_action_memory(record, user_id, character_id)
     if not settings.action_memory_policy_enabled:
         return None
     try:

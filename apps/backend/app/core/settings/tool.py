@@ -1,6 +1,10 @@
-"""V2.4.0 Tool System 域设置（TOOL-001）：工具系统总闸与九个子闸及治理参数。
+"""V2.4.0 Tool System 域设置（TOOL-001）：治理参数。
 
-总闸 + 子闸双开才生效；全部默认 off，关闭后行为与 V2.3.0 逐字节一致。
+原总闸 `tool_system_enabled` 与九个子闸（permission / schema_validation /
+observation / surface / memory / reflection / channel / external_api /
+user_defined）已随 V2.4.0 转正删除——工具系统无条件生效，不再有配置面。
+`tool_confirm_ttl_reuse` 按裁决保留：它不是部署闸门，而是「批准是否跨轮复用」
+的策略修饰位（默认 ON）。
 """
 
 from pydantic import model_validator
@@ -14,17 +18,6 @@ def parse_csv_values(value: str) -> frozenset[str]:
 
 class ToolSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
-
-    tool_system_enabled: bool = False
-    tool_permission_enabled: bool = False
-    tool_schema_validation_enabled: bool = False
-    tool_observation_enabled: bool = False
-    tool_surface_enabled: bool = False
-    tool_memory_enabled: bool = False
-    tool_reflection_enabled: bool = False
-    tool_channel_enabled: bool = False
-    tool_external_api_enabled: bool = False
-    tool_user_defined_enabled: bool = False
 
     tool_disabled_ids: str = ""
     tool_surface_max_tools: int = 12

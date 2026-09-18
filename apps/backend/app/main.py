@@ -72,21 +72,19 @@ async def lifespan(application: FastAPI):
             )
         )
         logging.getLogger(__name__).info("主动消息出站端口已注册：%s", FEISHU_CHANNEL)
-        if get_settings().tool_channel_enabled:
-            channel_tools.register_channel_adapter(
-                FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
-            )
-            logging.getLogger(__name__).info(
-                "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
-            )
-    if get_settings().tool_external_api_enabled:
-        report = get_manifest_loader().load(get_settings().tool_ext_manifest_path)
-        logging.getLogger(__name__).info(
-            "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",
-            report.path or "<未配置>",
-            len(report.loaded),
-            len(report.skipped),
+        channel_tools.register_channel_adapter(
+            FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
         )
+        logging.getLogger(__name__).info(
+            "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
+        )
+    report = get_manifest_loader().load(get_settings().tool_ext_manifest_path)
+    logging.getLogger(__name__).info(
+        "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",
+        report.path or "<未配置>",
+        len(report.loaded),
+        len(report.skipped),
+    )
     if get_settings().observability_persist_enabled:
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()

@@ -67,7 +67,6 @@ from app.services.tool.permission import (
     PermissionDecision,
     PermissionSnapshot,
     ToolPermissionGate,
-    permission_layer_enabled,
 )
 from app.services.tool.registry import ToolRegistry
 from app.services.tool.validator import ParamValidator
@@ -170,19 +169,18 @@ class ToolExecutor:
             )
 
         validation = None
-        if getattr(self.settings, "tool_schema_validation_enabled", False):
-            report = self.validator.validate(defn, params, _tool_ctx(ctx))
-            if not report.passed:
-                return self._terminal(
-                    index,
-                    defn,
-                    params,
-                    started_at,
-                    "invalid",
-                    decision=decision,
-                    validation=report.model_dump(mode="json"),
-                )
-            params = dict(report.normalized)
+        report = self.validator.validate(defn, params, _tool_ctx(ctx))
+        if not report.passed:
+            return self._terminal(
+                index,
+                defn,
+                params,
+                started_at,
+                "invalid",
+                decision=decision,
+                validation=report.model_dump(mode="json"),
+            )
+        params = dict(report.normalized)
 
         return await self._invoke(
             index, defn, params, ctx, started_at, decision, validation, invocation.dedupe_key
@@ -202,13 +200,10 @@ class ToolExecutor:
         ctx: ToolContext | ExecutionContext,
         permission_snapshot: PermissionSnapshot | None = None,
     ) -> PermissionDecision:
-        """② permission：闸门 off 走 TOOL-003 交付态；on 走真实七步判定（零外部调用）。"""
-        gate_enabled = permission_layer_enabled(
-            getattr(ctx, "settings", None) or self.settings
-        )
+        """② permission：走真实七步判定（零外部调用）。"""
         snapshot = permission_snapshot
         builder = getattr(self.permission_gate, "build_snapshot", None)
-        if gate_enabled and snapshot is None and builder is not None:
+        if snapshot is None and builder is not None:
             snapshot = builder(
                 getattr(ctx, "user_id", ""), _now(ctx), getattr(ctx, "settings", None)
             )
@@ -275,9 +270,7 @@ class ToolExecutor:
         )
 
     def _persisted(self, raw: CapabilityResult, tool_result: ToolResult) -> dict[str, Any]:
-        """观测闸 off → V9 原始 `CapabilityResult` 形态；on → ToolResult + 旧 payload 读键。"""
-        if not getattr(self.settings, "tool_observation_enabled", False):
-            return raw.model_dump(mode="json")
+        """观测结果持久化形态（TOOL-003）：ToolResult + 旧 `payload` 读键。"""
         return persisted_result(tool_result, raw)
 
     def _terminal(

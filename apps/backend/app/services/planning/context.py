@@ -347,11 +347,7 @@ class PlanContextAssembler:
             return ToolSurfaceResolver(None, settings).resolve(
                 RUN_KIND_AUTONOMOUS_TICK, base
             )
-        if not settings.tool_system_enabled:
-            return PlanUnavailable(PLAN_UNAVAILABLE_TOOL_SYSTEM_DISABLED)
         registry = get_tool_registry()
-        if registry is None:
-            return PlanUnavailable(PLAN_UNAVAILABLE_REGISTRY_UNAVAILABLE)
         tool_ctx = build_tool_context(base, settings=settings, now=now)
         return ToolSurfaceResolver(registry, settings).resolve(
             RUN_KIND_AUTONOMOUS_TICK, tool_ctx

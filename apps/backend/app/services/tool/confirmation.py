@@ -92,17 +92,13 @@ _QUESTION_GUARDS: tuple[str, ...] = (
 _QUESTION_PATTERN = re.compile(r"(你|能|可以|会).{0,10}(吗|么|嘛)")
 
 
-def non_todo_payload_kinds(settings: Any = None) -> tuple[str, ...] | None:
+def non_todo_payload_kinds() -> tuple[str, ...]:
     """借表的**非待办行**判别位（P2-1）：确认请求行与授权行。
 
     这两类行用 `trigger_type = action_due` 复用既有表（零 DDL 裁决），`due_at` 只表达 TTL，
     因此从到期到清理（`expire_due`）的窗口里会被 `has_due` 误计为"到期待办触发"。
-    返回 `None` 表示**不做排除**（工具总闸 off：这些行根本不会被登记，口径与 V9 完全一致），
-    工具总闸 on 时返回两类 kind，供调用侧按需传给 `trigger_registry_repository.has_due`。
+    返回两类 kind，供调用侧按需传给 `trigger_registry_repository.has_due`。
     """
-    resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "tool_system_enabled", False)):
-        return None
     return (CONFIRMATION_ROW_KIND, GRANT_ROW_KIND)
 
 

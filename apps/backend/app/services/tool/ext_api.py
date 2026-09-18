@@ -226,14 +226,6 @@ class _ManifestRejected(Exception):
         return MANIFEST_RULE_LABELS.get(self.rule, str(self.rule))
 
 
-def external_api_enabled(settings: Any = None) -> bool:
-    """外部 API 面双闸判据：总闸 + `tool_external_api_enabled`。"""
-    resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "tool_system_enabled", False)):
-        return False
-    return bool(getattr(resolved, "tool_external_api_enabled", False))
-
-
 def allowed_ext_hosts(settings: Any = None) -> frozenset[str]:
     """域名白名单（空 = 全禁）。
 
@@ -1311,12 +1303,6 @@ class ExternalApiCapability:
                 failure_kind=FAILURE_KIND_PERMANENT,
                 reason_kind=REASON_UNEXPECTED,
                 message=f"未知动作: {action}",
-            )
-        if not external_api_enabled(settings):
-            return _result(
-                UNAVAILABLE,
-                failure_kind=FAILURE_KIND_UNAVAILABLE,
-                reason_kind=REASON_EXTERNAL_API_DISABLED,
             )
         index = self._index if self._index is not None else get_manifest_index()
         manifest = index.resolve(params)

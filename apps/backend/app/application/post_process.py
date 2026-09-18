@@ -463,12 +463,6 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
 
 async def _run_confirmation_round(ctx: PostProcessContext) -> bool:
     """确认轮次检出与执行（TOOL-005 §2.3 步骤④）；未命中返回 False（按普通对话处理）。"""
-    settings = get_settings()
-    if not (
-        getattr(settings, "tool_system_enabled", False)
-        and getattr(settings, "tool_permission_enabled", False)
-    ):
-        return False
     started = time.perf_counter()
     try:
         from app.application.action_engine import run_confirmation_round
@@ -531,12 +525,8 @@ def _observe_pending_confirmation(record) -> dict:
 def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
     """工具证据反思接线（TOOL-009 §2.3）：只读 `action_records` 投影喂 reinforce 计数。
 
-    工具反思子闸（`tool_reflection_enabled`）关闭即零行为；
     接线失败记日志、不影响行动规划（与 REF-003 既有接线同款纪律）。
     """
-    settings = get_settings()
-    if not reflection_triggers.tool_channel_enabled(settings):
-        return {}
     try:
         fired = reflection_triggers.observe_tool_evidence_from_records(
             ctx.user_id, trace=ctx.trace
@@ -550,10 +540,8 @@ def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
 
 
 def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
-    """第 9 步内部工具面观测（总闸 + `tool_surface_enabled` 双闸；失败不影响本步骤）。"""
+    """第 9 步内部工具面观测（失败不影响本步骤）。"""
     settings = get_settings()
-    if not (settings.tool_system_enabled and settings.tool_surface_enabled):
-        return {}
     try:
         from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
         from app.services.tool.context import ToolContext
@@ -561,8 +549,6 @@ def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
         from app.services.tool.surface import ToolSurfaceResolver
 
         registry = get_tool_registry()
-        if registry is None:
-            return {}
         now = datetime.now()
         surface = ToolSurfaceResolver(registry, settings).resolve(
             RUN_KIND_FOREGROUND_CHAT,

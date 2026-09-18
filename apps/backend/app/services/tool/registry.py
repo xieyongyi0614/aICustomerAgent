@@ -446,11 +446,9 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
 _registry: ToolRegistry | None = None
 
 
-def get_tool_registry() -> ToolRegistry | None:
-    """模块级单例：总闸 off 返回 None（调用方走 V9 原路径），on 时惰性构建一次。"""
+def get_tool_registry() -> ToolRegistry:
+    """模块级单例：惰性构建一次（工具系统已随 V2.4.0 转正常开，不再有总闸）。"""
     global _registry
-    if not get_settings().tool_system_enabled:
-        return None
     if _registry is None:
         registry = ToolRegistry()
         register_builtin_tools(registry)

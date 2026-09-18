@@ -3,7 +3,7 @@
 全部输入为已读快照，闸门内零 IO；能力映射唯一来源 ACTION_CAPABILITY_MAP。
 Planner 只裁决与装配，不执行行动。
 
-V2.4.0 TOOL-004：`tool_system_enabled` 开启时，计划装配改经
+V2.4.0 TOOL-004：计划装配经
 `ToolRegistry.resolve(ToolSelector.select(intent, ToolSurface))` 取绑定；
 绑定解析失败（工具面为空 / 未覆盖 / 声明缺失）返回 None，沿用既有
 `capability_unavailable` 语义。总闸 off 时路径与 V9 逐字节一致。
@@ -130,27 +130,8 @@ def assemble_plan(
 ) -> ActionPlan | None:
     """能力映射 + 参数校验 + 计划装配；装配失败返回 None（理论不可达，防御兜底）。
 
-    V2.4.0：总闸开启时能力映射来自工具注册表绑定（工具面过滤后），关闭时走 V9 原路径。
+    V2.4.0：能力映射来自工具注册表绑定（工具面过滤后）。
     """
-    if not getattr(snapshot.settings, "tool_system_enabled", False):
-        capability_name, action = ACTION_CAPABILITY_MAP[intent.action_type]
-        capability = snapshot.registry.get(capability_name) if snapshot.registry is not None else None
-        if capability is None:
-            return None
-        schema = capability.actions.get(action)
-        if schema is None:
-            return None
-        errors = schema.validate(intent.params)
-        if errors:
-            logger.warning("计划装配参数校验失败（G2/G6 应已拦截）: %s", errors)
-            return None
-        step = ActionStep(index=0, capability=capability_name, action=action, params=dict(intent.params))
-        return ActionPlan(
-            intent=intent,
-            goal_id=goal_id,
-            steps=[step],
-            expires_at=now + timedelta(minutes=snapshot.settings.action_plan_expires_minutes),
-        )
     return _assemble_plan_via_tools(intent, snapshot, now, goal_id)
 
 
@@ -160,7 +141,7 @@ def _assemble_plan_via_tools(
     now: datetime,
     goal_id: str | None,
 ) -> ActionPlan | None:
-    """总闸开启时的装配路径：工具面 → 工具选择 → 注册表绑定 → V9 同款校验。"""
+    """装配路径：工具面 → 工具选择 → 注册表绑定 → V9 同款校验。"""
     surface = resolve_surface(snapshot)
     binding = ToolSelector(get_tool_registry()).select(intent, surface)
     if binding is None:

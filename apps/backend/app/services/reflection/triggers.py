@@ -98,17 +98,6 @@ def trigger_for_user(
     started = time.perf_counter()
     now = now or datetime.now()
     settings = get_settings()
-    if channel == CHANNEL_TOOL and not tool_channel_enabled(settings):
-        _trace(
-            trace,
-            started,
-            trigger=trigger,
-            decision=DECISION_OFF,
-            reason=_REASON_TOOL_OFF,
-            **_channel_field(channel),
-        )
-        return OUTCOME_OFF
-
     windows: list = []
     package: reflection_evidence.ToolEvidencePackage | None = None
     try:
@@ -262,12 +251,6 @@ def trigger_for_user(
     return OUTCOME_QUEUED
 
 
-def tool_channel_enabled(settings=None) -> bool:
-    """工具证据通道开关：工具反思子闸（默认 off）。"""
-    settings = settings or get_settings()
-    return bool(getattr(settings, "tool_reflection_enabled", False))
-
-
 def observe_tool_evidence(
     user_id: str,
     *,
@@ -282,8 +265,6 @@ def observe_tool_evidence(
     冷却 `reflection_event_cooldown_hours`）；触发走同一 `trigger_for_user`（channel=tool）。
     """
     settings = get_settings()
-    if not tool_channel_enabled(settings):
-        return False
     started = time.perf_counter()
     now = now or datetime.now()
     topic = f"{tool_id}|{failure_kind or ''}"
@@ -360,9 +341,6 @@ def observe_tool_evidence_from_records(
     只读投影（不经工具注册表 / 健康度）；失败证据（含 timeout）才计数。
     返回本次真正触发入队的次数。
     """
-    settings = get_settings()
-    if not tool_channel_enabled(settings):
-        return 0
     now = now or datetime.now()
     facts = reflection_evidence.tool_fact_projection(
         user_id, now=now, window_days=window_days

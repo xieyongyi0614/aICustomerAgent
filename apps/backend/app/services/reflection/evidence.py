@@ -1264,8 +1264,7 @@ def plan_thresholds(window_kind: str = "", settings=None) -> dict[str, float]:
 def plan_evidence_enabled(settings=None) -> bool:
     """计划证据通道子闸：`plan_reflection_enabled`。
 
-    与 `triggers.tool_channel_enabled` 同款纪律：子闸 off 时**零计划窗、零额外读取**
-    （`aggregate_evidence_windows` 的两通道行为与 V2.4.0 逐字节一致）。
+    子闸 off 时**零计划窗、零额外读取**（`aggregate_evidence_windows` 的记忆通道行为不变）。
     """
     resolved = settings if settings is not None else get_settings()
     return bool(getattr(resolved, "plan_reflection_enabled", False))

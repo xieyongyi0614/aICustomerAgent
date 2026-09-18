@@ -92,12 +92,7 @@ _registry: CapabilityRegistry | None = None
 
 _registry_flags: dict[str, bool] = {}
 
-REGISTRY_FLAG_NAMES: tuple[str, ...] = (
-    "tool_system_enabled",
-    "tool_channel_enabled",
-    "feishu_enabled",
-    "tool_external_api_enabled",
-)
+REGISTRY_FLAG_NAMES: tuple[str, ...] = ("feishu_enabled",)
 
 
 def get_capability_registry() -> CapabilityRegistry:

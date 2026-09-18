@@ -196,21 +196,15 @@ class _EvidenceSelection:
 
 
 def _select_evidence(run, now: datetime) -> _EvidenceSelection:
-    """证据窗选取：既有窗口恒参与；工具子闸开启时按 run 通道决定优先序。
+    """证据窗选取：既有窗口恒参与；按 run 通道决定优先序。
 
-    - 工具子闸关闭（默认）：只看既有窗口，行为与 V2.3.0 逐字节一致。
     - 工具通道 run：工具窗优先，取不到达门槛工具窗时回退既有窗口。
     - 用户通道 run：既有窗口优先，取不到时回退工具窗（同一 run 不空转）。
     """
-    settings = get_settings()
     windows = reflection_evidence.aggregate_evidence_windows(
         run.user_id, run.character_id, now=now
     )
     memory_passing = [window for window in windows if window.passes_gate]
-    if not getattr(settings, "tool_reflection_enabled", False):
-        return _EvidenceSelection(
-            channel=_run_channel(run), passing=memory_passing, window_count=len(windows)
-        )
     package = reflection_evidence.aggregate_tool_evidence(run.user_id, now=now)
     tool_passing = _pick_tool_windows(package.windows, run)
     channel = _run_channel(run)

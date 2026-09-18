@@ -4,11 +4,10 @@
 execute_plan → integrate_result。全部发生在 post_process 第 9 步（per-user 写锁内）
 或重试维护循环中。只做调度与容错，检出/闸门/执行逻辑在 services。
 
-V2.4.0：`tool_system_enabled` 开启时 `execute_plan` 的步骤执行改走 `ToolExecutor`
-（五段短路 + 结果归一），`steps[]` 增量落 `tool_id` / `permission` / `validation` /
-`duration_ms`；总闸关闭时执行路径与 V2.3.0 逐字节一致。
+V2.4.0：`execute_plan` 的步骤执行经 `ToolExecutor`（五段短路 + 结果归一），
+`steps[]` 增量落 `tool_id` / `permission` / `validation` / `duration_ms`。
 
-V2.4.0 TOOL-005：权限闸开启时装配 `PermissionSnapshot` 下传执行器（快照装配在引擎侧，
+V2.4.0 TOOL-005：装配 `PermissionSnapshot` 下传执行器（快照装配在引擎侧，
 闸门内零 IO）；`pending_confirmation` 步骤登记确认请求并把确认话术投影进行动结果
 （回复素材），确认态映射为 `ActionRecord.status="planned"` + `gate_reason=pending_confirmation`；
 用户批准后的确认轮次复用原记录与幂等键重新执行（不产生第二条 `ActionRecord`）；
@@ -158,13 +157,11 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
 def _build_tool_context(
     user_id: str, settings, now: datetime, run_kind: str
 ) -> ToolContext | None:
-    """工具上下文预读（TOOL-007 §2.3）：总闸 off → `None`（零 IO，V2.3.0 行为）。
+    """工具上下文预读（TOOL-007 §2.3）。
 
     装配失败不抛出（`WorldContextBuilder` 逐段降级）；本函数自身异常同样降级为
     `None`——工具系统是行动链路的旁路，任何失败都不得影响行动规划。
     """
-    if not getattr(settings, "tool_system_enabled", False):
-        return None
     try:
         base = ToolContext(
             user_id=user_id,
@@ -201,8 +198,8 @@ async def execute_plan(
     """执行计划：step 归一回填 steps/result；重试保留同 Record。
 
     `tool_context`（TOOL-007）：`_build_snapshot` 预读的世界事实快照；缺省时按执行上下文
-    重建（世界事实留空）——总闸 off 的路径行为与 V2.3.0 逐字节一致。
-    V2.6.0：总闸 on 时经 ActionExecutor 统一分派；off 时保持既有路径。
+    重建（世界事实留空）。
+    V2.6.0：总闸 on 时经 ActionExecutor 统一分派，否则经工具注册表执行。
     """
     settings = get_settings()
     storage = get_capability_registry()
@@ -224,64 +221,16 @@ async def execute_plan(
             tool_context=tool_context,
         )
 
-    tool_registry = get_tool_registry() if settings.tool_system_enabled else None
-    if tool_registry is not None:
-        return await _execute_plan_via_tools(
-            record,
-            plan,
-            ctx,
-            settings,
-            executor,
-            tool_registry,
-            permission_snapshot=permission_snapshot,
-            tool_context=tool_context,
-        )
-
-    step_dicts: list[dict] = []
-    for step in plan.steps:
-        result = await executor.run(step, ctx)
-        step_dicts.append(
-            {
-                "index": step.index,
-                "capability": step.capability,
-                "action": step.action,
-                "params": step.params,
-                "status": "failed" if result.status != "succeeded" else "succeeded",
-                "result": result.model_dump(mode="json"),
-            }
-        )
-
-    record.steps = step_dicts
-    all_ok = all(s["status"] == "succeeded" for s in record.steps)
-    if all_ok:
-        result_out = ActionResult(status="succeeded", effects=[])
-        record.status = transition_action("executing", "step_all_succeeded") or record.status
-    else:
-        step_result = record.steps[0].get("result", {})
-        failure_kind = (step_result.get("payload") or {}).get("failure_kind") or "transient"
-        result_out = ActionResult(
-            status="failed",
-            effects=[],
-            error=str(step_result.get("error"))[:80],
-            failure_kind=failure_kind,
-        )
-        if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
-            record.status = "executing"
-            record.attempt += 1
-            backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
-            record.next_retry_at = _now() + timedelta(seconds=backoff)
-        else:
-            record.status = transition_action(
-                "executing",
-                "step_retryable_failed"
-                if failure_kind in RETRYABLE_FAILURES
-                else "step_permanent_failed",
-                attempts_exceeded=True,
-            ) or "failed"
-    record.result = result_out.model_dump(mode="json")
-    record.updated_at = _now()
-    action_repository.save_record(record)
-    return result_out
+    return await _execute_plan_via_tools(
+        record,
+        plan,
+        ctx,
+        settings,
+        executor,
+        get_tool_registry(),
+        permission_snapshot=permission_snapshot,
+        tool_context=tool_context,
+    )
 
 
 def _action_execution_enabled(settings) -> bool:
@@ -305,48 +254,45 @@ async def _execute_plan_via_action_executor(
     from app.services.tool.executor import ToolExecutor
     from app.services.tool.health import ToolHealthTracker
 
-    tool_executor = None
-    tool_resolver = None
     exec_tool_ctx = tool_context
-    if settings.tool_system_enabled:
-        tool_registry = get_tool_registry()
-        tool_executor = ToolExecutor(
-            tool_registry,
-            capability_executor,
-            settings=settings,
-            health=ToolHealthTracker(tool_registry, settings),
+    tool_registry = get_tool_registry()
+    tool_executor = ToolExecutor(
+        tool_registry,
+        capability_executor,
+        settings=settings,
+        health=ToolHealthTracker(tool_registry, settings),
+    )
+
+    def tool_resolver(action: Action):
+        step = ActionStep(
+            index=0,
+            capability="",
+            action="",
+            params=dict(action.parameters or {}),
         )
+        if plan.steps:
+            step = plan.steps[0]
+        binding = resolve_step_binding(tool_registry, step)
+        if binding is None:
+            return None, None
+        intent = (
+            ActionIntent.model_validate(record.intent)
+            if record.intent
+            else plan.intent
+        )
+        invocation = ToolInvocation(
+            tool_id=binding.tool_id,
+            params=dict(step.params if plan.steps else action.parameters or {}),
+            rationale=str((record.intent or {}).get("evidence", "")),
+            source=record.source,
+            intent=intent,
+            goal_id=record.goal_id,
+            dedupe_key=record.dedupe_key,
+        )
+        return binding, invocation
 
-        def tool_resolver(action: Action):
-            step = ActionStep(
-                index=0,
-                capability="",
-                action="",
-                params=dict(action.parameters or {}),
-            )
-            if plan.steps:
-                step = plan.steps[0]
-            binding = resolve_step_binding(tool_registry, step)
-            if binding is None:
-                return None, None
-            intent = (
-                ActionIntent.model_validate(record.intent)
-                if record.intent
-                else plan.intent
-            )
-            invocation = ToolInvocation(
-                tool_id=binding.tool_id,
-                params=dict(step.params if plan.steps else action.parameters or {}),
-                rationale=str((record.intent or {}).get("evidence", "")),
-                source=record.source,
-                intent=intent,
-                goal_id=record.goal_id,
-                dedupe_key=record.dedupe_key,
-            )
-            return binding, invocation
-
-        if exec_tool_ctx is None:
-            exec_tool_ctx = _tool_context_for_execution(ctx, tool_context)
+    if exec_tool_ctx is None:
+        exec_tool_ctx = _tool_context_for_execution(ctx, tool_context)
 
     action_executor = ActionExecutor(
         storage,
@@ -619,14 +565,9 @@ def _build_permission_snapshot(
 ) -> PermissionSnapshot | None:
     """权限快照装配（TOOL-005 §2.2）：唯一读 IO 入口在 `ToolPermissionGate.build_snapshot`。
 
-    装配在引擎侧完成并下传执行器，使权限闸内（`evaluate`）保持零 IO；双闸未全开返回
-    `None`（不产生读 IO），执行器据此走 TOOL-003 交付态。
+    装配在引擎侧完成并下传执行器，使权限闸内（`evaluate`）保持零 IO；装配失败返回
+    `None`，执行器据此走快照不可用拒绝态。
     """
-    if not (
-        getattr(settings, "tool_system_enabled", False)
-        and getattr(settings, "tool_permission_enabled", False)
-    ):
-        return None
     return ToolPermissionGate(settings).build_snapshot(user_id, _now(), settings)
 
 
@@ -739,10 +680,8 @@ def _effect_ref(step_result: dict, kind: str) -> str | None:
 
 
 def _deliver_memory(record: ActionRecord, settings) -> dict | None:
-    """记忆投递路由（TOOL-008 §2.3）：工具记忆子闸 on 走泛化键，off 与 V9 逐字节一致。"""
-    if getattr(settings, "tool_memory_enabled", False):
-        return memory_bridge.deliver(record, record.user_id, record.character_id)
-    return memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
+    """记忆投递路由（TOOL-008 §2.3）：走泛化键（工具记忆子闸已随 V2.4.0 转正删除）。"""
+    return memory_bridge.deliver(record, record.user_id, record.character_id)
 
 
 def integrate_result(record: ActionRecord, result: ActionResult) -> None:
@@ -1151,11 +1090,6 @@ def _expire_pending_confirmations() -> int:
     下一轮维护重试，不影响行动过期扫描。
     """
     settings = get_settings()
-    if not (
-        getattr(settings, "tool_system_enabled", False)
-        and getattr(settings, "tool_permission_enabled", False)
-    ):
-        return 0
     try:
         expired = get_confirmation_service(settings).expire_due(_now())
     except Exception:

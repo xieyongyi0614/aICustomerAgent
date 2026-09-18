@@ -186,16 +186,12 @@ def _recent_tool_failures(
 def collect_tool_facts(user_id: str, ctx: ToolContext | None = None) -> dict:
     """有界工具事实段（TOOL-006 §4.1）：`{available, recent_failures, breaker_open}`。
 
-    总闸 off 或任何异常 → `{}`（降级为空包 + 日志，不抛出、不阻塞 tick）；
+    任何异常 → `{}`（降级为空包 + 日志，不抛出、不阻塞 tick）；
     整体经既有 `observability.bound_extra` 预算裁剪（不新增预算机制）。
     """
     try:
         settings = get_settings()
-        if not settings.tool_system_enabled:
-            return {}
         registry = get_tool_registry()
-        if registry is None:
-            return {}
         surface = resolve_autonomy_surface(user_id, ctx=ctx)
         if surface is None:
             return {}
@@ -217,13 +213,10 @@ def collect_tool_facts(user_id: str, ctx: ToolContext | None = None) -> dict:
 def collect_tool_insights(user_id: str) -> dict:
     """工具效能 Insight 只读信号段（TOOL-009 §2.3）：`{count, notes, insights, ...}`。
 
-    子闸 off / 无 active Insight / 任何异常 → `{}`（降级为空包 + 日志，不阻塞 tick）；
+    无 active Insight / 任何异常 → `{}`（降级为空包 + 日志，不阻塞 tick）；
     信号只读（`reflection.tool_feed` 无写方法），自治侧只把它当输入面追加理由。
     """
     try:
-        settings = get_settings()
-        if not getattr(settings, "tool_reflection_enabled", False):
-            return {}
         from app.services.reflection import tool_feed
 
         return tool_feed.autonomy_signal(user_id)

@@ -8,7 +8,7 @@
 
 | 纪律 | 落点 |
 |---|---|
-| 双闸门控 | `tool_system_enabled` + `tool_user_defined_enabled` 同时成立才可注册 |
+| 注册面常开 | 原 `tool_system_enabled` + `tool_user_defined_enabled` 双闸已随 V2.4.0 转正删除；注册只受下述三条纪律与 DSL 白名单约束 |
 | 强制 `level=dangerous` | 声明等级被忽略；`dangerous` 由模型校验器连带置 `audit=True` |
 | 强制不沉淀记忆 | `memory_policy_key` 恒等于 tool_id（`user.` 前缀 → TOOL-008 硬纪律不沉淀） |
 | `side_effects` 由步骤并集推导 | `dsl.derive_side_effects` 为唯一权威，声明值不参与判定（E11） |
@@ -70,10 +70,6 @@ FORCED_LEVEL = "dangerous"
 
 DEFAULT_STEP_TIMEOUT_SECONDS = 10.0
 
-GATE_DISABLED_REASON = (
-    "自定义工具未启用（需 tool_system_enabled + tool_user_defined_enabled 同时开启）"
-)
-
 ALLOWED_DECLARATION_KEYS: frozenset[str] = frozenset(
     {
         "tool_id",
@@ -107,14 +103,6 @@ _STATUS_FAILURE_KINDS: dict[str, str] = {
     "unavailable": "unavailable",
     "failed": "transient",
 }
-
-
-def user_defined_enabled(settings: Any = None) -> bool:
-    """双闸判据：总闸 + `tool_user_defined_enabled`。"""
-    resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "tool_system_enabled", False)):
-        return False
-    return bool(getattr(resolved, "tool_user_defined_enabled", False))
 
 
 class UserToolRejected(ValueError):
@@ -313,8 +301,6 @@ class UserToolCapability:
         settings = self._settings if self._settings is not None else getattr(ctx, "settings", None)
         if action != USER_TOOL_ACTION:
             return self._failure("failed", "permanent", f"未知动作: {action}", [])
-        if not user_defined_enabled(settings):
-            return self._failure("unavailable", "unavailable", "自定义工具未启用", [])
         results: list[dict[str, Any]] = []
         for index, step in enumerate(self._steps):
             step_params = render_params_map(step.get(PARAMS_MAP_KEY), params)
@@ -425,11 +411,6 @@ class UserToolRegistrar:
         self._executor = executor
         self._registered: dict[str, dict[str, Any]] = {}
 
-    def enabled(self, settings: Any = None) -> bool:
-        return user_defined_enabled(
-            settings if settings is not None else (self._settings or get_settings())
-        )
-
     def tool_registry(self) -> ToolRegistry | None:
         return self._fixed_registry if self._fixed_registry is not None else get_tool_registry()
 
@@ -469,8 +450,6 @@ class UserToolRegistrar:
         }
 
     def validate(self, declaration: Any) -> ValidationReport:
-        if not self.enabled():
-            return ValidationReport(passed=False, errors=[GATE_DISABLED_REASON])
         if not isinstance(declaration, Mapping):
             return ValidationReport(passed=False, errors=["declaration 必须是键值映射"])
         errors: list[str] = []
@@ -572,8 +551,6 @@ class UserToolRegistrar:
             raise UserToolRejected(report.errors)
         tool_id = report.tool_id
         registry = self.tool_registry()
-        if registry is None:
-            raise UserToolRejected([GATE_DISABLED_REASON])
         capability_registry = self.capability_registry()
         if capability_registry.has(tool_id):
             raise UserToolRejected([f"能力名已被占用，拒绝覆盖: {tool_id}"])

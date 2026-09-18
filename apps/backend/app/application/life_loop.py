@@ -108,15 +108,14 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
 def _due_trigger_present(user_id: str, now: datetime) -> bool:
     """到期待办触发判定（工作发现 / 周期原因共用）。
 
-    P2-1：工具总闸开启时排除借表的确认请求行与授权行（`payload.kind`）——它们用
+    P2-1：排除借表的确认请求行与授权行（`payload.kind`）——它们用
     `due_at` 只表达 TTL，从到期到清理的窗口里不应被算成"到期待办"而多跑一轮自治 tick。
-    总闸 off 时 `non_todo_payload_kinds` 返回 `None`，调用形态与 SQL 与 V9 逐字节一致。
     """
     return trigger_registry_repository.has_due(
         user_id,
         now=now,
         include_types=("scheduled_followup", "action_due"),
-        exclude_payload_kinds=non_todo_payload_kinds(get_settings()),
+        exclude_payload_kinds=non_todo_payload_kinds(),
     )
 
 

@@ -127,96 +127,9 @@ PLAN_CONTEXT_PROJECTION_FAILED = "context_projection_failed"
 否则调试面会掩盖自己的故障。
 """
 
-def _tools_enabled() -> bool:
-    return bool(get_settings().tool_system_enabled)
-
-
-def _require_tool_registry() -> ToolRegistry:
-    """写类端点门控：总闸 off → 403；注册表不可用按未启用处理。"""
-    if not _tools_enabled():
-        raise HTTPException(
-            status_code=403, detail="工具系统未启用（tool_system_enabled=false）"
-        )
-    registry = get_tool_registry()
-    if registry is None:
-        raise HTTPException(
-            status_code=403, detail="工具系统未启用（tool_system_enabled=false）"
-        )
-    return registry
-
-
-def _permission_layer_enabled() -> bool:
-    return bool(getattr(get_settings(), "tool_permission_enabled", False))
-
-
-def _require_permission_layer() -> None:
-    """权限闸写类端点门控：总闸 off → 403；权限闸 off → 403，与 WS-018 惯例一致。"""
-    _require_tool_registry()
-    if not _permission_layer_enabled():
-        raise HTTPException(
-            status_code=403, detail="工具权限闸未启用（tool_permission_enabled=false）"
-        )
-
-
-def _permission_read_gate() -> bool:
-    """权限闸读类端点门控：总闸 off → 200 `{"enabled": false}`；权限闸 off → 403。"""
-    if not _tools_enabled():
-        return False
-    if not _permission_layer_enabled():
-        raise HTTPException(
-            status_code=403, detail="工具权限闸未启用（tool_permission_enabled=false）"
-        )
-    return True
-
-
-def _external_api_enabled() -> bool:
-    return bool(getattr(get_settings(), "tool_external_api_enabled", False))
-
-
-def _user_defined_enabled() -> bool:
-    return bool(getattr(get_settings(), "tool_user_defined_enabled", False))
-
-
-def _require_external_api() -> None:
-    """外部 API 面写类门控：总闸 off / 外部面 off → 403（与 WS-018 惯例一致）。"""
-    _require_tool_registry()
-    if not _external_api_enabled():
-        raise HTTPException(
-            status_code=403,
-            detail="外部 API 工具未启用（tool_external_api_enabled=false）",
-        )
-
-
-def _external_api_read_gate() -> bool:
-    """外部 API 面读类门控：总闸 off → 200 `{"enabled": false}`；外部面 off → 403。"""
-    if not _tools_enabled():
-        return False
-    if not _external_api_enabled():
-        raise HTTPException(
-            status_code=403,
-            detail="外部 API 工具未启用（tool_external_api_enabled=false）",
-        )
-    return True
-
-
-def _require_user_defined() -> None:
-    _require_tool_registry()
-    if not _user_defined_enabled():
-        raise HTTPException(
-            status_code=403,
-            detail="自定义工具未启用（tool_user_defined_enabled=false）",
-        )
-
-
-def _user_defined_read_gate() -> bool:
-    if not _tools_enabled():
-        return False
-    if not _user_defined_enabled():
-        raise HTTPException(
-            status_code=403,
-            detail="自定义工具未启用（tool_user_defined_enabled=false）",
-        )
-    return True
+def _tool_registry() -> ToolRegistry:
+    """工具注册表（模块级单例，惰性构建；工具系统已随 V2.4.0 转正常开）。"""
+    return get_tool_registry()
 
 
 def _tool_health_out(registry: ToolRegistry, tool_id: str) -> ToolHealthOut | None:
@@ -266,11 +179,7 @@ def list_tools():
     `capability_names`，排障"为何某能力未注册"——注册表内容在首次构建时冻结，
     开关后开不会补注册。P2-3：附加 `tool_surface_degrade_count`（自治工具面降级计数）。
     """
-    if not _tools_enabled():
-        return ToolsOut(enabled=False)
-    registry = get_tool_registry()
-    if registry is None:
-        return ToolsOut(enabled=False)
+    registry = _tool_registry()
     return ToolsOut(
         enabled=True,
         tools=[
@@ -302,18 +211,9 @@ def _capability_names() -> list[str]:
 
 @debug_router.get("/debug/tools/surface", response_model=ToolSurfaceOut)
 def get_tool_surface(run_kind: str | None = None, user_id: str | None = None):
-    """工具面投影结果（含裁剪原因）；双闸：总闸 + `tool_surface_enabled`。"""
+    """工具面投影结果（含裁剪原因）。"""
     settings = get_settings()
-    if not _tools_enabled():
-        return ToolSurfaceOut(enabled=False)
-    if not settings.tool_surface_enabled:
-        raise HTTPException(
-            status_code=403,
-            detail="工具面投影未启用（tool_surface_enabled=false）",
-        )
-    registry = get_tool_registry()
-    if registry is None:
-        return ToolSurfaceOut(enabled=False)
+    registry = _tool_registry()
     resolved_kind = run_kind or TOOL_SURFACE_DEFAULT_RUN_KIND
     surface = ToolSurfaceResolver(registry, settings).resolve(
         resolved_kind,
@@ -337,8 +237,6 @@ def get_tool_surface(run_kind: str | None = None, user_id: str | None = None):
 @debug_router.get("/debug/tools/executions", response_model=ToolExecutionsOut)
 def list_tool_executions(user_id: str, limit: int = 50):
     """执行台账（从 `action_records.steps` 投影）；无记录返回空列表。"""
-    if not _tools_enabled():
-        return ToolExecutionsOut(enabled=False)
     return ToolExecutionsOut(
         enabled=True,
         user_id=user_id,
@@ -349,8 +247,6 @@ def list_tool_executions(user_id: str, limit: int = 50):
 @debug_router.get("/debug/tools/permissions", response_model=ToolPermissionsOut)
 def list_tool_permissions(user_id: str):
     """有效授权清单（持久层 + 进程层 + 通道级隐含）；总闸 off → `{"enabled": false}`。"""
-    if not _permission_read_gate():
-        return ToolPermissionsOut(enabled=False)
     service = get_confirmation_service(get_settings())
     grants = service.grant_records(user_id, datetime.now())
     return ToolPermissionsOut(
@@ -363,8 +259,6 @@ def list_tool_permissions(user_id: str):
 @debug_router.get("/debug/tools/confirmations", response_model=ToolConfirmationsOut)
 def list_tool_confirmations(user_id: str):
     """未决确认请求（按 created_at 倒序）；总闸 off → `{"enabled": false}`。"""
-    if not _permission_read_gate():
-        return ToolConfirmationsOut(enabled=False)
     service = get_confirmation_service(get_settings())
     return ToolConfirmationsOut(
         enabled=True,
@@ -392,7 +286,6 @@ def list_tool_confirmations(user_id: str):
 )
 def revoke_tool_confirmation(request_id: str):
     """撤销未决确认请求（运维，等价否定，不执行）；未找到 → 404。"""
-    _require_permission_layer()
     service = get_confirmation_service(get_settings())
     request = service.get(request_id)
     if request is None:
@@ -409,7 +302,6 @@ def revoke_tool_confirmation(request_id: str):
 @debug_router.post("/debug/tools/permissions/revoke", response_model=ToolPermissionRevokeOut)
 def revoke_tool_permissions(user_id: str, tool_id: str = "*"):
     """撤销授权（运维，工具级 / 范围级 / 会话级）；无匹配授权 → 404。"""
-    _require_permission_layer()
     service = get_confirmation_service(get_settings())
     revoked = service.revoke(user_id, tool_id)
     if revoked <= 0:
@@ -422,7 +314,7 @@ def revoke_tool_permissions(user_id: str, tool_id: str = "*"):
 @debug_router.post("/debug/tools/{tool_id}/disable", response_model=ToolRuntimeStatusOut)
 def disable_tool(tool_id: str):
     """运行期禁用（风控，进程内存态叠加，不写回声明）。"""
-    registry = _require_tool_registry()
+    registry = _tool_registry()
     if registry.get(tool_id) is None:
         raise HTTPException(status_code=404, detail="工具未注册")
     registry.set_runtime_disabled(tool_id)
@@ -437,7 +329,7 @@ def disable_tool(tool_id: str):
 @debug_router.post("/debug/tools/{tool_id}/enable", response_model=ToolRuntimeStatusOut)
 def enable_tool(tool_id: str):
     """解除运行期禁用（恢复）。"""
-    registry = _require_tool_registry()
+    registry = _tool_registry()
     if registry.get(tool_id) is None:
         raise HTTPException(status_code=404, detail="工具未注册")
     registry.clear_runtime_disabled(tool_id)
@@ -456,8 +348,6 @@ def list_tool_manifests():
     TOOL-011：报告是**进程内存态**（重启由声明文件重建）；投影只含声明信息与凭据**变量名**，
     凭据值从不落内存结构、不落日志、不落端点（E17）。
     """
-    if not _external_api_read_gate():
-        return ToolManifestsOut(enabled=False)
     report = last_load_report()
     return ToolManifestsOut(
         enabled=True,
@@ -475,16 +365,12 @@ def list_tool_manifests():
 @debug_router.get("/debug/tools/external", response_model=ToolExternalOut)
 def list_external_tools():
     """外部 API 工具清单：白名单现状 + 每条声明的**执行期**状态（不含凭据值）。"""
-    if not _external_api_read_gate():
-        return ToolExternalOut(enabled=False)
     hosts = sorted(allowed_ext_hosts(get_settings()))
-    registry = get_tool_registry()
+    registry = _tool_registry()
     tools: list[dict] = []
     for manifest in get_manifest_index().all():
         view = manifest.public_view()
-        view["status"] = (
-            "unregistered" if registry is None else registry.effective_status(manifest.tool_id)
-        )
+        view["status"] = registry.effective_status(manifest.tool_id)
         tools.append(view)
     return ToolExternalOut(
         enabled=True,
@@ -497,8 +383,6 @@ def list_external_tools():
 @debug_router.get("/debug/tools/user-defined", response_model=ToolUserDefinedOut)
 def list_user_defined_tools():
     """自定义工具清单（进程内存态；重启即空，E13）：含推导副作用与强制纪律生效值。"""
-    if not _user_defined_read_gate():
-        return ToolUserDefinedOut(enabled=False)
     registrar = get_user_tool_registrar()
     registered = registrar.list_registered()
     return ToolUserDefinedOut(
@@ -515,7 +399,6 @@ def list_user_defined_tools():
 )
 def revoke_user_defined_tool(tool_id: str):
     """注销自定义工具（运维）：未注册 → 404；注销后调用得 `unavailable`（E14）。"""
-    _require_user_defined()
     registrar = get_user_tool_registrar()
     if registrar.view(tool_id) is None:
         raise HTTPException(status_code=404, detail="自定义工具未注册")
@@ -531,11 +414,9 @@ def revoke_user_defined_tool(tool_id: str):
 @debug_router.get("/debug/tools/{tool_id}", response_model=ToolDetailOut)
 def get_tool(tool_id: str, user_id: str | None = None, limit: int = 20):
     """单工具详情（schema / permission / 健康度 / 最近执行）；未注册 → 404。"""
-    if not _tools_enabled():
-        return ToolDetailOut(enabled=False)
-    registry = get_tool_registry()
-    definition = None if registry is None else registry.get(tool_id)
-    if registry is None or definition is None:
+    registry = _tool_registry()
+    definition = registry.get(tool_id)
+    if definition is None:
         raise HTTPException(status_code=404, detail="工具未注册")
     return ToolDetailOut(
         enabled=True,
@@ -1049,9 +930,8 @@ def rollback_relationship(user_id: str, target_version: int):
 def _plan_debug_enabled() -> bool:
     """计划调试面门控（总闸 + 调试子闸）。
 
-    「调试总闸」即本面所属子系统的总闸 `planning_enabled`——与 TOOL-012
-    （`tool_system_enabled`）同构；`PlanSettings` / `enablement` 中不存在第三个独立
-    「调试总闸」Flag（PLAN-011 §4.2.6 / §6.3 D8 的三闸表述即此二闸）。
+    「调试总闸」即本面所属子系统的总闸 `planning_enabled`；`PlanSettings` / `enablement`
+    中不存在第三个独立「调试总闸」Flag（PLAN-011 §4.2.6 / §6.3 D8 的三闸表述即此二闸）。
     """
     settings = get_settings()
     return bool(settings.planning_enabled) and bool(settings.plan_debug_enabled)
@@ -1115,11 +995,7 @@ def _autonomous_tool_surface(user_id: str, settings, now: datetime):
             return ToolSurfaceResolver(None, settings).resolve(
                 RUN_KIND_AUTONOMOUS_TICK, base
             )
-        if not settings.tool_system_enabled:
-            return None
-        registry = get_tool_registry()
-        if registry is None:
-            return None
+        registry = _tool_registry()
         tool_ctx = build_tool_context(base, settings=settings, now=now)
         return ToolSurfaceResolver(registry, settings).resolve(
             RUN_KIND_AUTONOMOUS_TICK, tool_ctx

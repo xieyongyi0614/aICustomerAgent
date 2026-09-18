@@ -69,12 +69,6 @@ class NotificationCapability:
                 payload={"failure_kind": "permanent", "reason_kind": "unknown_action"},
             )
         settings = _settings_of(ctx)
-        if not bool(getattr(settings, "tool_system_enabled", False)):
-            return CapabilityResult(
-                status="unavailable",
-                error=V9_ERROR_TEXT,
-                payload={"failure_kind": "unavailable"},
-            )
         content = str(params.get("content") or "").strip()
         if not content:
             return CapabilityResult(

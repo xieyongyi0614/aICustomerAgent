@@ -27,20 +27,12 @@ TOOL_FEED_MAX_ITEMS = 5
 TOOL_FEED_NOTE_LIMIT = 3
 
 
-def is_enabled(settings=None) -> bool:
-    """反哺开关：工具反思子闸（默认 off）关闭时零读取、零信号。"""
-    settings = settings or get_settings()
-    return bool(getattr(settings, "tool_reflection_enabled", False))
-
-
 def interest_signal(user_id: str, *, limit: int = TOOL_FEED_MAX_ITEMS) -> list[dict]:
     """active 工具效能 Insight → interest 维软信号（按 confidence 降序，带工具身份）。
 
     返回 `[{insight_id, type, statement, confidence, scope, tool_ids}]`；异常降级为空信号。
     """
     settings = get_settings()
-    if not is_enabled(settings):
-        return []
     try:
         insights = [
             insight
