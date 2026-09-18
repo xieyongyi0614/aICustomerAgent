@@ -136,7 +136,6 @@ def enablement_violations(settings) -> list[str]:
         "daily_life_enabled",
         "event_detection_enabled",
         "scene_expansion_enabled",
-        "habit_time_enabled",
         "world_llm_assist_enabled",
         "debug_tick_enabled",
     )
@@ -219,39 +218,6 @@ def enablement_violations(settings) -> list[str]:
     return violations
 
 
-def world_sim_reserved_flag_warnings(settings) -> list[str]:
-    """RESERVED 子闸被开启时的提示（非阻断）：开了但当前版本无行为分支。"""
-    from app.core.settings.world_simulation import RESERVED_V23_SUB_FLAGS
-
-    warnings: list[str] = []
-    if not getattr(settings, "world_simulation_enabled", False):
-        return warnings
-    for flag in RESERVED_V23_SUB_FLAGS:
-        if getattr(settings, flag, False):
-            warnings.append(
-                f"{flag} 为 RESERVED 开关：当前版本尚未接线，开启不会产生行为变化"
-            )
-    return warnings
-
-
-def action_reserved_flag_warnings(settings) -> list[str]:
-    """V2.6.0 RESERVED 子闸提示：对齐 v23 先例，死 Flag 可发现。"""
-    from app.core.settings.action_execution import (
-        RESERVED_V26_SUB_FLAGS,
-        V26_MASTER_FLAG,
-    )
-
-    warnings: list[str] = []
-    if not getattr(settings, V26_MASTER_FLAG, False):
-        return warnings
-    for flag in RESERVED_V26_SUB_FLAGS:
-        if getattr(settings, flag, False):
-            warnings.append(
-                f"{flag} 为 RESERVED 开关：当前版本尚未接线，开启不会产生行为变化"
-            )
-    return warnings
-
-
 def tool_permission_sub_layer_warnings(settings) -> list[str]:
     """权限子闸未开启时的提示（非阻断）：总闸 on 而权限子闸 off。
 
@@ -276,9 +242,5 @@ def validate_enablement_chain(settings) -> None:
     violations = enablement_violations(settings)
     if violations:
         raise SettingsError("V2 启用链配置错误：" + "；".join(violations))
-    for message in world_sim_reserved_flag_warnings(settings):
-        _logger.warning("V2.3.0 开关提示：%s", message)
-    for message in action_reserved_flag_warnings(settings):
-        _logger.warning("V2.6.0 开关提示：%s", message)
     for message in tool_permission_sub_layer_warnings(settings):
         _logger.warning("V2.4.0 开关提示：%s", message)

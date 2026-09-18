@@ -1,4 +1,4 @@
-"""V2.6.1 P1：Flag 治理（登记/启用链/RESERVED）与 Manager 退避守卫。"""
+"""V2.6.1 P1：Flag 治理（登记/启用链）与 Manager 退避守卫。"""
 
 import asyncio
 from datetime import datetime, timedelta
@@ -9,13 +9,9 @@ from app.core.settings import get_settings
 from app.core.settings.enablement import (
     enablement_violations,
     validate_enablement_chain,
-    action_reserved_flag_warnings,
 )
 from app.core.settings._shared import SettingsError
-from app.core.settings.action_execution import (
-    RESERVED_V26_SUB_FLAGS,
-    V26_SUB_FLAGS,
-)
+from app.core.settings.action_execution import V26_SUB_FLAGS
 from app.models.action import ActionResult
 from app.repositories import action_repository
 from app.services.action import manager
@@ -71,47 +67,13 @@ class TestEnablementChain:
             settings.action_execution_enabled = original_v26
             settings.action_scheduler_enabled = original_sched
 
-    def test_reserved_flags_warn_when_master_on(self):
-        settings = get_settings()
-        original = {
-            name: getattr(settings, name)
-            for name in (
-                "action_execution_enabled",
-                *RESERVED_V26_SUB_FLAGS,
-            )
-        }
-        try:
-            settings.action_execution_enabled = True
-            for name in RESERVED_V26_SUB_FLAGS:
-                setattr(settings, name, True)
-            warnings = action_reserved_flag_warnings(settings)
-            assert len(warnings) == len(RESERVED_V26_SUB_FLAGS)
-            assert all("RESERVED" in w for w in warnings)
-        finally:
-            for name, value in original.items():
-                setattr(settings, name, value)
-
     def test_sub_flags_cover_master_gate(self):
         assert "action_scheduler_enabled" in V26_SUB_FLAGS
-        assert set(RESERVED_V26_SUB_FLAGS).issubset(set(V26_SUB_FLAGS))
 
 
-class TestMultistepReservedDecision:
+class TestMultistepDecision:
     def test_plan_max_steps_stays_one(self):
         assert get_settings().action_plan_max_steps == 1
-
-    def test_multistep_flag_is_reserved(self):
-        assert "action_multistep_enabled" in RESERVED_V26_SUB_FLAGS
-
-    def test_env_example_marks_multistep_reserved(self):
-        from pathlib import Path
-
-        example = Path(__file__).resolve().parents[2] / ".env.example"
-        text = example.read_text(encoding="utf-8")
-        assert "ACTION_MULTISTEP_ENABLED" in text
-        idx = text.index("ACTION_MULTISTEP_ENABLED")
-        window = text[max(0, idx - 200) : idx + 80]
-        assert "RESERVED" in window
 
 
 class TestExecuteBackoffGuard:

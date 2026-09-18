@@ -41,7 +41,6 @@ V23_FLAG_KEYS = (
     "DAILY_LIFE_ENABLED",
     "EVENT_DETECTION_ENABLED",
     "SCENE_EXPANSION_ENABLED",
-    "HABIT_TIME_ENABLED",
     "WORLD_LLM_ASSIST_ENABLED",
 )
 
@@ -61,13 +60,12 @@ FLAG_MATRIX = {
         "DAILY_LIFE_ENABLED": "true",
         "EVENT_DETECTION_ENABLED": "true",
     },
-    "plus_scene_habit": {
+    "plus_scene": {
         "WORLD_SIMULATION_ENABLED": "true",
         "TIME_ADVANCE_ENABLED": "true",
         "DAILY_LIFE_ENABLED": "true",
         "EVENT_DETECTION_ENABLED": "true",
         "SCENE_EXPANSION_ENABLED": "true",
-        "HABIT_TIME_ENABLED": "true",
     },
     "all_on": {key: "true" for key in V23_FLAG_KEYS},
 }
@@ -345,7 +343,7 @@ def scan_forbidden_writes(user_id: str) -> list[str]:
 
 def test_invariant_simulation_never_writes_character_domain(db_session_factory, flag_env):
     """不变量 2：模拟路径对 character_state/personality/relationship/goals 零直写。"""
-    flag_env("plus_scene_habit")
+    flag_env("plus_scene")
     user = "ws019-invariant-write"
     world_repository.ensure_world(user)
 

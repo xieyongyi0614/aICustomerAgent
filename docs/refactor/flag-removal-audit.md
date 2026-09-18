@@ -2,7 +2,8 @@
 
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
-> 本文只做成本评估，**不含任何代码改动**。所有数据由脚本实测得出，非估算。
+> 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
+> 当前状态（2026-09-18）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。尚未开始的只有**轨道 B（去门控）**。
 
 ---
 
@@ -427,6 +428,8 @@ cd apps/frontend && pnpm vitest run
 
 ## 附录 A：61 个 bool 开关完整台账
 
+> **改造前口径**：本表全部为旧名，现已去前缀（`v24_tool_system_enabled` → `tool_system_enabled`）；其中 10 个 v2 段开关已随批次 1 删除、3 个死开关已随 F.7 删除。**按旧名 grep 代码将 0 命中**，执行清单请用 `flag-rename-map.md` §四（48 个在存开关的新名 + 旧名对照）。本表的价值是「改造前有多少、各自什么形态」的历史账。
+
 列含义：`app` = `app/` 侧引用数（不含 `app/core/settings/`）；`测试` = 测试侧引用数；`guard`/`branch`/`三元`/`getattr` = 该开关在 `app/` 中的门控形态计数。
 
 | 开关 | 定义处 | 默认 | 角色 | app | 测试 | guard | branch | 三元 | getattr |
@@ -498,6 +501,8 @@ cd apps/frontend && pnpm vitest run
 ---
 
 ## 附录 B：151 个 `vXX_` 调参字段（仅需改名，无语义变更）
+
+> **改造前口径·已完成**：149 个待去前缀调参字段已随轨道 A 全部改名（见 F.6），本表仅作「旧名 → 领域名」的历史对照；当前字段清单请用 `flag-rename-map.md` §五或 `Settings.model_fields`。
 
 **action_execution.py**（1）
 
@@ -696,6 +701,17 @@ cd apps/frontend && pnpm vitest run
 | 7 | v26 | **7** | 0 | 35 | 76 | 1（§4.2 #6） | 待做 |
 | 8 | 收尾 | — | — | `enablement.py` 284 行 / 146 处版本名 | — | — | 待做（必须最后） |
 
+**上表为轨道 A 之前的快照，两处口径已过时**（2026-09-18 重测）：
+
+| 维度 | 表内 | 当前 | 说明 |
+|---|---|---|---|
+| 开关总数 | 6+5+8+11+14+7 = 51 | **48** | 第 0 步删 3 个死开关（F.7）：v23 8→**7**、v26 7→**5** |
+| app 引用 | 308（§2.3 旧口径含 v2 段） | **234 处 / 53 个模块** | v21 27 / v22 8 / v23 50 / v24 81 / v25 53 / v26 15 |
+| 表内开关名 | `v24_tool_confirm_ttl_reuse` 等 | **全部已去前缀** | 按旧名 grep 现在 0 命中；导出清单请用 `flag-rename-map.md` §四 |
+| 轨道 A（去前缀） | 未列 | **已完成并提交** | 与批次划分正交，见 F.6 |
+
+**执行顺序**：G.5 已把「改名」与「去门控」拆成两条轨道，轨道 A 做完后轨道 B 不再受改名依赖约束，因此按**风险递增**而非 §8 的依赖序执行：**v22（热身，0 条 OFF 路径）→ v21 → v23 → v24 → v25 → v26 → 收尾删 `enablement.py`**。
+
 **批次 1 的实际边界**（与本报告 D.3 / E.5 的差异）：
 
 - **删除 7 个字段**：`v2_life_loop_enabled`、`v2_autonomy_advanced_enabled`、`v2_memory_enabled`、`v2_memory_vector_enabled`、`v2_reflection_enabled`、`v2_development_enabled`、`v2_relationship_evolved_enabled`；连带删除 `app/application/autonomy_worker.py`（整模块）与 `main.py` 旧三循环。
@@ -734,14 +750,18 @@ cd apps/frontend && pnpm vitest run
 
 ### F.4 环境变量现状与「首次上线」性质
 
+**轨道 A 执行后的现状**（2026-09-18 实测）：
+
 | 文件 | `VXX_*` 行数 | 跟踪状态 |
 |---|---|---|
-| `apps/backend/.env.example` | 38（全为 V23/V24/V26，**值均为 `false`**） | 已跟踪 |
-| `apps/backend/.env` | 38（内容与上表一致） | **未跟踪**（`apps/backend/.gitignore:13`） |
+| `apps/backend/.env.example` | **0**（原 38 行已随字段改名去前缀） | 已跟踪 |
+| `apps/backend/.env` | **0**（内容与上表一致） | **未跟踪**（`apps/backend/.gitignore:13`） |
 
-v21 / v22 / v25 的开关未出现在 `.env` 中，走代码默认值，同样为 off。
+`.env` 中当前**只有 2 个开关为 `true`**：`CHARACTER_ACTION_SYNC_ENABLED` 与 `INVENTORY_GROUNDING_ENABLED`（两者已在批次 1 去 `v2_` 前缀）。其余 51 个待转正开关——含 `.env` 未列出的 v21 / v22 / v25 全部，以及 `.env` 中显式写 `false` 的 v23 / v24 / v26——**取值全为代码默认 off**。
 
-因此 **批次 2~7 的每一批都是对应路径的首次上线**（§1.2 前提一的具体形态）。每批必须配套执行 `docs/version/<version>/*/regression-checklist.md`，且部署侧 `.env` 副本须同批更新，否则按 §6.2 静默回落。
+启动侧的静默回落告警已就位：`app/main.py:47` 调 `unknown_versioned_env_keys()`，对形如 `V<数字>_` 且不对应任何字段的遗留键打 warning。注意它**只识别带版本前缀的旧键**；轨道 A 之后的改名把旧键也变成了无前缀形式（如 `WORLD_SIMULATION_ENABLED`），这类"改了名但运维侧没同步"的键不会触发告警——**部署侧 `.env` 必须逐条比对 `flag-rename-map.md` 的「旧 env」列更新**。
+
+因此 **轨道 B 的每一批都是对应路径的首次上线**（§1.2 前提一的具体形态）。每批必须配套执行 `docs/version/<version>/*/regression-checklist.md`，且部署侧 `.env` 副本须同批更新。
 
 ### F.5 测试基线（2026-09-18）
 
@@ -773,7 +793,7 @@ v21 / v22 / v25 的开关未出现在 `.env` 中，走代码默认值，同样�
 | 表结构与迁移冻结·既存 | 7 | G.3 第二类，与本次改造无关 |
 | 其它既存 | 10 | `e2e`（3）、`v2`/`v21`/`v23`/`v25`/`v7.8` 各 1、`tool010` 四步用例 1 等 |
 
-完整日志见 `.workbuddy/tmp/pytest-baseline2.log`（本地，不入库）。**24 failed 记为批次 2 的对比基线**，超出部分必须逐条归因。
+**基线日志已失效**：原文记录的 `.workbuddy/tmp/pytest-baseline2.log` 是本地件、不入库，现已不存在；且该路径违反 `apps/backend/AGENTS.md` 的临时件约定——**临时输出统一落 `apps/backend/.tmp/`**。`--basetemp` 同理应指向 `.tmp/` 下的目录。**当前有效基线以 F.6 为准**，每批开动前重跑一次并逐条归因增量。
 
 ### F.6 轨道 A（去前缀）执行结果 —— 2026-09-18
 
@@ -781,17 +801,54 @@ v21 / v22 / v25 的开关未出现在 `.env` 中，走代码默认值，同样�
 
 | 项 | 改造前 | 改造后 |
 |---|---|---|
-| settings 字段总数 | 427 | **425**（步骤 0 删除 2 个未接线字段） |
+| settings 字段总数 | 427 | **422**（步骤 0 删 2 个未接线字段 + 第 0 步删 3 个死开关，见 F.7） |
 | 带 `vXX_` 前缀 | 200 | **0** |
 | 其中开关 / 调参 | 51 / 149 | 0 / 0 |
 | 后端全量测试 | 24 failed / 6434 passed / 22 skipped | **16 failed / 6443 passed / 22 skipped** |
 | 前端 | — | vitest 29 文件 / 149 用例全绿；`tsc -b` 通过 |
+| 提交状态 | — | **已提交 `992f05c`**（`refactor: 设置字段去版本号前缀`），随批次 1 的 `68d85ac` / `93dcb1e` 一并推送到 `origin/feat/feishu_bot` |
 
 - 改动规模：265 个文件、2367 处替换；范围含 `app/`、`tests/`、`scripts/`、`apps/frontend/src/`、`.env`、`.env.example`，**不含 `docs/`**。
 - 撞名裁决执行情况：`world_llm_assist_*` 采用「删除未接线对」（§6.1）；`event_escalation_types` 采用 `agent_` / `world_` 前缀（§6.2）。命名一致性建议（对照表 §七）**未采纳**，保持机械去前缀结果。
 - 失败差额 = 8 条冻结哈希用例修复 + 0 新增；另 2 条 `tests/v7.8/test_performance.py` 用例经 3 次单跑确认为计时 flaky，与本次改造无关。
 - 剩余 16 条失败全部落在 F.5 的既存类别（表结构/迁移冻结 7 + 其它 9）。
-- 明细与逐步清单见 `docs/refactor/flag-rename-map.md` §九；部署侧 `.env` 需按该表同步改名（旧键会被 `extra="ignore"` 静默吞掉，只在启动日志告警）。
+- 明细与逐步清单见 `docs/refactor/flag-rename-map.md` §九；部署侧 `.env` 需按该表「旧 env」列同步改名（旧键会被 `extra="ignore"` 静默吞掉，告警的覆盖范围见 F.4 的限定）。
+
+### F.7 第 0 步：死开关与 RESERVED 标记清除 —— 2026-09-18
+
+§5.1 / §5.2 判定为「应删除而非转正」的 3 个开关已删除，**零行为变化**（它们在 `app/` 中不产生任何分支）：
+
+| 开关 | 删除依据 | 连带删除 |
+|---|---|---|
+| `action_abstraction_enabled` | `app/` 0 处读取 | `RESERVED_V26_SUB_FLAGS` 常量、`action_reserved_flag_warnings` |
+| `action_multistep_enabled` | `app/` 0 处读取；V2.6.1 裁决 `action_plan_max_steps` 仍为 1 | 同上 |
+| `habit_time_enabled` | 仅出现在 `world_engine._V23_FLAG_NAMES` 调试快照，无行为分支 | `RESERVED_V23_SUB_FLAGS` 常量、`world_sim_reserved_flag_warnings` |
+
+- 开关总数 51 → **48**；轨道 B 待转正清单相应缩短（v23 由 8 → 7、v26 由 7 → 5）。
+- `validate_enablement_chain` 现只剩 `tool_permission_sub_layer_warnings` 一条提示分支；启动校验与 v26 依赖链本身不变。
+- `world_engine.v23_flag_snapshot()` 输出由 8 键变 **7 键**——`tests/v23/test_ws018_debug_api.py` 的键数断言随之更新；前端 `WorldSimPanel.test.tsx` 的 mock 去掉该键。
+- `tests/unit/test_settings_flag_guard.py` 的 `TestReservedFlagMarker` 整类删除（被测的 RESERVED 语义已不存在），文件收敛为纯 env 键守卫；`_gate_sites()` 辅助函数一并移除。
+- `.env` / `.env.example` 顺带修正一处**失准注释**：`SCENE_EXPANSION_ENABLED` 原标「RESERVED·尚未接线」，实际已接线（§5.3 的同一处矛盾），改为按事实描述。
+- 冻结面同步：`tests/v24/test_tool007_integration.py::FROZEN_SOURCES` 的 `app/application/world_engine.py` 哈希重建（属 G.3 第一类的允许改动，提交信息须写明）。
+
+### F.8 当前有效测试基线与豁免清单（2026-09-18，第 0 步之后）
+
+替代 F.5 / F.6 的历史计数。**每批开动前重跑，只对本清单之外的新增失败负责。**
+
+```
+.venv/Scripts/python.exe -m pytest -q -n 4 --timeout=180 --basetemp=.tmp/pytest-bt
+=> 15 failed, 6439 passed, 22 skipped in 101.93s
+```
+
+**观测到的抖动区间是 15~18 failed**：e2e 流式用例（3~4）与 `test_performance` 计时用例（1~2）在多次运行间翻转，非重构引入。判据应为「失败 ID 集合 ⊆ 本清单」，而非失败数相等。
+
+| 类别 | 数量 | 用例 ID | 处置 |
+|---|---|---|---|
+| **表结构与迁移冻结**（G.3 第二类） | 7 | `v24/test_tool007_integration.py::test_no_new_tables_in_metadata`、`v24/test_tool008_integration.py::{test_no_new_migrations, test_no_new_tables_in_metadata}`、`v24/test_tool012_bans.py::test_session_tables_zero_structural_change`、`v24/test_tool_acceptance.py::{test_migration_chain_head_is_0046, test_zero_migration_model_structure_unchanged, test_zero_migration_reconciliation_records_0046_breakpoint}` | **豁免**：本次改造不触碰 `app/models/` 与 `migrations/`；每批归因时整类排除 |
+| **其它既存（稳定）** | 4 | `v2/test_aut005_goal_evaluation.py::TestRules::test_clean_slice_passes_all`、`v21/test_agent008_review_fixes.py::TestLowEnergySuppression::test_low_energy_suppresses_short_term`、`v23/test_ws004_day_cycle.py::test_maintenance_step_emits_markers`、`v25/test_plan010_regression.py::TestEndToEndLoop::test_s1_plan_evidence_becomes_an_insight_and_triggers_a_replan` | **豁免**，但其中 `test_maintenance_step_emits_markers` 已查明是**日期漂移**（硬编码 `time:day_start:2026-09-14`，而 `run_simulation_maintenance` 按真实当天推进）——批次 v23 会重写该路径，届时一并修正 |
+| **flaky** | 4（浮动） | `e2e/test_chat_http_integration.py::test_http_chat_streams_chunks_incrementally`、`e2e/test_memory_e2e.py::test_extractor_failure_does_not_break_sse`、`e2e/test_turn_meta_stream.py::test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id`、`v7.8/test_performance.py::test_observability_overhead_within_budget`（`v8/test_world_performance.py` 与 `e2e/test_debug_trace_persist.py` 亦偶发） | **豁免**：单跑复现或三轮内翻转即判 flaky |
+
+跑法备忘（Windows）：必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（实测已踩两次）。
 
 ---
 

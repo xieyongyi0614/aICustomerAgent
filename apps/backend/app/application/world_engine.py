@@ -1271,7 +1271,6 @@ _V23_FLAG_NAMES = (
     "daily_life_enabled",
     "event_detection_enabled",
     "scene_expansion_enabled",
-    "habit_time_enabled",
     "world_llm_assist_enabled",
     "debug_tick_enabled",
 )
@@ -1288,7 +1287,7 @@ _SIMULATION_EVENT_TYPES = (
 
 
 def v23_flag_snapshot() -> dict:
-    """调试面：7+1 个 v23 开关当前取值（只读）。"""
+    """调试面：6+1 个 v23 开关当前取值（只读）。"""
     settings = get_settings()
     return {name: bool(getattr(settings, name, False)) for name in _V23_FLAG_NAMES}
 

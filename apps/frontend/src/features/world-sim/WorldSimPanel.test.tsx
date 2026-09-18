@@ -48,7 +48,6 @@ const SIMULATION_ON = {
     daily_life_enabled: true,
     event_detection_enabled: true,
     scene_expansion_enabled: false,
-    habit_time_enabled: false,
     world_llm_assist_enabled: false,
     debug_tick_enabled: false,
   },

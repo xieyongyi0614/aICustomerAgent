@@ -32,7 +32,7 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "9691be2fcdd977af6be2be45615e210a814a27e58d96f35668dec22f2ce8347a",
+    "app/application/world_engine.py": "480b048be12519f14f516d0a3108b256c926848850c1cbc969af4a819c910953",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。

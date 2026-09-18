@@ -130,7 +130,7 @@ async def test_simulation_endpoint_matches_db(db_session_factory, v23_on):
     assert body["recent_events"][0]["type"] == "weather_change"
     assert body["recent_events"][0]["idempotency_key"] == f"weather:{user}:2026-09-14"
     assert body["flags"]["world_simulation_enabled"] is True
-    assert len(body["flags"]) == 8
+    assert len(body["flags"]) == 7
 
 
 @pytest.mark.asyncio

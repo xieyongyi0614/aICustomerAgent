@@ -6,29 +6,20 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 
 V26_MASTER_FLAG = "action_execution_enabled"
 V26_SUB_FLAGS = (
-    "action_abstraction_enabled",
     "action_scheduler_enabled",
-    "action_multistep_enabled",
     "action_result_enabled",
     "action_feedback_enabled",
     "action_debug_enabled",
 )
-# 开了但当前版本无行为分支（对齐 v23 RESERVED 先例；启动告警非阻断）
-RESERVED_V26_SUB_FLAGS = (
-    "action_abstraction_enabled",
-    "action_multistep_enabled",
-)
 
 
 class ActionExecutionSettings(BaseSettings):
-    """6 个 `action_*` Flag（默认全 off，Flag off 时与 V2.5.0 逐字节一致）。"""
+    """5 个 `action_*` Flag（默认全 off，Flag off 时与 V2.5.0 逐字节一致）。"""
 
     model_config = DOMAIN_MODEL_CONFIG
 
     action_execution_enabled: bool = False
-    action_abstraction_enabled: bool = False
     action_scheduler_enabled: bool = False
-    action_multistep_enabled: bool = False
     action_result_enabled: bool = False
     action_feedback_enabled: bool = False
 

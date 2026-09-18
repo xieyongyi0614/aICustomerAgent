@@ -1,7 +1,8 @@
 # vXX_ 字段改名对照表（旧名 → 新名）
 
 > 生成时间 **2026-09-18**（批次 1 之后、批次 2 之前）；「新名」列由脚本从 `app/core/settings/*` 实测导出，非手抄。
-> **执行状态：轨道 A 已执行完毕（2026-09-18，工作区改动，尚未提交）** —— 200 个字段的去前缀已落地，`app/core/settings/*` 中已无 `vXX_` 前缀；本表转为**读历史文档 / 查旧 env 名**的对照表。执行记录见 §九。
+> **执行状态：轨道 A 已执行完毕并提交 `992f05c`** —— 200 个字段的去前缀已落地，`app/core/settings/*` 中已无 `vXX_` 前缀；本表转为**读历史文档 / 查旧 env 名**的对照表。执行记录见 §九。
+> **⚠ 其中 3 个字段在「第 0 步」被直接删除、未进入在存清单**：`v23_habit_time_enabled` / `v26_action_abstraction_enabled` / `v26_action_multistep_enabled`（`app/` 侧无行为分支，见配套文档附录 F.7）。§四 表格中对应行的「新名」列即该字段曾用于代码中的名字，现已不存在。
 > 配套文档：`docs/refactor/flag-removal-audit.md`（成本审查 + 附录 F 批次台账 + 附录 G 验收判据）。
 
 ---
@@ -58,7 +59,7 @@
 
 ---
 
-## 四、开关字段（51 个，已去前缀）
+## 四、开关字段（51 个，已去前缀；其中 3 个已删除，在存 48）
 
 按版本段分组。这些字段同时是**门控**，去前缀已完成；**去门控**（固化 ON）仍按审查报告 §八 / 附录 F 的批次顺序推进。
 
@@ -78,7 +79,7 @@
 | v23 | `v23_daily_life_enabled` | `daily_life_enabled` | `V23_DAILY_LIFE_ENABLED` | `False` | 含 OFF 回退路径 |
 | v23 | `v23_debug_tick_enabled` | `debug_tick_enabled` | `V23_DEBUG_TICK_ENABLED` | `False` | — |
 | v23 | `v23_event_detection_enabled` | `event_detection_enabled` | `V23_EVENT_DETECTION_ENABLED` | `False` | 含 OFF 回退路径 |
-| v23 | `v23_habit_time_enabled` | `habit_time_enabled` | `V23_HABIT_TIME_ENABLED` | `False` | ⚠ 直接删（无行为变化） |
+| v23 | `v23_habit_time_enabled` | `habit_time_enabled` | `V23_HABIT_TIME_ENABLED` | `False` | ✅ 已删除（第 0 步，见报告 F.7） |
 | v23 | `v23_scene_expansion_enabled` | `scene_expansion_enabled` | `V23_SCENE_EXPANSION_ENABLED` | `False` | 含 OFF 回退路径 |
 | v23 | `v23_time_advance_enabled` | `time_advance_enabled` | `V23_TIME_ADVANCE_ENABLED` | `False` | — |
 | v23 | `v23_world_llm_assist_enabled` | `world_llm_assist_enabled` | `V23_WORLD_LLM_ASSIST_ENABLED` | `False` | ⚠ 撞名，见 §6.1 |
@@ -108,15 +109,15 @@
 | v25 | `v25_plan_tool_required` | `plan_tool_required` | `V25_PLAN_TOOL_REQUIRED` | `True` | 含 OFF 回退路径；默认 ON（策略位） |
 | v25 | `v25_plan_world_feedback_enabled` | `plan_world_feedback_enabled` | `V25_PLAN_WORLD_FEEDBACK_ENABLED` | `False` | — |
 | v25 | `v25_planning_enabled` | `planning_enabled` | `V25_PLANNING_ENABLED` | `False` | 含 OFF 回退路径 |
-| v26 | `v26_action_abstraction_enabled` | `action_abstraction_enabled` | `V26_ACTION_ABSTRACTION_ENABLED` | `False` | ⚠ 直接删（无行为变化） |
+| v26 | `v26_action_abstraction_enabled` | `action_abstraction_enabled` | `V26_ACTION_ABSTRACTION_ENABLED` | `False` | ✅ 已删除（第 0 步，见报告 F.7） |
 | v26 | `v26_action_debug_enabled` | `action_debug_enabled` | `V26_ACTION_DEBUG_ENABLED` | `False` | — |
 | v26 | `v26_action_execution_enabled` | `action_execution_enabled` | `V26_ACTION_EXECUTION_ENABLED` | `False` | 含 OFF 回退路径 |
 | v26 | `v26_action_feedback_enabled` | `action_feedback_enabled` | `V26_ACTION_FEEDBACK_ENABLED` | `False` | — |
-| v26 | `v26_action_multistep_enabled` | `action_multistep_enabled` | `V26_ACTION_MULTISTEP_ENABLED` | `False` | ⚠ 直接删（无行为变化） |
+| v26 | `v26_action_multistep_enabled` | `action_multistep_enabled` | `V26_ACTION_MULTISTEP_ENABLED` | `False` | ✅ 已删除（第 0 步，见报告 F.7） |
 | v26 | `v26_action_result_enabled` | `action_result_enabled` | `V26_ACTION_RESULT_ENABLED` | `False` | — |
 | v26 | `v26_action_scheduler_enabled` | `action_scheduler_enabled` | `V26_ACTION_SCHEDULER_ENABLED` | `False` | — |
 
-> 备注列含义：**含 OFF 回退路径** = 该开关旁边并存一条当前实际生效的旧路径，固化 ON 意味着删掉正在跑的代码（见报告 §四）；**⚠ 直接删** = 无门控读取点，应删除而非转正（见报告 §5.1、§5.2）；**默认 ON（策略位）** = 语义更接近策略修饰位，删除时需逐个确认（见报告 §5.4）。
+> 备注列含义：**含 OFF 回退路径** = 该开关旁边并存一条当前实际生效的旧路径，固化 ON 意味着删掉正在跑的代码（见报告 §四）；**✅ 已删除** = 无门控读取点的死开关，已按「删除而非转正」处理完（见报告 §5.1、§5.2 与 F.7）；**默认 ON（策略位）** = 语义更接近策略修饰位，删除时需逐个确认（见报告 §5.4）。
 
 ---
 
@@ -322,26 +323,32 @@
 
 ## 八、一致性校验与再生成
 
-重建「字段名 → 去前缀名」清单，与本表比对（只读，不改动任何文件）：
+**残留校验（轨道 A 的 done 判据，两条都应输出 0）**：
 
 ```bash
-cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; d=pathlib.Path('app/core/settings'); rows=[(p.name,n) for p in sorted(d.glob('*.py')) for n in re.findall(r'^\s{4}(v\d+_[a-z_]+)\s*:', p.read_text(encoding='utf-8'), re.M)]; print(len(rows)); [print(p, n, '->', re.sub(r'^v\d+_', '', n)) for p, n in rows]"
+cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; d=pathlib.Path('app/core/settings'); rows=[(p.name,n) for p in sorted(d.glob('*.py')) for n in re.findall(r'^\s{4}(v\d+_[a-z_]+)\s*:', p.read_text(encoding='utf-8'), re.M)]; print(len(rows)); [print(p, n) for p, n in rows]"
 ```
-
-权威口径（与本表附录计数同源）：
 
 ```bash
-cd apps/backend && .venv/Scripts/python.exe -c "import re; from app.core.settings import Settings; n=list(Settings.model_fields); pre=[x for x in n if re.match(r'^v[0-9]+_',x)]; print('总数',len(n),'带前缀',len(pre),'bool',sum(1 for x in pre if Settings.model_fields[x].annotation is bool))"
+cd apps/backend && .venv/Scripts/python.exe -c "import re; from app.core.settings import Settings; n=list(Settings.model_fields); pre=[x for x in n if re.match(r'^v[0-9]+_',x)]; print('总数',len(n),'带前缀',len(pre))"
 ```
 
-**再生成算法**（每完成一个批次后重新导出，不要手改表）：
+**轨道 B 的在存开关清单**（每批开动前用它导出该批的开关与 `app/` 侧引用数，替代已过时的报告附录 A）：
+
+```bash
+cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; mods={'agent_runtime':'v21','experience':'v22','world_simulation':'v23','tool':'v24','plan':'v25','action_execution':'v26'}; f={n:mods[p.stem] for p in pathlib.Path('app/core/settings').glob('*.py') if p.stem in mods for n in re.findall(r'^\s{4}([a-z_0-9]+)\s*:\s*bool\s*=',p.read_text(encoding='utf-8'),re.M)}; t={p:p.read_text(encoding='utf-8') for p in pathlib.Path('app').rglob('*.py') if 'core/settings' not in p.as_posix()}; [print(f[n], n, sum(len(re.findall(r'\b'+n+r'\b',x)) for x in t.values())) for n in sorted(f, key=lambda k:(f[k],k))]"
+```
+
+预期：48 行，按版本段汇总为 v21 6 / v22 5 / v23 7 / v24 11 / v25 14 / v26 5（2026-09-18 实测 app 引用合计 234 处 / 53 个模块）。
+
+**再生成算法**（本表若需重建）：
 
 1. 扫描 `app/core/settings/*.py` 中 **4 空格缩进**的 `name: type = default` 行（跳过 `__init__.py` / `_shared.py` / `enablement.py`）；多行默认值需按括号配对合并；
 2. 按注解是否 `bool` 分成「开关表」与「调参表」；
-3. 新名 = 旧名去掉 `^v<版本>_`；env = 旧名全大写；
-4. 备注列由三份清单驱动：§六 撞名表、报告 §5.1/§5.2 无行为开关、报告 §四 含 OFF 回退路径的开关。
+3. **旧名 = 在存名加回 `v<版本>_`**（版本段由定义所在模块推出：`agent_runtime`→v21、`experience`→v22、`world_simulation`→v23、`tool`→v24、`plan`→v25、`action_execution`→v26，其余模块→v2）；env = 在存名全大写；
+4. 备注列由三份清单驱动：§六 撞名表、报告 §5.1/§5.2 无行为开关（**已全部处理完，见 §九 步骤 2**）、报告 §四 含 OFF 回退路径的开关。
 
-> 本次生成的脚本为本地临时件（`.workbuddy/tmp/gen_rename_map.js`，不入库）；校验脚本与其负向测试同样为本地件。方法已固化在上文四条规则里，复现无需依赖这些文件。
+> 生成脚本与校验脚本的负向测试均为本地临时件，不入库；方法已固化在上文四条规则里，复现无需依赖那些文件。
 
 改造完成后的残留扫描与 done 判据见 `flag-removal-audit.md` 附录 G.1 / G.2。
 
@@ -359,9 +366,11 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re; from app.core.setting
 | 字段集合 | 427 → **425**（仅步骤 0 删除 2 个）；带 `vXX_` 前缀 **200 → 0** |
 | 后端全量 | `16 failed, 6443 passed, 22 skipped`（改造前基线 `24 failed, 6434 passed, 22 skipped`；差额 = 8 条冻结哈希修复 − 0 新增，另 2 条 v7.8 计时类用例经 3 次单跑确认为 flaky） |
 | 前端 | `vitest run` 29 文件 / 149 用例全绿；`tsc -b` 通过 |
-| 未提交 | 改动仍在工作区，未 commit / push |
+| 提交 | **已提交 `992f05c`**（`refactor: 设置字段去版本号前缀`），与批次 1 的 `68d85ac` / `93dcb1e` 一并在 `feat/feishu_bot` 上，已推 origin |
 
-**遗留（不在轨道 A 范围）**：`enablement.py` 内部版本桶常量（`V25_SUB_FLAGS` 等，批次 8 随文件删除）、测试目录名与测试函数名中的版本标记、`_V23_FLAG_NAMES`（批次 4 删除）——这些不影响「配置层与契约层不出现 `v[0-9]+_`」的 done 判据。
+**步骤 2（第 0 步，2026-09-18，零行为变化）**：删除 3 个死开关 `habit_time_enabled` / `action_abstraction_enabled` / `action_multistep_enabled`，连带 `RESERVED_V23_SUB_FLAGS` / `RESERVED_V26_SUB_FLAGS`、`enablement.py` 的两个 reserved warning 函数、`_V23_FLAG_NAMES` 中的对应条目（快照 8 键 → 7 键）。字段总数 425 → **422**；在存开关 51 → **48**。详见 `flag-removal-audit.md` F.7。
+
+**遗留（不在轨道 A 范围）**：`enablement.py` 内部版本桶常量（`V25_SUB_FLAGS` 等，收尾批随文件删除）、测试目录名与测试函数名中的版本标记（`v24_tool_env` / `v21_on` 等 fixture 名，测试侧残留 188 处全是这类标识符，非失效 env key）、`_V23_FLAG_NAMES`（v23 批删除）——这些不影响「配置层与契约层不出现 `v[0-9]+_`」的 done 判据。
 
 ---
 
@@ -374,9 +383,11 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re; from app.core.setting
 | 改造前 settings 字段总数（报告 §2.1 口径） | 434 |
 | 改造前其中带 `vXX_` 前缀 | 212 |
 | 批次 1 已处理 | 12（5 改名 + 7 删除） |
-| **当前** settings 字段总数 | **427** |
-| 其中带 `vXX_` 前缀（= 本表待去前缀合计） | **200**（51 开关 + 149 调参） |
-| 其中不带前缀（保持不变） | **227** |
-| 唯一性例外（撞名，见 §六） | 2 组 |
+| 轨道 A 处理 | 200 去前缀（51 开关 + 149 调参）+ 步骤 0 删 2 个未接线字段 |
+| 第 0 步删除死开关 | 3（见 §九 步骤 2） |
+| **当前** settings 字段总数 | **422** |
+| 其中带 `vXX_` 前缀 | **0** |
+| 原带前缀、现仍在存的字段 | 197（**48 开关** + 149 调参） |
+| 唯一性例外（撞名，见 §六） | 2 组（均已裁决并执行） |
 
-**对账**：`434 = 427 + 7`（已删的 7 个字段）；`212 = 200 + 12`（已处理）；`222 + 5 = 227`（改名后由"带前缀"转入"不带前缀"）。三者与报告 §2.1 / 附录 A 完全一致。
+**对账**：`434 − 7 − 2 − 3 = 422`；`212 = 200 + 12`；`200 = 197 + 3`（3 个死开关未进入改名后在存清单）。

@@ -107,9 +107,7 @@ class TestFlagMatrix:
     def test_defaults_off(self):
         settings = get_settings()
         assert settings.action_execution_enabled is False
-        assert settings.action_abstraction_enabled is False
         assert settings.action_scheduler_enabled is False
-        assert settings.action_multistep_enabled is False
         assert settings.action_result_enabled is False
         assert settings.action_feedback_enabled is False
 

@@ -14,7 +14,6 @@ V23_FLAGS = (
     "daily_life_enabled",
     "event_detection_enabled",
     "scene_expansion_enabled",
-    "habit_time_enabled",
     "world_llm_assist_enabled",
     "debug_tick_enabled",
 )
