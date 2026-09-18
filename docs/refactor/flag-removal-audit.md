@@ -1221,7 +1221,9 @@ grep -rn 'v2[1-6]_' apps/backend/app/api apps/frontend/src --include=*.py --incl
 3. **提交拆分**：G.4 的 3 提交，禁止合并；去门控那个提交是唯一需要回滚的。
 4. **冻结面**：G.3 第一类逐条重建哈希，提交信息写明「属于允许的改动」。
 5. **收批后**：重跑全量 + 该版本 regression-checklist（真实模型人工回归，无法用单测替代）；部署侧 `.env` 副本同批改名。
-6. **环境坑**：Windows 上必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（已踩三次）。
+6. **环境坑**：Windows 上必须显式 `--basetemp=.tmp/pytest-bt`，否则 `pytest-current` 符号链接抛 `PermissionError: [WinError 5]` 中断整轮（已踩三次）。本机 Bash 缺 coreutils（`ls` / `head` / `tail` / `mkdir` 均不可用），shell 操作走 Python；`git` 经 Python subprocess 调用。
+7. **批量改测试的脚本纪律**（H.11.1 事故后补）：改完先 `compileall` 整树，再跑测试；判定条件宁可窄，不要用推断式规则（「装饰器后面不是 def 就算孤儿」这类）。
+8. **提交边界**：去门控提交（行为变更，可单独 revert）与测试同步提交必须分开——G.4 的三提交纪律正是为此，中途态测试红是设计而非事故。
 
 ### H.8 开批前基线归因（2026-09-18 实测）
 
@@ -1332,20 +1334,38 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 
 #### 未完成：测试同步（本批第 2 个提交）
 
-去门控后实测：**242 failed + 191 errors / 5970 passed**。按文件归集的破损面：
+**全量**去门控后：**242 failed + 191 errors / 5970 passed**。
+**已完成一轮清理**（提交 `c77efb7` / `e7c5927`）后，`tests/v24` 单目录：**182 failed / 17 errors → 135 failed / 3 errors / 1408 passed**；`tests/` 全量 `compileall` 通过。
 
-| 文件 | 破损 | 性质 |
+已做（均为可重放的脚本化操作，脚本留在 `.tmp/`，不入库）：
+
+| 遍 | 操作 | 量 |
 |---|---|---|
-| `tests/v24/test_tool001_enablement.py` | 22 | ✅ **已改写**（转为「旧规则不再产生违规 + 旧 env 名不伪造违规」） |
-| `tests/v24/test_tool001_settings.py` | — | ✅ **已改写**（`test_v24_flags_removed_from_settings` + 参数默认值保持） |
-| `tests/v24/test_tool005_integration.py` | 18 | 待改：维护序列 + 权限三段语义断言 |
-| `tests/v24/test_tool003_executor.py` | 17 | 待改：校验/观测闸的 OFF 形态断言 → 转为常开形态 |
-| `tests/v24/test_tool003_action_engine.py` | 13 | 待改：`test_master_flag_off_keeps_v9_step_shape` 一类「闸关等价 V9」断言须删除或反转 |
-| `tests/v24/test_tool012_scenarios.py` | 12 | 待改 |
-| `tests/v24/test_tool005_permission.py` | 9 | 待改：`REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 断言失效 |
-| `tests/v24/test_tool010_e2e.py` | 8 | 待改（含 `ZERO_DIFF_HASHES` 重建） |
-| 其余 v24 | ~40 | 待改：`tool011_support` / `tool010_support` 等的 flag env 映射需摘除已删键 |
-| `tests/v9`（2 文件 5 条）、`tests/unit`（3 文件 3 条）、`tests/v25`（6 文件 10 条） | 18 | 待改：跨版本连带（V9 断言「能力注册表恒六能力」等） |
+| 1 | 摘除字典条目 / 关键字实参 / `monkeypatch.setenv` 中的已删开关 | 30 文件 91 行 |
+| 2 | 摘除调用内 kwarg（`v24_tool_env(tool_system_enabled=True)` 一类） | 26 文件 115 处 |
+| 3 | 语义定点改写 6 处 + 删除 12 个「闸关即等价上一版本」的失效用例 | 7 文件 |
+| 4 | 契约/读面收口：`PERMISSION_ON_SETTINGS = ()`、`capability_registry_flags` 断言改用 `REGISTRY_FLAG_NAMES[0]`、`tool012_support.runtime_fingerprint` 常开化、`REGISTRY_FLAG_NAMES` 单键断言 | 6 文件 |
+
+**剩余（`tests/v24` 135 failed + 3 errors，按文件）**：
+
+| 文件 | 剩余 | 性质与做法 |
+|---|---|---|
+| `test_tool_acceptance.py` | 34 | **flag 矩阵收敛**：`group_env(group)` 的 13 组开关组合 + `EXPECTED_FINGERPRINTS[group]` 已无意义，须整体收敛为「唯一常开配置」单行期望，并去掉 `parametrize` 的 group 维度 |
+| `test_tool003_executor.py` | 17 | 校验 / 观测闸的 OFF 形态断言 → 去掉 `tool_settings(...)` 开关注入后断言常开形态（`_persisted` 恒走 `persisted_result`、校验恒生效） |
+| `test_tool012_scenarios.py` | 12 | 同上矩阵收敛（`MASTER_ON` / `PERMISSION_ON` / `CHANNEL_ON` 常量语义已变） |
+| `test_tool005_permission.py` | 9 | `REASON_LAYER_OFF` / `REASON_LAYER_DISABLED*` 三个 reason 已不可达 → 对应用例删除；保留快照不可用 / 授权判定用例 |
+| `test_tool010_e2e.py` | 8 | 含 `ZERO_DIFF_HASHES` 重建（本批触碰 `post_process.py` / `action_engine.py` / `chat_pipeline.py` / `builder.py`） |
+| `test_tool005_confirmation.py` / `test_tool005_integration.py` | 12 | `non_todo_payload_kinds()` 去参数后签名同步；`tool_channel_enabled` 断言失效 |
+| `test_tool002_builtins.py`（5）、`test_tool008_integration.py`（4）、`test_tool011_debug_api.py`（4）、`test_tool006_surface.py`（3）、`test_tool007_integration.py`（3，含冻结面重建）、其余 8 文件 | 25 | 逐条：契约键、403 分支、`get_tool_registry()` 非空化 |
+| `tests/v9`、`tests/unit`、`tests/v25` 的跨版本连带 | 约 18 | 见上一版清单 |
+
+#### H.11.1 过程事故与纪律补充
+
+本轮出现过一次**工具性事故**：一个「清理 `drop_function` 残片」的脚本用了过宽的判定（「装饰器后面不是 `def` 即视为孤儿」），把 54 个文件中**多行 `@pytest.mark.parametrize(` 的首行**误删，`tests/` 大面积语法报错。
+
+处置：`git checkout -- apps/backend/tests` 回滚，随后**重放**前三遍脚本（全部是确定性的、留在 `.tmp/` 的脚本），并修正 `drop_function` 的边界判定（`async def` 的 `async` 半行也须吞掉）。修复后 `tests/` 全量编译通过，改动量与回滚前一致。
+
+**纪律补充（并入 H.7 §6）**：凡「按 AST/文本结构批量改测试」的脚本，改完**必须先 `compileall` 整树**再跑测试；判定条件宁可窄（只匹配已知模式），不要用「后面不是 def 就算孤儿」这类推断式规则。
 
 **改写纪律**（与 v21 / v22 / v23 批同款，勿机械删断言）：
 
