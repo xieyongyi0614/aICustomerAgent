@@ -31,10 +31,6 @@ from app.services import life_loop_budget
 logger = logging.getLogger(__name__)
 
 
-def unified_run_enabled() -> bool:
-    return get_settings().unified_run_enabled
-
-
 def open_run(
     user_id: str | None,
     run_kind: str,
@@ -65,10 +61,8 @@ def open_run(
     )
 
 
-def open_foreground_run(user_id: str, now: datetime | None = None) -> RunContext | None:
-    """前台收编入口：unified 关闭时返回 None（调用方走 v2.0.0 原路径）。"""
-    if not unified_run_enabled():
-        return None
+def open_foreground_run(user_id: str, now: datetime | None = None) -> RunContext:
+    """前台收编入口：每轮对话都是一次 foreground_chat Run。"""
     run_kind, trigger_type = trigger_router.classify_channel_message()
     return open_run(user_id, run_kind, trigger_type, "user_message", now)
 

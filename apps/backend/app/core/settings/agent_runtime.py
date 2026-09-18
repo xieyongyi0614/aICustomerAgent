@@ -6,7 +6,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 class AgentRuntimeSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    unified_run_enabled: bool = False
     foreground_run_llm_budget: int = 8
     foreground_gateway_enforced: bool = False
     light_llm_profile: str = ""

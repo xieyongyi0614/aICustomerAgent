@@ -266,8 +266,6 @@ def _run_foreground_decision(
     行为与 v2.0.0 一致；差异只体现在「候选如何评估/为什么赢」可审计。
     目标栈为只读模式（铁律 4：长期化写入只发生在后台）。
     """
-    if run_ctx is None:
-        return None
     try:
         from app.services import decision_pipeline, goal_stack as goal_stack_service
 
@@ -325,17 +323,16 @@ def _build_style_context(state: ConversationState, turn: TurnAnalysis, trace):
 async def run_chat_pipeline(
     session_id: str, user_id: str, content: str, llm, trace
 ) -> AsyncIterator[dict]:
-    """前台关键路径（V2.1.0 收编：unified 开启时整链为 foreground_chat Run）。"""
+    """前台关键路径：整链包裹为 foreground_chat Run（台账记账）。"""
     run_ctx = agent_runtime.open_foreground_run(user_id)
     status = "done"
     try:
         started = time.perf_counter()
         trace.user_id = user_id
-        if run_ctx is not None:
-            snapshot = await asyncio.to_thread(
-                agent_state_assembler.assemble_snapshot, user_id
-            )
-            agent_state_assembler.activate_run_state(snapshot, run_ctx)
+        snapshot = await asyncio.to_thread(
+            agent_state_assembler.assemble_snapshot, user_id
+        )
+        agent_state_assembler.activate_run_state(snapshot, run_ctx)
         world_ctx = await asyncio.to_thread(
             world_engine.build_context, user_id, session_id, trace=trace
         )
@@ -374,8 +371,7 @@ async def run_chat_pipeline(
             ),
             return_exceptions=True,
         )
-        if run_ctx is not None:
-            llm_gateway.account_turn_decisions(run_ctx)
+        llm_gateway.account_turn_decisions(run_ctx)
         if isinstance(role_mode, RoleMode):
             if role_mode.confidence < get_settings().router_confidence_threshold:
                 trace.mark_status("role_router", "degraded")
@@ -532,9 +528,7 @@ async def run_chat_pipeline(
             else "off"
         )
         buffer_reply = grounding_mode in ("rewrite", "annotate")
-        answer_llm = llm
-        if run_ctx is not None:
-            answer_llm = llm_gateway.resolve_answer_llm(run_ctx, llm)
+        answer_llm = llm_gateway.resolve_answer_llm(run_ctx, llm)
         try:
             async for token in answer_chain.astream(
                 mode_decision.effective,
@@ -653,12 +647,10 @@ async def run_chat_pipeline(
         }
 
     except Exception:
-        if run_ctx is not None:
-            status = "aborted"
+        status = "aborted"
         raise
     finally:
-        if run_ctx is not None:
-            agent_state_assembler.reset_run_state(run_ctx)
-            if status == "done" and run_ctx.degraded:
-                status = "degraded"
-            agent_runtime.close_run(run_ctx, status)
+        agent_state_assembler.reset_run_state(run_ctx)
+        if status == "done" and run_ctx.degraded:
+            status = "degraded"
+        agent_runtime.close_run(run_ctx, status)
