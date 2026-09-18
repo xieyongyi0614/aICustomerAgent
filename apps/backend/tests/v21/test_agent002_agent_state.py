@@ -2,7 +2,7 @@
 
 覆盖：人格轴种子幂等与边界物化、Interest 四来源加权与降级、Focus 组合、
 存档策略（显著变化/最小间隔/每日保底/保留期）、后台 Run 的 state_snapshot
-阶段与快照存档、前台 prompt 兴趣段、Flag off 零写入。
+阶段与快照存档、前台 prompt 兴趣段。
 """
 
 from datetime import datetime, timedelta
@@ -68,9 +68,7 @@ def client(db_session_factory):
 @pytest.fixture()
 def runtime_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(
-        AGENT_RUNTIME_ENABLED="true",
-        world_enabled="false")
+    override_settings(world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -210,10 +208,7 @@ class TestForegroundContextSegment:
         from app.application import agent_state_assembler as assembler_mod
         from app.core import llm_factory
 
-        override_settings(
-            AGENT_RUNTIME_ENABLED="true",
-            UNIFIED_RUN_ENABLED="true",
-        )
+        override_settings(UNIFIED_RUN_ENABLED="true")
         monkeypatch.setattr(
             assembler_mod,
             "_load_preferences",
@@ -256,10 +251,7 @@ class TestForegroundContextSegment:
     ):
         from app.core import llm_factory
 
-        override_settings(
-            AGENT_RUNTIME_ENABLED="true",
-            UNIFIED_RUN_ENABLED="true",
-        )
+        override_settings(UNIFIED_RUN_ENABLED="true")
         llm = fake_llm(
             response="好呀。",
             structured_responses={
@@ -279,27 +271,3 @@ class TestForegroundContextSegment:
         resp = client.post("/api/v1/chat/message", json={"content": "嗨"})
         assert resp.status_code == 200
         assert snapshot_repo.latest("default-user") is not None
-
-
-class TestFlagOff:
-    @pytest.mark.asyncio
-    async def test_legacy_cycle_has_no_snapshot_stage_or_rows(
-        self, db_session_factory, override_settings, monkeypatch
-    ):
-        override_settings( world_enabled="false")
-        trigger_evaluator._followup_registry.clear()
-        conversation_repository.get_or_create_conversation(SESSION, USER)
-        trigger_evaluator.register_followup(USER, NOW - timedelta(minutes=1), "下午面试")
-        from app.application import autonomy_engine
-
-        async def fake_tick(user_ids=None, llm=None, now=None):
-            return []
-
-        monkeypatch.setattr(autonomy_engine, "tick", fake_tick)
-        await life_loop.run_life_loop_tick(now=NOW)
-
-        run = loop_run_repository.list_recent(user_id=USER)[0]
-        assert "state_snapshot" not in [s["step"] for s in run.steps]
-        assert personality_state_repository.get_all(USER) == []
-        assert snapshot_repo.latest(USER) is None
-        trigger_evaluator._followup_registry.clear()

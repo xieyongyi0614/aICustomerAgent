@@ -36,9 +36,7 @@ EXPECTED_STAGES = [
 @pytest.fixture()
 def runtime_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(
-        AGENT_RUNTIME_ENABLED="true",
-        world_enabled="false")
+    override_settings(world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()

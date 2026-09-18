@@ -26,8 +26,7 @@ USER = "evo-user"
 
 
 @pytest.fixture()
-def evo_on(override_settings):
-    override_settings(AGENT_RUNTIME_ENABLED="true")
+def evo_on():
     yield
 
 

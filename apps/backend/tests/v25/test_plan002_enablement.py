@@ -42,7 +42,6 @@ FULL_CHAIN_ENVS = {
     "plan_world_feedback_enabled": True,
     "plan_autonomy_enabled": True,
     "plan_debug_enabled": True,
-    "agent_runtime_enabled": True,
     "tool_system_enabled": True,
     "action_enabled": True,
 }
@@ -59,11 +58,11 @@ def _settings_with(monkeypatch, **envs):
         get_settings.cache_clear()
 
 
-def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap():
+def test_u13_the_chain_ledger_has_six_entries_and_the_module_records_the_gap():
     docstring = enablement.__doc__
-    for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦"):
+    for marker in ("①", "②", "③", "④", "⑤", "⑥"):
         assert marker in docstring, marker
-    assert "剩余七条" in docstring
+    assert "剩余条目" in docstring
     assert len(V25_SUB_FLAGS) == 11
     assert enablement.V25_SUB_FLAGS == V25_SUB_FLAGS
     assert enablement.V25_GATE_FLAGS == (
@@ -71,13 +70,12 @@ def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap()
         enablement.V25_TOOL_REQUIRED_FLAG,
         *V25_SUB_FLAGS,
     )
-    assert len(enablement.V25_DEPENDENCIES) == 6
+    assert len(enablement.V25_DEPENDENCIES) == 5
     sources = {source for source, _, _ in enablement.V25_DEPENDENCIES}
     assert sources == {
         "plan_execution_enabled",
         "plan_step_binding_enabled",
         enablement.V25_TOOL_REQUIRED_FLAG,
-        "plan_autonomy_enabled",
     }
     intra_version = {
         dependency
@@ -96,7 +94,6 @@ def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap()
     assert cross_version == {
         "action_enabled",
         "tool_system_enabled",
-        "agent_runtime_enabled",
     }
     for _, _, reason in enablement.V25_DEPENDENCIES:
         assert reason.startswith("（") and reason.endswith("）")
@@ -180,19 +177,6 @@ def test_u13_tool_required_is_inert_while_the_master_is_off(monkeypatch):
     assert enablement_violations(settings) == []
 
 
-def test_u13_autonomy_requires_the_agent_runtime(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{
-            V25_MASTER: True,
-            "plan_tool_required": False,
-            "plan_autonomy_enabled": True,
-        },
-    )
-    violations = enablement_violations(settings)
-    assert any("agent_runtime_enabled" in item for item in violations)
-
-
 def test_u13_all_v25_flags_with_their_dependencies_are_clean(monkeypatch):
     settings = _settings_with(monkeypatch, **FULL_CHAIN_ENVS)
     assert enablement_violations(settings) == []
@@ -221,10 +205,10 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
     assert "总闸" in message
 
 
-def test_existing_v21_v23_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, unified_run_enabled=True)
+def test_existing_v23_v24_chain_rules_intact(monkeypatch):
+    settings = _settings_with(monkeypatch, tool_channel_enabled=True)
     assert any(
-        "agent_runtime_enabled" in item for item in enablement_violations(settings)
+        "feishu_enabled" in item for item in enablement_violations(settings)
     )
 
     settings = _settings_with(monkeypatch, event_detection_enabled=True)

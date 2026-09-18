@@ -31,13 +31,8 @@ from app.services import life_loop_budget
 logger = logging.getLogger(__name__)
 
 
-def enabled() -> bool:
-    return get_settings().agent_runtime_enabled
-
-
 def unified_run_enabled() -> bool:
-    settings = get_settings()
-    return settings.unified_run_enabled and settings.agent_runtime_enabled
+    return get_settings().unified_run_enabled
 
 
 def open_run(
@@ -197,8 +192,8 @@ async def run_autonomous_cycle(
 ) -> str:
     """autonomous_tick Profile：按 Profile Registry 声明的阶段序列执行。
 
-    与 v2.0.0 _run_user_cycle 的差异仅三处：台账经 open_run 落
-    run_kind/profile、decision 增加第三道 Gateway 闸、支持事件升级触发源。
+    唯一的自治周期入口（v2.0.0 的 `life_loop._run_user_cycle` 已随开关体系删除下线）：
+    台账落 run_kind/profile，decision 前置三道闸，触发源支持事件升级。
     """
     from app.application.post_process import get_user_write_lock
 

@@ -158,7 +158,7 @@ def ensure_personality_baseline(user_id: str | None, character_id: str = "asuna"
 
     由 Run Open 调用：Run 生命周期内的显式初始化，保证组装阶段为纯只读。
     """
-    if not user_id or not get_settings().agent_runtime_enabled:
+    if not user_id:
         return False
     try:
         return personality_state_repository.seed_if_absent(

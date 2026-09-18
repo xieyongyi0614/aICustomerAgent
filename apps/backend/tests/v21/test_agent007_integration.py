@@ -31,7 +31,6 @@ USER = "integration-user"
 SESSION = "int-s1"
 
 ALL_V21_FLAGS = {
-    "AGENT_RUNTIME_ENABLED": "true",
     "UNIFIED_RUN_ENABLED": "true",
 }
 
@@ -71,11 +70,6 @@ class TestEnablementMatrix:
         assert [
             v for v in enablement_violations(get_settings()) if "v21" in v
         ] == []
-
-    def test_unified_run_requires_runtime(self, override_settings):
-        override_settings(UNIFIED_RUN_ENABLED="true", AGENT_RUNTIME_ENABLED="false")
-        violations = enablement_violations(get_settings())
-        assert any("agent_runtime_enabled" in v for v in violations)
 
 
 class TestEvolutionLoopE2E:
@@ -195,10 +189,7 @@ class TestEvolutionLoopE2E:
         client.post("/api/v1/chat/message", json={"content": "嗨"})
         assert loop_run_repository.list_recent(run_kind="foreground_chat")
 
-        override_settings(
-            UNIFIED_RUN_ENABLED="false",
-            AGENT_RUNTIME_ENABLED="false",
-        )
+        override_settings(UNIFIED_RUN_ENABLED="false")
         runs_before = len(loop_run_repository.list_recent(run_kind="foreground_chat"))
         client.post("/api/v1/chat/message", json={"content": "在么"})
         runs = loop_run_repository.list_recent(run_kind="foreground_chat")

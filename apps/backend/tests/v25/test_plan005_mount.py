@@ -5,7 +5,6 @@
 """
 
 import inspect
-import re
 from pathlib import Path
 
 import pytest
@@ -20,19 +19,6 @@ from app.services.planning.observer import PlanObserver
 
 from . import plan005_support as support
 from .conftest import V25_NOW, V25_USER
-
-LIFE_LOOP_STEPS = (
-    "perception",
-    "state_update",
-    "goal_check",
-    "goal_supply",
-    "goal_advance",
-    "memory_retrieval",
-    "reflection_check",
-    "decision",
-    "world_experience",
-    "action_schedule",
-)
 
 AUTONOMOUS_TICK_STAGES = (
     "perception",
@@ -86,23 +72,15 @@ class TestShapeSnapshots:
             "now",
         ]
 
-    def test_life_loop_still_runs_exactly_the_nine_steps(self):
-        source = Path(life_loop.__file__).read_text(encoding="utf-8")
-        cycle = source.split("async def _run_user_cycle", 1)[1].split("async def ", 1)[0]
-        recorded = re.findall(r'_record_step(?:_async)?\(\s*run\.id,\s*steps,\s*"(\w+)"', cycle)
-        assert tuple(recorded) == LIFE_LOOP_STEPS
-
     def test_autonomous_tick_stage_sequence_is_unchanged(self):
         spec = profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK)
         assert spec.stages == AUTONOMOUS_TICK_STAGES
+        assert "plan_execute" not in spec.stages, "PLAN-005 纪律：不新增步骤"
         assert spec.llm_capable == frozenset({"decision"})
         assert spec.critical == frozenset({"decision"})
 
     def test_no_new_maintenance_step_or_scheduling_loop(self):
         source = Path(life_loop.__file__).read_text(encoding="utf-8")
-        assert "plan_execute" not in source.split("async def _run_user_cycle", 1)[1].split(
-            "async def ", 1
-        )[0]
         assert "_process_due_retries" in source, "退避仍由既有 action 维护步承载"
 
     def test_goal_observation_entry_points_are_still_registered(self):

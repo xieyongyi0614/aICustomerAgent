@@ -18,9 +18,6 @@ from app.application.worker_loop import run_worker_loop
 
 logger = logging.getLogger(__name__)
 
-def enabled() -> bool:
-    return get_settings().agent_runtime_enabled
-
 
 def run_evolution_tick(now: datetime | None = None) -> dict:
     """一次慢时钟 tick：逐用户评估快照 + 演化编译。
@@ -28,8 +25,6 @@ def run_evolution_tick(now: datetime | None = None) -> dict:
     指标快照按窗口幂等（同一窗口已落行则跳过，避免覆盖当日趋势基线）；
     人格编译与 Goal Rebalance 由引擎自身的周级限速兜底，可安全高频调用。
     """
-    if not enabled():
-        return {"status": "skipped", "skip_reason": "flag_disabled"}
     now = now or datetime.now()
     window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     stats = {"users": 0, "snapshots": 0, "personality": 0, "rebalance": 0}

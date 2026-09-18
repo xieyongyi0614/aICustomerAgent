@@ -59,10 +59,7 @@ class TestForegroundRun:
     def test_chat_creates_foreground_run_row(
         self, db_session_factory, override_settings, client, fake_llm
     ):
-        override_settings(
-            AGENT_RUNTIME_ENABLED="true",
-            UNIFIED_RUN_ENABLED="true",
-        )
+        override_settings(UNIFIED_RUN_ENABLED="true")
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         meta = _post(client)
@@ -82,7 +79,6 @@ class TestForegroundRun:
         self, db_session_factory, override_settings, client, fake_llm
     ):
         override_settings(
-            AGENT_RUNTIME_ENABLED="true",
             UNIFIED_RUN_ENABLED="true",
             FOREGROUND_RUN_LLM_BUDGET="0",
         )
@@ -94,9 +90,8 @@ class TestForegroundRun:
         assert run.status == "degraded"
 
     def test_unified_off_creates_no_run_row(
-        self, db_session_factory, override_settings, client, fake_llm
+        self, db_session_factory, client, fake_llm
     ):
-        override_settings(AGENT_RUNTIME_ENABLED="false")
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         _post(client)

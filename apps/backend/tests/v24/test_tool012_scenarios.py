@@ -534,7 +534,6 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
 
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",

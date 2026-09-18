@@ -24,11 +24,9 @@ from app.application import (
     observability,
     outbox_consumer,
 )
-from app.application.post_process import get_user_write_lock
 from app.repositories import (
     conversation_repository,
     goal_repository,
-    llm_call_repository,
     loop_run_repository,
     proactive_repository,
     trigger_registry_repository,
@@ -90,12 +88,9 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
         return stats
     for user_id in work_users:
         try:
-            if agent_runtime.enabled():
-                result = await agent_runtime.run_autonomous_cycle(
-                    user_id, llm=llm, now=now
-                )
-            else:
-                result = await _run_user_cycle(user_id, llm=llm, now=now)
+            result = await agent_runtime.run_autonomous_cycle(
+                user_id, llm=llm, now=now
+            )
             if result == "aborted":
                 stats["aborted"] += 1
             else:
@@ -103,8 +98,7 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
         except Exception:
             stats["aborted"] += 1
             logger.exception("life loop 用户周期失败：%s", user_id)
-    if agent_runtime.enabled():
-        await agent_runtime.run_event_pregate(llm=llm, now=now)
+    await agent_runtime.run_event_pregate(llm=llm, now=now)
     stats["maintenance"] = await _run_maintenance(now=now)
     stats["idle"] = not work_users and stats["maintenance"] == 0
     return stats
@@ -208,117 +202,6 @@ def _goal_catchup_due(user_id: str) -> bool:
         conversation_repository.count_human_messages(conversation.id) + 1
     )
     return any(goal.expires_at_turn < current_turn for goal in expiring)
-
-
-async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
-    """单用户周期：持 per-user 写锁串行执行步骤管线，loop_runs 全程记账。
-
-    返回 run 终态（done|aborted）；critical 步骤（decision）失败 → aborted。
-    decision 前置两道预算闸（LIFE-003）：全局日配额熔断 degraded → skip；
-    周期步骤 LLM 预算耗尽 → skip（触发器留 pending，配额恢复后自然重试）。
-    """
-    settings = get_settings()
-    run = loop_run_repository.create_run(
-        user_id=user_id, kind="autonomy", reason=_cycle_reason(user_id, now), now=now
-    )
-    steps: list[dict] = []
-    cycle_ctx: dict = {}
-    budget = life_loop_budget.check_daily_budget(now=now)
-    status = "done"
-    try:
-        async with get_user_write_lock(user_id):
-            _record_step(run.id, steps, "perception", _step_perception, user_id, now)
-            _record_step(run.id, steps, "state_update", _step_state_update, user_id, now)
-            _record_step(run.id, steps, "goal_check", _step_goal_check, user_id, now)
-            _record_step(
-                run.id, steps, "goal_supply", _step_goal_supply, user_id, now
-            )
-            await _record_step_async(
-                run.id,
-                steps,
-                "goal_advance",
-                lambda: _step_goal_advance(user_id, now),
-            )
-            _record_step(
-                run.id, steps, "memory_retrieval",
-                _step_memory_retrieval, user_id, now, cycle_ctx,
-            )
-            _record_step(
-                run.id, steps, "reflection_check", _step_reflection_check, user_id, now
-            )
-            if budget.status == life_loop_budget._STATUS_DEGRADED:
-                _append_step(
-                    run.id,
-                    steps,
-                    {
-                        "step": "decision",
-                        "status": "skipped",
-                        "skip_reason": "quota_circuit_open",
-                    },
-                )
-            elif _cycle_llm_budget_exhausted(steps, settings):
-                _append_step(
-                    run.id,
-                    steps,
-                    {
-                        "step": "decision",
-                        "status": "skipped",
-                        "skip_reason": "step_budget",
-                    },
-                )
-            else:
-                await _record_step_async(
-                    run.id, steps, "decision",
-                    lambda: _step_decision(user_id, llm, now),
-                    critical=True,
-                )
-            _record_step(
-                run.id, steps, "world_experience", _step_world_experience, user_id, now
-            )
-            if (
-                settings.action_execution_enabled
-                and settings.action_scheduler_enabled
-            ):
-                await _record_step_async(
-                    run.id,
-                    steps,
-                    "action_schedule",
-                    lambda: _step_action_schedule(user_id, now),
-                )
-    except Exception as exc:
-        logger.exception("life loop 用户周期中止：%s", user_id)
-        status = "aborted"
-        steps.append(
-            {"step": "abort", "status": "error", "error": exc.__class__.__name__}
-        )
-    digest_token = cycle_ctx.get("digest_token")
-    if digest_token is not None:
-        memory_digest_var.reset(digest_token)
-    finished_at = datetime.now()
-    try:
-        llm_count = (
-            llm_call_repository.count_calls_between(run.started_at, finished_at)
-            if finished_at >= run.started_at
-            else 0
-        )
-    except Exception:
-        logger.exception("run 窗口 LLM 计数失败，按 0 记账")
-        llm_count = 0
-    loop_run_repository.finish_run(
-        run.id,
-        status=status,
-        steps=steps,
-        llm_call_count=llm_count,
-        budget_state=budget.as_dict(),
-        now=finished_at,
-    )
-    return status
-
-
-def _append_step(run_id: str, steps: list[dict], entry: dict) -> None:
-    entry.setdefault("duration_ms", 0.0)
-    steps.append(entry)
-    loop_run_repository.mark_step(run_id, entry)
 
 
 def _cycle_llm_budget_exhausted(steps: list[dict], settings) -> bool:
@@ -737,12 +620,6 @@ def _step_world_experience(user_id: str, now: datetime) -> dict:
         return {"status": "skipped", "skip_reason": "world_disabled"}
     applied = world_engine.run_maintenance(user_id=user_id)
     return {"status": "ok", "applied": applied}
-
-
-async def _step_action_schedule(user_id: str, now: datetime) -> dict:
-    from app.services.action import scheduler as action_scheduler
-
-    return await action_scheduler.step_action_schedule(now)
 
 
 async def _run_maintenance(now: datetime) -> int:

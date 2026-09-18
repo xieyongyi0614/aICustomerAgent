@@ -1,8 +1,7 @@
 """AGENT-004 Decision Pipeline 测试。
 
 覆盖：五段管线（silence 恒在/优先级铁律/意图映射）、预算闸拒绝→silence 胜出、
-管线失败回退、autonomy 接线（flag on 审计落库/flag off 零行为）、
-enablement/幂等。
+管线失败回退、autonomy 接线（审计落库/失败回退）、enablement/幂等。
 """
 
 from datetime import datetime
@@ -31,16 +30,14 @@ def _stack(short_type="user_care"):
 
 
 class TestPipeline:
-    def test_silence_wins_when_no_candidates(self, override_settings):
-        override_settings(AGENT_RUNTIME_ENABLED="true")
+    def test_silence_wins_when_no_candidates(self):
         result = decision_pipeline.run_pipeline(run=None, now=NOW)
         assert result.winner.source == "silence"
         assert result.intention is None
         sources = [c["source"] for c in result.audit["candidates"]]
         assert sources == ["silence"]
 
-    def test_goal_compile_beats_capability_and_silence(self, db_session_factory, override_settings):
-        override_settings(AGENT_RUNTIME_ENABLED="true")
+    def test_goal_compile_beats_capability_and_silence(self, db_session_factory):
         result = decision_pipeline.run_pipeline(
             stack=_stack(), capabilities=["reminder"], run=None, now=NOW
         )
@@ -51,16 +48,14 @@ class TestPipeline:
         assert audit["capability"]["priority"] == "P3"
         assert audit["silence"]["priority"] == "P4"
 
-    def test_autonomy_trigger_intention_passthrough(self, override_settings):
-        override_settings(AGENT_RUNTIME_ENABLED="true")
+    def test_autonomy_trigger_intention_passthrough(self):
         result = decision_pipeline.run_pipeline(
             trigger_intention="check_in", trigger_goal_id=None, run=None, now=NOW
         )
         assert result.winner.source == "autonomy_trigger"
         assert result.intention == "check_in"
 
-    def test_budget_denied_falls_to_silence(self, db_session_factory, override_settings, monkeypatch):
-        override_settings(AGENT_RUNTIME_ENABLED="true")
+    def test_budget_denied_falls_to_silence(self, db_session_factory, monkeypatch):
         monkeypatch.setattr(
             llm_gateway,
             "acquire",
@@ -71,8 +66,7 @@ class TestPipeline:
         audit = {c["source"]: c for c in result.audit["candidates"]}
         assert audit["goal_compile"]["gates"][-1]["budget_cooldown"] == "rejected"
 
-    def test_audit_answers_four_questions(self, db_session_factory, override_settings):
-        override_settings(AGENT_RUNTIME_ENABLED="true")
+    def test_audit_answers_four_questions(self, db_session_factory):
         result = decision_pipeline.run_pipeline(stack=_stack(), run=None, now=NOW)
         winner_audit = next(
             c for c in result.audit["candidates"] if c["won"]
@@ -82,27 +76,17 @@ class TestPipeline:
 
 
 class TestAutonomyWiring:
-    def test_pipeline_intention_flag_off_noop(self, override_settings):
+    def test_pipeline_intention_writes_audit(self, db_session_factory):
         from app.application import autonomy_engine
 
-        override_settings(AGENT_RUNTIME_ENABLED="false")
-        verdict = SimpleNamespace(intention="check_in", goal_id=None)
-        intention, audit = autonomy_engine._pipeline_intention(verdict, USER, NOW)
-        assert intention is None and audit is None
-
-    def test_pipeline_intention_flag_on(self, db_session_factory, override_settings):
-        from app.application import autonomy_engine
-
-        override_settings(AGENT_RUNTIME_ENABLED="true")
         verdict = SimpleNamespace(intention="check_in", goal_id=None)
         intention, audit = autonomy_engine._pipeline_intention(verdict, USER, NOW)
         assert audit is not None and "candidates" in audit
         assert intention is None or isinstance(intention, str)
 
-    def test_pipeline_failure_falls_back(self, db_session_factory, override_settings, monkeypatch):
+    def test_pipeline_failure_falls_back(self, db_session_factory, monkeypatch):
         from app.application import autonomy_engine
 
-        override_settings(AGENT_RUNTIME_ENABLED="true")
         monkeypatch.setattr(
             decision_pipeline,
             "run_pipeline",

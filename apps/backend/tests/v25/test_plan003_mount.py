@@ -23,19 +23,6 @@ from app.services.planning import goal_contract
 from .conftest import V25_NOW, V25_USER
 from .test_plan001_flag_regression import FROZEN_PROMPT_DIGEST, _digest
 
-LIFE_LOOP_STEPS = (
-    "perception",
-    "state_update",
-    "goal_check",
-    "goal_supply",
-    "goal_advance",
-    "memory_retrieval",
-    "reflection_check",
-    "decision",
-    "world_experience",
-    "action_schedule",
-)
-
 AUTONOMOUS_TICK_STAGES = (
     "perception",
     "state_update",
@@ -249,13 +236,7 @@ class _SpyEngine:
 
 
 class TestShapeSnapshots:
-    """I7 / I8 / I9：九步序列、stage 序列、预算数学零差异。"""
-
-    def test_life_loop_has_exactly_the_nine_steps(self):
-        source = Path(life_loop.__file__).read_text(encoding="utf-8")
-        cycle = source.split("async def _run_user_cycle", 1)[1].split("async def ", 1)[0]
-        recorded = re.findall(r'_record_step(?:_async)?\(\s*run\.id,\s*steps,\s*"(\w+)"', cycle)
-        assert tuple(recorded) == LIFE_LOOP_STEPS
+    """I7 / I8 / I9：stage 序列、预算数学零差异。"""
 
     def test_autonomous_tick_stage_sequence_is_unchanged(self):
         spec = profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK)

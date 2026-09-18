@@ -92,13 +92,12 @@ async def lifespan(application: FastAPI):
         _observability_cleanup_task = asyncio.create_task(
             observability.run_retention_loop()
         )
-    if agent_evolution_worker.enabled():
-        _agent_evolution_task = asyncio.create_task(
-            agent_evolution_worker.run_agent_evolution_worker()
-        )
-        logging.getLogger(__name__).info(
-            "v2.1 agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）"
-        )
+    _agent_evolution_task = asyncio.create_task(
+        agent_evolution_worker.run_agent_evolution_worker()
+    )
+    logging.getLogger(__name__).info(
+        "agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）"
+    )
     yield
     for task in (
         _reclaim_task,

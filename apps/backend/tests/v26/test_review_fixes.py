@@ -5,40 +5,32 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.application import life_loop
 from app.core.settings import get_settings
 from app.models.action import ActionResult, ActionIntent, transition_action
 from app.repositories import action_repository
 from app.services.action import manager, scheduler
 
 
-class TestFlagOffLifeLoopDrift:
-    def test_flag_off_no_action_schedule_step_in_cycle_source(self):
-        source = open(life_loop.__file__, encoding="utf-8").read()
-        assert "action_execution_enabled" in source
-        assert "action_scheduler_enabled" in source
+class TestActionScheduleConsumption:
+    """REF-004/005 的消费入口现状：调度步自门控，且不在 `autonomous_tick` 阶段序列内。
+
+    v2.0.0 的 `life_loop._run_user_cycle` 随开关体系删除下线后，周期内没有 `action_schedule`
+    挂载点——消费入口归属是 v26 批待裁决项（docs/refactor/flag-removal-audit.md F.11）。
+    """
+
+    def test_flags_off_self_gate_in_scheduler(self):
         settings = get_settings()
         assert settings.action_execution_enabled is False
         assert settings.action_scheduler_enabled is False
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
+        assert result["skip_reason"] == "flag_off"
 
-    def test_flag_on_records_step(self, monkeypatch):
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_scheduler_enabled", True)
-        steps: list[dict] = []
-        # emulate gated append only
-        if settings.action_execution_enabled and settings.action_scheduler_enabled:
-            life_loop._record_step(
-                "run_x",
-                steps,
-                "action_schedule",
-                lambda *a: {"status": "ok"},
-                "u1",
-                datetime.now(),
-            )
-        assert any(s.get("step") == "action_schedule" for s in steps)
+    def test_autonomous_profile_has_no_action_schedule_stage(self):
+        from app.application.agent_runtime import profiles
+
+        spec = profiles.get_profile("autonomous_tick")
+        assert "action_schedule" not in spec.stages
 
 
 class TestStateMachineAuthority:

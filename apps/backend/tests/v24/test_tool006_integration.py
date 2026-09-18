@@ -147,7 +147,6 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        AGENT_RUNTIME_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true",
     )
     v24_tool_env(tool_system_enabled=True)
@@ -201,7 +200,6 @@ async def test_tick_keeps_capabilities_none_when_flag_off(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        AGENT_RUNTIME_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true",
     )
     v24_tool_env(tool_system_enabled=False)
@@ -233,7 +231,6 @@ async def test_autonomy_decision_to_world_write_through_outbox(
     Update World State（唯一合法路径：effects(world) → outbox → world_engine）。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",

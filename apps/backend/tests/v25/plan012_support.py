@@ -97,7 +97,6 @@ FULL_CHAIN_ENVS = {
     "PLAN_WORLD_FEEDBACK_ENABLED": "true",
     "PLAN_AUTONOMY_ENABLED": "true",
     "PLAN_DEBUG_ENABLED": "true",
-    "AGENT_RUNTIME_ENABLED": "true",
     "TOOL_SYSTEM_ENABLED": "true",
     "ACTION_ENABLED": "true",
     "WORLD_ENABLED": "false",

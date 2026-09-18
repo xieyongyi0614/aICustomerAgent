@@ -8,7 +8,6 @@ Gateway。领域层零感知；Flag 关闭时全部走 v2.0.0 原路径。
 from app.application.agent_runtime.controller import (
     append_step,
     close_run,
-    enabled,
     open_foreground_run,
     open_run,
     run_autonomous_cycle,
@@ -44,7 +43,6 @@ __all__ = [
     "classify_background_trigger",
     "classify_channel_message",
     "close_run",
-    "enabled",
     "evaluate_event_escalation",
     "get_capability",
     "get_profile",

@@ -85,16 +85,16 @@ class TestEnablementChainMatrix:
             validate_enablement_chain(settings)
         assert excinfo.value.args
 
-    def test_ledger_has_seven_chain_markers_and_records_the_gap(self):
+    def test_ledger_has_six_chain_markers_and_records_the_gap(self):
         from app.core.settings import enablement
 
         docstring = enablement.__doc__
-        for marker in ("①", "②", "③", "④", "⑤", "⑥", "⑦"):
+        for marker in ("①", "②", "③", "④", "⑤", "⑥"):
             assert marker in docstring
-        assert "剩余七条" in docstring
+        assert "剩余条目" in docstring
         assert len(V25_SUB_FLAGS) == 11
         assert V25_GATE_FLAGS[0] == "planning_enabled"
-        assert len(V25_DEPENDENCIES) >= 6
+        assert len(V25_DEPENDENCIES) >= 5
 
 
 class TestAllOffBytewiseCompat:

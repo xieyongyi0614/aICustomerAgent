@@ -23,8 +23,7 @@ USER = "metric-user"
 
 
 @pytest.fixture()
-def metrics_on(override_settings):
-    override_settings(AGENT_RUNTIME_ENABLED="true")
+def metrics_on():
     yield
 
 

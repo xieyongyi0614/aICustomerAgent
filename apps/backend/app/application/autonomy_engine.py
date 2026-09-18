@@ -551,8 +551,6 @@ def _pipeline_intention(
     TOOL-009：`tool_insights` 为只读反哺信号（缺省 None，interest 维行为不变）。
     """
     settings = get_settings()
-    if not settings.agent_runtime_enabled:
-        return None, None
     try:
         from app.application import agent_state_context
         from app.services import decision_pipeline, goal_stack as goal_stack_service

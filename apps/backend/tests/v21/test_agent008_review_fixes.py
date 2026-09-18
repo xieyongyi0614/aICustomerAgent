@@ -50,8 +50,7 @@ RUNTIME_MODULES = ("app.application.agent_runtime", "app.application.agent_evolu
 
 
 @pytest.fixture()
-def v21_on(override_settings):
-    override_settings(AGENT_RUNTIME_ENABLED="true")
+def v21_on():
     yield
 
 
@@ -116,10 +115,6 @@ class TestDependencyDirection:
 
 class TestEvolutionWorkerWiring:
     """A1：慢时钟必须有生产调用方（Evolution/Evaluation 不再只是存在）。"""
-
-    def test_flag_off_worker_is_noop(self, db_session_factory, override_settings):
-        override_settings(AGENT_RUNTIME_ENABLED="false")
-        assert agent_evolution_worker.run_evolution_tick(NOW)["status"] == "skipped"
 
     def test_tick_writes_metric_snapshot_and_personality_drift(
         self, db_session_factory, v21_on
@@ -384,10 +379,9 @@ class TestForegroundSharedPipeline:
         assert run.data["decision"]["winner"] == "chat_response"
         assert run.data["decision"]["intention"] == "comfort_user"
 
-    def test_flag_off_foreground_has_no_pipeline(self, db_session_factory, override_settings):
+    def test_foreground_without_run_context_has_no_pipeline(self, db_session_factory):
         from app.application import chat_pipeline
 
-        override_settings(AGENT_RUNTIME_ENABLED="false")
         intention = SimpleNamespace(intention="comfort_user", goal_id=None, degraded=False)
         assert chat_pipeline._run_foreground_decision(
             None, USER, intention, SimpleNamespace(goal=None), NOW

@@ -1,6 +1,6 @@
 """PLAN-011 Step 4 单测：`loop_runs.steps` 计划子步骤记账验证（§4.2.5 / §9.2 I5 / I6）。
 
-本文件验证**已落地**的记账形态（不新增记账点、不改 `life_loop` 九步序列）：
+本文件验证**已落地**的记账形态（不新增记账点、不改 `autonomous_tick` stage 序列）：
 
 | 记账位 | 形态 | 承载 |
 |---|---|---|
@@ -11,7 +11,7 @@
 **与 Task Detail §4.2.5 的一处偏差（`plan_execute`）**：Task Detail 命名的三个子步骤为
 `plan_assemble` / `plan_execute` / `plan_observe`，而落地形态是「装配 / 生成 / 修订三个独立条目 +
 `plan_observe` 字段」。`plan_execute` 在本版本**不存在**且不应存在：PLAN-005 的挂载纪律明确
-「不新增维护步、不新增调度循环」（`test_plan005_mount.py::test_no_new_maintenance_step_or_scheduling_loop`
+「不新增维护步、不新增调度循环」（`test_plan005_mount.py::test_autonomous_tick_stage_sequence_is_unchanged`
 把 `plan_execute` 不出现钉住），步骤执行仍由既有 `goal_observation` / `goal_execution` 阶段承载；
 PLAN-003 Task Detail §11.3 已把子步骤名裁决为 `plan_assemble` / `plan_generate` / `plan_revise`。
 故本任务按「**验证已落地形态 + 显式否定 `plan_execute`**」交付，不新增记账点（Non-Scope N8）。
@@ -19,9 +19,6 @@ PLAN-003 Task Detail §11.3 已把子步骤名裁决为 `plan_assemble` / `plan_
 预算约束：计划子步骤为 0 LLM（不带 `llm_capable`），故不占用 `life_loop_cycle_llm_budget`；
 日额度熔断时按 `status="skipped"` 降级记账（引擎 `_budget_skip`）。
 """
-
-import re
-from pathlib import Path
 
 import pytest
 
@@ -34,7 +31,7 @@ from app.services import life_loop_budget
 from app.services.planning import engine as plan_engine
 
 from . import plan011_support as support
-from .test_plan005_mount import AUTONOMOUS_TICK_STAGES, LIFE_LOOP_STEPS
+from .test_plan005_mount import AUTONOMOUS_TICK_STAGES
 
 
 @pytest.fixture
@@ -178,16 +175,7 @@ class TestPlanSubStepAccounting:
 
 
 class TestLifeLoopShapeIsUnchanged:
-    """I6：九步阶段序列 / `autonomous_tick` stage 序列 / 签名零差异。"""
-
-    def test_life_loop_still_runs_exactly_the_nine_steps(self):
-        source = Path(life_loop.__file__).read_text(encoding="utf-8")
-        cycle = source.split("async def _run_user_cycle", 1)[1].split("async def ", 1)[0]
-        recorded = re.findall(
-            r'_record_step(?:_async)?\(\s*run\.id,\s*steps,\s*"(\w+)"', cycle
-        )
-        assert tuple(recorded) == LIFE_LOOP_STEPS
-        assert "plan_execute" not in cycle
+    """I6：`autonomous_tick` stage 序列 / 签名零差异。"""
 
     def test_autonomous_tick_stage_sequence_is_unchanged(self):
         from app.application.agent_runtime import profiles

@@ -1,7 +1,8 @@
 """Enablement 串行链校验（dependency-graph 串行链的部署时 fail-fast）。
 
-V2.0.0 段**已整体移除**：`v2_autonomy_advanced_enabled` / `action_outbox_enabled` /
-`v2_life_loop_enabled` 三个字段随 `vXX_` 开关体系删除，其 ON 路径已转常开。
+V2.0.0 / V2.1.0 / V2.2.0 三段**已整体移除**：随 `vXX_` 开关体系删除，其 ON 路径已转常开，
+无闸可校验。`action_outbox_enabled` 与 `foreground_gateway_enforced` 按裁决保留门控
+（已去版本前缀，见 flag-removal-audit.md 附录 E 与 F.10），它们不在任何依赖链上。
 
 V2.5.0 段（PLAN-002，architecture.md §7.10）：
 
@@ -13,11 +14,10 @@ V2.5.0 段（PLAN-002，architecture.md §7.10）：
 | ④ | `plan_tool_required` ⇒ `plan_step_binding_enabled` AND `tool_system_enabled` |
 | ⑤ | `plan_reflection_enabled` ⇒ `planning_enabled`（①已覆盖） |
 | ⑥ | `plan_memory_enabled` ⇒ `planning_enabled`（①已覆盖） |
-| ⑦ | `plan_autonomy_enabled` ⇒ `planning_enabled`（①已覆盖）AND `agent_runtime_enabled` |
 
-原 architecture §7.10 八条中的跨版本依赖（⇒ `v2_autonomy_advanced_enabled` +
-`v2_life_loop_enabled`，以及 `v2_reflection_enabled` / `v2_memory_enabled`）随 V2.0.0 段
-字段删除而消失；剩余七条中①为通用条目，②~⑦为跨版本依赖条目。
+原 architecture §7.10 八条中的跨版本依赖——⇒ V2.0.0 的自治/生命循环/反思/记忆四闸，
+以及 ⇒ V2.1.0 统一 Run 模型（`plan_autonomy_enabled` 那条）——随对应字段删除而消失；
+剩余条目中①为通用条目，②~⑥为跨域依赖条目。
 
 两处判定口径（均为「让默认配置自洽」的必要裁决）：
 
@@ -25,10 +25,10 @@ V2.5.0 段（PLAN-002，architecture.md §7.10）：
    配置会立刻自我否决（总闸 off 而子闸 on）。它的语义是「计划编排启用后强制要求工具面」
    的策略修饰位，故以**有效闸值**参与判定：`planning_enabled AND
    plan_tool_required`，④随之只在总闸开启时生效。
-2. ②~⑦的跨版本条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
-   ①拦下，要么本就是 off，跨版本依赖无判定意义。
+2. ②~⑥的跨域条目同用有效闸值判定：总闸 off 时计划编排层整体不参与，任何子闸要么已被
+   ①拦下，要么本就是 off，跨域依赖无判定意义。
 
-②~⑦以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
+②~⑥以 `V25_DEPENDENCIES` 数据表承载（源闸 → 依赖闸 → 中文理由），与 v23 段的子闸表、
 v24 段的子闸表同款；①为 `V25_SUB_FLAGS` 上的子闸循环。
 
 仅在启动边界调用（main.lifespan / 运维脚本），不做为模型级校验，
@@ -82,21 +82,11 @@ V25_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
         "tool_system_enabled",
         "（可用工具面来自 V2.4.0 工具系统）",
     ),
-    (
-        "plan_autonomy_enabled",
-        "agent_runtime_enabled",
-        "（plan_facts 经统一 Run 模型进自治决策）",
-    ),
 )
 
 
 def enablement_violations(settings) -> list[str]:
     violations: list[str] = []
-    if settings.unified_run_enabled and not settings.agent_runtime_enabled:
-        violations.append(
-            "unified_run_enabled 要求 agent_runtime_enabled"
-            "（前台收编依赖统一 Run 模型）"
-        )
     v23_sub_flags = (
         "time_advance_enabled",
         "daily_life_enabled",
