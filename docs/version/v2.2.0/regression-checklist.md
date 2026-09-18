@@ -15,7 +15,7 @@
 | 原开关（已删） | 原门控语义 | 固化后的可观察变化 | 代码落点 |
 |---|---|---|---|
 | `experience_enabled`（总闸） | 关则整层失效 | 每轮必做装配并记 trace 步骤 | `chat_pipeline._build_style_context` |
-| `style_contract_enabled` | 关则不装配、不注入 | `PromptBuilder.build` 恒带 `style_ctx`，prompt 恒有风格段 | `services/experience/style_context.build_style_context` |
+| `style_contract_enabled` | 关则不装配、不注入 | 每轮恒尝试装配并注入 `style_ctx`（仅异常降级时缺段） | `services/experience/style_context.build_style_context` |
 | `emotion_transition_enabled` | 关则无情绪表达行 | 恒有「语气：…」±「表达通道」「情绪强度」行 | `style_assembler._apply_emotion` |
 | `relationship_addressing_enabled` | 关则无称呼档、无关系 boost | 恒有称呼/语气/主动程度行（偏离默认档时）+ 亲密期情绪强度抬升 | `_apply_addressing` / `relationship_emotion_boost` |
 | `habit_runtime_enabled` | 关则无习惯行 | 恒有 ≤2 行「习惯：…」 | `_apply_habits` / `habit_trigger.trigger_habits` |
