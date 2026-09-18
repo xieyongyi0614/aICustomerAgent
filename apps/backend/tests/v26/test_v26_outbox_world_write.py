@@ -19,7 +19,7 @@ class TestOutboxWorldWrite:
         override_settings(
             action_enabled=True,
             v26_action_execution_enabled=True,
-            v2_action_outbox_enabled=True,
+            action_outbox_enabled=True,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t2_outbox")
@@ -62,7 +62,7 @@ class TestOutboxWorldWrite:
         override_settings(
             action_enabled=True,
             v26_action_execution_enabled=True,
-            v2_action_outbox_enabled=False,
+            action_outbox_enabled=False,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t2_direct")

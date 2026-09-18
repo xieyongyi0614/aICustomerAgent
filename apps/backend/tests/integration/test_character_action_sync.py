@@ -51,7 +51,7 @@ def _world_notes(user_id: str) -> list[str]:
 
 
 def test_consume_closed_loop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.create_object(
         "cas-u1", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -72,7 +72,7 @@ def test_consume_closed_loop(db_session_factory, override_settings):
 
 
 def test_create_closed_loop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.ensure_world("cas-u2")
     _run(_ctx("cas-u2", ai_reply="我做好了一碗面。", current_turn=1))
 
@@ -85,7 +85,7 @@ def test_create_closed_loop(db_session_factory, override_settings):
 
 
 def test_gate_off_is_byte_identical(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="false")
+    override_settings(character_action_sync_enabled="false")
     world_engine.create_object(
         "cas-u3", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -112,7 +112,7 @@ def test_gate_off_is_byte_identical(db_session_factory, override_settings):
 
 
 def test_gate_on_after_events_renders_tag(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.create_object(
         "cas-u4", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -135,7 +135,7 @@ def test_gate_on_after_events_renders_tag(db_session_factory, override_settings)
 
 
 def test_no_applied_actions_keeps_notes_untouched(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.create_object(
         "cas-u5", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=1.0
     )
@@ -148,7 +148,7 @@ def test_no_applied_actions_keeps_notes_untouched(db_session_factory, override_s
 
 
 def test_interpreter_and_cas_notes_coexist(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.create_object(
         "cas-u6", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -164,7 +164,7 @@ def test_interpreter_and_cas_notes_coexist(db_session_factory, override_settings
 
 
 def test_replay_same_turn_no_duplicate(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     world_engine.create_object(
         "cas-u7", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -191,7 +191,7 @@ def test_step_handlers_order_relative_to_world_and_planning():
 
 
 def test_gate_off_handler_is_noop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="false")
+    override_settings(character_action_sync_enabled="false")
     world_engine.create_object(
         "cas-u8", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -202,7 +202,7 @@ def test_gate_off_handler_is_noop(db_session_factory, override_settings):
 
 
 def test_grounding_cap_and_take_consume_chain(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
 
     from app.models.world import InventoryItem
     from app.services.grounding.inventory_guard import (
@@ -239,7 +239,7 @@ def test_grounding_cap_and_take_consume_chain(db_session_factory, override_setti
 
 
 def test_omitted_subject_take_consumes_from_context(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+    override_settings(character_action_sync_enabled="true")
     user_id = "cas-omit"
     world_engine.ensure_world(user_id)
     ctx = _ctx(

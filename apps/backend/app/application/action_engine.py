@@ -790,7 +790,7 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
     else:
         record.result = minimal
 
-    if settings.v2_action_outbox_enabled:
+    if settings.action_outbox_enabled:
         _integrate_via_outbox(record)
         return
 

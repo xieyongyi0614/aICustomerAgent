@@ -284,7 +284,7 @@ def test_pipeline_style_context_skipped_when_total_off(monkeypatch):
 def test_enablement_chain_requires_total_gate_for_sub_flags():
     base_flags = {
         "action_enabled": False,
-        "v2_action_outbox_enabled": False,
+        "action_outbox_enabled": False,
         "v21_unified_run_enabled": False,
         "v21_agent_runtime_enabled": False,
         "v21_personality_evolution_enabled": False,

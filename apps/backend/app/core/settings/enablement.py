@@ -1,6 +1,6 @@
 """Enablement 串行链校验（dependency-graph 串行链的部署时 fail-fast）。
 
-V2.0.0 段**已整体移除**：`v2_autonomy_advanced_enabled` / `v2_action_outbox_enabled` /
+V2.0.0 段**已整体移除**：`v2_autonomy_advanced_enabled` / `action_outbox_enabled` /
 `v2_life_loop_enabled` 三个字段随 `vXX_` 开关体系删除，其 ON 路径已转常开。
 
 V2.5.0 段（PLAN-002，architecture.md §7.10）：

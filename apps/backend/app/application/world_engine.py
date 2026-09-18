@@ -948,7 +948,7 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
         )
         settings = get_settings()
         change_events = None
-        if settings.v2_character_action_sync_enabled:
+        if settings.character_action_sync_enabled:
             try:
                 change_events = world_repository.list_events(
                     world.world_id,
@@ -968,7 +968,7 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             nearby_limit=settings.world_nearby_objects_limit,
             events_limit=settings.world_salient_events_limit,
             change_events=change_events,
-            changes_limit=settings.v2_character_action_sync_context_lines,
+            changes_limit=settings.character_action_sync_context_lines,
         )
         if settings.v23_world_simulation_enabled:
             context = _attach_world_brief(user_id, world, time_ctx, context, settings)

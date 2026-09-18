@@ -232,7 +232,7 @@ async def test_autonomy_decision_to_world_write_through_outbox(
     """Autonomous Decision → Create Action → Execute Tool → Receive Result →
     Update World State（唯一合法路径：effects(world) → outbox → world_engine）。"""
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         V21_AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
@@ -312,7 +312,7 @@ async def test_daily_limit_not_relaxed_by_tool_system(
     db_session_factory, override_settings, v24_tool_env
 ):
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
@@ -336,7 +336,7 @@ async def test_max_active_per_user_not_relaxed_by_tool_system(
     db_session_factory, override_settings, v24_tool_env
 ):
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
@@ -365,7 +365,7 @@ async def test_daily_limit_hit_produces_no_tool_call(
 ):
     """E7：命中日额度上限 → 记录日志、不产行动、不消耗工具调用。"""
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
@@ -390,7 +390,7 @@ async def test_tool_tripped_between_surface_and_execution(
     """E6：同一 tick 内工具面与执行时状态不一致 → 执行前重新判状态 → unavailable，
     不产生行动副作用（无世界写入、无 outbox 登记）。"""
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true")

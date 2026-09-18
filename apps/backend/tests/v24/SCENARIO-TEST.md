@@ -186,7 +186,7 @@
 ### S4.1 自治 tick 三账对齐
 
 - **Scenario Name**：`S4.1 自治决策 → 工具执行 → 世界写入，三账对齐`
-- **Preconditions**：`V2_LIFE_LOOP_ENABLED` + `V2_ACTION_OUTBOX_ENABLED` + `V21_AGENT_RUNTIME_ENABLED` + `ACTION_ENABLED` + `WORLD_ENABLED` + `AUTONOMY_ACTION_ENABLED` + `OBSERVABILITY_PERSIST_ENABLED`；`autonomy_action_enabled=true`；存在持久目标与已闲置会话；已登记到期 followup。
+- **Preconditions**：`V21_AGENT_RUNTIME_ENABLED` + `ACTION_ENABLED` + `WORLD_ENABLED` + `AUTONOMY_ACTION_ENABLED` + `OBSERVABILITY_PERSIST_ENABLED`；`autonomy_action_enabled=true`；存在持久目标与已闲置会话；已登记到期 followup。
 - **Input**：`life_loop.run_life_loop_tick(now=NOW)`。
 - **Execution Flow**：维护步 → 触发评估 → 决策管线（工具面作为 `capabilities` 输入）→ `run_action_planning`（工具路径）→ `integrate_result` → outbox → `outbox_consumer.consume_pending` → `world_engine.create_event`。
 - **Expected Result**：自治行动台账恰 1 条且 `status="succeeded"`，`steps[0].tool_id="builtin.reminder.create"`；`outbox_events` 出现同 `idempotency_key`；消费后 `world_events` 出现 `type=reminder` 且 `payload.outbox_action_id == record.id`；`loop_runs` 一行 `kind=autonomy/status=done`；`decision_records` 一行 `decision=act` 且其 `input_snapshot.tool_facts.available` 含所用工具；三账 `user_id` 一致。
@@ -201,9 +201,9 @@
 ### S5.1 世界写入只经 outbox
 
 - **Scenario Name**：`S5.1 工具写世界先落 outbox，消费后才可见`
-- **Preconditions**：`ACTION_ENABLED` + `WORLD_ENABLED` + `V2_LIFE_LOOP_ENABLED` + `V2_ACTION_OUTBOX_ENABLED`；总闸 on。
+- **Preconditions**：`ACTION_ENABLED` + `WORLD_ENABLED` + `ACTION_OUTBOX_ENABLED`；总闸 on。
 - **Input**：`action_engine.run_action_planning(user, create_reminder, params={content, due_at})`。
-- **Execution Flow**：能力实现检测 `v2_action_outbox_enabled` → 返回 `deferred_world_op` → `_integrate_via_outbox` → `action_repository.save_record_with_outbox`；`outbox_consumer.consume_pending` 后才 `world_engine.create_event`。
+- **Execution Flow**：能力实现检测 `action_outbox_enabled` → 返回 `deferred_world_op` → `_integrate_via_outbox` → `action_repository.save_record_with_outbox`；`outbox_consumer.consume_pending` 后才 `world_engine.create_event`。
 - **Expected Result**：执行后 `world_events` 计数**不变**；`outbox_events` 含 `idempotency_key == record.id`；消费后计数 +1。
 - **Related Modules**：`app/application/action_engine.py`（`_integrate_via_outbox`）、`app/application/outbox_consumer.py`、`app/services/action/capabilities/reminder.py`
 - **自动化**：`test_s5_tool_writes_world_only_through_outbox`
@@ -269,7 +269,7 @@
 ### S7.1 阈值触发
 
 - **Scenario Name**：`S7.1 同工具同失败类达阈值才进反思窗`
-- **Preconditions**：`V2_REFLECTION_ENABLED=true` + `V24_TOOL_SYSTEM_ENABLED=true` + `V24_TOOL_REFLECTION_ENABLED=true`。
+- **Preconditions**：`V24_TOOL_SYSTEM_ENABLED=true` + `V24_TOOL_REFLECTION_ENABLED=true`。
 - **Input**：连续 `v2_reflection_event_threshold` 次 `observe_tool_evidence(user, tool_id, failure_kind="transient")`。
 - **Execution Flow**：reinforce 计数 → 低于阈值返 False → 达阈值触发 `trigger_for_user(channel=tool)`。
 - **Expected Result**：返回序列为 `[False] * (threshold-1) + [True]`；仅最后一次触发。
@@ -383,7 +383,7 @@
 ### S10.3 长离线追赶
 
 - **Scenario Name**：`S10.3 长离线后自治按 long_gap 折叠`
-- **Preconditions**：`V2_LIFE_LOOP_ENABLED=true`。
+- **Preconditions**：life-loop 全程启用。
 - **Input**：`last_covered = today - 15d`（长离线）与 `today - 3d`（短间隔）。
 - **Execution Flow**：`compute_catch_up_plan` 按 `catch_up_max_days` 判定折叠模式。
 - **Expected Result**：长离线 `mode="long_gap"` 且 `days_behind=15`；短间隔 `mode="daily"` 且 `missing_days` 长度 2。

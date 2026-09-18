@@ -535,8 +535,8 @@ async def run_chat_pipeline(
             action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
         settings = get_settings()
         grounding_mode = (
-            settings.v2_inventory_grounding_mode
-            if settings.v2_inventory_grounding_enabled and world_ctx is not None
+            settings.inventory_grounding_mode
+            if settings.inventory_grounding_enabled and world_ctx is not None
             else "off"
         )
         buffer_reply = grounding_mode in ("rewrite", "annotate")

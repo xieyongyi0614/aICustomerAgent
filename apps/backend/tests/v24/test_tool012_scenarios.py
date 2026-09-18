@@ -72,7 +72,6 @@ FULL_ON = {
     "V24_TOOL_REFLECTION_ENABLED": True,
     "V24_TOOL_CHANNEL_ENABLED": True,
     "FEISHU_ENABLED": True,
-    "V2_REFLECTION_ENABLED": True,
 }
 
 
@@ -534,7 +533,7 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
     from tests.v24.tool006_support import NOW, await_until, seed_tick_fixture
 
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         V21_AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
@@ -614,7 +613,7 @@ def test_s5_tool_writes_world_only_through_outbox(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        V2_ACTION_OUTBOX_ENABLED="true")
+        ACTION_OUTBOX_ENABLED="true")
     support.apply_flag_env(monkeypatch, MASTER_ON)
     from app.application import action_engine, outbox_consumer, world_engine
     from app.repositories import outbox_repository, world_repository
@@ -764,7 +763,7 @@ def test_s7_tool_failure_evidence_triggers_at_threshold(
     override_settings()
     support.apply_flag_env(
         monkeypatch,
-        {**MASTER_ON, "V24_TOOL_REFLECTION_ENABLED": True, "V2_REFLECTION_ENABLED": True},
+        {**MASTER_ON, "V24_TOOL_REFLECTION_ENABLED": True},
     )
     from datetime import datetime as _datetime
 

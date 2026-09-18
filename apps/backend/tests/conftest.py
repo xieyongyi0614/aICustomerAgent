@@ -16,7 +16,6 @@ os.environ.pop("https_proxy", None)
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
-os.environ.setdefault("V2_MEMORY_ENABLED", "false")
 os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
 # 世界/lifespan 循环的 DB 访问已由 autouse _offline_repos 落到内存 SQLite，无需再关闭 world。
 os.environ.setdefault(

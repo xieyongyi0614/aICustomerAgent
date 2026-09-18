@@ -915,7 +915,7 @@ def test_g_world_outbox_is_the_only_write_path(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        V2_ACTION_OUTBOX_ENABLED="true")
+        ACTION_OUTBOX_ENABLED="true")
     support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
     from app.application import action_engine, outbox_consumer, world_engine
     from app.repositories import outbox_repository, world_repository

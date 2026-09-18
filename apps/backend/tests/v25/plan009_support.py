@@ -430,7 +430,7 @@ def latest_candidate_row(session_factory, goal_id: str):
 
 @pytest.fixture
 def planning_memory_on(override_settings):
-    """PLAN-009 记忆面：总闸 + 记忆子闸 + `v2_memory_enabled` 全开；执行面保持关闭（夹具确定）。"""
+    """PLAN-009 记忆面：总闸 + 记忆子闸（v2_memory_enabled 已删除转常开）全开；执行面保持关闭（夹具确定）。"""
     override_settings(
         v25_planning_enabled="true",
         v25_plan_context_enabled="true",
@@ -445,6 +445,6 @@ def planning_memory_on(override_settings):
         action_memory_policy_enabled="true",
         action_relationship_enabled="false",
         world_enabled="false",
-        v2_action_outbox_enabled="false",
+        action_outbox_enabled="false",
         observability_persist_enabled="false")
     return True

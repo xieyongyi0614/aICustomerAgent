@@ -20,10 +20,10 @@ class WorldSettings(BaseSettings):
     world_interpreter_enabled: bool = True
     world_llm_assist_enabled: bool = False
     world_llm_assist_sample_rate: float = 0.2
-    v2_character_action_sync_enabled: bool = False
-    v2_character_action_sync_context_lines: int = 3
-    v2_inventory_grounding_enabled: bool = True
-    v2_inventory_grounding_mode: str = "rewrite"
+    character_action_sync_enabled: bool = False
+    character_action_sync_context_lines: int = 3
+    inventory_grounding_enabled: bool = True
+    inventory_grounding_mode: str = "rewrite"
     world_active_entities_limit: int = 200
     world_active_events_limit: int = 20
     world_event_grace_hours: float = 6.0
@@ -40,8 +40,8 @@ class WorldSettings(BaseSettings):
             raise SettingsError("WORLD_TIME_MODE 必须是 real_sync/simulated/story")
         if self.world_sim_rate <= 0:
             raise SettingsError("WORLD_SIM_RATE 必须大于 0")
-        if self.v2_inventory_grounding_mode not in ("off", "rewrite", "annotate"):
-            raise SettingsError("V2_INVENTORY_GROUNDING_MODE 必须是 off/rewrite/annotate")
+        if self.inventory_grounding_mode not in ("off", "rewrite", "annotate"):
+            raise SettingsError("INVENTORY_GROUNDING_MODE 必须是 off/rewrite/annotate")
         try:
             importance = json.loads(self.world_memory_importance_json)
         except json.JSONDecodeError as exc:

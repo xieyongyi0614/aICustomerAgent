@@ -50,7 +50,7 @@ class WorldActionCapability:
         name = str(params["object"]).strip()
         location_id = resolve_location_alias(str(params.get("location", "") or "")) if params.get("location") else None
         quantity = float(params.get("quantity", 1) or 1)
-        if get_settings().v2_action_outbox_enabled:
+        if get_settings().action_outbox_enabled:
             return CapabilityResult(
                 status="succeeded",
                 payload={
@@ -88,7 +88,7 @@ class WorldActionCapability:
         obj = world_engine.find_object_by_name(ctx.user_id, str(params["object"]))
         if obj is None:
             return _failure("没有这个东西")
-        if get_settings().v2_action_outbox_enabled:
+        if get_settings().action_outbox_enabled:
             return CapabilityResult(
                 status="succeeded",
                 payload={
@@ -112,7 +112,7 @@ class WorldActionCapability:
         if obj is None:
             return _failure("没有这个东西")
         verb = str(params.get("action", "use"))
-        if get_settings().v2_action_outbox_enabled:
+        if get_settings().action_outbox_enabled:
             return CapabilityResult(
                 status="succeeded",
                 payload={

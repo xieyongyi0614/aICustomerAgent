@@ -169,7 +169,7 @@ def action_chain_on(monkeypatch, override_settings):
         world_enabled="false",
         action_memory_policy_enabled="false",
         observability_persist_enabled="false",
-        v2_action_outbox_enabled="false")
+        action_outbox_enabled="false")
     return True
 
 

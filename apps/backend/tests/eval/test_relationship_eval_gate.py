@@ -1,8 +1,8 @@
 """E-REL Gate：REL-004 关系域离线评估（场景集全规则 0 LLM）。
 
-Flag 影子态运行：v2_relationship_evolved_enabled 开启后跑真实服务链
+v2_relationship_evolved_enabled 开关已随 vXX_ 体系删除，开闸行为转常开：
 （narrative job → 里程碑账本行 → REL-001 转写 → 投影/模式/规则审计），
-报告归档 tests/eval/reports/rel-{date}.json。Flag 关闭走 tests/golden。
+报告归档 tests/eval/reports/rel-{date}.json；flag_off 影子样本走 collect 空路。
 """
 
 import json

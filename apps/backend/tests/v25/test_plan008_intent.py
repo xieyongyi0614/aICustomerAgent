@@ -130,7 +130,7 @@ class TestPlanningSideZeroCalls:
         from app.services.tool.registry import get_tool_registry
         from tests.v24.tool007_support import seed_world
 
-        override_settings(v2_action_outbox_enabled="true")
+        override_settings(action_outbox_enabled="true")
         seed_world(USER)
         calls: list[str] = []
         monkeypatch.setattr(

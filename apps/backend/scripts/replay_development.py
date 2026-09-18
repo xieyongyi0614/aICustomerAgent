@@ -11,8 +11,6 @@
 import argparse
 import json
 
-from app.core.settings import get_settings
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Development 审计重放工具")
@@ -23,8 +21,6 @@ def main() -> None:
         help="实际清空重写该用户 development 两表（默认只读校验）",
     )
     args = parser.parse_args()
-    if args.rebuild and not get_settings().v2_development_enabled:
-        raise SystemExit("v2_development_enabled=false，禁止 rebuild")
     from app.services.development import audit
 
     report = audit.verify_replay(args.user_id, rebuild=args.rebuild)

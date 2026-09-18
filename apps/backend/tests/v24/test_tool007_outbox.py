@@ -46,7 +46,7 @@ def _tool_path_env(override_settings, monkeypatch):
         v24_tool_surface_enabled="true",
         world_enabled="true",
         action_enabled="true",
-        v2_action_outbox_enabled="true",
+        action_outbox_enabled="true",
         world_household_autoseed_enabled="false",
         observability_persist_enabled="false",
     )
@@ -264,7 +264,7 @@ async def test_e9_replay_does_not_duplicate_world_event(db_session_factory):
 @pytest.mark.asyncio
 async def test_flag_off_uses_v9_direct_path(db_session_factory, override_settings):
     seed_all()
-    override_settings(v24_tool_system_enabled="false", v2_action_outbox_enabled="false")
+    override_settings(v24_tool_system_enabled="false", action_outbox_enabled="false")
     record = await run_action_planning(
         USER,
         _intent(CREATE_REMINDER, content="复查", due_at=(NOW.replace(year=2027)).isoformat()),

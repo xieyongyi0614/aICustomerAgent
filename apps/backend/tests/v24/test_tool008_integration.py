@@ -108,7 +108,7 @@ async def test_reminder_create_end_to_end_deposits_memory(
     override_settings(
         action_enabled=True,
         world_enabled=True,
-        v2_action_outbox_enabled=False,
+        action_outbox_enabled=False,
         world_household_autoseed_enabled=False,
     )
     seed_all(USER)

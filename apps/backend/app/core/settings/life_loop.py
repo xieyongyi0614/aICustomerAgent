@@ -14,7 +14,7 @@ class LifeLoopSettings(BaseSettings):
     v2_life_loop_budget_cache_seconds: int = 60
     v2_life_loop_cycle_llm_budget: int = 1
     v2_life_loop_degraded_usage_ratio: float = 0.8
-    v2_action_outbox_enabled: bool = False
+    action_outbox_enabled: bool = False
     v2_life_loop_outbox_max_attempts: int = 5
     v2_life_loop_outbox_backoff_seconds: int = 30
     v2_life_loop_memory_min_salience: float = 0.8

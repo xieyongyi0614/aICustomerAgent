@@ -608,3 +608,64 @@ cd apps/frontend && pnpm vitest run
 
 - **真实模型行为回归**：`docs/version/v2.0.0/phases/*/regression-checklist.md` 各阶段清单必须人工执行。
 - **首次激活的写入路径**：`v2_memory_enabled` 固化 ON 后首次运行会走 memory V2 的 ingest/evaluate 与向量嵌入，这些路径在真实配置下**从未跑过**。建议在独立数据库上先跑一轮再切正式库。
+
+---
+
+## 附录 E：`v2_action_outbox_enabled` 单独评估
+
+批次 1 执行时发现它与 v26 反馈设计存在冲突，用户裁决「本批次不动它，单独评估」。以下是评估结论。
+
+### E.1 现状
+
+| 维度 | 事实 |
+|---|---|
+| app 侧读取点 | **8 处**：`action_engine.py:793`（`integrate_result` 分派）、`life_loop.py:797`（维护步消费）、`life_loop.py:844`（idle 判定）、`capabilities/reminder.py:60,102`、`capabilities/world_action.py:53,91,115` |
+| 测试侧引用 | 22 处 / 15 个文件 |
+| 默认值 | `False` |
+| **`.env` 设置** | **未设置 → 生产实际一直走内联直写路径** |
+| 所属任务 | V2.0.0 LIFE-004「跨域投递延迟化」 |
+
+### E.2 关键判断：它不是"冗余开关"，OFF 是"灰度未完成"的临时状态
+
+三条设计文档证据：
+
+1. **v24 工具系统架构要求它开启**。`docs/version/v2.4.0/tool-system/architecture.md:869`：「Tool System **不**直接写世界（必须经 `world_engine` 函数 + **outbox 延迟投递**）」；`:783`：「世界写入不经工具直接落库：写 `deferred_world_op` → outbox（V9 既有延迟投递）」。`capabilities/*` 里的 `deferred_world_op` 分支正是这条要求的实现——**只有开关开启时 v24 架构才被满足**。
+
+2. **LIFE-004 的动机是「不丢不重」**。`LIFE-004.md:13`：v1 的跨域投递发生在能力执行的多个事务里，**进程在任意两点之间崩溃都会留下半完成状态且无恢复线索**；outbox 把「行动成功」与「世界知道」解耦为两个可重放的事务（幂等键 = `action_id`），文档称其为 `data-flow.md §2.1 裁决的直接落地`。
+
+3. **它的灰度从未完成**。`LIFE-004.md:24` 明确：「outbox 的端到端灰度**依赖评审通过后开启 v9**（**评审项，非本 Task 改动**）」。即 OFF 状态是**刻意保留的未评审状态**，不是设计选择。
+
+### E.3 与 v26 反馈设计的冲突（批次 1 撞上的）
+
+`v26` 的 feedback 投影 `feedback_kinds` 在 `integrate_result` 时计算。outbox 开启后世界操作被**延迟**到消费器，此刻世界尚未变更，故 `feedback_kinds` 里不再出现 `"world"`。受影响的 4 个用例：
+`tests/v26/test_v26_feedback_consumers.py`(3) + `tests/v26/test_v26_source_semantics.py`(1)。
+同类还有 `tests/v24/test_tool008_integration.py`(4，行动记忆投递由「直写」改为「经 outbox + P1 摄取补扫收敛」)。
+
+**这不是测试写错了，是 v26 的反馈设计假设了内联世界写入，而 v24/LIFE-004 假设了延迟投递。**
+
+### E.4 三条路的成本
+
+| 方案 | 内容 | 成本 | 风险 |
+|---|---|---|---|
+| **① 固化 ON** | 删开关，落地既定架构；同时把 v26 的 world 反馈计算从 `integrate_result` 移到消费器之后 | 8 处 app 去门控 + 约 10 个用例改写 + **v26 反馈时序设计变更** | **中高**：等于上线一个 LIFE-004 明确标注"评审未通过"的架构变更；且改变了"行动成功即世界已变更"的既有语义 |
+| **② 固化 OFF** | 删开关与整条 outbox 路径（`outbox_consumer.py`、`outbox_events` 表、`deferred_world_op` 载荷、`save_record_with_outbox`、`test_life004_outbox.py`） | 删除一个 V2.0.0 正式任务的全部产物；v24 架构要求无法满足；`test_g_world_outbox_is_the_only_write_path` / `test_s5_*` 等 4~6 个用例废弃 | **高**：放弃「不丢不重」保障，且与 v24 架构文档冲突 |
+| **③ 改名保留**（去 `v2_` 前缀） | 字段改名 `action_outbox_enabled`，env 名同步 `ACTION_OUTBOX_ENABLED`（无撞名） | 8 处 app + 22 处测试的**机械改名**；行为零变化 | **低** |
+
+### E.5 结论与建议
+
+**建议方案 ③：改名保留，等 LIFE-004 的灰度评审完成后再决定固化方向。**
+
+理由：
+
+1. **用户的核心诉求是"版本号污染代码审查"，不是"开关本身有罪"。** 改名去 `v2_` 前缀即可消除污染，且行为零变化、零风险。
+2. **固化 ON 会把一个明确标注"评审未通过"的架构变更推进生产**，且需要改动 v26 的反馈时序设计——这超出了"删开关"的范围，应当走独立的设计评审。
+3. **固化 OFF 会删除 V2.0.0 的一个正式任务，并与 v24 架构文档直接冲突**，代价最大。
+4. LIFE-004 文档自己写了灰度前置条件是"评审通过后开启 v9"，**这个前置条件尚未满足**——在它满足前，开关必须保留。
+
+**如果后续确定要固化 ON**，则必须先做一件事：把 v26 的 world 反馈计算从 `integrate_result` 迁到 outbox 消费之后（或在消费时补写投影），否则 `feedback_kinds` 会永久丢失 `"world"`。
+
+### E.6 改名执行的注意点
+
+- 字段 `v2_action_outbox_enabled` → `action_outbox_enabled`；env `V2_ACTION_OUTBOX_ENABLED` → `ACTION_OUTBOX_ENABLED`。已确认**无撞名**（既有字段为 `action_enabled` / `action_detector_enabled` / `action_memory_policy_enabled`）。
+- 同批可一并处理 `v2_character_action_sync_enabled`、`v2_inventory_grounding_enabled`（同为 `v2_` 前缀的独立开关，且都在 `.env` 中已开启）——这三者构成「`v2_` 段残留开关」的完整集合。
+- 本仓库有 `set_known_env` 防呆守卫，改名前先加「env key ∈ `model_fields`」断言已就位（前置防呆第 2 条已完成）。

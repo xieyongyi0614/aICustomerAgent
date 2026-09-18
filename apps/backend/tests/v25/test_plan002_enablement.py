@@ -120,26 +120,6 @@ def test_u13_validate_chain_fail_fast_per_v25_sub_flag(monkeypatch, flag):
     assert flag in message
 
 
-def test_u13_master_requires_the_autonomy_advanced_flag(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{V25_MASTER: True, "v25_plan_tool_required": False, "v2_life_loop_enabled": True},
-    )
-    violations = enablement_violations(settings)
-
-
-def test_u13_master_requires_the_life_loop(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{
-            V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "action_enabled": True,
-        },
-    )
-    violations = enablement_violations(settings)
-
-
 def test_u13_execution_requires_the_scheduler_sub_gate(monkeypatch):
     settings = _settings_with(
         monkeypatch,
@@ -200,30 +180,6 @@ def test_u13_tool_required_is_inert_while_the_master_is_off(monkeypatch):
     assert enablement_violations(settings) == []
 
 
-def test_u13_reflection_requires_the_reflection_master(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{
-            V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "v25_plan_reflection_enabled": True,
-        },
-    )
-    violations = enablement_violations(settings)
-
-
-def test_u13_memory_requires_the_memory_master(monkeypatch):
-    settings = _settings_with(
-        monkeypatch,
-        **{
-            V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "v25_plan_memory_enabled": True,
-        },
-    )
-    violations = enablement_violations(settings)
-
-
 def test_u13_autonomy_requires_the_agent_runtime(monkeypatch):
     settings = _settings_with(
         monkeypatch,
@@ -266,8 +222,6 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
 
 
 def test_existing_v2_v21_v23_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch)
-
     settings = _settings_with(monkeypatch, v21_goal_stack_enabled=True)
     assert any(
         "v21_agent_runtime_enabled" in item for item in enablement_violations(settings)

@@ -39,7 +39,6 @@ V24_SUB_FLAGS: tuple[str, ...] = (
 )
 AUX_FLAGS: tuple[str, ...] = (
     "FEISHU_ENABLED",
-    "V2_REFLECTION_ENABLED",
 )
 TOOL_PARAM_ENVS: dict[str, str] = {
     "V24_TOOL_DISABLED_IDS": "",
@@ -547,7 +546,6 @@ FLAG_MATRIX: dict[str, dict[str, Any]] = {
     "g08_only_reflection": {
         V24_MASTER_FLAG: True,
         "V24_TOOL_REFLECTION_ENABLED": True,
-        "V2_REFLECTION_ENABLED": True,
     },
     "g09_only_channel": {
         V24_MASTER_FLAG: True,
@@ -565,7 +563,6 @@ FLAG_MATRIX: dict[str, dict[str, Any]] = {
     "g12_all_on": {
         V24_MASTER_FLAG: True,
         "FEISHU_ENABLED": True,
-        "V2_REFLECTION_ENABLED": True,
         **{flag: True for flag in V24_SUB_FLAGS},
     },
 }

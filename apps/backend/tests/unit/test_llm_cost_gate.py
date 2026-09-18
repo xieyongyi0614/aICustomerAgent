@@ -51,7 +51,7 @@ async def test_foreground_llm_calls_full_v2_flags_on_stays_within_cap(
     db_session_factory, fake_llm, override_settings
 ):
     override_settings(
-        v2_action_outbox_enabled="true",
+        action_outbox_enabled="true",
         action_enabled="true")
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     calls = await _run_turn(llm, "cost-on")

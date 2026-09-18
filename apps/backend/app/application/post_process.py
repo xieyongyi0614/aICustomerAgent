@@ -327,7 +327,7 @@ async def run_world_update(ctx: PostProcessContext) -> None:
 
 async def run_character_action_sync(ctx: PostProcessContext) -> None:
     """CAS 第 9 步：提取 → 校验 → 执行（ACTION-004）→ 摘要写 notes（ACTION-005 写侧）。"""
-    if not get_settings().v2_character_action_sync_enabled:
+    if not get_settings().character_action_sync_enabled:
         return
     started = time.perf_counter()
     try:

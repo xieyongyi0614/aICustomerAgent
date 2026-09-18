@@ -57,7 +57,7 @@ class ReminderCapability:
         due_at = _parse_due(params.get("due_at"))
         if due_at is None:
             return CapabilityResult(status="failed", error="due_at 无法解析", payload={"failure_kind": "permanent"})
-        if get_settings().v2_action_outbox_enabled:
+        if get_settings().action_outbox_enabled:
             return CapabilityResult(
                 status="succeeded",
                 payload={
@@ -99,7 +99,7 @@ class ReminderCapability:
         )
 
     async def _cancel(self, params: dict, ctx: ExecutionContext) -> CapabilityResult:
-        if get_settings().v2_action_outbox_enabled:
+        if get_settings().action_outbox_enabled:
             return CapabilityResult(
                 status="succeeded",
                 payload={

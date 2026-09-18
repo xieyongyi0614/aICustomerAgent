@@ -17,7 +17,7 @@ from app.services.memory2 import ingest as memory2_ingest
 from tests.conftest import FakeLLM, wait_until
 
 _V2_FLAGS = {
-    "v2_action_outbox_enabled": "true",
+    "action_outbox_enabled": "true",
     "action_enabled": "true",
 }
 

@@ -28,7 +28,7 @@ USER = "outbox-user"
 @pytest.fixture()
 def outbox_on(override_settings):
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
+        ACTION_OUTBOX_ENABLED="true",
         world_enabled="true",
         action_enabled="true",
     )

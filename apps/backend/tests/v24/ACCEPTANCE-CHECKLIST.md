@@ -164,7 +164,7 @@ PY
 ### R-5.1 自治 tick 的工具面与三账对齐
 
 - **id**：`R-5.1`
-- **前置**：`V2_LIFE_LOOP_ENABLED=true` + `ACTION_ENABLED=true` + `AUTONOMY_ACTION_ENABLED=true` + 总闸 on；真实模型；存在持久目标与闲置会话。
+- **前置**：`ACTION_ENABLED=true` + `AUTONOMY_ACTION_ENABLED=true` + 总闸 on；真实模型；存在持久目标与闲置会话。
 - **步骤**：跑一次真实 life-loop tick（或等待调度）。
 - **期望**：`runtime_traces` 出现 `autonomy_tool_surface` 步骤，其 `tool_ids` 不含 `channel.*`；Run 台账 / 决策台账 / 行动台账三账 user_id 一致；工具面内的工具能产出可解释的自治意图。
 - **观测点**：`loop_runs`、`decision_records.input_snapshot.tool_facts`、`action_records`。
@@ -217,7 +217,7 @@ PY
 ### R-7.2 反思证据窗的语义质量
 
 - **id**：`R-7.2`
-- **前置**：`V2_REFLECTION_ENABLED=true` + 反思子闸 on；真实模型；已有 ≥ 阈值条同工具失败记录。
+- **前置**：反思子闸 on；真实模型；已有 ≥ 阈值条同工具失败记录。
 - **步骤**：跑一次反思触发。
 - **期望**：产出的 Insight 类型落在 `capability_note` / `usage_preference` / `interaction_calibration` 三类内，且**不出现**性格 / 人格 / 关系类结论；工具状态未被自动修改。
 - **观测点**：`insights`（type / scope）、`/debug/tools`（工具状态与健康度不变）。
