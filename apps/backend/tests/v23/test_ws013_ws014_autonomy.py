@@ -17,10 +17,6 @@ pytestmark = pytest.mark.xdist_group("ws013")
 @pytest.fixture
 def detection_flags(monkeypatch):
     for key, value in {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
     }.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
@@ -28,15 +24,12 @@ def detection_flags(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_whitelist_unchanged_without_v23(monkeypatch):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
-    get_settings.cache_clear()
-    try:
-        whitelist = trigger_router.escalation_whitelist()
-        assert "user_condition" not in whitelist
-        assert "reminder" not in whitelist
-    finally:
-        get_settings.cache_clear()
+def test_whitelist_merges_world_types(monkeypatch, detection_flags):
+    whitelist = trigger_router.escalation_whitelist()
+    assert "user_condition" in whitelist
+    assert "reminder" not in whitelist
+    assert "weather_change" in whitelist
+    assert "calendar_event" in whitelist
 
 
 def test_whitelist_merges_v23_types(monkeypatch, detection_flags):
@@ -72,7 +65,6 @@ def test_collect_facts_enriched_with_impacts(db_session_factory, detection_flags
 
 
 def test_collect_facts_basic_without_v23(db_session_factory, monkeypatch):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
     get_settings.cache_clear()
     try:
         user = "ws013-off"

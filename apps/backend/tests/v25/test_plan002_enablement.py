@@ -205,15 +205,10 @@ def test_i2_violation_message_is_readable_chinese(monkeypatch):
     assert "总闸" in message
 
 
-def test_existing_v23_v24_chain_rules_intact(monkeypatch):
+def test_existing_v24_chain_rules_intact(monkeypatch):
     settings = _settings_with(monkeypatch, tool_channel_enabled=True)
     assert any(
         "feishu_enabled" in item for item in enablement_violations(settings)
-    )
-
-    settings = _settings_with(monkeypatch, event_detection_enabled=True)
-    assert any(
-        "world_simulation_enabled" in item for item in enablement_violations(settings)
     )
 
     settings = _settings_with(monkeypatch, tool_surface_enabled=True)

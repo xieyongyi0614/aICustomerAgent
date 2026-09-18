@@ -99,11 +99,6 @@ def test_default_settings_pass_chain():
     validate_enablement_chain(get_settings())
 
 
-def test_existing_v23_v24_chain_rules_intact(monkeypatch):
+def test_existing_v24_chain_rules_intact(monkeypatch):
     settings = _settings_with(monkeypatch, tool_channel_enabled=True)
     assert any("feishu_enabled" in v for v in enablement_violations(settings))
-
-    settings = _settings_with(monkeypatch, daily_life_enabled=True)
-    assert any(
-        "world_simulation_enabled" in v for v in enablement_violations(settings)
-    )

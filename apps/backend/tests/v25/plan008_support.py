@@ -286,8 +286,6 @@ def planning_world_on(override_settings):
         action_enabled="true",
         world_enabled="true",
         world_household_autoseed_enabled="false",
-        world_simulation_enabled="true",
-        event_detection_enabled="true",
         action_relationship_enabled="false",
         action_outbox_enabled="false",
         observability_persist_enabled="false")

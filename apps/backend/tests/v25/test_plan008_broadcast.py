@@ -239,8 +239,7 @@ class TestBroadcastFailureDiscipline:
         self, db_session_factory, planning_world_on, make_goal, make_plan, override_settings
     ):
         override_settings(
-            world_simulation_enabled="false", event_detection_enabled="false"
-        )
+            )
         goal = make_goal(description="事件链关闭目标")
         plan = make_plan(goal.id)
         settlement = OBSERVER.settle(goal, plan, _advance(goal, plan, "completed"))

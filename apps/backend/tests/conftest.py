@@ -390,7 +390,6 @@ def override_settings(monkeypatch):
             "world_context_char_budget": "WORLD_CONTEXT_CHAR_BUDGET",
             "world_household_autoseed_enabled": "WORLD_HOUSEHOLD_AUTOSEED_ENABLED",
             "world_interpreter_enabled": "WORLD_INTERPRETER_ENABLED",
-            "world_llm_assist_enabled": "WORLD_LLM_ASSIST_ENABLED",
             "world_memory_bridge_enabled": "WORLD_MEMORY_BRIDGE_ENABLED",
             "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
             "action_enabled": "ACTION_ENABLED",

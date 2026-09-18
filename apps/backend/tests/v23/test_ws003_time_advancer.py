@@ -11,8 +11,6 @@ from app.services.world.time_advancer import TimeAdvanceResult, advance_world_ti
 
 
 def _flags_on(monkeypatch, **extra):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
     for key, value in extra.items():
         monkeypatch.setenv(key.upper(), str(value).lower())
     get_settings.cache_clear()
@@ -111,9 +109,9 @@ def test_story_mode_never_advances(db_session_factory, story_flags):
     assert stored.sim_last_advanced_at == now
 
 
-def test_maintenance_step_disabled_without_flags(db_session_factory):
+def test_maintenance_step_ensures_world_when_missing(db_session_factory):
     world_engine.run_simulation_maintenance("ws003-off")
-    assert world_repository.get_world("ws003-off") is None
+    assert world_repository.get_world("ws003-off") is not None
 
 
 def test_maintenance_step_runs_for_all_worlds(db_session_factory, sim_flags):

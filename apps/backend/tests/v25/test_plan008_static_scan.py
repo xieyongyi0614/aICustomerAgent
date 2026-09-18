@@ -62,7 +62,6 @@ WORLD_WRITE_ATTRIBUTE_NAMES = frozenset(support.WORLD_WRITE_FACE) | {
     "build_debug_simulation",
     "build_debug_plan",
     "build_debug_situations",
-    "v23_flag_snapshot",
     "event_quota_drop_snapshot",
     "reset_event_quota_drop_snapshot",
     "get_available_consumables",

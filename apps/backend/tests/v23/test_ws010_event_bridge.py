@@ -16,8 +16,6 @@ pytestmark = pytest.mark.xdist_group("ws010")
 
 @pytest.fixture
 def bridge_flags(monkeypatch):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("EVENT_DETECTION_ENABLED", "true")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -37,9 +35,9 @@ def _seed_goal(user_id: str, description: str = "整理书架"):
     return goal_repository.create_goal(record)
 
 
-def test_register_goal_event_flag_off_noop(db_session_factory):
-    assert event_bridge.register_goal_event("u-off", "g1", "整理书架", "completed") is False
-    assert outbox_repository.list_pending(limit=10) == []
+def test_register_goal_event_always_writes_outbox(db_session_factory):
+    assert event_bridge.register_goal_event("u-off", "g1", "整理书架", "completed") is True
+    assert outbox_repository.list_pending(limit=10) != []
 
 
 def test_goal_completion_bridges_to_world_event(db_session_factory, bridge_flags):
@@ -95,14 +93,11 @@ def test_outbox_idempotent_redelivery(db_session_factory, bridge_flags):
     assert len(events) == 1
 
 
-def test_listener_registration_noop_when_flag_off(monkeypatch):
+def test_listener_registration_always_registers():
     from app.services.reflection import lifecycle as reflection_lifecycle
 
+    reflection_lifecycle.reset_insight_created_listeners()
     before = len(reflection_lifecycle._insight_created_listeners)
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setenv("WORLD_SIMULATION_ENABLED", "false")
-        get_settings.cache_clear()
-        event_bridge.register_character_event_listeners()
-    get_settings.cache_clear()
-    assert len(reflection_lifecycle._insight_created_listeners) == before
+    event_bridge.register_character_event_listeners()
+    assert len(reflection_lifecycle._insight_created_listeners) == before + 1
     reflection_lifecycle.reset_insight_created_listeners()

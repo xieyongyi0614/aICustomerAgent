@@ -1,4 +1,4 @@
-"""WS-018：世界模拟调试端点（三个只读 + tick 触发）门控与数据一致性测试。"""
+"""WS-018：世界模拟调试端点（开关固化后的常开行为）。"""
 
 from datetime import datetime
 
@@ -7,7 +7,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.v1.schemas import WorldSimulationOut
 from app.application import world_engine
-from app.core.settings import get_settings
 from app.main import app
 from app.models.world_simulation import (
     DailyPlan,
@@ -18,29 +17,6 @@ from app.models.world_simulation import (
 from app.repositories import world_repository, world_simulation_repository
 
 pytestmark = pytest.mark.xdist_group("ws018")
-
-
-@pytest.fixture
-def v23_on(monkeypatch):
-    for key, value in {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
-    }.items():
-        monkeypatch.setenv(key, value)
-    get_settings.cache_clear()
-    yield
-    get_settings.cache_clear()
-
-
-@pytest.fixture
-def v23_off(monkeypatch):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
-    monkeypatch.setenv("DEBUG_TICK_ENABLED", "false")
-    get_settings.cache_clear()
-    yield
-    get_settings.cache_clear()
 
 
 async def _get(path: str, **params):
@@ -103,17 +79,7 @@ def test_schema_serialization_disabled():
 
 
 @pytest.mark.asyncio
-async def test_simulation_endpoint_disabled_returns_enabled_false(db_session_factory, v23_off):
-    resp = await _get("/api/v1/debug/world/simulation", user_id="ws018-off")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["enabled"] is False
-    assert body["time_context"] is None
-    assert body["flags"] == {}
-
-
-@pytest.mark.asyncio
-async def test_simulation_endpoint_matches_db(db_session_factory, v23_on):
+async def test_simulation_endpoint_matches_db(db_session_factory):
     user = "ws018-on"
     _seed_world(user)
 
@@ -129,12 +95,11 @@ async def test_simulation_endpoint_matches_db(db_session_factory, v23_on):
     assert body["active_situations"][0]["intensity"] == 4
     assert body["recent_events"][0]["type"] == "weather_change"
     assert body["recent_events"][0]["idempotency_key"] == f"weather:{user}:2026-09-14"
-    assert body["flags"]["world_simulation_enabled"] is True
-    assert len(body["flags"]) == 7
+    assert body["flags"] == {}
 
 
 @pytest.mark.asyncio
-async def test_plan_endpoint_and_date_validation(db_session_factory, v23_on):
+async def test_plan_endpoint_and_date_validation(db_session_factory):
     user = "ws018-plan"
     _seed_world(user)
 
@@ -152,7 +117,7 @@ async def test_plan_endpoint_and_date_validation(db_session_factory, v23_on):
 
 
 @pytest.mark.asyncio
-async def test_situations_endpoint_include_expired(db_session_factory, v23_on):
+async def test_situations_endpoint_include_expired(db_session_factory):
     user = "ws018-sit"
     _seed_world(user)
     now = datetime.now()
@@ -178,50 +143,28 @@ async def test_situations_endpoint_include_expired(db_session_factory, v23_on):
 
 
 @pytest.mark.asyncio
-async def test_unknown_user_returns_404(db_session_factory, v23_on):
+async def test_unknown_user_returns_404(db_session_factory):
     resp = await _get("/api/v1/debug/world/simulation", user_id="ws018-missing")
     assert resp.status_code == 404
     assert resp.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_tick_requires_debug_flag(db_session_factory, v23_on):
-    user = "ws018-tick-gate"
-    world_repository.ensure_world(user)
-
+async def test_tick_runs_maintenance(db_session_factory):
+    user = "ws018-tick-ok"
+    _seed_world(user)
     resp = await _post("/api/v1/debug/world/simulation/tick", json={"user_id": user})
-    assert resp.status_code == 403
-    assert "debug_tick_enabled" in resp.json()["detail"]
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["enabled"] is True
+    assert body["result"]["advanced_minutes"] >= 0
+    assert body["result"]["errors"] == []
+    assert body["result"]["plan_summary"] is not None
+    assert body["result"]["plan_summary"]["date"] == datetime.now().date().isoformat()
 
 
 @pytest.mark.asyncio
-async def test_tick_runs_maintenance_with_debug_flag(db_session_factory, monkeypatch):
-    for key, value in {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
-        "DEBUG_TICK_ENABLED": "true",
-    }.items():
-        monkeypatch.setenv(key, value)
-    get_settings.cache_clear()
-    try:
-        user = "ws018-tick-ok"
-        _seed_world(user)
-        resp = await _post("/api/v1/debug/world/simulation/tick", json={"user_id": user})
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["enabled"] is True
-        assert body["result"]["advanced_minutes"] >= 0
-        assert body["result"]["errors"] == []
-        assert body["result"]["plan_summary"] is not None
-        assert body["result"]["plan_summary"]["date"] == datetime.now().date().isoformat()
-    finally:
-        get_settings.cache_clear()
-
-
-@pytest.mark.asyncio
-async def test_readonly_endpoints_do_not_mutate(db_session_factory, v23_on):
+async def test_readonly_endpoints_do_not_mutate(db_session_factory):
     user = "ws018-readonly"
     _seed_world(user)
     world = world_repository.ensure_world(user)

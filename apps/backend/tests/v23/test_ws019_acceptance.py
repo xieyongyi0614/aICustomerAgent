@@ -1,8 +1,8 @@
-"""WS-019：V2.3.0 World Simulation 全链路验收与逐字节一致性回归。
+"""WS-019：World Simulation 全链路验收（开关固化后的常开行为）。
 
 覆盖 architecture.md §6.1 验收矩阵：
-  ① Flag 矩阵（6 组开关组合行为差异）
-  ② 逐字节一致性（全 off 与 V2.2.0 基线 prompt/结构零差异）
+  ① 常开路径（维护步 / 简报）
+  ② prompt 世界段装配
   ③ 四条全链路场景（日常推进 / 降温提醒 / 前台简报 / 长离线追赶）
   ④ 边界不变量（§9.3 八条，含写域扫描与 0 LLM 断言）
   ⑤ 迁移与性能预算
@@ -35,169 +35,56 @@ pytestmark = pytest.mark.xdist_group("ws019")
 
 logger = logging.getLogger(__name__)
 
-V23_FLAG_KEYS = (
-    "WORLD_SIMULATION_ENABLED",
-    "TIME_ADVANCE_ENABLED",
-    "DAILY_LIFE_ENABLED",
-    "EVENT_DETECTION_ENABLED",
-    "SCENE_EXPANSION_ENABLED",
-    "WORLD_LLM_ASSIST_ENABLED",
-)
-
 # --- Flag 矩阵：6 组组合 ------------------------------------------------------
-
-FLAG_MATRIX = {
-    "all_off": {},
-    "master_time": {"WORLD_SIMULATION_ENABLED": "true", "TIME_ADVANCE_ENABLED": "true"},
-    "plus_daily": {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-    },
-    "plus_detection": {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
-    },
-    "plus_scene": {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "TIME_ADVANCE_ENABLED": "true",
-        "DAILY_LIFE_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
-        "SCENE_EXPANSION_ENABLED": "true",
-    },
-    "all_on": {key: "true" for key in V23_FLAG_KEYS},
-}
-
 
 @pytest.fixture
 def flag_env(monkeypatch):
-    """按组开启 v23 Flag；未列出的显式关闭，保证矩阵组间隔离。"""
-
-    def _apply(group: str):
-        for key in V23_FLAG_KEYS:
-            monkeypatch.setenv(key, "false")
-        for key, value in FLAG_MATRIX[group].items():
-            monkeypatch.setenv(key, value)
-        get_settings.cache_clear()
-        return group
-
-    yield _apply
+    """兼容保留：v23 开关已固化，仅清缓存。"""
+    get_settings.cache_clear()
+    yield lambda group=None: group
     get_settings.cache_clear()
 
 
-# --- ① Flag 矩阵 --------------------------------------------------------------
+# --- ① 常开路径 --------------------------------------------------------------
 
 
-@pytest.mark.parametrize("group", list(FLAG_MATRIX))
-def test_flag_matrix_maintenance_step_executes_per_gate(db_session_factory, flag_env, group):
-    flag_env(group)
-    user = f"ws019-matrix-{group}"
+def test_maintenance_step_executes(db_session_factory, flag_env):
+    flag_env()
+    user = "ws019-matrix"
     world_repository.ensure_world(user)
-    settings = get_settings()
-
     result = world_engine.run_simulation_maintenance(user)
-
-    if not settings.world_simulation_enabled or not settings.time_advance_enabled:
-        assert result is None, f"{group}: 未开时间推进不应执行维护步"
-        return
     assert result is not None
     assert isinstance(result, list)
 
 
-@pytest.mark.parametrize("group", list(FLAG_MATRIX))
-def test_flag_matrix_brief_presence_follows_master(db_session_factory, flag_env, group):
-    flag_env(group)
-    user = f"ws019-brief-{group}"
+def test_brief_present_after_solidification(db_session_factory, flag_env):
+    flag_env()
+    user = "ws019-brief"
     world_repository.ensure_world(user)
-    settings = get_settings()
-
-    context = world_engine.build_context(user)
-
-    if not settings.world_simulation_enabled:
-        assert context is not None
-        assert getattr(context, "brief", None) is None, f"{group}: 总闸关不得有简报"
-    else:
-        if context is not None:
-            assert getattr(context, "brief", None) is not None
-
-
-@pytest.mark.parametrize("group", list(FLAG_MATRIX))
-def test_flag_matrix_plan_generated_only_with_daily_life(db_session_factory, flag_env, group):
-    """daily_life 门控：维护步经 _run_simulation_substeps 时才生成当日计划。"""
-    flag_env(group)
-    user = f"ws019-plan-{group}"
-    world_repository.ensure_world(user)
-    settings = get_settings()
-
-    world_engine.run_simulation_maintenance(user)
-
-    plans = daily_plan.get_day_plan(user, datetime.now().date())
-    if not (settings.world_simulation_enabled and settings.daily_life_enabled):
-        assert plans == [], f"{group}: 未开 daily_life 不应生成计划"
-
-
-@pytest.mark.parametrize("group", list(FLAG_MATRIX))
-def test_flag_matrix_situation_detection_gated(db_session_factory, flag_env, group):
-    """detection 门控：维护步内 expire_and_notify 仅在子闸开启时才参与。"""
-    flag_env(group)
-    user = f"ws019-sit-{group}"
-    world_repository.ensure_world(user)
-    settings = get_settings()
-
-    world_engine.run_simulation_maintenance(user)
-
-    situations = world_simulation_repository.list_situations(user)
-    if not (
-        settings.world_simulation_enabled
-        and settings.time_advance_enabled
-        and settings.event_detection_enabled
-    ):
-        assert situations == [], f"{group}: 未开 detection 不应有处境记录"
-
-
-# --- ② 逐字节一致性 -----------------------------------------------------------
-
-
-def test_flags_off_context_has_no_v23_bytes(db_session_factory, flag_env):
-    """全 off：world 上下文不含任何 V2.3.0 新增字段（brief / impacts）。"""
-    flag_env("all_off")
-    user = "ws019-baseline"
-    world_repository.ensure_world(user)
-
     context = world_engine.build_context(user)
     assert context is not None
-    assert getattr(context, "brief", None) is None
-
-    facts = world_engine.collect_facts(user)
-    assert "impacts" not in facts
-    assert "current_block" not in facts
-    assert "active_situations" not in facts
+    assert getattr(context, "brief", None) is not None
 
 
-def test_flags_off_simulation_maintenance_is_noop(db_session_factory, flag_env):
-    """全 off：run_simulation_maintenance 返回 None 且零副作用（与 V2.2.0 一致）。"""
-    flag_env("all_off")
+def test_simulation_maintenance_returns_list_when_world_enabled(db_session_factory, flag_env):
+    flag_env()
     user = "ws019-noop"
     world = world_repository.ensure_world(user)
     before = len(world_repository.list_events(world.world_id, limit=500))
-
-    assert world_engine.run_simulation_maintenance(user) is None
-
+    result = world_engine.run_simulation_maintenance(user)
+    assert result is not None
     after = len(world_repository.list_events(world.world_id, limit=500))
-    assert after == before
+    assert after >= before
 
 
 def test_prompt_world_section_identical_when_brief_absent(db_session_factory, flag_env):
     """render_world_section 在 brief=None 时输出与既有路径一致（追加零字节）。"""
     from app.services.world.context_selector import render_world_section
 
-    flag_env("all_off")
+    flag_env()
     user = "ws019-render"
     world_repository.ensure_world(user)
     context = world_engine.build_context(user)
-
     with_brief_none = render_world_section(context, budget=600, brief=None)
     baseline = render_world_section(context, budget=600)
     assert with_brief_none == baseline
@@ -208,7 +95,7 @@ def test_prompt_world_section_identical_when_brief_absent(db_session_factory, fl
 
 def test_flow_daily_progression(db_session_factory, flag_env):
     """§7.1 日常推进：维护步 → 时间锚点 + 日循环标记 + 计划推进。"""
-    flag_env("plus_daily")
+    flag_env()
     user = "ws019-flow-daily"
     world = world_repository.ensure_world(user)
     now = datetime.now()
@@ -228,7 +115,7 @@ def test_flow_daily_progression(db_session_factory, flag_env):
 
 def test_flow_weather_drop_triggers_care_opportunity(db_session_factory, flag_env):
     """§7.2 降温提醒：weather_change → EventImpactRules → goal_opportunity。"""
-    flag_env("plus_detection")
+    flag_env()
     user = "ws019-flow-weather"
     world_repository.ensure_world(user)
     event = world_engine.create_event(
@@ -255,7 +142,7 @@ def test_flow_foreground_brief_assembly(db_session_factory, flag_env):
     """§7.3 前台简报：时间/日程块/处境/事件 → WorldBrief 入 prompt 段。"""
     from app.services.world.context_selector import render_world_section
 
-    flag_env("plus_detection")
+    flag_env()
     user = "ws019-flow-brief"
     world = world_repository.ensure_world(user)
     now = datetime.now()
@@ -281,7 +168,7 @@ def test_flow_foreground_brief_assembly(db_session_factory, flag_env):
 
 def test_flow_long_offline_catch_up(db_session_factory, flag_env):
     """§7.4 长离线追赶：>7 天折叠为单条 long_gap。"""
-    flag_env("plus_daily")
+    flag_env()
     user = "ws019-flow-catchup"
     world = world_repository.ensure_world(user)
     today = datetime.now().date()
@@ -343,7 +230,7 @@ def scan_forbidden_writes(user_id: str) -> list[str]:
 
 def test_invariant_simulation_never_writes_character_domain(db_session_factory, flag_env):
     """不变量 2：模拟路径对 character_state/personality/relationship/goals 零直写。"""
-    flag_env("plus_scene")
+    flag_env()
     user = "ws019-invariant-write"
     world_repository.ensure_world(user)
 
@@ -357,7 +244,7 @@ def test_invariant_simulation_never_writes_character_domain(db_session_factory, 
 
 def test_invariant_events_single_source_of_truth(db_session_factory, flag_env):
     """不变量 1：模拟事件全部落 world_events（唯一 SoT）。"""
-    flag_env("plus_detection")
+    flag_env()
     user = "ws019-invariant-sot"
     world = world_repository.ensure_world(user)
 
@@ -368,9 +255,11 @@ def test_invariant_events_single_source_of_truth(db_session_factory, flag_env):
     assert len(keys) == len(set(keys)), "幂等键重复写入违反唯一 SoT 去重语义"
 
 
-def test_invariant_zero_llm_on_deterministic_path(db_session_factory, flag_env, fake_llm):
+def test_invariant_zero_llm_on_deterministic_path(db_session_factory, flag_env, fake_llm, monkeypatch):
     """不变量 3：默认路径 0 LLM —— 维护步 + 确定性检出期间 LLM 调用记录为空。"""
-    flag_env("plus_detection")  # llm_assist 仍为 false
+    monkeypatch.setenv("WORLD_LLM_ASSIST_SAMPLE_RATE", "0")
+    get_settings.cache_clear()
+    flag_env()
     user = "ws019-invariant-llm"
     world_repository.ensure_world(user)
 
@@ -388,7 +277,7 @@ def test_invariant_seeded_randomness_reproducible(db_session_factory, flag_env):
     """不变量 4：随机性显式种子可复现。"""
     from app.services.world.daily_plan import build_daily_plan
 
-    flag_env("plus_daily")
+    flag_env()
     user = "ws019-invariant-seed"
     world_repository.ensure_world(user)
     day = date(2026, 9, 14)
@@ -400,7 +289,7 @@ def test_invariant_seeded_randomness_reproducible(db_session_factory, flag_env):
 
 def test_invariant_time_advance_bounded(db_session_factory, flag_env, monkeypatch):
     """不变量 7：单次模拟跨度受 sim_advance_max_minutes 上限约束。"""
-    flag_env("master_time")
+    flag_env()
     monkeypatch.setenv("WORLD_TIME_MODE", "simulated")
     monkeypatch.setenv("WORLD_SIM_RATE", "120")
     get_settings.cache_clear()
@@ -422,7 +311,7 @@ def test_invariant_time_advance_bounded(db_session_factory, flag_env, monkeypatc
 
 def test_invariant_event_storm_cap(db_session_factory, flag_env):
     """不变量 7：单 tick 事件风暴上限，超出折叠为 world_digest。"""
-    flag_env("plus_detection")
+    flag_env()
     user = "ws019-invariant-storm"
     world_repository.ensure_world(user)
     cap = get_settings().world_event_tick_cap
@@ -492,7 +381,7 @@ def test_performance_simulation_tick_budget(db_session_factory, flag_env):
     """性能预算：单 tick 维护步耗时留数据（不设硬阈值，防慢机误杀）。"""
     import time as _time
 
-    flag_env("plus_daily")
+    flag_env()
     user = "ws019-perf"
     world_repository.ensure_world(user)
 

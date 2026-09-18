@@ -118,20 +118,13 @@ def test_render_with_brief_prepends_lines(db_session_factory):
     assert rendered.index("09-14") < rendered.index("【当前世界】") + 30
 
 
-def test_build_context_attaches_brief_only_when_enabled(db_session_factory, monkeypatch):
+def test_build_context_attaches_brief_always(db_session_factory, monkeypatch):
     user = "ws012-flag"
     world_repository.ensure_world(user)
-    ctx_off = world_engine.build_context(user)
-    assert ctx_off.brief is None
-
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
-    get_settings.cache_clear()
-    try:
-        ctx_on = world_engine.build_context(user)
-        assert ctx_on.brief is not None
-        assert ctx_on.brief.time_line
-    finally:
-        get_settings.cache_clear()
+    ctx = world_engine.build_context(user)
+    assert ctx is not None
+    assert ctx.brief is not None
+    assert ctx.brief.time_line
 
 
 def test_prompt_builder_budget_switch(monkeypatch):

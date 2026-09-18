@@ -42,15 +42,7 @@ const SIMULATION_ON = {
   current_block: null,
   active_situations: [],
   recent_events: [],
-  flags: {
-    world_simulation_enabled: true,
-    time_advance_enabled: true,
-    daily_life_enabled: true,
-    event_detection_enabled: true,
-    scene_expansion_enabled: false,
-    world_llm_assist_enabled: false,
-    debug_tick_enabled: false,
-  },
+  flags: {},
 }
 
 const PLAN_DTO = {
@@ -127,10 +119,10 @@ describe("WorldSimPanel", () => {
     expect(screen.getByTestId("world-sim-block-status-1").textContent).toBe("active")
     expect(screen.getByTestId("world-sim-situation-health")).toBeTruthy()
     expect(screen.getByText("我今天感冒了")).toBeTruthy()
-    expect(screen.queryByTestId("world-sim-tick")).toBeNull()
+    expect(screen.getByTestId("world-sim-tick")).toBeTruthy()
   })
 
-  it("shows disabled empty state when master flag is off", async () => {
+  it("shows empty state when enabled is false", async () => {
     registerHandlers({ simulation: { ...SIMULATION_ON, enabled: false } })
     render(<WorldSimPanel userId="ws-off" />, { wrapper: makeWrapper() })
 
@@ -150,12 +142,12 @@ describe("WorldSimPanel", () => {
     expect(screen.getByTestId("world-sim-events-empty")).toBeTruthy()
   })
 
-  it("shows manual tick button and posts when debug tick flag is on", async () => {
+  it("shows manual tick button and posts when solidified", async () => {
     let posted = false
     registerHandlers({
       simulation: {
         ...SIMULATION_ON,
-        flags: { ...SIMULATION_ON.flags, debug_tick_enabled: true },
+        flags: {},
       },
     })
     server.use(

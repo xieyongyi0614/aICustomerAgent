@@ -15,8 +15,6 @@ pytestmark = pytest.mark.xdist_group("ws009")
 
 def _flags(monkeypatch, **extra):
     envs = {
-        "WORLD_SIMULATION_ENABLED": "true",
-        "EVENT_DETECTION_ENABLED": "true",
     }
     for key, value in extra.items():
         envs[key.upper()] = str(value).lower() if isinstance(value, bool) else str(value)

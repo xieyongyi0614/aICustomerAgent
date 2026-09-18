@@ -140,7 +140,7 @@ def test_world_settings_defaults(monkeypatch):
     assert settings.world_enabled is True
     assert settings.world_time_mode == "real_sync"
     assert settings.world_context_char_budget == 600
-    assert settings.world_llm_assist_enabled is False
+    assert "world_llm_assist_enabled" not in type(settings).model_fields
     assert settings.world_memory_importance()["normal"] == 0.6
     get_settings.cache_clear()
 

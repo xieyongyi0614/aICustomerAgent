@@ -83,9 +83,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/planner.py": "be5e56df23bc554f06bd3270bac745e5c71db9a9d831c607593200ec4573847e",
     "app/services/decision_pipeline.py": "0afb670900820ffe3af959516e3e8741c32e5c7c8c502fa4edfe987241411aac",
     "app/application/chat_pipeline.py": "8422352c04e992b13ce0a42d5c534de35313c9c82926280b7fc7fce2622a9d8b",
-    "app/application/post_process.py": "efeac1bc6108ccf89d5c567debdba27146f1809d153b4f87f40dae169a9eeee6",
-    "app/application/action_engine.py": "818767e0078cd2b2452fa1de6e4a9c830396d93798c46053de41e59931761342",
-    "app/prompts/builder.py": "cc2d3aedd5598437096a210c662937a6eb330624ef4ef9933dc5f8bb9799d5aa",
+    "app/application/post_process.py": "037cbd363d051a9f3f82d3a266315b37df3e5264b34f0a8032838127e4a28716",
+    "app/application/action_engine.py": "e5f426cb8635b1f100e5a5a4a6e685c558b308121705d6d2533c18f805f47542",
+    "app/prompts/builder.py": "a5f5c62778f07a6dc74dd4ad1317566232125f8fb104b98d54b5c33d635a0972",
 }
 """整文件零 diff 冻结面。
 

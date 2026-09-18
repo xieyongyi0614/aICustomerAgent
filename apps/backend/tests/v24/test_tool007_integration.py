@@ -32,8 +32,8 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "480b048be12519f14f516d0a3108b256c926848850c1cbc969af4a819c910953",
-    "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
+    "app/application/world_engine.py": "b51ab4dc8c822f476709d25472fffb2b4273acad527476ab783a2d9d277638c7",
+    "app/application/outbox_consumer.py": "3bac0ff4191b0307e2386602a7d46200f04df6a10e7dae5c4dd4317503a700a5",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
 

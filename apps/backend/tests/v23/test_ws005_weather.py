@@ -90,8 +90,6 @@ def test_daily_weather_orchestration_idempotent(db_session_factory, sim_mode):
 
 
 def test_maintenance_step_evolves_weather(monkeypatch, db_session_factory, sim_mode):
-    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
     get_settings.cache_clear()
     try:
         user = "ws005-maint"

@@ -290,21 +290,24 @@ def test_active_events_include_active_status(db_session_factory):
 # --- E10：场景画像 -----------------------------------------------------------
 
 
-def test_e10_scene_empty_when_expansion_flag_off(db_session_factory):
+def test_e10_scene_projection_when_world_present(db_session_factory):
     seed_all()
-    assert _build()["scene"] == {}
+    scene = _build()["scene"]
+    assert scene["location_id"] == LOCATION
+    assert scene["tone_bias"] == "intimate"
+    assert "日常" in scene["topic_affordances"]
 
 
 def test_scene_projection_when_expansion_flag_on(db_session_factory):
     seed_all()
-    scene = _build(scene_expansion_enabled=True)["scene"]
+    scene = _build()["scene"]
     assert scene["location_id"] == LOCATION
     assert scene["tone_bias"] == "intimate"
     assert "日常" in scene["topic_affordances"]
 
 
 def test_scene_empty_without_world_record(db_session_factory):
-    assert _build(scene_expansion_enabled=True)["scene"] == {}
+    assert _build()["scene"] == {}
 
 
 # --- E11：关系读取失败降级 ---------------------------------------------------
