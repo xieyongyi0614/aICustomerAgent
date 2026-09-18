@@ -29,7 +29,6 @@ from app.services.tool.confirmation import (
 )
 from app.services.tool.context import ToolContext
 from app.services.tool.executor import (
-    PERMISSION_LAYER_OFF_REASON,
     PermissionSnapshot,
     ToolExecutor,
 )
@@ -60,6 +59,7 @@ from tests.v24.tool005_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 USER = "u-tool005-round"
 CONTENT = "明天开会"
+FAR_FUTURE = "2030-01-01T09:00:00"
 
 POST_PROCESS_STEP_SEQUENCE = (
     "run_scene_update",
@@ -210,13 +210,17 @@ async def test_executor_level_allow_invokes_capability():
     executor = build_executor(registry, capability, settings=_executor_settings())
     execution = await executor.run(
         registry.resolve(NORMAL_TOOL_ID),
-        invocation(NORMAL_TOOL_ID, {"content": "x"}, action_type="create_reminder"),
+        invocation(
+            NORMAL_TOOL_ID,
+            {"content": "x", "due_at": FAR_FUTURE},
+            action_type="create_reminder",
+        ),
         _tool_ctx(),
     )
     assert execution.status == "succeeded"
     assert execution.permission["decision"] == DECISION_ALLOW
     assert execution.permission["reason"] == "level_no_grant_required"
-    assert capability.calls == [{"content": "x"}]
+    assert capability.calls == [{"content": "x", "due_at": FAR_FUTURE}]
 
 
 @pytest.mark.asyncio
@@ -253,27 +257,12 @@ async def test_executor_does_not_build_snapshot_when_given_one(monkeypatch):
     assert built == [USER]
 
 
-@pytest.mark.asyncio
-async def test_executor_master_gate_off_keeps_placeholder_allow_e14():
-    registry = registry_with(untrusted_definition())
-    capability = _memory_capability()
-    settings = _executor_settings()
-    executor = build_executor(registry, capability, settings=settings)
-    execution = await executor.run(
-        registry.resolve(UNTRUSTED_TOOL_ID),
-        invocation(UNTRUSTED_TOOL_ID),
-        _tool_ctx(permission_settings()),
-    )
-    assert execution.status == "succeeded"
-    assert execution.permission["decision"] == DECISION_ALLOW
-    assert execution.permission["reason"] == PERMISSION_LAYER_OFF_REASON
-    assert capability.calls != []
-
-
-def test_placeholder_reason_constant_removed():
+def test_permission_layer_off_reason_removed():
+    """三段语义删除后，执行器源码不得再出现占位放行与 permission_layer_* reason。"""
     source = (BACKEND_ROOT / "app/services/tool/executor.py").read_text(encoding="utf-8")
     assert "permission_gate_placeholder_allow_all" not in source
-    assert "PERMISSION_LAYER_OFF_REASON = REASON_LAYER_OFF" in source
+    assert "REASON_LAYER_" not in source
+    assert "PERMISSION_LAYER_" not in source
 
 
 # --- action_engine 端到端：确认登记与话术投影 ----------------------------------
@@ -548,8 +537,8 @@ def test_life_loop_maintenance_sequence_unchanged():
     assert not [step for step in LIFE_LOOP_MAINTENANCE_SEQUENCE if "confirmation" in step]
 
 
-def test_life_loop_passes_due_exclusion_only_when_master_gate_on(override_settings):
-    """P2-1 调用侧：工具总闸 off → 不传排除（V9 口径）；on → 传两类非待办 kind。"""
+def test_life_loop_passes_due_exclusion_on_every_cycle(override_settings):
+    """P2-1 调用侧：到期口径恒排除确认行与授权行（工具总闸已删，无 off 分支）。"""
     from app.application import life_loop
 
     calls: list[object] = []
@@ -568,7 +557,10 @@ def test_life_loop_passes_due_exclusion_only_when_master_gate_on(override_settin
     finally:
         trigger_repository.has_due = original
 
-    assert calls == [None, ("tool_confirmation", "tool_grant")]
+    assert calls == [
+        ("tool_confirmation", "tool_grant"),
+        ("tool_confirmation", "tool_grant"),
+    ]
 
 
 def test_expire_planned_calls_confirmation_cleanup():
@@ -680,17 +672,6 @@ def test_pending_confirmation_prompt_enters_action_context(override_settings, db
     assert "要我现在把「明天开会」发出去吗？" in rendered
 
 
-def test_action_context_unchanged_without_permission_flag(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
-    _persist_pending_record()
-
-    from app.services.action.context import build_action_context, render_action_section
-
-    rendered = render_action_section(build_action_context(USER))
-    assert "发送通知" in rendered
-    assert "要我现在把" not in rendered
-
-
 # --- 冻结面：枚举 / 闸门顺序 ----------------------------------------------------
 
 
@@ -753,6 +734,10 @@ def test_builtin_registry_matches_tool005_expectations():
     assert registry.get("world.env.query").permission.level == "safe"
 
 
-def test_tool_registry_singleton_requires_master_gate(override_settings):
+def test_tool_registry_singleton_is_always_available(override_settings):
+    """注册表构建面已常开：单例恒可用且只构建一次。"""
     override_settings()
-    assert get_tool_registry() is None
+    registry = get_tool_registry()
+    assert registry is not None
+    assert registry is get_tool_registry()
+    assert registry.get(NORMAL_TOOL_ID) is not None

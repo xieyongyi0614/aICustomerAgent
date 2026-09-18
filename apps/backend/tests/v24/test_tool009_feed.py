@@ -70,18 +70,6 @@ def test_feed_is_empty_without_flag_or_insights(db_session_factory, tool_reflect
     assert tool_feed.autonomy_signal(USER) == {}
 
 
-def test_feed_is_disabled_when_sub_flag_off(db_session_factory, v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
-    seed_insight(
-        db_session_factory,
-        "ins-tool009-off",
-        insight_type="capability_note",
-        tool_ids=(TOOL_WEATHER,),
-    )
-    assert tool_feed.is_enabled(get_settings()) is False
-    assert tool_feed.interest_signal(USER) == []
-
-
 def test_autonomy_signal_has_notes_and_unreliable_capabilities(
     db_session_factory, tool_reflection_on
 ):

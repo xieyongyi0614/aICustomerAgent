@@ -286,7 +286,7 @@ def test_has_due_excludes_confirmation_and_grant_rows():
     assert request is not None and grant_id is not None
     assert trigger_registry_repository.get(grant_id).due_at <= now
 
-    kinds = non_todo_payload_kinds(settings)
+    kinds = non_todo_payload_kinds()
     assert kinds == (CONFIRMATION_ROW_KIND, "tool_grant")
 
     assert (
@@ -329,7 +329,7 @@ def test_has_due_keeps_real_action_due_rows_with_exclusion():
             user_id=USER_ID,
             now=now,
             include_types=(CONFIRMATION_TRIGGER_TYPE,),
-            exclude_payload_kinds=non_todo_payload_kinds(settings),
+            exclude_payload_kinds=non_todo_payload_kinds(),
         )
         is True
     )
@@ -350,14 +350,6 @@ def test_has_due_default_arguments_keep_v9_shape():
             )
             is True
         ), kwargs
-
-
-def test_non_todo_payload_kinds_is_gated_by_master_switch():
-    """总闸 off → `None`（不排除）：这些行根本不会被登记，life_loop 侧的调用形态与 V9 一致。"""
-    from app.services.tool.confirmation import non_todo_payload_kinds
-
-    assert non_todo_payload_kinds(_settings()) is None
-    assert non_todo_payload_kinds(_settings()) is not None
 
 
 # --- TTL 复用两态 -------------------------------------------------------------
@@ -554,35 +546,8 @@ async def _post(path: str, **params):
 
 @pytest.fixture
 def permission_on(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_PERMISSION_ENABLED=True)
-
-
-@pytest.fixture
-def master_only(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_PERMISSION_ENABLED=False)
-
-
-@pytest.mark.asyncio
-async def test_debug_permissions_requires_master_gate(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_PERMISSION_ENABLED=False)
-    response = await _get("/debug/tools/permissions", user_id=USER_ID)
-    assert response.status_code == 200
-    assert response.json() == {"enabled": False, "user_id": None, "grants": []}
-
-
-@pytest.mark.asyncio
-async def test_debug_read_endpoints_forbidden_without_permission_layer(master_only):
-    assert (await _get("/debug/tools/permissions", user_id=USER_ID)).status_code == 403
-    assert (await _get("/debug/tools/confirmations", user_id=USER_ID)).status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_debug_write_endpoints_forbidden_without_master(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_PERMISSION_ENABLED=False)
-    assert (
-        await _post(f"/debug/tools/confirmations/{USER_ID}/revoke")
-    ).status_code == 403
-    assert (await _post("/debug/tools/permissions/revoke", user_id=USER_ID)).status_code == 403
+    """权限面已常开；夹具只负责 settings 缓存与注册表单例隔离。"""
+    v24_tool_env()
 
 
 @pytest.mark.asyncio

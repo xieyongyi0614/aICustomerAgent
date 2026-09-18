@@ -63,11 +63,10 @@ def _clean_singletons():
     get_settings.cache_clear()
 
 
-def test_flag_off_keeps_v9_capability_registry_untouched():
-    """AC：Flag 全 off → 外部能力不进全局注册表（V9 仍是六个能力）。"""
+def test_default_registry_is_v9_six_plus_external_capability():
+    """默认配置：注册表 = V9 六能力 + 外部能力体（外部面注册已常开，通道仍随飞书开关）。"""
     registry = capability_registry_module.get_capability_registry()
     names = {entry["name"] for entry in registry.describe()}
-    assert ext_api.EXT_API_CAPABILITY_NAME not in names
     assert "channel_feishu" not in names
     assert names == {
         "reminder",
@@ -76,56 +75,28 @@ def test_flag_off_keeps_v9_capability_registry_untouched():
         "environment_query",
         "search",
         "notification",
+        ext_api.EXT_API_CAPABILITY_NAME,
     }
 
 
-def test_flag_on_registers_external_capability(v24_tool_env):
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=True)
-    registry = capability_registry_module.get_capability_registry()
-    assert ext_api.EXT_API_CAPABILITY_NAME in {entry["name"] for entry in registry.describe()}
-
-
-def test_flag_off_means_no_tool_registry_and_no_manifests(tmp_path, monkeypatch):
-    """AC：Flag 全 off 时清单不加载、ext.api.* 工具不存在、自定义注册拒绝。"""
+def test_manifest_loader_rejects_host_outside_allowlist(tmp_path, monkeypatch):
+    """外部面已常开：准入由主机白名单单点决定（白名单为空 → 清单全部跳过）。"""
     from tests.v24.tool011_support import write_manifest
 
     write_manifest(tmp_path, "weather.yaml", weather_manifest())
     monkeypatch.setenv(WEATHER_ENV, WEATHER_SECRET)
     get_settings.cache_clear()
 
-    assert ext_api.external_api_enabled(get_settings()) is False
-    assert get_tool_registry() is None
-    report = ext_api.get_manifest_loader().load(str(tmp_path))
-    assert report.as_dict()["total"] == 0
+    report = ext_api.get_manifest_loader().load(str(tmp_path)).as_dict()
+    assert report["loaded"] == []
+    assert report["skipped"]
 
+
+def test_user_tool_registrar_is_always_available(v24_tool_env):
+    """自定义工具注册面已常开：声明合法即注册成功（不再有部署闸门）。"""
     registrar = user_defined.get_user_tool_registrar()
-    assert registrar.enabled() is False
-    with pytest.raises(user_defined.UserToolRejected):
-        registrar.register(user_declaration())
-    assert registrar.list_registered() == []
-
-
-def test_master_gate_alone_does_not_load_manifests(v24_tool_env, tmp_path):
-    """总闸单开（外部面关）：清单不加载、能力不进注册表。"""
-    from tests.v24.tool011_support import write_manifest
-
-    v24_tool_env(
-        TOOL_SYSTEM_ENABLED=True,
-        TOOL_EXTERNAL_API_ENABLED=False,
-        TOOL_EXT_ALLOWED_HOSTS=WEATHER_HOST,
-        TOOL_EXT_MANIFEST_PATH=str(tmp_path),
-        **{WEATHER_ENV: WEATHER_SECRET},
-    )
-    write_manifest(tmp_path, "weather.yaml", weather_manifest())
-    capability_registry_module._registry = None
-
-    assert ext_api.external_api_enabled(get_settings()) is False
-    assert ext_api.EXT_API_CAPABILITY_NAME not in {
-        entry["name"] for entry in capability_registry_module.get_capability_registry().describe()
-    }
-    tools = get_tool_registry()
-    assert tools is not None
-    assert [tool.id for tool in tools.list(namespace="ext.api")] == []
+    registered = registrar.register(user_declaration())
+    assert registered in registrar.list_registered()
 
 
 def test_ext_and_user_namespaces_never_deposit_memory():

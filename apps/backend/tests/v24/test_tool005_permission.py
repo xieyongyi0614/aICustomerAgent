@@ -23,9 +23,6 @@ from app.services.tool.permission import (
     REASON_DEFAULT_DENY,
     REASON_FIRST_TIME_CONFIRMATION,
     REASON_GRANT_MATCHED,
-    REASON_LAYER_DISABLED,
-    REASON_LAYER_DISABLED_GRANT_FREE,
-    REASON_LAYER_OFF,
     REASON_LEVEL_NO_GRANT_REQUIRED,
     REASON_OUT_OF_SCOPE,
     REASON_SNAPSHOT_UNAVAILABLE,
@@ -469,16 +466,6 @@ def test_channel_unbind_loses_implied_grant_e10():
     assert decision.reason == REASON_DEFAULT_DENY
 
 
-def test_master_gate_off_keeps_allow_all_e14():
-    definition = untrusted_definition()
-    settings = permission_settings()
-    decision = _gate().evaluate(
-        definition, invocation(UNTRUSTED_TOOL_ID), snapshot(settings=settings)
-    )
-    assert decision.decision == DECISION_ALLOW
-    assert decision.reason == REASON_LAYER_OFF
-
-
 @pytest.mark.parametrize(
     "definition_factory,tool_id",
     [
@@ -486,50 +473,11 @@ def test_master_gate_off_keeps_allow_all_e14():
         (normal_definition, NORMAL_TOOL_ID),
     ],
 )
-def test_sub_layer_off_grant_free_tier_still_allows(definition_factory, tool_id):
-    """P0-1 中段：总闸 on + 权限子闸 off 时，免授权档（safe / normal）仍放行。"""
-    settings = permission_settings()
-    decision = _gate().evaluate(
-        definition_factory(), invocation(tool_id), snapshot(settings=settings)
-    )
+def test_grant_free_tier_allows_without_grant(definition_factory, tool_id):
+    """① 步：免授权档（safe / normal）无需任何授权存储即放行。"""
+    decision = _gate().evaluate(definition_factory(), invocation(tool_id), snapshot())
     assert decision.decision == DECISION_ALLOW
-    assert decision.reason == REASON_LAYER_DISABLED_GRANT_FREE
-
-
-@pytest.mark.parametrize(
-    "definition_factory,tool_id,expected_level",
-    [
-        (sensitive_definition, SENSITIVE_TOOL_ID, "sensitive"),
-        (channel_definition, CHANNEL_TOOL_ID, "sensitive"),
-        (always_definition, DANGEROUS_TOOL_ID, "dangerous"),
-        (untrusted_definition, UNTRUSTED_TOOL_ID, "dangerous"),
-        (ext_definition, EXT_TOOL_ID, "sensitive"),
-    ],
-)
-def test_sub_layer_off_privileged_tiers_default_deny(
-    definition_factory, tool_id, expected_level
-):
-    """P0-1 中段：总闸 on + 权限子闸 off 时，特权档默认拒绝（fail-closed）。"""
-    settings = permission_settings()
-    decision = _gate().evaluate(
-        definition_factory(), invocation(tool_id), snapshot(settings=settings)
-    )
-    assert decision.decision == DECISION_DENY
-    assert decision.reason == REASON_LAYER_DISABLED
-    assert decision.level == expected_level
-
-
-def test_sub_layer_off_ignores_passed_snapshot_grants():
-    """子闸 off 时快照不参与判定：特权档即便带 grant 也不得放行（无授权存储可读）。"""
-    settings = permission_settings()
-    granted = snapshot(
-        grants=[grant(SENSITIVE_TOOL_ID, ("self",))], settings=settings
-    )
-    decision = _gate().evaluate(
-        sensitive_definition(), invocation(SENSITIVE_TOOL_ID), granted
-    )
-    assert decision.decision == DECISION_DENY
-    assert decision.reason == REASON_LAYER_DISABLED
+    assert decision.reason == REASON_LEVEL_NO_GRANT_REQUIRED
 
 
 def test_evaluate_never_raises_on_broken_snapshot():

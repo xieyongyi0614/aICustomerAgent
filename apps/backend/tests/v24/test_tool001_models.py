@@ -387,7 +387,7 @@ def _execution(**overrides):
         "permission": {
             "level": "sensitive",
             "decision": "deny",
-            "reason": "permission_layer_disabled",
+            "reason": "default_deny",
             "confirmed": False,
         },
         "validation": {
@@ -416,7 +416,7 @@ def test_execution_accessors_return_models_from_dicts():
     execution = _execution()
 
     assert isinstance(execution.permission_model(), PermissionDecision)
-    assert execution.permission_model().reason == "permission_layer_disabled"
+    assert execution.permission_model().reason == "default_deny"
     assert isinstance(execution.validation_model(), ValidationReport)
     assert execution.validation_model().structural == [
         {"param": "x", "code": "unknown_param", "message": "未知参数"}

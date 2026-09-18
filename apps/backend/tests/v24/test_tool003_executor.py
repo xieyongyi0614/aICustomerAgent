@@ -14,9 +14,6 @@ from app.services.tool.context import ToolContext
 from app.services.tool.executor import (
     PERMISSION_CONFIRM_REQUIRED,
     PERMISSION_DENY,
-    PERMISSION_LAYER_DISABLED_GRANT_FREE_REASON,
-    PERMISSION_LAYER_DISABLED_REASON,
-    PERMISSION_LAYER_OFF_REASON,
     PermissionDecision,
     PermissionGate,
     PermissionSnapshot,
@@ -590,7 +587,9 @@ async def test_five_stages_run_in_fixed_order():
         return original_is_tripped(tool_id, now)
 
     health.is_tripped = _is_tripped
-    gate = RecordingGate(PermissionDecision("allow", "normal", PERMISSION_LAYER_OFF_REASON))
+    gate = RecordingGate(
+        PermissionDecision("allow", "normal", REASON_LEVEL_NO_GRANT_REQUIRED)
+    )
     original_gate_evaluate = gate.evaluate
 
     def _evaluate(defn, inv, snapshot):
