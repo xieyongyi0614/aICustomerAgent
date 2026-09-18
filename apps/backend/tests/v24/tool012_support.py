@@ -572,12 +572,10 @@ def builtin_registry():
 
 
 def tool_settings(**overrides: Any):
-    """V2.4.0 全 Flag 的 settings 替身（默认总闸 on、子闸 off）。"""
+    """V2.4.0 工具域 settings 替身（开关体系已删除，只剩治理参数）。"""
     from types import SimpleNamespace
 
     values: dict[str, Any] = {
-        V24_MASTER_FLAG.lower(): True,
-        **{flag.lower(): False for flag in V24_SUB_FLAGS},
         "feishu_enabled": False,
         "tool_disabled_ids": "",
         "tool_surface_max_tools": 12,

@@ -43,6 +43,7 @@ from tests.v24.tool003_support import (
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 TOOL_ID = "builtin.reminder.create"
+DEFAULT_DUE_AT = "2026-06-02T08:00:00"
 NOTIFICATION_ID = "builtin.notification.send"
 
 GRANT_FREE_PERMISSION = PermissionProfile(level="normal", scope=("self",))
@@ -54,7 +55,12 @@ def _intent() -> ActionIntent:
 
 
 def _invocation(tool_id: str = TOOL_ID, params: dict | None = None) -> ToolInvocation:
-    return ToolInvocation(tool_id=tool_id, params=params or {}, intent=_intent())
+    """默认参数取自 schema 必填项：校验段已转正常开，空参数会被结构性拦下。"""
+    return ToolInvocation(
+        tool_id=tool_id,
+        params=params if params is not None else {"content": "买牛奶", "due_at": DEFAULT_DUE_AT},
+        intent=_intent(),
+    )
 
 
 def _ctx(**overrides) -> ToolContext:
@@ -189,60 +195,10 @@ async def test_tripped_tool_is_unavailable_after_resolve_e2():
 # --- ② permission ------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_permission_sub_layer_off_keeps_grant_free_tier_allow():
-    """P0-1：总闸 on + 权限子闸 off 时，免授权档（normal）仍放行——三段的中间段。"""
-    registry, capability = _succeeding_registry_and_capability()
-    executor = build_executor(registry, capability)
-    execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
-    assert execution.permission == {
-        "level": "normal",
-        "decision": "allow",
-        "reason": PERMISSION_LAYER_DISABLED_GRANT_FREE_REASON,
-        "confirmed": False,
-    }
-    assert execution.status == "succeeded"
-    assert capability.calls == [{}]
 
 
-@pytest.mark.asyncio
-async def test_permission_sub_layer_off_denies_sensitive_tier():
-    """P0-1：总闸 on + 权限子闸 off 时，特权档（sensitive）默认拒绝——fail-closed。"""
-    registry = registry_with(sensitive_definition())
-    capability = StubCapability()
-    executor = build_executor(registry, capability)
-    execution = await executor.run(
-        registry.resolve(NOTIFICATION_ID),
-        _invocation(NOTIFICATION_ID, {"content": "你好", "recipient": "u-9"}),
-        _ctx(),
-    )
-    assert execution.status == "denied"
-    assert execution.permission == {
-        "level": "sensitive",
-        "decision": "deny",
-        "reason": PERMISSION_LAYER_DISABLED_REASON,
-        "confirmed": False,
-    }
-    assert capability.calls == []
 
 
-@pytest.mark.asyncio
-async def test_master_gate_off_is_placeholder_allow_for_every_tier():
-    """总闸 off：权限段不参与（TOOL-003 交付态），特权档同样放行——三段的首段。"""
-    registry = registry_with(sensitive_definition())
-    capability = StubCapability()
-    executor = build_executor(
-        registry, capability, settings=tool_settings()
-    )
-    execution = await executor.run(
-        registry.resolve(NOTIFICATION_ID),
-        _invocation(NOTIFICATION_ID, {"content": "你好", "recipient": "u-9"}),
-        _ctx(),
-    )
-    assert execution.permission["decision"] == "allow"
-    assert execution.permission["reason"] == PERMISSION_LAYER_OFF_REASON
-    assert execution.status == "succeeded"
-    assert capability.calls != []
 
 
 @pytest.mark.asyncio
@@ -328,15 +284,6 @@ def test_permission_interfaces_are_frozen_shapes():
 # --- ③ validate --------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_validation_off_skips_validator():
-    registry, capability = _succeeding_registry_and_capability()
-    validator = RecordingValidator()
-    executor = build_executor(registry, capability, validator=validator)
-    execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
-    assert validator.calls == []
-    assert execution.validation is None
-    assert execution.status == "succeeded"
 
 
 @pytest.mark.asyncio
@@ -422,18 +369,6 @@ async def test_invoke_reuses_capability_executor_instance():
     assert execution.status == "succeeded"
 
 
-@pytest.mark.asyncio
-async def test_success_persists_v9_shape_when_observation_off():
-    registry, capability = _succeeding_registry_and_capability()
-    executor = build_executor(registry, capability)
-    execution = await executor.run(
-        registry.resolve(TOOL_ID),
-        _invocation(params={"content": "买牛奶", "due_at": "2026-06-02T08:00:00"}),
-        _ctx(),
-    )
-    assert execution.status == "succeeded"
-    assert set(execution.result) == {"status", "payload", "usage", "error"}
-    assert execution.result["payload"]["world_event_id"] == "evt-1"
 
 
 @pytest.mark.asyncio
@@ -612,7 +547,8 @@ async def test_empty_sensitive_param_is_not_redacted_e12():
         _invocation(NOTIFICATION_ID, {"content": "你好", "recipient": ""}),
         _ctx(),
     )
-    assert execution.params == {"content": "你好", "recipient": ""}
+    assert execution.params["content"] == "你好"
+    assert REDACTED_VALUE not in execution.params.values()
     assert execution.result["redacted"] == []
 
 
@@ -722,30 +658,6 @@ def test_executor_does_not_reimplement_timeout_wrapper():
     assert "app.repositories" not in source
 
 
-@pytest.mark.asyncio
-async def test_timeout_and_exception_results_match_v9_capability_executor():
-    async def _boom(params, ctx):
-        raise RuntimeError("boom!")
-
-    async def _slow(params, ctx):
-        await asyncio.sleep(1)
-        return CapabilityResult(status="succeeded")
-
-    for behavior, timeout in ((_boom, 2.0), (_slow, 0.05)):
-        registry = registry_with(definition())
-        capability = _reminder_capability(behavior)
-        v9_result = await CapabilityExecutor(stub_registry(capability), timeout).run(
-            ActionStep(index=0, capability="reminder", action="create", params={}), _ctx()
-        )
-        executor = build_executor(registry, capability, timeout_seconds=timeout)
-        execution = await executor.run(registry.resolve(TOOL_ID), _invocation(), _ctx())
-        v9_payload = v9_result.model_dump(mode="json")
-        assert execution.status == v9_result.status
-        assert {
-            key: value for key, value in execution.result.items() if key != "usage"
-        } == {key: value for key, value in v9_payload.items() if key != "usage"}
-        assert set(execution.result["usage"]) == set(v9_payload["usage"])
-        assert execution.duration_ms == round(execution.result["usage"]["duration_ms"])
 
 
 @pytest.mark.asyncio

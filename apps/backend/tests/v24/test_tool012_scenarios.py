@@ -147,12 +147,38 @@ S1_PARAMS: dict[str, object] = {
     "recipient": "ou_asuna",
 }
 
+TYPE_DEFAULTS: dict[str, object] = {
+    "string": "在吗",
+    "number": 1.0,
+    "integer": 1,
+    "boolean": True,
+}
+
+
+def _declared_params(definition) -> dict:
+    """按声明 schema 造必填参数。
+
+    校验段已转正常开：未声明的键（结构性）与类型不符（如 `importance` 是 number）
+    都会被拦下，故不能共用一份全键参数字典。
+    """
+    params: dict = {}
+    for parameter in definition.input_schema.parameters:
+        if not parameter.required:
+            continue
+        if parameter.type == "enum" and parameter.enum:
+            params[parameter.name] = parameter.enum[0]
+        elif parameter.type == "datetime":
+            params[parameter.name] = FAR_FUTURE
+        else:
+            params[parameter.name] = TYPE_DEFAULTS.get(parameter.type, "x")
+    return params
+
 
 @pytest.mark.parametrize("tool_id", S1_TOOL_IDS)
 def test_s1_foreground_tool_call_reaches_capability(monkeypatch, tool_id):
     """用户消息 → 工具选择 → 执行 → 结果归一（每个声明工具各一例）。
 
-    P0-1 后特权档（sensitive 及以上）需要权限子闸 + 授权快照才能到达能力实现。
+    权限层已转正常开，特权档需要授权快照才能到达能力实现。
     """
     env = CHANNEL_ON if tool_id == "channel.feishu.send" else MASTER_ON
     support.apply_flag_env(monkeypatch, _env_reaching_capability(tool_id, env))
@@ -165,7 +191,7 @@ def test_s1_foreground_tool_call_reaches_capability(monkeypatch, tool_id):
     execution = _run(
         executor,
         tool_id,
-        dict(S1_PARAMS),
+        _declared_params(definition),
         _context(settings=settings),
         snapshot_=_grant_snapshot_for(tool_id, settings),
     )
@@ -174,7 +200,7 @@ def test_s1_foreground_tool_call_reaches_capability(monkeypatch, tool_id):
     assert execution.capability == definition.capability
     assert execution.action == definition.action
     assert execution.status == "succeeded"
-    assert stub.calls and stub.calls[0]["content"] == "在吗"
+    assert stub.calls and stub.calls[0] == _declared_params(definition)
     assert execution.result["status"] == "succeeded"
     assert execution.duration_ms is not None
 
