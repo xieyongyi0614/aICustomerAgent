@@ -33,7 +33,7 @@ class TestFunctionalAcceptance:
     def test_execute_reuses_record(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         action = manager.create(
             user_id="u_acc_exec",
             action_type="remember_fact",
@@ -59,7 +59,7 @@ class TestFunctionalAcceptance:
     def test_result_generated(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_result_enabled", True)
+        monkeypatch.setattr(settings, "action_result_enabled", True)
         from app.models.action import CapabilityResult
 
         result = result_service.from_capability_result(
@@ -76,8 +76,8 @@ class TestFunctionalAcceptance:
 
     def test_feedback_produced(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_feedback_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_feedback_enabled", True)
         action = manager.create(
             user_id="u_acc_fb",
             action_type="create_reminder",
@@ -100,7 +100,7 @@ class TestSystemFlowAcceptance:
     def test_plan_action_execute_outcome(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         intent = ActionIntent(
             action_type="remember_fact",
             confidence="confident",
@@ -140,7 +140,7 @@ class TestSystemFlowAcceptance:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:
@@ -266,10 +266,10 @@ class TestErrorAcceptance:
 class TestRegressionCheck:
     def test_flag_off_defaults(self):
         settings = get_settings()
-        assert settings.v26_action_execution_enabled is False
-        assert settings.v26_action_scheduler_enabled is False
-        assert settings.v26_action_feedback_enabled is False
-        assert settings.v26_action_result_enabled is False
+        assert settings.action_execution_enabled is False
+        assert settings.action_scheduler_enabled is False
+        assert settings.action_feedback_enabled is False
+        assert settings.action_result_enabled is False
 
     def test_flag_off_no_schedule_step(self):
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
@@ -302,15 +302,15 @@ class TestRegressionCheck:
 
     def test_debug_flag_off_404(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", False)
+        monkeypatch.setattr(settings, "action_execution_enabled", False)
         with pytest.raises(HTTPException) as exc:
             debug_api.list_execution_actions(user_id="u")
         assert exc.value.status_code == 404
 
     def test_debug_flag_on_works(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_debug_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_debug_enabled", True)
         action = manager.create(
             user_id="u_dbg", action_type="create_reminder", params={"content": "dbg"}
         )

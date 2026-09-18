@@ -466,7 +466,7 @@ class TestReconcile:
     def test_configuration_window_is_used_by_default(self):
         from app.core.settings import get_settings
 
-        assert get_settings().v25_plan_step_max_attempts == 2
+        assert get_settings().plan_step_max_attempts == 2
         step = support.spec(1, attempt_count=1)
         updated = PlanExecutorBridge().reconcile(
             self._outcome("failed", failure_kind="permanent"), step

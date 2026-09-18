@@ -34,10 +34,10 @@ class TestScenarioASingleGoal:
         self, db_session_factory, override_settings, make_goal, stub_planning_llm
     ):
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_context_enabled="true",
-            v25_plan_step_binding_enabled="true",
-            v24_tool_system_enabled="true",
+            planning_enabled="true",
+            plan_context_enabled="true",
+            plan_step_binding_enabled="true",
+            tool_system_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")
         steps = [

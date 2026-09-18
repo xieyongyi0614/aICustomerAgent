@@ -28,8 +28,8 @@ def _now() -> datetime:
 def feedback_enabled() -> bool:
     settings = get_settings()
     return bool(
-        getattr(settings, "v26_action_execution_enabled", False)
-        and getattr(settings, "v26_action_feedback_enabled", False)
+        getattr(settings, "action_execution_enabled", False)
+        and getattr(settings, "action_feedback_enabled", False)
     )
 
 

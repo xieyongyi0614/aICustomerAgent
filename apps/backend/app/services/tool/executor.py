@@ -170,7 +170,7 @@ class ToolExecutor:
             )
 
         validation = None
-        if getattr(self.settings, "v24_tool_schema_validation_enabled", False):
+        if getattr(self.settings, "tool_schema_validation_enabled", False):
             report = self.validator.validate(defn, params, _tool_ctx(ctx))
             if not report.passed:
                 return self._terminal(
@@ -276,7 +276,7 @@ class ToolExecutor:
 
     def _persisted(self, raw: CapabilityResult, tool_result: ToolResult) -> dict[str, Any]:
         """观测闸 off → V9 原始 `CapabilityResult` 形态；on → ToolResult + 旧 payload 读键。"""
-        if not getattr(self.settings, "v24_tool_observation_enabled", False):
+        if not getattr(self.settings, "tool_observation_enabled", False):
             return raw.model_dump(mode="json")
         return persisted_result(tool_result, raw)
 

@@ -89,7 +89,7 @@ TOOL_WINDOW_THRESHOLDS: dict[str, dict[str, float]] = {
     },
     TOOL_WINDOW_USER_FEEDBACK: {"min_samples": 3, "min_span_hours": 24.0},
 }
-"""样本数 / 时间跨度门槛：与既有 `v2_reflection_min_evidence` / `min_span_hours` 同量级。"""
+"""样本数 / 时间跨度门槛：与既有 `reflection_min_evidence` / `min_span_hours` 同量级。"""
 
 TOOL_FEEDBACK_POLARITY_NEGATIVE = "negative"
 TOOL_FEEDBACK_POLARITY_POSITIVE = "positive"

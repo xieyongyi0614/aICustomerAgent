@@ -7,16 +7,16 @@ from app.core.settings._shared import SettingsError
 from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 
 V24_FLAGS = (
-    "v24_tool_system_enabled",
-    "v24_tool_permission_enabled",
-    "v24_tool_schema_validation_enabled",
-    "v24_tool_observation_enabled",
-    "v24_tool_surface_enabled",
-    "v24_tool_memory_enabled",
-    "v24_tool_reflection_enabled",
-    "v24_tool_channel_enabled",
-    "v24_tool_external_api_enabled",
-    "v24_tool_user_defined_enabled",
+    "tool_system_enabled",
+    "tool_permission_enabled",
+    "tool_schema_validation_enabled",
+    "tool_observation_enabled",
+    "tool_surface_enabled",
+    "tool_memory_enabled",
+    "tool_reflection_enabled",
+    "tool_channel_enabled",
+    "tool_external_api_enabled",
+    "tool_user_defined_enabled",
 )
 
 V24_SUB_FLAGS = V24_FLAGS[1:]
@@ -44,7 +44,7 @@ def _settings_with(monkeypatch, **envs):
 def test_each_v24_sub_flag_without_master_is_violation(monkeypatch, flag):
     settings = _settings_with(monkeypatch, **{flag: True})
     violations = enablement_violations(settings)
-    assert any("v24_tool_system_enabled" in violation for violation in violations), flag
+    assert any("tool_system_enabled" in violation for violation in violations), flag
 
 
 @pytest.mark.parametrize("flag", V24_SUB_FLAGS)
@@ -65,8 +65,8 @@ def test_all_v24_flags_with_master_is_clean(monkeypatch):
 def test_channel_requires_feishu_binding(monkeypatch):
     settings = _settings_with(
         monkeypatch,
-        v24_tool_system_enabled=True,
-        v24_tool_channel_enabled=True,
+        tool_system_enabled=True,
+        tool_channel_enabled=True,
     )
     violations = enablement_violations(settings)
     assert any("feishu_enabled" in violation for violation in violations)
@@ -74,24 +74,24 @@ def test_channel_requires_feishu_binding(monkeypatch):
 
 def test_channel_with_feishu_binding_is_clean(monkeypatch):
     envs = dict(FEISHU_BINDING_ENVS)
-    envs.update(v24_tool_system_enabled=True, v24_tool_channel_enabled=True)
+    envs.update(tool_system_enabled=True, tool_channel_enabled=True)
     settings = _settings_with(monkeypatch, **envs)
     assert enablement_violations(settings) == []
 
 
 def test_external_api_requires_master(monkeypatch):
-    settings = _settings_with(monkeypatch, v24_tool_external_api_enabled=True)
+    settings = _settings_with(monkeypatch, tool_external_api_enabled=True)
     violations = enablement_violations(settings)
-    assert any("v24_tool_system_enabled" in violation for violation in violations)
+    assert any("tool_system_enabled" in violation for violation in violations)
 
 
 def test_violation_message_is_readable_chinese(monkeypatch):
-    settings = _settings_with(monkeypatch, v24_tool_permission_enabled=True)
+    settings = _settings_with(monkeypatch, tool_permission_enabled=True)
     with pytest.raises(SettingsError) as excinfo:
         validate_enablement_chain(settings)
     message = str(excinfo.value)
     assert "V2 启用链配置错误" in message
-    assert "v24_tool_permission_enabled" in message
+    assert "tool_permission_enabled" in message
     assert "总闸" in message
 
 
@@ -102,13 +102,13 @@ def test_default_settings_pass_chain():
 def test_existing_v2_v21_v22_v23_chain_rules_intact(monkeypatch):
     settings = _settings_with(monkeypatch)
 
-    settings = _settings_with(monkeypatch, v21_personality_evolution_enabled=True)
-    assert any("v21_agent_runtime_enabled" in v for v in enablement_violations(settings))
+    settings = _settings_with(monkeypatch, personality_evolution_enabled=True)
+    assert any("agent_runtime_enabled" in v for v in enablement_violations(settings))
 
-    settings = _settings_with(monkeypatch, v22_style_contract_enabled=True)
-    assert any("v22_experience_enabled" in v for v in enablement_violations(settings))
+    settings = _settings_with(monkeypatch, style_contract_enabled=True)
+    assert any("experience_enabled" in v for v in enablement_violations(settings))
 
-    settings = _settings_with(monkeypatch, v23_daily_life_enabled=True)
+    settings = _settings_with(monkeypatch, daily_life_enabled=True)
     assert any(
-        "v23_world_simulation_enabled" in v for v in enablement_violations(settings)
+        "world_simulation_enabled" in v for v in enablement_violations(settings)
     )

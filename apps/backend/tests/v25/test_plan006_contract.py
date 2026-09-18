@@ -446,7 +446,7 @@ class TestFlagOffKeepsTheToolFaceOutOfPlanning:
         """绑定子闸 off：闸门 5/6 不生效（工具面不参与规划），计划内容原样落库。"""
         from app.repositories import goal_repository
 
-        override_settings(v25_plan_step_binding_enabled="false")
+        override_settings(plan_step_binding_enabled="false")
         goal = make_goal(description="绑定子闸关闭目标")
         stub_planning_llm(
             sub_goals=[

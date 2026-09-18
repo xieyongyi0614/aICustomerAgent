@@ -266,7 +266,7 @@ class PlanValidator:
 
     三闸**互不重叠**（Task Detail §6.2 D3）：形状闸只看结构，绑定闸只看工具面与绑定一致性，
     预算闸只看四项预算。`validate_binding` 的语义前提是绑定子闸开启
-    （`v25_plan_step_binding_enabled` off 时不应调用，与 PLAN-003 闸门 5 / 6 的门控一致）。
+    （`plan_step_binding_enabled` off 时不应调用，与 PLAN-003 闸门 5 / 6 的门控一致）。
     """
 
     @staticmethod
@@ -364,7 +364,7 @@ class TaskDecomposer:
         该闸依然成立：形状理由非空即不进入 ③④）。
         """
         max_depth = min(
-            int(settings.v2_autonomy_subgoal_max_depth), int(settings.v25_plan_max_depth)
+            int(settings.autonomy_subgoal_max_depth), int(settings.plan_max_depth)
         )
         steps = _parse_structure(proposal, max_depth=max_depth)
         bindings, binding_errors = _bind_tools(
@@ -399,24 +399,24 @@ class TaskDecomposer:
 def _plan_budget_limits(ctx, settings) -> dict[str, int]:
     """预算四项 + 目标激活窗的 settings / `PlanContext.budget` 投影（参数注入，零 IO）。
 
-    步数与深度取 `v25_*` 与 `v2_autonomy_subgoal_*` 的**较小值**（与 PLAN-003 闸门 2 / 3 同源）；
+    步数与深度取 `plan_*` 与 `autonomy_subgoal_*` 的**较小值**（与 PLAN-003 闸门 2 / 3 同源）；
     TTL 与激活窗只在校验时参与判定，不落库（Task Detail §7 TL 存储说明）。
     模块私有（§6.7 冻结公开面只有四个）；外部调用方按 `BUDGET_KEYS` 自组字典即可调三闸。
     """
     return {
         BUDGET_MAX_STEPS: min(
-            int(ctx.budget.get(BUDGET_MAX_STEPS, settings.v25_plan_max_steps)),
-            int(settings.v2_autonomy_subgoal_max_count),
+            int(ctx.budget.get(BUDGET_MAX_STEPS, settings.plan_max_steps)),
+            int(settings.autonomy_subgoal_max_count),
         ),
         BUDGET_MAX_DEPTH: min(
-            int(ctx.budget.get(BUDGET_MAX_DEPTH, settings.v25_plan_max_depth)),
-            int(settings.v2_autonomy_subgoal_max_depth),
+            int(ctx.budget.get(BUDGET_MAX_DEPTH, settings.plan_max_depth)),
+            int(settings.autonomy_subgoal_max_depth),
         ),
         BUDGET_STEP_MAX_ATTEMPTS: int(
-            ctx.budget.get(BUDGET_STEP_MAX_ATTEMPTS, settings.v25_plan_step_max_attempts)
+            ctx.budget.get(BUDGET_STEP_MAX_ATTEMPTS, settings.plan_step_max_attempts)
         ),
-        BUDGET_TTL_HOURS: int(settings.v25_plan_ttl_hours),
-        BUDGET_GOAL_WINDOW_HOURS: int(settings.v2_autonomy_goal_max_active_hours),
+        BUDGET_TTL_HOURS: int(settings.plan_ttl_hours),
+        BUDGET_GOAL_WINDOW_HOURS: int(settings.autonomy_goal_max_active_hours),
     }
 
 
@@ -437,8 +437,8 @@ def _parse_structure(
 
 def _binding_enabled(settings) -> bool:
     """绑定生效的合取判据（§8 Step 6）：绑定子闸 off 或工具面非要 off，都退化为 V2.4.0。"""
-    return bool(settings.v25_plan_step_binding_enabled) and bool(
-        settings.v25_plan_tool_required
+    return bool(settings.plan_step_binding_enabled) and bool(
+        settings.plan_tool_required
     )
 
 
@@ -929,7 +929,7 @@ def _attempt_budget_errors(
 
 
 def _ttl_budget_errors(budget: dict[str, int]) -> list[str]:
-    """计划 TTL：必须为正，且不得超出目标激活窗（`v2_autonomy_goal_max_active_hours`）。"""
+    """计划 TTL：必须为正，且不得超出目标激活窗（`autonomy_goal_max_active_hours`）。"""
     ttl_hours = _budget_int(budget, BUDGET_TTL_HOURS)
     window_hours = _budget_int(budget, BUDGET_GOAL_WINDOW_HOURS)
     if ttl_hours < 1:

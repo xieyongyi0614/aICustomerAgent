@@ -298,7 +298,7 @@ def _allowed_ext_hosts(settings: Any) -> frozenset[str]:
     resolver = getattr(settings, "allowed_ext_hosts", None)
     if callable(resolver):
         return frozenset(resolver())
-    raw = getattr(settings, "v24_tool_ext_allowed_hosts", "") or ""
+    raw = getattr(settings, "tool_ext_allowed_hosts", "") or ""
     return frozenset(part.strip() for part in str(raw).split(",") if part.strip())
 
 
@@ -344,16 +344,16 @@ def build_confirm_prompt(
 
 def permission_layer_enabled(settings: Any) -> bool:
     """双闸判定：总闸为上层门控，总闸 off 时权限段不参与（E14）。"""
-    if not bool(getattr(settings, "v24_tool_system_enabled", False)):
+    if not bool(getattr(settings, "tool_system_enabled", False)):
         return False
-    return bool(getattr(settings, "v24_tool_permission_enabled", False))
+    return bool(getattr(settings, "tool_permission_enabled", False))
 
 
 def permission_sub_layer_disabled(settings: Any) -> bool:
     """"总闸 on 而权限子闸 off"：权限段既不参与七步判定，也不得放行特权工具。"""
-    if not bool(getattr(settings, "v24_tool_system_enabled", False)):
+    if not bool(getattr(settings, "tool_system_enabled", False)):
         return False
-    return not bool(getattr(settings, "v24_tool_permission_enabled", False))
+    return not bool(getattr(settings, "tool_permission_enabled", False))
 
 
 _FLOOR_ONLY_SNAPSHOT = PermissionSnapshot()
@@ -377,7 +377,7 @@ def _disabled_layer_decision(
     if level in GRANT_FREE_LEVELS and not is_untrusted_namespace(definition):
         return _allow(REASON_LAYER_DISABLED_GRANT_FREE, level, scope)
     logger.warning(
-        "权限子闸未启用（v24_tool_permission_enabled=false），特权工具默认拒绝："
+        "权限子闸未启用（tool_permission_enabled=false），特权工具默认拒绝："
         "tool_id=%s level=%s",
         definition.id,
         level,

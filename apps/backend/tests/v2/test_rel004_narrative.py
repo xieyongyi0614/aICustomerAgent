@@ -116,7 +116,7 @@ class TestNarrativeMilestone:
 
     def test_low_confidence_skipped(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_min_confidence", 0.75
+            get_settings(), "relationship_narrative_min_confidence", 0.75
         )
         with relationship_narrative.SessionLocal() as session:
             session.add(
@@ -138,7 +138,7 @@ class TestNarrativeMilestone:
 
     def test_daily_cap(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:all_nighter": {"title": "熬夜", "keywords": ["熬夜"], "all": true},'
             ' "narrative:trip": {"title": "旅行", "keywords": ["旅行"], "all": true}}',
         )
@@ -154,7 +154,7 @@ class TestNarrativeMilestone:
 
     def test_any_mode_matching(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:any_rule": {"title": "任意", "keywords": ["旅行", "熬夜"],'
             ' "all": false}}',
         )
@@ -236,7 +236,7 @@ class TestNarrativeRules:
 
     def test_milestone_provenance_violations(self, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:all_nighter": {"title": "熬夜", "keywords": ["熬夜"], "all": true}}',
         )
         unprovenanced = _slice(

@@ -8,7 +8,7 @@ V2.4.0 TOOL-010：通道工具能力 `channel_feishu` 在**通道可用时**追�
 声明态 `disabled`，不进工具面，见 `tool/builtin.py`）。
 
 V2.4.0 TOOL-011：外部 API 能力 `external_api` 在**外部面双闸开启时**追加注册
-（`external_api_enabled()` = 总闸 + `v24_tool_external_api_enabled`），
+（`external_api_enabled()` = 总闸 + `tool_external_api_enabled`），
 使声明式清单生成的 `ext.api.*` 工具在统一执行器内可解析到实现体。
 用户自定义工具的能力体（能力名 = tool_id）由 `tool/user_defined.py` 在注册时按需登记，
 注销走 `CapabilityRegistry.unregister`。

@@ -17,10 +17,10 @@ pytestmark = pytest.mark.xdist_group("ws013")
 @pytest.fixture
 def detection_flags(monkeypatch):
     for key, value in {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
     }.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
@@ -29,7 +29,7 @@ def detection_flags(monkeypatch):
 
 
 def test_whitelist_unchanged_without_v23(monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "false")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
     get_settings.cache_clear()
     try:
         whitelist = trigger_router.escalation_whitelist()
@@ -72,7 +72,7 @@ def test_collect_facts_enriched_with_impacts(db_session_factory, detection_flags
 
 
 def test_collect_facts_basic_without_v23(db_session_factory, monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "false")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
     get_settings.cache_clear()
     try:
         user = "ws013-off"

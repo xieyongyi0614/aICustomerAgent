@@ -57,7 +57,7 @@ def answer_max_tokens(state: ConversationState) -> int:
     delta = overlay.style.max_tokens_delta
     if delta >= 0:
         return base
-    floor = min(base, settings.v2_development_answer_min_tokens)
+    floor = min(base, settings.development_answer_min_tokens)
     return max(floor, base + delta)
 
 

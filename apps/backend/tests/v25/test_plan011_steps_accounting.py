@@ -16,7 +16,7 @@
 PLAN-003 Task Detail §11.3 已把子步骤名裁决为 `plan_assemble` / `plan_generate` / `plan_revise`。
 故本任务按「**验证已落地形态 + 显式否定 `plan_execute`**」交付，不新增记账点（Non-Scope N8）。
 
-预算约束：计划子步骤为 0 LLM（不带 `llm_capable`），故不占用 `v2_life_loop_cycle_llm_budget`；
+预算约束：计划子步骤为 0 LLM（不带 `llm_capable`），故不占用 `life_loop_cycle_llm_budget`；
 日额度熔断时按 `status="skipped"` 降级记账（引擎 `_budget_skip`）。
 """
 
@@ -40,9 +40,9 @@ from .test_plan005_mount import AUTONOMOUS_TICK_STAGES, LIFE_LOOP_STEPS
 @pytest.fixture
 def planning_on(override_settings):
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_observation_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        plan_observation_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     life_loop_budget.reset_cache()

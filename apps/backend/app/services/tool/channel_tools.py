@@ -86,9 +86,9 @@ MISSING_ERROR_CODE = ChannelErrorKind.UNKNOWN.value
 def channel_tools_enabled(settings: Any = None) -> bool:
     """通道工具可用性单点判据：总闸 + 通道子闸 + `feishu_enabled` 三者同时成立。"""
     resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "v24_tool_system_enabled", False)):
+    if not bool(getattr(resolved, "tool_system_enabled", False)):
         return False
-    if not bool(getattr(resolved, "v24_tool_channel_enabled", False)):
+    if not bool(getattr(resolved, "tool_channel_enabled", False)):
         return False
     return bool(getattr(resolved, "feishu_enabled", False))
 

@@ -14,7 +14,7 @@ TOOL-009 §2.3：追加工具效能证据源。`trigger_for_user(channel=tool)` 
 
 PLAN-010 §4.1.3 ②：追加计划效能证据源（`CHANNEL_PLAN`）。**本函数零改动**——计划通道
 不新增分支、不新增闸门、不新增幂等键：计划窗由 `evidence.aggregate_evidence_windows`
-在 `v25_plan_reflection_enabled` 开启时**扩源**进既有窗口列表，故它与用户证据走的是
+在 `plan_reflection_enabled` 开启时**扩源**进既有窗口列表，故它与用户证据走的是
 同一个 `channel=memory` 闸门序列（门槛 / 当日额度 / 幂等入队三层一字不差）。
 这就是本任务的「三道闸零豁免」：不是「也过一遍闸门」，而是**同一条路径**。
 """
@@ -265,7 +265,7 @@ def trigger_for_user(
 def tool_channel_enabled(settings=None) -> bool:
     """工具证据通道开关：工具反思子闸（默认 off）。"""
     settings = settings or get_settings()
-    return bool(getattr(settings, "v24_tool_reflection_enabled", False))
+    return bool(getattr(settings, "tool_reflection_enabled", False))
 
 
 def observe_tool_evidence(
@@ -278,8 +278,8 @@ def observe_tool_evidence(
 ) -> bool:
     """工具证据 reinforce 计数（§2.3）：同 tool_id 同 failure_kind 达阈值 + 冷却 → 触发。
 
-    复用 REF-003 既有机制与冷却窗（阈值 `v2_reflection_event_threshold`、
-    冷却 `v2_reflection_event_cooldown_hours`）；触发走同一 `trigger_for_user`（channel=tool）。
+    复用 REF-003 既有机制与冷却窗（阈值 `reflection_event_threshold`、
+    冷却 `reflection_event_cooldown_hours`）；触发走同一 `trigger_for_user`（channel=tool）。
     """
     settings = get_settings()
     if not tool_channel_enabled(settings):
@@ -292,7 +292,7 @@ def observe_tool_evidence(
         bucket = {"topic": topic, "count": 0, "last_triggered_at": None}
         _tool_buckets[user_id][topic] = bucket
     bucket["count"] += 1
-    cooldown = timedelta(hours=settings.v2_reflection_event_cooldown_hours)
+    cooldown = timedelta(hours=settings.reflection_event_cooldown_hours)
     last = bucket.get("last_triggered_at")
     if last is not None and now - last < cooldown:
         _trace(
@@ -307,7 +307,7 @@ def observe_tool_evidence(
             reason="cooldown",
         )
         return False
-    if bucket["count"] < settings.v2_reflection_event_threshold:
+    if bucket["count"] < settings.reflection_event_threshold:
         _trace(
             trace,
             started,
@@ -409,12 +409,12 @@ def observe_reinforce(user_id: str, memory_ids: list[str], trace=None) -> None:
         if len(content) > len(bucket["topic_content"]):
             bucket["topic_content"] = content
         bucket["count"] += 1
-    cooldown = timedelta(hours=settings.v2_reflection_event_cooldown_hours)
+    cooldown = timedelta(hours=settings.reflection_event_cooldown_hours)
     for bucket in affected:
         last = bucket.get("last_triggered_at")
         if last is not None and now - last < cooldown:
             continue
-        if bucket["count"] < settings.v2_reflection_event_threshold:
+        if bucket["count"] < settings.reflection_event_threshold:
             continue
         bucket["last_triggered_at"] = now
         bucket["count"] = 0
@@ -436,7 +436,7 @@ def run_reflection_trigger_tick(now: datetime | None = None) -> int:
     """周期触发入口：job_worker tick 挂靠；每用户每日一次判定（Flag OFF 空转）。"""
     now = now or datetime.now()
     settings = get_settings()
-    if now.hour < settings.v2_reflection_schedule_hour:
+    if now.hour < settings.reflection_schedule_hour:
         return 0
     judged = 0
     for user_id in _users_with_memories():

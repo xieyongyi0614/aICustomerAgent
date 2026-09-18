@@ -275,7 +275,7 @@ class ToolSurfaceResolver:
             return int(rule.max_tools)
         settings = self.settings if self.settings is not None else ctx.settings
         return int(
-            getattr(settings, "v24_tool_surface_max_tools", DEFAULT_SURFACE_MAX_TOOLS)
+            getattr(settings, "tool_surface_max_tools", DEFAULT_SURFACE_MAX_TOOLS)
         )
 
 

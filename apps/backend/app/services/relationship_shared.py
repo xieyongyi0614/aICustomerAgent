@@ -142,7 +142,7 @@ def collect_shared_experiences(
         logger.exception("共同经历投影：账本源查询失败，按空处理")
     try:
         memories = _memory_entries(
-            user_id, character_id, settings.v2_relationship_shared_min_salience
+            user_id, character_id, settings.relationship_shared_min_salience
         )
     except Exception:
         logger.exception("共同经历投影：记忆源查询失败，按空处理")

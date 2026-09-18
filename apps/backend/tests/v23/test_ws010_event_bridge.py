@@ -16,8 +16,8 @@ pytestmark = pytest.mark.xdist_group("ws010")
 
 @pytest.fixture
 def bridge_flags(monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("V23_EVENT_DETECTION_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("EVENT_DETECTION_ENABLED", "true")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -100,7 +100,7 @@ def test_listener_registration_noop_when_flag_off(monkeypatch):
 
     before = len(reflection_lifecycle._insight_created_listeners)
     with pytest.MonkeyPatch.context() as mp:
-        mp.setenv("V23_WORLD_SIMULATION_ENABLED", "false")
+        mp.setenv("WORLD_SIMULATION_ENABLED", "false")
         get_settings.cache_clear()
         event_bridge.register_character_event_listeners()
     get_settings.cache_clear()

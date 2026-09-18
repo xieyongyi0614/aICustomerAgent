@@ -13,37 +13,37 @@ from app.core.settings.enablement import (
     validate_enablement_chain,
 )
 
-V25_MASTER = "v25_planning_enabled"
+V25_MASTER = "planning_enabled"
 
 V25_SUB_FLAGS = (
-    "v25_plan_context_enabled",
-    "v25_plan_step_binding_enabled",
-    "v25_plan_scheduler_enabled",
-    "v25_plan_execution_enabled",
-    "v25_plan_observation_enabled",
-    "v25_plan_revision_enabled",
-    "v25_plan_memory_enabled",
-    "v25_plan_reflection_enabled",
-    "v25_plan_world_feedback_enabled",
-    "v25_plan_autonomy_enabled",
-    "v25_plan_debug_enabled",
+    "plan_context_enabled",
+    "plan_step_binding_enabled",
+    "plan_scheduler_enabled",
+    "plan_execution_enabled",
+    "plan_observation_enabled",
+    "plan_revision_enabled",
+    "plan_memory_enabled",
+    "plan_reflection_enabled",
+    "plan_world_feedback_enabled",
+    "plan_autonomy_enabled",
+    "plan_debug_enabled",
 )
 
 FULL_CHAIN_ENVS = {
     V25_MASTER: True,
-    "v25_plan_context_enabled": True,
-    "v25_plan_step_binding_enabled": True,
-    "v25_plan_scheduler_enabled": True,
-    "v25_plan_execution_enabled": True,
-    "v25_plan_observation_enabled": True,
-    "v25_plan_revision_enabled": True,
-    "v25_plan_memory_enabled": True,
-    "v25_plan_reflection_enabled": True,
-    "v25_plan_world_feedback_enabled": True,
-    "v25_plan_autonomy_enabled": True,
-    "v25_plan_debug_enabled": True,
-    "v21_agent_runtime_enabled": True,
-    "v24_tool_system_enabled": True,
+    "plan_context_enabled": True,
+    "plan_step_binding_enabled": True,
+    "plan_scheduler_enabled": True,
+    "plan_execution_enabled": True,
+    "plan_observation_enabled": True,
+    "plan_revision_enabled": True,
+    "plan_memory_enabled": True,
+    "plan_reflection_enabled": True,
+    "plan_world_feedback_enabled": True,
+    "plan_autonomy_enabled": True,
+    "plan_debug_enabled": True,
+    "agent_runtime_enabled": True,
+    "tool_system_enabled": True,
     "action_enabled": True,
 }
 
@@ -74,10 +74,10 @@ def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap()
     assert len(enablement.V25_DEPENDENCIES) == 6
     sources = {source for source, _, _ in enablement.V25_DEPENDENCIES}
     assert sources == {
-        "v25_plan_execution_enabled",
-        "v25_plan_step_binding_enabled",
+        "plan_execution_enabled",
+        "plan_step_binding_enabled",
         enablement.V25_TOOL_REQUIRED_FLAG,
-        "v25_plan_autonomy_enabled",
+        "plan_autonomy_enabled",
     }
     intra_version = {
         dependency
@@ -90,13 +90,13 @@ def test_u13_the_chain_ledger_has_seven_entries_and_the_module_records_the_gap()
         if dependency not in enablement.V25_GATE_FLAGS
     }
     assert intra_version == {
-        "v25_plan_scheduler_enabled",
-        "v25_plan_step_binding_enabled",
+        "plan_scheduler_enabled",
+        "plan_step_binding_enabled",
     }
     assert cross_version == {
         "action_enabled",
-        "v24_tool_system_enabled",
-        "v21_agent_runtime_enabled",
+        "tool_system_enabled",
+        "agent_runtime_enabled",
     }
     for _, _, reason in enablement.V25_DEPENDENCIES:
         assert reason.startswith("（") and reason.endswith("）")
@@ -125,13 +125,13 @@ def test_u13_execution_requires_the_scheduler_sub_gate(monkeypatch):
         monkeypatch,
         **{
             V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "v25_plan_execution_enabled": True,
+            "plan_tool_required": False,
+            "plan_execution_enabled": True,
             "action_enabled": True,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v25_plan_scheduler_enabled" in item for item in violations)
+    assert any("plan_scheduler_enabled" in item for item in violations)
 
 
 def test_u13_execution_requires_the_action_engine(monkeypatch):
@@ -139,9 +139,9 @@ def test_u13_execution_requires_the_action_engine(monkeypatch):
         monkeypatch,
         **{
             V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "v25_plan_execution_enabled": True,
-            "v25_plan_scheduler_enabled": True,
+            "plan_tool_required": False,
+            "plan_execution_enabled": True,
+            "plan_scheduler_enabled": True,
         },
     )
     violations = enablement_violations(settings)
@@ -153,12 +153,12 @@ def test_u13_step_binding_requires_the_tool_system(monkeypatch):
         monkeypatch,
         **{
             V25_MASTER: True,
-            "v25_plan_step_binding_enabled": True,
-            "v25_plan_tool_required": False,
+            "plan_step_binding_enabled": True,
+            "plan_tool_required": False,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v24_tool_system_enabled" in item for item in violations)
+    assert any("tool_system_enabled" in item for item in violations)
 
 
 def test_u13_tool_required_requires_binding_and_the_tool_system(monkeypatch):
@@ -169,14 +169,14 @@ def test_u13_tool_required_requires_binding_and_the_tool_system(monkeypatch):
         },
     )
     violations = enablement_violations(settings)
-    assert any("v25_plan_step_binding_enabled" in item for item in violations)
-    assert any("v24_tool_system_enabled" in item for item in violations)
+    assert any("plan_step_binding_enabled" in item for item in violations)
+    assert any("tool_system_enabled" in item for item in violations)
 
 
 def test_u13_tool_required_is_inert_while_the_master_is_off(monkeypatch):
-    settings = _settings_with(monkeypatch, **{"v25_plan_tool_required": True})
-    assert settings.v25_plan_tool_required is True
-    assert settings.v25_planning_enabled is False
+    settings = _settings_with(monkeypatch, **{"plan_tool_required": True})
+    assert settings.plan_tool_required is True
+    assert settings.planning_enabled is False
     assert enablement_violations(settings) == []
 
 
@@ -185,12 +185,12 @@ def test_u13_autonomy_requires_the_agent_runtime(monkeypatch):
         monkeypatch,
         **{
             V25_MASTER: True,
-            "v25_plan_tool_required": False,
-            "v25_plan_autonomy_enabled": True,
+            "plan_tool_required": False,
+            "plan_autonomy_enabled": True,
         },
     )
     violations = enablement_violations(settings)
-    assert any("v21_agent_runtime_enabled" in item for item in violations)
+    assert any("agent_runtime_enabled" in item for item in violations)
 
 
 def test_u13_all_v25_flags_with_their_dependencies_are_clean(monkeypatch):
@@ -200,9 +200,9 @@ def test_u13_all_v25_flags_with_their_dependencies_are_clean(monkeypatch):
 
 def test_u13_disabling_tool_required_allows_headless_planning(monkeypatch):
     envs = dict(FULL_CHAIN_ENVS)
-    envs["v25_plan_tool_required"] = False
-    envs["v24_tool_system_enabled"] = False
-    envs["v25_plan_step_binding_enabled"] = False
+    envs["plan_tool_required"] = False
+    envs["tool_system_enabled"] = False
+    envs["plan_step_binding_enabled"] = False
     settings = _settings_with(monkeypatch, **envs)
     assert enablement_violations(settings) == []
 
@@ -212,27 +212,27 @@ def test_i2_default_settings_pass_the_chain():
 
 
 def test_i2_violation_message_is_readable_chinese(monkeypatch):
-    settings = _settings_with(monkeypatch, **{"v25_plan_debug_enabled": True})
+    settings = _settings_with(monkeypatch, **{"plan_debug_enabled": True})
     with pytest.raises(SettingsError) as excinfo:
         validate_enablement_chain(settings)
     message = str(excinfo.value)
     assert "V2 启用链配置错误" in message
-    assert "v25_plan_debug_enabled" in message
+    assert "plan_debug_enabled" in message
     assert "总闸" in message
 
 
 def test_existing_v2_v21_v23_v24_chain_rules_intact(monkeypatch):
-    settings = _settings_with(monkeypatch, v21_goal_stack_enabled=True)
+    settings = _settings_with(monkeypatch, goal_stack_enabled=True)
     assert any(
-        "v21_agent_runtime_enabled" in item for item in enablement_violations(settings)
+        "agent_runtime_enabled" in item for item in enablement_violations(settings)
     )
 
-    settings = _settings_with(monkeypatch, v23_event_detection_enabled=True)
+    settings = _settings_with(monkeypatch, event_detection_enabled=True)
     assert any(
-        "v23_world_simulation_enabled" in item for item in enablement_violations(settings)
+        "world_simulation_enabled" in item for item in enablement_violations(settings)
     )
 
-    settings = _settings_with(monkeypatch, v24_tool_surface_enabled=True)
+    settings = _settings_with(monkeypatch, tool_surface_enabled=True)
     assert any(
-        "v24_tool_system_enabled" in item for item in enablement_violations(settings)
+        "tool_system_enabled" in item for item in enablement_violations(settings)
     )

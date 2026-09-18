@@ -104,7 +104,7 @@ class TestStateMachine:
 
 class TestPriority:
     def test_long_term_layer_bonus(self, override_settings):
-        override_settings( v2_autonomy_priority_layer_weight_long="1.0")
+        override_settings( autonomy_priority_layer_weight_long="1.0")
         from app.core.settings import get_settings
 
         goal = _goal(layer="long_term", priority=3)
@@ -113,7 +113,7 @@ class TestPriority:
 
     def test_relationship_tension_bonus_and_conflict_penalty(self, override_settings):
         override_settings(
-            v2_autonomy_priority_layer_weight_long="0",
+            autonomy_priority_layer_weight_long="0",
             rel_tension_freeze="0.5")
         from app.core.settings import get_settings
 
@@ -208,7 +208,7 @@ class TestAbandonment:
         return goal
 
     def test_dual_signal_abandons(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         goal = self._long_term_goal()
         result = goal_arbitration.check_abandonment(USER, _facts(), NOW)
         assert len(result["abandoned"]) == 1
@@ -218,7 +218,7 @@ class TestAbandonment:
         assert record.arbitration_state["low_relevance"] == {"memory": True, "action": True}
 
     def test_single_signal_caps_below_threshold(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         goal = self._long_term_goal()
         facts = _facts(
             salient_memories=[_memory(f"{goal.description[:4]}相关记忆")],
@@ -228,7 +228,7 @@ class TestAbandonment:
         assert goal_repository.get_goal(goal.id).status == "active"
 
     def test_recent_progress_keeps_goal(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         goal = _goal(description="长期目标", layer="long_term")
         goal_repository.create_plan(
             GoalPlanRecord(
@@ -244,7 +244,7 @@ class TestAbandonment:
         assert result["abandoned"] == []
 
     def test_recent_action_blocks_low_relevance(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         goal = self._long_term_goal()
         facts = _facts(
             action_history=[{"capability": "create_reminder", "created_at": NOW - timedelta(days=1)}]
@@ -253,14 +253,14 @@ class TestAbandonment:
         assert result["abandoned"] == []
 
     def test_abandonment_cascades_children(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         goal = self._long_term_goal()
         child = _child(goal.id)
         goal_arbitration.check_abandonment(USER, _facts(), NOW)
         assert goal_repository.get_goal(child.id).status == "abandoned"
 
     def test_short_term_goals_exempt(self, aut_on, override_settings):
-        override_settings(v2_autonomy_abandon_min_progress_days="14")
+        override_settings(autonomy_abandon_min_progress_days="14")
         _goal(description="短期目标", layer="short_term")
         result = goal_arbitration.check_abandonment(USER, _facts(), NOW)
         assert result["abandoned"] == []

@@ -153,9 +153,9 @@ class TestScoring:
         assert retriever._detect_query_types("今天天气") == set()
 
     def test_hybrid_score_weighting(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_semantic", 0.5)
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_structured", 0.3)
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_affinity", 0.2)
+        monkeypatch.setattr(get_settings(), "memory_weight_semantic", 0.5)
+        monkeypatch.setattr(get_settings(), "memory_weight_structured", 0.3)
+        monkeypatch.setattr(get_settings(), "memory_weight_affinity", 0.2)
         now = datetime.datetime.now()
         _memory("m1", "用户喜欢吃西瓜", embedding=json.dumps([1.0, 0.0]), created_at=now)
         _embed_stub(monkeypatch, {"我喜欢吃水果": [1.0, 0.0]})

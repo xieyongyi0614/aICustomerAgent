@@ -25,31 +25,31 @@ REPO_ROOT = BACKEND_ROOT.parents[1]
 BASELINE_COMMIT = "d67ebe7"
 BASELINE_LABEL = "V2.3.0"
 
-V24_MASTER_FLAG = "V24_TOOL_SYSTEM_ENABLED"
+V24_MASTER_FLAG = "TOOL_SYSTEM_ENABLED"
 V24_SUB_FLAGS: tuple[str, ...] = (
-    "V24_TOOL_PERMISSION_ENABLED",
-    "V24_TOOL_SCHEMA_VALIDATION_ENABLED",
-    "V24_TOOL_OBSERVATION_ENABLED",
-    "V24_TOOL_SURFACE_ENABLED",
-    "V24_TOOL_MEMORY_ENABLED",
-    "V24_TOOL_REFLECTION_ENABLED",
-    "V24_TOOL_CHANNEL_ENABLED",
-    "V24_TOOL_EXTERNAL_API_ENABLED",
-    "V24_TOOL_USER_DEFINED_ENABLED",
+    "TOOL_PERMISSION_ENABLED",
+    "TOOL_SCHEMA_VALIDATION_ENABLED",
+    "TOOL_OBSERVATION_ENABLED",
+    "TOOL_SURFACE_ENABLED",
+    "TOOL_MEMORY_ENABLED",
+    "TOOL_REFLECTION_ENABLED",
+    "TOOL_CHANNEL_ENABLED",
+    "TOOL_EXTERNAL_API_ENABLED",
+    "TOOL_USER_DEFINED_ENABLED",
 )
 AUX_FLAGS: tuple[str, ...] = (
     "FEISHU_ENABLED",
 )
 TOOL_PARAM_ENVS: dict[str, str] = {
-    "V24_TOOL_DISABLED_IDS": "",
-    "V24_TOOL_SURFACE_MAX_TOOLS": "12",
-    "V24_TOOL_BREAKER_THRESHOLD": "3",
-    "V24_TOOL_BREAKER_COOLDOWN_SECONDS": "300",
-    "V24_TOOL_CONFIRM_TIMEOUT_HOURS": "24",
-    "V24_TOOL_CONFIRM_TTL_REUSE": "true",
-    "V24_TOOL_AUDIT_RETENTION_DAYS": "180",
-    "V24_TOOL_EXT_MANIFEST_PATH": "",
-    "V24_TOOL_EXT_ALLOWED_HOSTS": "",
+    "TOOL_DISABLED_IDS": "",
+    "TOOL_SURFACE_MAX_TOOLS": "12",
+    "TOOL_BREAKER_THRESHOLD": "3",
+    "TOOL_BREAKER_COOLDOWN_SECONDS": "300",
+    "TOOL_CONFIRM_TIMEOUT_HOURS": "24",
+    "TOOL_CONFIRM_TTL_REUSE": "true",
+    "TOOL_AUDIT_RETENTION_DAYS": "180",
+    "TOOL_EXT_MANIFEST_PATH": "",
+    "TOOL_EXT_ALLOWED_HOSTS": "",
 }
 FEISHU_PLACEHOLDER_ENVS: dict[str, str] = {
     "FEISHU_APP_ID": "cli_tool012_test",
@@ -537,28 +537,28 @@ FLAG_MATRIX: dict[str, dict[str, Any]] = {
     "g02_master_on_all_sub_off": {V24_MASTER_FLAG: True},
     "g03_only_schema_validation": {
         V24_MASTER_FLAG: True,
-        "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True,
+        "TOOL_SCHEMA_VALIDATION_ENABLED": True,
     },
-    "g04_only_permission": {V24_MASTER_FLAG: True, "V24_TOOL_PERMISSION_ENABLED": True},
-    "g05_only_observation": {V24_MASTER_FLAG: True, "V24_TOOL_OBSERVATION_ENABLED": True},
-    "g06_only_surface": {V24_MASTER_FLAG: True, "V24_TOOL_SURFACE_ENABLED": True},
-    "g07_only_memory": {V24_MASTER_FLAG: True, "V24_TOOL_MEMORY_ENABLED": True},
+    "g04_only_permission": {V24_MASTER_FLAG: True, "TOOL_PERMISSION_ENABLED": True},
+    "g05_only_observation": {V24_MASTER_FLAG: True, "TOOL_OBSERVATION_ENABLED": True},
+    "g06_only_surface": {V24_MASTER_FLAG: True, "TOOL_SURFACE_ENABLED": True},
+    "g07_only_memory": {V24_MASTER_FLAG: True, "TOOL_MEMORY_ENABLED": True},
     "g08_only_reflection": {
         V24_MASTER_FLAG: True,
-        "V24_TOOL_REFLECTION_ENABLED": True,
+        "TOOL_REFLECTION_ENABLED": True,
     },
     "g09_only_channel": {
         V24_MASTER_FLAG: True,
-        "V24_TOOL_CHANNEL_ENABLED": True,
+        "TOOL_CHANNEL_ENABLED": True,
         "FEISHU_ENABLED": True,
     },
     "g10_only_external_api": {
         V24_MASTER_FLAG: True,
-        "V24_TOOL_EXTERNAL_API_ENABLED": True,
+        "TOOL_EXTERNAL_API_ENABLED": True,
     },
     "g11_only_user_defined": {
         V24_MASTER_FLAG: True,
-        "V24_TOOL_USER_DEFINED_ENABLED": True,
+        "TOOL_USER_DEFINED_ENABLED": True,
     },
     "g12_all_on": {
         V24_MASTER_FLAG: True,
@@ -695,7 +695,7 @@ def capability_fingerprint(settings) -> dict[str, Any]:
         "user_defined": user_defined.user_defined_enabled(settings),
         "tool_feed": tool_feed.is_enabled(settings),
         "tool_insights_ready": bool(
-            getattr(settings, "v24_tool_reflection_enabled", False)
+            getattr(settings, "tool_reflection_enabled", False)
         ),
     }
 
@@ -718,26 +718,26 @@ def tool_settings(**overrides: Any):
         V24_MASTER_FLAG.lower(): True,
         **{flag.lower(): False for flag in V24_SUB_FLAGS},
         "feishu_enabled": False,
-        "v24_tool_disabled_ids": "",
-        "v24_tool_surface_max_tools": 12,
-        "v24_tool_breaker_threshold": 3,
-        "v24_tool_breaker_cooldown_seconds": 300,
-        "v24_tool_confirm_timeout_hours": 24,
-        "v24_tool_confirm_ttl_reuse": True,
-        "v24_tool_ext_allowed_hosts": "",
-        "v24_tool_ext_manifest_path": "",
+        "tool_disabled_ids": "",
+        "tool_surface_max_tools": 12,
+        "tool_breaker_threshold": 3,
+        "tool_breaker_cooldown_seconds": 300,
+        "tool_confirm_timeout_hours": 24,
+        "tool_confirm_ttl_reuse": True,
+        "tool_ext_allowed_hosts": "",
+        "tool_ext_manifest_path": "",
         "action_execution_timeout_seconds": 10,
     }
     values.update(overrides)
     settings = SimpleNamespace(**values)
     settings.disabled_tool_ids = lambda: frozenset(
         part.strip()
-        for part in str(values["v24_tool_disabled_ids"]).split(",")
+        for part in str(values["tool_disabled_ids"]).split(",")
         if part.strip()
     )
     settings.allowed_ext_hosts = lambda: frozenset(
         part.strip()
-        for part in str(values["v24_tool_ext_allowed_hosts"]).split(",")
+        for part in str(values["tool_ext_allowed_hosts"]).split(",")
         if part.strip()
     )
     return settings

@@ -279,7 +279,7 @@ def test_e4_surface_limit_keeps_lowest_priority_and_lists_overflow():
     registry = registry_with(
         *(tool_definition(f"builtin.tool_{index}", priority=index) for index in range(1, 6))
     )
-    ctx = surface_context(settings=tool_settings(v24_tool_surface_max_tools=1))
+    ctx = surface_context(settings=tool_settings(tool_surface_max_tools=1))
     surface = resolve(registry, ctx)
     assert surface.tool_ids == ("builtin.tool_1",)
     overflow = {
@@ -302,7 +302,7 @@ def test_surface_rule_max_tools_overrides_global(monkeypatch):
     )
     surface = resolve(
         builtin_registry(),
-        surface_context(settings=tool_settings(v24_tool_surface_max_tools=99)),
+        surface_context(settings=tool_settings(tool_surface_max_tools=99)),
     )
     assert len(surface.tool_ids) == 2
     assert [item["reason"] for item in surface.excluded].count(SURFACE_LIMIT_REASON) > 0
@@ -504,7 +504,7 @@ def test_toolcontext_field_set_is_frozen_to_documented_shape():
 
 def test_surface_limit_defaults_to_ctx_settings():
     registry = builtin_registry()
-    ctx = surface_context(settings=tool_settings(v24_tool_surface_max_tools=1))
+    ctx = surface_context(settings=tool_settings(tool_surface_max_tools=1))
     resolver = ToolSurfaceResolver(registry)
     surface = resolver.resolve(ctx.run_kind, ctx)
     assert len(surface.tool_ids) == 1

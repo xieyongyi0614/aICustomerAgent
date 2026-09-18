@@ -84,14 +84,14 @@ class TestCapabilityRegistry:
 
 class TestAcquireMatrix:
     def test_background_run_budget_exhausted_denies(self, override_settings):
-        override_settings(V2_LIFE_LOOP_CYCLE_LLM_BUDGET="1")
+        override_settings(LIFE_LOOP_CYCLE_LLM_BUDGET="1")
         run = _run(llm_calls=1)
         grant = llm_gateway.acquire("u1", "proactive", run, now=NOW)
         assert grant.granted is False
         assert grant.reason == "run_budget_exhausted"
 
     def test_foreground_soft_mode_accounts_without_denial(self, override_settings):
-        override_settings(V21_FOREGROUND_RUN_LLM_BUDGET="0")
+        override_settings(FOREGROUND_RUN_LLM_BUDGET="0")
         run = _run(run_kind="foreground_chat")
         grant = llm_gateway.acquire("u1", "answer", run, now=NOW)
         assert grant.granted is True
@@ -100,8 +100,8 @@ class TestAcquireMatrix:
 
     def test_foreground_enforced_mode_denies(self, override_settings):
         override_settings(
-            V21_FOREGROUND_RUN_LLM_BUDGET="0",
-            V21_FOREGROUND_GATEWAY_ENFORCED="true",
+            FOREGROUND_RUN_LLM_BUDGET="0",
+            FOREGROUND_GATEWAY_ENFORCED="true",
         )
         grant = llm_gateway.acquire("u1", "answer", _run("foreground_chat"), now=NOW)
         assert grant.granted is False
@@ -132,7 +132,7 @@ class TestAcquireMatrix:
         self, monkeypatch, override_settings
     ):
         override_settings(
-            V21_FOREGROUND_GATEWAY_ENFORCED="true")
+            FOREGROUND_GATEWAY_ENFORCED="true")
         monkeypatch.setattr(life_loop_budget, "is_degraded", lambda **kwargs: True)
         grant = llm_gateway.acquire("u1", "answer", _run("foreground_chat"), now=NOW)
         assert grant.granted is False
@@ -145,15 +145,15 @@ class TestAcquireMatrix:
 
 class TestResolveAnswerLlm:
     def test_normal_grant_returns_original(self, override_settings):
-        override_settings(V21_FOREGROUND_RUN_LLM_BUDGET="8")
+        override_settings(FOREGROUND_RUN_LLM_BUDGET="8")
         run = _run("foreground_chat")
         sentinel = object()
         assert llm_gateway.resolve_answer_llm(run, sentinel, now=NOW) is sentinel
 
     def test_degraded_with_light_profile_downgrades(self, override_settings):
         override_settings(
-            V21_FOREGROUND_RUN_LLM_BUDGET="0",
-            V21_LIGHT_LLM_PROFILE="longcat",
+            FOREGROUND_RUN_LLM_BUDGET="0",
+            LIGHT_LLM_PROFILE="longcat",
         )
         run = _run("foreground_chat")
         sentinel = object()
@@ -163,8 +163,8 @@ class TestResolveAnswerLlm:
 
     def test_enforced_denial_without_light_raises(self, override_settings):
         override_settings(
-            V21_FOREGROUND_RUN_LLM_BUDGET="0",
-            V21_FOREGROUND_GATEWAY_ENFORCED="true",
+            FOREGROUND_RUN_LLM_BUDGET="0",
+            FOREGROUND_GATEWAY_ENFORCED="true",
         )
         with pytest.raises(GatewayDeniedError):
             llm_gateway.resolve_answer_llm(_run("foreground_chat"), object(), now=NOW)

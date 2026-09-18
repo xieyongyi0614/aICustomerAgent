@@ -106,25 +106,25 @@ class TestFailureScenarios:
 class TestFlagMatrix:
     def test_defaults_off(self):
         settings = get_settings()
-        assert settings.v26_action_execution_enabled is False
-        assert settings.v26_action_abstraction_enabled is False
-        assert settings.v26_action_scheduler_enabled is False
-        assert settings.v26_action_multistep_enabled is False
-        assert settings.v26_action_result_enabled is False
-        assert settings.v26_action_feedback_enabled is False
+        assert settings.action_execution_enabled is False
+        assert settings.action_abstraction_enabled is False
+        assert settings.action_scheduler_enabled is False
+        assert settings.action_multistep_enabled is False
+        assert settings.action_result_enabled is False
+        assert settings.action_feedback_enabled is False
 
     def test_sub_flag_requires_master(self):
         with pytest.raises(SettingsError):
             Settings(
-                v26_action_scheduler_enabled=True,
+                action_scheduler_enabled=True,
                 llm_profiles_json='[{"id":"p","label":"p","base_url":"u","model":"m","api_key":"k"}]',
                 default_llm_profile="p",
             )
 
     def test_master_with_sub_flags_ok(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_feedback_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_feedback_enabled", True)
         assert integration.feedback_enabled() is True
 
     def test_master_off_feedback_legacy(self):

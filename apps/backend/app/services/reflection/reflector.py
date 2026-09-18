@@ -127,8 +127,8 @@ def execute_run(run_id: str, trace=None) -> str:
     window = selection.passing[0]
     evidence_block, provided = build_evidence_block(
         window,
-        settings.v2_reflection_evidence_max_members,
-        settings.v2_reflection_evidence_content_chars,
+        settings.reflection_evidence_max_members,
+        settings.reflection_evidence_content_chars,
     )
     try:
         proposal = _ask_llm_with_retry(window)
@@ -207,7 +207,7 @@ def _select_evidence(run, now: datetime) -> _EvidenceSelection:
         run.user_id, run.character_id, now=now
     )
     memory_passing = [window for window in windows if window.passes_gate]
-    if not getattr(settings, "v24_tool_reflection_enabled", False):
+    if not getattr(settings, "tool_reflection_enabled", False):
         return _EvidenceSelection(
             channel=_run_channel(run), passing=memory_passing, window_count=len(windows)
         )
@@ -254,12 +254,12 @@ def calibrate_confidence(
     """confidence 终值 = clamp(coherence × count_factor, 0, 0.95)；含 ai_inferred 成员封顶。"""
     settings = settings or get_settings()
     factor = _count_factor(
-        distinct_source_refs, settings.v2_reflection_confidence_count_curve_json
+        distinct_source_refs, settings.reflection_confidence_count_curve_json
     )
     final = coherence * factor
     final = max(0.0, min(_CONFIDENCE_CEILING, final))
     if "ai_inferred" in sources:
-        final = min(final, settings.v2_reflection_ai_inferred_cap)
+        final = min(final, settings.reflection_ai_inferred_cap)
     return round(final, 4)
 
 
@@ -267,7 +267,7 @@ def confidence_ceiling(evidence_count: int, settings=None) -> float:
     """给定证据数的 confidence 折算上限（coherence=1.0；REF-006 校准复核规则复用）。"""
     settings = settings or get_settings()
     factor = _count_factor(
-        evidence_count, settings.v2_reflection_confidence_count_curve_json
+        evidence_count, settings.reflection_confidence_count_curve_json
     )
     return round(min(factor, _CONFIDENCE_CEILING), 4)
 
@@ -284,7 +284,7 @@ def _count_factor(count: int, curve_json: str) -> float:
 
 def _calibrate_and_review(proposal, window, provided, settings) -> tuple[list, list[dict]]:
     """逐 draft：evidence_ids 映射 → confidence 校准 → 三闸复检。返回 (通过, 拒绝)。"""
-    min_confidence = settings.v2_reflection_min_confidence
+    min_confidence = settings.reflection_min_confidence
     allowed_types = _window_insight_types(window)
     accepted: list = []
     rejected: list[dict] = []
@@ -349,16 +349,16 @@ def _review_draft(
         reasons.append(_REVIEW_NO_EVIDENCE)
     if invalid:
         reasons.append(_REVIEW_OUT_OF_SCOPE)
-    if len(set(resolved)) < settings.v2_reflection_min_evidence:
+    if len(set(resolved)) < settings.reflection_min_evidence:
         reasons.append(_REVIEW_BELOW_MIN)
     statement = (draft.statement or "").strip()
     if not statement:
         reasons.append(_REVIEW_EMPTY_STATEMENT)
-    elif len(statement) > settings.v2_reflection_statement_max_chars:
+    elif len(statement) > settings.reflection_statement_max_chars:
         reasons.append(_REVIEW_STATEMENT_TOO_LONG)
     if not (draft.counter_evidence or "").strip():
         reasons.append(_REVIEW_MISSING_COUNTER)
-    if final < settings.v2_reflection_min_confidence:
+    if final < settings.reflection_min_confidence:
         reasons.append(_REVIEW_BELOW_CONFIDENCE)
     if allowed_types is not None:
         if draft.type not in allowed_types:
@@ -371,7 +371,7 @@ def _review_draft(
 def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
     """单事务：INSERT insights + evidence_links + supersede 同主题旧 active + run→done。"""
     settings = get_settings()
-    top = accepted[: settings.v2_reflection_max_insights_per_run]
+    top = accepted[: settings.reflection_max_insights_per_run]
     insight_ids = [f"ins:{uuid.uuid4().hex}" for _ in top]
     weights = {member.memory_id: member.weight for member in provided}
     superseded: list[dict] = []
@@ -493,7 +493,7 @@ def _ask_llm_with_retry(window) -> ReflectionProposal:
 
 
 def _resolve_llm(settings):
-    profile = settings.v2_reflection_llm_profile or None
+    profile = settings.reflection_llm_profile or None
     try:
         return get_llm(profile)
     except SettingsError:
@@ -523,7 +523,7 @@ def _claim_run(run_id: str, now: datetime) -> bool:
 
 
 def _recover_timed_out_runs(now: datetime) -> int:
-    threshold = now - timedelta(minutes=get_settings().v2_reflection_run_timeout_minutes)
+    threshold = now - timedelta(minutes=get_settings().reflection_run_timeout_minutes)
     with SessionLocal() as session:
         updated = (
             session.query(ReflectionRunRow)

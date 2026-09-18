@@ -8,7 +8,7 @@
 
 | 纪律 | 落点 |
 |---|---|
-| 双闸门控 | `v24_tool_system_enabled` + `v24_tool_user_defined_enabled` 同时成立才可注册 |
+| 双闸门控 | `tool_system_enabled` + `tool_user_defined_enabled` 同时成立才可注册 |
 | 强制 `level=dangerous` | 声明等级被忽略；`dangerous` 由模型校验器连带置 `audit=True` |
 | 强制不沉淀记忆 | `memory_policy_key` 恒等于 tool_id（`user.` 前缀 → TOOL-008 硬纪律不沉淀） |
 | `side_effects` 由步骤并集推导 | `dsl.derive_side_effects` 为唯一权威，声明值不参与判定（E11） |
@@ -71,7 +71,7 @@ FORCED_LEVEL = "dangerous"
 DEFAULT_STEP_TIMEOUT_SECONDS = 10.0
 
 GATE_DISABLED_REASON = (
-    "自定义工具未启用（需 v24_tool_system_enabled + v24_tool_user_defined_enabled 同时开启）"
+    "自定义工具未启用（需 tool_system_enabled + tool_user_defined_enabled 同时开启）"
 )
 
 ALLOWED_DECLARATION_KEYS: frozenset[str] = frozenset(
@@ -110,11 +110,11 @@ _STATUS_FAILURE_KINDS: dict[str, str] = {
 
 
 def user_defined_enabled(settings: Any = None) -> bool:
-    """双闸判据：总闸 + `v24_tool_user_defined_enabled`。"""
+    """双闸判据：总闸 + `tool_user_defined_enabled`。"""
     resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "v24_tool_system_enabled", False)):
+    if not bool(getattr(resolved, "tool_system_enabled", False)):
         return False
-    return bool(getattr(resolved, "v24_tool_user_defined_enabled", False))
+    return bool(getattr(resolved, "tool_user_defined_enabled", False))
 
 
 class UserToolRejected(ValueError):

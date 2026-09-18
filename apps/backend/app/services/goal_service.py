@@ -352,7 +352,7 @@ def select(
         tier = _effective_tier(goal, signals)
         if development_weights:
             delta = float(development_weights.get(goal.type) or 0.0)
-            cap = settings.v2_development_pattern_goal_tier_delta_max
+            cap = settings.development_pattern_goal_tier_delta_max
             tier -= max(-cap, min(cap, delta))
         return (
             tier,

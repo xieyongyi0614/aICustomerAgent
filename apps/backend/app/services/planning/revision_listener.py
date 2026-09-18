@@ -12,7 +12,7 @@ notify_insight_created_listeners(user_id, created)
     ├─ 三个既有消费者（零改动）
     └─ ★ PlanningRevisionListener.on_insight_created
           ├─ 门槛一：insight.type ∈ PLAN_INFLUENCE_INSIGHT_TYPES（capability_note / pattern）
-          ├─ 门槛二：insight.confidence ≥ v25_plan_replan_min_confidence（0.7）
+          ├─ 门槛二：insight.confidence ≥ plan_replan_min_confidence（0.7）
           ├─ 门槛三：存在可映射的 active 目标（scope → 目标 domain）
           └─ 全过 → enqueue_replan（幂等键 plan_replan:{goal_id}:{insight_id}）
                 ▼
@@ -135,7 +135,7 @@ class PlanningRevisionListener:
         也不影响已完成的 Insight 落库（既有 `notify_insight_created_listeners` 的隔离语义）。
         """
         settings = self._settings()
-        if not settings.v25_plan_reflection_enabled:
+        if not settings.plan_reflection_enabled:
             return
         for item in list(created or []):
             try:
@@ -150,7 +150,7 @@ class PlanningRevisionListener:
         目标不存在 / 子闸 off → `False`。**零其他副作用**：不碰计划内容、不碰 `GoalStatus`、
         不碰工具注册表。
         """
-        if not self._settings().v25_plan_reflection_enabled:
+        if not self._settings().plan_reflection_enabled:
             return False
         key = replan_idempotency_key(goal_id, insight_id)
         if not key or key in self._replanned:
@@ -209,7 +209,7 @@ class PlanningRevisionListener:
             return
         if str(item.get("type") or "") not in PLAN_INFLUENCE_INSIGHT_TYPES:
             return
-        if _confidence_of(item) < float(settings.v25_plan_replan_min_confidence):
+        if _confidence_of(item) < float(settings.plan_replan_min_confidence):
             return
         goal_id = self.mappable_goal_id(user_id, str(item.get("scope") or ""))
         if goal_id is None:
@@ -272,9 +272,9 @@ def get_revision_listener() -> PlanningRevisionListener:
 def register_runtime() -> None:
     """编排层入口（`main.lifespan` 调用）：注册第四个 `insight_created` 消费者。
 
-    子闸 `v25_plan_reflection_enabled` off → **零注册零行为**（与既有三个消费者同款纪律）。
+    子闸 `plan_reflection_enabled` off → **零注册零行为**（与既有三个消费者同款纪律）。
     """
-    if not get_settings().v25_plan_reflection_enabled:
+    if not get_settings().plan_reflection_enabled:
         return
     from app.services.reflection import lifecycle as reflection_lifecycle
 

@@ -88,7 +88,7 @@ class TestFourOutcomes:
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_result_enabled", True)
+        monkeypatch.setattr(settings, "action_result_enabled", True)
         result = result_service.from_capability_result(
             CapabilityResult(status="timeout", error="slow", payload={"failure_kind": "timeout"}),
             action_id="a4",

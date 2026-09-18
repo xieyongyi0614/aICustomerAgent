@@ -40,7 +40,7 @@ class ActionContext:
 
 def _pending_confirmation_prompt(record) -> str | None:
     """待确认行动的确认话术（角色语气）；权限闸关闭或非待确认态返回 None。"""
-    if not getattr(get_settings(), "v24_tool_permission_enabled", False):
+    if not getattr(get_settings(), "tool_permission_enabled", False):
         return None
     if getattr(record, "gate_reason", None) != GATE_REASON_PENDING_CONFIRMATION:
         return None

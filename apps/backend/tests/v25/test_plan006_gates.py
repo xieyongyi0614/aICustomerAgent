@@ -180,7 +180,7 @@ class TestGateSwitchability:
     async def test_u3_binding_switch_off_disables_both_gates(
         self, db_session_factory, planning_gates_on, engine, make_goal, stub_planning_llm, override_settings
     ):
-        override_settings(v25_plan_step_binding_enabled="false")
+        override_settings(plan_step_binding_enabled="false")
         goal = make_goal(description="绑定子闸关闭目标")
         stub_planning_llm(sub_goals=[_step(support.UNRESOLVABLE_TOOL)])
         surface = support.resolve_surface()
@@ -224,7 +224,7 @@ class TestFourExcludedToolClasses:
     async def test_t1_operationally_disabled_tool_never_enters_a_plan(
         self, db_session_factory, planning_gates_on, make_goal, stub_planning_llm, override_settings
     ):
-        override_settings(v24_tool_disabled_ids=support.MEMORY_SAVE)
+        override_settings(tool_disabled_ids=support.MEMORY_SAVE)
         registry = get_tool_registry()
         assert registry is not None and registry.effective_status(support.MEMORY_SAVE) == "disabled"
         surface = support.resolve_surface(registry)
@@ -348,13 +348,13 @@ class TestSurfaceExplainability:
     """U9 / U10 / I13：八维理由逐条可解释、`surface_hash` 稳定、世界关闭剔除 `world.*`。"""
 
     def test_u9_every_exclusion_carries_a_reason(self, planning_gates_on, override_settings):
-        override_settings(v24_tool_disabled_ids=support.MEMORY_SAVE)
+        override_settings(tool_disabled_ids=support.MEMORY_SAVE)
         surface = support.resolve_surface()
         assert surface.excluded
         assert all(entry.get("tool_id") and entry.get("reason") for entry in surface.excluded)
 
     def test_u9_reason_prefixes_match_the_dimension(self, planning_gates_on, override_settings):
-        override_settings(v24_tool_disabled_ids=support.MEMORY_SAVE)
+        override_settings(tool_disabled_ids=support.MEMORY_SAVE)
         surface = support.resolve_surface()
         assert support.excluded_reason(surface, support.MEMORY_SAVE) == "tool_status:disabled"
         assert support.excluded_reason(surface, support.SEARCH_QUERY) == TOOL_UNAVAILABLE_REASON

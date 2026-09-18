@@ -319,11 +319,14 @@ def set_known_env(monkeypatch, env_key: str, value) -> None:
 
 
 def set_known_flag_env(monkeypatch, env_key: str, value) -> None:
-    """写入环境变量；仅对版本号开关（`V2_*` / `V21_*` / …）校验字段存在。
+    """写入环境变量；仅对形如 `V<数字>_` 的版本化键校验字段存在。
 
-    `v24_tool_env` 除 `V24_*` 开关外还用于注入外部工具密钥（如
+    `v24_tool_env` 除开关外还用于注入外部工具密钥（如
     `EXT_API_WEATHER_TOKEN`）这类非 settings 字段的环境变量，故只守卫会被改名
-    影响的版本号开关，其余原样放行。
+    影响的版本化键，其余原样放行。
+
+    去前缀重构（轨道 A）后测试中已无版本化键，本分支实际处于休眠状态；保留它是为了
+    让「旧 env 名残留」这类回归仍能在写入点被拦住。
     """
     if _VERSIONED_ENV_KEY.match(env_key.upper()):
         set_known_env(monkeypatch, env_key, value)

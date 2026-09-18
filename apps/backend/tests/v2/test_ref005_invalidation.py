@@ -116,7 +116,7 @@ def _clean_listeners():
 
 
 def test_match_threshold_unique_high_match(db_session_factory, override_settings):
-    override_settings( v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     invalidated = lifecycle.observe_negation(
@@ -130,7 +130,7 @@ def test_match_threshold_unique_high_match(db_session_factory, override_settings
 
 
 def test_match_ambiguous_multiple_ignored(db_session_factory, override_settings):
-    override_settings( v2_reflection_invalidate_match_threshold=0.5
+    override_settings( reflection_invalidate_match_threshold=0.5
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     _seed_insight(db_session_factory, "ins-b", "用户最近持续处于工作压力中，情绪疲惫")
@@ -141,7 +141,7 @@ def test_match_ambiguous_multiple_ignored(db_session_factory, override_settings)
 
 
 def test_match_below_threshold_ignored(db_session_factory, override_settings):
-    override_settings( v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     for fuzzy in FUZZY_CLARIFICATIONS:
@@ -155,7 +155,7 @@ def test_match_empty_candidate_set(db_session_factory, override_settings):
 
 
 def test_rebuttal_variants_invalidate_and_keep_row(db_session_factory, override_settings):
-    override_settings( v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     for index, variant in enumerate(NEGATION_VARIANTS):
         user = f"{USER}-{index}"
@@ -173,7 +173,7 @@ def test_rebuttal_variants_invalidate_and_keep_row(db_session_factory, override_
 def test_repeat_negation_is_idempotent_and_hook_fires_once(
     db_session_factory, override_settings
 ):
-    override_settings( v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     hook = HookRecorder()
@@ -263,7 +263,7 @@ def test_noop_invalidation_does_not_fire_hook(db_session_factory, override_setti
 
 
 def test_invalidate_trace_records_matching(db_session_factory, override_settings):
-    override_settings( v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     trace = StubTrace()

@@ -208,7 +208,7 @@ class TestRetryPolicyMapping:
 
     def test_until_budget_default_mirrors_the_settings_default(self):
         policy = PlanRevisionPolicy.policy_for(support.spec(1, retry_policy="until_budget"))
-        assert policy.max_attempts == get_settings().v25_plan_step_max_attempts == 2
+        assert policy.max_attempts == get_settings().plan_step_max_attempts == 2
 
     def test_retry_policy_has_no_backoff_field(self):
         assert tuple(RetryPolicy.model_fields) == ("mode", "max_attempts")
@@ -242,8 +242,8 @@ class TestRevisionBudget:
         from app.services.planning import context as plan_context
         from app.services.planning import engine as plan_engine
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_revision_budget="1",
+            planning_enabled="true",
+            plan_revision_budget="1",
             world_enabled="false",
             observability_persist_enabled="false")
         goal = make_goal(user_id=V25_USER, description="预算耗尽")

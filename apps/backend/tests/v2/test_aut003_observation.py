@@ -193,7 +193,7 @@ class TestAdvanceGoal:
         assert plan.sub_goals[0].attempt_count == 0
 
     def test_threshold_failure_skips_ahead_to_next_step(self, aut_on, override_settings):
-        override_settings(v2_autonomy_subgoal_failure_threshold="2")
+        override_settings(autonomy_subgoal_failure_threshold="2")
         goal = _goal()
         plan = _plan(goal.id, [_spec(index=1), _spec(index=2, capability="query_environment")])
         goal_observation.advance_goal(goal, plan, _facts(), NOW)
@@ -206,7 +206,7 @@ class TestAdvanceGoal:
         assert plan.sub_goals[1].status == "pending"
 
     def test_no_executable_triggers_replan_while_budget_remains(self, aut_on, override_settings):
-        override_settings(v2_autonomy_subgoal_failure_threshold="1")
+        override_settings(autonomy_subgoal_failure_threshold="1")
         goal = _goal()
         plan = _plan(goal.id, [_spec(index=1)])
         goal_observation.advance_goal(goal, plan, _facts(), NOW)
@@ -216,7 +216,7 @@ class TestAdvanceGoal:
         assert goal_repository.get_goal(goal.id).status == "active"
 
     def test_goal_fails_when_replan_budget_exhausted(self, aut_on, override_settings):
-        override_settings(v2_autonomy_subgoal_failure_threshold="1")
+        override_settings(autonomy_subgoal_failure_threshold="1")
         goal = _goal()
         for version in range(1, 3):
             now = datetime.now()
@@ -257,8 +257,8 @@ class TestAdvanceGoal:
 class TestFailureReplanReactivation:
     def test_failed_goal_single_replan_reactivates(self, aut_on, override_settings, monkeypatch):
         override_settings(
-            v2_autonomy_subgoal_failure_threshold="1",
-            v2_autonomy_planning_max_attempts="2",
+            autonomy_subgoal_failure_threshold="1",
+            autonomy_planning_max_attempts="2",
         )
         goal = _goal()
         now = datetime.now()
@@ -390,7 +390,7 @@ class TestWorkDiscovery:
     def test_goal_work_cooldown_not_due(self, aut_on, override_settings):
         from app.application import life_loop
 
-        override_settings(v2_autonomy_subgoal_execute_cooldown_minutes="60")
+        override_settings(autonomy_subgoal_execute_cooldown_minutes="60")
         goal = _goal()
         plan = _plan(goal.id, [_spec(index=1)])
         plan.sub_goals[0].last_attempt_at = NOW - timedelta(minutes=10)

@@ -43,8 +43,8 @@ def _goal(layer, description, priority=3, type_="conversation", age_days=0):
 def stack_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V21_AGENT_RUNTIME_ENABLED="true",
-        V21_GOAL_STACK_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
+        GOAL_STACK_ENABLED="true",
         world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
@@ -53,7 +53,7 @@ def stack_on(override_settings):
 
 class TestGoalStackEvaluator:
     def test_empty_stack_when_flag_off(self, db_session_factory, override_settings):
-        override_settings(V21_GOAL_STACK_ENABLED="false")
+        override_settings(GOAL_STACK_ENABLED="false")
         stack = goal_stack.evaluate_stack(USER, NOW)
         assert stack.primary() is None and stack.drives == {}
 
@@ -193,7 +193,7 @@ class TestEnablement:
         from app.core.settings import get_settings
         from app.core.settings.enablement import enablement_violations
 
-        override_settings(V21_GOAL_STACK_ENABLED="true")
+        override_settings(GOAL_STACK_ENABLED="true")
         assert any(
-            "v21_goal_stack_enabled" in v for v in enablement_violations(get_settings())
+            "goal_stack_enabled" in v for v in enablement_violations(get_settings())
         )

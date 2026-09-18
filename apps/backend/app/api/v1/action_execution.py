@@ -10,18 +10,18 @@ from app.repositories import action_repository
 action_execution_router = APIRouter()
 
 
-def _v26_debug_enabled() -> bool:
+def _action_debug_enabled() -> bool:
     settings = get_settings()
-    return bool(settings.v26_action_execution_enabled) and bool(
-        settings.v26_action_debug_enabled
+    return bool(settings.action_execution_enabled) and bool(
+        settings.action_debug_enabled
     )
 
 
 def _require_debug() -> None:
-    if not _v26_debug_enabled():
+    if not _action_debug_enabled():
         raise HTTPException(
             status_code=404,
-            detail="Action 调试面未启用（v26_action_execution_enabled / v26_action_debug_enabled）",
+            detail="Action 调试面未启用（action_execution_enabled / action_debug_enabled）",
         )
 
 

@@ -28,9 +28,9 @@ USER = "evo-user"
 @pytest.fixture()
 def evo_on(override_settings):
     override_settings(
-        V21_AGENT_RUNTIME_ENABLED="true",
-        V21_PERSONALITY_EVOLUTION_ENABLED="true",
-        V21_GOAL_STACK_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
+        PERSONALITY_EVOLUTION_ENABLED="true",
+        GOAL_STACK_ENABLED="true",
     )
     yield
 
@@ -66,7 +66,7 @@ def _current(axis):
 
 class TestPersonalityCompile:
     def test_flag_off_no_drift(self, db_session_factory, override_settings):
-        override_settings(V21_PERSONALITY_EVOLUTION_ENABLED="false")
+        override_settings(PERSONALITY_EVOLUTION_ENABLED="false")
         _seed_personality()
         _insight("用户多次希望角色主动发起话题")
         assert evolution.compile_personality(USER, NOW) == []

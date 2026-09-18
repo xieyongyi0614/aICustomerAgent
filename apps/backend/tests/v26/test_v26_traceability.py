@@ -70,7 +70,7 @@ class TestPlanStepTraceability:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         monkeypatch.setattr(settings, "world_enabled", True)
         world_engine.ensure_world("u_bridge_trace")
         bridge = PlanExecutorBridge()

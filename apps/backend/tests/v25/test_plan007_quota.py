@@ -312,7 +312,7 @@ class TestIntervalAndCooldownAreNotRelaxed:
             assert verdict.decision == "wait", minutes_ago
 
     def test_the_step_cooldown_window_is_unchanged(self):
-        assert get_settings().v25_plan_step_cooldown_minutes == 30
+        assert get_settings().plan_step_cooldown_minutes == 30
 
     def test_a_step_inside_the_cooldown_window_is_not_schedulable(self):
         step = support.spec(1, last_attempt_at=NOW - timedelta(minutes=5))
@@ -325,7 +325,7 @@ class TestIntervalAndCooldownAreNotRelaxed:
     def test_the_packet_reports_the_block_without_relaxing_it(
         self, override_settings, db_session_factory
     ):
-        override_settings(v25_plan_autonomy_enabled="true", world_enabled="false")
+        override_settings(plan_autonomy_enabled="true", world_enabled="false")
         goal = support.seed_layered_goal(USER)
         support.seed_plan(
             goal.id, [support.spec(1, last_attempt_at=NOW - timedelta(minutes=5))]

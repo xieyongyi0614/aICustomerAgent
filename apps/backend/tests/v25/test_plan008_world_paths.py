@@ -156,7 +156,7 @@ class TestWorldOpWhitelist:
         self, db_session_factory, forward_on, override_settings
     ):
         """负例：名字落在 `world_engine` 之外 → 重试（零世界副作用）。"""
-        override_settings(v2_life_loop_outbox_max_attempts="3")
+        override_settings(life_loop_outbox_max_attempts="3")
         seed_world(USER)
         key = "plan8-neg-op"
         outbox_repository.insert(

@@ -239,7 +239,7 @@ class TestBroadcastFailureDiscipline:
         self, db_session_factory, planning_world_on, make_goal, make_plan, override_settings
     ):
         override_settings(
-            v23_world_simulation_enabled="false", v23_event_detection_enabled="false"
+            world_simulation_enabled="false", event_detection_enabled="false"
         )
         goal = make_goal(description="事件链关闭目标")
         plan = make_plan(goal.id)
@@ -289,7 +289,7 @@ class TestWorldEventTypeValueSet:
 
     def test_escalation_whitelist_contains_goal_completed(self, planning_world_on):
         settings = get_settings()
-        types = {item.strip() for item in settings.v23_event_escalation_types.split(",")}
+        types = {item.strip() for item in settings.world_event_escalation_types.split(",")}
         assert GOAL_COMPLETED_EVENT in types
 
     def test_i6_the_broadcast_lands_on_the_existing_escalation_link(self, planning_world_on):

@@ -289,7 +289,7 @@ class TestZeroExternalCallsOnPreSegmentFailures:
         """① resolve：执行期工具已被禁用 → 终态 `unavailable`，只经过第一段。"""
         from app.services.action.executor import CapabilityExecutor
 
-        override_settings(v24_tool_disabled_ids=MEMORY_TOOL)
+        override_settings(tool_disabled_ids=MEMORY_TOOL)
         registry = support.builtin_registry()
         capability = _memory_capability()
         log = support.SegmentLog()

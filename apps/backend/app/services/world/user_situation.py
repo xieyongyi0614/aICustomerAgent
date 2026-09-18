@@ -210,9 +210,9 @@ def _llm_assist_gate(
     now: datetime,
 ) -> UserSituation | None:
     settings = get_settings()
-    if not settings.v23_world_llm_assist_enabled:
+    if not settings.world_llm_assist_enabled:
         return None
-    if random.random() > settings.v23_llm_assist_sample_rate:
+    if random.random() > settings.world_llm_assist_sample_rate:
         return None
     return llm_assist_detect(user_id, text, evidence, now)
 

@@ -110,7 +110,7 @@ def test_compile_cap_saturated_under_reinforcement():
     deltas = {item.value["max_tokens_delta"] for items in saturating for item in items
               if item.key == policy.KEY_RESPONSE_STYLE_LENGTH}
     assert deltas == {-190}
-    assert all(abs(delta) <= settings.v2_development_preference_max_token_delta
+    assert all(abs(delta) <= settings.development_preference_max_token_delta
                for delta in deltas)
 
 

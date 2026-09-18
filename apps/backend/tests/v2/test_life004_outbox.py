@@ -188,7 +188,7 @@ class TestConsumer:
     def test_retry_backoff_then_dead_letter(
         self, db_session_factory, outbox_on, monkeypatch, override_settings
     ):
-        override_settings(v2_life_loop_outbox_max_attempts="3")
+        override_settings(life_loop_outbox_max_attempts="3")
 
         def boom(*args, **kwargs):
             raise RuntimeError("world down")

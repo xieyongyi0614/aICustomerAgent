@@ -33,14 +33,14 @@ def life_loop_on(override_settings):
 
 class TestEnablement:
     def test_unified_requires_runtime(self, override_settings):
-        override_settings(V21_UNIFIED_RUN_ENABLED="true")
+        override_settings(UNIFIED_RUN_ENABLED="true")
         violations = enablement_violations(get_settings())
-        assert any("v21_unified_run_enabled" in v for v in violations)
+        assert any("unified_run_enabled" in v for v in violations)
 
     def test_legal_combo_has_no_v21_violations(self, override_settings):
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_UNIFIED_RUN_ENABLED="true",
+            AGENT_RUNTIME_ENABLED="true",
+            UNIFIED_RUN_ENABLED="true",
         )
         violations = [
             v for v in enablement_violations(get_settings()) if "v21" in v
@@ -81,7 +81,7 @@ class TestFlagOffBehavior:
         from app.core import llm_factory
         from app.main import app
 
-        override_settings(V21_AGENT_RUNTIME_ENABLED="false")
+        override_settings(AGENT_RUNTIME_ENABLED="false")
         llm = fake_llm(
             response="好的。",
             structured_responses={

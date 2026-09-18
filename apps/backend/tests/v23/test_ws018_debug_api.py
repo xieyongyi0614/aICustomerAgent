@@ -23,10 +23,10 @@ pytestmark = pytest.mark.xdist_group("ws018")
 @pytest.fixture
 def v23_on(monkeypatch):
     for key, value in {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
     }.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
@@ -36,8 +36,8 @@ def v23_on(monkeypatch):
 
 @pytest.fixture
 def v23_off(monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "false")
-    monkeypatch.setenv("V23_DEBUG_TICK_ENABLED", "false")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "false")
+    monkeypatch.setenv("DEBUG_TICK_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -129,7 +129,7 @@ async def test_simulation_endpoint_matches_db(db_session_factory, v23_on):
     assert body["active_situations"][0]["intensity"] == 4
     assert body["recent_events"][0]["type"] == "weather_change"
     assert body["recent_events"][0]["idempotency_key"] == f"weather:{user}:2026-09-14"
-    assert body["flags"]["v23_world_simulation_enabled"] is True
+    assert body["flags"]["world_simulation_enabled"] is True
     assert len(body["flags"]) == 8
 
 
@@ -191,17 +191,17 @@ async def test_tick_requires_debug_flag(db_session_factory, v23_on):
 
     resp = await _post("/api/v1/debug/world/simulation/tick", json={"user_id": user})
     assert resp.status_code == 403
-    assert "v23_debug_tick_enabled" in resp.json()["detail"]
+    assert "debug_tick_enabled" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_tick_runs_maintenance_with_debug_flag(db_session_factory, monkeypatch):
     for key, value in {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
-        "V23_DEBUG_TICK_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
+        "DEBUG_TICK_ENABLED": "true",
     }.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()

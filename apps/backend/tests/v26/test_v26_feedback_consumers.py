@@ -19,8 +19,8 @@ def _due_at(hours: int = 2) -> str:
 def _enabled(monkeypatch, **flags):
     settings_flags = {
         "action_enabled": True,
-        "v26_action_execution_enabled": True,
-        "v26_action_feedback_enabled": True,
+        "action_execution_enabled": True,
+        "action_feedback_enabled": True,
         "world_enabled": True,
     }
     settings_flags.update(flags)
@@ -68,8 +68,8 @@ class TestUniqueEntry:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_feedback_enabled", False)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_feedback_enabled", False)
         monkeypatch.setattr(settings, "world_enabled", True)
         world_engine.ensure_world("u_fb_off")
         action = manager.create(

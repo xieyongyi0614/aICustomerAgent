@@ -25,9 +25,9 @@ USER = "metric-user"
 @pytest.fixture()
 def metrics_on(override_settings):
     override_settings(
-        V21_AGENT_RUNTIME_ENABLED="true",
-        V21_AGENT_METRICS_ENABLED="true",
-        V21_GOAL_STACK_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
+        AGENT_METRICS_ENABLED="true",
+        GOAL_STACK_ENABLED="true",
     )
     yield
 
@@ -72,7 +72,7 @@ def _decision(candidates=None, outcome=None, created_at=NOW):
 
 class TestSnapshot:
     def test_flag_off_skips(self, db_session_factory, override_settings):
-        override_settings(V21_AGENT_METRICS_ENABLED="false")
+        override_settings(AGENT_METRICS_ENABLED="false")
         result = agent_evaluation.run_daily_snapshot(USER, NOW)
         assert result["status"] == "skipped"
 
@@ -138,8 +138,8 @@ class TestEnablement:
         from app.core.settings import get_settings
         from app.core.settings.enablement import enablement_violations
 
-        override_settings(V21_AGENT_METRICS_ENABLED="true")
+        override_settings(AGENT_METRICS_ENABLED="true")
         assert any(
-            "v21_agent_metrics_enabled" in v
+            "agent_metrics_enabled" in v
             for v in enablement_violations(get_settings())
         )

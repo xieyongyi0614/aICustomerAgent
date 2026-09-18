@@ -1,6 +1,6 @@
 """PLAN-004 阶段 Flag 门控与回归断言（Task Detail §8 Step 6 / §9.2 I8~I11 / §9.3 S6）。
 
-本模块**不导入** `plan004_binding_on` 夹具：默认即为出厂态（`v25_plan_step_binding_enabled`
+本模块**不导入** `plan004_binding_on` 夹具：默认即为出厂态（`plan_step_binding_enabled`
 off），「off 时零绑定、落库形状与 V2.4.0 逐字节一致」正是本模块的被测对象。
 """
 
@@ -104,12 +104,12 @@ class TestBindingSubGateOff:
 
 
 class TestToolRequiredOff:
-    """I9：`v25_plan_tool_required` off → 允许无面规划并退化为 V2.4.0 行为。"""
+    """I9：`plan_tool_required` off → 允许无面规划并退化为 V2.4.0 行为。"""
 
     def test_surface_less_planning_stays_unbound_without_errors(self, override_settings):
         override_settings(
-            v25_plan_step_binding_enabled="true",
-            v25_plan_tool_required="false",
+            plan_step_binding_enabled="true",
+            plan_tool_required="false",
         )
         result = decompose(step(1), ctx=make_ctx())
         assert result.bindings == []
@@ -119,8 +119,8 @@ class TestToolRequiredOff:
 
     def test_binding_subgate_off_alone_is_also_enough(self, override_settings):
         override_settings(
-            v25_plan_step_binding_enabled="false",
-            v25_plan_tool_required="true",
+            plan_step_binding_enabled="false",
+            plan_tool_required="true",
         )
         result = decompose(step(1), ctx=make_ctx())
         assert result.bindings == [] and result.binding_errors == []
@@ -129,13 +129,13 @@ class TestToolRequiredOff:
     def test_binding_is_active_only_when_both_gates_are_on(self, override_settings):
         settings_obj = settings()
         assert decompose_mod._binding_enabled(settings_obj) is False
-        override_settings(v25_plan_step_binding_enabled="true")
+        override_settings(plan_step_binding_enabled="true")
         assert decompose_mod._binding_enabled(settings()) is True
-        override_settings(v25_plan_step_binding_enabled="true", v25_plan_tool_required="false")
+        override_settings(plan_step_binding_enabled="true", plan_tool_required="false")
         assert decompose_mod._binding_enabled(settings()) is False
 
     def test_checked_in_registry_is_read_only_when_binding_is_active(self, override_settings):
-        override_settings(v25_plan_step_binding_enabled="true")
+        override_settings(plan_step_binding_enabled="true")
         result = decompose(
             step(1), ctx=make_ctx(REMINDER_CREATE), registry=builtin_registry()
         )

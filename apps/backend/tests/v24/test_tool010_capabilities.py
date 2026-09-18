@@ -46,7 +46,7 @@ def _ctx(enabled: bool) -> ExecutionContext:
         user_id=USER,
         record_id="act-tool010",
         now=NOW,
-        settings=tool_settings(v24_tool_system_enabled=enabled),
+        settings=tool_settings(tool_system_enabled=enabled),
         dedupe_key="dk-tool010",
     )
 

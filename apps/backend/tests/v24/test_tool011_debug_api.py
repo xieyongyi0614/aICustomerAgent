@@ -49,11 +49,11 @@ def _reset_ext_state():
 
 def _enable_ext_face(v24_tool_env, tmp_path, **overrides):
     envs = {
-        "V24_TOOL_SYSTEM_ENABLED": True,
-        "V24_TOOL_EXTERNAL_API_ENABLED": True,
-        "V24_TOOL_USER_DEFINED_ENABLED": True,
-        "V24_TOOL_EXT_ALLOWED_HOSTS": "api.example.com",
-        "V24_TOOL_EXT_MANIFEST_PATH": str(tmp_path),
+        "TOOL_SYSTEM_ENABLED": True,
+        "TOOL_EXTERNAL_API_ENABLED": True,
+        "TOOL_USER_DEFINED_ENABLED": True,
+        "TOOL_EXT_ALLOWED_HOSTS": "api.example.com",
+        "TOOL_EXT_MANIFEST_PATH": str(tmp_path),
         WEATHER_ENV: WEATHER_SECRET,
     }
     envs.update(overrides)
@@ -63,7 +63,7 @@ def _enable_ext_face(v24_tool_env, tmp_path, **overrides):
 
 def _run_startup_load():
     settings = get_settings()
-    return ext_api.get_manifest_loader().load(settings.v24_tool_ext_manifest_path)
+    return ext_api.get_manifest_loader().load(settings.tool_ext_manifest_path)
 
 
 @pytest.mark.asyncio
@@ -127,7 +127,7 @@ async def test_e17_external_tools_endpoint_hides_credentials(v24_tool_env, tmp_p
 
 @pytest.mark.asyncio
 async def test_manifests_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False, V24_TOOL_EXTERNAL_API_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_EXTERNAL_API_ENABLED=False)
     response = await _get("/debug/tools/manifests")
     assert response.status_code == 200
     assert response.json() == {
@@ -142,22 +142,22 @@ async def test_manifests_endpoint_enabled_false_when_tool_system_off(v24_tool_en
 
 @pytest.mark.asyncio
 async def test_manifests_endpoint_403_when_external_face_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_EXTERNAL_API_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=False)
     response = await _get("/debug/tools/manifests")
     assert response.status_code == 403
-    assert "v24_tool_external_api_enabled" in response.json()["detail"]
+    assert "tool_external_api_enabled" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_external_endpoint_403_when_external_face_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_EXTERNAL_API_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=False)
     response = await _get("/debug/tools/external")
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_external_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False, V24_TOOL_EXTERNAL_API_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_EXTERNAL_API_ENABLED=False)
     response = await _get("/debug/tools/external")
     assert response.status_code == 200
     assert response.json()["enabled"] is False
@@ -165,7 +165,7 @@ async def test_external_endpoint_enabled_false_when_tool_system_off(v24_tool_env
 
 @pytest.mark.asyncio
 async def test_external_endpoint_shows_empty_whitelist_as_all_disabled(v24_tool_env, tmp_path):
-    _enable_ext_face(v24_tool_env, tmp_path, V24_TOOL_EXT_ALLOWED_HOSTS="")
+    _enable_ext_face(v24_tool_env, tmp_path, TOOL_EXT_ALLOWED_HOSTS="")
     response = await _get("/debug/tools/external")
     body = response.json()
     assert body["allowed_hosts"] == []
@@ -211,14 +211,14 @@ async def test_user_defined_endpoint_lists_and_revokes(v24_tool_env, tmp_path):
 
 @pytest.mark.asyncio
 async def test_user_defined_endpoint_403_when_flag_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_USER_DEFINED_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_USER_DEFINED_ENABLED=False)
     assert (await _get("/debug/tools/user-defined")).status_code == 403
     assert (await _post("/debug/tools/user-defined/user.x.y/revoke")).status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_user_defined_endpoint_enabled_false_when_tool_system_off(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False, V24_TOOL_USER_DEFINED_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_USER_DEFINED_ENABLED=False)
     response = await _get("/debug/tools/user-defined")
     assert response.status_code == 200
     assert response.json() == {"enabled": False, "registered": [], "tools": []}

@@ -297,14 +297,14 @@ def test_e10_scene_empty_when_expansion_flag_off(db_session_factory):
 
 def test_scene_projection_when_expansion_flag_on(db_session_factory):
     seed_all()
-    scene = _build(v23_scene_expansion_enabled=True)["scene"]
+    scene = _build(scene_expansion_enabled=True)["scene"]
     assert scene["location_id"] == LOCATION
     assert scene["tone_bias"] == "intimate"
     assert "日常" in scene["topic_affordances"]
 
 
 def test_scene_empty_without_world_record(db_session_factory):
-    assert _build(v23_scene_expansion_enabled=True)["scene"] == {}
+    assert _build(scene_expansion_enabled=True)["scene"] == {}
 
 
 # --- E11：关系读取失败降级 ---------------------------------------------------
@@ -405,7 +405,7 @@ def _raiser(message: str):
 def test_each_segment_degrades_independently(db_session_factory, monkeypatch, segment, install, degraded):
     seed_all()
     install(monkeypatch)
-    facts = _build(v23_scene_expansion_enabled=True, world_enabled=True)
+    facts = _build(scene_expansion_enabled=True, world_enabled=True)
     assert set(facts) == set(WORLD_FACTS_KEYS)
     assert degraded(facts) is True
     assert all(key in facts["world"] for key in WORLD_SEGMENT_KEYS)
@@ -418,7 +418,7 @@ def test_segment_success_path_is_unaffected_by_other_segment_degradation(
     """单段失败不得牵连其他段（逐段独立 try）。"""
     seed_all()
     install(monkeypatch)
-    facts = _build(v23_scene_expansion_enabled=True)
+    facts = _build(scene_expansion_enabled=True)
     healthy = {
         "inventory": sorted(facts["inventory"]) == sorted(DEFAULT_INVENTORY),
         "situations": len(facts["situations"]) == 1,
@@ -435,7 +435,7 @@ def test_segment_success_path_is_unaffected_by_other_segment_degradation(
 def test_all_segments_failing_still_returns_usable_structure(db_session_factory, monkeypatch):
     for _, install, _ in _segment_cases():
         install(monkeypatch)
-    facts = _build(v23_scene_expansion_enabled=True)
+    facts = _build(scene_expansion_enabled=True)
     assert set(facts) == set(WORLD_FACTS_KEYS)
     assert set(facts["world"]) == set(WORLD_SEGMENT_KEYS)
     assert facts["world"]["world_enabled"] is True
@@ -455,7 +455,7 @@ def test_degradation_is_logged(db_session_factory, monkeypatch, caplog):
 
 def test_sub_builders_are_independently_callable(db_session_factory):
     seed_all()
-    builder = _builder(v23_scene_expansion_enabled=True)
+    builder = _builder(scene_expansion_enabled=True)
     assert sorted(builder.build_inventory(USER)) == sorted(DEFAULT_INVENTORY)
     assert [item["dimension"] for item in builder.build_situations(USER)] == ["health"]
     assert builder.build_scene(USER)["location_id"] == LOCATION
@@ -559,7 +559,7 @@ def test_preread_performs_no_world_write(db_session_factory, monkeypatch):
         monkeypatch.setattr(world_engine, name, probe)
 
     before = (world_objects(), world_event_titles())
-    facts = _build(v23_scene_expansion_enabled=True)
+    facts = _build(scene_expansion_enabled=True)
     assert facts["world"]["world_enabled"] is True
     assert write_calls == []
     assert (world_objects(), world_event_titles()) == before

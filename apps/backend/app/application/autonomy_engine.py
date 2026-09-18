@@ -191,7 +191,7 @@ def collect_tool_facts(user_id: str, ctx: ToolContext | None = None) -> dict:
     """
     try:
         settings = get_settings()
-        if not settings.v24_tool_system_enabled:
+        if not settings.tool_system_enabled:
             return {}
         registry = get_tool_registry()
         if registry is None:
@@ -222,7 +222,7 @@ def collect_tool_insights(user_id: str) -> dict:
     """
     try:
         settings = get_settings()
-        if not getattr(settings, "v24_tool_reflection_enabled", False):
+        if not getattr(settings, "tool_reflection_enabled", False):
             return {}
         from app.services.reflection import tool_feed
 
@@ -327,14 +327,14 @@ def _advance_moment(snapshot: dict, fallback: datetime | None) -> datetime:
 def _collect_plan_facts(user_id: str, now: datetime | None = None) -> dict:
     """有界计划事实段（PLAN-007 §4.2.1 / §6.2）：固定七键、单目标、只读、失败降级为空包。
 
-    与既有事实段同款纪律：子闸 `v25_plan_autonomy_enabled` off → `{}`（原状）；
+    与既有事实段同款纪律：子闸 `plan_autonomy_enabled` off → `{}`（原状）；
     无 active 计划 → `{}`；任何异常 → `{}` + 日志，**不阻塞 tick**；整体经既有
     `observability.bound_extra` 预算裁剪（不新增预算机制）。字段契约见
     `autonomy_policy.PLAN_FACTS_KEYS`（唯一声明处）。
     """
     try:
         settings = get_settings()
-        if not settings.v25_plan_autonomy_enabled:
+        if not settings.plan_autonomy_enabled:
             return {}
         pair = _latest_active_plan(user_id)
         if pair is None:
@@ -551,7 +551,7 @@ def _pipeline_intention(
     TOOL-009：`tool_insights` 为只读反哺信号（缺省 None，interest 维行为不变）。
     """
     settings = get_settings()
-    if not settings.v21_agent_runtime_enabled:
+    if not settings.agent_runtime_enabled:
         return None, None
     try:
         from app.application import agent_state_context
@@ -559,15 +559,15 @@ def _pipeline_intention(
 
         stack = (
             goal_stack_service.evaluate_stack(user_id, now)
-            if settings.v21_goal_stack_enabled
+            if settings.goal_stack_enabled
             else None
         )
         world_impacts = None
         world_schedule = None
-        if settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled:
+        if settings.world_simulation_enabled and settings.event_detection_enabled:
             facts = world_engine.collect_facts(user_id)
             world_impacts = facts.get("impacts")
-            if settings.v23_daily_life_enabled:
+            if settings.daily_life_enabled:
                 world_schedule = {
                     "current_block": facts.get("current_block"),
                     "part_of_day": facts.get("part_of_day"),

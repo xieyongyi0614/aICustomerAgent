@@ -89,7 +89,7 @@ def _similarity(left: str, right: str) -> float:
 
 
 def decay_lambda_for(memory_type: str) -> float:
-    table = get_settings().v2_memory_decay_lambdas()
+    table = get_settings().decay_lambdas()
     canonical = memory2_types.normalize_type(memory_type) or memory_type
     if canonical in table:
         return float(table[canonical])
@@ -127,7 +127,7 @@ def flush_reinforce_buffer(trace=None) -> list[str]:
 def _apply_reinforce(memory_ids: list[str], trace=None) -> list[str]:
     started = time.perf_counter()
     now = datetime.now()
-    boost = get_settings().v2_memory_reinforce_boost
+    boost = get_settings().memory_reinforce_boost
     updated_ids: list[str] = []
     with SessionLocal() as session:
         rows = session.query(Memory).filter(Memory.id.in_(memory_ids)).all()
@@ -172,7 +172,7 @@ def run_decay_cycle(now: datetime | None = None, trace=None) -> dict:
 def _decay_batch(now: datetime, trace=None) -> int:
     started = time.perf_counter()
     settings = get_settings()
-    floor = settings.v2_memory_salience_floor
+    floor = settings.memory_salience_floor
     decayed_count = 0
     scanned = 0
     with SessionLocal() as session:
@@ -180,7 +180,7 @@ def _decay_batch(now: datetime, trace=None) -> int:
             session.query(Memory)
             .filter(Memory.status == STATUS_ACTIVE)
             .order_by(Memory.created_at.asc())
-            .limit(settings.v2_memory_decay_batch_size)
+            .limit(settings.memory_decay_batch_size)
             .all()
         )
         for row in rows:
@@ -205,7 +205,7 @@ def _decay_batch(now: datetime, trace=None) -> int:
 
 def _forget_stale_decayed(now: datetime, trace=None) -> int:
     started = time.perf_counter()
-    retention_days = get_settings().v2_memory_forget_retention_days
+    retention_days = get_settings().memory_forget_retention_days
     threshold = now - timedelta(days=retention_days)
     forgotten = 0
     with SessionLocal() as session:
@@ -230,10 +230,10 @@ def _forget_stale_decayed(now: datetime, trace=None) -> int:
 
 
 def purge_expired_forgotten(now: datetime | None = None, trace=None) -> int:
-    """软删保留期（v2_memory_forget_retention_days）届满的 forgotten 行物理删除。"""
+    """软删保留期（memory_forget_retention_days）届满的 forgotten 行物理删除。"""
     now = now or datetime.now()
     started = time.perf_counter()
-    threshold = now - timedelta(days=get_settings().v2_memory_forget_retention_days)
+    threshold = now - timedelta(days=get_settings().memory_forget_retention_days)
     with SessionLocal() as session:
         rows = (
             session.query(Memory)

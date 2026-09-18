@@ -121,8 +121,8 @@ def test_emitted_events_are_completed_time_markers(db_session_factory, sim_mode)
 
 
 def test_maintenance_step_emits_markers(monkeypatch, db_session_factory):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("V23_TIME_ADVANCE_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
     get_settings.cache_clear()
     try:
         user = "ws004-maint"

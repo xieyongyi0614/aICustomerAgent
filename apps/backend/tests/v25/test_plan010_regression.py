@@ -220,7 +220,7 @@ class TestExistingConsumersRegression:
 
     def test_i10_reflection_stays_in_the_background_step(self):
         settings = get_settings()
-        assert settings.v25_plan_reflection_enabled is False
+        assert settings.plan_reflection_enabled is False
         from app.application import life_loop
 
         source = life_loop.__file__
@@ -301,7 +301,7 @@ class TestFlagOffRegression:
     def test_i13_no_plan_reads_when_the_sub_flag_is_off(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
 
         def _boom(*args, **kwargs):
             raise AssertionError("子闸 off 时不得读取计划数据")
@@ -316,7 +316,7 @@ class TestFlagOffRegression:
     def test_i13_no_listener_is_registered_when_off(
         self, db_session_factory, override_settings
     ):
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
         reflection_lifecycle.reset_insight_created_listeners()
         listener_mod.register_runtime()
         assert reflection_lifecycle._insight_created_listeners == []
@@ -324,7 +324,7 @@ class TestFlagOffRegression:
     def test_i13_prompt_bytes_are_unchanged_with_the_plan_gates_off(
         self, db_session_factory, make_goal, autonomy_on, stub_planning_llm, override_settings
     ):
-        override_settings(v25_plan_reflection_enabled="false")
+        override_settings(plan_reflection_enabled="false")
         recorder: dict = {}
         stub_planning_llm(recorder=recorder)
         goal = make_goal(description="prompt 快照目标", priority=4, domain="relationship")
@@ -335,7 +335,7 @@ class TestFlagOffRegression:
     def test_i13_plan_window_insight_types_are_not_consulted_when_off(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
         probe_calls = []
         original = reflection_evidence.plan_evidence_enabled
 
@@ -370,7 +370,7 @@ class TestEndToEndLoop:
         insight = rows[0]
         assert insight.type == "capability_note"
         assert insight.scope == "user"
-        assert insight.confidence >= get_settings().v25_plan_replan_min_confidence
+        assert insight.confidence >= get_settings().plan_replan_min_confidence
         assert scripted_reflection_llm.calls == 1
 
         jobs = planning_jobs(db_session_factory)
@@ -449,7 +449,7 @@ class TestEndToEndLoop:
         from .plan010_support import plan_reflection_env
 
         plan_reflection_env(override_settings)
-        override_settings(v25_plan_reflection_enabled="false")
+        override_settings(plan_reflection_enabled="false")
         seed_success_rate_series()
         reflection_lifecycle.reset_insight_created_listeners()
         listener_mod.register_runtime()

@@ -39,11 +39,11 @@ class ToolHealthTracker:
 
     @property
     def threshold(self) -> int:
-        return int(getattr(self._settings, "v24_tool_breaker_threshold", 3))
+        return int(getattr(self._settings, "tool_breaker_threshold", 3))
 
     @property
     def cooldown_seconds(self) -> float:
-        return float(getattr(self._settings, "v24_tool_breaker_cooldown_seconds", 300))
+        return float(getattr(self._settings, "tool_breaker_cooldown_seconds", 300))
 
     def record_outcome(
         self, tool_id: str, *, ok: bool, failure_kind: str | None = None

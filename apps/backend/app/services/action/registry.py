@@ -93,10 +93,10 @@ _registry: CapabilityRegistry | None = None
 _registry_flags: dict[str, bool] = {}
 
 REGISTRY_FLAG_NAMES: tuple[str, ...] = (
-    "v24_tool_system_enabled",
-    "v24_tool_channel_enabled",
+    "tool_system_enabled",
+    "tool_channel_enabled",
     "feishu_enabled",
-    "v24_tool_external_api_enabled",
+    "tool_external_api_enabled",
 )
 
 

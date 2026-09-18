@@ -117,8 +117,8 @@ class TestLifeLoopStep:
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_scheduler_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_scheduler_enabled", True)
         action = _action("到期")
         scheduler.schedule(action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1))
         result = __import__("asyncio").run(scheduler.step_action_schedule(datetime.now()))

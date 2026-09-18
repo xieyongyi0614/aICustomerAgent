@@ -48,7 +48,7 @@ def reset_cache() -> None:
 def check_daily_budget(
     now: datetime | None = None, settings: Settings | None = None
 ) -> BudgetState:
-    """当日用量聚合 → ok|degraded；结果按日缓存 v2_life_loop_budget_cache_seconds。"""
+    """当日用量聚合 → ok|degraded；结果按日缓存 life_loop_budget_cache_seconds。"""
     settings = settings or get_settings()
     now = now or datetime.now()
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -56,7 +56,7 @@ def check_daily_budget(
     if (
         cached is not None
         and (now - cached.checked_at).total_seconds()
-        < settings.v2_life_loop_budget_cache_seconds
+        < settings.life_loop_budget_cache_seconds
     ):
         return cached
 
@@ -68,14 +68,14 @@ def check_daily_budget(
     except Exception:
         logger.exception("日 LLM 用量聚合失败，进入保守模式（宁紧勿松）")
         conservative = True
-        used_calls = settings.v2_life_loop_daily_llm_call_budget
-        token_total = settings.v2_life_loop_daily_llm_token_budget
+        used_calls = settings.life_loop_daily_llm_call_budget
+        token_total = settings.life_loop_daily_llm_token_budget
 
-    call_limit = settings.v2_life_loop_daily_llm_call_budget
-    token_limit = settings.v2_life_loop_daily_llm_token_budget
+    call_limit = settings.life_loop_daily_llm_call_budget
+    token_limit = settings.life_loop_daily_llm_token_budget
     if conservative:
         # used 未知按 limit 记 → 必然降级；限额按 80% 收紧留痕（宁紧勿松）
-        call_limit = int(call_limit * settings.v2_life_loop_degraded_usage_ratio)
+        call_limit = int(call_limit * settings.life_loop_degraded_usage_ratio)
         status, reason = _STATUS_DEGRADED, "usage_query_failed_conservative"
     elif call_limit > 0 and used_calls >= call_limit:
         status, reason = _STATUS_DEGRADED, "over_call_limit"

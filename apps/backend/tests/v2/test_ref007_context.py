@@ -75,7 +75,7 @@ def test_filter_threshold_scope_and_limit(db_session_factory, override_settings)
 
 
 def test_max_items_cap_and_over_limit_reason(db_session_factory, override_settings):
-    override_settings( v2_reflection_context_max_items=2)
+    override_settings( reflection_context_max_items=2)
     for i in range(4):
         _seed_insight(
             db_session_factory, f"i-{i}", f"认知条目 {i}", confidence=0.9 - i * 0.05
@@ -96,7 +96,7 @@ def test_budget_full_memory_leaves_no_insight(db_session_factory, override_setti
 
 
 def test_budget_partial_takes_first_fit(db_session_factory, override_settings):
-    override_settings( v2_reflection_context_max_items=5)
+    override_settings( reflection_context_max_items=5)
     _seed_insight(db_session_factory, "i-big", "很长" * 80, confidence=0.95)
     _seed_insight(db_session_factory, "i-small", "短认知", confidence=0.9)
     selected, payload = _load_context_insights(USER, retrieval_used=770)
@@ -105,7 +105,7 @@ def test_budget_partial_takes_first_fit(db_session_factory, override_settings):
 
 
 def test_statement_truncated_with_ellipsis(db_session_factory, override_settings):
-    override_settings( v2_reflection_context_statement_chars=10
+    override_settings( reflection_context_statement_chars=10
     )
     _seed_insight(db_session_factory, "i-long", "这是一条远超截断长度的认知陈述句", confidence=0.9)
     selected, _payload = _load_context_insights(USER, retrieval_used=0)

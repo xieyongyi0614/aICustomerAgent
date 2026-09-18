@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 
 from app.core.settings import get_settings
+from app.core.settings.plan import PlanSettings
 from app.models.observability import DecisionKind
 from app.application import autonomy_engine
 from app.repositories import goal_repository
@@ -468,21 +469,18 @@ class TestZeroMigration:
         assert plan_tables == ("daily_plans", "goal_plans"), "计划域表集未扩"
 
     def test_no_new_v25_setting_is_introduced(self):
-        settings = get_settings()
-        declared = {
-            name for name in type(settings).model_fields if name.startswith("v25_")
-        }
+        declared = set(PlanSettings.model_fields)
         assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
         assert len(PLAN_002_SETTINGS_FLAGS) == 13
         assert len(PLAN_002_SETTINGS_PARAMS) == 14
-        assert "v25_plan_autonomy_enabled" in declared
+        assert "plan_autonomy_enabled" in declared
 
 
 class TestFlagOffParity:
     """I11：Flag 全 off 时 `plan_facts` 不存在（`{}` 原状）、行为与 V2.4.0 逐字节一致。"""
 
     def test_the_packet_stays_empty_with_the_default_configuration(self):
-        assert get_settings().v25_plan_autonomy_enabled is False
+        assert get_settings().plan_autonomy_enabled is False
         snapshot = support.act_snapshot()
         assert snapshot.plan_facts == {}
         baseline = autonomy_policy.evaluate(

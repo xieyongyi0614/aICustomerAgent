@@ -31,7 +31,7 @@ METRIC_NAMES = (
 
 def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
     settings = get_settings()
-    if not settings.v21_agent_metrics_enabled:
+    if not settings.agent_metrics_enabled:
         return {"status": "skipped", "skip_reason": "flag_disabled"}
     now = now or datetime.now()
     window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -39,7 +39,7 @@ def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
     history = [
         row
         for row in agent_metric_repository.list_recent(
-            user_id, limit=settings.v21_metric_trend_windows
+            user_id, limit=settings.metric_trend_windows
         )
         if row.window_start < window_start
     ]
@@ -107,10 +107,10 @@ def _goal_progress(user_id: str, now: datetime) -> float | None:
         overdue = False
         if goal.created_at:
             age = now - goal.created_at
-            if goal.layer == "medium" and age > timedelta(days=settings.v21_goal_medium_timeout_days):
+            if goal.layer == "medium" and age > timedelta(days=settings.goal_medium_timeout_days):
                 overdue = True
             if goal.layer == "short_term" and age > timedelta(
-                hours=settings.v21_goal_short_timeout_hours
+                hours=settings.goal_short_timeout_hours
             ):
                 overdue = True
         healthy += 0 if overdue else 1
@@ -145,17 +145,17 @@ def _trend(metrics: dict, history: list, settings) -> dict:
     """趋势：方向 + 连续越限窗口数（streak）。
 
     越限判定 = 当前窗口与之前连续窗口的值均低于该指标阈值，且连续数达到
-    `v21_metric_breach_streak`（默认 2，与既有「当前+前值」规则等价）。
-    `v21_metric_trend_windows` 为历史取数深度；`windows` 字段回报真实连续数。
+    `metric_breach_streak`（默认 2，与既有「当前+前值」规则等价）。
+    `metric_trend_windows` 为历史取数深度；`windows` 字段回报真实连续数。
     """
-    streak_required = max(settings.v21_metric_breach_streak, 1)
+    streak_required = max(settings.metric_breach_streak, 1)
     trend: dict = {}
     for name, value in metrics.items():
         if value is None:
             continue
         prior_values = [h.metrics.get(name) for h in history]
         previous = next((v for v in prior_values if v is not None), None)
-        threshold = getattr(settings, f"v21_metric_floor_{name}", None)
+        threshold = getattr(settings, f"metric_floor_{name}", None)
         streak = 0
         if threshold is not None and value < threshold:
             streak = 1

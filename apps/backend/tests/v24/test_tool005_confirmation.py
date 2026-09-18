@@ -356,7 +356,7 @@ def test_non_todo_payload_kinds_is_gated_by_master_switch():
     """总闸 off → `None`（不排除）：这些行根本不会被登记，life_loop 侧的调用形态与 V9 一致。"""
     from app.services.tool.confirmation import non_todo_payload_kinds
 
-    assert non_todo_payload_kinds(_settings(v24_tool_system_enabled=False)) is None
+    assert non_todo_payload_kinds(_settings(tool_system_enabled=False)) is None
     assert non_todo_payload_kinds(_settings()) is not None
 
 
@@ -365,7 +365,7 @@ def test_non_todo_payload_kinds_is_gated_by_master_switch():
 
 def test_ttl_reuse_true_keeps_grant_within_window():
     now = datetime.now()
-    settings = _settings(v24_tool_confirm_ttl_reuse=True)
+    settings = _settings(tool_confirm_ttl_reuse=True)
     service = ConfirmationService(settings)
     request = _register(service, now, settings=settings)
     service.resolve(request.request_id, approved=True)
@@ -386,7 +386,7 @@ def test_ttl_reuse_true_keeps_grant_within_window():
 
 def test_ttl_reuse_false_grants_only_current_round():
     now = datetime.now()
-    settings = _settings(v24_tool_confirm_ttl_reuse=False)
+    settings = _settings(tool_confirm_ttl_reuse=False)
     service = ConfirmationService(settings)
     request = _register(service, now, settings=settings)
     service.resolve(request.request_id, approved=True)
@@ -425,7 +425,7 @@ def test_revoke_takes_effect_on_next_decision():
 
 
 def test_revoke_removes_session_grant_only():
-    service = ConfirmationService(_settings(v24_tool_confirm_ttl_reuse=False))
+    service = ConfirmationService(_settings(tool_confirm_ttl_reuse=False))
     service.grant_scope(USER_ID, SENSITIVE_TOOL_ID, ("self",))
     assert service.revoke(USER_ID, SENSITIVE_TOOL_ID) == 1
     assert service.has_grant(USER_ID, SENSITIVE_TOOL_ID, ("self",)) is False
@@ -554,17 +554,17 @@ async def _post(path: str, **params):
 
 @pytest.fixture
 def permission_on(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_PERMISSION_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_PERMISSION_ENABLED=True)
 
 
 @pytest.fixture
 def master_only(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_PERMISSION_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_PERMISSION_ENABLED=False)
 
 
 @pytest.mark.asyncio
 async def test_debug_permissions_requires_master_gate(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False, V24_TOOL_PERMISSION_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_PERMISSION_ENABLED=False)
     response = await _get("/debug/tools/permissions", user_id=USER_ID)
     assert response.status_code == 200
     assert response.json() == {"enabled": False, "user_id": None, "grants": []}
@@ -578,7 +578,7 @@ async def test_debug_read_endpoints_forbidden_without_permission_layer(master_on
 
 @pytest.mark.asyncio
 async def test_debug_write_endpoints_forbidden_without_master(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False, V24_TOOL_PERMISSION_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False, TOOL_PERMISSION_ENABLED=False)
     assert (
         await _post(f"/debug/tools/confirmations/{USER_ID}/revoke")
     ).status_code == 403

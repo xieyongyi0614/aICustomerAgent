@@ -60,8 +60,8 @@ class TestForegroundRun:
         self, db_session_factory, override_settings, client, fake_llm
     ):
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_UNIFIED_RUN_ENABLED="true",
+            AGENT_RUNTIME_ENABLED="true",
+            UNIFIED_RUN_ENABLED="true",
         )
         llm_factory.set_llm(_structured_llm(fake_llm))
 
@@ -82,9 +82,9 @@ class TestForegroundRun:
         self, db_session_factory, override_settings, client, fake_llm
     ):
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_UNIFIED_RUN_ENABLED="true",
-            V21_FOREGROUND_RUN_LLM_BUDGET="0",
+            AGENT_RUNTIME_ENABLED="true",
+            UNIFIED_RUN_ENABLED="true",
+            FOREGROUND_RUN_LLM_BUDGET="0",
         )
         llm_factory.set_llm(_structured_llm(fake_llm))
 
@@ -96,7 +96,7 @@ class TestForegroundRun:
     def test_unified_off_creates_no_run_row(
         self, db_session_factory, override_settings, client, fake_llm
     ):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="false")
+        override_settings(AGENT_RUNTIME_ENABLED="false")
         llm_factory.set_llm(_structured_llm(fake_llm))
 
         _post(client)

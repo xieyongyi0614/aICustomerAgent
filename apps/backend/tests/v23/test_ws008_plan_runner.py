@@ -95,9 +95,9 @@ def test_no_world_is_noop(db_session_factory):
 
 
 def test_maintenance_step_advances_plan(db_session_factory, monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("V23_TIME_ADVANCE_ENABLED", "true")
-    monkeypatch.setenv("V23_DAILY_LIFE_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
+    monkeypatch.setenv("DAILY_LIFE_ENABLED", "true")
     get_settings.cache_clear()
     try:
         from app.application import world_engine

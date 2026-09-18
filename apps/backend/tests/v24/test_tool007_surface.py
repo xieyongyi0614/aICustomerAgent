@@ -236,7 +236,7 @@ async def test_executor_blocks_invalid_location_without_calling_capability(db_se
     executor = build_executor(
         registry,
         capability,
-        settings=world_settings(v24_tool_schema_validation_enabled=True),
+        settings=world_settings(tool_schema_validation_enabled=True),
     )
     binding = registry.resolve(MOVED_TOOL)
     assert binding is not None
@@ -260,7 +260,7 @@ async def test_executor_passes_valid_world_action_with_real_facts(db_session_fac
     executor = build_executor(
         registry,
         capability,
-        settings=world_settings(v24_tool_schema_validation_enabled=True),
+        settings=world_settings(tool_schema_validation_enabled=True),
     )
     binding = registry.resolve(MOVED_TOOL)
     execution = await executor.run(
@@ -289,7 +289,7 @@ def _invocation(params: dict):
 
 def test_world_facts_carry_all_projection_inputs(db_session_factory):
     seed_all()
-    ctx = _ctx_with_facts(v23_scene_expansion_enabled=True)
+    ctx = _ctx_with_facts(scene_expansion_enabled=True)
     assert ctx.world_facts_assembled() is True
     assert ctx.part_of_day() in ("morning", "afternoon", "dusk", "evening", "late_night")
     assert ctx.scene_tone_bias() == "intimate"

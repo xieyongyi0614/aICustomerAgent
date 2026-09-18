@@ -30,7 +30,7 @@ PlanStepSpec{status, attempt_count, last_attempt_at, failure_note}
 双层重试的边界（B5 关闭点，§4.3.5）
 
 - Action 层管**技术性重试**（`failure_kind ∈ RETRYABLE_FAILURES` 的退避重试，本模块只观察
-  其终态）；Plan 层管**业务性放弃**（`v25_plan_step_max_attempts`）。
+  其终态）；Plan 层管**业务性放弃**（`plan_step_max_attempts`）。
 - `attempt_count` **只在 Action 落终态**（`succeeded` / `failed`，取值即 PLAN-002 的
   `PLAN_STEP_ATTEMPT_INCREMENT_STATUSES`）时递增——与 V9 的 `executing` 中间态解耦（D7/U8）。
 - 本模块**零等待、零退避、零 `next_retry_at` 计算**（D8）。
@@ -272,7 +272,7 @@ class PlanExecutorBridge:
         V2.6.1：回填 `plan_step`（`step_<index>`），保证计划↔行动 1:1 可溯源。
         """
         settings = get_settings()
-        if getattr(settings, "v26_action_execution_enabled", False):
+        if getattr(settings, "action_execution_enabled", False):
             from app.repositories import action_repository
             from app.services.action import manager as action_manager
 
@@ -395,8 +395,8 @@ def _moment(ctx) -> datetime:
 
 
 def _step_max_attempts(explicit: int | None, settings) -> int:
-    """Plan 层尝试上限：显式注入优先，其次 `v25_plan_step_max_attempts`（非非负整数按 0 处理）。"""
-    value = settings.v25_plan_step_max_attempts if explicit is None else explicit
+    """Plan 层尝试上限：显式注入优先，其次 `plan_step_max_attempts`（非非负整数按 0 处理）。"""
+    value = settings.plan_step_max_attempts if explicit is None else explicit
     return value if isinstance(value, int) and value >= 0 else 0
 
 
@@ -449,7 +449,7 @@ def _outcome_from_result_projection(step, record, at: datetime) -> PlanStepOutco
     """
     from app.core.settings import get_settings
 
-    if not getattr(get_settings(), "v26_action_execution_enabled", False):
+    if not getattr(get_settings(), "action_execution_enabled", False):
         return None
     stored = record.result if isinstance(record.result, dict) else None
     if not stored or "status" not in stored:

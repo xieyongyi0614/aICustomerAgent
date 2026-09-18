@@ -84,10 +84,10 @@ PLAN_FACE_SIGNATURES = (
 def planning_on(override_settings):
     life_loop_budget.reset_cache()
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_step_binding_enabled="true",
-        v24_tool_system_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        plan_step_binding_enabled="true",
+        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -120,7 +120,7 @@ class TestMountWiring:
         ]
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_supply_interval_minutes="0",
+            autonomy_supply_interval_minutes="0",
             world_enabled="false")
         monkeypatch.setattr(
             goal_planning,
@@ -142,7 +142,7 @@ class TestMountWiring:
         flag_off = life_loop._step_goal_supply(V25_USER, V25_NOW)
         assert calls == []
         life_loop._supply_last.clear()
-        override_settings(v25_planning_enabled="true")
+        override_settings(planning_enabled="true")
         flag_on = life_loop._step_goal_supply(V25_USER, V25_NOW)
         life_loop._supply_last.clear()
         assert set(flag_off) == set(flag_on)
@@ -166,9 +166,9 @@ class TestMountWiring:
         """
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_supply_interval_minutes="0",
-            v25_planning_enabled="true",
-            v24_tool_system_enabled="true",
+            autonomy_supply_interval_minutes="0",
+            planning_enabled="true",
+            tool_system_enabled="true",
             world_enabled="false")
         goal = make_goal(description="供给步处理目标")
         _claim_planning_job(goal.id)
@@ -207,7 +207,7 @@ class TestMountWiring:
     ):
         life_loop_budget.reset_cache()
         override_settings(
-            v2_autonomy_supply_interval_minutes="0",
+            autonomy_supply_interval_minutes="0",
             world_enabled="false")
         monkeypatch.setattr(
             goal_planning,
@@ -222,7 +222,7 @@ class TestMountWiring:
         life_loop._step_goal_supply(V25_USER, V25_NOW)
         life_loop._supply_last.clear()
         assert calls == []
-        override_settings(v25_planning_enabled="true")
+        override_settings(planning_enabled="true")
         life_loop._step_goal_supply(V25_USER, V25_NOW)
         life_loop._supply_last.clear()
         assert calls == [("run_jobs", None)]
@@ -267,7 +267,7 @@ class TestShapeSnapshots:
     def test_cycle_llm_budget_math_is_unchanged(self):
         from app.core.settings import get_settings
 
-        assert get_settings().v2_life_loop_cycle_llm_budget == 1
+        assert get_settings().life_loop_cycle_llm_budget == 1
         assert tuple(_CAPABILITY_DEFAULTS) == CAPABILITY_BITS
         assert profiles.snapshot_profile(RUN_KIND_AUTONOMOUS_TICK)["llm_capable"] == ["decision"]
 

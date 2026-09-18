@@ -39,15 +39,15 @@ def enabled(monkeypatch):
 
 
 def _weights(monkeypatch, source=0.35, novelty=0.30, affinity=0.20, salience=0.15):
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", source)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", novelty)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", affinity)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", salience)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_source", source)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", novelty)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", affinity)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", salience)
 
 
 def _thresholds(monkeypatch, high=0.75, low=0.35):
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", high)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", low)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", high)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", low)
 
 
 def _candidate(

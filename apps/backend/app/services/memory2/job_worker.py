@@ -3,7 +3,7 @@
 调度与执行分离：周期入队器只负责到点 INSERT（幂等键拦截重复），执行统一走
 认领（pending+due → running，PG 下 FOR UPDATE SKIP LOCKED 为 P5 多执行器预留）
 → 分发 job_type 处理器 → done；异常 attempts+1 指数退避重试，达上限转 failed
-死信；running 超 v2_job_running_timeout 视为崩溃回收重跑（处理器幂等保证安全，
+死信；running 超 job_running_timeout 视为崩溃回收重跑（处理器幂等保证安全，
 MEM-004 条件回填 / MEM-005 日桶衰减均已幂等）。同轮附带 flush reinforce 缓冲与
 embedding 攒批窗口，补齐两个内存态通道的周期驱动。
 """
@@ -53,7 +53,7 @@ async def run_job_worker_loop() -> None:
     await run_worker_loop(
         "memory job worker",
         run_job_tick,
-        get_settings().v2_job_poll_interval,
+        get_settings().job_poll_interval,
         offload=True,
     )
 
@@ -158,11 +158,11 @@ def _reschedule_or_fail(job_id: str, exc: Exception, now: datetime) -> str:
             return "gone"
         job.attempts += 1
         job.last_error = f"{exc.__class__.__name__}: {exc}"[:500]
-        if job.attempts >= settings.v2_job_max_attempts:
+        if job.attempts >= settings.job_max_attempts:
             job.status = "failed"
             outcome = "failed"
         else:
-            delay = settings.v2_job_retry_backoff_seconds * (2 ** (job.attempts - 1))
+            delay = settings.job_retry_backoff_seconds * (2 ** (job.attempts - 1))
             job.status = "pending"
             job.run_at = now + timedelta(seconds=delay)
             outcome = "retried"
@@ -172,7 +172,7 @@ def _reschedule_or_fail(job_id: str, exc: Exception, now: datetime) -> str:
 
 def _recover_zombies(now: datetime) -> int:
     settings = get_settings()
-    threshold = now - timedelta(seconds=settings.v2_job_running_timeout)
+    threshold = now - timedelta(seconds=settings.job_running_timeout)
     recovered = 0
     with SessionLocal() as session:
         rows = (
@@ -186,7 +186,7 @@ def _recover_zombies(now: datetime) -> int:
         )
         for job in rows:
             job.attempts += 1
-            if job.attempts >= settings.v2_job_max_attempts:
+            if job.attempts >= settings.job_max_attempts:
                 job.status = "failed"
                 job.last_error = "zombie_recovered_max_attempts"
             else:

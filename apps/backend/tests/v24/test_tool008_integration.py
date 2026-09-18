@@ -40,7 +40,7 @@ FROZEN_SOURCES: dict[str, str] = {
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
     "app/models/memory.py": "4371cd849a76f8de2fcf7fcff9a1b1a4f66163329b56b59367d2a8d993591fa1",
     "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
-    "app/character/asuna/action.py": "86d8080c29b29c2f2a88c6b804ac4b4500b4d8b75d92b8557cf8bb17425b6a8d",
+    "app/character/asuna/action.py": "af39c42cbe2b9a9fce61de609a552cad66c7a70cbc907a05f3c21485da66b572",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 
@@ -78,7 +78,7 @@ MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 @pytest.fixture
 def tool_memory_on(v24_tool_env, override_settings):
     """工具记忆子闸 + 行动通道双开（V2.4.0 总闸下的最小开启面）。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_MEMORY_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_MEMORY_ENABLED=True)
     override_settings(action_enabled=True)
     yield
 
@@ -104,7 +104,7 @@ async def test_reminder_create_end_to_end_deposits_memory(
     from app.services.tool import registry as tool_registry
     from tests.v24.tool007_support import seed_all
 
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_MEMORY_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_MEMORY_ENABLED=True)
     override_settings(
         action_enabled=True,
         world_enabled=True,
@@ -334,7 +334,7 @@ def test_integrate_result_flag_off_uses_v9_action_type_path(
     db_session_factory, v24_tool_env, override_settings, monkeypatch
 ):
     """Flag off：走 V9 `action_type` 键路径，投递函数与参数不变。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     override_settings(action_enabled=True, memory_importance_threshold=0.5)
     calls: list[tuple] = []
     original = memory_bridge.deliver_action_memory
@@ -357,7 +357,7 @@ def test_integrate_result_flag_off_uses_v9_action_type_path(
 def test_deliver_falls_back_to_v9_path_when_sub_gate_off(
     v24_tool_env, override_settings, monkeypatch
 ):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     override_settings(action_enabled=True)
     sentinel = {"memory_id": "mem-v9", "content": "用户不想再被提醒：开会"}
     monkeypatch.setattr(memory_bridge, "deliver_action_memory", lambda *a, **k: sentinel)
@@ -560,7 +560,7 @@ def test_delivery_blocked_when_action_memory_switch_off(
 ):
     """E9：工具记忆子闸 on 但 `action_memory_policy_enabled` off → 不投递。"""
     override_settings(action_memory_policy_enabled=False, memory_importance_threshold=0.5)
-    assert get_settings().v24_tool_memory_enabled is True
+    assert get_settings().tool_memory_enabled is True
     assert memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER) is None
     assert memory_count(USER) == 0
 

@@ -8,7 +8,7 @@
 
 两层存储叠加：
 - **持久层**（`trigger_registry`）：工具级 / 范围级授权与未决确认请求；
-- **进程层**（内存态）：会话级授权（`v24_tool_confirm_ttl_reuse=False` 时批准只放行当次）；
+- **进程层**（内存态）：会话级授权（`tool_confirm_ttl_reuse=False` 时批准只放行当次）；
 - **通道级**：不新增存储，由 `channel_identities` 绑定状态隐含 `channel.<name>.base` 基础授权。
 
 纪律：一切读 IO 经既有仓储（`trigger_registry_repository` / `channel_identity_repository`），
@@ -101,7 +101,7 @@ def non_todo_payload_kinds(settings: Any = None) -> tuple[str, ...] | None:
     工具总闸 on 时返回两类 kind，供调用侧按需传给 `trigger_registry_repository.has_due`。
     """
     resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "v24_tool_system_enabled", False)):
+    if not bool(getattr(resolved, "tool_system_enabled", False)):
         return None
     return (CONFIRMATION_ROW_KIND, GRANT_ROW_KIND)
 
@@ -439,7 +439,7 @@ class ConfirmationService:
         persistent: bool | None = None,
         now: datetime | None = None,
     ) -> str | None:
-        """落授权：`v24_tool_confirm_ttl_reuse=True` 落 TTL 持久授权，False 只放行当次。"""
+        """落授权：`tool_confirm_ttl_reuse=True` 落 TTL 持久授权，False 只放行当次。"""
         now = now or datetime.now()
         resolved_persistent = (
             self.confirm_ttl_reuse() if persistent is None else bool(persistent)
@@ -571,13 +571,13 @@ class ConfirmationService:
     def confirm_timeout_hours(self) -> int:
         return int(
             getattr(
-                self._settings, "v24_tool_confirm_timeout_hours", DEFAULT_CONFIRM_TIMEOUT_HOURS
+                self._settings, "tool_confirm_timeout_hours", DEFAULT_CONFIRM_TIMEOUT_HOURS
             )
         )
 
     def confirm_ttl_reuse(self) -> bool:
         return bool(
-            getattr(self._settings, "v24_tool_confirm_ttl_reuse", DEFAULT_CONFIRM_TTL_REUSE)
+            getattr(self._settings, "tool_confirm_ttl_reuse", DEFAULT_CONFIRM_TTL_REUSE)
         )
 
     def _persistent_grants(self, user_id: str, now: datetime) -> list[dict[str, Any]]:

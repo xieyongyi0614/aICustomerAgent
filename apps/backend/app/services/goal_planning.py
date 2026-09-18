@@ -84,7 +84,7 @@ class PlanningProposal(BaseModel):
 
 
 def _template(settings, domain: str) -> str:
-    templates = json.loads(settings.v2_autonomy_supply_templates_json)
+    templates = json.loads(settings.autonomy_supply_templates_json)
     return templates.get(domain, "")
 
 
@@ -118,7 +118,7 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
             (abs(float(value)) for value in overlay.goal_weights.values()),
             default=0.0,
         )
-        if max_weight >= settings.v2_autonomy_supply_personal_min_weight:
+        if max_weight >= settings.autonomy_supply_personal_min_weight:
             _append(
                 "long_term",
                 "personal",
@@ -133,7 +133,7 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
         patterns = []
     if patterns:
         strongest = max(patterns, key=lambda pattern: pattern.strength)
-        if strongest.strength >= settings.v2_autonomy_supply_relationship_min_strength:
+        if strongest.strength >= settings.autonomy_supply_relationship_min_strength:
             _append(
                 "long_term",
                 "relationship",
@@ -159,7 +159,7 @@ def collect_candidates(user_id: str, world_facts: dict | None = None) -> list[di
     try:
         salient = memory_repository.list_top_salience(
             user_id,
-            min_salience=settings.v2_autonomy_supply_world_min_salience,
+            min_salience=settings.autonomy_supply_world_min_salience,
             limit=3,
         )
     except Exception:
@@ -282,7 +282,7 @@ def _build_messages(
         "action_succeeded 需 capability；field_equals 需 source(world|state|memory)"
         "/path/value；threshold_reached 需 source/path/op(>=|<=)/value，path 只允许 "
         f"{'、'.join(CRITERION_METRIC_PATHS)}；all_of/any_of 需非空 children 且只允许一层。"
-        f"全树步骤数量不超过 {settings.v2_autonomy_subgoal_max_count}，嵌套不超过两层。"
+        f"全树步骤数量不超过 {settings.autonomy_subgoal_max_count}，嵌套不超过两层。"
         "每步必须是角色能真实执行或可客观判定的动作，不得输出无法验证的愿望。"
     )
     brief = goal
@@ -312,7 +312,7 @@ def _build_messages(
 
 
 def _resolve_llm(settings):
-    profile = settings.v2_autonomy_planning_llm_profile or None
+    profile = settings.autonomy_planning_llm_profile or None
     try:
         return get_llm(profile)
     except SettingsError:
@@ -397,8 +397,8 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         return {"status": "skipped", "skip_reason": "goal_not_plannable"}
     attempts = goal_repository.count_plans(goal_id)
     failure_replan = trigger == TRIGGER_REPLAN and goal.status == "failed"
-    if attempts > settings.v2_autonomy_planning_max_attempts or (
-        attempts >= settings.v2_autonomy_planning_max_attempts
+    if attempts > settings.autonomy_planning_max_attempts or (
+        attempts >= settings.autonomy_planning_max_attempts
         and not failure_replan
     ):
         trace = TurnTraceSession()
@@ -427,9 +427,9 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         messages = _build_messages(goal, overlay, world_facts or {}, settings)
         proposal = _ask_llm_with_retry(messages, settings)
         specs = validate_sub_goals(
-            proposal.sub_goals, max_depth=settings.v2_autonomy_subgoal_max_depth
+            proposal.sub_goals, max_depth=settings.autonomy_subgoal_max_depth
         )
-        if len(specs) > settings.v2_autonomy_subgoal_max_count:
+        if len(specs) > settings.autonomy_subgoal_max_count:
             raise ValueError(REASON_COUNT_EXCEEDED)
         unaligned = next(
             (spec.capability for spec in specs if spec.capability not in ACTION_TYPES),

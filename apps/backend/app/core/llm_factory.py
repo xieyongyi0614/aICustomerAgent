@@ -48,17 +48,17 @@ EMBEDDING_CLIENT_CACHE_KEY = "embedding"
 
 
 def get_embedding_client():
-    """embedding 端点客户端（OpenAI 兼容）；未配置 v2_embedding_model 时返回 None。
+    """embedding 端点客户端（OpenAI 兼容）；未配置 embedding_model 时返回 None。
 
-    凭据复用 llm_profiles 中 v2_embedding_profile 指向的 profile（空则默认 profile），
+    凭据复用 llm_profiles 中 embedding_profile 指向的 profile（空则默认 profile），
     不改 chat profile 结构。
     """
     settings = get_settings()
-    if not settings.v2_embedding_model:
+    if not settings.embedding_model:
         return None
     if EMBEDDING_CLIENT_CACHE_KEY in _llm_cache:
         return _llm_cache[EMBEDDING_CLIENT_CACHE_KEY]
-    profile = settings.get_llm_profile(settings.v2_embedding_profile or None)
+    profile = settings.get_llm_profile(settings.embedding_profile or None)
     from openai import OpenAI
 
     client = OpenAI(

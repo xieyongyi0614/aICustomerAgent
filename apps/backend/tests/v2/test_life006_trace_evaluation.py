@@ -197,7 +197,7 @@ class TestProvenanceAndStorm:
         )
 
     def test_storm_threshold(self, override_settings):
-        override_settings(v2_life_loop_storm_daily_limit="3")
+        override_settings(life_loop_storm_daily_limit="3")
         proactive = [LifeLoopProactiveRef(action_id=f"pa-{i}") for i in range(4)]
         issue = STORM_AND_REPEAT.evaluate(
             _ctx(LifeLoopSlice(delivered_proactive=proactive))

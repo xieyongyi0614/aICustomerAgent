@@ -75,9 +75,9 @@ def test_prune_expired_plans_disabled_when_retention_non_positive(
 
 
 def test_maintenance_prunes_on_day_rollover(db_session_factory, monkeypatch):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("V23_TIME_ADVANCE_ENABLED", "true")
-    monkeypatch.setenv("V23_DAILY_LIFE_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
+    monkeypatch.setenv("DAILY_LIFE_ENABLED", "true")
     monkeypatch.setenv("WORLD_TIME_MODE", "simulated")
     get_settings.cache_clear()
     try:

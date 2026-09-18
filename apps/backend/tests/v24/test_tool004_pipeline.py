@@ -183,7 +183,7 @@ def test_plan_assembly_off_path_matches_v9(monkeypatch):
         raise AssertionError("总闸 off 时不得触达工具注册表")
 
     monkeypatch.setattr(planner, "get_tool_registry", _forbidden)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=False))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=False))
     plan = planner.assemble_plan(intent(), snapshot, NOW, goal_id="g-1")
     assert plan is not None
     assert plan.goal_id == "g-1"
@@ -195,7 +195,7 @@ def test_plan_assembly_off_path_matches_v9(monkeypatch):
 
 
 def test_plan_assembly_off_path_rejects_invalid_params():
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=False))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=False))
     assert planner.assemble_plan(intent(params={"content": "开会"}), snapshot, NOW) is None
 
 
@@ -205,7 +205,7 @@ def test_plan_assembly_off_path_rejects_invalid_params():
 def test_plan_assembly_on_path_uses_tool_binding(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=True))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=True))
     plan = planner.assemble_plan(intent(), snapshot, NOW, goal_id="g-2")
     assert plan is not None
     step = plan.steps[0]
@@ -216,7 +216,7 @@ def test_plan_assembly_on_path_uses_tool_binding(monkeypatch):
 def test_plan_assembly_on_path_without_binding_is_capability_unavailable(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    settings = tool_settings(v24_tool_system_enabled=True, world_enabled=False)
+    settings = tool_settings(tool_system_enabled=True, world_enabled=False)
     snapshot = _snapshot(settings)
     moving = intent("move_object", object="牛奶", location="home.kitchen")
     assert planner.assemble_plan(moving, snapshot, NOW) is None
@@ -225,7 +225,7 @@ def test_plan_assembly_on_path_without_binding_is_capability_unavailable(monkeyp
 def test_plan_assembly_on_path_respects_runtime_disable(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=True))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=True))
     assert planner.assemble_plan(intent(), snapshot, NOW) is not None
     assert registry.set_runtime_disabled("builtin.reminder.create") is True
     assert planner.assemble_plan(intent(), snapshot, NOW) is None
@@ -234,7 +234,7 @@ def test_plan_assembly_on_path_respects_runtime_disable(monkeypatch):
 def test_plan_assembly_on_path_uses_preread_surface(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=True))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=True))
     snapshot.tool_surface = ToolSurface(run_kind=RUN_KIND_FOREGROUND_CHAT, tool_ids=())
     assert planner.assemble_plan(intent(), snapshot, NOW) is None
     snapshot.tool_surface = ToolSurface(
@@ -249,7 +249,7 @@ def test_preread_tool_context_is_used_for_projection(monkeypatch):
         tool_definition("builtin.social.checkin", tags=("social",), priority=20),
     )
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=True))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=True))
     snapshot.tool_context = surface_context(world={"part_of_day": "late_night"})
     surface = planner.resolve_surface(snapshot)
     assert surface.tool_ids == ("builtin.reminder.create",)
@@ -313,7 +313,7 @@ def _no_action_engine(monkeypatch):
 async def test_step_nine_is_unchanged_when_surface_flag_is_off(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_SURFACE_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=False)
     override_settings(action_enabled=True)
 
     def _forbidden(*args, **kwargs):
@@ -332,7 +332,7 @@ async def test_step_nine_is_unchanged_when_surface_flag_is_off(
 async def test_step_nine_with_surface_flag_on_feeds_capabilities_and_audits(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_SURFACE_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=True)
     override_settings(action_enabled=True, observability_persist_enabled=True)
 
     registry = builtin_registry()
@@ -387,7 +387,7 @@ async def test_step_nine_with_surface_flag_on_feeds_capabilities_and_audits(
 async def test_step_nine_surface_failure_does_not_break_action_planning(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_SURFACE_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=True)
     override_settings(action_enabled=True)
 
     def _boom(**kwargs):
@@ -422,7 +422,7 @@ def test_registered_capability_map_still_matches_v9():
 def test_intent_params_are_not_mutated_by_assembly(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    snapshot = _snapshot(tool_settings(v24_tool_system_enabled=True))
+    snapshot = _snapshot(tool_settings(tool_system_enabled=True))
     original = intent()
     before = dict(original.params)
     planner.assemble_plan(original, snapshot, NOW)
@@ -432,7 +432,7 @@ def test_intent_params_are_not_mutated_by_assembly(monkeypatch):
 def test_plan_expiry_uses_snapshot_settings(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    settings = tool_settings(v24_tool_system_enabled=True)
+    settings = tool_settings(tool_system_enabled=True)
     snapshot = _snapshot(settings)
     moment = datetime(2026, 9, 14, 8, 0, 0)
     plan = planner.assemble_plan(intent(), snapshot, moment)

@@ -39,8 +39,8 @@ def consume_pending(limit: int = 50, now: datetime | None = None) -> dict:
                 row.idempotency_key,
                 reason=str(exc),
                 now=now,
-                max_attempts=settings.v2_life_loop_outbox_max_attempts,
-                backoff_seconds=settings.v2_life_loop_outbox_backoff_seconds,
+                max_attempts=settings.life_loop_outbox_max_attempts,
+                backoff_seconds=settings.life_loop_outbox_backoff_seconds,
             )
             if status == "failed":
                 stats["dead_lettered"] += 1

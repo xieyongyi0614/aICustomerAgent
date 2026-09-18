@@ -369,10 +369,10 @@ class TestDecomposeFeedsTheEngine:
     @pytest.fixture
     def planning_on(self, override_settings):
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_context_enabled="true",
-            v25_plan_step_binding_enabled="true",
-            v24_tool_system_enabled="true",
+            planning_enabled="true",
+            plan_context_enabled="true",
+            plan_step_binding_enabled="true",
+            tool_system_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")
 
@@ -439,14 +439,14 @@ def test_plan_budget_limits_project_settings_and_context():
     budget = decompose_mod._plan_budget_limits(make_ctx(), settings)
     assert budget == {
         decompose_mod.BUDGET_MAX_STEPS: min(
-            settings.v25_plan_max_steps, settings.v2_autonomy_subgoal_max_count
+            settings.plan_max_steps, settings.autonomy_subgoal_max_count
         ),
         decompose_mod.BUDGET_MAX_DEPTH: min(
-            settings.v25_plan_max_depth, settings.v2_autonomy_subgoal_max_depth
+            settings.plan_max_depth, settings.autonomy_subgoal_max_depth
         ),
-        decompose_mod.BUDGET_STEP_MAX_ATTEMPTS: settings.v25_plan_step_max_attempts,
-        decompose_mod.BUDGET_TTL_HOURS: settings.v25_plan_ttl_hours,
-        decompose_mod.BUDGET_GOAL_WINDOW_HOURS: settings.v2_autonomy_goal_max_active_hours,
+        decompose_mod.BUDGET_STEP_MAX_ATTEMPTS: settings.plan_step_max_attempts,
+        decompose_mod.BUDGET_TTL_HOURS: settings.plan_ttl_hours,
+        decompose_mod.BUDGET_GOAL_WINDOW_HOURS: settings.autonomy_goal_max_active_hours,
     }
     narrowed = decompose_mod._plan_budget_limits(
         SimpleNamespace(tool_surface=make_ctx().tool_surface, budget={"max_steps": 2}),
@@ -454,5 +454,5 @@ def test_plan_budget_limits_project_settings_and_context():
     )
     assert narrowed[decompose_mod.BUDGET_MAX_STEPS] == 2
     assert narrowed[decompose_mod.BUDGET_MAX_DEPTH] == min(
-        settings.v25_plan_max_depth, settings.v2_autonomy_subgoal_max_depth
+        settings.plan_max_depth, settings.autonomy_subgoal_max_depth
     )

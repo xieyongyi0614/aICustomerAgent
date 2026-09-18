@@ -28,8 +28,8 @@ class TestDebugEndpointsFlagOn:
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_debug_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_debug_enabled", True)
 
         action = manager.create(
             user_id="u_api",

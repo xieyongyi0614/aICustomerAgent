@@ -69,7 +69,7 @@ class NotificationCapability:
                 payload={"failure_kind": "permanent", "reason_kind": "unknown_action"},
             )
         settings = _settings_of(ctx)
-        if not bool(getattr(settings, "v24_tool_system_enabled", False)):
+        if not bool(getattr(settings, "tool_system_enabled", False)):
             return CapabilityResult(
                 status="unavailable",
                 error=V9_ERROR_TEXT,

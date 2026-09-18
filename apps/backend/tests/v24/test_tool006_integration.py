@@ -147,10 +147,10 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true",
     )
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     captured = _spy_pipeline(monkeypatch)
     seed_tick_fixture()
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
@@ -201,10 +201,10 @@ async def test_tick_keeps_capabilities_none_when_flag_off(
     override_settings(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true",
     )
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     captured = _spy_pipeline(monkeypatch)
     seed_tick_fixture()
     llm = fake_llm(response=["忙完了吗？"])
@@ -233,12 +233,12 @@ async def test_autonomy_decision_to_world_write_through_outbox(
     Update World State（唯一合法路径：effects(world) → outbox → world_engine）。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true")
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     seed_tick_fixture()
     _ensure_world(USER)
     trigger_evaluator.register_followup(USER, NOW - timedelta(minutes=1), "下午面试")
@@ -318,9 +318,9 @@ async def test_daily_limit_not_relaxed_by_tool_system(
         AUTONOMY_ACTION_ENABLED="true",
         AUTONOMY_ACTION_DAILY_LIMIT="1")
     _ensure_world(USER_OFF, USER_ON)
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     off = (await _produce(USER_OFF), await _produce(USER_OFF))
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     on = (await _produce(USER_ON), await _produce(USER_ON))
 
     assert off == on == (True, False)
@@ -345,9 +345,9 @@ async def test_max_active_per_user_not_relaxed_by_tool_system(
     _ensure_world(USER_OFF, USER_ON)
     _seed_active_record(USER_OFF)
     _seed_active_record(USER_ON)
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     await _produce(USER_OFF)
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     await _produce(USER_ON)
 
     off_record = _autonomy_records(USER_OFF)[0]
@@ -370,7 +370,7 @@ async def test_daily_limit_hit_produces_no_tool_call(
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         AUTONOMY_ACTION_DAILY_LIMIT="1")
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     _ensure_world(USER_ON)
     assert await _produce(USER_ON) is True
     assert await _produce(USER_ON) is False
@@ -394,7 +394,7 @@ async def test_tool_tripped_between_surface_and_execution(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true")
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     registry = builtin_registry()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry)
     monkeypatch.setattr(action_engine, "get_tool_registry", lambda: registry)

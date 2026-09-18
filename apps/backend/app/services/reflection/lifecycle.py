@@ -166,7 +166,7 @@ def list_active_insights(
     """active Insight 只读查询（confidence DESC, created_at DESC）；REF-007 消费。"""
     settings = get_settings()
     threshold = (
-        min_confidence if min_confidence is not None else settings.v2_reflection_min_confidence
+        min_confidence if min_confidence is not None else settings.reflection_min_confidence
     )
     with SessionLocal() as session:
         query = session.query(InsightRow).filter(
@@ -262,7 +262,7 @@ def match_insights_for_invalidation(
     threshold = (
         threshold
         if threshold is not None
-        else get_settings().v2_reflection_invalidate_match_threshold
+        else get_settings().reflection_invalidate_match_threshold
     )
     scored = [
         (insight, statement_similarity(content, insight.statement))
@@ -279,7 +279,7 @@ def observe_negation(
     """澄清通道：唯一高匹配 → invalidated；多匹配/低匹配/无匹配保守忽略（0 LLM）。"""
     started = time.perf_counter()
     settings = get_settings()
-    threshold = settings.v2_reflection_invalidate_match_threshold
+    threshold = settings.reflection_invalidate_match_threshold
     with SessionLocal() as session:
         rows = (
             session.query(InsightRow)
@@ -336,7 +336,7 @@ def find_superseded_insights(
     threshold = (
         threshold
         if threshold is not None
-        else get_settings().v2_reflection_invalidate_match_threshold
+        else get_settings().reflection_invalidate_match_threshold
     )
     return [
         insight.id

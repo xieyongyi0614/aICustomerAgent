@@ -87,11 +87,11 @@ def test_flag_matrix_group13_sub_gate_without_master_fails_fast(monkeypatch, fla
 
 def test_flag_matrix_group13_message_matches_v23_template(monkeypatch):
     """串行链文案沿用 V2.3.0 同款（"要求 …（V2.4.0 总闸先开）"）。"""
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_OBSERVATION_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_OBSERVATION_ENABLED": True})
     violations = enablement_violations(get_settings())
 
     assert any(
-        message.startswith("v24_tool_observation_enabled 要求 v24_tool_system_enabled")
+        message.startswith("tool_observation_enabled 要求 tool_system_enabled")
         and "V2.4.0 总闸先开" in message
         for message in violations
     )
@@ -101,20 +101,20 @@ def test_flag_matrix_channel_gate_requires_feishu(monkeypatch):
     """矩阵 E6：仅 channel on 而 feishu off → fail-fast（不静默降级）。"""
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_CHANNEL_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_CHANNEL_ENABLED": True},
     )
     settings = get_settings()
     violations = enablement_violations(settings)
 
-    assert any("v24_tool_channel_enabled 要求 feishu_enabled" in m for m in violations)
+    assert any("tool_channel_enabled 要求 feishu_enabled" in m for m in violations)
     with pytest.raises(SettingsError):
         validate_enablement_chain(settings)
 
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_CHANNEL_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_CHANNEL_ENABLED": True,
             "FEISHU_ENABLED": True,
         },
     )
@@ -318,7 +318,7 @@ def test_flag_matrix_autonomy_surface_follows_master(monkeypatch):
     support.apply_flag_env(monkeypatch, {})
     assert autonomy_engine.resolve_autonomy_surface("tool012", support._now()) is None
 
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     surface = autonomy_engine.resolve_autonomy_surface("tool012", support._now())
     assert surface is not None
     assert surface.tool_ids
@@ -457,7 +457,7 @@ def test_g_compat_action_domain_steps_gain_v24_keys_only_when_master_on(
     import asyncio
 
     override_settings(ACTION_ENABLED="true", WORLD_ENABLED="true")
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     from app.application import action_engine
     from app.application import world_engine
 
@@ -481,7 +481,7 @@ def test_g_compat_action_domain_steps_gain_v24_keys_only_when_master_on(
 
 def test_g_govern_every_tool_answers_four_questions(monkeypatch):
     """每个工具都能回答：谁注册 / 何时启用 / 当前状态 / 最近健康度。"""
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     registry = builtin_registry()
     from app.models.tool import ToolSurface
 
@@ -515,7 +515,7 @@ def test_g_govern_every_tool_answers_four_questions(monkeypatch):
 
 def test_g_govern_namespace_index_reports_registration_source(monkeypatch):
     """命名空间索引回答"谁注册"：三个命名空间各自可枚举且计数自洽。"""
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     registry = builtin_registry()
 
     index = registry.namespaces()
@@ -533,8 +533,8 @@ def _surface(run_kind, *, channel_on: bool = True, **context_overrides):
     from app.services.tool.surface import ToolSurfaceResolver
 
     settings = support.tool_settings(
-        v24_tool_system_enabled=True,
-        v24_tool_channel_enabled=channel_on,
+        tool_system_enabled=True,
+        tool_channel_enabled=channel_on,
         feishu_enabled=channel_on,
     )
     values = {"user_id": "u-tool012", "now": support._now(), "settings": settings}
@@ -548,8 +548,8 @@ def test_g_select_three_contexts_project_three_surfaces(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_CHANNEL_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_CHANNEL_ENABLED": True,
             "FEISHU_ENABLED": True,
         },
     )
@@ -576,8 +576,8 @@ def test_g_select_excluded_reasons_are_human_readable(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_CHANNEL_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_CHANNEL_ENABLED": True,
             "FEISHU_ENABLED": True,
         },
     )
@@ -593,8 +593,8 @@ def test_g_select_late_night_and_relationship_dimensions(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_CHANNEL_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_CHANNEL_ENABLED": True,
             "FEISHU_ENABLED": True,
         },
     )
@@ -755,8 +755,8 @@ def test_g_validate_rejects_before_execution(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_SCHEMA_VALIDATION_ENABLED": True,
         },
     )
     settings = get_settings()
@@ -803,8 +803,8 @@ def test_g_permission_default_deny_paths(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_PERMISSION_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_PERMISSION_ENABLED": True,
         },
     )
     settings = get_settings()
@@ -847,8 +847,8 @@ def test_g_permission_denied_path_makes_zero_external_calls(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_PERMISSION_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_PERMISSION_ENABLED": True,
         },
     )
     settings = get_settings()
@@ -873,8 +873,8 @@ def test_g_permission_grant_unlocks_without_confirmation(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         {
-            "V24_TOOL_SYSTEM_ENABLED": True,
-            "V24_TOOL_PERMISSION_ENABLED": True,
+            "TOOL_SYSTEM_ENABLED": True,
+            "TOOL_PERMISSION_ENABLED": True,
         },
     )
     settings = get_settings()
@@ -916,7 +916,7 @@ def test_g_world_outbox_is_the_only_write_path(
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         ACTION_OUTBOX_ENABLED="true")
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     from app.application import action_engine, outbox_consumer, world_engine
     from app.repositories import outbox_repository, world_repository
 
@@ -1086,7 +1086,7 @@ def test_g_memory_policy_rejection_prevents_write(
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_MEMORY_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
     from app.services.action import memory_bridge
     from tests.v24.tool008_support import memory_count, record
@@ -1105,7 +1105,7 @@ def test_g_memory_idempotent_effects_block_redelivery(monkeypatch):
     """幂等：effects 已登记 memory 效果时不重复投递。"""
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_MEMORY_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
     from app.services.tool.memory_policy import has_memory_effect
     from tests.v24.tool008_support import record
@@ -1166,7 +1166,7 @@ def test_g_extend_new_builtin_needs_no_pipeline_change():
     assert registry.effective_status(definition.id) == "enabled"
     assert definition.id in {item.tool_id for item in registry.describe()}
 
-    settings = support.tool_settings(v24_tool_system_enabled=True)
+    settings = support.tool_settings(tool_system_enabled=True)
     surface = ToolSurfaceResolver(registry, settings).resolve(
         "foreground_chat", ToolContext(user_id="u-tool012", settings=settings)
     )
@@ -1213,8 +1213,8 @@ def test_g_extend_external_api_costs_one_manifest(tmp_path):
         tmp_path,
         manifests={"weather.yaml": weather_manifest()},
         settings=support.tool_settings(
-            v24_tool_external_api_enabled=True,
-            v24_tool_ext_allowed_hosts=WEATHER_HOST,
+            tool_external_api_enabled=True,
+            tool_ext_allowed_hosts=WEATHER_HOST,
         ),
         environ={"EXT_API_WEATHER_TOKEN": "test-value"},
     )
@@ -1334,11 +1334,11 @@ def test_migration_0046_is_downgradable():
 # --- 交付面核对（.env.example / 文档零改动） -------------------------------------
 
 
-def test_env_example_covers_every_v24_flag_and_param():
-    """.env.example 的 V24_TOOL_* 段完整且默认值与 ToolSettings 一致。"""
+def test_env_example_covers_every_tool_flag_and_param():
+    """.env.example 的 TOOL_* 段完整且默认值与 ToolSettings 一致。"""
     text = (support.BACKEND_ROOT / ".env.example").read_text(encoding="utf-8")
     present = dict(
-        re.findall(r"^(V24_TOOL_[A-Z_]+)=(.*)$", text, flags=re.MULTILINE)
+        re.findall(r"^(TOOL_[A-Z_]+)=(.*)$", text, flags=re.MULTILINE)
     )
     from app.core.settings.tool import ToolSettings
 

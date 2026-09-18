@@ -48,8 +48,8 @@ PLAN_AWARE_MODULES = ("app.services.planning",)
 
 @pytest.fixture
 def stack_on(override_settings):
-    """`v21_goal_stack_enabled` 开启（`goal_compile` 候选面的唯一来源，非本任务新增 Flag）。"""
-    override_settings(v21_goal_stack_enabled="true", world_enabled="false")
+    """`goal_stack_enabled` 开启（`goal_compile` 候选面的唯一来源，非本任务新增 Flag）。"""
+    override_settings(goal_stack_enabled="true", world_enabled="false")
     return True
 
 
@@ -220,7 +220,7 @@ class TestPlanIntentionEntersTheGoalCompileFace:
             for name, weight in FROZEN_DIMENSION_WEIGHTS.items()
         )
         assert audit["goal_compile"]["total"] == round(
-            min(max(weighted * get_settings().v21_decision_weight, 0.0), 1.0), 4
+            min(max(weighted * get_settings().decision_weight, 0.0), 1.0), 4
         )
 
     def test_the_compiled_intention_is_resolved_by_the_existing_defaults(

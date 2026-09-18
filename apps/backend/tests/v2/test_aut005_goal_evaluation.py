@@ -154,7 +154,7 @@ class TestRules:
         assert IssueCode.GOAL_ARBITRATION_MISSING in issues
 
     def test_planning_budget_exceeded_flagged(self, db_session_factory, aut_on, override_settings):
-        override_settings(v2_autonomy_planning_max_attempts="2")
+        override_settings(autonomy_planning_max_attempts="2")
         goal = _goal()
         for version in range(1, 5):
             _plan(goal.id, version=version, status="rejected")
@@ -162,7 +162,7 @@ class TestRules:
         assert IssueCode.GOAL_PLANNING_BUDGET_EXCEEDED in issues
 
     def test_execution_cap_exceeded_flagged(self, db_session_factory, aut_on, override_settings):
-        override_settings(v2_autonomy_goal_max_active_hours="1")
+        override_settings(autonomy_goal_max_active_hours="1")
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)], updated_at=NOW - timedelta(hours=48))
         issues = _issues(collect_goal_slice(USER, now=NOW))

@@ -161,7 +161,7 @@ def test_e5_runtime_whitelist_narrowing_denies_without_request(loaded):
     _, index, cap = loaded
     transport = StubTransport(response({"data": {}}))
     cap._transport = transport
-    cap._settings = ext_settings(v24_tool_ext_allowed_hosts="other.example.com")
+    cap._settings = ext_settings(tool_ext_allowed_hosts="other.example.com")
 
     result = _run(cap.execute("call", _params(city="东京"), ext_context()))
 
@@ -175,7 +175,7 @@ def test_e5_empty_whitelist_denies(loaded):
     _, _, cap = loaded
     transport = StubTransport(response({"data": {}}))
     cap._transport = transport
-    cap._settings = ext_settings(v24_tool_ext_allowed_hosts="")
+    cap._settings = ext_settings(tool_ext_allowed_hosts="")
     result = _run(cap.execute("call", _params(city="东京"), ext_context()))
     assert result.payload["failure_kind"] == "denied"
     assert transport.called is False
@@ -283,7 +283,7 @@ def test_e9_injection_text_is_marked_untrusted(loaded):
 
 def test_disabled_flag_returns_unavailable(loaded):
     _, index, _ = loaded
-    cap = capability(index, StubTransport(), settings=ext_settings(v24_tool_external_api_enabled=False))
+    cap = capability(index, StubTransport(), settings=ext_settings(tool_external_api_enabled=False))
     result = _run(cap.execute("call", _params(city="东京"), ext_context()))
     assert result.status == "unavailable"
     assert result.payload["reason_kind"] == "external_api_disabled"

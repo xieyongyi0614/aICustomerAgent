@@ -110,8 +110,8 @@ class TestFeedbackLoop:
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_feedback_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_feedback_enabled", True)
         action = manager.create(
             user_id="u_fb2",
             action_type="create_reminder",

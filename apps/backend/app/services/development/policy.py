@@ -181,14 +181,14 @@ def register_runtime() -> None:
 
 
 def _compile_preference(base, statement: str, strength: float, settings) -> list:
-    max_delta = settings.v2_development_preference_max_token_delta
+    max_delta = settings.development_preference_max_token_delta
     proposals = []
     delta = -int(strength * max_delta)
     if delta < 0:
         proposals.append(
             _proposal(base, KEY_RESPONSE_STYLE_LENGTH, {"max_tokens_delta": delta})
         )
-    tone = _first_keyword_rule(settings.v2_development_preference_tone_rules_json, statement)
+    tone = _first_keyword_rule(settings.development_preference_tone_rules_json, statement)
     if tone:
         proposals.append(_proposal(base, KEY_RESPONSE_STYLE_TONE, {"tone_hint": tone}))
     return proposals
@@ -196,7 +196,7 @@ def _compile_preference(base, statement: str, strength: float, settings) -> list
 
 def _compile_belief(base, statement: str, settings) -> list:
     proposals = []
-    topics = _keyword_matches(settings.v2_development_belief_topic_rules_json, statement)
+    topics = _keyword_matches(settings.development_belief_topic_rules_json, statement)
     if topics:
         proposals.append(
             _proposal(
@@ -206,7 +206,7 @@ def _compile_belief(base, statement: str, settings) -> list:
             )
         )
     candidates = _keyword_values(
-        settings.v2_development_belief_habit_templates_json, statement
+        settings.development_belief_habit_templates_json, statement
     )
     if candidates:
         proposals.append(
@@ -216,7 +216,7 @@ def _compile_belief(base, statement: str, settings) -> list:
 
 
 def _compile_pattern(base, strength: float, settings) -> list:
-    max_delta = settings.v2_development_pattern_goal_tier_delta_max
+    max_delta = settings.development_pattern_goal_tier_delta_max
     goal_delta = round(strength * max_delta, 2)
     return [
         _proposal(base, KEY_GOAL_USER_CARE_WEIGHT, {"tier_delta": goal_delta}),

@@ -124,7 +124,7 @@ def test_build_context_attaches_brief_only_when_enabled(db_session_factory, monk
     ctx_off = world_engine.build_context(user)
     assert ctx_off.brief is None
 
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
     get_settings.cache_clear()
     try:
         ctx_on = world_engine.build_context(user)

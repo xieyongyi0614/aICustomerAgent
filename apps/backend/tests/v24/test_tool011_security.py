@@ -32,7 +32,7 @@ EXPECTED_TASK_GLOBALS = frozenset(
     {
         "_reclaim_task",
         "_observability_cleanup_task",
-        "_v2_job_worker_task",
+        "_job_worker_task",
         "_life_loop_task",
         "_agent_evolution_task",
     }
@@ -203,10 +203,10 @@ def test_sample_manifests_hold_no_credentials():
 def test_env_example_ext_section_has_no_real_values():
     text = Path(".env.example").read_text(encoding="utf-8")
     for line in text.splitlines():
-        if line.startswith(("V24_TOOL_EXT_MANIFEST_PATH=", "V24_TOOL_EXT_ALLOWED_HOSTS=")):
+        if line.startswith(("TOOL_EXT_MANIFEST_PATH=", "TOOL_EXT_ALLOWED_HOSTS=")):
             assert line.endswith("="), line
-    assert "V24_TOOL_EXT_MANIFEST_PATH=" in text
-    assert "V24_TOOL_EXT_ALLOWED_HOSTS=" in text
+    assert "TOOL_EXT_MANIFEST_PATH=" in text
+    assert "TOOL_EXT_ALLOWED_HOSTS=" in text
 
 
 def test_main_py_has_no_new_resident_task():
@@ -238,7 +238,7 @@ def test_main_py_has_no_new_resident_task():
 
 def test_lifespan_loads_manifests_under_master_gate():
     text = Path("app/main.py").read_text(encoding="utf-8")
-    assert "v24_tool_external_api_enabled" in text
+    assert "tool_external_api_enabled" in text
     assert "get_manifest_loader().load(" in text
 
 

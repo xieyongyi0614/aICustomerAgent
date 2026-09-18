@@ -123,7 +123,7 @@ class TestGMemorySourceDiscipline:
         (plan_memory_policy.EVENT_PLAN_FAILED, plan_memory_policy.EVENT_PLAN_ABANDONED),
     )
     def test_failed_and_abandoned_respect_the_configured_floor(self, event_kind):
-        floor = get_settings().v25_plan_memory_importance_floor
+        floor = get_settings().plan_memory_importance_floor
         assert POLICY.decide(event_kind).importance >= floor
 
     @pytest.mark.parametrize(
@@ -131,7 +131,7 @@ class TestGMemorySourceDiscipline:
         (plan_memory_policy.EVENT_PLAN_FAILED, plan_memory_policy.EVENT_PLAN_ABANDONED),
     )
     def test_a_raised_floor_lifts_the_importance(self, event_kind, override_settings):
-        override_settings(v25_plan_memory_importance_floor="0.85")
+        override_settings(plan_memory_importance_floor="0.85")
         assert POLICY.decide(event_kind).importance == 0.85
 
     def test_an_ai_inferred_row_is_a_hard_implementation_defect(self):

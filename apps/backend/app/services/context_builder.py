@@ -40,13 +40,13 @@ def _working_window(messages):
 
 
 def _select_retrieval_segment(ranked) -> tuple[list, int, int]:
-    """检索段装配：Freshness 排序 + 合并预算（≤v2_memory_retrieval_budget）贪心装入。
+    """检索段装配：Freshness 排序 + 合并预算（≤memory_retrieval_budget）贪心装入。
 
     Working 段（近期消息/信号/Scene）由既有分段承载；本函数只裁定长期检索段。
     超预算的条目按 Freshness 丢弃并计数，明细随 context_assemble_v2 步骤进 trace。
     """
     settings = get_settings()
-    budget = settings.v2_memory_retrieval_budget
+    budget = settings.memory_retrieval_budget
     fresh_first = sorted(
         ranked.items,
         key=lambda item: (_freshness(item.memory), item.score),
@@ -120,29 +120,29 @@ def _load_context_insights(
             "asuna",
             min_confidence=0.0,
             scopes=None,
-            limit=settings.v2_reflection_context_max_items * 3,
+            limit=settings.reflection_context_max_items * 3,
         )
     except Exception:
         logger.exception("Insight 查询失败，insight 段降级为空")
         return [], {}
-    scopes = json.loads(settings.v2_reflection_context_scopes_json)
-    budget = max(0, settings.v2_memory_retrieval_budget - retrieval_used)
+    scopes = json.loads(settings.reflection_context_scopes_json)
+    budget = max(0, settings.memory_retrieval_budget - retrieval_used)
     selected: list[InsightSummary] = []
     reasons: dict[str, str] = {}
     used = 0
     for insight in candidates:
-        if len(selected) >= settings.v2_reflection_context_max_items:
+        if len(selected) >= settings.reflection_context_max_items:
             reasons[insight.id] = "over_limit"
             continue
-        if insight.confidence < settings.v2_reflection_min_confidence:
+        if insight.confidence < settings.reflection_min_confidence:
             reasons[insight.id] = "below_confidence"
             continue
         if insight.scope not in scopes:
             reasons[insight.id] = "scope_excluded"
             continue
         statement = insight.statement.strip()
-        if len(statement) > settings.v2_reflection_context_statement_chars:
-            statement = statement[: settings.v2_reflection_context_statement_chars] + "…"
+        if len(statement) > settings.reflection_context_statement_chars:
+            statement = statement[: settings.reflection_context_statement_chars] + "…"
         text = f"- ({insight.type}) {statement}"
         if used + len(text) > budget:
             reasons[insight.id] = "budget"
@@ -171,9 +171,9 @@ def _load_context_insights(
 def _select_shared_entries(collected: list, trace=None) -> tuple[list, dict]:
     """共同经历选材：Freshness（最新优先）选材 + 预算贪心装入，渲染保持时间序。"""
     settings = get_settings()
-    budget = settings.v2_relationship_shared_budget_chars
+    budget = settings.relationship_shared_budget_chars
     reserve = len(SHARED_EXPERIENCE_HEADER) + len(SHARED_EXPERIENCE_NOTE) + 1
-    limit = settings.v2_relationship_shared_limit
+    limit = settings.relationship_shared_limit
     fresh_first = sorted(collected, key=lambda entry: entry.occurred_at, reverse=True)
     selected: list = []
     reasons: dict[str, str] = {}
@@ -273,7 +273,7 @@ def _build_sync(
             "ok",
             working_messages=len(recent_window),
             working_chars=sum(len(m.content) for m in recent_window),
-            retrieval_budget=get_settings().v2_memory_retrieval_budget,
+            retrieval_budget=get_settings().memory_retrieval_budget,
             retrieval_used=retrieval_used,
             retrieval_selected=len(memories),
             retrieval_dropped=dropped,
@@ -286,7 +286,7 @@ def _build_sync(
     goals = [goal for goal in all_active_goals if goal.layer is None]
     layered_goals = (
         [goal for goal in all_active_goals if goal.layer is not None]
-        if get_settings().v21_goal_stack_enabled
+        if get_settings().goal_stack_enabled
         else []
     )
     development_overlay = development_aggregate.read_overlay(user_id)

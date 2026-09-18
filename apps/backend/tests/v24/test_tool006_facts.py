@@ -31,7 +31,7 @@ TRIGGER_BASE_REASON = "触发 conversation_inactivity，存在 user_care 目标"
 
 @pytest.fixture
 def registry_on(monkeypatch, v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     registry = builtin_registry()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry)
     return registry
@@ -40,7 +40,7 @@ def registry_on(monkeypatch, v24_tool_env):
 @pytest.fixture
 def stub_registry_env(monkeypatch, v24_tool_env):
     """总闸 on + 自建注册表（不掺内置声明，保证工具事实的有界性断言可复现）。"""
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
 
     def _install(*definitions):
         registry = registry_with(*definitions)
@@ -195,7 +195,7 @@ def test_tool_facts_bounded_by_existing_char_budget(stub_registry_env, monkeypat
 
 
 def test_tool_facts_empty_when_master_flag_off(v24_tool_env, db_session_factory):
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     _seed_tool_step(USER, "builtin.reminder.create", "timeout")
     assert autonomy_engine.collect_tool_facts(USER) == {}
 
@@ -216,7 +216,7 @@ def test_tool_facts_degrade_to_empty_on_surface_failure(
 
 
 def test_empty_registry_yields_empty_facts(monkeypatch, v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: ToolRegistry())
     assert autonomy_engine.collect_tool_facts(USER) == {
         "available": [],
@@ -226,7 +226,7 @@ def test_empty_registry_yields_empty_facts(monkeypatch, v24_tool_env):
 
 
 def test_registry_absent_degrades_to_empty(monkeypatch, v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: None)
     assert autonomy_engine.collect_tool_facts(USER) == {}
     assert autonomy_engine._autonomy_binding("create_reminder", NOW) is None
@@ -318,7 +318,7 @@ def test_health_snapshot_is_read_only_copy(registry_on):
 
 def test_binding_absent_for_tool_outside_surface(monkeypatch, v24_tool_env):
     """工具不在自治工具面内 → 无绑定（回退 V9 固定模板）。"""
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     channel_only = registry_with(
         tool_definition("channel.feishu.send", namespace="channel")
     )
@@ -334,7 +334,7 @@ def test_collect_action_facts_identical_to_collect_facts_when_flag_off(
 ):
     """Flag 全 off：`_collect_action_facts` 输出与既有 `collect_facts` 逐字节一致。"""
     override_settings(action_enabled="true")
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     monkeypatch.setattr(
         autonomy_engine, "collect_facts", lambda user_id: {"active_plans": 1}
     )
@@ -345,7 +345,7 @@ def test_collect_action_facts_unchanged_when_tool_facts_empty(
     monkeypatch, override_settings, v24_tool_env
 ):
     override_settings(action_enabled="true")
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     monkeypatch.setattr(
         autonomy_engine, "collect_facts", lambda user_id: {"active_plans": 2}
     )

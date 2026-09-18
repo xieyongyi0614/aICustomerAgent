@@ -39,8 +39,8 @@ from tests.v24.tool010_support import builtin_registry
 pytestmark = pytest.mark.xdist_group("tool012")
 
 PERMISSION_ON = {
-    "V24_TOOL_SYSTEM_ENABLED": True,
-    "V24_TOOL_PERMISSION_ENABLED": True,
+    "TOOL_SYSTEM_ENABLED": True,
+    "TOOL_PERMISSION_ENABLED": True,
 }
 
 
@@ -165,7 +165,7 @@ def test_ban_no_second_memory_write_channel(monkeypatch):
     """运行期：工具结果记忆写入必经 `memory_policy.apply_policy`（零豁免）。"""
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_MEMORY_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
     monkeypatch.setenv("ACTION_MEMORY_POLICY_ENABLED", "true")
     get_settings.cache_clear()
@@ -196,7 +196,7 @@ def test_ban_no_second_memory_rejected_candidate_writes_nothing(monkeypatch):
     """运行期：政策拒收的候选不得落库（R1 命中路径零写入）。"""
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_MEMORY_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
     monkeypatch.setenv("ACTION_MEMORY_POLICY_ENABLED", "true")
     get_settings.cache_clear()
@@ -263,7 +263,7 @@ def test_ban_no_second_event_world_events_is_single_source_of_truth(
 ):
     """运行期：工具产世界事实只落 `world_events`，且幂等键唯一。"""
     override_settings(WORLD_ENABLED="true")
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     from app.application import world_engine
     from app.repositories import world_repository
 
@@ -343,7 +343,7 @@ def test_invariant_01_default_deny(monkeypatch, tool_id, expected):
 def test_invariant_02_zero_external_calls_before_gate(monkeypatch):
     """不变量 2：权限与校验失败路径零外部调用（能力 / 网络 / 通道）。"""
     support.apply_flag_env(
-        monkeypatch, {**PERMISSION_ON, "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True}
+        monkeypatch, {**PERMISSION_ON, "TOOL_SCHEMA_VALIDATION_ENABLED": True}
     )
     settings = get_settings()
     probe = support.ExternalCallProbe().install(monkeypatch)
@@ -394,14 +394,14 @@ def test_invariant_04_domain_whitelist_empty_means_deny_all():
     from app.services.tool import ext_api
 
     empty = support.tool_settings(
-        v24_tool_external_api_enabled=True, v24_tool_ext_allowed_hosts=""
+        tool_external_api_enabled=True, tool_ext_allowed_hosts=""
     )
     assert ext_api.allowed_ext_hosts(empty) == frozenset()
     assert ext_api.host_allowed("api.example.com", empty) is False
 
     configured = support.tool_settings(
-        v24_tool_external_api_enabled=True,
-        v24_tool_ext_allowed_hosts="api.example.com",
+        tool_external_api_enabled=True,
+        tool_ext_allowed_hosts="api.example.com",
     )
     assert ext_api.host_allowed("api.example.com", configured) is True
     assert ext_api.host_allowed("evil.example.com", configured) is False
@@ -423,7 +423,7 @@ def test_invariant_04_domain_whitelist_rejects_at_call_time(tmp_path):
     )
 
     settings = support.tool_settings(
-        v24_tool_external_api_enabled=True, v24_tool_ext_allowed_hosts=WEATHER_HOST
+        tool_external_api_enabled=True, tool_ext_allowed_hosts=WEATHER_HOST
     )
     _registry, index, _report = load_manifests(
         tmp_path,
@@ -453,7 +453,7 @@ def test_invariant_05_sensitive_params_are_redacted(monkeypatch):
     """
     support.apply_flag_env(
         monkeypatch,
-        {"V24_TOOL_SYSTEM_ENABLED": True, "V24_TOOL_OBSERVATION_ENABLED": True},
+        {"TOOL_SYSTEM_ENABLED": True, "TOOL_OBSERVATION_ENABLED": True},
     )
     settings = get_settings()
     from app.models.tool import PermissionProfile

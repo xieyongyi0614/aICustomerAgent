@@ -259,7 +259,7 @@ class TestEnqueueAndGate:
         assert [spec.index for spec in latest.sub_goals] == [1, 2]
 
     def test_gate_rejects_oversize_plan(self, aut_on, override_settings):
-        override_settings(v2_autonomy_subgoal_max_count="1")
+        override_settings(autonomy_subgoal_max_count="1")
         goal = _make_goal()
         outcome = planning.plan_goal(goal.id, planning.TRIGGER_CREATED)
         assert outcome["status"] == "rejected"

@@ -83,15 +83,15 @@ def gate_env(monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_eval_threshold_high", 0.75)
-    monkeypatch.setattr(settings, "v2_memory_eval_threshold_low", 0.35)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_source", 0.35)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_novelty", 0.30)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_affinity", 0.20)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_salience", 0.15)
+    monkeypatch.setattr(settings, "memory_eval_threshold_high", 0.75)
+    monkeypatch.setattr(settings, "memory_eval_threshold_low", 0.35)
+    monkeypatch.setattr(settings, "memory_eval_weight_source", 0.35)
+    monkeypatch.setattr(settings, "memory_eval_weight_novelty", 0.30)
+    monkeypatch.setattr(settings, "memory_eval_weight_affinity", 0.20)
+    monkeypatch.setattr(settings, "memory_eval_weight_salience", 0.15)
     monkeypatch.setattr(settings, "memory_conflict_threshold", 0.6)
-    monkeypatch.setattr(settings, "v2_memory_retrieval_budget", 800)
-    monkeypatch.setattr(settings, "v2_memory_reinforce_boost", 0.1)
+    monkeypatch.setattr(settings, "memory_retrieval_budget", 800)
+    monkeypatch.setattr(settings, "memory_reinforce_boost", 0.1)
 
     stub = _StubLLM()
     monkeypatch.setattr(evaluator, "_ask_llm", stub)
@@ -288,7 +288,7 @@ class ScenarioRunner:
         result_ids = [item.memory.id for item in result.items]
         result_refs = [self._ref_of(mid) for mid in result_ids]
         total_chars = sum(len(item.memory.content) for item in result.items)
-        if total_chars > get_settings().v2_memory_retrieval_budget:
+        if total_chars > get_settings().memory_retrieval_budget:
             self.context_violations.append(
                 f"{step.get('query')}: 检索段 {total_chars} 超预算"
             )

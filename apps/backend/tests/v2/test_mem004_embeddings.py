@@ -24,7 +24,7 @@ def embed_db(monkeypatch):
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(background_job_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(embeddings, "EMBED_RETRY_BACKOFF_SECONDS", 0)
-    monkeypatch.setattr(get_settings(), "v2_embedding_model", "fake-embedding")
+    monkeypatch.setattr(get_settings(), "embedding_model", "fake-embedding")
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -99,13 +99,13 @@ def _jobs():
 
 
 def test_embedding_client_none_when_unconfigured(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_embedding_model", "")
+    monkeypatch.setattr(get_settings(), "embedding_model", "")
     assert llm_factory.get_embedding_client() is None
 
 
 def test_embedding_client_reuses_profile_credentials(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_embedding_model", "fake-embedding")
-    monkeypatch.setattr(get_settings(), "v2_embedding_profile", "longcat")
+    monkeypatch.setattr(get_settings(), "embedding_model", "fake-embedding")
+    monkeypatch.setattr(get_settings(), "embedding_profile", "longcat")
     try:
         client = llm_factory.get_embedding_client()
         assert client is not None
@@ -116,7 +116,7 @@ def test_embedding_client_reuses_profile_credentials(monkeypatch):
 
 class TestBatching:
     def test_size_condition_triggers_flush(self, embed_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_embedding_batch_size", 2)
+        monkeypatch.setattr(get_settings(), "embedding_batch_size", 2)
         client = _fake_client(monkeypatch)
         _memory("m1", "内容一")
         _memory("m2", "内容二")
@@ -130,7 +130,7 @@ class TestBatching:
         assert embeddings._queue == []
 
     def test_window_condition_triggers_flush(self, embed_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_embedding_batch_window_seconds", 60)
+        monkeypatch.setattr(get_settings(), "embedding_batch_window_seconds", 60)
         client = _fake_client(monkeypatch)
         _memory("m1", "内容一")
         embeddings.enqueue("m1", "内容一")
@@ -150,7 +150,7 @@ class TestBatching:
         assert total_texts.count("内容一") == 1
 
     def test_truncates_overlong_input(self, embed_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_embedding_max_input_chars", 10)
+        monkeypatch.setattr(get_settings(), "embedding_max_input_chars", 10)
         client = _fake_client(monkeypatch)
         _memory("m1", "x" * 100)
         embeddings.enqueue("m1", "x" * 100)
@@ -282,13 +282,13 @@ def _approve_candidate(monkeypatch, id, content):
     from app.services.memory2 import evaluator
 
     monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
     for name, value in (
-        ("v2_memory_eval_weight_source", 1.0),
-        ("v2_memory_eval_weight_novelty", 0.0),
-        ("v2_memory_eval_weight_affinity", 0.0),
-        ("v2_memory_eval_weight_salience", 0.0),
+        ("memory_eval_weight_source", 1.0),
+        ("memory_eval_weight_novelty", 0.0),
+        ("memory_eval_weight_affinity", 0.0),
+        ("memory_eval_weight_salience", 0.0),
     ):
         monkeypatch.setattr(get_settings(), name, value)
     row = _pending_candidate(id, content)
@@ -305,7 +305,7 @@ def _approve_candidate(monkeypatch, id, content):
 class TestEvaluatorWiring:
     def test_promotion_enqueues_embedding(self, embed_db, monkeypatch):
         client = _fake_client(monkeypatch)
-        monkeypatch.setattr(get_settings(), "v2_embedding_batch_size", 32)
+        monkeypatch.setattr(get_settings(), "embedding_batch_size", 32)
         decision = _approve_candidate(monkeypatch, "c1", "我在深圳工作")
         assert decision.action == "approve"
         assert [item.memory_id for item in embeddings._queue] == [decision.memory_id]

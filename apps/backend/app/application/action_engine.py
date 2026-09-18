@@ -4,7 +4,7 @@
 execute_plan → integrate_result。全部发生在 post_process 第 9 步（per-user 写锁内）
 或重试维护循环中。只做调度与容错，检出/闸门/执行逻辑在 services。
 
-V2.4.0：`v24_tool_system_enabled` 开启时 `execute_plan` 的步骤执行改走 `ToolExecutor`
+V2.4.0：`tool_system_enabled` 开启时 `execute_plan` 的步骤执行改走 `ToolExecutor`
 （五段短路 + 结果归一），`steps[]` 增量落 `tool_id` / `permission` / `validation` /
 `duration_ms`；总闸关闭时执行路径与 V2.3.0 逐字节一致。
 
@@ -163,7 +163,7 @@ def _build_tool_context(
     装配失败不抛出（`WorldContextBuilder` 逐段降级）；本函数自身异常同样降级为
     `None`——工具系统是行动链路的旁路，任何失败都不得影响行动规划。
     """
-    if not getattr(settings, "v24_tool_system_enabled", False):
+    if not getattr(settings, "tool_system_enabled", False):
         return None
     try:
         base = ToolContext(
@@ -212,7 +212,7 @@ async def execute_plan(
     record.updated_at = _now()
     action_repository.save_record(record)
 
-    if _v26_action_execution_enabled(settings):
+    if _action_execution_enabled(settings):
         return await _execute_plan_via_action_executor(
             record,
             plan,
@@ -224,7 +224,7 @@ async def execute_plan(
             tool_context=tool_context,
         )
 
-    tool_registry = get_tool_registry() if settings.v24_tool_system_enabled else None
+    tool_registry = get_tool_registry() if settings.tool_system_enabled else None
     if tool_registry is not None:
         return await _execute_plan_via_tools(
             record,
@@ -284,8 +284,8 @@ async def execute_plan(
     return result_out
 
 
-def _v26_action_execution_enabled(settings) -> bool:
-    return bool(getattr(settings, "v26_action_execution_enabled", False))
+def _action_execution_enabled(settings) -> bool:
+    return bool(getattr(settings, "action_execution_enabled", False))
 
 
 async def _execute_plan_via_action_executor(
@@ -308,7 +308,7 @@ async def _execute_plan_via_action_executor(
     tool_executor = None
     tool_resolver = None
     exec_tool_ctx = tool_context
-    if settings.v24_tool_system_enabled:
+    if settings.tool_system_enabled:
         tool_registry = get_tool_registry()
         tool_executor = ToolExecutor(
             tool_registry,
@@ -623,8 +623,8 @@ def _build_permission_snapshot(
     `None`（不产生读 IO），执行器据此走 TOOL-003 交付态。
     """
     if not (
-        getattr(settings, "v24_tool_system_enabled", False)
-        and getattr(settings, "v24_tool_permission_enabled", False)
+        getattr(settings, "tool_system_enabled", False)
+        and getattr(settings, "tool_permission_enabled", False)
     ):
         return None
     return ToolPermissionGate(settings).build_snapshot(user_id, _now(), settings)
@@ -740,7 +740,7 @@ def _effect_ref(step_result: dict, kind: str) -> str | None:
 
 def _deliver_memory(record: ActionRecord, settings) -> dict | None:
     """记忆投递路由（TOOL-008 §2.3）：工具记忆子闸 on 走泛化键，off 与 V9 逐字节一致。"""
-    if getattr(settings, "v24_tool_memory_enabled", False):
+    if getattr(settings, "tool_memory_enabled", False):
         return memory_bridge.deliver(record, record.user_id, record.character_id)
     return memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
 
@@ -1119,7 +1119,7 @@ def _expire_planned():
 def _recover_stale_executing() -> int:
     """architecture §11.4：孤儿 executing 超时置 failed，避免永久非终态。"""
     settings = get_settings()
-    if not getattr(settings, "v26_action_execution_enabled", False):
+    if not getattr(settings, "action_execution_enabled", False):
         return 0
     try:
         cutoff = _now() - timedelta(minutes=settings.action_executing_timeout_minutes)
@@ -1152,8 +1152,8 @@ def _expire_pending_confirmations() -> int:
     """
     settings = get_settings()
     if not (
-        getattr(settings, "v24_tool_system_enabled", False)
-        and getattr(settings, "v24_tool_permission_enabled", False)
+        getattr(settings, "tool_system_enabled", False)
+        and getattr(settings, "tool_permission_enabled", False)
     ):
         return 0
     try:

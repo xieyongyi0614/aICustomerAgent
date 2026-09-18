@@ -4,7 +4,7 @@
 只做声明与发现——不执行、不做授权判断、不做参数校验（TOOL-003 / 004 / 005）。
 注册期七项校验失败即抛错：注册是启动期行为，错误必须显式暴露，不降级不静默。
 生命周期为三层纯函数式叠加（代码态基线 + 运行期禁用 + 熔断），覆盖层不写回声明；
-运行期禁用有两条来源：settings 的 `v24_tool_disabled_ids`（配置态）与
+运行期禁用有两条来源：settings 的 `tool_disabled_ids`（配置态）与
 `set_runtime_disabled()` / `clear_runtime_disabled()`（进程内存态，管理面风控入口，TOOL-004），
 两者与熔断一起被 `effective_status()` 消费，重启即清零。
 健康度为进程内存态，重启归零，`record_outcome()` 与熔断置位/解除（TOOL-003 写入面）
@@ -449,7 +449,7 @@ _registry: ToolRegistry | None = None
 def get_tool_registry() -> ToolRegistry | None:
     """模块级单例：总闸 off 返回 None（调用方走 V9 原路径），on 时惰性构建一次。"""
     global _registry
-    if not get_settings().v24_tool_system_enabled:
+    if not get_settings().tool_system_enabled:
         return None
     if _registry is None:
         registry = ToolRegistry()

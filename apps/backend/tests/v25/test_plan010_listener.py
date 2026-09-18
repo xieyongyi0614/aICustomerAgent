@@ -52,9 +52,9 @@ def planning_reflection_on(override_settings):
     """计划反思 + 规划面（引擎 / 装配）同开。"""
     plan_reflection_env(override_settings)
     override_settings(
-        v25_plan_context_enabled="true",
-        v25_plan_step_binding_enabled="true",
-        v24_tool_system_enabled="true",
+        plan_context_enabled="true",
+        plan_step_binding_enabled="true",
+        tool_system_enabled="true",
     )
 
 
@@ -97,7 +97,7 @@ class TestThreeGates:
 
         goal = seed_goal(description="置信度门槛目标")
         seed_plan(goal.id, [structure_step(1)])
-        threshold = get_settings().v25_plan_replan_min_confidence
+        threshold = get_settings().plan_replan_min_confidence
         listener, probe = listener_with_probe()
         listener.on_insight_created(
             USER, [insight_item("ins-u10", confidence=threshold - 0.01)]
@@ -147,8 +147,8 @@ class TestThreeGates:
         from app.core.settings import get_settings
 
         settings = get_settings()
-        assert settings.v25_plan_replan_min_confidence == 0.7
-        assert settings.v25_plan_reflection_min_samples == 3
+        assert settings.plan_replan_min_confidence == 0.7
+        assert settings.plan_reflection_min_samples == 3
         assert listener_mod.SCOPE_GOAL_DOMAINS == {
             "user": ("personal",),
             "relationship": ("relationship",),
@@ -205,7 +205,7 @@ class TestIdempotency:
         assert jobs[0].payload["goal_id"] == goal.id
 
     def test_enqueue_requires_the_sub_flag(self, db_session_factory, override_settings):
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
         goal = seed_goal(description="子闸关闭目标")
         seed_plan(goal.id, [structure_step(1)])
         listener = listener_mod.PlanningRevisionListener()
@@ -385,18 +385,18 @@ class TestIsolation:
 
 
 class TestRegistration:
-    """I5：第四个注册点，受 `v25_plan_reflection_enabled` 门控。"""
+    """I5：第四个注册点，受 `plan_reflection_enabled` 门控。"""
 
     def test_i5_not_registered_when_the_sub_flag_is_off(
         self, db_session_factory, override_settings
     ):
         from app.core.settings import get_settings
 
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
         reflection_lifecycle.reset_insight_created_listeners()
         listener_mod.register_runtime()
         assert reflection_lifecycle._insight_created_listeners == []
-        assert get_settings().v25_plan_reflection_enabled is False
+        assert get_settings().plan_reflection_enabled is False
 
     def test_i5_registered_as_the_fourth_consumer(self, db_session_factory, plan_reflection_on):
         reflection_lifecycle.reset_insight_created_listeners()
@@ -425,7 +425,7 @@ class TestRegistration:
 
         source = Path(main.__file__).read_text(encoding="utf-8")
         assert (
-            "if get_settings().v25_plan_reflection_enabled:\n        "
+            "if get_settings().plan_reflection_enabled:\n        "
             "register_plan_revision_listener()" in source
         )
         assert (

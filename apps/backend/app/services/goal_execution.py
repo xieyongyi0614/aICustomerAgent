@@ -39,7 +39,7 @@ async def attempt_current_step(goal, plan, now: datetime) -> dict:
     current = goal_observation._current_step(specs)
     if current is None:
         return {"status": "skipped", "skip_reason": "no_current_step"}
-    cooldown = settings.v2_autonomy_subgoal_execute_cooldown_minutes
+    cooldown = settings.autonomy_subgoal_execute_cooldown_minutes
     last = current.last_attempt_at
     if last is not None and (now - last).total_seconds() < cooldown * 60:
         return {"status": "skipped", "skip_reason": "cooldown", "goal_id": goal.id}

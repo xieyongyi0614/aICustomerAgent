@@ -11,8 +11,8 @@ from tests.conftest import set_known_flag_env
 @pytest.fixture(autouse=True)
 def _pin_v24_tool_env(monkeypatch):
     """目录级隔离：工具系统开关取默认（总闸 off、运行期禁用清单为空），用例内可显式覆盖。"""
-    monkeypatch.setenv("V24_TOOL_SYSTEM_ENABLED", "false")
-    monkeypatch.setenv("V24_TOOL_DISABLED_IDS", "")
+    monkeypatch.setenv("TOOL_SYSTEM_ENABLED", "false")
+    monkeypatch.setenv("TOOL_DISABLED_IDS", "")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -40,7 +40,7 @@ def _isolate_capability_registry(monkeypatch):
 
 @pytest.fixture
 def v24_tool_env(monkeypatch):
-    """按需注入 V24_* 环境开关，并保证用例结束后 settings 缓存与注册表单例干净。"""
+    """按需注入 TOOL_* 环境开关，并保证用例结束后 settings 缓存与注册表单例干净。"""
     monkeypatch.setattr(tool_registry, "_registry", None)
 
     def _apply(**envs):

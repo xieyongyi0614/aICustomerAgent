@@ -36,38 +36,38 @@ pytestmark = pytest.mark.xdist_group("ws019")
 logger = logging.getLogger(__name__)
 
 V23_FLAG_KEYS = (
-    "V23_WORLD_SIMULATION_ENABLED",
-    "V23_TIME_ADVANCE_ENABLED",
-    "V23_DAILY_LIFE_ENABLED",
-    "V23_EVENT_DETECTION_ENABLED",
-    "V23_SCENE_EXPANSION_ENABLED",
-    "V23_HABIT_TIME_ENABLED",
-    "V23_WORLD_LLM_ASSIST_ENABLED",
+    "WORLD_SIMULATION_ENABLED",
+    "TIME_ADVANCE_ENABLED",
+    "DAILY_LIFE_ENABLED",
+    "EVENT_DETECTION_ENABLED",
+    "SCENE_EXPANSION_ENABLED",
+    "HABIT_TIME_ENABLED",
+    "WORLD_LLM_ASSIST_ENABLED",
 )
 
 # --- Flag 矩阵：6 组组合 ------------------------------------------------------
 
 FLAG_MATRIX = {
     "all_off": {},
-    "master_time": {"V23_WORLD_SIMULATION_ENABLED": "true", "V23_TIME_ADVANCE_ENABLED": "true"},
+    "master_time": {"WORLD_SIMULATION_ENABLED": "true", "TIME_ADVANCE_ENABLED": "true"},
     "plus_daily": {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
     },
     "plus_detection": {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
     },
     "plus_scene_habit": {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_TIME_ADVANCE_ENABLED": "true",
-        "V23_DAILY_LIFE_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
-        "V23_SCENE_EXPANSION_ENABLED": "true",
-        "V23_HABIT_TIME_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "TIME_ADVANCE_ENABLED": "true",
+        "DAILY_LIFE_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
+        "SCENE_EXPANSION_ENABLED": "true",
+        "HABIT_TIME_ENABLED": "true",
     },
     "all_on": {key: "true" for key in V23_FLAG_KEYS},
 }
@@ -101,7 +101,7 @@ def test_flag_matrix_maintenance_step_executes_per_gate(db_session_factory, flag
 
     result = world_engine.run_simulation_maintenance(user)
 
-    if not settings.v23_world_simulation_enabled or not settings.v23_time_advance_enabled:
+    if not settings.world_simulation_enabled or not settings.time_advance_enabled:
         assert result is None, f"{group}: 未开时间推进不应执行维护步"
         return
     assert result is not None
@@ -117,7 +117,7 @@ def test_flag_matrix_brief_presence_follows_master(db_session_factory, flag_env,
 
     context = world_engine.build_context(user)
 
-    if not settings.v23_world_simulation_enabled:
+    if not settings.world_simulation_enabled:
         assert context is not None
         assert getattr(context, "brief", None) is None, f"{group}: 总闸关不得有简报"
     else:
@@ -136,7 +136,7 @@ def test_flag_matrix_plan_generated_only_with_daily_life(db_session_factory, fla
     world_engine.run_simulation_maintenance(user)
 
     plans = daily_plan.get_day_plan(user, datetime.now().date())
-    if not (settings.v23_world_simulation_enabled and settings.v23_daily_life_enabled):
+    if not (settings.world_simulation_enabled and settings.daily_life_enabled):
         assert plans == [], f"{group}: 未开 daily_life 不应生成计划"
 
 
@@ -152,9 +152,9 @@ def test_flag_matrix_situation_detection_gated(db_session_factory, flag_env, gro
 
     situations = world_simulation_repository.list_situations(user)
     if not (
-        settings.v23_world_simulation_enabled
-        and settings.v23_time_advance_enabled
-        and settings.v23_event_detection_enabled
+        settings.world_simulation_enabled
+        and settings.time_advance_enabled
+        and settings.event_detection_enabled
     ):
         assert situations == [], f"{group}: 未开 detection 不应有处境记录"
 

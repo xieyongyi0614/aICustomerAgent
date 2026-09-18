@@ -153,7 +153,7 @@ def _patch_llm(monkeypatch):
 
 
 def test_count_factor_curve():
-    curve = reflector.get_settings().v2_reflection_confidence_count_curve_json
+    curve = reflector.get_settings().reflection_confidence_count_curve_json
     assert reflector._count_factor(3, curve) == 0.65
     assert reflector._count_factor(4, curve) == 0.75
     assert reflector._count_factor(5, curve) == 0.85
@@ -170,7 +170,7 @@ def test_calibrate_confidence_monotonic_and_capped():
     assert strong > mid > weak
     assert strong <= 0.95
     capped = reflector.calibrate_confidence(0.9, 6, ["user_stated", "ai_inferred"], settings)
-    assert capped == settings.v2_reflection_ai_inferred_cap
+    assert capped == settings.reflection_ai_inferred_cap
 
 
 def test_review_rejects_hallucinated_evidence_ids():
@@ -204,7 +204,7 @@ def test_review_rejects_missing_counter_evidence():
 
 
 def test_review_rejects_below_min_confidence(db_session_factory, reflection_on, override_settings):
-    override_settings( v2_reflection_min_confidence=0.99)
+    override_settings( reflection_min_confidence=0.99)
     settings = reflector.get_settings()
     proposal = _proposal()
     accepted, rejected = reflector._calibrate_and_review(
@@ -339,7 +339,7 @@ def test_claim_is_conditional_update(db_session_factory, reflection_on):
 def test_timeout_recovery_requeues_running(db_session_factory, reflection_on):
     _seed_run(db_session_factory, "run-zombie", status="running")
     stale = datetime.now() - timedelta(
-        minutes=reflector.get_settings().v2_reflection_run_timeout_minutes + 1
+        minutes=reflector.get_settings().reflection_run_timeout_minutes + 1
     )
     with db_session_factory() as session:
         row = session.get(ReflectionRunRow, "run-zombie")

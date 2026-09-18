@@ -857,7 +857,7 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
             if discard_object(user_id, object_id) is not None:
                 applied += 1
         if result.location_move is not None:
-            if settings.v23_world_simulation_enabled and settings.v23_scene_expansion_enabled:
+            if settings.world_simulation_enabled and settings.scene_expansion_enabled:
                 move_result = movement.apply(
                     user_id,
                     result.location_move,
@@ -970,7 +970,7 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             change_events=change_events,
             changes_limit=settings.character_action_sync_context_lines,
         )
-        if settings.v23_world_simulation_enabled:
+        if settings.world_simulation_enabled:
             context = _attach_world_brief(user_id, world, time_ctx, context, settings)
         if trace is not None:
             trace.record(
@@ -998,7 +998,7 @@ def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
         from app.services.world import world_brief as brief_service
 
         block = None
-        if settings.v23_daily_life_enabled:
+        if settings.daily_life_enabled:
             minutes = time_ctx.now.hour * 60 + time_ctx.now.minute
             plans = daily_plan_service.get_day_plan(
                 user_id, time_ctx.now.date()
@@ -1007,7 +1007,7 @@ def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
             block = active[0] if active else None
         situations = (
             situation_service.active_situations(user_id)
-            if settings.v23_event_detection_enabled
+            if settings.event_detection_enabled
             else []
         )
         brief = brief_service.build_world_brief(
@@ -1028,13 +1028,13 @@ def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
     """V2.3.0 自治素材增强（v23 门控）：影响裁决包 + 当前日程块 + 活跃处境。"""
     try:
         settings = get_settings()
-        if not settings.v23_world_simulation_enabled:
+        if not settings.world_simulation_enabled:
             return facts
         from app.models.world_simulation import DailyPlanStatus
         from app.services.world import daily_plan, event_impact, user_situation
 
         context: dict = {"part_of_day": facts.get("part_of_day")}
-        if settings.v23_daily_life_enabled:
+        if settings.daily_life_enabled:
             minutes = now.hour * 60 + now.minute
             block = daily_plan.get_current_block(user_id, now.date(), minutes)
             context["current_block"] = (
@@ -1046,7 +1046,7 @@ def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
                 if block is not None
                 else None
             )
-        if settings.v23_event_detection_enabled:
+        if settings.event_detection_enabled:
             situations = user_situation.active_situations(user_id)
             context["active_situations"] = [
                 {"dimension": s.dimension.value, "summary": s.summary, "intensity": s.intensity}
@@ -1213,7 +1213,7 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
     weather.evolve_daily_weather(user_id)
     user_situation.expire_and_notify(user_id, now)
     settings = get_settings()
-    if settings.v23_daily_life_enabled:
+    if settings.daily_life_enabled:
         from app.services.world import daily_plan
 
         world = get_world(user_id)
@@ -1241,8 +1241,8 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
     settings = get_settings()
     if (
         not settings.world_enabled
-        or not settings.v23_world_simulation_enabled
-        or not settings.v23_time_advance_enabled
+        or not settings.world_simulation_enabled
+        or not settings.time_advance_enabled
     ):
         return None
     worlds = (
@@ -1266,14 +1266,14 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
 
 
 _V23_FLAG_NAMES = (
-    "v23_world_simulation_enabled",
-    "v23_time_advance_enabled",
-    "v23_daily_life_enabled",
-    "v23_event_detection_enabled",
-    "v23_scene_expansion_enabled",
-    "v23_habit_time_enabled",
-    "v23_world_llm_assist_enabled",
-    "v23_debug_tick_enabled",
+    "world_simulation_enabled",
+    "time_advance_enabled",
+    "daily_life_enabled",
+    "event_detection_enabled",
+    "scene_expansion_enabled",
+    "habit_time_enabled",
+    "world_llm_assist_enabled",
+    "debug_tick_enabled",
 )
 
 _SIMULATION_EVENT_SOURCES = ("simulation",)
@@ -1306,7 +1306,7 @@ def build_debug_simulation(user_id: str) -> dict | None:
     block = None
     situations: list = []
     try:
-        if settings.v23_daily_life_enabled:
+        if settings.daily_life_enabled:
             from app.models.world_simulation import DailyPlanStatus
             from app.services.world import daily_plan as daily_plan_service
 
@@ -1316,7 +1316,7 @@ def build_debug_simulation(user_id: str) -> dict | None:
     except Exception:
         logger.exception("调试总览日程块装配失败")
     try:
-        if settings.v23_event_detection_enabled:
+        if settings.event_detection_enabled:
             from app.services.world import user_situation as situation_service
 
             situations = situation_service.active_situations(user_id)
@@ -1431,7 +1431,7 @@ def run_debug_tick(user_id: str) -> dict:
         from app.services.world import daily_plan as daily_plan_service
 
         world = get_world(user_id)
-        if world is not None and get_settings().v23_daily_life_enabled:
+        if world is not None and get_settings().daily_life_enabled:
             now = _default_provider.now(world)
             plans = daily_plan_service.get_day_plan(user_id, now.date())
             plan_summary = {

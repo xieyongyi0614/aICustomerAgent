@@ -4,7 +4,7 @@
 memory_repository 落库；source 只用 user_stated / user_derived。
 
 V2.4.0 TOOL-008：新增 `deliver` 泛化路径（键从 action_type 升级为 memory_policy_key），
-工具记忆子闸 `v24_tool_memory_enabled` off 时回退本模块既有的 `deliver_action_memory`。
+工具记忆子闸 `tool_memory_enabled` off 时回退本模块既有的 `deliver_action_memory`。
 两条路径共用同一政策闸与落库入口，幂等标记同为 `effects.kind == "memory"`。
 """
 
@@ -90,7 +90,7 @@ def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> 
     任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
     """
     settings = get_settings()
-    if not settings.v24_tool_memory_enabled:
+    if not settings.tool_memory_enabled:
         return deliver_action_memory(record, user_id, character_id)
     if not settings.action_memory_policy_enabled:
         return None

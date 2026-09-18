@@ -174,8 +174,8 @@ def test_get_tool_registry_returns_none_when_master_flag_off(v24_tool_env, monke
     monkeypatch.setattr(
         tool_registry, "register_builtin_tools", lambda registry: calls.append("built")
     )
-    v24_tool_env(v24_tool_system_enabled=False)
-    assert get_settings().v24_tool_system_enabled is False
+    v24_tool_env(tool_system_enabled=False)
+    assert get_settings().tool_system_enabled is False
     assert get_tool_registry() is None
     assert calls == []
 
@@ -184,7 +184,7 @@ def test_get_tool_registry_ignores_existing_instance_when_flag_off(
     v24_tool_env, monkeypatch
 ):
     monkeypatch.setattr(tool_registry, "_registry", ToolRegistry())
-    v24_tool_env(v24_tool_system_enabled=False)
+    v24_tool_env(tool_system_enabled=False)
     assert get_tool_registry() is None
 
 
@@ -197,7 +197,7 @@ def test_get_tool_registry_builds_once_when_master_flag_on(v24_tool_env, monkeyp
         original(registry)
 
     monkeypatch.setattr(tool_registry, "register_builtin_tools", _spy)
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     first = get_tool_registry()
     second = get_tool_registry()
     assert first is not None
@@ -207,7 +207,7 @@ def test_get_tool_registry_builds_once_when_master_flag_on(v24_tool_env, monkeyp
 
 
 def test_get_tool_registry_singleton_is_memoized_across_calls(v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     assert get_tool_registry() is get_tool_registry()
 
 
@@ -273,7 +273,7 @@ def test_module_level_unregister_capability_is_gone():
 
 
 def test_capability_registry_flags_snapshot_is_read_only_copy(v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     action_registry._registry = None
     action_registry._registry_flags.clear()
     assert action_registry.capability_registry_flags() == {}
@@ -282,8 +282,8 @@ def test_capability_registry_flags_snapshot_is_read_only_copy(v24_tool_env):
     registry = get_capability_registry()
 
     snapshot = action_registry.capability_registry_flags()
-    assert snapshot["v24_tool_system_enabled"] is True
+    assert snapshot["tool_system_enabled"] is True
     assert set(snapshot) == set(action_registry.REGISTRY_FLAG_NAMES)
-    snapshot["v24_tool_system_enabled"] = False
-    assert action_registry.capability_registry_flags()["v24_tool_system_enabled"] is True
+    snapshot["tool_system_enabled"] = False
+    assert action_registry.capability_registry_flags()["tool_system_enabled"] is True
     assert action_registry.peek_capability_registry() is registry

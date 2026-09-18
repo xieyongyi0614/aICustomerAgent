@@ -5,12 +5,12 @@
 ## 生效方式
 
 ```bash
-V24_TOOL_SYSTEM_ENABLED=true
-V24_TOOL_EXTERNAL_API_ENABLED=true
+TOOL_SYSTEM_ENABLED=true
+TOOL_EXTERNAL_API_ENABLED=true
 # 本目录（或你自己的声明目录）
-V24_TOOL_EXT_MANIFEST_PATH=app/services/tool/manifests
+TOOL_EXT_MANIFEST_PATH=app/services/tool/manifests
 # 域名白名单，逗号分隔；空 = 全禁（硬纪律）
-V24_TOOL_EXT_ALLOWED_HOSTS=api.example.com,hooks.example.com
+TOOL_EXT_ALLOWED_HOSTS=api.example.com,hooks.example.com
 # 凭据只从环境变量读取，声明文件里只写变量名
 EXT_API_WEATHER_TOKEN=...
 EXT_API_HOOK_KEY=...
@@ -23,7 +23,7 @@ EXT_API_HOOK_KEY=...
 ## 安全边界（机制非约定）
 
 - **凭据零硬编码**：声明文件只写 `env: <VAR_NAME>`，值只从环境变量读取；不进日志、不进端点响应、不进台账。
-- **域名白名单默认全禁**：`v24_tool_ext_allowed_hosts` 为空时一条都不加载；执行期还会二次校验（防加载后配置收窄）。
+- **域名白名单默认全禁**：`tool_ext_allowed_hosts` 为空时一条都不加载；执行期还会二次校验（防加载后配置收窄）。
 - **返回值不受信**：响应内容一律 `untrusted=True`，只作事实素材，不作指令进入决策。
 - **无任意代码**：`response_map` 只支持 `$.a.b` / `$.a[0].b` 与 `:str` / `:num` / `:bool` 后缀，函数 / 运算 / 条件 / 通配一律在校验期拒绝。
 

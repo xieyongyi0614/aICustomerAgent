@@ -118,12 +118,12 @@ def tools_on(monkeypatch, override_settings):
     """
     reset_tool_registry(monkeypatch)
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_step_binding_enabled="true",
-        v25_plan_tool_required="true",
-        v24_tool_system_enabled="true",
-        v24_tool_channel_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        plan_step_binding_enabled="true",
+        plan_tool_required="true",
+        tool_system_enabled="true",
+        tool_channel_enabled="true",
         feishu_enabled="true",
         feishu_app_id="plan6-app",
         feishu_app_secret="plan6-secret",
@@ -139,11 +139,11 @@ def planning_gates_on(monkeypatch, override_settings):
     """规划期闸门用例的开关面（计划子闸 on + 工具总闸 on，世界/记忆/反思关闭）。"""
     reset_tool_registry(monkeypatch)
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_step_binding_enabled="true",
-        v25_plan_tool_required="true",
-        v24_tool_system_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        plan_step_binding_enabled="true",
+        plan_tool_required="true",
+        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     return True
@@ -160,12 +160,12 @@ def action_chain_on(monkeypatch, override_settings):
     override_settings(
         action_enabled="true",
         action_max_active_per_user="5",
-        v25_plan_step_binding_enabled="true",
-        v25_plan_tool_required="true",
-        v24_tool_system_enabled="true",
-        v24_tool_permission_enabled="true",
-        v24_tool_schema_validation_enabled="true",
-        v24_tool_observation_enabled="true",
+        plan_step_binding_enabled="true",
+        plan_tool_required="true",
+        tool_system_enabled="true",
+        tool_permission_enabled="true",
+        tool_schema_validation_enabled="true",
+        tool_observation_enabled="true",
         world_enabled="false",
         action_memory_policy_enabled="false",
         observability_persist_enabled="false",

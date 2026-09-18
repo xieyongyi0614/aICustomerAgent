@@ -52,8 +52,8 @@ FEISHU_BINDING_ENVS: dict[str, object] = {
 }
 
 CHANNEL_ENVS: dict[str, object] = {
-    "v24_tool_system_enabled": True,
-    "v24_tool_channel_enabled": True,
+    "tool_system_enabled": True,
+    "tool_channel_enabled": True,
     **FEISHU_BINDING_ENVS,
 }
 

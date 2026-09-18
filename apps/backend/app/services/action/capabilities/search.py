@@ -66,7 +66,7 @@ class SearchCapability:
                 error=f"未知动作: {action}",
                 payload={"failure_kind": "permanent", "reason_kind": "unknown_action"},
             )
-        if not bool(getattr(_settings_of(ctx), "v24_tool_system_enabled", False)):
+        if not bool(getattr(_settings_of(ctx), "tool_system_enabled", False)):
             return CapabilityResult(
                 status=UNAVAILABLE_STATUS,
                 error=V9_ERROR_TEXT,

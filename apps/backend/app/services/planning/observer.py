@@ -56,7 +56,7 @@
 **终态记忆（PLAN-009 §4.2.1 / §7.5.5）**：`_transition` 在迁移成功后调
 `deliver_goal_terminal_memory`（映射表 `TERMINAL_MEMORY_EVENTS`，含 `completed` / `failed` /
 `abandoned`），委托 `planning/memory_policy.py` 完成判据 B → 候选构造 → `memory_policy`
-R1~R8 → `memories`（零新列）→ 幂等标记；子闸 `v25_plan_memory_enabled` off 时零调用零写入。
+R1~R8 → `memories`（零新列）→ 幂等标记；子闸 `plan_memory_enabled` off 时零调用零写入。
 与广播的差别只在**覆盖面**：`failed` 不广播但**要**沉淀（「想帮用户做一件事但没做成」本身是
 用户可感知的事实）；投递失败只 log，**不回滚计划终态**（D10 / D15 同款纪律）。计划本体与中间
 步骤一律不进记忆（判据 B 的 ❌ 四行），步骤是否沉淀由该步的工具按 V2.4.0 边界表独立决定
@@ -367,7 +367,7 @@ class PlanObserver:
     def observe_user_goals(self, user_id: str, facts: dict, *, now: datetime) -> dict:
         """编排入口：对用户当前 active 计划逐个 `observe` + `settle`（Step 8 的接线形态）。
 
-        门控由调用方承担（`v25_plan_observation_enabled`）；
+        门控由调用方承担（`plan_observation_enabled`）；
         返回形状与既有 `goal_observation.advance_user_goals` 兼容（`goals` / `results`，
         `results[]` 带 `observations` 计数供既有编排步骤统计），并追加：
         `settled`（本次进入终态的**目标**数，含由既有写面 `_complete` 结算者）、
@@ -605,14 +605,14 @@ def _plan_owner(plan) -> str | None:
 def broadcast_goal_terminal(goal, outcome: str) -> bool:
     """终态广播（PLAN-008 §4.2.5 / §6.3）：计划层的**唯一**世界事件表达。
 
-    门控：`v25_planning_enabled` + `v25_plan_world_feedback_enabled`（世界反馈子闸）。
+    门控：`planning_enabled` + `plan_world_feedback_enabled`（世界反馈子闸）。
     只调既有 `event_bridge.register_goal_event`（复用既有 `goal_completed` 类型与既有
     outbox → `world_engine` 链路，不新增事件类型、不新增写入路径）；`outcome` 不在映射表内
     （`failed` 等）即零调用返回 `False`。广播失败（抛错 / Flag off / 幂等键命中）**只 log**：
     不回滚计划终态（§6.5 D15，与 V9「投递失败不回滚执行」同款纪律）。
     """
     settings = get_settings()
-    if not settings.v25_planning_enabled or not settings.v25_plan_world_feedback_enabled:
+    if not settings.planning_enabled or not settings.plan_world_feedback_enabled:
         return False
     mapped = TERMINAL_BROADCAST_OUTCOMES.get(outcome)
     if mapped is None:
@@ -632,14 +632,14 @@ def deliver_goal_terminal_memory(goal, plan, outcome: str, *, policy=None) -> di
     """终态记忆投递（PLAN-009 §4.2.1 / §7.5.5）：计划层的**唯一**记忆表达。
 
     只做 `GoalStatus` → `event_kind` 映射并委托 `memory_policy.deliver_plan_memory`（判据 B、
-    候选构造、R1~R8、落库、幂等全在彼处）；子闸 `v25_plan_memory_enabled` off 时零调用零写入
+    候选构造、R1~R8、落库、幂等全在彼处）；子闸 `plan_memory_enabled` off 时零调用零写入
     （记忆通道走既有原路径，行为与 V2.4.0 逐字节一致）。投递失败只 log：**不回滚计划终态**
     （同款纪律）；`plan is None` 时不投递（隐私判别与幂等标记都以计划域台账为面）。
     """
     event_kind = TERMINAL_MEMORY_EVENTS.get(outcome)
     if event_kind is None or plan is None:
         return None
-    if not get_settings().v25_plan_memory_enabled:
+    if not get_settings().plan_memory_enabled:
         return None
     return plan_memory_policy.deliver_plan_memory(
         goal, plan, event_kind, policy=policy
@@ -694,7 +694,7 @@ def _records(user_id: str) -> list:
 def _action_results(records: list, now: datetime, settings) -> list[dict]:
     """动作观察窗投影（既有语义）：`status` 取步级 `steps[].status`，缺步骤回退记录级。"""
     window_start = now - timedelta(
-        minutes=settings.v2_autonomy_observation_window_minutes
+        minutes=settings.autonomy_observation_window_minutes
     )
     return [
         {
@@ -710,7 +710,7 @@ def _action_results(records: list, now: datetime, settings) -> list[dict]:
 def _action_history(records: list, now: datetime, settings) -> list[dict]:
     """放弃判据的历史窗投影（既有语义，字段集不变）。"""
     history_start = now - timedelta(
-        days=settings.v2_autonomy_abandon_min_progress_days
+        days=settings.autonomy_abandon_min_progress_days
     )
     return [
         {"capability": record.action_type, "created_at": record.created_at}
@@ -758,8 +758,8 @@ def _memory_facts(settings, user_id: str) -> tuple[dict, list]:
     try:
         salient = memory_repository.list_top_salience(
             user_id,
-            min_salience=settings.v2_life_loop_memory_min_salience,
-            limit=settings.v2_life_loop_memory_limit,
+            min_salience=settings.life_loop_memory_min_salience,
+            limit=settings.life_loop_memory_limit,
         )
     except Exception:
         logger.exception("记忆事实采集失败，判据按不可判定处理")

@@ -32,7 +32,7 @@ def _stack(short_type="user_care"):
 
 class TestPipeline:
     def test_silence_wins_when_no_candidates(self, override_settings):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         result = decision_pipeline.run_pipeline(run=None, now=NOW)
         assert result.winner.source == "silence"
         assert result.intention is None
@@ -40,7 +40,7 @@ class TestPipeline:
         assert sources == ["silence"]
 
     def test_goal_compile_beats_capability_and_silence(self, db_session_factory, override_settings):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         result = decision_pipeline.run_pipeline(
             stack=_stack(), capabilities=["reminder"], run=None, now=NOW
         )
@@ -52,7 +52,7 @@ class TestPipeline:
         assert audit["silence"]["priority"] == "P4"
 
     def test_autonomy_trigger_intention_passthrough(self, override_settings):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         result = decision_pipeline.run_pipeline(
             trigger_intention="check_in", trigger_goal_id=None, run=None, now=NOW
         )
@@ -60,7 +60,7 @@ class TestPipeline:
         assert result.intention == "check_in"
 
     def test_budget_denied_falls_to_silence(self, db_session_factory, override_settings, monkeypatch):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         monkeypatch.setattr(
             llm_gateway,
             "acquire",
@@ -72,7 +72,7 @@ class TestPipeline:
         assert audit["goal_compile"]["gates"][-1]["budget_cooldown"] == "rejected"
 
     def test_audit_answers_four_questions(self, db_session_factory, override_settings):
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         result = decision_pipeline.run_pipeline(stack=_stack(), run=None, now=NOW)
         winner_audit = next(
             c for c in result.audit["candidates"] if c["won"]
@@ -85,7 +85,7 @@ class TestAutonomyWiring:
     def test_pipeline_intention_flag_off_noop(self, override_settings):
         from app.application import autonomy_engine
 
-        override_settings(V21_AGENT_RUNTIME_ENABLED="false")
+        override_settings(AGENT_RUNTIME_ENABLED="false")
         verdict = SimpleNamespace(intention="check_in", goal_id=None)
         intention, audit = autonomy_engine._pipeline_intention(verdict, USER, NOW)
         assert intention is None and audit is None
@@ -93,7 +93,7 @@ class TestAutonomyWiring:
     def test_pipeline_intention_flag_on(self, db_session_factory, override_settings):
         from app.application import autonomy_engine
 
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true", V21_GOAL_STACK_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true", GOAL_STACK_ENABLED="true")
         verdict = SimpleNamespace(intention="check_in", goal_id=None)
         intention, audit = autonomy_engine._pipeline_intention(verdict, USER, NOW)
         assert audit is not None and "candidates" in audit
@@ -102,7 +102,7 @@ class TestAutonomyWiring:
     def test_pipeline_failure_falls_back(self, db_session_factory, override_settings, monkeypatch):
         from app.application import autonomy_engine
 
-        override_settings(V21_AGENT_RUNTIME_ENABLED="true")
+        override_settings(AGENT_RUNTIME_ENABLED="true")
         monkeypatch.setattr(
             decision_pipeline,
             "run_pipeline",

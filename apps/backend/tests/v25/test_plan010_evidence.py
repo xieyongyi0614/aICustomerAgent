@@ -253,9 +253,9 @@ class TestPlanEvidenceWindows:
         base = reflection_evidence.plan_thresholds(
             reflection_evidence.PLAN_WINDOW_SUCCESS_RATE
         )
-        assert base["min_samples"] == settings.v25_plan_reflection_min_samples
-        assert base["min_span_hours"] == settings.v2_reflection_min_span_hours
-        assert base["min_failures"] == settings.v25_plan_reflection_min_samples
+        assert base["min_samples"] == settings.plan_reflection_min_samples
+        assert base["min_span_hours"] == settings.reflection_min_span_hours
+        assert base["min_failures"] == settings.plan_reflection_min_samples
         assert reflection_evidence.PLAN_WINDOW_FAILURE_DRIVEN_KINDS == PLAN_WINDOWS
 
     def test_u5_plan_module_does_not_redeclare_the_existing_caps(self):
@@ -410,7 +410,7 @@ class TestPlanEvidenceFromProjections:
     ):
         """D14：子闸 off → 计划窗零产出、零额外读取（证据聚合只有两通道）。"""
         plan_reflection_env(override_settings)
-        override_settings(v25_plan_reflection_enabled="false")
+        override_settings(plan_reflection_enabled="false")
         seed_success_rate_series()
         package = reflection_evidence.aggregate_plan_evidence(USER, now=NOW)
         assert package.windows == []
@@ -620,7 +620,7 @@ class TestTriggerForUserIsUntouched:
     ):
         from app.models.reflection import EvidenceMember, EvidenceWindow, WindowStats
 
-        override_settings( v25_plan_reflection_enabled="false")
+        override_settings( plan_reflection_enabled="false")
         window = EvidenceWindow(
             topic_digest="既有窗口",
             members=[

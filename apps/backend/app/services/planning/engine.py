@@ -8,8 +8,8 @@
 
 | # | 闸门 | 理由码 | 依据 |
 |---|---|---|---|
-| 1 | 总闸与尝试次数 | `attempt_cap` | `count_plans` vs `v2_autonomy_planning_max_attempts` |
-| 2 | 步骤数上限 | `subgoal_count_exceeded` | `min(v25_plan_max_steps, v2_autonomy_subgoal_max_count)` |
+| 1 | 总闸与尝试次数 | `attempt_cap` | `count_plans` vs `autonomy_planning_max_attempts` |
+| 2 | 步骤数上限 | `subgoal_count_exceeded` | `min(plan_max_steps, autonomy_subgoal_max_count)` |
 | 3 | 形状合法 | `invalid_sub_goal_shape` | `validate_sub_goals`（序号 / 前向依赖 / 深度） |
 | 4 | 能力对齐 | `capability_unaligned` | `capability ∈ ACTION_TYPES` |
 | 5 | **工具可解析** | `plan_tool_unresolvable` | `ToolRegistry.resolve(tool_id)` |
@@ -18,7 +18,7 @@
 
 闸门 5 与 6 的区别是评审要点：5 问「这个工具存在吗」（声明面），6 问「这一刻它能用吗」
 （运行时面）。`channel.feishu.send` 在 `late_night` 被工具面剔除时**闸门 5 过、闸门 6 拒**——
-计划步数与内容不变，只是暂不装配该步。两道闸门受 `v25_plan_step_binding_enabled` 门控，
+计划步数与内容不变，只是暂不装配该步。两道闸门受 `plan_step_binding_enabled` 门控，
 且可分别独立关闭（构造参数），用于单列验证。
 
 PLAN-006 补齐的判定细节（Task Detail §6.1 的两个内部接口，实现为模块级纯函数以便单列验证）
@@ -149,7 +149,7 @@ class _Draft:
 class PlanningEngine:
     """七道闸规划引擎（`plan` / `revise` / `enqueue` / `run_jobs` / `register_runtime`）。
 
-    `tool_binding_enabled` 缺省取 `v25_plan_step_binding_enabled`；`tool_resolvable_gate` /
+    `tool_binding_enabled` 缺省取 `plan_step_binding_enabled`；`tool_resolvable_gate` /
     `tool_surface_gate` 是闸门 5 / 6 的**独立开关**（Task Detail §8 Step 4.4 要求二者可分别
     关闭并单独验证）。两者仅在绑定子闸开启时生效。
     """
@@ -176,12 +176,12 @@ class PlanningEngine:
     ) -> PlanOutcome:
         """修订（Task Detail §4.1.5）：版本 +1、旧版置 `superseded`、已完成步骤不重做。
 
-        达 `v25_plan_revision_budget` 即终止：计划置 `rejected`、目标转
+        达 `plan_revision_budget` 即终止：计划置 `rejected`、目标转
         `failed(failure_reason="plan_exhausted")`（不吞写面抛出的 `ValueError`）。
         """
         settings = get_settings()
         attempts = goal_repository.count_plans(plan.goal_id)
-        if attempts >= settings.v25_plan_revision_budget:
+        if attempts >= settings.plan_revision_budget:
             return self._exhaust(plan, ctx, reason)
         kept = [spec for spec in plan.sub_goals if spec.status == PLAN_STATUS_DONE]
         outcome = await self._generate(
@@ -306,7 +306,7 @@ class PlanningEngine:
             trigger=draft.trigger,
             context_digest=(
                 context_digest(draft.ctx)
-                if settings.v25_plan_context_digest_enabled
+                if settings.plan_context_digest_enabled
                 else None
             ),
             evidence_refs=tuple(draft.ctx.evidence_refs),
@@ -360,7 +360,7 @@ class PlanningEngine:
         可单列验证（Task Detail §9.1 U4）：两道闸门按序独立判定，前一道不通过即短路。
         """
         enabled = (
-            settings.v25_plan_step_binding_enabled
+            settings.plan_step_binding_enabled
             if self._tool_binding_enabled is None
             else self._tool_binding_enabled
         )
@@ -486,11 +486,11 @@ def _proposal_evidence(draft: _Draft) -> tuple:
 
 
 def _llm_settings(settings):
-    """`v25_plan_llm_profile` 非空时覆盖既有规划 profile（空 = 沿用既有配置）。"""
-    profile = str(getattr(settings, "v25_plan_llm_profile", "") or "")
+    """`plan_llm_profile` 非空时覆盖既有规划 profile（空 = 沿用既有配置）。"""
+    profile = str(getattr(settings, "plan_llm_profile", "") or "")
     if not profile:
         return settings
-    return settings.model_copy(update={"v2_autonomy_planning_llm_profile": profile})
+    return settings.model_copy(update={"autonomy_planning_llm_profile": profile})
 
 
 def _pre_llm_gate(draft: _Draft, settings) -> str | None:
@@ -498,7 +498,7 @@ def _pre_llm_gate(draft: _Draft, settings) -> str | None:
     failure_replan = (
         draft.trigger == goal_planning.TRIGGER_REPLAN and draft.goal.status == "failed"
     )
-    max_attempts = settings.v2_autonomy_planning_max_attempts
+    max_attempts = settings.autonomy_planning_max_attempts
     if draft.attempts > max_attempts or (
         draft.attempts >= max_attempts and not failure_replan
     ):
@@ -516,13 +516,13 @@ def _parse_specs(proposal, settings) -> tuple[list[SubGoalSpec] | None, str | No
         specs = validate_sub_goals(
             proposal.sub_goals,
             max_depth=min(
-                settings.v2_autonomy_subgoal_max_depth, settings.v25_plan_max_depth
+                settings.autonomy_subgoal_max_depth, settings.plan_max_depth
             ),
         )
     except ValueError:
         return None, REASON_INVALID_SHAPE
     if len(specs) > min(
-        settings.v25_plan_max_steps, settings.v2_autonomy_subgoal_max_count
+        settings.plan_max_steps, settings.autonomy_subgoal_max_count
     ):
         return None, REASON_COUNT_EXCEEDED
     unaligned = next(

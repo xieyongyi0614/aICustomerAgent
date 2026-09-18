@@ -231,7 +231,7 @@ def collect_life_loop_slice(
     settings = get_settings()
     cutoff = now - timedelta(hours=window_hours)
     stale_cutoff = now - timedelta(
-        seconds=2 * settings.v2_job_running_timeout
+        seconds=2 * settings.job_running_timeout
     )
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -301,7 +301,7 @@ def collect_life_loop_slice(
         triggers=triggers,
         delivered_proactive=delivered,
         day_llm_calls=usage["calls"],
-        day_llm_call_limit=settings.v2_life_loop_daily_llm_call_budget,
+        day_llm_call_limit=settings.life_loop_daily_llm_call_budget,
         outbox_dead_letters=len(dead_letters),
     )
 

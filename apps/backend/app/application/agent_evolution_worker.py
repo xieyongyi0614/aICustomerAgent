@@ -19,17 +19,17 @@ from app.application.worker_loop import run_worker_loop
 logger = logging.getLogger(__name__)
 
 def metrics_enabled() -> bool:
-    return get_settings().v21_agent_metrics_enabled
+    return get_settings().agent_metrics_enabled
 
 def evolution_enabled() -> bool:
-    return get_settings().v21_personality_evolution_enabled
+    return get_settings().personality_evolution_enabled
 
 
 def enabled() -> bool:
     settings = get_settings()
     return bool(
-        settings.v21_agent_runtime_enabled
-        and (settings.v21_agent_metrics_enabled or settings.v21_personality_evolution_enabled)
+        settings.agent_runtime_enabled
+        and (settings.agent_metrics_enabled or settings.personality_evolution_enabled)
     )
 
 
@@ -66,7 +66,7 @@ def run_evolution_tick(now: datetime | None = None) -> dict:
 
 async def run_agent_evolution_worker(interval: float | None = None) -> None:
     """常驻循环（lifespan 内注册）；异常退避由 worker_loop 统一承担。"""
-    seconds = interval or get_settings().v21_agent_evolution_interval_seconds
+    seconds = interval or get_settings().agent_evolution_interval_seconds
     await run_worker_loop(
         "agent evolution worker",
         run_evolution_tick,

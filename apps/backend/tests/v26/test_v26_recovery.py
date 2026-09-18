@@ -50,7 +50,7 @@ class TestStaleExecutingRecovery:
 
     def test_recover_stale_executing_to_failed(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
         stale_at = datetime.now() - timedelta(hours=1)
         record = action_repository.save_record(
@@ -65,7 +65,7 @@ class TestStaleExecutingRecovery:
 
     def test_recover_skips_fresh_executing(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
         record = action_repository.save_record(_record("u_rec_d", "executing"))
         action_engine._recover_stale_executing()
@@ -75,7 +75,7 @@ class TestStaleExecutingRecovery:
 
     def test_recover_skipped_when_flag_off(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", False)
+        monkeypatch.setattr(settings, "action_execution_enabled", False)
         stale_at = datetime.now() - timedelta(hours=1)
         record = action_repository.save_record(
             _record("u_rec_e", "executing", updated_at=stale_at)
@@ -88,7 +88,7 @@ class TestStaleExecutingRecovery:
 
     def test_expire_planned_includes_recovery(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
         stale_at = datetime.now() - timedelta(hours=1)
         record = action_repository.save_record(
@@ -113,7 +113,7 @@ class TestPartialTerminalMapping:
 
     def test_count_active_excludes_recovered(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
         user_id = "u_rec_count"
         stale_at = datetime.now() - timedelta(hours=1)

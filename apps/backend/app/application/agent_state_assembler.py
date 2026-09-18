@@ -145,7 +145,7 @@ def _load_salient_memories(user_id: str, settings) -> list:
     try:
         return memory_repository.list_top_salience(
             user_id,
-            min_salience=settings.v2_life_loop_memory_min_salience,
+            min_salience=settings.life_loop_memory_min_salience,
             limit=5,
         )
     except Exception:
@@ -158,7 +158,7 @@ def ensure_personality_baseline(user_id: str | None, character_id: str = "asuna"
 
     由 Run Open 调用：Run 生命周期内的显式初始化，保证组装阶段为纯只读。
     """
-    if not user_id or not get_settings().v21_agent_runtime_enabled:
+    if not user_id or not get_settings().agent_runtime_enabled:
         return False
     try:
         return personality_state_repository.seed_if_absent(
@@ -198,24 +198,24 @@ def _compose_interest(goals, preferences, world_facts, memories, settings) -> li
     for goal in goals:
         _add(
             goal.description,
-            settings.v21_interest_weight_goal * (goal.priority / 5.0),
+            settings.interest_weight_goal * (goal.priority / 5.0),
         )
     for mod in preferences:
         strength = float(getattr(mod, "strength", 0.0) or 0.0)
-        _add(mod.key, settings.v21_interest_weight_preference * strength)
+        _add(mod.key, settings.interest_weight_preference * strength)
     for memory in memories:
         salience = float(getattr(memory, "salience", 0.0) or 0.0)
-        _add(memory.content[:24], settings.v21_interest_weight_memory * salience)
+        _add(memory.content[:24], settings.interest_weight_memory * salience)
     for event in world_facts.get("salient_events") or []:
         title = (
             event.get("title") or event.get("description")
             if isinstance(event, dict)
             else str(event)
         )
-        _add(str(title or ""), settings.v21_interest_weight_world)
+        _add(str(title or ""), settings.interest_weight_world)
 
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    top_n = max(settings.v21_interest_top_n, 0)
+    top_n = max(settings.interest_top_n, 0)
     return [InterestTopic(topic=topic, score=round(score, 4)) for topic, score in ranked[:top_n]]
 
 

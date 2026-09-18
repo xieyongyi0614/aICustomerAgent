@@ -15,8 +15,8 @@ pytestmark = pytest.mark.xdist_group("ws009")
 
 def _flags(monkeypatch, **extra):
     envs = {
-        "V23_WORLD_SIMULATION_ENABLED": "true",
-        "V23_EVENT_DETECTION_ENABLED": "true",
+        "WORLD_SIMULATION_ENABLED": "true",
+        "EVENT_DETECTION_ENABLED": "true",
     }
     for key, value in extra.items():
         envs[key.upper()] = str(value).lower() if isinstance(value, bool) else str(value)
@@ -36,8 +36,8 @@ def detect_flags(monkeypatch):
 def assist_flags(monkeypatch):
     yield from _flags(
         monkeypatch,
-        v23_world_llm_assist_enabled=True,
-        v23_llm_assist_sample_rate=1.0,
+        world_llm_assist_enabled=True,
+        world_llm_assist_sample_rate=1.0,
     )
 
 

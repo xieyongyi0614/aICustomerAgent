@@ -78,8 +78,8 @@ def build_reflection_messages(
     settings = get_settings()
     evidence_block, _provided = build_evidence_block(
         window,
-        settings.v2_reflection_evidence_max_members,
-        settings.v2_reflection_evidence_content_chars,
+        settings.reflection_evidence_max_members,
+        settings.reflection_evidence_content_chars,
     )
     if insight_types:
         system_prompt = TOOL_SYSTEM_PROMPT

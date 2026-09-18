@@ -1,7 +1,7 @@
 """Memory 2.0 Embedding 批处理（MEM-004）。
 
-转正记忆经 enqueue 进内存队列，双条件触发 flush（条数 ≥ v2_embedding_batch_size
-或队首等待 ≥ v2_embedding_batch_window_seconds）；每批一次 embedding 端点调用，
+转正记忆经 enqueue 进内存队列，双条件触发 flush（条数 ≥ embedding_batch_size
+或队首等待 ≥ embedding_batch_window_seconds）；每批一次 embedding 端点调用，
 条件回填（active 且 embedding IS NULL）单事务完成；失败退避重试 2 次后写入
 background_jobs（幂等键 embedding:{memory_id}:{content_hash}），由存量 NULL 补扫
 闭环恢复。embedding 不作 SoT：任何时刻可清列后由 backfill_scan 全量重建。
@@ -48,17 +48,17 @@ def enqueue(memory_id: str, content: str) -> None:
         return
     _queued_ids.add(memory_id)
     _queue.append(_PendingItem(memory_id, content or "", time.monotonic()))
-    if len(_queue) >= settings.v2_embedding_batch_size:
+    if len(_queue) >= settings.embedding_batch_size:
         _flush()
 
 
 def flush_if_due(trace=None) -> int:
-    """时间窗口触发：队首等待超过 v2_embedding_batch_window_seconds 时 flush。"""
+    """时间窗口触发：队首等待超过 embedding_batch_window_seconds 时 flush。"""
     if not _queue:
         return 0
     settings = get_settings()
     first_age = time.monotonic() - _queue[0].enqueued_at
-    if first_age < settings.v2_embedding_batch_window_seconds:
+    if first_age < settings.embedding_batch_window_seconds:
         return 0
     return _flush(trace=trace)
 
@@ -67,7 +67,7 @@ def backfill_scan(trace=None) -> int:
     """存量补扫：active 且 embedding IS NULL 的行进批处理，覆盖中断积压与重启恢复。"""
     settings = get_settings()
     rows = memory_repository.list_pending_embedding(
-        limit=settings.v2_embedding_batch_size
+        limit=settings.embedding_batch_size
     )
     items = [
         _PendingItem(row.id, row.content or "", time.monotonic())
@@ -82,7 +82,7 @@ def backfill_scan(trace=None) -> int:
 def _flush(trace=None) -> int:
     settings = get_settings()
     items: list[_PendingItem] = []
-    while _queue and len(items) < settings.v2_embedding_batch_size:
+    while _queue and len(items) < settings.embedding_batch_size:
         item = _queue.pop(0)
         _queued_ids.discard(item.memory_id)
         items.append(item)
@@ -92,7 +92,7 @@ def _flush(trace=None) -> int:
 
 
 def _truncate(content: str) -> str:
-    return content[: get_settings().v2_embedding_max_input_chars]
+    return content[: get_settings().embedding_max_input_chars]
 
 
 def _content_hash(content: str) -> str:
@@ -106,9 +106,9 @@ def _job_key(item: _PendingItem) -> str:
 def _embed_batch(texts: list[str]) -> list[list[float]]:
     client = get_embedding_client()
     if client is None:
-        raise EmbeddingClientUnavailableError("v2_embedding_model 未配置")
+        raise EmbeddingClientUnavailableError("embedding_model 未配置")
     response = client.embeddings.create(
-        model=get_settings().v2_embedding_model, input=texts
+        model=get_settings().embedding_model, input=texts
     )
     data = sorted(response.data, key=lambda item: item.index)
     return [item.embedding for item in data]
@@ -163,10 +163,10 @@ def _process(items: list[_PendingItem], trace=None) -> int:
         _trace_batch(trace, started, items, 0, failed=len(items))
         return 0
     if len(vectors) != len(items) or any(
-        len(vector) != settings.v2_embedding_dimensions for vector in vectors
+        len(vector) != settings.embedding_dimensions for vector in vectors
     ):
         logger.warning(
-            "embedding 返回维度/条数异常：期望 %d 维 %d 条", settings.v2_embedding_dimensions, len(items)
+            "embedding 返回维度/条数异常：期望 %d 维 %d 条", settings.embedding_dimensions, len(items)
         )
         _record_job_failures(items, "dimension_mismatch")
         _trace_batch(trace, started, items, 0, failed=len(items))

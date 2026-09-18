@@ -223,7 +223,7 @@ def test_rule2_requires_https(tmp_path, index, environ):
 
 
 def test_rule2_host_must_be_allowlisted(tmp_path, index, environ):
-    """八项校验 ②：host 必须在 v24_tool_ext_allowed_hosts 内。"""
+    """八项校验 ②：host 必须在 tool_ext_allowed_hosts 内。"""
     payload = weather_manifest(
         http={**weather_manifest()["http"], "url": "https://evil.example.org/v1"}
     )
@@ -234,7 +234,7 @@ def test_rule2_host_must_be_allowlisted(tmp_path, index, environ):
 
 def test_rule2_empty_whitelist_blocks_everything(tmp_path, index, environ):
     """AC：白名单为空时全禁（0 条加载）。"""
-    settings = ext_settings(v24_tool_ext_allowed_hosts="")
+    settings = ext_settings(tool_ext_allowed_hosts="")
     registry = ToolRegistry()
     write_manifest(tmp_path, "weather.yaml", weather_manifest())
     write_manifest(tmp_path, "hook.yaml", hook_manifest())

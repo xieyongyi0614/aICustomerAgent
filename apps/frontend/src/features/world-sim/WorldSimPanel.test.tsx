@@ -43,14 +43,14 @@ const SIMULATION_ON = {
   active_situations: [],
   recent_events: [],
   flags: {
-    v23_world_simulation_enabled: true,
-    v23_time_advance_enabled: true,
-    v23_daily_life_enabled: true,
-    v23_event_detection_enabled: true,
-    v23_scene_expansion_enabled: false,
-    v23_habit_time_enabled: false,
-    v23_world_llm_assist_enabled: false,
-    v23_debug_tick_enabled: false,
+    world_simulation_enabled: true,
+    time_advance_enabled: true,
+    daily_life_enabled: true,
+    event_detection_enabled: true,
+    scene_expansion_enabled: false,
+    habit_time_enabled: false,
+    world_llm_assist_enabled: false,
+    debug_tick_enabled: false,
   },
 }
 
@@ -156,7 +156,7 @@ describe("WorldSimPanel", () => {
     registerHandlers({
       simulation: {
         ...SIMULATION_ON,
-        flags: { ...SIMULATION_ON.flags, v23_debug_tick_enabled: true },
+        flags: { ...SIMULATION_ON.flags, debug_tick_enabled: true },
       },
     })
     server.use(

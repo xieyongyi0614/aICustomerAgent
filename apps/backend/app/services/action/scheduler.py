@@ -63,7 +63,7 @@ def schedule(
         priority
         if priority is not None
         else getattr(action, "priority", None)
-        or settings.v26_action_schedule_default_priority
+        or settings.action_schedule_default_priority
     )
     schedule_row = ActionSchedule(
         id=action_repository.new_schedule_id(),
@@ -175,8 +175,8 @@ async def step_action_schedule(now: datetime | None = None) -> dict:
     """
     settings = get_settings()
     if not (
-        getattr(settings, "v26_action_execution_enabled", False)
-        and getattr(settings, "v26_action_scheduler_enabled", False)
+        getattr(settings, "action_execution_enabled", False)
+        and getattr(settings, "action_scheduler_enabled", False)
     ):
         return {"status": "skipped", "skip_reason": "flag_off"}
     when = now or _now()

@@ -4,15 +4,15 @@
 
 RESERVED 子闸：已定义并纳入总闸校验，但当前版本尚无行为分支，开启不生效。
 上线前若运维误开会产生"看着开了但没变化"的困惑，故在启动时告警提示
-（见 enablement.validate_v23_reserved_flags）。
+（见 enablement.world_sim_reserved_flag_warnings）。
 """
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
-RESERVED_V23_SUB_FLAGS = ("v23_habit_time_enabled",)
+RESERVED_V23_SUB_FLAGS = ("habit_time_enabled",)
 """声明但未接线（WS-016 习惯时段延后交付）：开启不会产生行为变化。
 
-`v23_scene_expansion_enabled` 原列于此，实际已接线——`world_engine.py` 的
+`scene_expansion_enabled` 原列于此，实际已接线——`world_engine.py` 的
 `movement.apply` 分支与 `services/tool/world_context.py` 的场景画像投影均读取它，
 与 RESERVED 的「开启不产生行为变化」语义不符，故移出。
 """
@@ -21,16 +21,16 @@ RESERVED_V23_SUB_FLAGS = ("v23_habit_time_enabled",)
 class WorldSimulationSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v23_world_simulation_enabled: bool = False
-    v23_time_advance_enabled: bool = False
-    v23_daily_life_enabled: bool = False
-    v23_event_detection_enabled: bool = False
-    v23_scene_expansion_enabled: bool = False
+    world_simulation_enabled: bool = False
+    time_advance_enabled: bool = False
+    daily_life_enabled: bool = False
+    event_detection_enabled: bool = False
+    scene_expansion_enabled: bool = False
     """已接线：gates 移动落点走 `movement.apply` 与场景画像投影（WS-016 部分交付）。"""
-    v23_habit_time_enabled: bool = False
+    habit_time_enabled: bool = False
     """RESERVED：习惯时段信号尚未实现（WS-016）。"""
-    v23_world_llm_assist_enabled: bool = False
-    v23_debug_tick_enabled: bool = False
+    world_llm_assist_enabled: bool = False
+    debug_tick_enabled: bool = False
 
     world_sim_interval_seconds: int = 60
     sim_advance_max_minutes: int = 120
@@ -40,11 +40,11 @@ class WorldSimulationSettings(BaseSettings):
     world_context_char_budget_v23: int = 1000
     daily_plan_retention_days: int = 30
     user_situation_valid_hours: int = 48
-    v23_part_boundaries_json: str = (
+    part_boundaries_json: str = (
         '{"morning":360,"noon":690,"afternoon":840,"evening":1080,"night":1320}'
     )
-    v23_llm_assist_sample_rate: float = 0.2
-    v23_event_escalation_types: str = (
+    world_llm_assist_sample_rate: float = 0.2
+    world_event_escalation_types: str = (
         "user_condition,weather_change,calendar_event,goal_completed"
     )
-    v23_interest_confidence_threshold: float = 0.7
+    interest_confidence_threshold: float = 0.7

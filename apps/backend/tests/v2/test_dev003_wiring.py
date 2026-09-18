@@ -223,7 +223,7 @@ def test_goal_weights_flip_selection(db_session_factory):
 
 
 def test_answer_max_tokens_overlay_and_clamp(override_settings):
-    override_settings(answer_max_tokens=800, v2_development_answer_min_tokens=300)
+    override_settings(answer_max_tokens=800, development_answer_min_tokens=300)
     base_state = _conversation_state(overlay=None)
     assert answer_max_tokens(base_state) == 800
     lowered = _conversation_state(
@@ -279,7 +279,7 @@ def _strategy():
 
 
 def test_development_apply_trace_payload(override_settings):
-    override_settings(answer_max_tokens=800, v2_development_answer_min_tokens=300)
+    override_settings(answer_max_tokens=800, development_answer_min_tokens=300)
     trace = StubTrace()
     overlay = DevelopmentOverlay(
         style=DevelopmentStyleParams(max_tokens_delta=-200, tone_hint="更简练"),

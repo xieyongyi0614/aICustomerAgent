@@ -65,13 +65,19 @@ class TestEnvKeyGuard:
     def test_unknown_versioned_env_keys_reports_ghost(self):
         environ = {
             "V99_GHOST_ENABLED": "true",
-            "V25_PLANNING_ENABLED": "true",
+            "ACTION_ENABLED": "true",
             "PATH": "/usr/bin",
         }
         assert unknown_versioned_env_keys(environ) == ["V99_GHOST_ENABLED"]
 
     def test_unknown_versioned_env_keys_ignores_non_versioned(self):
         assert unknown_versioned_env_keys({"SOME_OTHER_SETTING": "1"}) == []
+
+    def test_unknown_versioned_env_keys_matches_any_version_digit(self):
+        """去前缀之后已无版本化设置键；本守卫仍须能识别形如 `V<数字>_` 的幽灵键。"""
+        assert unknown_versioned_env_keys({"V2_MEMORY_ENABLED": "true"}) == [
+            "V2_MEMORY_ENABLED"
+        ]
 
 
 class TestReservedFlagMarker:
@@ -84,5 +90,5 @@ class TestReservedFlagMarker:
         )
 
     def test_scene_expansion_is_wired_and_not_reserved(self):
-        assert "v23_scene_expansion_enabled" not in RESERVED_V23_SUB_FLAGS
-        assert _gate_sites("v23_scene_expansion_enabled")
+        assert "scene_expansion_enabled" not in RESERVED_V23_SUB_FLAGS
+        assert _gate_sites("scene_expansion_enabled")

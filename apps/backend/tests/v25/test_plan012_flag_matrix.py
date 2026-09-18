@@ -42,14 +42,14 @@ class TestFlagDefaults:
 
     def test_parameter_defaults_match_architecture(self):
         settings = get_settings()
-        assert settings.v25_plan_max_steps == 5
-        assert settings.v25_plan_max_depth == 2
-        assert settings.v25_plan_step_max_attempts == 2
-        assert settings.v25_plan_revision_budget == 3
-        assert settings.v25_plan_ttl_hours == 168
-        assert settings.v25_plan_step_cooldown_minutes == 30
-        assert settings.v25_plan_replan_min_confidence == 0.7
-        assert settings.v25_plan_memory_importance_floor == 0.6
+        assert settings.plan_max_steps == 5
+        assert settings.plan_max_depth == 2
+        assert settings.plan_step_max_attempts == 2
+        assert settings.plan_revision_budget == 3
+        assert settings.plan_ttl_hours == 168
+        assert settings.plan_step_cooldown_minutes == 30
+        assert settings.plan_replan_min_confidence == 0.7
+        assert settings.plan_memory_importance_floor == 0.6
 
 
 class TestEnablementChainMatrix:
@@ -63,24 +63,24 @@ class TestEnablementChainMatrix:
         assert enablement_violations(settings) == []
 
     def test_sub_flag_without_master_fails(self, monkeypatch):
-        settings = _settings_with(monkeypatch, V25_PLAN_DEBUG_ENABLED="true")
+        settings = _settings_with(monkeypatch, PLAN_DEBUG_ENABLED="true")
         reasons = enablement_violations(settings)
-        assert any("v25_planning_enabled" in reason or "计划" in reason for reason in reasons)
+        assert any("planning_enabled" in reason or "计划" in reason for reason in reasons)
 
     def test_master_without_dependencies_fails(self, monkeypatch):
-        settings = _settings_with(monkeypatch, V25_PLANNING_ENABLED="true")
+        settings = _settings_with(monkeypatch, PLANNING_ENABLED="true")
         reasons = enablement_violations(settings)
         assert reasons
 
     def test_execution_requires_scheduler_and_action(self, monkeypatch):
         envs = dict(support.FULL_CHAIN_ENVS)
-        envs["V25_PLAN_SCHEDULER_ENABLED"] = "false"
+        envs["PLAN_SCHEDULER_ENABLED"] = "false"
         settings = _settings_with(monkeypatch, **envs)
         reasons = enablement_violations(settings)
         assert reasons
 
     def test_validate_enablement_chain_raises_readable_error(self, monkeypatch):
-        settings = _settings_with(monkeypatch, V25_PLAN_CONTEXT_ENABLED="true")
+        settings = _settings_with(monkeypatch, PLAN_CONTEXT_ENABLED="true")
         with pytest.raises(SettingsError) as excinfo:
             validate_enablement_chain(settings)
         assert excinfo.value.args
@@ -93,7 +93,7 @@ class TestEnablementChainMatrix:
             assert marker in docstring
         assert "剩余七条" in docstring
         assert len(V25_SUB_FLAGS) == 11
-        assert V25_GATE_FLAGS[0] == "v25_planning_enabled"
+        assert V25_GATE_FLAGS[0] == "planning_enabled"
         assert len(V25_DEPENDENCIES) >= 6
 
 
@@ -113,9 +113,9 @@ class TestAllOffBytewiseCompat:
 
     def test_v25_flags_are_all_off_in_this_module_baseline(self):
         settings = get_settings()
-        assert settings.v25_planning_enabled is False
+        assert settings.planning_enabled is False
         for name in support.V25_FLAG_NAMES:
-            if name == "v25_plan_tool_required":
+            if name == "plan_tool_required":
                 assert getattr(settings, name) is True
             else:
                 assert getattr(settings, name) is False

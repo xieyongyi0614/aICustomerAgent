@@ -75,17 +75,17 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/feishu/outbound.py": "50aa5f198d1793195ba32634e6d25e67fd21f160821957f96c4e5d78b1b800ac",
     "app/channels/feishu/client.py": "5f9fe0dadc8a5fa49a945f611d68600f3dc15d07e65d3d2463384a6f036bff7e",
     "app/channels/feishu/delivery.py": "4b16ad9e5e57694b4f2d8ff57029981a36cfa48efd9475870dfc2766110b493c",
-    "app/services/action/capabilities/reminder.py": "df820840262c7d00c229e29cb412ceebf71011e2e72356ded51efbf0accd8062",
+    "app/services/action/capabilities/reminder.py": "d6cd1bc27a698b107a02e534c7bb3e1afe48d1cb1f887f8e21e39d4b84ebd954",
     "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
-    "app/services/action/capabilities/world_action.py": "10c0ef114fdd32b2fc6ad44354127cea19e501be3b15c5fb6c211c44a86c4cb0",
+    "app/services/action/capabilities/world_action.py": "eed88f384917b1b0c12fc3212c7023a6d960f84204c1cc61da2935486f587b77",
     "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
-    "app/character/asuna/action.py": "86d8080c29b29c2f2a88c6b804ac4b4500b4d8b75d92b8557cf8bb17425b6a8d",
-    "app/services/action/planner.py": "3efc790a9cbde441885a1ae789bb0af844d2e12ec75fd35304f1b959240013cd",
-    "app/services/decision_pipeline.py": "2ac6b51e501bd127fab008ea985beb5fe5cfa0167485b0ae64daeb00c2daf757",
-    "app/application/chat_pipeline.py": "da4ac2ccfb6c7923ac62a683e7a1452297c2d27dc619cf8c37b3ed4d07b34bc7",
-    "app/application/post_process.py": "9ad19a529e0ce662ad8ad36602a2de5346a3f1ebc983159a8c8ed8c2108f6e7e",
-    "app/application/action_engine.py": "2529395ca3eb97b36ce9b9a520ef0f8449ae760344dd6d1aa7ab55d4f5e92f4c",
-    "app/prompts/builder.py": "d1a98f6887735b34c935896b00cf5d94d2bd36e41a8c433620ced649c678c826",
+    "app/character/asuna/action.py": "af39c42cbe2b9a9fce61de609a552cad66c7a70cbc907a05f3c21485da66b572",
+    "app/services/action/planner.py": "be5e56df23bc554f06bd3270bac745e5c71db9a9d831c607593200ec4573847e",
+    "app/services/decision_pipeline.py": "0afb670900820ffe3af959516e3e8741c32e5c7c8c502fa4edfe987241411aac",
+    "app/application/chat_pipeline.py": "48c56412e9626097c020b0efcef5d017fc94a1781f082fe6292aceb46616247a",
+    "app/application/post_process.py": "efeac1bc6108ccf89d5c567debdba27146f1809d153b4f87f40dae169a9eeee6",
+    "app/application/action_engine.py": "818767e0078cd2b2452fa1de6e4a9c830396d93798c46053de41e59931761342",
+    "app/prompts/builder.py": "cc2d3aedd5598437096a210c662937a6eb330624ef4ef9933dc5f8bb9799d5aa",
 }
 """整文件零 diff 冻结面。
 
@@ -138,17 +138,17 @@ def _isolate_singletons(monkeypatch):
 
 def _settings(**overrides):
     values = {
-        "v24_tool_system_enabled": True,
-        "v24_tool_permission_enabled": True,
-        "v24_tool_schema_validation_enabled": True,
-        "v24_tool_observation_enabled": True,
-        "v24_tool_channel_enabled": True,
+        "tool_system_enabled": True,
+        "tool_permission_enabled": True,
+        "tool_schema_validation_enabled": True,
+        "tool_observation_enabled": True,
+        "tool_channel_enabled": True,
         "feishu_enabled": True,
-        "v24_tool_confirm_timeout_hours": 24,
-        "v24_tool_confirm_ttl_reuse": True,
-        "v24_tool_ext_allowed_hosts": "",
-        "v24_tool_breaker_threshold": 3,
-        "v24_tool_breaker_cooldown_seconds": 300,
+        "tool_confirm_timeout_hours": 24,
+        "tool_confirm_ttl_reuse": True,
+        "tool_ext_allowed_hosts": "",
+        "tool_breaker_threshold": 3,
+        "tool_breaker_cooldown_seconds": 300,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -420,13 +420,13 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
 def test_flag_off_tool_registry_is_absent(monkeypatch):
     from app.services.tool.registry import get_tool_registry
 
-    enable(monkeypatch, v24_tool_system_enabled=False, v24_tool_channel_enabled=False)
+    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
     reset_runtime_state()
     assert get_tool_registry() is None
 
 
 def test_flag_off_capability_registry_is_six_v9_capabilities(monkeypatch):
-    enable(monkeypatch, v24_tool_system_enabled=False, v24_tool_channel_enabled=False)
+    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
     reset_runtime_state()
     names = {entry["name"] for entry in get_capability_registry().describe()}
     assert names == {
@@ -440,7 +440,7 @@ def test_flag_off_capability_registry_is_six_v9_capabilities(monkeypatch):
 
 
 async def test_flag_off_capabilities_keep_v9_unavailable_shape(monkeypatch):
-    enable(monkeypatch, v24_tool_system_enabled=False, v24_tool_channel_enabled=False)
+    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
     reset_runtime_state()
     from app.services.action.registry import ExecutionContext
 
@@ -453,7 +453,7 @@ async def test_flag_off_capabilities_keep_v9_unavailable_shape(monkeypatch):
 
 
 def test_channel_adapter_port_unregistered_in_default_deployment(monkeypatch):
-    enable(monkeypatch, v24_tool_system_enabled=False, v24_tool_channel_enabled=False)
+    enable(monkeypatch, tool_system_enabled=False, tool_channel_enabled=False)
     reset_runtime_state()
     assert channel_tools.get_channel_adapter() is None
     registry = builtin_registry()

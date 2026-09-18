@@ -9,14 +9,14 @@ from app.core.settings.enablement import enablement_violations, validate_enablem
 from app.core.settings._shared import SettingsError
 
 V23_FLAGS = (
-    "v23_world_simulation_enabled",
-    "v23_time_advance_enabled",
-    "v23_daily_life_enabled",
-    "v23_event_detection_enabled",
-    "v23_scene_expansion_enabled",
-    "v23_habit_time_enabled",
-    "v23_world_llm_assist_enabled",
-    "v23_debug_tick_enabled",
+    "world_simulation_enabled",
+    "time_advance_enabled",
+    "daily_life_enabled",
+    "event_detection_enabled",
+    "scene_expansion_enabled",
+    "habit_time_enabled",
+    "world_llm_assist_enabled",
+    "debug_tick_enabled",
 )
 
 V23_PARAM_DEFAULTS = {
@@ -28,8 +28,8 @@ V23_PARAM_DEFAULTS = {
     "world_context_char_budget_v23": 1000,
     "daily_plan_retention_days": 30,
     "user_situation_valid_hours": 48,
-    "v23_llm_assist_sample_rate": 0.2,
-    "v23_interest_confidence_threshold": 0.7,
+    "world_llm_assist_sample_rate": 0.2,
+    "interest_confidence_threshold": 0.7,
 }
 
 
@@ -53,7 +53,7 @@ def test_v23_params_defaults():
     settings = get_settings()
     for name, value in V23_PARAM_DEFAULTS.items():
         assert getattr(settings, name) == value, name
-    boundaries = json.loads(settings.v23_part_boundaries_json)
+    boundaries = json.loads(settings.part_boundaries_json)
     assert boundaries == {
         "morning": 360,
         "noon": 690,
@@ -61,7 +61,7 @@ def test_v23_params_defaults():
         "evening": 1080,
         "night": 1320,
     }
-    assert settings.v23_event_escalation_types.split(",") == [
+    assert settings.world_event_escalation_types.split(",") == [
         "user_condition",
         "weather_change",
         "calendar_event",
@@ -71,11 +71,11 @@ def test_v23_params_defaults():
 
 def test_sub_flag_without_master_is_violation(monkeypatch):
     for flag in V23_FLAGS:
-        if flag == "v23_world_simulation_enabled":
+        if flag == "world_simulation_enabled":
             continue
         settings = _settings_with(monkeypatch, **{flag: True})
         violations = enablement_violations(settings)
-        assert any("v23_world_simulation_enabled" in v for v in violations), flag
+        assert any("world_simulation_enabled" in v for v in violations), flag
 
 
 def test_all_sub_flags_with_master_is_clean(monkeypatch):
@@ -87,25 +87,25 @@ def test_all_sub_flags_with_master_is_clean(monkeypatch):
 def test_daily_life_requires_time_advance(monkeypatch):
     settings = _settings_with(
         monkeypatch,
-        v23_world_simulation_enabled=True,
-        v23_daily_life_enabled=True,
+        world_simulation_enabled=True,
+        daily_life_enabled=True,
     )
     violations = enablement_violations(settings)
-    assert any("v23_time_advance_enabled" in v for v in violations)
+    assert any("time_advance_enabled" in v for v in violations)
 
 
 def test_llm_assist_requires_event_detection(monkeypatch):
     settings = _settings_with(
         monkeypatch,
-        v23_world_simulation_enabled=True,
-        v23_world_llm_assist_enabled=True,
+        world_simulation_enabled=True,
+        world_llm_assist_enabled=True,
     )
     violations = enablement_violations(settings)
-    assert any("v23_event_detection_enabled" in v for v in violations)
+    assert any("event_detection_enabled" in v for v in violations)
 
 
 def test_validate_chain_raises_on_violation(monkeypatch):
-    settings = _settings_with(monkeypatch, v23_daily_life_enabled=True)
+    settings = _settings_with(monkeypatch, daily_life_enabled=True)
     with pytest.raises(SettingsError):
         validate_enablement_chain(settings)
 

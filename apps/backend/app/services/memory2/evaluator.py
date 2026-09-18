@@ -117,7 +117,7 @@ def _fallback_budget_available() -> bool:
     if not _fallback_window:
         return True
     rate = sum(_fallback_window) / len(_fallback_window)
-    return rate <= get_settings().v2_memory_llm_fallback_rate_cap
+    return rate <= get_settings().memory_llm_fallback_rate_cap
 
 
 def _record_llm_failure(candidate_id: str) -> int:
@@ -156,13 +156,13 @@ def _score_components(
     settings = get_settings()
     salience = candidate.salience if candidate.salience is not None else _DEFAULT_DIM_SALIENCE
     return {
-        "source": settings.v2_memory_eval_weight_source
+        "source": settings.memory_eval_weight_source
         * SOURCE_WEIGHTS.get(candidate.source, UNKNOWN_SOURCE_WEIGHT),
-        "novelty": settings.v2_memory_eval_weight_novelty
+        "novelty": settings.memory_eval_weight_novelty
         * _novelty(content, active_contents),
-        "affinity": settings.v2_memory_eval_weight_affinity
+        "affinity": settings.memory_eval_weight_affinity
         * _type_affinity(content, candidate.proposed_type),
-        "salience": settings.v2_memory_eval_weight_salience * salience,
+        "salience": settings.memory_eval_weight_salience * salience,
     }
 
 
@@ -401,7 +401,7 @@ async def _decide(
     components = _score_components(candidate, content, active_contents)
     score = sum(components.values())
     settings = get_settings()
-    if score >= settings.v2_memory_eval_threshold_high:
+    if score >= settings.memory_eval_threshold_high:
         return _promote_or_defer(
             candidate,
             final_type=_final_type(candidate.proposed_type, None),
@@ -410,7 +410,7 @@ async def _decide(
             score=score,
             components=components,
         )
-    if score < settings.v2_memory_eval_threshold_low:
+    if score < settings.memory_eval_threshold_low:
         _mark_rejected(candidate.id, f"low_score:{score:.2f}")
         return Decision(
             DECISION_REJECT, f"low_score:{score:.2f}", score, components=components

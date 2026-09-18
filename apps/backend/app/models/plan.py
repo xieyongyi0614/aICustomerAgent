@@ -179,7 +179,7 @@ class GoalRef(BaseModel):
 
 
 class MemoryRef(BaseModel):
-    """进 `PlanContext` 的长期记忆只读投影（条数由 `v25_plan_context_memory_limit` 约束）。"""
+    """进 `PlanContext` 的长期记忆只读投影（条数由 `plan_context_memory_limit` 约束）。"""
 
     id: str
     type: str = ""
@@ -191,7 +191,7 @@ class RetryPolicy(BaseModel):
     """Plan 层重试策略（architecture.md §4.3.4 / §5.5）。
 
     只承载「尝试上限由谁裁决」：`none` / `once` 的界在本对象，`until_budget` 的界在
-    `v25_plan_step_max_attempts`。退避数学**只有一份**，在 Action 层，本对象不复制。
+    `plan_step_max_attempts`。退避数学**只有一份**，在 Action 层，本对象不复制。
     """
 
     mode: RetryMode = "once"

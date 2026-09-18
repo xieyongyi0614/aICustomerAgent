@@ -162,7 +162,7 @@ def _select_goal(
             or now.hour < settings.goal_late_night_end
         )
         goals_for_select = list(state.goals)
-        if get_settings().v21_goal_stack_enabled and state.layered_goals:
+        if get_settings().goal_stack_enabled and state.layered_goals:
             goals_for_select.extend(state.layered_goals)
         return goal_service.select(
             goals_for_select,
@@ -276,7 +276,7 @@ def _run_foreground_decision(
             goal_stack_service.evaluate_stack(
                 user_id, now, retire_overdue_enabled=False
             )
-            if settings.v21_goal_stack_enabled
+            if settings.goal_stack_enabled
             else None
         )
         goal = getattr(selected_goal, "goal", None)
@@ -309,7 +309,7 @@ def _run_foreground_decision(
 def _build_style_context(state: ConversationState, turn: TurnAnalysis, trace):
     """V2.2.0 CHAR-007：StyleContext 构造与 trace 记录；总闸关闭时为 None。"""
     settings = get_settings()
-    if not settings.v22_experience_enabled:
+    if not settings.experience_enabled:
         return None
     started = time.perf_counter()
     personality_state = None

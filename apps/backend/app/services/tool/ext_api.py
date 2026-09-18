@@ -227,11 +227,11 @@ class _ManifestRejected(Exception):
 
 
 def external_api_enabled(settings: Any = None) -> bool:
-    """外部 API 面双闸判据：总闸 + `v24_tool_external_api_enabled`。"""
+    """外部 API 面双闸判据：总闸 + `tool_external_api_enabled`。"""
     resolved = settings if settings is not None else get_settings()
-    if not bool(getattr(resolved, "v24_tool_system_enabled", False)):
+    if not bool(getattr(resolved, "tool_system_enabled", False)):
         return False
-    return bool(getattr(resolved, "v24_tool_external_api_enabled", False))
+    return bool(getattr(resolved, "tool_external_api_enabled", False))
 
 
 def allowed_ext_hosts(settings: Any = None) -> frozenset[str]:
@@ -244,7 +244,7 @@ def allowed_ext_hosts(settings: Any = None) -> frozenset[str]:
     resolver = getattr(resolved, "allowed_ext_hosts", None)
     if callable(resolver):
         return frozenset(resolver())
-    raw = getattr(resolved, "v24_tool_ext_allowed_hosts", "") or ""
+    raw = getattr(resolved, "tool_ext_allowed_hosts", "") or ""
     return frozenset(part.strip().lower() for part in str(raw).split(",") if part.strip())
 
 
@@ -557,7 +557,7 @@ def _check_http_endpoint(http: Mapping[str, Any], settings: Any) -> tuple[str, s
     if not allowed:
         raise _ManifestRejected(2, "域名白名单为空（空 = 全禁），拒绝加载外部清单")
     if host not in allowed:
-        raise _ManifestRejected(2, f"host 不在 v24_tool_ext_allowed_hosts 内: {host}")
+        raise _ManifestRejected(2, f"host 不在 tool_ext_allowed_hosts 内: {host}")
     return url, host
 
 
@@ -993,7 +993,7 @@ class ToolManifestLoader:
     def _load(self, path: str | None, registry: ToolRegistry | None) -> LoadReport:
         text = "" if path is None else str(path).strip()
         if not text:
-            logger.info("V24_TOOL_EXT_MANIFEST_PATH 为空，不加载任何外部 API 清单（E1）")
+            logger.info("TOOL_EXT_MANIFEST_PATH 为空，不加载任何外部 API 清单（E1）")
             return LoadReport(path="")
         directory = Path(text)
         if not directory.exists():

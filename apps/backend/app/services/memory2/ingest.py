@@ -49,10 +49,10 @@ def classify_conversation_visibility(
     hypothetical 触发 → visibility=hypothetical（入库但标记）；瞬时动作 → (None, 拦截原因)。
     """
     settings = get_settings()
-    hypothetical = _trigger_hit(content, settings.v2_memory_hypothetical_triggers())
+    hypothetical = _trigger_hit(content, settings.hypothetical_triggers())
     if hypothetical is not None:
         return VISIBILITY_HYPOTHETICAL, None
-    transient = _trigger_hit(content, settings.v2_memory_transient_triggers())
+    transient = _trigger_hit(content, settings.transient_triggers())
     if transient is not None:
         reason = f"transient_action:{transient}"
         if trace is not None:
@@ -124,7 +124,7 @@ def ingest_from_conversation(
     settings = get_settings()
     rows: list[MemoryCandidateRow] = []
     blocked = 0
-    limit = settings.v2_memory_ingest_max_per_turn
+    limit = settings.memory_ingest_max_per_turn
     for index, candidate in enumerate(extraction.candidates[:limit]):
         if not candidate.content:
             continue

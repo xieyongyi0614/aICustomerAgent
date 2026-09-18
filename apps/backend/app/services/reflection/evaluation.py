@@ -155,7 +155,7 @@ def _run_pressure_scenario(session_factory, reflector_stub, judge_llm, now) -> d
         failures.append("未产出 Insight")
     for insight in insights:
         links = _evidence_count(session_factory, insight["id"])
-        if links < get_settings().v2_reflection_min_evidence:
+        if links < get_settings().reflection_min_evidence:
             failures.append(f"insight={insight['id']} 引用数 {links} 低于门槛")
         if not (insight["confidence"] > 0 and insight["confidence"] <= 0.95):
             failures.append(f"insight={insight['id']} confidence 越界")

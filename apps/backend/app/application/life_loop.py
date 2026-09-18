@@ -72,7 +72,7 @@ async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> Non
     await run_worker_loop(
         "life loop worker",
         _tick,
-        tick_seconds or get_settings().v2_life_loop_tick_seconds,
+        tick_seconds or get_settings().life_loop_tick_seconds,
     )
 
 
@@ -155,7 +155,7 @@ def _goal_work_due(user_id: str, now: datetime) -> bool:
             if last is None:
                 return True
             if (now - last).total_seconds() >= (
-                settings.v2_autonomy_subgoal_execute_cooldown_minutes * 60
+                settings.autonomy_subgoal_execute_cooldown_minutes * 60
             ):
                 return True
     return False
@@ -276,8 +276,8 @@ async def _run_user_cycle(user_id: str, llm, now: datetime) -> str:
                 run.id, steps, "world_experience", _step_world_experience, user_id, now
             )
             if (
-                settings.v26_action_execution_enabled
-                and settings.v26_action_scheduler_enabled
+                settings.action_execution_enabled
+                and settings.action_scheduler_enabled
             ):
                 await _record_step_async(
                     run.id,
@@ -328,7 +328,7 @@ def _cycle_llm_budget_exhausted(steps: list[dict], settings) -> bool:
         for s in steps
         if s.get("llm_capable") and s.get("status") == "ok"
     )
-    return used >= max(settings.v2_life_loop_cycle_llm_budget, 0)
+    return used >= max(settings.life_loop_cycle_llm_budget, 0)
 
 
 async def _step_decision(user_id: str, llm, now: datetime) -> dict:
@@ -437,7 +437,7 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     """AUT-002 供给装配（纯规则 0 LLM）：三来源候选→层级 goal→规划 job 入队。
     World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。
 
-    V2.5.0 PLAN-003 接线：`v25_planning_enabled` on 时本步内部改走
+    V2.5.0 PLAN-003 接线：`planning_enabled` on 时本步内部改走
     `PlanningEngine.enqueue` / `run_jobs`（规划在供给步内被处理完，不再只依赖后台
     job worker）。入队幂等（`idempotency_key` 含 trigger），故对 `materialize` 已入队的
     目标重复入队返回 False、不产生第二个 job；Flag off 时本步与 V2.4.0 逐字节一致。
@@ -447,7 +447,7 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     budget = life_loop_budget.check_daily_budget(now=now)
     if budget.status == life_loop_budget._STATUS_DEGRADED:
         return {"status": "skipped", "skip_reason": "quota_circuit_open"}
-    interval_minutes = settings.v2_autonomy_supply_interval_minutes
+    interval_minutes = settings.autonomy_supply_interval_minutes
     last = _supply_last.get(user_id)
     if last is not None and (now - last).total_seconds() < interval_minutes * 60:
         return {"status": "skipped", "skip_reason": "throttled"}
@@ -466,7 +466,7 @@ def _route_planning_jobs(user_id: str, result: dict, settings) -> None:
     入队幂等：`materialize` 已入队的目标在此重复入队返回 False，不产生第二个 job
     （`job_type` 仍为既有 `goal_planning`，`idempotency_key` 含 trigger）。
     """
-    if not settings.v25_planning_enabled:
+    if not settings.planning_enabled:
         return
     engine = planning_engine.get_planning_engine()
     for goal_id in result.get("created") or []:
@@ -491,29 +491,29 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
 
 def _plan_observation_enabled(settings) -> bool:
     """V2.5.0 观测接线闸（总闸 + 观测子闸；串行链由 `settings/enablement.py` 在启动边界校验）。"""
-    return bool(settings.v25_planning_enabled) and bool(
-        settings.v25_plan_observation_enabled
+    return bool(settings.planning_enabled) and bool(
+        settings.plan_observation_enabled
     )
 
 
 def _plan_scheduler_enabled(settings) -> bool:
     """调度子闸：on 时就绪步取自 `PlanScheduler`（否则回退既有 `_current_step`）。"""
-    return bool(settings.v25_planning_enabled) and bool(
-        settings.v25_plan_scheduler_enabled
+    return bool(settings.planning_enabled) and bool(
+        settings.plan_scheduler_enabled
     )
 
 
 def _plan_execution_enabled(settings) -> bool:
     """执行子闸：on 时步骤执行走 `PlanExecutorBridge`（否则走既有 `goal_execution`）。"""
-    return bool(settings.v25_planning_enabled) and bool(
-        settings.v25_plan_execution_enabled
+    return bool(settings.planning_enabled) and bool(
+        settings.plan_execution_enabled
     ) and bool(settings.action_enabled)
 
 
 def _plan_revision_enabled(settings) -> bool:
     """重规划子闸：on 时执行后经 `PlanRevisionPolicy` 判定并入队 `TRIGGER_REPLAN`。"""
-    return bool(settings.v25_planning_enabled) and bool(
-        settings.v25_plan_revision_enabled
+    return bool(settings.planning_enabled) and bool(
+        settings.plan_revision_enabled
     )
 
 
@@ -544,7 +544,7 @@ def _should_skip_user_facing(step, now, settings) -> dict | None:
 
 def _revision_ctx(settings) -> SimpleNamespace:
     return SimpleNamespace(
-        step_max_attempts=settings.v25_plan_step_max_attempts,
+        step_max_attempts=settings.plan_step_max_attempts,
         off_surface_streak=0,
         undecidable_streak=0,
         insight_driven=False,
@@ -552,7 +552,7 @@ def _revision_ctx(settings) -> SimpleNamespace:
 
 
 async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -> dict:
-    """V2.5.0 执行桥接线（总闸 + `v25_plan_execution_enabled`）：一步走 `execute_step`。
+    """V2.5.0 执行桥接线（总闸 + `plan_execution_enabled`）：一步走 `execute_step`。
 
     链路：`current_step` → `execute_step`（两道防御性断言 + 六闸门）→ `reconcile`
     → `update_plan_progress`；重规划子闸 on 时追加 `PlanRevisionPolicy` 裁决入队。
@@ -631,8 +631,8 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。
 
     V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测经 `_observe_goals` 分派、执行经
-    `_execute_active_plans` 分派（分别受 `v25_plan_observation_enabled` /
-    `v25_plan_execution_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段
+    `_execute_active_plans` 分派（分别受 `plan_observation_enabled` /
+    `plan_execution_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段
     子步骤以 `plan_observe` / `plan_execute` 记入返回投影。
     """
 
@@ -699,12 +699,12 @@ def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict
     settings = get_settings()
     rows = memory_repository.list_top_salience(
         user_id,
-        min_salience=settings.v2_life_loop_memory_min_salience,
-        limit=settings.v2_life_loop_memory_limit,
+        min_salience=settings.life_loop_memory_min_salience,
+        limit=settings.life_loop_memory_limit,
     )
     if not rows:
         return {"status": "skipped", "skip_reason": "no_salient_memory", "count": 0}
-    digest = _build_memory_digest(rows, settings.v2_life_loop_memory_digest_chars)
+    digest = _build_memory_digest(rows, settings.life_loop_memory_digest_chars)
     cycle_ctx["digest_token"] = memory_digest_var.set(digest)
     return {
         "status": "ok",
@@ -723,7 +723,7 @@ def _step_reflection_check(user_id: str, now: datetime) -> dict:
     本步骤只做频控调用；同周期/同日不重复入队由 REF-003 日桶键保证。"""
 
     settings = get_settings()
-    interval_minutes = settings.v2_life_loop_reflection_check_interval_minutes
+    interval_minutes = settings.life_loop_reflection_check_interval_minutes
     last = _reflection_check_last.get(user_id)
     if last is not None and (now - last).total_seconds() < interval_minutes * 60:
         return {"status": "skipped", "skip_reason": "throttled"}
@@ -757,8 +757,8 @@ async def _run_maintenance(now: datetime) -> int:
         _record_maintenance_run("world_maintenance", [entry], now)
         executed += 1
     if (
-        settings.v23_world_simulation_enabled
-        and settings.v23_time_advance_enabled
+        settings.world_simulation_enabled
+        and settings.time_advance_enabled
         and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
     ):
         _mark_maintenance("world_simulation")
@@ -808,8 +808,8 @@ async def _run_maintenance(now: datetime) -> int:
         _mark_maintenance("trigger_reconcile")
         recovered = trigger_registry_repository.recover_stale(
             now=now,
-            max_attempts=settings.v2_life_loop_trigger_max_attempts,
-            backoff_seconds=settings.v2_life_loop_trigger_backoff_seconds,
+            max_attempts=settings.life_loop_trigger_max_attempts,
+            backoff_seconds=settings.life_loop_trigger_backoff_seconds,
         )
         _record_maintenance_run(
             "trigger_reconcile",
@@ -832,8 +832,8 @@ def _maintenance_pending(settings) -> bool:
     ):
         return True
     if (
-        settings.v23_world_simulation_enabled
-        and settings.v23_time_advance_enabled
+        settings.world_simulation_enabled
+        and settings.time_advance_enabled
         and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
     ):
         return True

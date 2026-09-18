@@ -52,10 +52,10 @@ def _step(index: int = 1, **overrides) -> dict:
 @pytest.fixture
 def planning_on(override_settings):
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_step_binding_enabled="true",
-        v24_tool_system_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        plan_step_binding_enabled="true",
+        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -90,7 +90,7 @@ class TestSevenGates:
         self, db_session_factory, planning_on, engine, make_goal, override_settings
     ):
         goal = make_goal(description="尝试封顶目标")
-        override_settings(v2_autonomy_planning_max_attempts="0")
+        override_settings(autonomy_planning_max_attempts="0")
         outcome = await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert outcome.status == plan_engine.PLAN_STATUS_REJECTED
         assert outcome.rejection_reason == plan_engine.REASON_ATTEMPT_CAP
@@ -101,7 +101,7 @@ class TestSevenGates:
         self, db_session_factory, planning_on, engine, make_goal, stub_planning_llm, override_settings
     ):
         goal = make_goal(description="步数封顶目标")
-        override_settings(v25_plan_max_steps="1")
+        override_settings(plan_max_steps="1")
         stub_planning_llm(sub_goals=[_step(1), _step(2)])
         outcome = await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert outcome.rejection_reason == plan_engine.REASON_COUNT_EXCEEDED
@@ -255,7 +255,7 @@ class TestNewGatesAreIndependentlySwitchable:
         self, db_session_factory, planning_on, engine, make_goal, stub_planning_llm, override_settings
     ):
         goal = make_goal(description="绑定子闸关闭目标")
-        override_settings(v25_plan_step_binding_enabled="false")
+        override_settings(plan_step_binding_enabled="false")
         step = _step(1, tool_id=UNRESOLVABLE_TOOL)
         stub_planning_llm(sub_goals=[step])
         outcome = await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
@@ -311,7 +311,7 @@ class TestReviseSemantics:
     ):
         goal = make_goal(description="修订预算耗尽目标")
         plan = make_plan(goal.id, [_step(1)], version=1, status="active")
-        override_settings(v25_plan_revision_budget="1")
+        override_settings(plan_revision_budget="1")
         outcome = await engine.revise(plan, _context(goal), reason="tool_persistently_unavailable")
         assert outcome.status == plan_engine.PLAN_STATUS_REJECTED
         assert outcome.rejection_reason == plan_engine.REASON_REVISION_EXHAUSTED
@@ -329,7 +329,7 @@ class TestReviseSemantics:
     ):
         goal = make_goal(description="零修订预算目标")
         plan = make_plan(goal.id, [_step(1)], version=1, status="active")
-        override_settings(v25_plan_revision_budget="0")
+        override_settings(plan_revision_budget="0")
         outcome = await engine.revise(plan, _context(goal), reason="insight_driven")
         assert outcome.rejection_reason == plan_engine.REASON_REVISION_EXHAUSTED
         assert goal_repository.count_plans(goal.id) == 1
@@ -348,14 +348,14 @@ class TestReviseSemantics:
 
 
 class TestParameterBoundaries:
-    """U13：`v25_plan_max_steps` / `v25_plan_max_depth` / `v25_plan_revision_budget` 边界各一例。"""
+    """U13：`plan_max_steps` / `plan_max_depth` / `plan_revision_budget` 边界各一例。"""
 
     @pytest.mark.asyncio
     async def test_max_steps_boundary_is_inclusive(
         self, db_session_factory, planning_on, engine, make_goal, stub_planning_llm, override_settings
     ):
         goal = make_goal(description="步数边界目标")
-        override_settings(v25_plan_max_steps="2")
+        override_settings(plan_max_steps="2")
         stub_planning_llm(sub_goals=[_step(1, tool_id=ON_SURFACE_TOOL), _step(2, tool_id=ON_SURFACE_TOOL)])
         allowed = await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert allowed.status == plan_engine.PLAN_STATUS_VALIDATED
@@ -372,7 +372,7 @@ class TestParameterBoundaries:
         self, db_session_factory, planning_on, engine, make_goal, stub_planning_llm, override_settings
     ):
         goal = make_goal(description="深度边界目标")
-        override_settings(v25_plan_max_depth="1")
+        override_settings(plan_max_depth="1")
         stub_planning_llm(
             sub_goals=[_step(1, tool_id=ON_SURFACE_TOOL), _step(2, parent_index=1, tool_id=ON_SURFACE_TOOL)]
         )
@@ -386,14 +386,14 @@ class TestParameterBoundaries:
         goal = make_goal(description="修订预算边界目标")
         make_plan(goal.id, [_step(1)], version=1, status="superseded")
         make_plan(goal.id, [_step(1)], version=2, status="active")
-        override_settings(v25_plan_revision_budget="3")
+        override_settings(plan_revision_budget="3")
         stub_planning_llm(sub_goals=[_step(1, tool_id=ON_SURFACE_TOOL)])
         plan = goal_repository.get_latest_plan(goal.id)
         outcome = await engine.revise(plan, _context(goal), reason="criteria_undecidable")
         assert outcome.status == plan_engine.PLAN_STATUS_VALIDATED
         assert outcome.plan.version == 3
 
-        override_settings(v25_plan_revision_budget="2")
+        override_settings(plan_revision_budget="2")
         plan = goal_repository.get_latest_plan(goal.id)
         exhausted = await engine.revise(plan, _context(goal), reason="criteria_undecidable")
         assert exhausted.rejection_reason == plan_engine.REASON_REVISION_EXHAUSTED
@@ -481,12 +481,12 @@ class TestEnqueueAndBudget:
         seen: list = []
         monkeypatch.setattr(goal_planning, "get_llm", lambda profile=None: seen.append(profile))
         stub_planning_llm(sub_goals=[_step(1, tool_id=ON_SURFACE_TOOL)])
-        override_settings(v25_plan_llm_profile="plan-heavy")
+        override_settings(plan_llm_profile="plan-heavy")
         await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert seen == ["plan-heavy"]
 
         seen.clear()
-        override_settings(v25_plan_llm_profile="", v2_autonomy_planning_llm_profile="")
+        override_settings(plan_llm_profile="", autonomy_planning_llm_profile="")
         await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert seen == [None]
 
@@ -529,7 +529,7 @@ class TestEnqueueAndBudget:
         goal = make_goal(description="终态目标修订目标")
         plan = make_plan(goal.id, [_step(1)], version=1, status="active")
         goal_repository.fail_goal(goal.id, "previous_failure")
-        override_settings(v25_plan_revision_budget="0")
+        override_settings(plan_revision_budget="0")
         outcome = await engine.revise(plan, _context(goal), reason="insight_driven")
         assert outcome.rejection_reason == plan_engine.REASON_REVISION_EXHAUSTED
         assert goal_repository.get_goal(goal.id).failure_reason == "previous_failure"

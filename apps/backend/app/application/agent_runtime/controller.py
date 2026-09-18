@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 def enabled() -> bool:
-    return get_settings().v21_agent_runtime_enabled
+    return get_settings().agent_runtime_enabled
 
 
 def unified_run_enabled() -> bool:
     settings = get_settings()
-    return settings.v21_unified_run_enabled and settings.v21_agent_runtime_enabled
+    return settings.unified_run_enabled and settings.agent_runtime_enabled
 
 
 def open_run(
@@ -269,7 +269,7 @@ async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -
 async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
     """event_driven Profile（Flow C）：白名单事件升级为完整 Run，其余 0 消耗。"""
     settings = get_settings()
-    if not settings.v21_event_escalation_types:
+    if not settings.agent_event_escalation_types:
         return 0
     now = now or datetime.now()
     escalated = 0

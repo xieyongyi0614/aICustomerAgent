@@ -205,7 +205,7 @@ class TestSelectionAndRender:
         assert payload["reasons"]["e1"] == "over_limit"
 
     def test_budget_drops_overflow(self, _offline_repos, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_relationship_shared_budget_chars", 60)
+        monkeypatch.setattr(get_settings(), "relationship_shared_budget_chars", 60)
         entries = [
             self._entry("long", "很" * 50, BASE),
             self._entry("short", "短", BASE + timedelta(days=1)),

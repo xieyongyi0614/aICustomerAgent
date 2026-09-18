@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def _enabled() -> bool:
     settings = get_settings()
-    return settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled
+    return settings.world_simulation_enabled and settings.event_detection_enabled
 
 
 def _register_world_op(
@@ -82,7 +82,7 @@ def register_interest_event(
 
 def on_insight_created(user_id: str, created: list[dict]) -> None:
     """insight_created 订阅：self 域高置信 Insight → interest_emerged。"""
-    threshold = get_settings().v23_interest_confidence_threshold
+    threshold = get_settings().interest_confidence_threshold
     for item in created or []:
         insight_id = item.get("insight_id")
         if not insight_id:

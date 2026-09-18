@@ -25,7 +25,7 @@
 |---|---|---|
 | `ctx.tool_surface.tool_ids` | `blocked_reason` 的面感知 | 不判 `off_surface` |
 | `ctx.now`（`datetime`） | `blocked_reason` 的冷却判定 | 不判 `cooldown` |
-| `ctx.step_cooldown_minutes` / `ctx.settings.v25_plan_step_cooldown_minutes` | 同上 | 不判 `cooldown` |
+| `ctx.step_cooldown_minutes` / `ctx.settings.plan_step_cooldown_minutes` | 同上 | 不判 `cooldown` |
 
 与 Task Detail 的一处接口核对（已在测试留痕）
 
@@ -82,7 +82,7 @@ BLOCKED_REASONS: tuple[str, ...] = (
 """§4.5 的三类阻塞原因（`None` = 存在可执行步，非阻塞）。"""
 
 COOLDOWN_MINUTES_KEY = "step_cooldown_minutes"
-COOLDOWN_SETTING_NAME = "v25_plan_step_cooldown_minutes"
+COOLDOWN_SETTING_NAME = "plan_step_cooldown_minutes"
 
 __all__ = [
     "ACTIVE_STATUSES",

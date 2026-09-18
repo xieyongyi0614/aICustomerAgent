@@ -37,7 +37,7 @@ EXPECTED_STAGES = [
 def runtime_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
@@ -152,7 +152,7 @@ class TestEventPregate:
     ):
         from app.repositories import conversation_repository
 
-        override_settings(V21_EVENT_ESCALATION_TYPES="action_result")
+        override_settings(AGENT_EVENT_ESCALATION_TYPES="action_result")
         conversation_repository.get_or_create_conversation(SESSION, USER)
         outbox_repository.insert({"user_id": USER, "world_ops": []}, "evt-hit", now=NOW)
         _fake_tick(monkeypatch)

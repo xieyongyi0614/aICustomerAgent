@@ -46,7 +46,7 @@ def _env_reaching_capability(tool_id: str, base_env: dict) -> dict:
     """特权档额外打开权限子闸（子闸 off 时那些工具根本走不到能力实现）。"""
     if tool_id not in PRIVILEGED_TOOL_IDS:
         return dict(base_env)
-    return {**base_env, "V24_TOOL_PERMISSION_ENABLED": True}
+    return {**base_env, "TOOL_PERMISSION_ENABLED": True}
 
 
 def _grant_snapshot_for(tool_id: str, settings):
@@ -55,22 +55,22 @@ def _grant_snapshot_for(tool_id: str, settings):
         return None
     return snapshot(grants=[grant(tool_id, ("*",))], settings=settings)
 
-MASTER_ON = {"V24_TOOL_SYSTEM_ENABLED": True}
+MASTER_ON = {"TOOL_SYSTEM_ENABLED": True}
 CHANNEL_ON = {
-    "V24_TOOL_SYSTEM_ENABLED": True,
-    "V24_TOOL_CHANNEL_ENABLED": True,
+    "TOOL_SYSTEM_ENABLED": True,
+    "TOOL_CHANNEL_ENABLED": True,
     "FEISHU_ENABLED": True,
 }
-PERMISSION_ON = {**MASTER_ON, "V24_TOOL_PERMISSION_ENABLED": True}
+PERMISSION_ON = {**MASTER_ON, "TOOL_PERMISSION_ENABLED": True}
 FULL_ON = {
-    "V24_TOOL_SYSTEM_ENABLED": True,
-    "V24_TOOL_PERMISSION_ENABLED": True,
-    "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True,
-    "V24_TOOL_OBSERVATION_ENABLED": True,
-    "V24_TOOL_SURFACE_ENABLED": True,
-    "V24_TOOL_MEMORY_ENABLED": True,
-    "V24_TOOL_REFLECTION_ENABLED": True,
-    "V24_TOOL_CHANNEL_ENABLED": True,
+    "TOOL_SYSTEM_ENABLED": True,
+    "TOOL_PERMISSION_ENABLED": True,
+    "TOOL_SCHEMA_VALIDATION_ENABLED": True,
+    "TOOL_OBSERVATION_ENABLED": True,
+    "TOOL_SURFACE_ENABLED": True,
+    "TOOL_MEMORY_ENABLED": True,
+    "TOOL_REFLECTION_ENABLED": True,
+    "TOOL_CHANNEL_ENABLED": True,
     "FEISHU_ENABLED": True,
 }
 
@@ -182,7 +182,7 @@ def test_s1_foreground_tool_call_reaches_capability(monkeypatch, tool_id):
 def test_s1_foreground_tool_call_result_carries_observation(monkeypatch):
     """前台工具结果归一：观测闸 on 时 `world.event_id` 等观察键进入结果契约。"""
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_OBSERVATION_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_OBSERVATION_ENABLED": True}
     )
     settings = get_settings()
     registry = builtin_registry()
@@ -312,7 +312,7 @@ def _s2_context(**overrides):
 def test_s2_structural_failure_blocks_execution(monkeypatch, code, params):
     """结构失败在执行前拦下：能力零调用 + 字段级理由。"""
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_SCHEMA_VALIDATION_ENABLED": True}
     )
     settings = get_settings()
     executor, capability = _s2_executor(settings)
@@ -334,7 +334,7 @@ def test_s2_structural_failure_blocks_execution(monkeypatch, code, params):
 def test_s2_semantic_failure_blocks_execution(monkeypatch, code, case):
     """语义失败在执行前拦下：世界事实被当事实用（非降级放行）。"""
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_SCHEMA_VALIDATION_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_SCHEMA_VALIDATION_ENABLED": True}
     )
     settings = get_settings()
     executor, capability = _s2_executor(settings)
@@ -534,12 +534,12 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
 
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true")
-    support.apply_flag_env(monkeypatch, {"V24_TOOL_SYSTEM_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     seed_tick_fixture()
     world_engine.ensure_world("u-tool006")
     trigger_evaluator.register_followup(
@@ -680,7 +680,7 @@ def test_s6_read_only_tool_deposits_nothing(
     """读类工具零沉淀：`world.env.query` 不产生记忆行。"""
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_MEMORY_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
     from app.services.action import memory_bridge
     from tests.v24.tool008_support import memory_count
@@ -699,7 +699,7 @@ def test_s6_important_result_deposits_candidate(
     """重要结果沉淀：`builtin.reminder.cancel` 成功 → memories 落 1 行。"""
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true", memory_importance_threshold=0.5)
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_MEMORY_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
     from app.services.action import memory_bridge
     from tests.v24.tool008_support import memory_contents, memory_count
@@ -719,7 +719,7 @@ def test_s6_untrusted_source_rejected_by_policy(
     """R1 拒收：来源 ai_inferred 的候选（外发类工具）不入库。"""
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_MEMORY_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
     from app.services.action import memory_bridge
     from tests.v24.tool008_support import memory_count
@@ -738,7 +738,7 @@ def test_s6_idempotent_redelivery_is_skipped(
     """幂等：已登记 memory 效果的行动不重复投递。"""
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
-        monkeypatch, {**MASTER_ON, "V24_TOOL_MEMORY_ENABLED": True}
+        monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
     from app.services.action import memory_bridge
     from tests.v24.tool008_support import memory_count
@@ -763,7 +763,7 @@ def test_s7_tool_failure_evidence_triggers_at_threshold(
     override_settings()
     support.apply_flag_env(
         monkeypatch,
-        {**MASTER_ON, "V24_TOOL_REFLECTION_ENABLED": True},
+        {**MASTER_ON, "TOOL_REFLECTION_ENABLED": True},
     )
     from datetime import datetime as _datetime
 
@@ -779,7 +779,7 @@ def test_s7_tool_failure_evidence_triggers_at_threshold(
     )
     triggers.reset_trigger_state()
     now = _datetime(2026, 9, 14, 12, 0, 0)
-    threshold = get_settings().v2_reflection_event_threshold
+    threshold = get_settings().reflection_event_threshold
     tool_id = "builtin.notification.send"
 
     outcomes = [
@@ -815,7 +815,7 @@ def test_s7_tool_insight_does_not_trip_tool_breaker(monkeypatch):
 
 def test_s8_channel_send_requires_confirmation(monkeypatch):
     """发送需确认：无授权时通道工具停在 pending_confirmation，适配器零调用。"""
-    support.apply_flag_env(monkeypatch, {**CHANNEL_ON, "V24_TOOL_PERMISSION_ENABLED": True})
+    support.apply_flag_env(monkeypatch, {**CHANNEL_ON, "TOOL_PERMISSION_ENABLED": True})
     settings = get_settings()
     from tests.v24.tool010_support import RecordingAdapter, reset_runtime_state
     from app.services.tool import channel_tools
@@ -920,7 +920,7 @@ def test_s9_external_api_tool_costs_one_manifest(tmp_path):
     )
 
     settings = support.tool_settings(
-        v24_tool_external_api_enabled=True, v24_tool_ext_allowed_hosts=WEATHER_HOST
+        tool_external_api_enabled=True, tool_ext_allowed_hosts=WEATHER_HOST
     )
     registry, index, report = load_manifests(
         tmp_path,
@@ -970,7 +970,7 @@ def test_s10_tool_failure_records_failure_kind(monkeypatch):
     support.apply_flag_env(
         monkeypatch,
         _env_reaching_capability(
-            SENSITIVE_TOOL_ID, {**MASTER_ON, "V24_TOOL_OBSERVATION_ENABLED": True}
+            SENSITIVE_TOOL_ID, {**MASTER_ON, "TOOL_OBSERVATION_ENABLED": True}
         ),
     )
     settings = get_settings()
@@ -1010,14 +1010,14 @@ def test_s10_breaker_trips_and_half_opens(monkeypatch):
     clock = {"now": datetime(2026, 9, 14, 12, 0, 0)}
     tracker = ToolHealthTracker(registry, settings, clock=lambda: clock["now"])
 
-    for _ in range(settings.v24_tool_breaker_threshold):
+    for _ in range(settings.tool_breaker_threshold):
         tracker.record_outcome(SENSITIVE_TOOL_ID, ok=False, failure_kind="transient")
 
     assert tracker.is_tripped(SENSITIVE_TOOL_ID, clock["now"]) is True
     assert registry.effective_status(SENSITIVE_TOOL_ID) == "disabled"
 
     clock["now"] = clock["now"] + timedelta(
-        seconds=settings.v24_tool_breaker_cooldown_seconds + 1
+        seconds=settings.tool_breaker_cooldown_seconds + 1
     )
     assert tracker.is_tripped(SENSITIVE_TOOL_ID, clock["now"]) is False
     assert registry.effective_status(SENSITIVE_TOOL_ID) == "enabled"

@@ -27,7 +27,7 @@
 
 | 项 | 说明 |
 |---|---|
-| Flag 基线 | 全部 `v24_*` 默认 off；每条用例 Preconditions 显式声明所需 Flag |
+| Flag 基线 | 全部 `tool_*` 默认 off；每条用例 Preconditions 显式声明所需 Flag |
 | 离线纪律 | 零真实 LLM（`FakeLLM` / 脚本化 stub）、零真实网络（`StubTransport`）、零真实通道（`RecordingAdapter`）、内存 SQLite |
 | 观测面 ① | 调试端点 `/api/v1/debug/tools*` |
 | 观测面 ② | `action_records.steps[]`（工具执行台账唯一落点） |
@@ -61,7 +61,7 @@
 ### S1.1 ~ S1.10 十个声明工具各一例
 
 - **Scenario Name**：`S1.<n> <tool_id> 前台调用可达能力实现`
-- **Preconditions**：`V24_TOOL_SYSTEM_ENABLED=true`；`channel.feishu.send` 另需 `V24_TOOL_CHANNEL_ENABLED=true` + `FEISHU_ENABLED=true` + 三项飞书凭据；能力侧为打桩实现。
+- **Preconditions**：`TOOL_SYSTEM_ENABLED=true`；`channel.feishu.send` 另需 `TOOL_CHANNEL_ENABLED=true` + `FEISHU_ENABLED=true` + 三项飞书凭据；能力侧为打桩实现。
 - **Input**：`ToolInvocation(tool_id=<声明 id>, params={"content": "在吗", ...})`，`source=conversation`。
 - **Execution Flow**：`ToolExecutor.run` ①resolve（注册表命中且 `effective_status=enabled`）→ ②permission（闸 off → 占位 allow）→ ③validate（闸 off → 跳过）→ ④invoke（`CapabilityExecutor.run` → 打桩能力）→ ⑤normalize。
 - **Expected Result**：`ToolExecution.tool_id == 声明 id`；`capability/action` 与声明一致；`status="succeeded"`；能力收到 `params`；`result["status"]="succeeded"`；`duration_ms` 非空。声明全集恰为 10 条（`builtin.*` 5 + `world.*` 4 + `channel.*` 1）。
@@ -72,7 +72,7 @@
 ### S1.11 工具结果的观察键进入结果契约
 
 - **Scenario Name**：`S1.11 前台调用结果携带结构化观察`
-- **Preconditions**：`V24_TOOL_SYSTEM_ENABLED=true` + `V24_TOOL_OBSERVATION_ENABLED=true`。
+- **Preconditions**：`TOOL_SYSTEM_ENABLED=true` + `TOOL_OBSERVATION_ENABLED=true`。
 - **Input**：`builtin.reminder.create`，能力返回 `payload={"world_event_id": "ev-tool012"}`。
 - **Execution Flow**：`ObservationNormalizer.normalize` 按 `TOOL_OBSERVATION_KEYS` 把 payload 键映射为观察键，并据 `world_event_id` 产出 `ToolEffect(kind="world")`。
 - **Expected Result**：`result["observations"]["world.event_id"] == "ev-tool012"`；`result["effects"][0]["kind"] == "world"`。
@@ -88,7 +88,7 @@
 ### S2.1 ~ S2.8 结构失败八类
 
 - **Scenario Name**：`S2.<n> <code> 在执行前拦下`
-- **Preconditions**：`V24_TOOL_SYSTEM_ENABLED=true` + `V24_TOOL_SCHEMA_VALIDATION_ENABLED=true`。
+- **Preconditions**：`TOOL_SYSTEM_ENABLED=true` + `TOOL_SCHEMA_VALIDATION_ENABLED=true`。
 - **Input**：各自构造的参数（见下表）。
 - **Execution Flow**：①resolve → ②permission（allow）→ ③validate 失败 → 短路为 `invalid`（不进入 ④invoke）。
 - **Expected Result**：`status="invalid"`；能力实现**零调用**；`validation.structural` 含该 code；该 issue 带非空 `param` 与 `message`。
@@ -186,7 +186,7 @@
 ### S4.1 自治 tick 三账对齐
 
 - **Scenario Name**：`S4.1 自治决策 → 工具执行 → 世界写入，三账对齐`
-- **Preconditions**：`V21_AGENT_RUNTIME_ENABLED` + `ACTION_ENABLED` + `WORLD_ENABLED` + `AUTONOMY_ACTION_ENABLED` + `OBSERVABILITY_PERSIST_ENABLED`；`autonomy_action_enabled=true`；存在持久目标与已闲置会话；已登记到期 followup。
+- **Preconditions**：`AGENT_RUNTIME_ENABLED` + `ACTION_ENABLED` + `WORLD_ENABLED` + `AUTONOMY_ACTION_ENABLED` + `OBSERVABILITY_PERSIST_ENABLED`；`autonomy_action_enabled=true`；存在持久目标与已闲置会话；已登记到期 followup。
 - **Input**：`life_loop.run_life_loop_tick(now=NOW)`。
 - **Execution Flow**：维护步 → 触发评估 → 决策管线（工具面作为 `capabilities` 输入）→ `run_action_planning`（工具路径）→ `integrate_result` → outbox → `outbox_consumer.consume_pending` → `world_engine.create_event`。
 - **Expected Result**：自治行动台账恰 1 条且 `status="succeeded"`，`steps[0].tool_id="builtin.reminder.create"`；`outbox_events` 出现同 `idempotency_key`；消费后 `world_events` 出现 `type=reminder` 且 `payload.outbox_action_id == record.id`；`loop_runs` 一行 `kind=autonomy/status=done`；`decision_records` 一行 `decision=act` 且其 `input_snapshot.tool_facts.available` 含所用工具；三账 `user_id` 一致。
@@ -269,8 +269,8 @@
 ### S7.1 阈值触发
 
 - **Scenario Name**：`S7.1 同工具同失败类达阈值才进反思窗`
-- **Preconditions**：`V24_TOOL_SYSTEM_ENABLED=true` + `V24_TOOL_REFLECTION_ENABLED=true`。
-- **Input**：连续 `v2_reflection_event_threshold` 次 `observe_tool_evidence(user, tool_id, failure_kind="transient")`。
+- **Preconditions**：`TOOL_SYSTEM_ENABLED=true` + `TOOL_REFLECTION_ENABLED=true`。
+- **Input**：连续 `reflection_event_threshold` 次 `observe_tool_evidence(user, tool_id, failure_kind="transient")`。
 - **Execution Flow**：reinforce 计数 → 低于阈值返 False → 达阈值触发 `trigger_for_user(channel=tool)`。
 - **Expected Result**：返回序列为 `[False] * (threshold-1) + [True]`；仅最后一次触发。
 - **Related Modules**：`app/services/reflection/triggers.py`
@@ -338,7 +338,7 @@
 ### S9.2 外部 API 工具一个 YAML
 
 - **Scenario Name**：`S9.2 单清单文件产出单工具`
-- **Preconditions**：`V24_TOOL_EXTERNAL_API_ENABLED=true`；`V24_TOOL_EXT_ALLOWED_HOSTS` 含清单域名；凭据在环境变量中（测试为占位值）。
+- **Preconditions**：`TOOL_EXTERNAL_API_ENABLED=true`；`TOOL_EXT_ALLOWED_HOSTS` 含清单域名；凭据在环境变量中（测试为占位值）。
 - **Input**：`weather.yaml` 一份。
 - **Execution Flow**：`ToolManifestLoader.load` → 8 项 manifest 校验 → `parse_manifest` → `registry.register`。
 - **Expected Result**：`report.loaded == ["ext.api.weather.current"]`；索引仅 1 个工具；注册表 `ext.api` 命名空间恰 1 条。
@@ -373,7 +373,7 @@
 ### S10.2 熔断与半开
 
 - **Scenario Name**：`S10.2 连续失败熔断，冷却后半开`
-- **Preconditions**：总闸 on；`V24_TOOL_BREAKER_THRESHOLD=3`、`V24_TOOL_BREAKER_COOLDOWN_SECONDS=300`；时钟可注入。
+- **Preconditions**：总闸 on；`TOOL_BREAKER_THRESHOLD=3`、`TOOL_BREAKER_COOLDOWN_SECONDS=300`；时钟可注入。
 - **Input**：连续 3 次失败 → 推进时钟越过冷却 → 再 1 次失败。
 - **Execution Flow**：`ToolHealthTracker.record_outcome` 达阈值 → `mark_tripped`；`is_tripped` 在冷却后触发半开 → 下一次失败立即重熔。
 - **Expected Result**：熔断期 `effective_status="disabled"`；半开后回到 `enabled`；再次失败立即回到 `disabled`。

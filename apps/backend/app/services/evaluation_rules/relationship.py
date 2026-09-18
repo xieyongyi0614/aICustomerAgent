@@ -194,7 +194,7 @@ class NarrativeMilestoneProvenanceRule(EvaluationRule):
 
 def _narrative_whitelist_keys() -> set[str]:
     try:
-        raw = get_settings().v2_relationship_narrative_whitelist_json
+        raw = get_settings().relationship_narrative_whitelist_json
         table = json.loads(raw)
         return set(table) if isinstance(table, dict) else set()
     except Exception:

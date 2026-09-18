@@ -31,11 +31,11 @@ USER = "integration-user"
 SESSION = "int-s1"
 
 ALL_V21_FLAGS = {
-    "V21_AGENT_RUNTIME_ENABLED": "true",
-    "V21_UNIFIED_RUN_ENABLED": "true",
-    "V21_GOAL_STACK_ENABLED": "true",
-    "V21_AGENT_METRICS_ENABLED": "true",
-    "V21_PERSONALITY_EVOLUTION_ENABLED": "true",
+    "AGENT_RUNTIME_ENABLED": "true",
+    "UNIFIED_RUN_ENABLED": "true",
+    "GOAL_STACK_ENABLED": "true",
+    "AGENT_METRICS_ENABLED": "true",
+    "PERSONALITY_EVOLUTION_ENABLED": "true",
 }
 
 
@@ -77,25 +77,25 @@ class TestEnablementMatrix:
 
     def test_each_subflag_requires_runtime(self, override_settings):
         for flag in (
-            "V21_UNIFIED_RUN_ENABLED",
-            "V21_GOAL_STACK_ENABLED",
-            "V21_AGENT_METRICS_ENABLED",
-            "V21_PERSONALITY_EVOLUTION_ENABLED",
+            "UNIFIED_RUN_ENABLED",
+            "GOAL_STACK_ENABLED",
+            "AGENT_METRICS_ENABLED",
+            "PERSONALITY_EVOLUTION_ENABLED",
         ):
-            override_settings(**{flag: "true"}, V21_AGENT_RUNTIME_ENABLED="false")
+            override_settings(**{flag: "true"}, AGENT_RUNTIME_ENABLED="false")
             violations = enablement_violations(get_settings())
-            assert any("v21_agent_runtime_enabled" in v for v in violations), flag
+            assert any("agent_runtime_enabled" in v for v in violations), flag
 
     def test_personality_requires_metrics(self, override_settings):
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_PERSONALITY_EVOLUTION_ENABLED="true",
-            V21_AGENT_METRICS_ENABLED="false",
+            AGENT_RUNTIME_ENABLED="true",
+            PERSONALITY_EVOLUTION_ENABLED="true",
+            AGENT_METRICS_ENABLED="false",
         )
         violations = [
             v
             for v in enablement_violations(get_settings())
-            if "v21_personality_evolution_enabled" in v
+            if "personality_evolution_enabled" in v
         ]
         assert violations, "演化必须依赖反馈通道（架构 §9.2 顺序约束）"
 
@@ -218,11 +218,11 @@ class TestEvolutionLoopE2E:
         assert loop_run_repository.list_recent(run_kind="foreground_chat")
 
         override_settings(
-            V21_PERSONALITY_EVOLUTION_ENABLED="false",
-            V21_AGENT_METRICS_ENABLED="false",
-            V21_GOAL_STACK_ENABLED="false",
-            V21_UNIFIED_RUN_ENABLED="false",
-            V21_AGENT_RUNTIME_ENABLED="false",
+            PERSONALITY_EVOLUTION_ENABLED="false",
+            AGENT_METRICS_ENABLED="false",
+            GOAL_STACK_ENABLED="false",
+            UNIFIED_RUN_ENABLED="false",
+            AGENT_RUNTIME_ENABLED="false",
         )
         runs_before = len(loop_run_repository.list_recent(run_kind="foreground_chat"))
         client.post("/api/v1/chat/message", json={"content": "在么"})

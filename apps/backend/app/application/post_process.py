@@ -312,7 +312,7 @@ async def run_world_update(ctx: PostProcessContext) -> None:
     except Exception:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
     settings = get_settings()
-    if settings.v23_world_simulation_enabled and settings.v23_event_detection_enabled:
+    if settings.world_simulation_enabled and settings.event_detection_enabled:
         try:
             from app.services.world import user_situation
 
@@ -467,8 +467,8 @@ async def _run_confirmation_round(ctx: PostProcessContext) -> bool:
     """确认轮次检出与执行（TOOL-005 §2.3 步骤④）；未命中返回 False（按普通对话处理）。"""
     settings = get_settings()
     if not (
-        getattr(settings, "v24_tool_system_enabled", False)
-        and getattr(settings, "v24_tool_permission_enabled", False)
+        getattr(settings, "tool_system_enabled", False)
+        and getattr(settings, "tool_permission_enabled", False)
     ):
         return False
     started = time.perf_counter()
@@ -533,7 +533,7 @@ def _observe_pending_confirmation(record) -> dict:
 def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
     """工具证据反思接线（TOOL-009 §2.3）：只读 `action_records` 投影喂 reinforce 计数。
 
-    工具反思子闸（`v24_tool_reflection_enabled`）关闭即零行为；
+    工具反思子闸（`tool_reflection_enabled`）关闭即零行为；
     接线失败记日志、不影响行动规划（与 REF-003 既有接线同款纪律）。
     """
     settings = get_settings()
@@ -552,9 +552,9 @@ def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
 
 
 def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
-    """第 9 步内部工具面观测（总闸 + `v24_tool_surface_enabled` 双闸；失败不影响本步骤）。"""
+    """第 9 步内部工具面观测（总闸 + `tool_surface_enabled` 双闸；失败不影响本步骤）。"""
     settings = get_settings()
-    if not (settings.v24_tool_system_enabled and settings.v24_tool_surface_enabled):
+    if not (settings.tool_system_enabled and settings.tool_surface_enabled):
         return {}
     try:
         from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT

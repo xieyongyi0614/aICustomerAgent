@@ -239,7 +239,7 @@ class TestUniqueWiring:
         block = source.split("register_plan_revision_listener()", 1)[0].rsplit(
             "if get_settings()", 1
         )[1]
-        assert "v25_plan_reflection_enabled" in block
+        assert "plan_reflection_enabled" in block
         assert "self._enabled" not in block
 
 
@@ -275,7 +275,7 @@ class TestStagePosition:
 
     def test_the_sub_flag_keeps_the_whole_channel_dark_by_default(self):
         settings = get_settings()
-        assert settings.v25_plan_reflection_enabled is False
+        assert settings.plan_reflection_enabled is False
         assert reflection_evidence.plan_evidence_enabled(settings) is False
         assert listener_mod.get_revision_listener() is not None
 

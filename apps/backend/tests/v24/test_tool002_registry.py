@@ -156,7 +156,7 @@ def test_describe_excludes_disabled_placeholder():
 
 def test_describe_enabled_only_false_includes_disabled_and_tripped(v24_tool_env):
     """P2-5：`enabled_only=False` 显式关闭过滤，disabled / 熔断条目带真实状态回归投影。"""
-    v24_tool_env(v24_tool_system_enabled=True, v24_tool_disabled_ids="world.object.move")
+    v24_tool_env(tool_system_enabled=True, tool_disabled_ids="world.object.move")
     registry = _registry_with_builtins()
     registry.mark_tripped("world.object.use")
 
@@ -181,7 +181,7 @@ def test_describe_enabled_only_false_includes_disabled_and_tripped(v24_tool_env)
 
 def test_describe_enabled_only_false_respects_surface_order(v24_tool_env):
     """`enabled_only=False` 与 `surface` 组合：保 surface 序、去重、忽略未注册 id。"""
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",
@@ -193,7 +193,7 @@ def test_describe_enabled_only_false_respects_surface_order(v24_tool_env):
 
 
 def test_describe_with_surface_keeps_surface_order_and_ignores_unknown(v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",
@@ -211,13 +211,13 @@ def test_describe_with_surface_keeps_surface_order_and_ignores_unknown(v24_tool_
 
 
 def test_describe_empty_surface_returns_empty(v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True)
+    v24_tool_env(tool_system_enabled=True)
     registry = _registry_with_builtins()
     assert registry.describe(surface=ToolSurface(run_kind="conversation")) == []
 
 
 def test_describe_surface_skips_disabled_tool(v24_tool_env):
-    v24_tool_env(v24_tool_system_enabled=True, v24_tool_disabled_ids="world.object.move")
+    v24_tool_env(tool_system_enabled=True, tool_disabled_ids="world.object.move")
     registry = _registry_with_builtins()
     surface = ToolSurface(
         run_kind="conversation",
@@ -233,7 +233,7 @@ def test_effective_status_layers(v24_tool_env):
     assert registry.effective_status("builtin.reminder.create") == "enabled"
     assert registry.effective_status("channel.feishu.send") == "disabled"
 
-    v24_tool_env(v24_tool_disabled_ids="builtin.reminder.create")
+    v24_tool_env(tool_disabled_ids="builtin.reminder.create")
     assert registry.effective_status("builtin.reminder.create") == "disabled"
 
     registry._health["world.object.create"].tripped = True
@@ -241,7 +241,7 @@ def test_effective_status_layers(v24_tool_env):
 
 
 def test_effective_status_terminal_code_state_wins_over_overrides(v24_tool_env):
-    v24_tool_env(v24_tool_disabled_ids="builtin.reminder.create,builtin.reminder.cancel")
+    v24_tool_env(tool_disabled_ids="builtin.reminder.create,builtin.reminder.cancel")
     registry = ToolRegistry()
     registry.register(definition(status="deprecated"))
     registry.register(
@@ -271,7 +271,7 @@ def test_deprecated_tool_skips_describe_but_stays_resolvable():
 
 
 def test_disabled_id_absent_from_describe_and_list(v24_tool_env):
-    v24_tool_env(v24_tool_disabled_ids="builtin.reminder.create")
+    v24_tool_env(tool_disabled_ids="builtin.reminder.create")
     registry = _registry_with_builtins()
     assert registry.effective_status("builtin.reminder.create") == "disabled"
     assert "builtin.reminder.create" not in [
@@ -283,7 +283,7 @@ def test_disabled_id_absent_from_describe_and_list(v24_tool_env):
 
 
 def test_disabled_overlay_does_not_write_back_to_definition(v24_tool_env):
-    v24_tool_env(v24_tool_disabled_ids="builtin.reminder.create")
+    v24_tool_env(tool_disabled_ids="builtin.reminder.create")
     registry = _registry_with_builtins()
     assert registry.get("builtin.reminder.create").status == "enabled"
     assert registry.effective_status("builtin.reminder.create") == "disabled"

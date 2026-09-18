@@ -226,8 +226,8 @@ def _plan005_modules() -> tuple[str, ...]:
 @pytest.fixture
 def planning_on(override_settings):
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_revision_budget="3",
+        planning_enabled="true",
+        plan_revision_budget="3",
         world_enabled="false",
         observability_persist_enabled="false")
 

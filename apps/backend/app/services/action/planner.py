@@ -3,7 +3,7 @@
 全部输入为已读快照，闸门内零 IO；能力映射唯一来源 ACTION_CAPABILITY_MAP。
 Planner 只裁决与装配，不执行行动。
 
-V2.4.0 TOOL-004：`v24_tool_system_enabled` 开启时，计划装配改经
+V2.4.0 TOOL-004：`tool_system_enabled` 开启时，计划装配改经
 `ToolRegistry.resolve(ToolSelector.select(intent, ToolSurface))` 取绑定；
 绑定解析失败（工具面为空 / 未覆盖 / 声明缺失）返回 None，沿用既有
 `capability_unavailable` 语义。总闸 off 时路径与 V9 逐字节一致。
@@ -132,7 +132,7 @@ def assemble_plan(
 
     V2.4.0：总闸开启时能力映射来自工具注册表绑定（工具面过滤后），关闭时走 V9 原路径。
     """
-    if not getattr(snapshot.settings, "v24_tool_system_enabled", False):
+    if not getattr(snapshot.settings, "tool_system_enabled", False):
         capability_name, action = ACTION_CAPABILITY_MAP[intent.action_type]
         capability = snapshot.registry.get(capability_name) if snapshot.registry is not None else None
         if capability is None:

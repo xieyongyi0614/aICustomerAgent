@@ -14,9 +14,9 @@
 | Reflection | `list_user_active_insights` / `interest_signal` | 空列表 / `reflection_unavailable` |
 | ToolSurface | `build_tool_context` + `ToolSurfaceResolver` | **硬依赖**（总闸 off / 注册表不可得 / 无面退化见下） |
 
-ToolSurface 的三态：`v25_plan_tool_required` on 且工具系统可用 → 按 `RUN_KIND_AUTONOMOUS_TICK`
+ToolSurface 的三态：`plan_tool_required` on 且工具系统可用 → 按 `RUN_KIND_AUTONOMOUS_TICK`
 投影；总闸 off → `PlanUnavailable("tool_system_disabled")`；注册表不可得 →
-`PlanUnavailable("registry_unavailable")`；`v25_plan_tool_required` off → 空面 +
+`PlanUnavailable("registry_unavailable")`；`plan_tool_required` off → 空面 +
 `surface_unavailable`（允许无面规划，退化为 V2.4.0 行为）。
 
 **零 IO / 零 LLM / 零写库**：`assemble` 是唯一允许读仓储的入口，且只读不写；`PlanContextProbe`
@@ -199,10 +199,10 @@ _PROBE_SNAPSHOTS: dict[str, PlanProbeSnapshot] = {}
 def plan_budget(settings) -> dict[str, int]:
     """`PlanContext.budget` 的 settings 投影（步数 / 深度 / 修订 / 尝试四项上限）。"""
     return {
-        "max_steps": int(settings.v25_plan_max_steps),
-        "max_depth": int(settings.v25_plan_max_depth),
-        "revision_budget": int(settings.v25_plan_revision_budget),
-        "step_max_attempts": int(settings.v25_plan_step_max_attempts),
+        "max_steps": int(settings.plan_max_steps),
+        "max_depth": int(settings.plan_max_depth),
+        "revision_budget": int(settings.plan_revision_budget),
+        "step_max_attempts": int(settings.plan_step_max_attempts),
     }
 
 
@@ -270,7 +270,7 @@ class PlanContextAssembler:
 
     `assemble` 为 async：World 源的既有装配入口是同步阻塞的仓储读（与 `chat_pipeline`
     同款 `asyncio.to_thread` 卸载）。其余源同步只读。
-    `v25_plan_context_enabled` off 时**不做四源装配**（只保硬依赖两源，`degraded` 为空）。
+    `plan_context_enabled` off 时**不做四源装配**（只保硬依赖两源，`degraded` 为空）。
     """
 
     async def assemble(
@@ -300,12 +300,12 @@ class PlanContextAssembler:
         settings,
         run: RunContext | None,
     ) -> PlanContext:
-        """汇总四源（`v25_plan_context_enabled` 才装配）+ 硬依赖两源 → `PlanContext`。"""
+        """汇总四源（`plan_context_enabled` 才装配）+ 硬依赖两源 → `PlanContext`。"""
         sources = _PlanSources()
-        if settings.v25_plan_context_enabled:
+        if settings.plan_context_enabled:
             sources = await _gather_sources(goal, settings)
         degraded = list(sources.degraded)
-        if not settings.v25_plan_tool_required:
+        if not settings.plan_tool_required:
             degraded.append(DEGRADED_SURFACE_UNAVAILABLE)
         ancestors, siblings = _assemble_goal_chain(goal)
         return PlanContext(
@@ -333,7 +333,7 @@ class PlanContextAssembler:
     ) -> ToolSurface | PlanUnavailable:
         """工具面（硬依赖，Task Detail §4.3.2）：按 `RUN_KIND_AUTONOMOUS_TICK` 解析。
 
-        `v25_plan_tool_required` off → 允许无面规划（空面，退化为 V2.4.0 行为）；
+        `plan_tool_required` off → 允许无面规划（空面，退化为 V2.4.0 行为）；
         on 时总闸 off / 注册表不可得都是硬依赖缺失——**宁可这一轮不规划**。
         """
         base = ToolContext(
@@ -343,11 +343,11 @@ class PlanContextAssembler:
             run_kind=RUN_KIND_AUTONOMOUS_TICK,
             source=PLAN_TOOL_RUN_SOURCE,
         )
-        if not settings.v25_plan_tool_required:
+        if not settings.plan_tool_required:
             return ToolSurfaceResolver(None, settings).resolve(
                 RUN_KIND_AUTONOMOUS_TICK, base
             )
-        if not settings.v24_tool_system_enabled:
+        if not settings.tool_system_enabled:
             return PlanUnavailable(PLAN_UNAVAILABLE_TOOL_SYSTEM_DISABLED)
         registry = get_tool_registry()
         if registry is None:
@@ -627,7 +627,7 @@ def _assemble_memory(goal: GoalRecord, settings) -> tuple[list[MemoryRef], list[
         )
         for item in ranked.items
     ]
-    return refs[: settings.v25_plan_context_memory_limit], []
+    return refs[: settings.plan_context_memory_limit], []
 
 
 def _assemble_reflection(
@@ -649,7 +649,7 @@ def _assemble_reflection(
     except Exception:
         logger.exception("规划反思读取失败，规划上下文反思源降级：%s", user_id)
         return [], [DEGRADED_REFLECTION_UNAVAILABLE]
-    return merged[: settings.v25_plan_context_insight_limit], []
+    return merged[: settings.plan_context_insight_limit], []
 
 
 def _merge_insights(

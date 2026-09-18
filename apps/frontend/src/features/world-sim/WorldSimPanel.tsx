@@ -110,7 +110,7 @@ function WorldSimPanelInner({ userId }: { userId: string }) {
   const tick = useWorldSimTick(userId)
 
   const enabled = simulation.data?.enabled ?? false
-  const debugTickOn = simulation.data?.flags?.v23_debug_tick_enabled ?? false
+  const debugTickOn = simulation.data?.flags?.debug_tick_enabled ?? false
 
   if (simulation.isPending) {
     return (
@@ -139,7 +139,7 @@ function WorldSimPanelInner({ userId }: { userId: string }) {
   if (!enabled) {
     return (
       <p data-testid="world-sim-disabled" className="font-mono text-xs text-fg-tertiary">
-        世界模拟未启用（v23_world_simulation_enabled=false）
+        世界模拟未启用（world_simulation_enabled=false）
       </p>
     )
   }

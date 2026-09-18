@@ -24,12 +24,12 @@ NOW = datetime(2026, 9, 16, 12, 0, 0)
 def plan004_binding_on(override_settings):
     """PLAN-004 功能用例默认开绑定子闸。
 
-    `v25_plan_step_binding_enabled` 出厂为 **off**（V2.4.0 原状，绑定只在执行期发生），
+    `plan_step_binding_enabled` 出厂为 **off**（V2.4.0 原状，绑定只在执行期发生），
     故本任务的绑定 / 判据用例统一显式开闸；「off 时零绑定、落库形状与 V2.4.0 一致」由
     `test_plan004_flags.py` 专测（该模块在用例内覆盖本夹具）。夹具经 import 进各测试模块生效
     ——pytest 从测试模块命名空间收集夹具，故各模块需显式导入本名字。
     """
-    override_settings(v25_plan_step_binding_enabled="true")
+    override_settings(plan_step_binding_enabled="true")
 
 RUN_KIND_AUTONOMOUS = "autonomous_tick"
 RUN_KIND_FOREGROUND = "foreground_chat"

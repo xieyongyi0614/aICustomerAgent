@@ -38,7 +38,7 @@ def read_relationship_patterns(
             if insight.scope != "relationship":
                 reasons[row.key] = "scope_excluded"
                 continue
-            if row.strength < settings.v2_relationship_pattern_min_strength:
+            if row.strength < settings.relationship_pattern_min_strength:
                 reasons[row.key] = "below_threshold"
                 continue
             candidates.append(
@@ -51,8 +51,8 @@ def read_relationship_patterns(
                 )
             )
         candidates.sort(key=lambda item: item.strength, reverse=True)
-        selected = candidates[: settings.v2_relationship_pattern_max_items]
-        for item in candidates[settings.v2_relationship_pattern_max_items :]:
+        selected = candidates[: settings.relationship_pattern_max_items]
+        for item in candidates[settings.relationship_pattern_max_items :]:
             reasons[item.key] = "over_limit"
         payload = {
             "selected": [

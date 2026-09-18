@@ -33,7 +33,7 @@ logging.basicConfig(level=logging.INFO)
 
 _reclaim_task: asyncio.Task | None = None
 _observability_cleanup_task: asyncio.Task | None = None
-_v2_job_worker_task: asyncio.Task | None = None
+_job_worker_task: asyncio.Task | None = None
 _life_loop_task: asyncio.Task | None = None
 _agent_evolution_task: asyncio.Task | None = None
 
@@ -41,7 +41,7 @@ _agent_evolution_task: asyncio.Task | None = None
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _reclaim_task, _observability_cleanup_task
-    global _v2_job_worker_task
+    global _job_worker_task
     global _life_loop_task, _agent_evolution_task
     validate_enablement_chain(get_settings())
     for unknown_key in unknown_versioned_env_keys():
@@ -51,16 +51,16 @@ async def lifespan(application: FastAPI):
         )
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
-    _v2_job_worker_task = asyncio.create_task(run_job_worker_loop())
+    _job_worker_task = asyncio.create_task(run_job_worker_loop())
     register_goal_runtime()
     register_with_job_worker()
     register_executor()
-    if get_settings().v25_plan_reflection_enabled:
+    if get_settings().plan_reflection_enabled:
         register_plan_revision_listener()
     register_development_runtime()
     register_rollback_listener()
     register_narrative_listener()
-    if get_settings().v23_world_simulation_enabled and get_settings().v23_event_detection_enabled:
+    if get_settings().world_simulation_enabled and get_settings().event_detection_enabled:
         from app.services.world.event_bridge import register_character_event_listeners
 
         register_character_event_listeners()
@@ -73,15 +73,15 @@ async def lifespan(application: FastAPI):
             )
         )
         logging.getLogger(__name__).info("主动消息出站端口已注册：%s", FEISHU_CHANNEL)
-        if get_settings().v24_tool_channel_enabled:
+        if get_settings().tool_channel_enabled:
             channel_tools.register_channel_adapter(
                 FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
             )
             logging.getLogger(__name__).info(
                 "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
             )
-    if get_settings().v24_tool_external_api_enabled:
-        report = get_manifest_loader().load(get_settings().v24_tool_ext_manifest_path)
+    if get_settings().tool_external_api_enabled:
+        report = get_manifest_loader().load(get_settings().tool_ext_manifest_path)
         logging.getLogger(__name__).info(
             "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",
             report.path or "<未配置>",
@@ -103,7 +103,7 @@ async def lifespan(application: FastAPI):
     for task in (
         _reclaim_task,
         _observability_cleanup_task,
-        _v2_job_worker_task,
+        _job_worker_task,
         _life_loop_task,
         _agent_evolution_task,
     ):
@@ -115,7 +115,7 @@ async def lifespan(application: FastAPI):
                 pass
     _reclaim_task = None
     _observability_cleanup_task = None
-    _v2_job_worker_task = None
+    _job_worker_task = None
     _life_loop_task = None
 
 

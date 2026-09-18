@@ -81,7 +81,7 @@ class _Message:
 
 class TestRetrievalBudget:
     def test_within_budget_all_selected(self, asm_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_retrieval_budget", 800)
+        monkeypatch.setattr(get_settings(), "memory_retrieval_budget", 800)
         ranked = _ranked("短记忆一", "短记忆二", "短记忆三")
         selected, used, dropped = _select_retrieval_segment(ranked)
         assert len(selected) == 3
@@ -89,7 +89,7 @@ class TestRetrievalBudget:
         assert dropped == 0
 
     def test_over_budget_truncated_by_freshness(self, asm_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_retrieval_budget", 15)
+        monkeypatch.setattr(get_settings(), "memory_retrieval_budget", 15)
         now = datetime.datetime.now()
         stale = now - datetime.timedelta(days=10)
         _memory("m-fresh", "新鲜的长记忆内容排在前面", last_accessed_at=now)
@@ -203,6 +203,6 @@ class TestAssembleTrace:
         assert len(steps) == 1
         extra = steps[0].extra
         assert extra["retrieval_selected"] == 1
-        assert extra["retrieval_budget"] == get_settings().v2_memory_retrieval_budget
+        assert extra["retrieval_budget"] == get_settings().memory_retrieval_budget
         assert extra["working_messages"] == 4
         assert extra["retrieval_dropped"] == 0

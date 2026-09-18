@@ -52,7 +52,7 @@ _GATE_RELATIONSHIP = "relationship_gate"
 _GATE_ACTION = "action_check"
 _GATE_BUDGET = "budget_cooldown"
 
-# 六维权重（§5.2③）：和为 1；v21_decision_weight 为全局缩放（默认 1.0）
+# 六维权重（§5.2③）：和为 1；decision_weight 为全局缩放（默认 1.0）
 _DIMENSION_WEIGHTS = {
     "goal_alignment": 0.35,
     "state_fit": 0.15,
@@ -244,7 +244,7 @@ def score_candidates(
         }
         candidate.scores = scores
         weighted = sum(scores[name] * _DIMENSION_WEIGHTS[name] for name in scores)
-        candidate.total = round(min(max(weighted * settings.v21_decision_weight, 0.0), 1.0), 4)
+        candidate.total = round(min(max(weighted * settings.decision_weight, 0.0), 1.0), 4)
 
 
 def _state_fit(candidate: Candidate, snapshot) -> float:

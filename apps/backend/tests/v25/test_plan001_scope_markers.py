@@ -103,11 +103,16 @@ PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（�
 
 - `declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)`，
 - `len(PLAN_002_SETTINGS_FLAGS) == 13` 与 `len(PLAN_002_SETTINGS_PARAMS) == 14`，
-- `settings.v25_planning_enabled is False` 与 `settings.v25_plan_tool_required is True`
+- `settings.planning_enabled is False` 与 `settings.plan_tool_required is True`
 
 都必须改为对**去前缀后字段名与默认值**的断言。两个常量 `PLAN_002_SETTINGS_FLAGS` /
 `PLAN_002_SETTINGS_PARAMS` 随字段改名同步去前缀（常量名与成员名都要改）；成员数是否变化
 取决于该批次的最终范围，须在改动时留痕。
+
+**留痕（去前缀横切重构，轨道 A）**：成员名已随 `vXX_` 前缀去除同步改名（27 项不变，13 + 14）；
+`declared` 的取值口径由「按 `v25_` 前缀筛选」改为 `set(PlanSettings.model_fields)`
+（`plan.py` 全域字段即该段集合），断言结构与数量不变。此改动使该用例不再依赖前缀命名，
+后续批次（v25 去门控）只需改默认值断言。
 
 本纪律由 `test_plan_002_flag_contract_assertions_survive_flag_removal` 消费
 （`PLAN_002_FLAG_CONTRACT_ASSERTIONS`）：若有人用「删掉用例」来消除开关删除引发的失败，
@@ -118,6 +123,7 @@ import sys
 from pathlib import Path
 
 from app.core.settings import Settings, get_settings
+from app.core.settings.plan import PlanSettings
 from app.models.goal import (
     CRITERION_FACT_SOURCES,
     GoalPlanRecord,
@@ -126,36 +132,36 @@ from app.models.goal import (
 from app.services.planning import goal_contract
 
 PLAN_002_SETTINGS_FLAGS = (
-    "v25_planning_enabled",
-    "v25_plan_context_enabled",
-    "v25_plan_step_binding_enabled",
-    "v25_plan_scheduler_enabled",
-    "v25_plan_execution_enabled",
-    "v25_plan_observation_enabled",
-    "v25_plan_revision_enabled",
-    "v25_plan_memory_enabled",
-    "v25_plan_reflection_enabled",
-    "v25_plan_world_feedback_enabled",
-    "v25_plan_autonomy_enabled",
-    "v25_plan_tool_required",
-    "v25_plan_debug_enabled",
+    "planning_enabled",
+    "plan_context_enabled",
+    "plan_step_binding_enabled",
+    "plan_scheduler_enabled",
+    "plan_execution_enabled",
+    "plan_observation_enabled",
+    "plan_revision_enabled",
+    "plan_memory_enabled",
+    "plan_reflection_enabled",
+    "plan_world_feedback_enabled",
+    "plan_autonomy_enabled",
+    "plan_tool_required",
+    "plan_debug_enabled",
 )
 
 PLAN_002_SETTINGS_PARAMS = (
-    "v25_plan_max_steps",
-    "v25_plan_max_depth",
-    "v25_plan_step_max_attempts",
-    "v25_plan_revision_budget",
-    "v25_plan_ttl_hours",
-    "v25_plan_step_cooldown_minutes",
-    "v25_plan_observation_window_minutes",
-    "v25_plan_context_memory_limit",
-    "v25_plan_context_insight_limit",
-    "v25_plan_llm_profile",
-    "v25_plan_replan_min_confidence",
-    "v25_plan_reflection_min_samples",
-    "v25_plan_memory_importance_floor",
-    "v25_plan_context_digest_enabled",
+    "plan_max_steps",
+    "plan_max_depth",
+    "plan_step_max_attempts",
+    "plan_revision_budget",
+    "plan_ttl_hours",
+    "plan_step_cooldown_minutes",
+    "plan_observation_window_minutes",
+    "plan_context_memory_limit",
+    "plan_context_insight_limit",
+    "plan_llm_profile",
+    "plan_replan_min_confidence",
+    "plan_reflection_min_samples",
+    "plan_memory_importance_floor",
+    "plan_context_digest_enabled",
 )
 
 PLAN_002_FLAG_CONTRACT_ASSERTIONS = (
@@ -257,12 +263,12 @@ def _planning_dir() -> Path:
 
 def test_plan_002_settings_are_embedded_and_the_master_stays_off():
     settings = get_settings()
-    declared = {name for name in Settings.model_fields if name.startswith("v25_")}
+    declared = set(PlanSettings.model_fields)
     assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
     assert len(PLAN_002_SETTINGS_FLAGS) == 13
     assert len(PLAN_002_SETTINGS_PARAMS) == 14
-    assert settings.v25_planning_enabled is False
-    assert settings.v25_plan_tool_required is True
+    assert settings.planning_enabled is False
+    assert settings.plan_tool_required is True
     assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
 
 

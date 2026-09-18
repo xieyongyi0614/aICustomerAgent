@@ -133,12 +133,12 @@ class GoalPlanningBudgetRule(EvaluationRule):
         if goal_slice is None:
             return None
         settings = get_settings()
-        cap = settings.v2_autonomy_planning_max_attempts + 1
+        cap = settings.autonomy_planning_max_attempts + 1
         counts: dict[str, int] = {}
         for plan in goal_slice.plans:
             counts[plan.goal_id] = counts.get(plan.goal_id, 0) + 1
             if plan.status in ("active", "validated"):
-                if len(plan.sub_goal_statuses) > settings.v2_autonomy_subgoal_max_count:
+                if len(plan.sub_goal_statuses) > settings.autonomy_subgoal_max_count:
                     return build_issue(
                         self.code,
                         evidence_quote=f"goal {plan.goal_id} plan v{plan.version} 步骤数超封顶",
@@ -170,7 +170,7 @@ class GoalExecutionCapRule(EvaluationRule):
         if goal_slice is None:
             return None
         settings = get_settings()
-        cap = timedelta(hours=settings.v2_autonomy_goal_max_active_hours)
+        cap = timedelta(hours=settings.autonomy_goal_max_active_hours)
         for plan in goal_slice.plans:
             if plan.status != "active" or plan.updated_at is None:
                 continue
@@ -186,7 +186,7 @@ class GoalExecutionCapRule(EvaluationRule):
             if reference_now - plan.updated_at > cap:
                 return build_issue(
                     self.code,
-                    evidence_quote=f"goal {plan.goal_id} 执行周期超出 {settings.v2_autonomy_goal_max_active_hours}h 未终态化",
+                    evidence_quote=f"goal {plan.goal_id} 执行周期超出 {settings.autonomy_goal_max_active_hours}h 未终态化",
                 )
         return None
 

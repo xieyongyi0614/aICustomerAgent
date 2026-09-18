@@ -36,8 +36,8 @@ from .plan004_support import (
 )
 
 CHANNEL_FLAGS = {
-    "v24_tool_system_enabled": "true",
-    "v24_tool_channel_enabled": "true",
+    "tool_system_enabled": "true",
+    "tool_channel_enabled": "true",
     "feishu_enabled": "true",
     "feishu_app_id": "plan4-app",
     "feishu_app_secret": "plan4-secret",
@@ -49,10 +49,10 @@ def _surface_context(*, channel_on: bool) -> ToolContext:
     from types import SimpleNamespace
 
     settings = SimpleNamespace(
-        v24_tool_system_enabled=True,
-        v24_tool_channel_enabled=channel_on,
+        tool_system_enabled=True,
+        tool_channel_enabled=channel_on,
         feishu_enabled=channel_on,
-        v24_tool_surface_max_tools=12,
+        tool_surface_max_tools=12,
         world_enabled=True,
     )
     return ToolContext(user_id="plan4-user", settings=settings)

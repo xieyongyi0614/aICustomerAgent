@@ -129,7 +129,7 @@ def _affinity_score(memory: UserMemory, query_types: set[str]) -> float:
 
 
 def _recently_rejected_contents(user_id: str, now: datetime) -> list[str]:
-    cutoff = now - timedelta(hours=get_settings().v2_memory_rejected_cooldown_hours)
+    cutoff = now - timedelta(hours=get_settings().memory_rejected_cooldown_hours)
     with SessionLocal() as session:
         rows = (
             session.query(MemoryCandidateRow.content)
@@ -145,7 +145,7 @@ def _recently_rejected_contents(user_id: str, now: datetime) -> list[str]:
 
 def _contradicts_cooldown_ids(user_id: str, now: datetime) -> set[str]:
     """被纠正未满冷却期的 contradicts 对侧：对侧行已离开 active 且 24h 内被处置。"""
-    cutoff = now - timedelta(hours=get_settings().v2_memory_rejected_cooldown_hours)
+    cutoff = now - timedelta(hours=get_settings().memory_rejected_cooldown_hours)
     with SessionLocal() as session:
         actives = (
             session.query(Memory)
@@ -255,12 +255,12 @@ def _score_all(
         structured = _structured_score(memory, fact.get("salience"), now)
         affinity = _affinity_score(memory, query_types)
         score = (
-            settings.v2_memory_weight_semantic * semantic
-            + settings.v2_memory_weight_structured * structured
-            + settings.v2_memory_weight_affinity * affinity
+            settings.memory_weight_semantic * semantic
+            + settings.memory_weight_structured * structured
+            + settings.memory_weight_affinity * affinity
         )
         if temporal:
-            score += settings.v2_memory_temporal_recency_boost * _recency(memory, now)
+            score += settings.memory_temporal_recency_boost * _recency(memory, now)
         ranked.append(
             RankedMemory(
                 memory=memory,
@@ -317,9 +317,9 @@ def retrieve(
         reason = _filter_reasons(item.memory, rejected_contents, cooldown_ids)
         if reason is not None:
             item.penalty = (
-                settings.v2_memory_penalty_rejected
+                settings.memory_penalty_rejected
                 if reason == "recently_rejected"
-                else settings.v2_memory_penalty_contradicts
+                else settings.memory_penalty_contradicts
             )
             item.reason = reason
             filtered.append(item)
@@ -350,7 +350,7 @@ def _vector_recall(
             user_id,
             character_id,
             query_embedding,
-            limit=get_settings().v2_memory_vector_recall_k,
+            limit=get_settings().memory_vector_recall_k,
         )
     except Exception as exc:
         logger.warning("向量召回失败，降级结构化：%s", exc.__class__.__name__)

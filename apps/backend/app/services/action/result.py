@@ -18,7 +18,7 @@ def _now() -> datetime:
 
 
 def result_timeout_enabled() -> bool:
-    return bool(getattr(get_settings(), "v26_action_result_enabled", False))
+    return bool(getattr(get_settings(), "action_result_enabled", False))
 
 
 def make_result_id() -> str:

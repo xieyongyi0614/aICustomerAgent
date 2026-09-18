@@ -69,7 +69,7 @@ def client(db_session_factory):
 def runtime_on(override_settings):
     trigger_evaluator._followup_registry.clear()
     override_settings(
-        V21_AGENT_RUNTIME_ENABLED="true",
+        AGENT_RUNTIME_ENABLED="true",
         world_enabled="false")
     yield
     trigger_evaluator._followup_registry.clear()
@@ -100,7 +100,7 @@ class TestPersonalitySeed:
 
 class TestInterestComposition:
     def test_sources_weighted_and_ranked(self, override_settings):
-        override_settings(V21_INTEREST_WEIGHT_MEMORY="2.0")
+        override_settings(INTEREST_WEIGHT_MEMORY="2.0")
         settings = __import__("app.core.settings", fromlist=["get_settings"]).get_settings()
         goals = [_goal()]
         preferences = [
@@ -113,7 +113,7 @@ class TestInterestComposition:
         )
         assert topics, "有来源时榜单不应为空"
         assert topics[0].topic == "用户在准备一场重要的面试"[:24]
-        assert len(topics) <= settings.v21_interest_top_n
+        assert len(topics) <= settings.interest_top_n
 
     def test_empty_sources_give_empty_board(self, override_settings):
         settings = __import__("app.core.settings", fromlist=["get_settings"]).get_settings()
@@ -211,8 +211,8 @@ class TestForegroundContextSegment:
         from app.core import llm_factory
 
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_UNIFIED_RUN_ENABLED="true",
+            AGENT_RUNTIME_ENABLED="true",
+            UNIFIED_RUN_ENABLED="true",
         )
         monkeypatch.setattr(
             assembler_mod,
@@ -257,8 +257,8 @@ class TestForegroundContextSegment:
         from app.core import llm_factory
 
         override_settings(
-            V21_AGENT_RUNTIME_ENABLED="true",
-            V21_UNIFIED_RUN_ENABLED="true",
+            AGENT_RUNTIME_ENABLED="true",
+            UNIFIED_RUN_ENABLED="true",
         )
         llm = fake_llm(
             response="好呀。",

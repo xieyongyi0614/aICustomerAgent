@@ -25,11 +25,11 @@ from app.services.trace_collector import TurnTraceSession
 
 
 FLAG_ENVS = {
-    "V22_EXPERIENCE_ENABLED": "true",
-    "V22_STYLE_CONTRACT_ENABLED": "true",
-    "V22_EMOTION_TRANSITION_ENABLED": "true",
-    "V22_RELATIONSHIP_ADDRESSING_ENABLED": "true",
-    "V22_HABIT_RUNTIME_ENABLED": "true",
+    "EXPERIENCE_ENABLED": "true",
+    "STYLE_CONTRACT_ENABLED": "true",
+    "EMOTION_TRANSITION_ENABLED": "true",
+    "RELATIONSHIP_ADDRESSING_ENABLED": "true",
+    "HABIT_RUNTIME_ENABLED": "true",
 }
 
 
@@ -89,7 +89,7 @@ def test_build_style_context_returns_none_when_flags_off():
 
 
 def test_build_style_context_requires_style_contract_gate(monkeypatch):
-    _set_flags(monkeypatch, V22_STYLE_CONTRACT_ENABLED="false")
+    _set_flags(monkeypatch, STYLE_CONTRACT_ENABLED="false")
     try:
         assert build_style_context(_state(), _analysis()) is None
     finally:
@@ -99,9 +99,9 @@ def test_build_style_context_requires_style_contract_gate(monkeypatch):
 def test_build_style_context_with_only_total_and_style_gates(monkeypatch):
     _set_flags(
         monkeypatch,
-        V22_EMOTION_TRANSITION_ENABLED="false",
-        V22_RELATIONSHIP_ADDRESSING_ENABLED="false",
-        V22_HABIT_RUNTIME_ENABLED="false",
+        EMOTION_TRANSITION_ENABLED="false",
+        RELATIONSHIP_ADDRESSING_ENABLED="false",
+        HABIT_RUNTIME_ENABLED="false",
     )
     try:
         contract = build_style_context(_state(), _analysis())
@@ -140,7 +140,7 @@ def test_build_style_context_relationship_gate_controls_boost(monkeypatch):
         character_state=CharacterState(mood="calm", intensity=0.45),
         relationship_state=RelationshipState(stage="partner"),
     )
-    _set_flags(monkeypatch, V22_RELATIONSHIP_ADDRESSING_ENABLED="false")
+    _set_flags(monkeypatch, RELATIONSHIP_ADDRESSING_ENABLED="false")
     try:
         without_boost = build_style_context(partner_state, _analysis())
         assert without_boost.emotion_constraint.expression_intensity == "natural"
@@ -166,7 +166,7 @@ def test_build_style_context_emotion_off_keeps_relationship_expressiveness(monke
         character_state=CharacterState(mood="calm", intensity=0.2),
         relationship_state=RelationshipState(stage="partner"),
     )
-    _set_flags(monkeypatch, V22_EMOTION_TRANSITION_ENABLED="false")
+    _set_flags(monkeypatch, EMOTION_TRANSITION_ENABLED="false")
     try:
         contract = build_style_context(partner_state, _analysis())
         assert contract.addressing.emotion_expressiveness == "open"
@@ -285,24 +285,24 @@ def test_enablement_chain_requires_total_gate_for_sub_flags():
     base_flags = {
         "action_enabled": False,
         "action_outbox_enabled": False,
-        "v21_unified_run_enabled": False,
-        "v21_agent_runtime_enabled": False,
-        "v21_personality_evolution_enabled": False,
-        "v21_agent_metrics_enabled": False,
-        "v21_goal_stack_enabled": False,
-        "v22_experience_enabled": False,
-        "v22_emotion_transition_enabled": False,
-        "v22_relationship_addressing_enabled": False,
-        "v22_habit_runtime_enabled": False,
-        "v22_style_contract_enabled": False,
+        "unified_run_enabled": False,
+        "agent_runtime_enabled": False,
+        "personality_evolution_enabled": False,
+        "agent_metrics_enabled": False,
+        "goal_stack_enabled": False,
+        "experience_enabled": False,
+        "emotion_transition_enabled": False,
+        "relationship_addressing_enabled": False,
+        "habit_runtime_enabled": False,
+        "style_contract_enabled": False,
     }
     settings = SimpleNamespace(**base_flags)
     assert enablement_violations(settings) == []
 
-    settings.v22_style_contract_enabled = True
+    settings.style_contract_enabled = True
     violations = enablement_violations(settings)
     assert len(violations) == 1
-    assert "v22_experience_enabled" in violations[0]
+    assert "experience_enabled" in violations[0]
 
-    settings.v22_experience_enabled = True
+    settings.experience_enabled = True
     assert enablement_violations(settings) == []

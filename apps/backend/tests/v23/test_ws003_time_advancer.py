@@ -11,8 +11,8 @@ from app.services.world.time_advancer import TimeAdvanceResult, advance_world_ti
 
 
 def _flags_on(monkeypatch, **extra):
-    monkeypatch.setenv("V23_WORLD_SIMULATION_ENABLED", "true")
-    monkeypatch.setenv("V23_TIME_ADVANCE_ENABLED", "true")
+    monkeypatch.setenv("WORLD_SIMULATION_ENABLED", "true")
+    monkeypatch.setenv("TIME_ADVANCE_ENABLED", "true")
     for key, value in extra.items():
         monkeypatch.setenv(key.upper(), str(value).lower())
     get_settings.cache_clear()

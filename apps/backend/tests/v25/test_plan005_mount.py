@@ -70,7 +70,7 @@ def advance_on(override_settings):
 
 @pytest.fixture
 def observation_on(advance_on, override_settings):
-    override_settings(v25_planning_enabled="true", v25_plan_observation_enabled="true")
+    override_settings(planning_enabled="true", plan_observation_enabled="true")
 
 
 class TestShapeSnapshots:
@@ -182,7 +182,7 @@ class TestFlagGatedWiring:
         goal = make_goal(user_id=V25_USER, description="字段集对照")
         make_plan(goal.id)
         off = await life_loop._step_goal_advance(V25_USER, V25_NOW)
-        override_settings(v25_planning_enabled="true", v25_plan_observation_enabled="true")
+        override_settings(planning_enabled="true", plan_observation_enabled="true")
         on = await life_loop._step_goal_advance(V25_USER, V25_NOW)
         assert set(off) | {"plan_observe"} == set(on)
 
@@ -192,7 +192,7 @@ class TestFlagGatedWiring:
     ):
         """总闸 off 时观测子闸不生效（串行链的运行时形态）。"""
         calls = self._spy_observer(monkeypatch)
-        override_settings(v25_plan_observation_enabled="true")
+        override_settings(plan_observation_enabled="true")
         goal = make_goal(user_id=V25_USER, description="总闸 off")
         make_plan(goal.id)
         await life_loop._step_goal_advance(V25_USER, V25_NOW)

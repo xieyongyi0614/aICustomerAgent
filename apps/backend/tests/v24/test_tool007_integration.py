@@ -32,8 +32,8 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "69c783609e4426a7160c8c75699842cf566676bb6d589db43cf23cf7e146dcbc",
-    "app/application/outbox_consumer.py": "e4ea78f0b3800c3ddc7edc8d90066e1fe4b14c9adb68e1fc8f11d72ecbaad0d6",
+    "app/application/world_engine.py": "9691be2fcdd977af6be2be45615e210a814a27e58d96f35668dec22f2ce8347a",
+    "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
 
@@ -117,9 +117,9 @@ def _pin_action_engine_clock(monkeypatch):
 
 
 def test_build_snapshot_assembles_world_facts_when_master_flag_on(db_session_factory, override_settings):
-    override_settings(v24_tool_system_enabled="true", world_enabled="true")
+    override_settings(tool_system_enabled="true", world_enabled="true")
     seed_all()
-    snapshot = action_engine._build_snapshot(USER, world_settings(v24_tool_system_enabled=True))
+    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
 
     tool_ctx = snapshot.tool_context
     assert isinstance(tool_ctx, ToolContext)
@@ -160,19 +160,19 @@ def test_build_snapshot_v23_shape_unchanged_when_flags_off(db_session_factory):
 
 
 def test_build_snapshot_degrades_when_preread_crashes(db_session_factory, monkeypatch, override_settings):
-    override_settings(v24_tool_system_enabled="true")
+    override_settings(tool_system_enabled="true")
     monkeypatch.setattr(
         world_context_module.WorldContextBuilder,
         "build",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("preread down")),
     )
-    snapshot = action_engine._build_snapshot(USER, world_settings(v24_tool_system_enabled=True))
+    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
     assert snapshot.tool_context is None
 
 
 def test_build_snapshot_survives_missing_world(db_session_factory, override_settings):
-    override_settings(v24_tool_system_enabled="true", world_enabled="true")
-    snapshot = action_engine._build_snapshot(USER, world_settings(v24_tool_system_enabled=True))
+    override_settings(tool_system_enabled="true", world_enabled="true")
+    snapshot = action_engine._build_snapshot(USER, world_settings(tool_system_enabled=True))
     assert snapshot.tool_context is not None
     assert snapshot.tool_context.world["world_enabled"] is True
     assert snapshot.tool_context.world["location"] is None
@@ -183,7 +183,7 @@ def test_build_snapshot_survives_missing_world(db_session_factory, override_sett
 
 
 def test_tool_context_for_execution_keeps_identity_and_takes_world_facts(db_session_factory, override_settings):
-    override_settings(v24_tool_system_enabled="true")
+    override_settings(tool_system_enabled="true")
     from app.services.action.registry import ExecutionContext
 
     preloaded = tool_context(
@@ -222,9 +222,9 @@ def _snapshot_with_tool_context(tool_ctx: ToolContext, settings) -> GateSnapshot
 
 
 def test_resolve_surface_uses_preloaded_world_facts(db_session_factory, monkeypatch, override_settings):
-    override_settings(v24_tool_system_enabled="true")
+    override_settings(tool_system_enabled="true")
     seed_all()
-    settings = world_settings(v24_tool_system_enabled=True)
+    settings = world_settings(tool_system_enabled=True)
     snapshot = _snapshot_with_tool_context(
         action_engine._build_snapshot(USER, settings).tool_context, settings
     )
@@ -236,8 +236,8 @@ def test_resolve_surface_uses_preloaded_world_facts(db_session_factory, monkeypa
 
 
 def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_settings):
-    override_settings(v24_tool_system_enabled="true", world_enabled="false")
-    settings = world_settings(v24_tool_system_enabled=True, world_enabled=False)
+    override_settings(tool_system_enabled="true", world_enabled="false")
+    settings = world_settings(tool_system_enabled=True, world_enabled=False)
     facts = WorldContextBuilder(settings).build(USER, now=NOW, settings=settings)
     ctx = apply_world_facts(ToolContext(user_id=USER, now=NOW, settings=settings), facts)
     surface = resolve_surface(_snapshot_with_tool_context(ctx, settings))
@@ -250,10 +250,10 @@ def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_s
 
 def test_assemble_plan_uses_preloaded_facts_for_tool_choice(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        v24_tool_system_enabled="true", world_enabled="true", action_enabled="true"
+        tool_system_enabled="true", world_enabled="true", action_enabled="true"
     )
     seed_all()
-    settings = world_settings(v24_tool_system_enabled=True, action_enabled=True)
+    settings = world_settings(tool_system_enabled=True, action_enabled=True)
     snapshot = action_engine._build_snapshot(USER, settings)
     intent = ActionIntent(
         action_type="move_object",

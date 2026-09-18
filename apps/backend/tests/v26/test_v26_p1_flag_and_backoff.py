@@ -9,7 +9,7 @@ from app.core.settings import get_settings
 from app.core.settings.enablement import (
     enablement_violations,
     validate_enablement_chain,
-    v26_reserved_flag_warnings,
+    action_reserved_flag_warnings,
 )
 from app.core.settings._shared import SettingsError
 from app.core.settings.action_execution import (
@@ -28,11 +28,11 @@ class TestEnvExampleRegistration:
         example = Path(__file__).resolve().parents[2] / ".env.example"
         text = example.read_text(encoding="utf-8")
         for flag in (
-            "V26_ACTION_EXECUTION_ENABLED",
-            "V26_ACTION_SCHEDULER_ENABLED",
-            "V26_ACTION_RESULT_ENABLED",
-            "V26_ACTION_FEEDBACK_ENABLED",
-            "V26_ACTION_DEBUG_ENABLED",
+            "ACTION_EXECUTION_ENABLED",
+            "ACTION_SCHEDULER_ENABLED",
+            "ACTION_RESULT_ENABLED",
+            "ACTION_FEEDBACK_ENABLED",
+            "ACTION_DEBUG_ENABLED",
             "ACTION_EXECUTING_TIMEOUT_MINUTES",
         ):
             assert flag in text, f".env.example 缺少 {flag}"
@@ -42,49 +42,49 @@ class TestEnablementChain:
     def test_master_requires_action_enabled(self):
         settings = get_settings()
         original = settings.action_enabled
-        original_v26 = settings.v26_action_execution_enabled
+        original_v26 = settings.action_execution_enabled
         try:
             settings.action_enabled = False
-            settings.v26_action_execution_enabled = True
+            settings.action_execution_enabled = True
             violations = enablement_violations(settings)
-            assert any("v26_action_execution_enabled 要求 action_enabled" in v for v in violations)
+            assert any("action_execution_enabled 要求 action_enabled" in v for v in violations)
         finally:
             settings.action_enabled = original
-            settings.v26_action_execution_enabled = original_v26
+            settings.action_execution_enabled = original_v26
 
     def test_sub_flag_requires_master(self):
         settings = get_settings()
-        original_v26 = settings.v26_action_execution_enabled
-        original_sched = settings.v26_action_scheduler_enabled
+        original_v26 = settings.action_execution_enabled
+        original_sched = settings.action_scheduler_enabled
         original_action = settings.action_enabled
         try:
             settings.action_enabled = True
-            settings.v26_action_execution_enabled = False
-            settings.v26_action_scheduler_enabled = True
+            settings.action_execution_enabled = False
+            settings.action_scheduler_enabled = True
             violations = enablement_violations(settings)
             assert any(
-                "v26_action_scheduler_enabled 要求 v26_action_execution_enabled" in v
+                "action_scheduler_enabled 要求 action_execution_enabled" in v
                 for v in violations
             )
         finally:
             settings.action_enabled = original_action
-            settings.v26_action_execution_enabled = original_v26
-            settings.v26_action_scheduler_enabled = original_sched
+            settings.action_execution_enabled = original_v26
+            settings.action_scheduler_enabled = original_sched
 
     def test_reserved_flags_warn_when_master_on(self):
         settings = get_settings()
         original = {
             name: getattr(settings, name)
             for name in (
-                "v26_action_execution_enabled",
+                "action_execution_enabled",
                 *RESERVED_V26_SUB_FLAGS,
             )
         }
         try:
-            settings.v26_action_execution_enabled = True
+            settings.action_execution_enabled = True
             for name in RESERVED_V26_SUB_FLAGS:
                 setattr(settings, name, True)
-            warnings = v26_reserved_flag_warnings(settings)
+            warnings = action_reserved_flag_warnings(settings)
             assert len(warnings) == len(RESERVED_V26_SUB_FLAGS)
             assert all("RESERVED" in w for w in warnings)
         finally:
@@ -92,7 +92,7 @@ class TestEnablementChain:
                 setattr(settings, name, value)
 
     def test_sub_flags_cover_master_gate(self):
-        assert "v26_action_scheduler_enabled" in V26_SUB_FLAGS
+        assert "action_scheduler_enabled" in V26_SUB_FLAGS
         assert set(RESERVED_V26_SUB_FLAGS).issubset(set(V26_SUB_FLAGS))
 
 
@@ -101,15 +101,15 @@ class TestMultistepReservedDecision:
         assert get_settings().action_plan_max_steps == 1
 
     def test_multistep_flag_is_reserved(self):
-        assert "v26_action_multistep_enabled" in RESERVED_V26_SUB_FLAGS
+        assert "action_multistep_enabled" in RESERVED_V26_SUB_FLAGS
 
     def test_env_example_marks_multistep_reserved(self):
         from pathlib import Path
 
         example = Path(__file__).resolve().parents[2] / ".env.example"
         text = example.read_text(encoding="utf-8")
-        assert "V26_ACTION_MULTISTEP_ENABLED" in text
-        idx = text.index("V26_ACTION_MULTISTEP_ENABLED")
+        assert "ACTION_MULTISTEP_ENABLED" in text
+        idx = text.index("ACTION_MULTISTEP_ENABLED")
         window = text[max(0, idx - 200) : idx + 80]
         assert "RESERVED" in window
 
@@ -137,7 +137,7 @@ class TestExecuteBackoffGuard:
     def test_execute_proceeds_when_backoff_elapsed(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", False)
+        monkeypatch.setattr(settings, "action_execution_enabled", False)
         monkeypatch.setattr(settings, "world_enabled", True)
         from app.application import world_engine
 

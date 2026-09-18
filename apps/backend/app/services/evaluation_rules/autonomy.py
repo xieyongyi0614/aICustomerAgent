@@ -188,7 +188,7 @@ class StormAndRepeatRule(EvaluationRule):
         if loop is None:
             return None
         delivered = len(loop.delivered_proactive)
-        limit = get_settings().v2_life_loop_storm_daily_limit
+        limit = get_settings().life_loop_storm_daily_limit
         if delivered > limit:
             return build_issue(
                 self.code,

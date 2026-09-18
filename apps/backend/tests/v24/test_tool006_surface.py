@@ -36,8 +36,8 @@ EXPECTED_AUTONOMOUS_STAGES = (
 @pytest.fixture
 def registry_on(monkeypatch, v24_tool_env):
     """总闸 on：注入内置声明注册表（惰性单例按 env 语境重建）。"""
-    v24_tool_env(v24_tool_system_enabled=True)
-    assert autonomy_engine.get_settings().v24_tool_system_enabled is True
+    v24_tool_env(tool_system_enabled=True)
+    assert autonomy_engine.get_settings().tool_system_enabled is True
     registry = builtin_registry()
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry)
     return registry
@@ -47,13 +47,13 @@ def registry_on(monkeypatch, v24_tool_env):
 
 
 def test_surface_is_none_when_master_flag_off(monkeypatch, v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
     monkeypatch.setattr(tool_registry_module, "_registry", None)
     assert autonomy_engine.resolve_autonomy_surface(USER, NOW) is None
 
 
 def test_surface_off_keeps_capabilities_none_and_records_nothing(monkeypatch, v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
     monkeypatch.setattr(tool_registry_module, "_registry", None)
     trace = RecordingTrace()
     assert autonomy_engine._resolve_tick_capabilities(USER, NOW, trace, {}) is None
@@ -124,7 +124,7 @@ def test_trace_step_carries_tool_facts(registry_on):
 
 def test_capabilities_distinguish_empty_surface_from_none(monkeypatch, v24_tool_env):
     """E1：总闸 on 但注册表为空 → capabilities=[]（非 None），决策仍正常（silence 兜底）。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     monkeypatch.setattr(autonomy_engine, "get_tool_registry", lambda: registry_with())
     trace = RecordingTrace()
     assert autonomy_engine._resolve_tick_capabilities(USER, NOW, trace, {}) == []
@@ -205,7 +205,7 @@ def test_event_driven_profile_and_autonomous_stage_sequence_unchanged(registry_o
 
 def test_master_flag_off_keeps_v9_autonomy_path(monkeypatch, v24_tool_env):
     """Flag 全 off：工具面与工具事实都不参与，capabilities 恒为 None（V2.3.0 原状）。"""
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
     monkeypatch.setattr(tool_registry_module, "_registry", None)
     assert autonomy_engine.resolve_autonomy_surface(USER, NOW) is None
     assert autonomy_engine.collect_tool_facts(USER) == {}

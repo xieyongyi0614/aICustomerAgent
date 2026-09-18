@@ -160,7 +160,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
     detail: dict = {"goal_id": goal.id, "observations": 0, "adjustments": []}
 
     active_start = plan.updated_at or plan.created_at
-    max_hours = settings.v2_autonomy_goal_max_active_hours
+    max_hours = settings.autonomy_goal_max_active_hours
     if active_start is not None and now - active_start > timedelta(hours=max_hours):
         record = goal_repository.fail_goal(goal.id, REASON_PERIOD_EXCEEDED)
         _record_lifecycle(record or goal, "failed", REASON_PERIOD_EXCEEDED, goal.id)
@@ -174,7 +174,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
         if _all_done(specs):
             detail.update(_complete(goal))
             return detail
-        if goal_repository.count_plans(goal.id) < settings.v2_autonomy_planning_max_attempts:
+        if goal_repository.count_plans(goal.id) < settings.autonomy_planning_max_attempts:
             enqueued = goal_planning.enqueue_planning(
                 goal.user_id, goal.id, goal_planning.TRIGGER_BLOCKED
             )
@@ -220,7 +220,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
     if current.last_observed_at != now:
         current.attempt_count += 1
     current.last_observed_at = now
-    if current.attempt_count < settings.v2_autonomy_subgoal_failure_threshold:
+    if current.attempt_count < settings.autonomy_subgoal_failure_threshold:
         detail["outcome"] = "retrying"
         detail["attempt_count"] = current.attempt_count
         _save_progress(plan.id, specs, now)
@@ -236,7 +236,7 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
         return detail
 
     _save_progress(plan.id, specs, now)
-    if goal_repository.count_plans(goal.id) < settings.v2_autonomy_planning_max_attempts:
+    if goal_repository.count_plans(goal.id) < settings.autonomy_planning_max_attempts:
         enqueued = goal_planning.enqueue_planning(
             goal.user_id, goal.id, goal_planning.TRIGGER_BLOCKED
         )

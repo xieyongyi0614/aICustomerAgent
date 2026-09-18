@@ -73,7 +73,7 @@ class TestBudgetState:
         assert state.used_calls == 0
 
     def test_over_call_limit_degraded(self, db_session_factory, override_settings):
-        override_settings(v2_life_loop_daily_llm_call_budget="2")
+        override_settings(life_loop_daily_llm_call_budget="2")
         _prefill_llm_calls(db_session_factory, count=2)
         state = life_loop_budget.check_daily_budget(now=NOW)
         assert state.status == "degraded"
@@ -82,8 +82,8 @@ class TestBudgetState:
 
     def test_over_token_limit_degraded(self, db_session_factory, override_settings):
         override_settings(
-            v2_life_loop_daily_llm_call_budget="0",
-            v2_life_loop_daily_llm_token_budget="100",
+            life_loop_daily_llm_call_budget="0",
+            life_loop_daily_llm_token_budget="100",
         )
         _prefill_llm_calls(db_session_factory, count=1, tokens=100)
         state = life_loop_budget.check_daily_budget(now=NOW)
@@ -93,7 +93,7 @@ class TestBudgetState:
     def test_usage_query_failure_conservative(
         self, db_session_factory, monkeypatch, override_settings
     ):
-        override_settings(v2_life_loop_daily_llm_call_budget="10")
+        override_settings(life_loop_daily_llm_call_budget="10")
 
         def boom(cutoff):
             raise RuntimeError("db down")
@@ -122,7 +122,7 @@ class TestBudgetState:
         assert calls["n"] == 2
 
     def test_next_day_recovers(self, db_session_factory, override_settings):
-        override_settings(v2_life_loop_daily_llm_call_budget="1")
+        override_settings(life_loop_daily_llm_call_budget="1")
         _prefill_llm_calls(db_session_factory, count=1)
         assert life_loop_budget.check_daily_budget(now=NOW).status == "degraded"
         next_day = NOW + timedelta(days=1)
@@ -183,7 +183,7 @@ class TestBudgetGate:
     async def test_degraded_skips_decision_and_keeps_trigger_pending(
         self, db_session_factory, life_loop_on, override_settings, monkeypatch
     ):
-        override_settings(v2_life_loop_daily_llm_call_budget="1")
+        override_settings(life_loop_daily_llm_call_budget="1")
         _prefill_llm_calls(db_session_factory, count=1)
         _stub_tick(monkeypatch)
         conversation_repository.get_or_create_conversation(SESSION, USER)
@@ -205,7 +205,7 @@ class TestBudgetGate:
     async def test_cycle_step_budget_skips_decision(
         self, db_session_factory, life_loop_on, override_settings, monkeypatch
     ):
-        override_settings(v2_life_loop_cycle_llm_budget="0")
+        override_settings(life_loop_cycle_llm_budget="0")
         _stub_tick(monkeypatch)
         conversation_repository.get_or_create_conversation(SESSION, USER)
         trigger_evaluator.register_followup(

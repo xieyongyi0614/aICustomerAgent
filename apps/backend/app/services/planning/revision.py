@@ -15,7 +15,7 @@
 
 **避免「无限重规划」是本模块存在的首要理由**：既有 `goal_planning._LLM_RETRY_ATTEMPTS` 只管
 LLM 调用失败，管不了「计划本身行不通」。终止路径由 `budget_exhausted` 判定
-（`plan.version ≥ v25_plan_revision_budget`）→ 计划 `rejected` + 目标
+（`plan.version ≥ plan_revision_budget`）→ 计划 `rejected` + 目标
 `failed("plan_exhausted")`（终态由既有 `PlanningEngine.revise::_exhaust` 落，本模块不写）。
 
 **保留已完成步骤（G-RETRY，本任务最容易写错的一处）**：步级幂等键由
@@ -34,7 +34,7 @@ LLM 调用失败，管不了「计划本身行不通」。终止路径由 `budge
 | `ctx.off_surface_streak` / `ctx.undecidable_streak` | 连续计数（调用方维护） | 0 |
 | `ctx.insight_driven` | PLAN-010 的 Insight 投递信号 | `False` |
 
-阈值 N 由本模块定义（settings 无对应项）：新增 `v25_*` 参数会改动 PLAN-002 冻结的
+阈值 N 由本模块定义（settings 无对应项）：新增 `plan_*` 参数会改动 PLAN-002 冻结的
 「13 Flag + 14 参数」快照，与零迁移 / 零新增配置的强断言冲突；阈值是**判定纪律**而非可调
 策略，故以模块常量承载。退避数学**只有一份**（Action 层），本模块不复制、不新增退避字段。
 """
@@ -124,7 +124,7 @@ class PlanRevisionPolicy:
     ) -> RetryPolicy:
         """由 `step.retry_policy` 映射为 `RetryPolicy`（**引用 settings，不自建退避**）。
 
-        `until_budget` 的界在 `v25_plan_step_max_attempts`（由调用方经 `max_attempts` 注入，
+        `until_budget` 的界在 `plan_step_max_attempts`（由调用方经 `max_attempts` 注入，
         缺省即该设置项的出厂值）；`none` / `once` 的界在本对象。`RetryPolicy` 只承载
         「尝试上限由谁裁决」，**零退避字段**——退避数学只有一份，在 Action 层。
         """
@@ -151,7 +151,7 @@ class PlanRevisionPolicy:
 
     @staticmethod
     def budget_exhausted(plan, *, revision_budget: int) -> bool:
-        """修订预算终止判定（§4.1.5 ①）：`plan.version ≥ v25_plan_revision_budget`。
+        """修订预算终止判定（§4.1.5 ①）：`plan.version ≥ plan_revision_budget`。
 
         引擎侧的终止动作由既有 `PlanningEngine.revise` 承担（计划置 `rejected` + 目标
         `failed("plan_exhausted")`，其自身另有一道 `count_plans` 守卫）；本判定是「该不该再修」

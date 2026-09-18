@@ -227,11 +227,11 @@ def test_pipeline_flags_on_injects_style_contract(
     client_fixture, db_session_factory, fake_llm, override_settings, monkeypatch
 ):
     override_settings(
-        v22_experience_enabled=True,
-        v22_style_contract_enabled=True,
-        v22_emotion_transition_enabled=True,
-        v22_relationship_addressing_enabled=True,
-        v22_habit_runtime_enabled=True,
+        experience_enabled=True,
+        style_contract_enabled=True,
+        emotion_transition_enabled=True,
+        relationship_addressing_enabled=True,
+        habit_runtime_enabled=True,
     )
     captured = {}
     real_build = PromptBuilder.build

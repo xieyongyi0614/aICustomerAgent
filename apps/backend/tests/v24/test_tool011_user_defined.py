@@ -80,9 +80,9 @@ def test_register_returns_tool_id_and_applies_forced_disciplines():
 def test_register_requires_both_gates():
     """AC：注册需双闸；Flag 全 off 时注册拒绝。"""
     for envs in (
-        {"v24_tool_system_enabled": False, "v24_tool_user_defined_enabled": False},
-        {"v24_tool_system_enabled": False, "v24_tool_user_defined_enabled": True},
-        {"v24_tool_system_enabled": True, "v24_tool_user_defined_enabled": False},
+        {"tool_system_enabled": False, "tool_user_defined_enabled": False},
+        {"tool_system_enabled": False, "tool_user_defined_enabled": True},
+        {"tool_system_enabled": True, "tool_user_defined_enabled": False},
     ):
         registrar = _registrar(settings=ext_settings(**envs))
         report = registrar.validate(user_declaration())
@@ -359,7 +359,7 @@ def test_composite_is_unavailable_when_gate_off():
         "记录心情",
         ({"capability": "memory", "action": "save"},),
         (),
-        settings=ext_settings(v24_tool_user_defined_enabled=False),
+        settings=ext_settings(tool_user_defined_enabled=False),
         capability_registry=registry,
     )
     result = asyncio.run(capability.execute("run", {}, _execution_context()))

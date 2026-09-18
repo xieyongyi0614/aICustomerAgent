@@ -218,7 +218,7 @@ def test_event_storm_only_first_enqueues(db_session_factory, reflection_on):
 
 
 def test_event_cooldown_window_blocks_repeat(db_session_factory, reflection_on, override_settings):
-    override_settings( v2_reflection_event_cooldown_hours=24.0)
+    override_settings( reflection_event_cooldown_hours=24.0)
     now = _seed_passing_evidence(db_session_factory)
     ids = [f"mem-trg-{i}" for i in range(5)]
     triggers.observe_reinforce(USER, ids)

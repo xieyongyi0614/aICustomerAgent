@@ -235,7 +235,7 @@ class PromptBuilder:
         if not entries:
             return None
         settings = get_settings()
-        budget = settings.v2_relationship_shared_budget_chars
+        budget = settings.relationship_shared_budget_chars
         lines = [SHARED_EXPERIENCE_HEADER]
         used = len(SHARED_EXPERIENCE_HEADER)
         for entry in entries:
@@ -253,7 +253,7 @@ class PromptBuilder:
         if not patterns:
             return None
         settings = get_settings()
-        budget = settings.v2_relationship_pattern_budget_chars
+        budget = settings.relationship_pattern_budget_chars
         lines = [RELATIONSHIP_PATTERN_HEADER]
         used = len(RELATIONSHIP_PATTERN_HEADER)
         for pattern in patterns:
@@ -333,7 +333,7 @@ class PromptBuilder:
         settings = get_settings()
         world_budget = (
             settings.world_context_char_budget_v23
-            if settings.v23_world_simulation_enabled
+            if settings.world_simulation_enabled
             else settings.world_context_char_budget
         )
         brief = getattr(world_ctx, "brief", None) if world_ctx is not None else None

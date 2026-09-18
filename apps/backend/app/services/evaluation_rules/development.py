@@ -104,9 +104,9 @@ class OverCapRule(EvaluationRule):
 
     def _cap(self, key: str, settings):
         if key == "response_style.length":
-            return settings.v2_development_preference_max_token_delta
+            return settings.development_preference_max_token_delta
         if key == "goal.user_care.weight":
-            return settings.v2_development_pattern_goal_tier_delta_max
+            return settings.development_pattern_goal_tier_delta_max
         return None
 
 

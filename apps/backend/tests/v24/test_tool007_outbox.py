@@ -42,8 +42,8 @@ def _tool_path_env(override_settings, monkeypatch):
     """总闸 + outbox 双开；自动播种关闭（库存夹具确定）。"""
     monkeypatch.setattr(tool_registry, "_registry", None)
     override_settings(
-        v24_tool_system_enabled="true",
-        v24_tool_surface_enabled="true",
+        tool_system_enabled="true",
+        tool_surface_enabled="true",
         world_enabled="true",
         action_enabled="true",
         action_outbox_enabled="true",
@@ -142,7 +142,7 @@ def _insert_row(key: str, ops: list[dict], record_payload: dict) -> None:
 
 @pytest.mark.asyncio
 async def test_e7_unknown_op_goes_to_retry(db_session_factory, override_settings):
-    override_settings(v2_life_loop_outbox_max_attempts="3")
+    override_settings(life_loop_outbox_max_attempts="3")
     seed_all()
     key = "act-tool007-e7"
     _insert_row(key, [{"op": "explode_world", "args": [USER]}], _record_payload())
@@ -157,7 +157,7 @@ async def test_e7_unknown_op_goes_to_retry(db_session_factory, override_settings
 
 @pytest.mark.asyncio
 async def test_e7_unknown_op_dead_letters_after_backoff(db_session_factory, override_settings):
-    override_settings(v2_life_loop_outbox_max_attempts="3")
+    override_settings(life_loop_outbox_max_attempts="3")
     seed_all()
     key = "act-tool007-e7-dl"
     _insert_row(key, [{"op": "explode_world", "args": [USER]}], _record_payload())
@@ -214,7 +214,7 @@ async def test_e8_world_write_failure_never_rolls_back_action(
     db_session_factory, monkeypatch, override_settings
 ):
     """投递失败不回滚执行（V9 纪律）：连续失败至死信，行动终态仍为 succeeded。"""
-    override_settings(v2_life_loop_outbox_max_attempts="3")
+    override_settings(life_loop_outbox_max_attempts="3")
     seed_all()
     monkeypatch.setattr(world_engine, "move_object", lambda *args, **kwargs: None)
     record = await run_action_planning(
@@ -264,7 +264,7 @@ async def test_e9_replay_does_not_duplicate_world_event(db_session_factory):
 @pytest.mark.asyncio
 async def test_flag_off_uses_v9_direct_path(db_session_factory, override_settings):
     seed_all()
-    override_settings(v24_tool_system_enabled="false", action_outbox_enabled="false")
+    override_settings(tool_system_enabled="false", action_outbox_enabled="false")
     record = await run_action_planning(
         USER,
         _intent(CREATE_REMINDER, content="复查", due_at=(NOW.replace(year=2027)).isoformat()),

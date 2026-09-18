@@ -9,8 +9,8 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 class ExperienceSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    v22_experience_enabled: bool = False
-    v22_emotion_transition_enabled: bool = False
-    v22_relationship_addressing_enabled: bool = False
-    v22_habit_runtime_enabled: bool = False
-    v22_style_contract_enabled: bool = False
+    experience_enabled: bool = False
+    emotion_transition_enabled: bool = False
+    relationship_addressing_enabled: bool = False
+    habit_runtime_enabled: bool = False
+    style_contract_enabled: bool = False

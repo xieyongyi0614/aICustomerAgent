@@ -341,7 +341,7 @@ def test_deny_out_of_scope_for_ext_api_with_whitelisted_host_e3():
         invocation(EXT_TOOL_ID, {"content": "x", "url": "https://api.example.com/push"}),
         snapshot(
             grants=[grant(EXT_TOOL_ID, ("external:a.com",))],
-            settings=permission_settings(v24_tool_ext_allowed_hosts="api.example.com"),
+            settings=permission_settings(tool_ext_allowed_hosts="api.example.com"),
         ),
     )
     assert decision.decision == DECISION_DENY
@@ -373,7 +373,7 @@ def test_ext_host_whitelist_empty_denies_every_host():
     decision = _gate().evaluate(
         ext_definition(),
         invocation(EXT_TOOL_ID, {"content": "x", "url": "https://api.example.com/v1/push"}),
-        snapshot(settings=permission_settings(v24_tool_ext_allowed_hosts="")),
+        snapshot(settings=permission_settings(tool_ext_allowed_hosts="")),
     )
     assert decision.reason == REASON_UNTRUSTED_NAMESPACE
 
@@ -383,7 +383,7 @@ def test_ext_host_whitelist_allows_listed_host_into_confirm_flow():
         ext_definition(),
         invocation(EXT_TOOL_ID, {"content": "x", "url": "https://api.example.com/v1/push"}),
         snapshot(
-            settings=permission_settings(v24_tool_ext_allowed_hosts="api.example.com")
+            settings=permission_settings(tool_ext_allowed_hosts="api.example.com")
         ),
     )
     assert decision.decision == DECISION_CONFIRM_REQUIRED
@@ -471,7 +471,7 @@ def test_channel_unbind_loses_implied_grant_e10():
 
 def test_master_gate_off_keeps_allow_all_e14():
     definition = untrusted_definition()
-    settings = permission_settings(v24_tool_system_enabled=False)
+    settings = permission_settings(tool_system_enabled=False)
     decision = _gate().evaluate(
         definition, invocation(UNTRUSTED_TOOL_ID), snapshot(settings=settings)
     )
@@ -488,7 +488,7 @@ def test_master_gate_off_keeps_allow_all_e14():
 )
 def test_sub_layer_off_grant_free_tier_still_allows(definition_factory, tool_id):
     """P0-1 中段：总闸 on + 权限子闸 off 时，免授权档（safe / normal）仍放行。"""
-    settings = permission_settings(v24_tool_permission_enabled=False)
+    settings = permission_settings(tool_permission_enabled=False)
     decision = _gate().evaluate(
         definition_factory(), invocation(tool_id), snapshot(settings=settings)
     )
@@ -510,7 +510,7 @@ def test_sub_layer_off_privileged_tiers_default_deny(
     definition_factory, tool_id, expected_level
 ):
     """P0-1 中段：总闸 on + 权限子闸 off 时，特权档默认拒绝（fail-closed）。"""
-    settings = permission_settings(v24_tool_permission_enabled=False)
+    settings = permission_settings(tool_permission_enabled=False)
     decision = _gate().evaluate(
         definition_factory(), invocation(tool_id), snapshot(settings=settings)
     )
@@ -521,7 +521,7 @@ def test_sub_layer_off_privileged_tiers_default_deny(
 
 def test_sub_layer_off_ignores_passed_snapshot_grants():
     """子闸 off 时快照不参与判定：特权档即便带 grant 也不得放行（无授权存储可读）。"""
-    settings = permission_settings(v24_tool_permission_enabled=False)
+    settings = permission_settings(tool_permission_enabled=False)
     granted = snapshot(
         grants=[grant(SENSITIVE_TOOL_ID, ("self",))], settings=settings
     )

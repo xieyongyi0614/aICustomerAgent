@@ -137,7 +137,7 @@ class TestTransitionGuard:
 
 class TestDecay:
     def test_decay_formula(self, life_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_decay_lambda_json",
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.03}')
         now = datetime.datetime.now()
         _memory("m1", "内容", type="user_preference", salience=0.8,
@@ -149,7 +149,7 @@ class TestDecay:
         assert _row("m1").status == "active"
 
     def test_same_day_rerun_idempotent(self, life_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_decay_lambda_json",
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.5}')
         now = datetime.datetime.now()
         _memory("m1", "内容", salience=0.8,
@@ -160,9 +160,9 @@ class TestDecay:
         assert _row("m1").salience == pytest.approx(first)
 
     def test_salience_floor_transitions_to_decayed(self, life_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_decay_lambda_json",
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 1.0}')
-        monkeypatch.setattr(get_settings(), "v2_memory_salience_floor", 0.1)
+        monkeypatch.setattr(get_settings(), "memory_salience_floor", 0.1)
         now = datetime.datetime.now()
         _memory("m1", "内容", salience=0.3,
                 last_reinforced_at=now - datetime.timedelta(days=5))
@@ -184,9 +184,9 @@ class TestDecay:
         assert _row("m2").status == "decayed"
 
     def test_30day_low_salience_decayed_not_deleted(self, life_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_decay_lambda_json",
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 1.0}')
-        monkeypatch.setattr(get_settings(), "v2_memory_salience_floor", 0.1)
+        monkeypatch.setattr(get_settings(), "memory_salience_floor", 0.1)
         now = datetime.datetime.now()
         _memory("m1", "低显著度", salience=0.15,
                 last_reinforced_at=now - datetime.timedelta(days=30))
@@ -196,7 +196,7 @@ class TestDecay:
         assert row.id == "m1"
 
     def test_row_exception_isolated(self, life_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_decay_lambda_json",
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.01}')
         now = datetime.datetime.now()
         _memory("m1", "正常", last_reinforced_at=now - datetime.timedelta(days=3))
@@ -349,7 +349,7 @@ class TestPurge:
     def test_purge_after_retention_with_links(self, life_db):
         now = datetime.datetime.now()
         stale = now - datetime.timedelta(
-            days=get_settings().v2_memory_forget_retention_days + 1
+            days=get_settings().memory_forget_retention_days + 1
         )
         _memory("gone", "过期遗忘", status="forgotten", forgotten_at=stale)
         _memory("keep", "新近遗忘", status="forgotten", forgotten_at=now)
@@ -384,12 +384,12 @@ class TestEvaluatorIntegration:
 
         monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
         monkeypatch.setattr(lifecycle, "SessionLocal", memory_repository.SessionLocal)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 1.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
         _memory("old", "用户喜欢吃辣")
 
         row = MemoryCandidateRow(

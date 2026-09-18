@@ -46,14 +46,14 @@ def archive_if_significant(
         now=now,
     )
     try:
-        snapshot_repo.cleanup_expired(settings.v21_state_snapshot_retention_days, now)
+        snapshot_repo.cleanup_expired(settings.state_snapshot_retention_days, now)
     except Exception:
         logger.exception("快照保留期清理失败，已忽略")
     return True
 
 
 def _interval_ok(last_created: datetime, now: datetime, settings) -> bool:
-    min_interval = max(settings.v21_state_snapshot_min_interval_minutes, 0)
+    min_interval = max(settings.state_snapshot_min_interval_minutes, 0)
     return (now - last_created).total_seconds() >= min_interval * 60
 
 

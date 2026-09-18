@@ -26,8 +26,8 @@ NOW = datetime(2026, 9, 14, 12, 0, 0)
 @pytest.fixture
 def tool_reflection_on(v24_tool_env):
     v24_tool_env(
-        V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_REFLECTION_ENABLED=True)
+        TOOL_SYSTEM_ENABLED=True,
+        TOOL_REFLECTION_ENABLED=True)
     triggers.reset_trigger_state()
     yield
     triggers.reset_trigger_state()
@@ -71,7 +71,7 @@ def test_feed_is_empty_without_flag_or_insights(db_session_factory, tool_reflect
 
 
 def test_feed_is_disabled_when_sub_flag_off(db_session_factory, v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     seed_insight(
         db_session_factory,
         "ins-tool009-off",
@@ -338,11 +338,11 @@ def test_autonomy_notes_are_bounded_to_sixty_chars():
 def test_collect_tool_insights_degrades_to_empty(db_session_factory, v24_tool_env, monkeypatch):
     from app.application import autonomy_engine
 
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     assert autonomy_engine.collect_tool_insights(USER) == {}
     v24_tool_env(
-        V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_REFLECTION_ENABLED=True)
+        TOOL_SYSTEM_ENABLED=True,
+        TOOL_REFLECTION_ENABLED=True)
     seed_insight(
         db_session_factory,
         "ins-tool009-autonomy",

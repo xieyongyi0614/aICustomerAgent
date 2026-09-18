@@ -17,8 +17,8 @@
 | `event_kind` | deposit | `memory_type` | `importance` | `source` |
 |---|---|---|---|---|
 | `plan_completed` | ✅ | `important_event` | 0.7 | `user_derived` |
-| `plan_failed` | ✅ | `important_event` | ≥ `v25_plan_memory_importance_floor` | `user_derived` |
-| `plan_abandoned` | ✅ | `important_event` | ≥ `v25_plan_memory_importance_floor` | `user_derived` |
+| `plan_failed` | ✅ | `important_event` | ≥ `plan_memory_importance_floor` | `user_derived` |
+| `plan_abandoned` | ✅ | `important_event` | ≥ `plan_memory_importance_floor` | `user_derived` |
 | `plan_created` / `plan_revised` / `step_succeeded` / `step_failed` | ❌ | — | — | — |
 
 **G-MEMORY（本任务唯一 Gate）**：`memory_policy._evaluate` 的 R1 对 `source == "ai_inferred"`
@@ -33,7 +33,7 @@
   `{goal_id}:completed` 与既有 AUT-003 完成通道**同锚**（重复投递不产生第二条候选行）。
 - `plan_failed` / `plan_abandoned`：走 §4.2.2 的**加权重路径**——内容锚定用户委托的目标描述
   并带未完成语义（措辞逐字复用 V9 失败纪律 `上次没能帮用户完成：…`）、重要度取
-  `max(FAILED_IMPORTANCE_FLOOR, v25_plan_memory_importance_floor)`。
+  `max(FAILED_IMPORTANCE_FLOOR, plan_memory_importance_floor)`。
 - 隐私步骤参数（§4.2.2 末行）：步骤 `params` 命中既有显式遗忘指令（`memory2.commands.detect_command`
   → `forget`）→ 候选取 `action="forget"`，经 `memory_policy` **R3** 分支判为
   `DECISION_PRIVACY`（「用户要求遗忘，转隐私执行」）并移交既有隐私通道；**本层不复制遗忘执行
@@ -147,7 +147,7 @@ PLAN_MEMORY_EVENT_KINDS: tuple[str, ...] = (
 """七值 `event_kind`（§6.2）：取值集恰为七值、与边界表逐行对应，零新增取值。"""
 
 PLAN_MEMORY_FLOOR_EVENT_KINDS: tuple[str, ...] = (EVENT_PLAN_FAILED, EVENT_PLAN_ABANDONED)
-"""受 `v25_plan_memory_importance_floor` 约束的两行（§4.2.5：失败 / 放弃类）。"""
+"""受 `plan_memory_importance_floor` 约束的两行（§4.2.5：失败 / 放弃类）。"""
 
 PLAN_MEMORY_BOUNDARY_TABLE: dict[str, dict[str, Any]] = {
     EVENT_PLAN_COMPLETED: {
@@ -258,7 +258,7 @@ class PlanMemoryPolicy:
     def decide(self, event_kind: str, *, settings=None) -> PlanMemoryDecision:
         """`event_kind` → 沉积决策（§6.2 冻结签名；`settings` 可注入以便确定性用例）。
 
-        失败 / 放弃类另施加 `v25_plan_memory_importance_floor`（§4.2.5）；`ai_inferred` 行
+        失败 / 放弃类另施加 `plan_memory_importance_floor`（§4.2.5）；`ai_inferred` 行
         **fail-fast**（G-MEMORY：该取值必然被 R1 丢弃，静默放行等于交付一条存不进的候选）。
         """
         resolved = settings if settings is not None else get_settings()
@@ -274,7 +274,7 @@ class PlanMemoryPolicy:
             )
         importance = float(row.get("importance", DEFAULT_IMPORTANCE))
         if event_kind in PLAN_MEMORY_FLOOR_EVENT_KINDS:
-            importance = max(importance, resolved.v25_plan_memory_importance_floor)
+            importance = max(importance, resolved.plan_memory_importance_floor)
         return PlanMemoryDecision(
             True,
             REASON_POLICY_DEPOSIT,
@@ -321,7 +321,7 @@ def deliver_plan_memory(goal, plan, event_kind: str, *, policy=None) -> dict | N
     失败都**不回滚计划终态**（D10）。
     """
     settings = get_settings()
-    if not settings.v25_plan_memory_enabled:
+    if not settings.plan_memory_enabled:
         return None
     try:
         return _deliver(goal, plan, event_kind, policy)

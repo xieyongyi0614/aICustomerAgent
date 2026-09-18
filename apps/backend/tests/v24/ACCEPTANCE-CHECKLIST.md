@@ -13,8 +13,8 @@
 
 | 项 | 说明 |
 |---|---|
-| Flag 基线 | 全部 `V24_TOOL_*` 默认 off；按 §7.8 启用链逐组开启（总闸 → 子闸），每组观察后再开下一组 |
-| 启用顺序 | `V24_TOOL_SYSTEM_ENABLED` → `V24_TOOL_SCHEMA_VALIDATION_ENABLED` → `V24_TOOL_PERMISSION_ENABLED` → `V24_TOOL_OBSERVATION_ENABLED` → `V24_TOOL_SURFACE_ENABLED` → `V24_TOOL_MEMORY_ENABLED` → `V24_TOOL_REFLECTION_ENABLED` → `V24_TOOL_EXTERNAL_API_ENABLED` → `V24_TOOL_USER_DEFINED_ENABLED` → `V24_TOOL_CHANNEL_ENABLED`（另需 `FEISHU_ENABLED=true` + 三项飞书凭据） |
+| Flag 基线 | 全部 `TOOL_*` 默认 off；按 §7.8 启用链逐组开启（总闸 → 子闸），每组观察后再开下一组 |
+| 启用顺序 | `TOOL_SYSTEM_ENABLED` → `TOOL_SCHEMA_VALIDATION_ENABLED` → `TOOL_PERMISSION_ENABLED` → `TOOL_OBSERVATION_ENABLED` → `TOOL_SURFACE_ENABLED` → `TOOL_MEMORY_ENABLED` → `TOOL_REFLECTION_ENABLED` → `TOOL_EXTERNAL_API_ENABLED` → `TOOL_USER_DEFINED_ENABLED` → `TOOL_CHANNEL_ENABLED`（另需 `FEISHU_ENABLED=true` + 三项飞书凭据） |
 | 调试端点 | `GET /api/v1/debug/tools`、`/tools/surface`、`/tools/executions`、`/tools/permissions`、`/tools/confirmations`、`/tools/manifests`、`/tools/external`、`/tools/user-defined`、`/tools/{tool_id}`；`POST /debug/tools/{tool_id}/disable`、`/enable`、`/permissions/revoke`、`/confirmations/{request_id}/revoke` |
 | 观测三件套 | ① 调试端点 JSON ② `runtime_traces` 的 `autonomy_tool_surface` / 第 9 步步骤 ③ 库断言（下节 SQL） |
 | 内存 SQLite | 自动化侧全部离线可跑；人工侧建议用真实 PG，避免方言差异掩盖问题 |
@@ -80,7 +80,7 @@ PY
 ### R-2.2 工具结果的观察键进入回复素材
 
 - **id**：`R-2.2`
-- **前置**：总闸 + `V24_TOOL_OBSERVATION_ENABLED=true`；真实模型。
+- **前置**：总闸 + `TOOL_OBSERVATION_ENABLED=true`；真实模型。
 - **步骤**：输入「现在外面天气怎么样」。
 - **期望**：回复引用环境事实（天气/时段），而非泛泛而谈；`steps[0].result.observations` 含 `env.weather` 或 `env.part_of_day`。
 - **观测点**：`action_records.steps[0].result.observations`；prompt trace 第 9 步素材。
@@ -151,7 +151,7 @@ PY
 ### R-4.4 域名白名单的真实拒绝（需真实外部 API）
 
 - **id**：`R-4.4`
-- **前置**：总闸 + 外部 API 闸 on；`V24_TOOL_EXT_MANIFEST_PATH` 指向真实清单；`V24_TOOL_EXT_ALLOWED_HOSTS` 配置真实域名。
+- **前置**：总闸 + 外部 API 闸 on；`TOOL_EXT_MANIFEST_PATH` 指向真实清单；`TOOL_EXT_ALLOWED_HOSTS` 配置真实域名。
 - **步骤**：① 正常调用白名单内域名；② 用一个不在白名单的 host 触发调用。
 - **期望**：① 成功并把响应映射进 observations 且带 `ext.untrusted=true`；② `denied / host_not_allowed`，且**无任何出站请求**。
 - **观测点**：`/debug/tools/external`、出站抓包或上游访问日志。
@@ -239,7 +239,7 @@ PY
 
 - **id**：`R-8.2`
 - **前置**：外部 API 闸 on；真实第三方 API 与其凭据（**只经环境变量**）。
-- **步骤**：新增一个 manifest YAML → 配 `V24_TOOL_EXT_ALLOWED_HOSTS` → 跑真实调用。
+- **步骤**：新增一个 manifest YAML → 配 `TOOL_EXT_ALLOWED_HOSTS` → 跑真实调用。
 - **期望**：零 Python 改动；`/debug/tools/manifests` 显示 `loaded`；凭据不出现在任何日志 / 端点 / 台账。
 - **关联任务**：TOOL-011。
 

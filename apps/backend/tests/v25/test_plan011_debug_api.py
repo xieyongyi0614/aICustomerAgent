@@ -1,6 +1,6 @@
 """PLAN-011 Step 5 单测：管理面 6 端点（§4.2.6 / §6.3 D8~D13；§9.1 U6~U8）。
 
-- D8 / I9：端点受 `v25_planning_enabled` + `v25_plan_debug_enabled` 门控；任一 off → 404。
+- D8 / I9：端点受 `planning_enabled` + `plan_debug_enabled` 门控；任一 off → 404。
 - D9 / I10：六端点全部只读（会话级写探针零写）。
 - D10：投影只读四张既有表（`goal_plans` / `action_records` / `decision_records` / `loop_runs`）。
 - D11：上下文投影含**六源**与 `degraded` 清单。
@@ -53,10 +53,10 @@ pytestmark = pytest.mark.api
 def plan_panel_on(override_settings, monkeypatch):
     monkeypatch.setattr(tool_registry_module, "_registry", None)
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_debug_enabled="true",
-        v25_plan_context_enabled="true",
-        v25_plan_observation_enabled="true",
+        planning_enabled="true",
+        plan_debug_enabled="true",
+        plan_context_enabled="true",
+        plan_observation_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     life_loop_budget.reset_cache()
@@ -66,9 +66,9 @@ def plan_panel_on(override_settings, monkeypatch):
 @pytest.fixture
 def plan_panel_tools_on(plan_panel_on, override_settings):
     override_settings(
-        v25_plan_step_binding_enabled="true",
-        v25_plan_tool_required="true",
-        v24_tool_system_enabled="true",
+        plan_step_binding_enabled="true",
+        plan_tool_required="true",
+        tool_system_enabled="true",
     )
     return True
 
@@ -125,7 +125,7 @@ class TestGating:
         self, db_session_factory, make_goal, override_settings, monkeypatch
     ):
         monkeypatch.setattr(tool_registry_module, "_registry", None)
-        override_settings(v25_planning_enabled="true", v25_plan_debug_enabled="false")
+        override_settings(planning_enabled="true", plan_debug_enabled="false")
         goal = make_goal(user_id=support.USER, description="调试子闸 off")
         plan = _plan(goal.id, 1, "active")
         for path, status in await self._probe_all(goal.id, plan.id):

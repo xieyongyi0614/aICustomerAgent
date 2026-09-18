@@ -128,25 +128,25 @@ PLAN_CONTEXT_PROJECTION_FAILED = "context_projection_failed"
 """
 
 def _tools_enabled() -> bool:
-    return bool(get_settings().v24_tool_system_enabled)
+    return bool(get_settings().tool_system_enabled)
 
 
 def _require_tool_registry() -> ToolRegistry:
     """写类端点门控：总闸 off → 403；注册表不可用按未启用处理。"""
     if not _tools_enabled():
         raise HTTPException(
-            status_code=403, detail="工具系统未启用（v24_tool_system_enabled=false）"
+            status_code=403, detail="工具系统未启用（tool_system_enabled=false）"
         )
     registry = get_tool_registry()
     if registry is None:
         raise HTTPException(
-            status_code=403, detail="工具系统未启用（v24_tool_system_enabled=false）"
+            status_code=403, detail="工具系统未启用（tool_system_enabled=false）"
         )
     return registry
 
 
 def _permission_layer_enabled() -> bool:
-    return bool(getattr(get_settings(), "v24_tool_permission_enabled", False))
+    return bool(getattr(get_settings(), "tool_permission_enabled", False))
 
 
 def _require_permission_layer() -> None:
@@ -154,7 +154,7 @@ def _require_permission_layer() -> None:
     _require_tool_registry()
     if not _permission_layer_enabled():
         raise HTTPException(
-            status_code=403, detail="工具权限闸未启用（v24_tool_permission_enabled=false）"
+            status_code=403, detail="工具权限闸未启用（tool_permission_enabled=false）"
         )
 
 
@@ -164,17 +164,17 @@ def _permission_read_gate() -> bool:
         return False
     if not _permission_layer_enabled():
         raise HTTPException(
-            status_code=403, detail="工具权限闸未启用（v24_tool_permission_enabled=false）"
+            status_code=403, detail="工具权限闸未启用（tool_permission_enabled=false）"
         )
     return True
 
 
 def _external_api_enabled() -> bool:
-    return bool(getattr(get_settings(), "v24_tool_external_api_enabled", False))
+    return bool(getattr(get_settings(), "tool_external_api_enabled", False))
 
 
 def _user_defined_enabled() -> bool:
-    return bool(getattr(get_settings(), "v24_tool_user_defined_enabled", False))
+    return bool(getattr(get_settings(), "tool_user_defined_enabled", False))
 
 
 def _require_external_api() -> None:
@@ -183,7 +183,7 @@ def _require_external_api() -> None:
     if not _external_api_enabled():
         raise HTTPException(
             status_code=403,
-            detail="外部 API 工具未启用（v24_tool_external_api_enabled=false）",
+            detail="外部 API 工具未启用（tool_external_api_enabled=false）",
         )
 
 
@@ -194,7 +194,7 @@ def _external_api_read_gate() -> bool:
     if not _external_api_enabled():
         raise HTTPException(
             status_code=403,
-            detail="外部 API 工具未启用（v24_tool_external_api_enabled=false）",
+            detail="外部 API 工具未启用（tool_external_api_enabled=false）",
         )
     return True
 
@@ -204,7 +204,7 @@ def _require_user_defined() -> None:
     if not _user_defined_enabled():
         raise HTTPException(
             status_code=403,
-            detail="自定义工具未启用（v24_tool_user_defined_enabled=false）",
+            detail="自定义工具未启用（tool_user_defined_enabled=false）",
         )
 
 
@@ -214,7 +214,7 @@ def _user_defined_read_gate() -> bool:
     if not _user_defined_enabled():
         raise HTTPException(
             status_code=403,
-            detail="自定义工具未启用（v24_tool_user_defined_enabled=false）",
+            detail="自定义工具未启用（tool_user_defined_enabled=false）",
         )
     return True
 
@@ -302,14 +302,14 @@ def _capability_names() -> list[str]:
 
 @debug_router.get("/debug/tools/surface", response_model=ToolSurfaceOut)
 def get_tool_surface(run_kind: str | None = None, user_id: str | None = None):
-    """工具面投影结果（含裁剪原因）；双闸：总闸 + `v24_tool_surface_enabled`。"""
+    """工具面投影结果（含裁剪原因）；双闸：总闸 + `tool_surface_enabled`。"""
     settings = get_settings()
     if not _tools_enabled():
         return ToolSurfaceOut(enabled=False)
-    if not settings.v24_tool_surface_enabled:
+    if not settings.tool_surface_enabled:
         raise HTTPException(
             status_code=403,
-            detail="工具面投影未启用（v24_tool_surface_enabled=false）",
+            detail="工具面投影未启用（tool_surface_enabled=false）",
         )
     registry = get_tool_registry()
     if registry is None:
@@ -1049,13 +1049,13 @@ def rollback_relationship(user_id: str, target_version: int):
 def _plan_debug_enabled() -> bool:
     """计划调试面门控（总闸 + 调试子闸）。
 
-    「调试总闸」即本面所属子系统的总闸 `v25_planning_enabled`——与 WS-018
-    （`v23_world_simulation_enabled` + `v23_debug_tick_enabled`）、TOOL-012
-    （`v24_tool_system_enabled`）同构；`PlanSettings` / `enablement` 中不存在第三个独立
+    「调试总闸」即本面所属子系统的总闸 `planning_enabled`——与 WS-018
+    （`world_simulation_enabled` + `debug_tick_enabled`）、TOOL-012
+    （`tool_system_enabled`）同构；`PlanSettings` / `enablement` 中不存在第三个独立
     「调试总闸」Flag（PLAN-011 §4.2.6 / §6.3 D8 的三闸表述即此二闸）。
     """
     settings = get_settings()
-    return bool(settings.v25_planning_enabled) and bool(settings.v25_plan_debug_enabled)
+    return bool(settings.planning_enabled) and bool(settings.plan_debug_enabled)
 
 
 def _require_plan_debug() -> None:
@@ -1068,7 +1068,7 @@ def _require_plan_debug() -> None:
     if not _plan_debug_enabled():
         raise HTTPException(
             status_code=404,
-            detail="计划调试面未启用（v25_planning_enabled / v25_plan_debug_enabled）",
+            detail="计划调试面未启用（planning_enabled / plan_debug_enabled）",
         )
 
 
@@ -1089,7 +1089,7 @@ class _PlanScheduleContext:
     """`PlanScheduler` 的鸭子类型上下文（§8.4 的 `ctx` 在本端点的只读形态）。
 
     只投影判定所需的三项：`now`（冷却窗口）、`tool_surface`（面感知）、`settings`
-    （既有 `v25_plan_step_cooldown_minutes`）。六源装配**不在此发生**——调度只读计划本体，
+    （既有 `plan_step_cooldown_minutes`）。六源装配**不在此发生**——调度只读计划本体，
     零新增读取面。
     """
 
@@ -1112,11 +1112,11 @@ def _autonomous_tool_surface(user_id: str, settings, now: datetime):
         source=plan_context.PLAN_TOOL_RUN_SOURCE,
     )
     try:
-        if not settings.v25_plan_tool_required:
+        if not settings.plan_tool_required:
             return ToolSurfaceResolver(None, settings).resolve(
                 RUN_KIND_AUTONOMOUS_TICK, base
             )
-        if not settings.v24_tool_system_enabled:
+        if not settings.tool_system_enabled:
             return None
         registry = get_tool_registry()
         if registry is None:

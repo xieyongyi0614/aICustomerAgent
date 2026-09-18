@@ -69,9 +69,9 @@ GOAL_WRITE_FACE = (
 def planning_on(override_settings):
     """PLAN-003 装配面：v25 总闸 + 上下文子闸 + 工具总闸；四源按用例各自开闸。"""
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_context_enabled="true",
-        v24_tool_system_enabled="true",
+        planning_enabled="true",
+        plan_context_enabled="true",
+        tool_system_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -197,7 +197,7 @@ class TestHardDependencies:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="工具系统关闭目标")
-        override_settings(v24_tool_system_enabled="false")
+        override_settings(tool_system_enabled="false")
         calls: list = []
         monkeypatch.setattr(
             "app.services.goal_planning._ask_llm_with_retry",
@@ -336,7 +336,7 @@ class TestSixSources:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="工具效能倾向目标")
-        override_settings( v25_plan_context_insight_limit="5")
+        override_settings( plan_context_insight_limit="5")
         _stub_insights(
             monkeypatch,
             1,
@@ -369,9 +369,9 @@ class TestSixSources:
     async def test_memory_source_is_bounded_by_the_tighter_limit(
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
-        """U4：条数 ≤ min(`memory_top_k`, `v25_plan_context_memory_limit`) 两侧各一例。"""
+        """U4：条数 ≤ min(`memory_top_k`, `plan_context_memory_limit`) 两侧各一例。"""
         goal = make_goal(description="记忆有界目标")
-        override_settings( memory_top_k="5", v25_plan_context_memory_limit="2")
+        override_settings( memory_top_k="5", plan_context_memory_limit="2")
         seen = _stub_memories(monkeypatch)
         by_limit = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(by_limit, PlanContext)
@@ -380,7 +380,7 @@ class TestSixSources:
         assert seen["query"] == goal.description
 
         _stub_memories(monkeypatch, respect_top_k=True)
-        override_settings(memory_top_k="1", v25_plan_context_memory_limit="5")
+        override_settings(memory_top_k="1", plan_context_memory_limit="5")
         by_top_k = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(by_top_k, PlanContext)
         assert len(by_top_k.memories) == 1
@@ -390,7 +390,7 @@ class TestSixSources:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="反思有界目标")
-        override_settings( v25_plan_context_insight_limit="1")
+        override_settings( plan_context_insight_limit="1")
         _stub_insights(monkeypatch, 3)
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
@@ -430,7 +430,7 @@ class TestAssemblyDiscipline:
         assert isinstance(first, PlanContext) and isinstance(second, PlanContext)
         assert plan_context.context_digest(first) == plan_context.context_digest(second)
 
-        override_settings(v25_plan_max_steps="9")
+        override_settings(plan_max_steps="9")
         changed = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(changed, PlanContext)
         assert plan_context.context_digest(changed) != plan_context.context_digest(first)
@@ -452,7 +452,7 @@ class TestAssemblyDiscipline:
         self, db_session_factory, planning_on, assembler, make_goal, override_settings
     ):
         goal = make_goal(description="无面规划目标")
-        override_settings(v25_plan_tool_required="false")
+        override_settings(plan_tool_required="false")
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
         assert result.tool_surface.tool_ids == ()
@@ -635,14 +635,14 @@ class TestDegradedRegistry:
 
 
 class TestContextSwitch:
-    """`v25_plan_context_enabled` off：不做四源装配（degraded 不登记）。"""
+    """`plan_context_enabled` off：不做四源装配（degraded 不登记）。"""
 
     @pytest.mark.asyncio
     async def test_context_disabled_skips_the_four_degradable_sources(
         self, db_session_factory, planning_on, assembler, make_goal, override_settings
     ):
         goal = make_goal(description="装配总开关目标")
-        override_settings(v25_plan_context_enabled="false")
+        override_settings(plan_context_enabled="false")
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
         assert result.world == {}

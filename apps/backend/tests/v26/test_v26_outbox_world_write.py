@@ -18,7 +18,7 @@ class TestOutboxWorldWrite:
     def test_create_reminder_outbox_world_ops_and_consume(self, override_settings):
         override_settings(
             action_enabled=True,
-            v26_action_execution_enabled=True,
+            action_execution_enabled=True,
             action_outbox_enabled=True,
             world_enabled=True,
         )
@@ -61,7 +61,7 @@ class TestOutboxWorldWrite:
     def test_outbox_off_direct_world_event(self, override_settings):
         override_settings(
             action_enabled=True,
-            v26_action_execution_enabled=True,
+            action_execution_enabled=True,
             action_outbox_enabled=False,
             world_enabled=True,
         )

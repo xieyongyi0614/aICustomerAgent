@@ -373,7 +373,7 @@ def _run_shared_experience_reconciliation(now: datetime) -> dict:
     section = PromptBuilder.build_shared_experience_section(
         _state_with(entries=selected)
     )
-    if section is None or len(section) > get_settings().v2_relationship_shared_budget_chars:
+    if section is None or len(section) > get_settings().relationship_shared_budget_chars:
         failures.append("Context 段预算超限或缺席")
     return _result("shared_experience_reconciliation", failures, {"entries": len(entries)})
 
@@ -402,7 +402,7 @@ def _run_pattern_injection_ablation(now: datetime) -> dict:
     section = PromptBuilder.build_relationship_pattern_section(
         _state_with(patterns=with_patterns)
     )
-    if section is None or len(section) > get_settings().v2_relationship_pattern_budget_chars:
+    if section is None or len(section) > get_settings().relationship_pattern_budget_chars:
         failures.append("关系模式段预算超限或缺席")
     return _result("pattern_injection_ablation", failures, {})
 

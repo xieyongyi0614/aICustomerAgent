@@ -79,9 +79,9 @@ def get_capability(name: str) -> CapabilitySpec:
 
 def _run_llm_limit(run_kind: str, settings) -> int:
     if run_kind == "foreground_chat":
-        return max(settings.v21_foreground_run_llm_budget, 0)
+        return max(settings.foreground_run_llm_budget, 0)
     if run_kind == "autonomous_tick":
-        return max(settings.v2_life_loop_cycle_llm_budget, 0)
+        return max(settings.life_loop_cycle_llm_budget, 0)
     return 0
 
 
@@ -96,19 +96,19 @@ def acquire(
 
     account=False 为「只问不记账」（决策管线的风险闸预检），不消耗 run 预算。
     前台能力默认软模式（只记账标记 degraded，不拒绝用户回复），
-    v21_foreground_gateway_enforced=true 时才硬拒绝。
+    foreground_gateway_enforced=true 时才硬拒绝。
     """
     spec = get_capability(capability)
     settings = get_settings()
     now = now or datetime.now()
     if life_loop_budget.is_degraded(now=now):
-        if spec.budget_type == "foreground" and not settings.v21_foreground_gateway_enforced:
+        if spec.budget_type == "foreground" and not settings.foreground_gateway_enforced:
             if account:
                 _account(run, degraded=True)
             return Grant(True, True, "quota_circuit_open_soft")
         return Grant(False, False, "quota_circuit_open")
     if run is not None and run.llm_calls >= _run_llm_limit(run.run_kind, settings):
-        if spec.budget_type == "foreground" and not settings.v21_foreground_gateway_enforced:
+        if spec.budget_type == "foreground" and not settings.foreground_gateway_enforced:
             if account:
                 run.degraded = True
             return Grant(True, True, "run_budget_soft")
@@ -147,9 +147,9 @@ def resolve_answer_llm(run, llm, now: datetime | None = None):
     if light is not None:
         if run is not None:
             run.degraded = True
-        logger.warning("answer 能力降档（%s）：%s", grant.reason, settings.v21_light_llm_profile)
+        logger.warning("answer 能力降档（%s）：%s", grant.reason, settings.light_llm_profile)
         return light
-    if not grant.granted and settings.v21_foreground_gateway_enforced:
+    if not grant.granted and settings.foreground_gateway_enforced:
         raise GatewayDeniedError(f"llm gateway denied: {grant.reason}")
     if run is not None:
         run.degraded = True
@@ -157,7 +157,7 @@ def resolve_answer_llm(run, llm, now: datetime | None = None):
 
 
 def _build_light_llm(settings):
-    profile_id = settings.v21_light_llm_profile
+    profile_id = settings.light_llm_profile
     if not profile_id:
         return None
     try:

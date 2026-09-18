@@ -15,21 +15,21 @@ from app.services.action import manager, scheduler
 class TestFlagOffLifeLoopDrift:
     def test_flag_off_no_action_schedule_step_in_cycle_source(self):
         source = open(life_loop.__file__, encoding="utf-8").read()
-        assert "v26_action_execution_enabled" in source
-        assert "v26_action_scheduler_enabled" in source
+        assert "action_execution_enabled" in source
+        assert "action_scheduler_enabled" in source
         settings = get_settings()
-        assert settings.v26_action_execution_enabled is False
-        assert settings.v26_action_scheduler_enabled is False
+        assert settings.action_execution_enabled is False
+        assert settings.action_scheduler_enabled is False
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
         assert result["status"] == "skipped"
 
     def test_flag_on_records_step(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_scheduler_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_scheduler_enabled", True)
         steps: list[dict] = []
         # emulate gated append only
-        if settings.v26_action_execution_enabled and settings.v26_action_scheduler_enabled:
+        if settings.action_execution_enabled and settings.action_scheduler_enabled:
             life_loop._record_step(
                 "run_x",
                 steps,
@@ -118,8 +118,8 @@ class TestV26ExecutorPath:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
-        assert action_engine._v26_action_execution_enabled(settings) is True
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
+        assert action_engine._action_execution_enabled(settings) is True
         action = manager.create(
             user_id="u_v26e",
             action_type="remember_fact",
@@ -138,7 +138,7 @@ class TestV26ExecutorPath:
         from app.application import action_engine
 
         settings = get_settings()
-        assert action_engine._v26_action_execution_enabled(settings) is False
+        assert action_engine._action_execution_enabled(settings) is False
 
 
 class TestSchedulerOwnerAndRecordSync:
@@ -162,7 +162,7 @@ class TestPlanningBridgeFlagOn:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "v26_action_execution_enabled", True)
+        monkeypatch.setattr(settings, "action_execution_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:

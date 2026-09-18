@@ -147,7 +147,7 @@ async def _get(path: str, **params):
 
 @pytest.mark.asyncio
 async def test_e14_debug_tools_exposes_not_wired(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     payload = (await _get("/debug/tools")).json()
     assert payload["enabled"] is True
     assert payload["world_intent"] == {
@@ -162,7 +162,7 @@ async def test_e14_debug_tools_exposes_not_wired(v24_tool_env):
 
 @pytest.mark.asyncio
 async def test_debug_tools_master_flag_off_hides_world_intent(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=False)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=False)
     payload = (await _get("/debug/tools")).json()
     assert payload["enabled"] is False
     assert payload["world_intent"] is None
@@ -170,7 +170,7 @@ async def test_debug_tools_master_flag_off_hides_world_intent(v24_tool_env):
 
 @pytest.mark.asyncio
 async def test_debug_world_intent_status_is_not_a_registered_tool(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True)
     payload = (await _get("/debug/tools")).json()
     assert WORLD_INTENT_TOOL_ID not in {row["tool_id"] for row in payload["tools"]}
     assert payload["world_intent"]["wired"] is False

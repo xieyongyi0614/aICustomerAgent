@@ -128,10 +128,10 @@ class TestMemoryAttribution:
         assert lifecycle_steps[0]["extra"]["event"] == "reinforce"
 
     def test_supersede_link_traced(self, attr_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 1.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
         old = MemoryRow(
             id="old",
             user_id="u1",
@@ -184,12 +184,12 @@ class TestMemoryAttribution:
 
 class TestCandidateAttribution:
     def test_rejected_candidate_reason_visible(self, attr_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 0.5)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 0.5)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
 
         async def _reject(*args, **kwargs):
             from app.models.memory2 import EvaluationVerdict

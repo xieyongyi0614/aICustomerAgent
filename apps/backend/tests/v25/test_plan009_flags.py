@@ -72,8 +72,8 @@ class TestFlagGating:
     ):
         probe = support.install_delivery_probe(monkeypatch)
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_memory_enabled="false",
+            planning_enabled="true",
+            plan_memory_enabled="false",
             action_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")
@@ -119,7 +119,7 @@ class TestFlagGating:
 
 
 class TestImportanceFloorParameter:
-    """§8 Step 6.2：`v25_plan_memory_importance_floor` 生效于失败 / 放弃类。"""
+    """§8 Step 6.2：`plan_memory_importance_floor` 生效于失败 / 放弃类。"""
 
     @pytest.mark.parametrize(
         "event_kind", ("plan_failed", "plan_abandoned")
@@ -129,9 +129,9 @@ class TestImportanceFloorParameter:
     ):
         probe = support.install_delivery_probe(monkeypatch)
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_memory_enabled="true",
-            v25_plan_memory_importance_floor="0.9",
+            planning_enabled="true",
+            plan_memory_enabled="true",
+            plan_memory_importance_floor="0.9",
             action_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")

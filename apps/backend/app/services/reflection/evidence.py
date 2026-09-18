@@ -3,7 +3,7 @@
 从 memories（active、非 hypothetical）聚合合格证据组：窗口过滤 → 贪心单遍主题
 聚类（语义邻域 ∪ same_topic 关键词路）→ 组统计（数量/跨度/独立来源/印证度/
 成员 weight）→ 门槛前置判定。纯规则 0 LLM；单条记忆不成组；同数据同分组幂等。
-「独立来源」口径 = ≥v2_reflection_min_evidence 个不同 source_ref.id（不同原始
+「独立来源」口径 = ≥reflection_min_evidence 个不同 source_ref.id（不同原始
 消息/事件），source 类型分布仅作统计与 REF-004 折算输入。
 
 TOOL-009 §2.1/§4.1 追加三个工具效能证据窗（工具使用效果 / Action 成功率 /
@@ -195,11 +195,11 @@ def passes_gate(window: EvidenceWindow, settings=None) -> tuple[bool, list[str]]
     settings = settings or get_settings()
     stats = window.stats
     reasons: list[str] = []
-    if stats.distinct_source_refs < settings.v2_reflection_min_evidence:
+    if stats.distinct_source_refs < settings.reflection_min_evidence:
         reasons.append(_GATE_EVIDENCE_COUNT)
-    if stats.span_hours < settings.v2_reflection_min_span_hours:
+    if stats.span_hours < settings.reflection_min_span_hours:
         reasons.append(_GATE_SPAN)
-    if stats.coherence < settings.v2_reflection_min_coherence:
+    if stats.coherence < settings.reflection_min_coherence:
         reasons.append(_GATE_COHERENCE)
     return not reasons, reasons
 
@@ -336,7 +336,7 @@ def _aggregate(user_id: str, character_id: str, now: datetime) -> dict:
             semantic = _cosine(vector, cluster.rep_vector)
             topic_sim = _topic_similarity(member.content, cluster.rep_content)
             matched = (
-                semantic >= settings.v2_reflection_cluster_cosine
+                semantic >= settings.reflection_cluster_cosine
                 or same_topic(member.content, cluster.rep_content)
             )
             if not matched:
@@ -360,7 +360,7 @@ def _pool(user_id: str, character_id: str, now: datetime) -> list[dict]:
         user_id, character_id, limit=settings.memory_candidate_pool_limit
     )
     facts = _row_facts([memory.id for memory in memories])
-    window_start = now - timedelta(days=settings.v2_reflection_window_days)
+    window_start = now - timedelta(days=settings.reflection_window_days)
     candidates: list[dict] = []
     for memory in memories:
         fact = facts.get(memory.id, {})
@@ -1243,18 +1243,18 @@ def plan_thresholds(window_kind: str = "", settings=None) -> dict[str, float]:
 
     | 项 | 取值 | 对齐来源 |
     |---|---|---|
-    | `min_samples` | `v25_plan_reflection_min_samples`（3） | `v2_reflection_min_evidence` |
-    | `min_span_hours` | `v2_reflection_min_span_hours`（24.0） | 既有反思窗跨度纪律 |
+    | `min_samples` | `plan_reflection_min_samples`（3） | `reflection_min_evidence` |
+    | `min_span_hours` | `reflection_min_span_hours`（24.0） | 既有反思窗跨度纪律 |
     | `min_failures` | 同 `min_samples`，**仅失败驱动窗** | `TOOL_WINDOW_THRESHOLDS` 的 `min_failures` |
 
     形状与 `asuna_evaluation.TOOL_WINDOW_THRESHOLDS` 同构，直接喂既有 `passes_tool_gate` /
     `tool_gate_reasons`。
     """
     resolved = settings if settings is not None else get_settings()
-    min_samples = int(resolved.v25_plan_reflection_min_samples)
+    min_samples = int(resolved.plan_reflection_min_samples)
     thresholds: dict[str, float] = {
         "min_samples": min_samples,
-        "min_span_hours": float(resolved.v2_reflection_min_span_hours),
+        "min_span_hours": float(resolved.reflection_min_span_hours),
     }
     if window_kind in PLAN_WINDOW_FAILURE_DRIVEN_KINDS:
         thresholds["min_failures"] = min_samples
@@ -1262,13 +1262,13 @@ def plan_thresholds(window_kind: str = "", settings=None) -> dict[str, float]:
 
 
 def plan_evidence_enabled(settings=None) -> bool:
-    """计划证据通道子闸：`v25_plan_reflection_enabled`。
+    """计划证据通道子闸：`plan_reflection_enabled`。
 
     与 `triggers.tool_channel_enabled` 同款纪律：子闸 off 时**零计划窗、零额外读取**
     （`aggregate_evidence_windows` 的两通道行为与 V2.4.0 逐字节一致）。
     """
     resolved = settings if settings is not None else get_settings()
-    return bool(getattr(resolved, "v25_plan_reflection_enabled", False))
+    return bool(getattr(resolved, "plan_reflection_enabled", False))
 
 
 @dataclass(frozen=True)
@@ -1512,7 +1512,7 @@ def aggregate_plan_evidence(
     """计划效能证据包：三窗聚合 → 逐组门槛 → 达门槛窗口（纯读、零 LLM、零写入）。
 
     子闸 off 时直接返回空包（**零计划窗、零额外读取**：Flag off 下与 V2.4.0 逐字节一致）。
-    证据不足（样本 < `v25_plan_reflection_min_samples` 或跨度不足）→ 该组不成窗，
+    证据不足（样本 < `plan_reflection_min_samples` 或跨度不足）→ 该组不成窗，
     故不产 Insight：调用链上不存在「证据不足仍调 LLM」的路径。
     """
     started = time.perf_counter()

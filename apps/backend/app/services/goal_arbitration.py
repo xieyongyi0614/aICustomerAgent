@@ -36,7 +36,7 @@ _ABANDON_CONFIDENCE_THRESHOLD = 0.6
 def compute_priority(goal, overlay, relationship_params: dict, settings) -> float:
     score = float(goal.priority)
     if goal.layer == "long_term":
-        score += settings.v2_autonomy_priority_layer_weight_long
+        score += settings.autonomy_priority_layer_weight_long
     if overlay is not None and overlay.goal_weights:
         score += float(overlay.goal_weights.get(goal.domain) or 0.0)
     tension = float(relationship_params.get("tension") or 0.0)
@@ -208,7 +208,7 @@ def _low_relevance_signals(goal, facts: dict, min_days: int) -> tuple[bool, bool
 def check_abandonment(user_id: str, facts: dict, now: datetime) -> dict:
     """long_term active 顶层 goal 的放弃检查：双信号置信，保守阈值。"""
     settings = get_settings()
-    min_days = settings.v2_autonomy_abandon_min_progress_days
+    min_days = settings.autonomy_abandon_min_progress_days
     abandoned: list[dict] = []
     for goal in goal_repository.list_top_level_layered(user_id, statuses=("active",)):
         if goal.layer != "long_term":
@@ -268,7 +268,7 @@ def run_user_arbitration(user_id: str, facts: dict, now: datetime) -> dict:
     """编排入口：复活+冲突仲裁每次；abandonment 按节流窗口执行。"""
     settings = get_settings()
     result = arbitrate_user(user_id, now)
-    interval = settings.v2_autonomy_arbitration_interval_minutes
+    interval = settings.autonomy_arbitration_interval_minutes
     last = _abandon_last.get(user_id)
     abandonment: dict = {"abandoned": []}
     if last is None or (now - last).total_seconds() >= interval * 60:

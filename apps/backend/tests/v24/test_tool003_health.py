@@ -54,7 +54,7 @@ def test_failure_window_rate_is_computed_by_registry():
 
 def test_threshold_trips_and_disables_tool():
     registry = _registry()
-    health = tracker(registry, settings=tool_settings(v24_tool_breaker_threshold=3), clock=Clock(T0))
+    health = tracker(registry, settings=tool_settings(tool_breaker_threshold=3), clock=Clock(T0))
     _fail(health, 2)
     assert health.snapshot(TOOL_ID)[TOOL_ID].tripped is False
     assert registry.effective_status(TOOL_ID) == "enabled"
@@ -68,11 +68,11 @@ def test_threshold_trips_and_disables_tool():
 
 def test_threshold_is_read_from_settings_at_call_time():
     registry = _registry()
-    settings = tool_settings(v24_tool_breaker_threshold=10)
+    settings = tool_settings(tool_breaker_threshold=10)
     health = tracker(registry, settings=settings, clock=Clock(T0))
     _fail(health, 3)
     assert health.snapshot(TOOL_ID)[TOOL_ID].tripped is False
-    settings.v24_tool_breaker_threshold = 3
+    settings.tool_breaker_threshold = 3
     _fail(health, 1)
     assert health.snapshot(TOOL_ID)[TOOL_ID].tripped is True
 
@@ -92,7 +92,7 @@ def test_half_open_after_cooldown_keeps_failure_count():
     clock = Clock(T0)
     health = tracker(
         registry,
-        settings=tool_settings(v24_tool_breaker_cooldown_seconds=300),
+        settings=tool_settings(tool_breaker_cooldown_seconds=300),
         clock=clock,
     )
     _fail(health, 3)
@@ -110,7 +110,7 @@ def test_failure_inside_cooldown_does_not_reset_timer_e13():
     clock = Clock(T0)
     health = tracker(
         registry,
-        settings=tool_settings(v24_tool_breaker_cooldown_seconds=300),
+        settings=tool_settings(tool_breaker_cooldown_seconds=300),
         clock=clock,
     )
     _fail(health, 3)
@@ -127,7 +127,7 @@ def test_next_failure_after_half_open_re_trips_immediately():
     clock = Clock(T0)
     health = tracker(
         registry,
-        settings=tool_settings(v24_tool_breaker_cooldown_seconds=300),
+        settings=tool_settings(tool_breaker_cooldown_seconds=300),
         clock=clock,
     )
     _fail(health, 3)

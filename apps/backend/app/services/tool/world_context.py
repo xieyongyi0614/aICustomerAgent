@@ -141,7 +141,7 @@ class WorldContextBuilder:
     """世界事实预读装配器（TOOL-007 §4.1）：无共享可变状态，并发安全（E15）。
 
     `settings` 可在构造或 `build()` 传入（后者优先）；只读 `world_enabled` 与
-    `v23_scene_expansion_enabled` 两个既有开关，缺省时按"世界可用 / 场景未开启"处理。
+    `scene_expansion_enabled` 两个既有开关，缺省时按"世界可用 / 场景未开启"处理。
     """
 
     def __init__(self, settings: Any = None) -> None:
@@ -200,11 +200,11 @@ class WorldContextBuilder:
     ) -> dict[str, Any]:
         """⑦ 场景画像 `{location_id, tone_bias, topic_affordances}`。
 
-        `v23_scene_expansion_enabled` off（默认）→ `{}`：场景维度投影降级为不裁剪（E10）。
+        `scene_expansion_enabled` off（默认）→ `{}`：场景维度投影降级为不裁剪（E10）。
         """
         resolved = settings if settings is not None else self._settings
         try:
-            if not bool(getattr(resolved, "v23_scene_expansion_enabled", False)):
+            if not bool(getattr(resolved, "scene_expansion_enabled", False)):
                 return {}
             current = world if world is not None else world_engine.get_world(user_id)
             if current is None:

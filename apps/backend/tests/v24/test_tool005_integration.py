@@ -82,7 +82,7 @@ LIFE_LOOP_MAINTENANCE_SEQUENCE = (
     "trigger_reconcile",
 )
 
-PERMISSION_ON_SETTINGS = ("v24_tool_system_enabled", "v24_tool_permission_enabled")
+PERMISSION_ON_SETTINGS = ("tool_system_enabled", "tool_permission_enabled")
 
 
 @pytest.fixture(autouse=True)
@@ -114,8 +114,8 @@ def _remind_intent(fact: str = "小明喜欢喝咖啡") -> ActionIntent:
 
 def _executor_settings(**overrides):
     values = {
-        "v24_tool_system_enabled": True,
-        "v24_tool_permission_enabled": True,
+        "tool_system_enabled": True,
+        "tool_permission_enabled": True,
     }
     values.update(overrides)
     return tool_settings(**values)
@@ -137,8 +137,8 @@ def _enable(override_settings, **extra):
     override_settings(
         action_enabled=True,
         world_enabled=False,
-        v24_tool_system_enabled=True,
-        v24_tool_permission_enabled=True,
+        tool_system_enabled=True,
+        tool_permission_enabled=True,
         **extra,
     )
 
@@ -260,12 +260,12 @@ async def test_executor_does_not_build_snapshot_when_given_one(monkeypatch):
 async def test_executor_master_gate_off_keeps_placeholder_allow_e14():
     registry = registry_with(untrusted_definition())
     capability = _memory_capability()
-    settings = _executor_settings(v24_tool_system_enabled=False)
+    settings = _executor_settings(tool_system_enabled=False)
     executor = build_executor(registry, capability, settings=settings)
     execution = await executor.run(
         registry.resolve(UNTRUSTED_TOOL_ID),
         invocation(UNTRUSTED_TOOL_ID),
-        _tool_ctx(permission_settings(v24_tool_system_enabled=False)),
+        _tool_ctx(permission_settings(tool_system_enabled=False)),
     )
     assert execution.status == "succeeded"
     assert execution.permission["decision"] == DECISION_ALLOW
@@ -564,9 +564,9 @@ def test_life_loop_passes_due_exclusion_only_when_master_gate_on(override_settin
 
     trigger_repository.has_due = _spy
     try:
-        override_settings(v24_tool_system_enabled=False)
+        override_settings(tool_system_enabled=False)
         life_loop._cycle_reason("u-exclusion", NOW)
-        override_settings(v24_tool_system_enabled=True)
+        override_settings(tool_system_enabled=True)
         life_loop._cycle_reason("u-exclusion", NOW)
     finally:
         trigger_repository.has_due = original
@@ -638,7 +638,7 @@ async def test_post_process_keeps_pending_for_unrelated_reply(
 
 @pytest.mark.asyncio
 async def test_post_process_confirmation_round_disabled_without_flag(override_settings):
-    override_settings(action_enabled=True, v24_tool_permission_enabled=False)
+    override_settings(action_enabled=True, tool_permission_enabled=False)
     assert await post_process._run_confirmation_round(_post_ctx("好")) is False
 
 
@@ -684,7 +684,7 @@ def test_pending_confirmation_prompt_enters_action_context(override_settings, db
 
 
 def test_action_context_unchanged_without_permission_flag(override_settings, db_session_factory):
-    override_settings(action_enabled=True, v24_tool_permission_enabled=False)
+    override_settings(action_enabled=True, tool_permission_enabled=False)
     _persist_pending_record()
 
     from app.services.action.context import build_action_context, render_action_section
@@ -757,5 +757,5 @@ def test_builtin_registry_matches_tool005_expectations():
 
 
 def test_tool_registry_singleton_requires_master_gate(override_settings):
-    override_settings(v24_tool_system_enabled=False)
+    override_settings(tool_system_enabled=False)
     assert get_tool_registry() is None

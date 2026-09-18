@@ -268,7 +268,7 @@ def _run_cap_saturation(session_factory, now) -> dict:
     user_id = f"eval-{scenario_id}"
     failures: list[str] = []
     settings = get_settings()
-    cap = settings.v2_development_preference_max_token_delta
+    cap = settings.development_preference_max_token_delta
     for index in range(10):
         _seed_insight(
             session_factory,

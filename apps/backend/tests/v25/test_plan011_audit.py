@@ -30,8 +30,8 @@ from . import plan011_support as support
 @pytest.fixture
 def plan_debug_on(override_settings):
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_debug_enabled="true",
+        planning_enabled="true",
+        plan_debug_enabled="true",
         action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")

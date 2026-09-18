@@ -24,12 +24,12 @@ def types_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (memory_repository, evaluator, lifecycle, retriever):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 1.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
     evaluator.reset_evaluator_state()
     yield testing_session
     evaluator.reset_evaluator_state()
@@ -173,7 +173,7 @@ class TestDecayLambdaAliases:
     def test_legacy_type_uses_canonical_lambda(self, monkeypatch):
         monkeypatch.setattr(
             get_settings(),
-            "v2_memory_decay_lambda_json",
+            "memory_decay_lambda_json",
             '{"experience": 0.03, "relationship_fact": 0.03}',
         )
         assert lifecycle.decay_lambda_for("important_event") == pytest.approx(0.03)

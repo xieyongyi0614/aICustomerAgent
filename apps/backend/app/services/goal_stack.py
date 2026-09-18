@@ -17,8 +17,8 @@ from app.services import state_service
 logger = logging.getLogger(__name__)
 
 _LAYER_TIMEOUT_SETTINGS = {
-    "medium": "v21_goal_medium_timeout_days",
-    "short_term": "v21_goal_short_timeout_hours",
+    "medium": "goal_medium_timeout_days",
+    "short_term": "goal_short_timeout_hours",
 }
 
 
@@ -63,7 +63,7 @@ def evaluate_stack(
     长期化写入只发生在后台）。"""
     settings = get_settings()
     now = now or datetime.now()
-    if not settings.v21_goal_stack_enabled:
+    if not settings.goal_stack_enabled:
         return GoalStack()
     if retire_overdue_enabled:
         retire_overdue(user_id, now, settings)
@@ -138,7 +138,7 @@ def run_goal_stack_stage(user_id: str, run, now: datetime | None = None) -> dict
 
 def _apply_evolution_rebalance(user_id: str, now: datetime) -> list[str]:
     settings = get_settings()
-    if not settings.v21_personality_evolution_enabled:
+    if not settings.personality_evolution_enabled:
         return []
     try:
         from app.services import evolution

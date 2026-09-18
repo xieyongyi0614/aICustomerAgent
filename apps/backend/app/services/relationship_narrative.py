@@ -32,7 +32,7 @@ STATUS_ACTIVE = "active"
 
 
 def load_whitelist() -> dict:
-    raw = get_settings().v2_relationship_narrative_whitelist_json
+    raw = get_settings().relationship_narrative_whitelist_json
     try:
         table = json.loads(raw)
     except json.JSONDecodeError:
@@ -43,7 +43,7 @@ def load_whitelist() -> dict:
 
 def on_insight_created(user_id: str, created: list[dict]) -> None:
     """创建事件回调：relationship 类高置信 Insight → enqueue 叙事里程碑 job。"""
-    threshold = get_settings().v2_relationship_narrative_min_confidence
+    threshold = get_settings().relationship_narrative_min_confidence
     for item in created or []:
         insight_id = item.get("insight_id")
         if not insight_id:
@@ -136,7 +136,7 @@ def _load_eligible_insight(insight_id: str) -> Insight | None:
             row is None
             or row.status != STATUS_ACTIVE
             or row.scope != "relationship"
-            or float(row.confidence) < settings.v2_relationship_narrative_min_confidence
+            or float(row.confidence) < settings.relationship_narrative_min_confidence
         ):
             return None
         return Insight(
@@ -176,7 +176,7 @@ def _daily_cap_available(user_id: str) -> bool:
     count = relationship_milestone_repository.count_keys_since(
         user_id, NARRATIVE_MILESTONE_PREFIX, day_start
     )
-    return count < settings.v2_relationship_narrative_daily_cap
+    return count < settings.relationship_narrative_daily_cap
 
 
 def _trace(trace, started: float, **extra) -> None:

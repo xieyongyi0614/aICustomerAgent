@@ -80,7 +80,7 @@ def test_flag_off_keeps_v9_capability_registry_untouched():
 
 
 def test_flag_on_registers_external_capability(v24_tool_env):
-    v24_tool_env(V24_TOOL_SYSTEM_ENABLED=True, V24_TOOL_EXTERNAL_API_ENABLED=True)
+    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_EXTERNAL_API_ENABLED=True)
     registry = capability_registry_module.get_capability_registry()
     assert ext_api.EXT_API_CAPABILITY_NAME in {entry["name"] for entry in registry.describe()}
 
@@ -110,10 +110,10 @@ def test_master_gate_alone_does_not_load_manifests(v24_tool_env, tmp_path):
     from tests.v24.tool011_support import write_manifest
 
     v24_tool_env(
-        V24_TOOL_SYSTEM_ENABLED=True,
-        V24_TOOL_EXTERNAL_API_ENABLED=False,
-        V24_TOOL_EXT_ALLOWED_HOSTS=WEATHER_HOST,
-        V24_TOOL_EXT_MANIFEST_PATH=str(tmp_path),
+        TOOL_SYSTEM_ENABLED=True,
+        TOOL_EXTERNAL_API_ENABLED=False,
+        TOOL_EXT_ALLOWED_HOSTS=WEATHER_HOST,
+        TOOL_EXT_MANIFEST_PATH=str(tmp_path),
         **{WEATHER_ENV: WEATHER_SECRET},
     )
     write_manifest(tmp_path, "weather.yaml", weather_manifest())
@@ -172,9 +172,9 @@ def _read_only_definition(tool_id: str, namespace: str, *, policy_key: str):
 def test_ext_tool_runs_through_unified_executor(tmp_path):
     """AC：外部工具经统一执行器（权限 / 校验 / 超时 / 归一全部生效，无旁路）。"""
     settings = ext_settings(
-        v24_tool_permission_enabled=True,
-        v24_tool_schema_validation_enabled=True,
-        v24_tool_observation_enabled=True,
+        tool_permission_enabled=True,
+        tool_schema_validation_enabled=True,
+        tool_observation_enabled=True,
     )
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
@@ -229,8 +229,8 @@ def test_ext_tool_runs_through_unified_executor(tmp_path):
 def test_ext_tool_invalid_params_are_rejected_before_request(tmp_path):
     """校验闸在能力之前：声明外参数被拒 → `invalid`，不发起请求。"""
     settings = ext_settings(
-        v24_tool_permission_enabled=True,
-        v24_tool_schema_validation_enabled=True,
+        tool_permission_enabled=True,
+        tool_schema_validation_enabled=True,
     )
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
@@ -269,7 +269,7 @@ def test_ext_tool_invalid_params_are_rejected_before_request(tmp_path):
 
 def test_ext_tool_without_grant_waits_for_confirmation_and_never_calls(tmp_path):
     """未授权 → 首次确认（pending_confirmation），请求不发出（无旁路）。"""
-    settings = ext_settings(v24_tool_permission_enabled=True)
+    settings = ext_settings(tool_permission_enabled=True)
     registry = ToolRegistry()
     index = ext_api.ManifestIndex()
     transport = StubTransport(response({"data": {}}))
@@ -311,9 +311,9 @@ def test_ext_tool_without_grant_waits_for_confirmation_and_never_calls(tmp_path)
 def test_user_tool_runs_through_unified_executor(tmp_path):
     """自定义工具同样经统一执行器：能力名 = tool_id，(capability, action) 唯一可解析。"""
     settings = ext_settings(
-        v24_tool_permission_enabled=True,
-        v24_tool_schema_validation_enabled=True,
-        v24_tool_observation_enabled=True,
+        tool_permission_enabled=True,
+        tool_schema_validation_enabled=True,
+        tool_observation_enabled=True,
     )
     registry = ToolRegistry()
     memory = ScriptedCapability("memory", {"save": ["fact"]}, {"memory_id": "mem-42"})
@@ -355,7 +355,7 @@ def test_user_tool_runs_through_unified_executor(tmp_path):
 
 
 def test_user_tool_requires_grant_before_execution():
-    settings = ext_settings(v24_tool_permission_enabled=True)
+    settings = ext_settings(tool_permission_enabled=True)
     registry = ToolRegistry()
     memory = ScriptedCapability("memory", {"save": ["fact"]}, {"memory_id": "mem-1"})
     capability_registry = CapabilityRegistry()
@@ -388,7 +388,7 @@ def test_user_tool_requires_grant_before_execution():
 
 
 def test_unregistered_user_tool_is_unavailable_through_executor():
-    settings = ext_settings(v24_tool_permission_enabled=True)
+    settings = ext_settings(tool_permission_enabled=True)
     registry = ToolRegistry()
     capability_registry = CapabilityRegistry()
     capability_registry.register(

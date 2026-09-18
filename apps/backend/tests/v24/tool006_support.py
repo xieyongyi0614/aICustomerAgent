@@ -27,11 +27,11 @@ SESSION = "tool006-s1"
 def autonomy_settings(**overrides: Any) -> SimpleNamespace:
     """自治工具面设置替身：默认总闸 + 工具面子闸 on、上限 12、世界与行动可用。"""
     values: dict[str, Any] = {
-        "v24_tool_system_enabled": True,
-        "v24_tool_surface_enabled": True,
-        "v24_tool_surface_max_tools": 12,
-        "v24_tool_breaker_threshold": 3,
-        "v24_tool_breaker_cooldown_seconds": 300,
+        "tool_system_enabled": True,
+        "tool_surface_enabled": True,
+        "tool_surface_max_tools": 12,
+        "tool_breaker_threshold": 3,
+        "tool_breaker_cooldown_seconds": 300,
         "world_enabled": True,
         "action_enabled": True,
         "observability_step_extra_max_chars": 2000,

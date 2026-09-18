@@ -2,8 +2,8 @@
 
 对应 Acceptance Report P1：
 1. `PlanExecutorBridge` 进入 `life_loop._step_goal_advance` 生产执行路径
-2. `v25_plan_scheduler_enabled` / `v25_plan_execution_enabled` /
-   `v25_plan_revision_enabled` / `v25_plan_world_feedback_enabled` 有真实行为门控
+2. `plan_scheduler_enabled` / `plan_execution_enabled` /
+   `plan_revision_enabled` / `plan_world_feedback_enabled` 有真实行为门控
 """
 
 from types import SimpleNamespace
@@ -25,13 +25,13 @@ from .conftest import V25_NOW, V25_USER
 @pytest.fixture
 def plan_path_on(override_settings):
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_observation_enabled="true",
-        v25_plan_scheduler_enabled="true",
-        v25_plan_execution_enabled="true",
-        v25_plan_revision_enabled="true",
-        v25_plan_world_feedback_enabled="true",
-        v24_tool_system_enabled="true",
+        planning_enabled="true",
+        plan_observation_enabled="true",
+        plan_scheduler_enabled="true",
+        plan_execution_enabled="true",
+        plan_revision_enabled="true",
+        plan_world_feedback_enabled="true",
+        tool_system_enabled="true",
         action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
@@ -41,10 +41,10 @@ def plan_path_on(override_settings):
 def execution_on(override_settings):
     """执行桥 on、观测与调度 off：验证分派不受无关子闸影响。"""
     override_settings(
-        v25_planning_enabled="true",
-        v25_plan_execution_enabled="true",
-        v25_plan_scheduler_enabled="false",
-        v25_plan_observation_enabled="false",
+        planning_enabled="true",
+        plan_execution_enabled="true",
+        plan_scheduler_enabled="false",
+        plan_observation_enabled="false",
         action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
@@ -116,8 +116,8 @@ class TestExecutionBridgeIsMounted:
     def test_master_flag_off_leaves_execution_child_inert(
         self, monkeypatch
     ):
-        monkeypatch.setenv("V25_PLANNING_ENABLED", "false")
-        monkeypatch.setenv("V25_PLAN_EXECUTION_ENABLED", "true")
+        monkeypatch.setenv("PLANNING_ENABLED", "false")
+        monkeypatch.setenv("PLAN_EXECUTION_ENABLED", "true")
         monkeypatch.setenv("ACTION_ENABLED", "true")
         get_settings.cache_clear()
         try:
@@ -127,11 +127,11 @@ class TestExecutionBridgeIsMounted:
 
 
 class TestSchedulerFlagIsLive:
-    """P1-2a：`v25_plan_scheduler_enabled` 决定就绪步来源。"""
+    """P1-2a：`plan_scheduler_enabled` 决定就绪步来源。"""
 
     def test_scheduler_on_uses_plan_scheduler(self, monkeypatch):
-        monkeypatch.setenv("V25_PLANNING_ENABLED", "true")
-        monkeypatch.setenv("V25_PLAN_SCHEDULER_ENABLED", "true")
+        monkeypatch.setenv("PLANNING_ENABLED", "true")
+        monkeypatch.setenv("PLAN_SCHEDULER_ENABLED", "true")
         get_settings.cache_clear()
         called: list = []
         monkeypatch.setattr(
@@ -173,7 +173,7 @@ class TestSchedulerFlagIsLive:
 
 
 class TestRevisionFlagIsLive:
-    """P1-2b：`v25_plan_revision_enabled` on 时执行后入队 TRIGGER_REPLAN。"""
+    """P1-2b：`plan_revision_enabled` on 时执行后入队 TRIGGER_REPLAN。"""
 
     @pytest.mark.asyncio
     async def test_exhausted_attempt_enqueues_replan(
@@ -246,14 +246,14 @@ class TestRevisionFlagIsLive:
 
 
 class TestWorldFeedbackFlagIsLive:
-    """P1-2c：`v25_plan_world_feedback_enabled` 门控终态广播。"""
+    """P1-2c：`plan_world_feedback_enabled` 门控终态广播。"""
 
     def test_broadcast_off_when_world_feedback_disabled(
         self, db_session_factory, override_settings, make_goal, monkeypatch
     ):
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_world_feedback_enabled="false",
+            planning_enabled="true",
+            plan_world_feedback_enabled="false",
         )
         called: list = []
         monkeypatch.setattr(
@@ -269,8 +269,8 @@ class TestWorldFeedbackFlagIsLive:
         self, db_session_factory, override_settings, make_goal, monkeypatch
     ):
         override_settings(
-            v25_planning_enabled="true",
-            v25_plan_world_feedback_enabled="true",
+            planning_enabled="true",
+            plan_world_feedback_enabled="true",
         )
         called: list = []
         monkeypatch.setattr(
@@ -291,10 +291,10 @@ class TestFlagConsumptionStatic:
 
         app_root = Path(life_loop.__file__).parents[1]
         hits = {name: [] for name in (
-            "v25_plan_scheduler_enabled",
-            "v25_plan_execution_enabled",
-            "v25_plan_revision_enabled",
-            "v25_plan_world_feedback_enabled",
+            "plan_scheduler_enabled",
+            "plan_execution_enabled",
+            "plan_revision_enabled",
+            "plan_world_feedback_enabled",
         )}
         for path in app_root.rglob("*.py"):
             text = path.read_text(encoding="utf-8")
