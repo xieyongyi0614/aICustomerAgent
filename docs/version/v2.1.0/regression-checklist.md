@@ -1,18 +1,20 @@
 # V2.1.0 Agent Evolution Regression Checklist（真实模型人工回归）
 
-> 前置：AGENT-001~007 已实现（迁移链尾 0043）。真实模型下验证 Evolution Loop 全链贯通与三条成长主线。
-> 执行前：`alembic upgrade head`（0043），`.env` 开启五 Flag。
+> 前置：AGENT-001~007 已实现。真实模型下验证 Evolution Loop 全链贯通与三条成长主线。
+> 执行前：`alembic upgrade head`（链尾现为 0048）。
+> **本清单已随 `vXX_` 开关体系删除改写**（见 `docs/refactor/flag-removal-audit.md` F.10）：V2.1.0 的功能不再靠 env 打开。
 
-## 1. 开关准备
+## 1. 生效确认（开关已删除，功能无条件生效）
 
-| 环境变量 | 取值 | 目的 |
-|---|---|---|
-| `V21_AGENT_RUNTIME_ENABLED` | true（总闸） | 统一 Run 模型 + LLM Gateway |
-| `V21_UNIFIED_RUN_ENABLED` | true | 前台对话收编为 foreground_chat Run |
-| `V21_GOAL_STACK_ENABLED` | true | 四层目标栈 + 对齐度评分 |
-| `V21_AGENT_METRICS_ENABLED` | true | Agent 级指标快照 + 演化议题 |
-| `V21_PERSONALITY_EVOLUTION_ENABLED` | true | 人格轴演化 + Goal Rebalance |
-| 对照轮 | 全部 false | 行为与 v2.0.0 逐字节一致 |
+四个 Flag 的配置面已消失、ON 路径常开：`agent_runtime_enabled`、`goal_stack_enabled`、`agent_metrics_enabled`、`personality_evolution_enabled`。
+仍在场的只有两个：`unified_run_enabled`（前台收编，**尚未固化**，仍默认 false）与 `foreground_gateway_enforced`（按裁决保留门控，见 F.10）。
+
+| # | 动作 | 核对点 | 结果 |
+|---|---|---|---|
+| P1 | 起服务并看启动日志 | 出现 `agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）`——该 task 原受 `enabled()` 门控，现无条件注册 | ☐ |
+| P2 | 查部署侧 `.env` 副本 | **不得残留** `V21_*` 或 `AGENT_RUNTIME_ENABLED` / `GOAL_STACK_ENABLED` / `AGENT_METRICS_ENABLED` / `PERSONALITY_EVOLUTION_ENABLED`：`V21_*` 会触发启动告警，无前缀的旧键则**静默无效**，容易误判「还能用 env 关」 | ☐ |
+| P3 | 确认前台尚未收编 | `unified_run_enabled` 仍为 false → `loop_runs` 中**不应**出现 `run_kind=foreground_chat` 行；A1/A7 的台账核对留到该批 | ☐ |
+| P4 | 后台自治已换实现 | `autonomous_tick` 台账行的 `run_kind` / `profile` 字段有值（v2.0.0 的 `life_loop._run_user_cycle` 已删除，唯一入口是 `agent_runtime.run_autonomous_cycle`） | ☐ |
 
 ## 2. 基础主线下钻
 
@@ -23,7 +25,8 @@
 | A3 | 关闭灯等后台 tick 触发（闲置/到期 trigger） | `loop_runs` 出现 `autonomous_tick` 行；steps 含 perception→state_snapshot→goal_check→goal_stack→…→world_experience | ☐ |
 | A4 | 触发主动行为 | 主动消息经管线选择（decision_records.candidates 可见候选来源/六维得分/闸结果/落选清单） | ☐ |
 | A5 | 断网/超预算场景 | Gateway 熔断：后台 decision skip（gateway_denied / quota_circuit_open），Run 终态 degraded；前台软降级不报错 | ☐ |
-| A6 | 等待慢时钟 tick（默认 1h；可将 `V21_AGENT_EVOLUTION_INTERVAL_SECONDS` 调小验证） | 日志出现 agent evolution worker；`agent_metric_snapshots` 当日窗口落行（同窗口不重复落）；`personality_state.current` 与 `evolution.ledger` 随时间变化 | ☐ |
+| A5.1 | **固化专项（本批新增风险面）**：连跑 ≥20 个自治周期（把 `life_loop_tick_seconds` 调小即可），统计 decision 步骤的 `skip_reason` 分布 | `gateway_denied` 占比可解释（对应 run 级 LLM 预算与日配额熔断）。**占比 > 5%、或主动消息/目标推进量明显低于对照轮 → 判 FAIL**：这道 run 级 Gateway 闸是本次固化新引入的静默跳过来源，且软模式豁免只覆盖 `budget_type == "foreground"`，自治能力不在其内 | ☐ |
+| A6 | 等待慢时钟 tick（默认 1h；可将 `AGENT_EVOLUTION_INTERVAL_SECONDS` 调小验证） | 日志出现 agent evolution worker；`agent_metric_snapshots` 当日窗口落行（同窗口不重复落）；`personality_state.current` 与 `evolution.ledger` 随时间变化 | ☐ |
 | A7 | 查前台 Run 台账与决策审计 | `loop_runs` 中 `profile.stages` 与 `steps` 阶段序列**完全一致**；`decision_records.candidates`（TURN_INTENTION 行）可见前台候选来源/六维得分/逐闸结果 | ☐ |
 
 ## 3. 成长主线（V2.1.0 核心）
@@ -55,13 +58,13 @@
 
 | # | 动作 | 核对点 | 结果 |
 |---|---|---|---|
-| R1 | 逐档关闭 ④→③→②→① | 每档既有套件全绿、无脏数据、行为面收敛 | ☐ |
-| R2 | 全关对照轮 | 前台/后台/维护/投递/评估/记忆行为与 v2.0.0 逐字节一致 | ☐ |
-| R3 | 迁移回滚演练 | 0043→0038 逆放可执行，旧行为恢复 | ☐ |
+| R1 | ~~逐档关闭 ④→③→②→①~~ **已不可行**：四个 Flag 无配置面 | 回滚 = `git revert` 去门控提交（F.10 记的 `51ffca8` 与 A 组提交），因此本清单**必须先在独立库上跑完**再切主库 | ☐ |
+| R2 | 对照轮（与固化前留档的同一组输入比对） | 前台/后台/维护/投递/评估/记忆的行为差异**只应**出现在「V2.1.0 能力开始生效」这一预期范围内；范围外差异即 FAIL | ☐ |
+| R3 | 迁移回滚演练 | 本次改造零迁移（链尾 0048）；如需回退代码，旧行为随 `git revert` 恢复 | ☐ |
 
 ## 5. 上线判定
 
-- 三条成长主线 + 基础主线全部通过；
-- 对照轮零差异；
+- 三条成长主线 + 基础主线（含 A5.1 固化专项）全部通过；
+- 对照轮差异只落在「V2.1.0 能力开始生效」的预期范围内（§4 R2）；
 - 性能预算（Snapshot ≤150ms、Run 台账 ≤20ms、前台 LLM ≤4 次、事件预闸 0 LLM）抽测达标；
 - 遗留问题 Q1~Q5 裁决已回填 architecture.md 附表。

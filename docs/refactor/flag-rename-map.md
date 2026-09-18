@@ -59,14 +59,14 @@
 
 ---
 
-## 四、开关字段（51 个，已去前缀；3 个死开关已删 + v22 段 5 个已固化常开，在存 43）
+## 四、开关字段（51 个，已去前缀；3 个死开关已删 + 9 个已固化常开，在存 39）
 
-按版本段分组。这些字段同时是**门控**。去前缀（轨道 A）已全部完成；**去门控**（固化 ON）已完成 v22 段（5 个，报告 F.9），剩余 43 个按风险递增顺序推进：v21 → v23 → v24 → v25 → v26 → 收尾删 `enablement.py`。
+按版本段分组。这些字段同时是**门控**。去前缀（轨道 A）已全部完成；**去门控**（固化 ON）已完成 v22 段（5 个，F.9）与 v21 的 4 个（F.10 三个 + F.11 一个），在存 **39** 个按风险递增顺序推进：v21 批 3（`unified_run_enabled`）→ v23 → v24 → v25 → v26 → 收尾删 `enablement.py`；`foreground_gateway_enforced` 按裁决永久保留门控。
 
 | 段 | 旧名 | 新名 | 旧 env | 默认 | 备注 |
 |---|---|---|---|---|---|
 | v21 | `v21_agent_metrics_enabled` | `agent_metrics_enabled` | `V21_AGENT_METRICS_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
-| v21 | `v21_agent_runtime_enabled` | `agent_runtime_enabled` | `V21_AGENT_RUNTIME_ENABLED` | `False` | — |
+| v21 | `v21_agent_runtime_enabled` | `agent_runtime_enabled` | `V21_AGENT_RUNTIME_ENABLED` | `False` | ✅ 已固化常开（v21 批 2，报告 F.11；**含活路径替换**） |
 | v21 | `v21_foreground_gateway_enforced` | `foreground_gateway_enforced` | `V21_FOREGROUND_GATEWAY_ENFORCED` | `False` | ⏸ 裁决保留门控（缺 light_llm_profile，见 F.10） |
 | v21 | `v21_goal_stack_enabled` | `goal_stack_enabled` | `V21_GOAL_STACK_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
 | v21 | `v21_personality_evolution_enabled` | `personality_evolution_enabled` | `V21_PERSONALITY_EVOLUTION_ENABLED` | `False` | ✅ 已固化常开（v21 批 1，报告 F.10） |
@@ -386,9 +386,10 @@ cd apps/backend && .venv/Scripts/python.exe -c "import re,pathlib; mods={'agent_
 | 轨道 A 处理 | 200 去前缀（51 开关 + 149 调参）+ 步骤 0 删 2 个未接线字段 |
 | 第 0 步删除死开关 | 3（见 §九 步骤 2） |
 | v22 段去门控删除 | 5（ON 转常开，见报告 F.9） |
-| **当前** settings 字段总数 | **417** |
+| v21 段去门控删除 | 4（F.10 三个 + F.11 一个；`unified_run_enabled` 与裁决保留的 `foreground_gateway_enforced` 仍在） |
+| **当前** settings 字段总数 | **413** |
 | 其中带 `vXX_` 前缀 | **0** |
-| 原带前缀、现仍在存的字段 | 192（**43 开关** + 149 调参） |
+| 原带前缀、现仍在存的字段 | 188（**39 开关** + 149 调参） |
 | 唯一性例外（撞名，见 §六） | 2 组（均已裁决并执行） |
 
-**对账**：`434 − 7 − 2 − 3 − 5 = 417`；`212 = 200 + 12`；`200 = 192 + 3 + 5`（3 个死开关 + v22 段 5 个固化常开，均未进入在存清单）。
+**对账**：`434 − 7 − 2 − 3 − 5 − 4 = 413`；`212 = 200 + 12`；`200 = 188 + 12`（3 个死开关 + v22 段 5 个 + v21 段 4 个已固化常开或直删，均未进入在存清单）。

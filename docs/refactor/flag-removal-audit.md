@@ -897,6 +897,22 @@ v21 段按风险拆三批执行（F.11 = `agent_runtime_enabled`、F.12 = `unifi
 
 **`foreground_gateway_enforced` 裁决：保留门控，不固化**。理由：`light_llm_profile` 代码默认 `""` 且 `.env.example` 无该键，固化 ON 后 `resolve_answer_llm` 在预算耗尽时抛 `GatewayDeniedError`——**用户该轮回复直接失败**。与附录 E 的 `action_outbox_enabled` 同类：门控不是冗余，而是前置条件未满足。字段已无前缀（F.6），保留零污染；要推翻本裁决，须先让 `light_llm_profile` 成为必配项。
 
+### F.11 轨道 B 批次 v21-2（`agent_runtime_enabled`）去门控 —— 2026-09-18
+
+**本改造至今风险最高的一批**：删掉的是当前实际在跑的自治循环实现（§4.1 型活路径替换，且是 §4 清单漏记的那条）。
+
+| 项 | 内容 |
+|---|---|
+| 删除字段 | `agent_runtime_enabled`（字段 414 → **413**；在存开关 40 → **39**） |
+| 活路径替换 | `life_loop` 的 `if agent_runtime.enabled(): … else: _run_user_cycle(…)` 改为无条件走 `run_autonomous_cycle`；**删除 `life_loop._run_user_cycle`（105 行）与随之变孤儿的 `_append_step`、`_step_action_schedule`** |
+| 连带删除 | `agent_runtime/controller.enabled()`（含 `__init__` 的 import 与 `__all__`）、`agent_evolution_worker.enabled()` 及 `run_evolution_tick` 的 `flag_disabled` 早返回、`agent_state_assembler` 的字段判据、`autonomy_engine._pipeline_intention` 的早返回、`main.py` 的 worker 条件启动（改为常驻） |
+| **本批引入并被当场抓到的 bug** | `enablement.V25_DEPENDENCIES` 残留 `plan_autonomy_enabled ⇒ agent_runtime_enabled`；字段删除后 `getattr(…, False)` 使该条**恒判配置错误**（`plan_autonomy_enabled` 一开就启动失败）。已删该条 + 同步 `plan002/plan012` 两处依赖表钉测（⑦ → ①~⑥、`len>=6 → >=5`）。**教训：删任一开关前必须先 grep `enablement.py` 的依赖表与子闸表是否引用它**，后续 v23~v26 每批照做 |
+| ⚠ **移交 v26 批的缺口（不得丢）** | v2.0.0 周期里由 `action_execution_enabled` + `action_scheduler_enabled` 双闸挂载的 `action_schedule` 步骤，在 v2.1.0 的 `autonomous_tick` profile 里**从来不存在**（`AUTONOMOUS_TICK_STAGES` 止于 `world_experience`）。固化后 v2.0.0 路径消失 ⇒ 该步骤**无任何消费入口**。`scheduler.step_action_schedule` 本体（V2.6.1 REF-004/005）完好且自带 `flag_off` 门控，只是没人调。v26 批必须先裁决：加 profile 阶段，还是挂到 `_run_maintenance`。现已由 `tests/v26/test_review_fixes.py::TestActionScheduleConsumption` 把「profile 里没有该阶段」钉成断言，防止无声失踪 |
+| 测试 | 15 个文件；删 7 个纯门控语义用例（含 `test_unified_requires_runtime`、`test_tick_uses_legacy_run_shape`、`test_legacy_cycle_has_no_snapshot_stage_or_rows`、`test_pipeline_intention_flag_off_noop`、`test_flag_off_worker_is_noop`、`test_u13_autonomy_requires_the_agent_runtime` 等）；4 个 v25 源码文本锚点（`source.split("async def _run_user_cycle"…)`）改钉 `autonomous_tick` 的 profile 阶段序列；链样本改用 `tool_channel_enabled ⇒ feishu_enabled` |
+| 清单改写 | `docs/version/v2.1.0/regression-checklist.md`：原「用 env 开五 Flag / 逐档关闭回滚 / 链尾 0043」三处随固化失效，改写为「生效确认 P1~P4 + 回滚 = `git revert`」，并新增 **A5.1 专项**：连跑 ≥20 个自治周期统计 decision 的 `skip_reason`，`gateway_denied` 占比 > 5% 判 FAIL（这道 run 级闸是本次固化新引入的静默跳过来源，且软模式豁免不覆盖自治能力） |
+| 验证 | 目标 10 文件 **891 passed / 2 failed**（两条均属 F.8 既存豁免）；Fast Test **1449 全绿**；全量 **17 failed**，新增两条（`plan012_flag_matrix`、`v26/test_review_fixes`）均为本批依赖表/锚点问题，已在本批内修 |
+| env | v21 各键从未写入 `.env` / `.env.example` ⇒ 零 env 变更；部署侧若自行加过，删除后成**静默无效键**（无版本前缀 ⇒ 不触发启动告警） |
+
 ---
 
 ## 附录 G：done 定义与验收判据
