@@ -12,6 +12,7 @@ trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅�
 
 import logging
 import time
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -767,6 +768,34 @@ def _safe_sync_call(kind: str, func) -> dict:
         return {"step": kind, "status": "error", "error": exc.__class__.__name__}
 
 
+def _json_safe(value):
+    """维护步返回值归一为 JSON 可序列化形态。
+
+    `loop_runs.steps` 是 JSON 列，而各维护步的返回值形态不一：`world_maintenance`
+    返回 int、`action_retry` 传 dict，`world_simulation` 则把
+    `run_simulation_maintenance` 的返回值原样带回——那是一串 `TimeAdvanceResult`
+    （dataclass，含 `datetime` 字段），直接落库即
+    `TypeError: Object of type TimeAdvanceResult is not JSON serializable`。
+    在唯一写入路径统一收口，后续新增维护步不必各自处理。
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            field.name: _json_safe(getattr(value, field.name)) for field in fields(value)
+        }
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        return _json_safe(dump(mode="json"))
+    return str(value)
+
+
 def _record_maintenance_run(
     kind: str, steps, now: datetime, status: str = "done"
 ) -> None:
@@ -775,5 +804,5 @@ def _record_maintenance_run(
     )
     step_list = steps if isinstance(steps, list) else [steps]
     loop_run_repository.finish_run(
-        run.id, status=status, steps=step_list, now=now
+        run.id, status=status, steps=_json_safe(step_list), now=now
     )

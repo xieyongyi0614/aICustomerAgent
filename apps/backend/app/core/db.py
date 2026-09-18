@@ -1216,8 +1216,8 @@ class LoopRunRow(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', "
-            "'outbox_consume', 'trigger_reconcile')",
+            "kind IN ('autonomy', 'chat', 'world_maintenance', 'world_simulation', "
+            "'action_retry', 'action_schedule', 'outbox_consume', 'trigger_reconcile')",
             name="ck_loop_runs_kind",
         ),
         CheckConstraint(
