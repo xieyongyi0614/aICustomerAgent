@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
+from app.application import logical_clock
 from app.models.action import (
     ActionEffect,
     ActionResult,
@@ -96,7 +97,7 @@ _TOOL_ACTION_FAILURE_KINDS: dict[str, str] = {
 
 
 def _now() -> datetime:
-    return datetime.now()
+    return logical_clock.logical_now()
 
 
 def new_record(

@@ -25,6 +25,7 @@ from app.application.agent_runtime.models import (
 )
 from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
+from app.application import logical_clock
 from app.repositories import llm_call_repository, loop_run_repository, outbox_repository
 from app.services import life_loop_budget
 
@@ -192,6 +193,7 @@ async def run_autonomous_cycle(
     from app.application.post_process import get_user_write_lock
 
     now = now or datetime.now()
+    clock_token = logical_clock.bind(now)
     settings = get_settings()
     if trigger_type is None or reason is None:
         trigger_type, reason = trigger_router.classify_background_trigger(user_id, now)
@@ -220,6 +222,7 @@ async def run_autonomous_cycle(
             {"step": "abort", "status": "error", "error": exc.__class__.__name__}
         )
     finally:
+        logical_clock.unbind(clock_token)
         digest_token = run.data.get("digest_token")
         if digest_token is not None:
             memory_digest_var.reset(digest_token)
