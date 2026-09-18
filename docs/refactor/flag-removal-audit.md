@@ -348,6 +348,8 @@ get_settings.cache_clear()
 
 顺序由 `app/core/settings/enablement.py` 的依赖表（`V25_DEPENDENCIES:71-114`、`V25_SUB_FLAGS:51-63`，以及 v2/v21/v22/v23/v24/v26 各段内联表）加运行时耦合推出。
 
+> **执行期修订（2026-09-18）**：本表表头计数、开关清单与批次 6 的依赖描述已由 **附录 F.2** 修订（批次 4 为 8 个而非 7 个、批次 6 为 14 个而非 13 个、批次 7 为 7 个而非 6 个，合计 51 而非 48；批次 6 对 v2 段的依赖已随批次 1 消失）。**执行前请以附录 F 为准**，并从附录 A 重新导出该批清单。
+
 **前置说明：非版本号的基础闸必须保留。** `action_enabled` / `world_enabled` / `autonomy_enabled` / `feishu_enabled` 不带版本前缀，且 vXX_ 的 ON 路径运行时仍依赖它们（如 `v25_plan_execution_enabled` 要求 `action_enabled`、`v26_action_execution_enabled` 要求 `action_enabled`、`v24_tool_channel_enabled` 要求 `feishu_enabled`）。这些**不在本次删除范围内**。
 
 | 批次 | 范围 | 内部顺序 | 依赖说明 |
@@ -381,6 +383,8 @@ get_settings.cache_clear()
 | `v23_reserved_flag_warnings` 等对应测试（`tests/unit/test_enablement_chain.py` 等） | 随被测对象删除 | **高** |
 
 ### 9.2 验证命令
+
+> 判据修订见 **附录 G.1 / G.2**：① 的「0 命中」目标不可直接达成——历史说明性注释是**有意保留**的（批次 1 已留 7 处），须按「该行是否为可执行语句」过滤；并补充契约层与前端两条命令。
 
 ```bash
 # ① 源码侧残留扫描（目标：0 命中）
@@ -669,3 +673,226 @@ cd apps/frontend && pnpm vitest run
 - 字段 `v2_action_outbox_enabled` → `action_outbox_enabled`；env `V2_ACTION_OUTBOX_ENABLED` → `ACTION_OUTBOX_ENABLED`。已确认**无撞名**（既有字段为 `action_enabled` / `action_detector_enabled` / `action_memory_policy_enabled`）。
 - 同批可一并处理 `v2_character_action_sync_enabled`、`v2_inventory_grounding_enabled`（同为 `v2_` 前缀的独立开关，且都在 `.env` 中已开启）——这三者构成「`v2_` 段残留开关」的完整集合。
 - 本仓库有 `set_known_env` 防呆守卫，改名前先加「env key ∈ `model_fields`」断言已就位（前置防呆第 2 条已完成）。
+
+---
+
+## 附录 F：批次执行台账（实测 2026-09-18）
+
+> 执行期现状快照，替代 §8 表头的估算计数与 §2 的改造前口径。数据由脚本实测（`app/`、`tests/`、`.env`、`git log`），非估算。
+> 配套提交：`a74c5a6`（前置防呆）、`68d85ac`（批次 1 去门控）、`93dcb1e`（批次 1 收尾改名）。
+
+### F.1 批次进度与实测规模
+
+「app 引用 / 测试引用」为开关名在对应目录中出现的总次数（`app/` 侧已排除 `app/core/settings/`；测试侧含 `.md`），含 docstring 与注释提及，故大于门控点数。
+
+| 批次 | 版本 | 开关数 | 其中默认 ON | app 引用 | 测试引用 | 待删 OFF 回退路径 | 状态 |
+|---|---|---|---|---|---|---|---|
+| 1 | v2 段 | 7（已删）+ 3（改名保留） | — | 63 处门控（见 D.2） | 207 调用点 | 5（§4.1 #1~#4 + D 段） | **已完成** |
+| 2 | v21 | 6 | 0 | 51 | 19 | 2（§4.2 #16、#17） | 待做 |
+| 3 | v22 | 5 | 0 | 19 | 15 | 0 | 待做（可作热身批） |
+| 4 | v23 | **8** | 0 | 79 | 47 | 3（§4.1 #5、§4.2 #14/#15） | 待做 |
+| 5 | v24 | 11 | 1（`v24_tool_confirm_ttl_reuse`） | 106 | 272 | 1（§4.2 #9） | 待做（测试量最大） |
+| 6 | v25 | **14** | 2（`v25_plan_tool_required`、`v25_plan_context_digest_enabled`） | 103 | 266 | 6（§4.2 #7/#8/#10~#13） | 待做（依赖面最广） |
+| 7 | v26 | **7** | 0 | 35 | 76 | 1（§4.2 #6） | 待做 |
+| 8 | 收尾 | — | — | `enablement.py` 284 行 / 146 处版本名 | — | — | 待做（必须最后） |
+
+**批次 1 的实际边界**（与本报告 D.3 / E.5 的差异）：
+
+- **删除 7 个字段**：`v2_life_loop_enabled`、`v2_autonomy_advanced_enabled`、`v2_memory_enabled`、`v2_memory_vector_enabled`、`v2_reflection_enabled`、`v2_development_enabled`、`v2_relationship_evolved_enabled`；连带删除 `app/application/autonomy_worker.py`（整模块）与 `main.py` 旧三循环。
+- **改名保留 3 个开关**（附录 E 方案③）：`action_outbox_enabled`、`character_action_sync_enabled`、`inventory_grounding_enabled`；另有 2 个相关调参字段随同改名（`character_action_sync_context_lines`、`inventory_grounding_mode`），即批次 1 共改名 5 个字段。注意 `v2_life_loop_outbox_max_attempts` / `v2_life_loop_outbox_backoff_seconds` **沿用原名**，仍计入 F.3 的 149 个待改名调参。
+- 因此 D.2 的「settings 字段定义 8」应读作「7 删 + 1 改名」；`enablement.py` 中 v2 段与 v25 对 v2 的跨版本依赖条目已同步移除。
+
+### F.2 §8 需修订之处（执行前必读）
+
+| # | §8 原文 | 实测 | 影响 |
+|---|---|---|---|
+| 1 | 批次 4「v23（7 个）」 | **8 个** | 漏做 1 个 |
+| 2 | 批次 6「v25（13 个）」且清单未列 `v25_plan_context_digest_enabled` | **14 个** | 漏做 1 个 |
+| 3 | 批次 7「v26（6 个）」 | **7 个**（转正 5 + 直删 2） | 账目错位 |
+| 4 | 表头合计 6+5+7+11+13+6 = 48 | **51**（与附录 A 的 61−10 一致） | 与附录 A 自相矛盾 |
+| 5 | 批次 6 依赖「`v25_planning_enabled`（依赖 `v2_autonomy_advanced_enabled` + `v2_life_loop_enabled`）」 | 该依赖**已随批次 1 消失**（`enablement.py` 对应条目已移除） | 排序理由过时；批次 6 仍须最后做（内部依赖 v24/v21 仍在） |
+
+> 执行任何一批前，请从**附录 A** 重新导出该批开关清单，不要沿用 §8 表头计数。
+
+### F.3 剩余字段口径（去前缀工作量的完整盘子）
+
+| 模块 | 开关 | 调参 | 版本段 |
+|---|---|---|---|
+| `agent_runtime.py` | 6 | 22 | v21 |
+| `experience.py` | 5 | 0 | v22 |
+| `world_simulation.py` | 8 | 4 | v23 |
+| `tool.py` | 11 | 8 | v24 |
+| `plan.py` | 14 | 13 | v25 |
+| `action_execution.py` | 7 | 1 | v26 |
+| `life_loop.py` | 0 | 15 | v2（仅剩调参） |
+| `memory.py` | 0 | 34 | v2（同上） |
+| `autonomy_advanced.py` | 0 | 16 | v2（同上） |
+| `reflection_development.py` | 0 | 36 | v2（同上） |
+| **合计** | **51** | **149** | 共 **200 个待去前缀字段** |
+
+去前缀后仍为 **2 处撞名**（与 §6.1 一致，无新增）：`v21_event_escalation_types` ↔ `v23_event_escalation_types`；`v23_world_llm_assist_enabled` ↔ 既有 `world_llm_assist_enabled`。
+
+### F.4 环境变量现状与「首次上线」性质
+
+| 文件 | `VXX_*` 行数 | 跟踪状态 |
+|---|---|---|
+| `apps/backend/.env.example` | 38（全为 V23/V24/V26，**值均为 `false`**） | 已跟踪 |
+| `apps/backend/.env` | 38（内容与上表一致） | **未跟踪**（`apps/backend/.gitignore:13`） |
+
+v21 / v22 / v25 的开关未出现在 `.env` 中，走代码默认值，同样为 off。
+
+因此 **批次 2~7 的每一批都是对应路径的首次上线**（§1.2 前提一的具体形态）。每批必须配套执行 `docs/version/<version>/*/regression-checklist.md`，且部署侧 `.env` 副本须同批更新，否则按 §6.2 静默回落。
+
+### F.5 测试基线（2026-09-18）
+
+```
+.venv/Scripts/python.exe -m pytest -q -n 4 --timeout=180 --basetemp=<仓库内目录>
+=> 24 failed, 6434 passed, 22 skipped, 3 warnings in 202.05s
+```
+
+**环境坑**：`-n 4` 配合默认 basetemp 时，Windows 上 `pytest-current` 符号链接会抛 `PermissionError: [WinError 5]` 使整轮中断（实测已踩）。必须显式 `--basetemp=<仓库内目录>`。
+
+**批次 1 新增的 3 个失败（均为「冻结面零 diff」守卫）**：
+
+| 用例 | 冻结文件 |
+|---|---|
+| `tests/v24/test_tool010_e2e.py::test_zero_diff_frozen_surfaces` | `app/services/action/capabilities/reminder.py` |
+| 同上 | `app/services/action/capabilities/world_action.py` |
+| 同上 | `app/application/chat_pipeline.py` |
+
+判定方式：对同一文件取 `b3f5100`（批次 1 前）与工作区字节分别做 sha256，前者与记录值一致、后者不一致。
+
+另有 3 个文件在批次 1 **之前**即已失配（`app/character/asuna/action.py`、`app/application/post_process.py`、`app/application/action_engine.py`），属既存失败，不计入新增。
+
+**24 个失败的初步归因**（供批次 2 逐条比对）：
+
+| 类别 | 数量 | 说明 |
+|---|---|---|
+| 批次 1 新增 | 3 | 源码哈希冻结（G.3 第一类） |
+| 源码哈希冻结·既存 | 4 | 同上，含 `tool008` 的 `asuna/action.py` |
+| 表结构与迁移冻结·既存 | 7 | G.3 第二类，与本次改造无关 |
+| 其它既存 | 10 | `e2e`（3）、`v2`/`v21`/`v23`/`v25`/`v7.8` 各 1、`tool010` 四步用例 1 等 |
+
+完整日志见 `.workbuddy/tmp/pytest-baseline2.log`（本地，不入库）。**24 failed 记为批次 2 的对比基线**，超出部分必须逐条归因。
+
+### F.6 轨道 A（去前缀）执行结果 —— 2026-09-18
+
+按 G.5 建议拆出的两条轨道中，**轨道 A（纯改名，零行为变化）已执行**；轨道 B（去门控）尚未开始。
+
+| 项 | 改造前 | 改造后 |
+|---|---|---|
+| settings 字段总数 | 427 | **425**（步骤 0 删除 2 个未接线字段） |
+| 带 `vXX_` 前缀 | 200 | **0** |
+| 其中开关 / 调参 | 51 / 149 | 0 / 0 |
+| 后端全量测试 | 24 failed / 6434 passed / 22 skipped | **16 failed / 6443 passed / 22 skipped** |
+| 前端 | — | vitest 29 文件 / 149 用例全绿；`tsc -b` 通过 |
+
+- 改动规模：265 个文件、2367 处替换；范围含 `app/`、`tests/`、`scripts/`、`apps/frontend/src/`、`.env`、`.env.example`，**不含 `docs/`**。
+- 撞名裁决执行情况：`world_llm_assist_*` 采用「删除未接线对」（§6.1）；`event_escalation_types` 采用 `agent_` / `world_` 前缀（§6.2）。命名一致性建议（对照表 §七）**未采纳**，保持机械去前缀结果。
+- 失败差额 = 8 条冻结哈希用例修复 + 0 新增；另 2 条 `tests/v7.8/test_performance.py` 用例经 3 次单跑确认为计时 flaky，与本次改造无关。
+- 剩余 16 条失败全部落在 F.5 的既存类别（表结构/迁移冻结 7 + 其它 9）。
+- 明细与逐步清单见 `docs/refactor/flag-rename-map.md` §九；部署侧 `.env` 需按该表同步改名（旧键会被 `extra="ignore"` 静默吞掉，只在启动日志告警）。
+
+---
+
+## 附录 G：done 定义与验收判据
+
+### G.1 done 定义（四层边界）
+
+| 层 | 内容 | 是否必须清零 |
+|---|---|---|
+| 配置层 | `app/core/settings/*` 的字段名、`.env.example` 的键名 | **必须** |
+| 代码层 | `app/`（除 `core/settings/`）中的门控表达式与开关名字面量 | **必须** |
+| 契约层 | API 响应中的 flag key：`app/api/v1/world.py` 的 `flags`、`app/api/v1/debug.py` 的 `capability_registry_flags`、`app/application/world_engine.py` 的 `_V23_FLAG_NAMES` 快照，以及前端 `WorldSimPanel` 的读取点 | **必须** |
+| 历史层 | docstring / 注释中的解释性说明、`tests/v21..v26` 目录名、`migrations/versions/` 文件名、`docs/` 全文 | **允许保留** |
+
+> 结论：可行且应当达成的目标是「**配置层与契约层不出现 `v[0-9]+_`**」。把版本号从 docstring、测试目录名、迁移文件名中彻底抹除既不可能也无必要——它们是历史坐标。
+> **契约层是 §4.4 之外的补充**：`flags` / `capability_registry_flags` 是 `dict`，开关名直接作为 JSON key 输出，改名即改 API key；前端读不到 key 会静默回落为 `false`（与 §6.2 的 env 静默失效同构，只是发生在 HTTP 层）。
+
+### G.2 验证命令（修订 §9.2）
+
+```bash
+# ① 候选行（含注释与 docstring，需按下列规则二次过滤）
+grep -rn '\bv[0-9][0-9a-z_]*\b' apps/backend/app --include=*.py | grep -v 'core/settings'
+
+# ⑦ 前端契约同步
+cd apps/frontend && pnpm vitest run
+
+# ⑧ 契约层残留（目标：0 命中）
+grep -rn 'v2[1-6]_' apps/backend/app/api apps/frontend/src --include=*.py --include=*.ts --include=*.tsx
+```
+
+① 的二次过滤规则（目标 0 命中）：
+
+- 剔除 `#` 之后的注释片段；
+- 剔除 docstring 覆盖的行（用 `ast.get_docstring` 取节点行号区间判定）；
+- `_V23_FLAG_NAMES` 这类**调试快照名列表**随批次 4 一并删除，不计入残留。
+
+> 批次 1 已有先例：`app/core/settings/enablement.py` 头部、`tests/eval/test_relationship_eval_gate.py`、`tests/v25/test_plan001_flag_regression.py`、`tests/v25/plan009_support.py` 共 **7 处有意保留**的旧名说明注释。这正是原 ① 判据不可直接达成的原因。
+
+### G.3 冻结面守卫清单（每批必须同步）
+
+以下测试用源码/结构哈希做「零 diff」断言，任何重构都会打破它。**每批必须显式更新对应哈希，并在提交信息里写明「属于允许的改动」**，否则守卫会退化为噪音，失败数将单调累积到无法归因。
+
+**第一类：源码文件哈希冻结**（会随每批重构变化，必须同步）
+
+| 守卫位置 | 冻结对象 | 当前状态 |
+|---|---|---|
+| `tests/v24/test_tool010_e2e.py::ZERO_DIFF_HASHES` | 15 个源码文件（`channels/`、`action/capabilities/`、`application/` 等） | 0 失配（2026-09-18 重建基线） |
+| `tests/v24/test_tool008_integration.py::FROZEN_SOURCES` | 5 个 `app/` 文件（记忆桥、`asuna/action.py` 等） | 0 失配（同上） |
+| `tests/v24/test_tool007_integration.py::FROZEN_SOURCES` | 4 个 `app/` 文件（`world_engine`、`outbox_consumer`、`life_loop`、`world_context`） | 0 |
+| `tests/v24/test_tool002_builtins.py::FROZEN_SOURCE_HASHES` | `action/registry.py`、`models/action.py`、`tool/user_defined.py` | 0 |
+| `tests/v24/test_tool003_action_engine.py`（内联哈希） | `models/action.py`、`action/executor.py` | 0 |
+| `tests/v25/test_plan001_flag_regression.py::FROZEN_PROMPT_DIGEST` | 提示词摘要 | 0 |
+| `tests/v25/test_plan011_regression.py::FROZEN_PLAN_FACE_*` | 计划面签名 | 0 |
+
+> 批次 4（v23）与批次 6（v25）会大面积触碰 `world_engine.py`、`life_loop.py`、`plan_*`，是这类守卫的主要受害批。
+
+**第二类：表结构与迁移冻结**（与本次改造无关，但会持续污染「失败增量」的归因）
+
+| 守卫 | 当前状态 |
+|---|---|
+| `tests/v24/test_tool007_integration.py::test_no_new_tables_in_metadata` | 失败（既存） |
+| `tests/v24/test_tool008_integration.py::test_no_new_tables_in_metadata` / `::test_no_new_migrations` | 失败（既存） |
+| `tests/v24/test_tool012_bans.py::test_session_tables_zero_structural_change` | 失败（既存，`tool012_support.SCHEMA_FROZEN_TABLES`） |
+| `tests/v24/test_tool_acceptance.py::test_migration_chain_head_is_0046` / `::test_zero_migration_model_structure_unchanged` / `::test_zero_migration_reconciliation_records_0046_breakpoint` | 失败（既存） |
+
+这 7 个失败在批次 1 之前即存在（批次 1 未触碰 `app/models/` 与 `migrations/`），**不要求本次改造修复，但必须从每批的失败增量中排除**。建议在批次 2 开始前单独提交一次「基线豁免清单」或就地修复，避免后续所有批次都要重复解释同一批失败。
+
+> **已重建基线（2026-09-18，轨道 A）**：第一类表格中 12 条源码哈希已同步至当前内容——8 条由去前缀重构引发（`world_engine` / `outbox_consumer` / `action_engine` / `chat_pipeline` / `post_process` / `prompts/builder` / `action/planner` / `decision_pipeline`），另 4 条为**既存失配的基线重建**（`capabilities/reminder.py`、`capabilities/world_action.py` 源自批次 1，`asuna/action.py` 源自 V2.6.1，两处 guard 各一条）。第二类（表结构与迁移冻结）保持原状，仍为 7 条既存失败。
+
+### G.4 每批提交拆分与回滚点
+
+每批固定拆 3 个提交，**禁止合并**：
+
+1. **去门控**（行为变更）——唯一需要回滚的提交，可单独 revert；
+2. **测试同步**（`override_settings` 调用点、`setenv` 字面量、断言改写）；
+3. **文档回写**（§8 / §F 台账、该版本 regression 记录）。
+
+配套纪律：
+
+- **批次开动前先回写 §8 / §F**：上一批会改变依赖表与剩余清单（F.2 #5 即为实例）；
+- **批次完成后记基线**：与上一批的 `passed/failed` 逐条比对归因；
+- **每批上线前做该版本真实模型回归**，并在独立数据库上跑首轮（§9.3 未覆盖部分）。
+
+### G.5 执行策略建议：把改名与去门控拆成两条轨道
+
+§8 的批次划分依据是「删除依赖」（谁被依赖谁先删），该顺序对**去门控**是正确的；但它把两种性质不同的工作绑进了同一批：
+
+- **去前缀改名**：200 个字段，零行为变化，可脚本化，依赖关系是**全局一致**的（字段名 / env 名 / 测试字面量 / 契约 key 必须同步）——本质上不适合「分批」；
+- **去门控常开化**：行为变更，必须逐点人工判读 OFF 侧可否删除，是真正的风险所在。
+
+批次 1 实际执行时已经不自觉地把两者拆开了（`68d85ac` 去门控、`93dcb1e` 收尾改名），但 §8 并未把这个模式上升为方案。后果是：一个批次的 diff 里约 2/3 是重命名噪音，review 无法分辨哪一行是行为变更——**这恰是「版本号污染代码审查」的另一种表现形式**。
+
+| 轨道 | 内容 | 验收口径 |
+|---|---|---|
+| **A 去前缀（一次做完）** | 51 个开关 + 149 个调参 + 2 处撞名裁决 + env 键同步 + 契约 key 同步 | 字段集合一致 · 启动未知环境变量告警为 0 · 缓存清空后 `pytest` 与基线一致 · 前端 `vitest` |
+| **B 去门控（逐批）** | 批次 2~8，每批 3 个提交（G.4） | 该批的 OFF 路径全部删除 · 断言改写完成 · 该版本 regression-checklist 通过 |
+
+**反方意见（需权衡）**：若计划短期内连做 6 批，先全量改名会让后续每批都二次触碰同一批文件，等于两次改同一行。鉴于每批都需人工真实模型回归、批次之间必然拖长，建议拆开执行。
+
+**其它两项护栏**：
+
+1. 可选用一次性 alias 兼容窗口（pydantic `validation_alias=AliasChoices("新名","旧名")`）让旧 env 名继续生效一个版本——代价是破坏「env 名 = 字段名大写」这一不变式（§7.3 的守卫正依赖它），仅建议在部署侧 `.env` 无法同步修改时使用，且须同步放宽守卫；默认仍用 §6.2 的显式告警。
+2. **「旧名 → 新名」对照表已建**：见 `docs/refactor/flag-rename-map.md`（200 个待去前缀字段 + 批次 1 已处理的 12 个 + 2 处撞名裁决 + 命名一致性建议，附校验脚本）。§1.2 前提二选择不改写 `docs/` 的 1,589 处引用，代价是代码中已无版本次命名、文档中仍是旧名——对照表是把这个代价压到可接受的最低成本手段（与 §6.2 的告警同属护栏类改动）。
+

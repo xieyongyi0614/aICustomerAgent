@@ -32,6 +32,7 @@
 - `docs/version/v1.0.0/backend-refactor/` — 后端架构审计与目标架构（application 编排层，已实现）
 - `docs/version/v1.0.0/v2/01-task-registry.md` / `docs/version/v1.0.0/v1/01-task-registry.md` — 早期版本（已完结）
 - `docs/version/v2.1.0/` — V2.1.0 Agent Evolution 架构 + 任务注册表（AGENT-001~007 已实现）+ Task Detail + regression-checklist + code-review
+- `docs/refactor/` — 横切重构：`flag-removal-audit.md`（vXX_ 开关体系删除成本审查 + 批次执行台账 + done 定义）、`flag-rename-map.md`（设置字段「旧名 → 新名」对照表）
 
 ## 全局约定
 
@@ -39,4 +40,5 @@
 - 不添加代码注释，用命名表达意图。
 - 提交风格：`feat:` / `fix:` / `refactor:` / `docs:` + 简短中文描述。单行、≤ 30 字，只概括核心变更；不罗列修改文件清单、不写实现细节与测试结果。
 - 不要提交 `.env`、`__pycache__/`、`.venv/`。
+- 设置字段与 env 键**不带版本号前缀**（`vXX_` 开关体系删除中，见 `docs/refactor/`）：新增设置项按领域命名（如 `plan_max_steps` / `tool_system_enabled`），勿再引入版本前缀；环境变量名 = 字段名大写（无 alias 层），改名必须同批同步部署侧 `.env`。
 - 只有用户明确要求时才提交 / 推送 / 建 PR。
