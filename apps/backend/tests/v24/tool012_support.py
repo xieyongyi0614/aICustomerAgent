@@ -145,6 +145,7 @@ LIFE_LOOP_MAINTENANCE_SEQUENCE: tuple[str, ...] = (
     "world_maintenance",
     "world_simulation",
     "action_retry",
+    "action_schedule",
     "outbox_consume",
     "trigger_reconcile",
 )
