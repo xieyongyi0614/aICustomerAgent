@@ -13,40 +13,50 @@ uv run uvicorn app.main:app --reload --port 8020   # 启动服务
 
 ## 任务入口
 
-开发前先读 `docs/version/v1.0.0/v9/tasks.md`（当前任务注册表），确认当前 Task 及其 Scope / 依赖；各版本设计文档在 `docs/version/v1.0.0/v*/`。后端分层与边界的权威描述见 `docs/version/v1.0.0/backend-refactor/target-architecture.md`。
+- **架构类问题先查** `docs/current-system-architecture-baseline.md`（当前系统唯一可信架构基线，描述已实现的真实系统）；**分层与边界的权威描述**见 `docs/version/v1.0.0/backend-refactor/target-architecture.md`。
+- 开发前读对应版本的 `tasks.md` 确认 Task 及其 Scope / 依赖：当前版本 `docs/version/v2.6.1/tasks.md`，各版本设计文档在 `docs/version/<版本>/`。
+- 飞书通道相关改动另见 `docs/integrations/feishu/architecture.md`（本域唯一架构依据）+ `review-v1.1.md`（已知缺陷与多实例硬前置）。
 
 ## 架构约束
 
 分层单向依赖，禁止反向引用：
 
 ```text
+channels（通道层：base.py 契约 + feishu/ 适配器）
+   ↓
 api → application（编排） → services → repositories → core
-         chains（LLM 链）┘    engines（纯函数）┘
+         ├── agent_runtime（Run 生命周期唯一管理者）┘
+         ├── chains（LLM 链）┘
+         └── engines（纯函数）┘
 ```
 
 - `application/` 只做调度与容错（编排管线、post_process 步骤注册），不做状态计算；新增能力以注册新步骤 / 新 context 段的方式接入。
+- `agent_runtime/`（`application/agent_runtime/`）是 Run 生命周期的唯一管理者：`open → 执行阶段 → close`，**唯一写面 = `loop_runs`**；三种 Run Profile（`foreground_chat` / `autonomous_tick` / `event_driven`）在 `profiles.py` **唯一声明**，禁止另开阶段序列。
 - 纯函数引擎（如 `behavior_engine` / `state_engine` / `autonomy_policy`）无 IO、无 LLM，可直接单测。
 - `api` 层禁止直接依赖 `repositories` 与 langchain。
+- **通道层边界**：`channels/` 只做「消息归一为 `InboundMessage` + 经 `OutboundMessage` 契约出站」，**不得**包含 Agent / Memory / World 逻辑，也不得 import 任何 Autonomy 模块；核心层（`application` / `services` / `repositories` / `chains` / `core` / `character`）**不得** import `app.channels.<impl>`（如 `app.channels.feishu`），**仅可** import `app.channels.base`（零第三方依赖、零 `app.*` 依赖的契约）。
 - LLM 实例必须来自 `core/llm_factory.get_llm()`（profile 机制），禁止各处新建 `ChatOpenAI`；结构化输出统一走 `chains/structured.py` 的 `build_structured_chain`（主链 + 一层降级），禁止自由解析。
 - DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM。
-- 数据库结构变更只走 Alembic（`migrations/`，当前链尾 `0043`），`create_all` 已退役（单元测试内存建表属豁免）。
-- 所有阈值/魔法数字放 `core/settings/` 包（15 个领域模块，平铺字段名），禁止硬编码。
+- 数据库结构变更只走 Alembic（`migrations/`，**当前链尾 `0049`**），`create_all` 已退役（单元测试内存建表属豁免）。
+- 所有阈值/魔法数字放 `core/settings/` 包（**21 个领域模块**，平铺字段名），禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理（post_process）失败不得影响已产出的回答。
+- 单一写面纪律：计划落库只经 `goal_repository` 计划面；行动写世界只走 `deferred_world_op → outbox → world_engine`；Run 只写 `loop_runs`；关系状态只经 `relationship_evolution` / 状态只经 `state_service`。
 - 角色资产按人设分子目录存放于 `character/<persona>/`（如 `character/asuna/`），每人设一套 identity/personality/relationship/behavior/modes/goals/habits。
 
 ## 代码规范
 
-- 异步优先：I/O 一律 `async/await`。
+- 异步优先：I/O 一律 `async/await`；**同步阻塞调用（如同步 SQLAlchemy）不得直接跑在事件循环上**，须 `asyncio.to_thread` 下放。
 - Prompt 组装必须走 `prompts/` 模板（PromptBuilder），禁止手工拼接字符串。
 
 ## 测试约定
 
 - 完整规范见 `docs/TESTING.md`（marker、执行级别、AI Coding 测试规则）。
-- `pytest` + `pytest-asyncio`，fixture 在 `tests/conftest.py`；目录分层 `unit / integration / e2e / golden / evaluation / v7.8 / v8 / v8.5 / v9 / v2`。
+- `pytest` + `pytest-asyncio`，fixture 在 `tests/conftest.py`；目录分层 `unit / integration / e2e / golden / evaluation / eval / v7.8 / v8 / v8.5 / v9 / v2 / v21~v26`。
 - **AI 修改代码后禁止默认执行全量 `pytest`**：必须先 Focused Test → Module Test → 必要时 Fast Test（`pytest -m "(unit or api) and not slow"`；多个 `-m` 连用只有最后一个生效，勿拆开写）。
 - marker（`unit / api / integration / e2e / golden / slow`）由 `tests/conftest.py::pytest_collection_modifyitems` 自动打标，新测试无需手写。
 - **测试禁止真实 LLM 调用**：用 `core/llm_factory.set_llm(mock)` 注入 FakeLLM（结构化输出按 schema 类名分发）。
 - 单元 / 集成 / e2e 测试 DB 用内存 SQLite（`sqlite:///:memory:`），每测试独立建表；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL。
+- **新增仓储 / 服务必须注册进 `tests/conftest.py`**（仓储 → `_REPO_MODULES`；服务内使用模块级 `SessionLocal` → `_SERVICE_DB_MODULES`），否则内存库补丁被绕过、测试连真实 PG 而挂起。
 - golden prompt 快照回归：`tests/golden/` + `tests/unit/test_prompt_golden.py`，`UPDATE_GOLDEN=1` 重新生成。
 - 慢测试加入 `conftest.py` 的 `SLOW_TEST_FILES`（或 `@pytest.mark.slow`），日常开发用 `-m "not slow"` 排除。
 - commit 门槛：影响范围分级测试全绿（Focused Test → Module Test → 必要时 Fast Test；`core/` 基础设施改动走 Fast Test）。全量 pytest 仅在阶段收口 / PR / 发布 / 用户明确要求时执行，执行前先汇报测试规模。
