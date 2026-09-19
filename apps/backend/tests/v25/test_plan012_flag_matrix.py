@@ -1,19 +1,16 @@
-"""PLAN-012 Flag 矩阵一致性：13 Flag 默认值 + 八条串行链 + 总闸 off 三重对照。"""
+"""PLAN-012 Flag 矩阵一致性（v25 去门控语义反转）：2 策略位默认值 + 链机制仍被 v26 段行使 + 常开 prompt 快照。
 
-import hashlib
-import json
+原「13 Flag 默认值 + 八条串行链 + 总闸 off 对照」三重矩阵的前提已随
+`vXX_` 开关体系删除：编排恒常开，本模块按范围标记纪律显式更新——
+默认值矩阵收敛为保留的两个策略位；串行链矩阵改以 V2.6.0 段样本负例钉住
+链机制本身；「总闸 off prompt 逐字节不变」反转为「常开路径 prompt 快照」。
+"""
 
 import pytest
 
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
-from app.core.settings.enablement import (
-    V25_DEPENDENCIES,
-    V25_GATE_FLAGS,
-    V25_SUB_FLAGS,
-    enablement_violations,
-    validate_enablement_chain,
-)
+from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 from app.services import goal_planning
 
 from . import plan012_support as support
@@ -32,13 +29,13 @@ def _settings_with(monkeypatch, **envs):
 
 
 class TestFlagDefaults:
-    """U1：13 个 Flag 默认值与 §7.10 逐条一致（12 off + tool_required on）。"""
+    """U1：2 个策略位默认值与 §7.10 逐条一致（均 on；门控 Flag 已删）。"""
 
     def test_defaults_match_the_frozen_table(self):
         settings = get_settings()
         for name, expected in support.V25_DEFAULTS.items():
             assert getattr(settings, name) is expected, name
-        assert len(support.V25_FLAG_NAMES) == 13
+        assert len(support.V25_FLAG_NAMES) == 2
 
     def test_parameter_defaults_match_architecture(self):
         settings = get_settings()
@@ -53,7 +50,7 @@ class TestFlagDefaults:
 
 
 class TestEnablementChainMatrix:
-    """U2：八条串行链——非法组合 fail-fast；全链合法组合干净。"""
+    """U2：链机制仍被 V2.6.0 段行使——非法组合 fail-fast；全链合法组合干净。"""
 
     def test_default_configuration_is_clean(self):
         assert enablement_violations(get_settings()) == []
@@ -62,45 +59,66 @@ class TestEnablementChainMatrix:
         settings = _settings_with(monkeypatch, **support.FULL_CHAIN_ENVS)
         assert enablement_violations(settings) == []
 
-    def test_sub_flag_without_master_fails(self, monkeypatch):
-        settings = _settings_with(monkeypatch, PLAN_DEBUG_ENABLED="true")
-        reasons = enablement_violations(settings)
-        assert any("planning_enabled" in reason or "计划" in reason for reason in reasons)
-
-    def test_master_without_dependencies_fails(self, monkeypatch):
-        settings = _settings_with(monkeypatch, PLANNING_ENABLED="true")
-        reasons = enablement_violations(settings)
-        assert reasons
-
-    def test_execution_requires_scheduler_and_action(self, monkeypatch):
-        envs = dict(support.FULL_CHAIN_ENVS)
-        envs["PLAN_SCHEDULER_ENABLED"] = "false"
-        settings = _settings_with(monkeypatch, **envs)
-        reasons = enablement_violations(settings)
-        assert reasons
-
-    def test_validate_enablement_chain_raises_readable_error(self, monkeypatch):
-        settings = _settings_with(monkeypatch, PLAN_CONTEXT_ENABLED="true")
+    def test_v26_sub_flag_without_master_fails(self, monkeypatch):
+        """v26 链在 Settings 构造期即 fail-fast（model 级校验）。"""
         with pytest.raises(SettingsError) as excinfo:
-            validate_enablement_chain(settings)
+            _settings_with(monkeypatch, ACTION_SCHEDULER_ENABLED="true")
+        assert "action_scheduler_enabled" in str(excinfo.value)
+        assert "action_execution_enabled" in str(excinfo.value)
+
+    def test_v26_master_without_base_gate_fails(self):
+        """总闸 ⇒ 基闸 `action_enabled` 由 enablement 层判定（model 级校验只管子闸）。"""
+        from types import SimpleNamespace
+
+        stub = SimpleNamespace(
+            action_execution_enabled=True,
+            action_scheduler_enabled=False,
+            action_enabled=False,
+        )
+        reasons = enablement_violations(stub)
+        assert any("action_enabled" in reason for reason in reasons)
+
+    def test_enablement_violations_reports_the_v26_chain(self):
+        """`enablement_violations` 对 v26 组合仍可独立判定（打桩 Settings）。"""
+        from types import SimpleNamespace
+
+        stub = SimpleNamespace(
+            action_execution_enabled=False,
+            action_scheduler_enabled=True,
+            action_enabled=True,
+        )
+        reasons = enablement_violations(stub)
+        assert any("action_execution_enabled" in reason for reason in reasons)
+
+    def test_validate_enablement_chain_raises_readable_error(self):
+        """`validate_enablement_chain` 对链上违规组合抛可读 SettingsError（打桩 Settings）。"""
+        from types import SimpleNamespace
+
+        stub = SimpleNamespace(
+            action_execution_enabled=False,
+            action_scheduler_enabled=True,
+            action_enabled=True,
+        )
+        with pytest.raises(SettingsError) as excinfo:
+            validate_enablement_chain(stub)
         assert excinfo.value.args
 
-    def test_ledger_has_six_chain_markers_and_records_the_gap(self):
+    def test_ledger_has_v26_chain_markers_only(self):
         from app.core.settings import enablement
 
-        docstring = enablement.__doc__
-        for marker in ("①", "②", "③", "④", "⑤", "⑥"):
+        docstring = enablement.__doc__ or ""
+        for marker in ("①", "②"):
             assert marker in docstring
-        assert "剩余条目" in docstring
-        assert len(V25_SUB_FLAGS) == 11
-        assert V25_GATE_FLAGS[0] == "planning_enabled"
-        assert len(V25_DEPENDENCIES) >= 3
+        assert "V2.5.0 段" in docstring and "已整体移除" in docstring
+        assert not any(
+            name.startswith("V25_") for name in vars(enablement)
+        )
 
 
-class TestAllOffBytewiseCompat:
-    """I1 / S6：总闸 off 对照——prompt / 维护序列。"""
+class TestAlwaysOnPlanningCompat:
+    """I1 / S6 语义反转：编排常开对照——prompt 快照与策略位默认值。"""
 
-    def test_planning_prompt_bytes_are_unchanged(
+    def test_planning_prompt_digest_is_stable(
         self, make_goal, stub_planning_llm, autonomy_on
     ):
         assert autonomy_on
@@ -111,11 +129,24 @@ class TestAllOffBytewiseCompat:
         messages = recorder["messages"]
         assert _digest(messages) == FROZEN_PROMPT_DIGEST
 
-    def test_v25_flags_are_all_off_in_this_module_baseline(self):
+    def test_removed_gates_are_absent_and_policy_bits_default_on(self):
+        from app.core.settings import Settings
+
         settings = get_settings()
-        assert settings.planning_enabled is False
         for name in support.V25_FLAG_NAMES:
-            if name == "plan_tool_required":
-                assert getattr(settings, name) is True
-            else:
-                assert getattr(settings, name) is False
+            assert getattr(settings, name) is True, name
+        for name in (
+            "planning_enabled",
+            "plan_context_enabled",
+            "plan_step_binding_enabled",
+            "plan_scheduler_enabled",
+            "plan_execution_enabled",
+            "plan_observation_enabled",
+            "plan_revision_enabled",
+            "plan_memory_enabled",
+            "plan_reflection_enabled",
+            "plan_world_feedback_enabled",
+            "plan_autonomy_enabled",
+            "plan_debug_enabled",
+        ):
+            assert name not in Settings.model_fields, name

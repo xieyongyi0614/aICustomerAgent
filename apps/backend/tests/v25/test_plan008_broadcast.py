@@ -235,19 +235,6 @@ class TestBroadcastFailureDiscipline:
         assert settlement.goal_status == "completed"
         assert goal_repository.get_goal(goal.id).status == "completed"
 
-    def test_event_system_flags_off_write_nothing(
-        self, db_session_factory, planning_world_on, make_goal, make_plan, override_settings
-    ):
-        override_settings(
-            )
-        goal = make_goal(description="事件链关闭目标")
-        plan = make_plan(goal.id)
-        settlement = OBSERVER.settle(goal, plan, _advance(goal, plan, "completed"))
-        assert settlement.transitioned is True
-        assert goal_repository.get_goal(goal.id).status == "completed"
-        assert outbox_repository.list_pending(limit=50) == []
-        assert _goal_events(goal.user_id) == []
-
     def test_audit_and_attribution_survive_a_failed_broadcast(
         self, db_session_factory, planning_world_on, make_goal, make_plan, monkeypatch
     ):

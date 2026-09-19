@@ -29,9 +29,8 @@ from . import plan011_support as support
 
 @pytest.fixture
 def plan_debug_on(override_settings):
+    """审计面锚点（历史名保留）：调试子闸已随开关体系删除，只钉行动与世界面。"""
     override_settings(
-        planning_enabled="true",
-        plan_debug_enabled="true",
         action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")

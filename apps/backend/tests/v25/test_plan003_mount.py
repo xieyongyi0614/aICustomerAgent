@@ -69,11 +69,9 @@ PLAN_FACE_SIGNATURES = (
 
 @pytest.fixture
 def planning_on(override_settings):
+    """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     life_loop_budget.reset_cache()
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -125,14 +123,9 @@ class TestMountWiring:
             lambda: _SpyEngine(engine, calls),
         )
         life_loop._supply_last.clear()
-        flag_off = life_loop._step_goal_supply(V25_USER, V25_NOW)
-        assert calls == []
+        detail = life_loop._step_goal_supply(V25_USER, V25_NOW)
         life_loop._supply_last.clear()
-        override_settings(planning_enabled="true")
-        flag_on = life_loop._step_goal_supply(V25_USER, V25_NOW)
-        life_loop._supply_last.clear()
-        assert set(flag_off) == set(flag_on)
-        assert flag_on["created"] == ["g-1"]
+        assert detail["created"] == ["g-1"]
         assert calls == [("enqueue", "g-1"), ("run_jobs", None)]
 
     def test_supply_processes_claimed_planning_job_in_step(
@@ -153,7 +146,6 @@ class TestMountWiring:
         life_loop_budget.reset_cache()
         override_settings(
             autonomy_supply_interval_minutes="0",
-            planning_enabled="true",
             world_enabled="false")
         goal = make_goal(description="供给步处理目标")
         _claim_planning_job(goal.id)
@@ -187,9 +179,10 @@ class TestMountWiring:
         assert [spec.index for spec in plan.sub_goals] == [1]
         assert len(background_job_repository.list_jobs("goal_planning")) == 1
 
-    def test_engine_routing_is_flag_gated(
+    def test_engine_routing_always_happens(
         self, db_session_factory, override_settings, monkeypatch
     ):
+        """编排常开（原 flag 分派反转为无条件路由）：无新建目标时也只做 `run_jobs`。"""
         life_loop_budget.reset_cache()
         override_settings(
             autonomy_supply_interval_minutes="0",
@@ -204,10 +197,6 @@ class TestMountWiring:
             plan_engine, "get_planning_engine", lambda: _SpyEngine(None, calls)
         )
         life_loop._supply_last.clear()
-        life_loop._step_goal_supply(V25_USER, V25_NOW)
-        life_loop._supply_last.clear()
-        assert calls == []
-        override_settings(planning_enabled="true")
         life_loop._step_goal_supply(V25_USER, V25_NOW)
         life_loop._supply_last.clear()
         assert calls == [("run_jobs", None)]

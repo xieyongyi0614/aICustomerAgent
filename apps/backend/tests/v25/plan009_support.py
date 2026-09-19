@@ -430,15 +430,8 @@ def latest_candidate_row(session_factory, goal_id: str):
 
 @pytest.fixture
 def planning_memory_on(override_settings):
-    """PLAN-009 记忆面：总闸 + 记忆子闸（v2_memory_enabled 已删除转常开）全开；执行面保持关闭（夹具确定）。"""
+    """PLAN-009 记忆面：编排与记忆子闸已随开关体系删除转常开；执行面保持开启（夹具确定）。"""
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
-        plan_scheduler_enabled="true",
-        plan_execution_enabled="true",
-        plan_observation_enabled="true",
-        plan_memory_enabled="true",
         plan_tool_required="true",
         action_enabled="true",
         action_memory_policy_enabled="true",

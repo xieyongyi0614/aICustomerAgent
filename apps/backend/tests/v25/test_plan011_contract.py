@@ -355,8 +355,9 @@ def _code_text(source: str) -> str:
 
 
 def _plan_section_source() -> str:
+    """计划面段落（`_plan_debug_enabled` 门控已随 v25 去门控删除，锚点前移至 `_plan_statuses`）。"""
     source = DEBUG_PATH.read_text(encoding="utf-8")
-    marker = "def _plan_debug_enabled"
+    marker = "def _plan_statuses"
     return source[source.index(marker) :]
 
 

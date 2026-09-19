@@ -325,7 +325,7 @@ class TestIntervalAndCooldownAreNotRelaxed:
     def test_the_packet_reports_the_block_without_relaxing_it(
         self, override_settings, db_session_factory
     ):
-        override_settings(plan_autonomy_enabled="true", world_enabled="false")
+        override_settings(world_enabled="false")
         goal = support.seed_layered_goal(USER)
         support.seed_plan(
             goal.id, [support.spec(1, last_attempt_at=NOW - timedelta(minutes=5))]

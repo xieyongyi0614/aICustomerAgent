@@ -178,9 +178,10 @@ class TestGateSwitchability:
 
     @pytest.mark.asyncio
     async def test_u3_binding_switch_off_disables_both_gates(
-        self, db_session_factory, planning_gates_on, engine, make_goal, stub_planning_llm, override_settings
+        self, db_session_factory, planning_gates_on, engine, make_goal, stub_planning_llm
     ):
-        override_settings(plan_step_binding_enabled="false")
+        """绑定开关注入 off（构造参数，供单列验证；settings 子闸已删）→ 两道闸跳过。"""
+        engine = plan_engine.PlanningEngine(tool_binding_enabled=False)
         goal = make_goal(description="绑定子闸关闭目标")
         stub_planning_llm(sub_goals=[_step(support.UNRESOLVABLE_TOOL)])
         surface = support.resolve_surface()

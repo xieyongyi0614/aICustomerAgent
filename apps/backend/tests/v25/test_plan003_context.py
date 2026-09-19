@@ -67,10 +67,8 @@ GOAL_WRITE_FACE = (
 
 @pytest.fixture
 def planning_on(override_settings):
-    """PLAN-003 装配面：v25 总闸 + 上下文子闸 + 工具总闸；四源按用例各自开闸。"""
+    """PLAN-003 装配面：编排常开（总闸与上下文子闸已删），四源恒装配；世界/观测面钉死。"""
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -602,19 +600,8 @@ class TestDegradedRegistry:
 
 
 class TestContextSwitch:
-    """`plan_context_enabled` off：不做四源装配（degraded 不登记）。"""
+    """`plan_context_enabled` 已随开关体系删除：四源装配恒发生。
 
-    @pytest.mark.asyncio
-    async def test_context_disabled_skips_the_four_degradable_sources(
-        self, db_session_factory, planning_on, assembler, make_goal, override_settings
-    ):
-        goal = make_goal(description="装配总开关目标")
-        override_settings(plan_context_enabled="false")
-        result = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(result, PlanContext)
-        assert result.world == {}
-        assert result.memories == []
-        assert result.insights == []
-        assert result.scene is None
-        assert result.degraded == []
-        assert result.tool_surface.tool_ids
+    原「子闸 off 跳过四源」用例的前提不存在，按开关删除纪律整类退役——
+    四源装配行为由本文件其余常开用例覆盖。
+    """

@@ -255,32 +255,13 @@ class TestTerminalPlansInfrastructure:
         assert "def aggregate_plan_success_rate" in source
 
 
-class TestFlagOffRegression:
-    """I14：Flag 全 off 时端点不可见、prompt 逐字节一致。"""
-
-    @pytest.mark.asyncio
-    async def test_flag_off_keeps_every_plan_endpoint_invisible(
-        self, db_session_factory, make_goal, make_plan
-    ):
-        goal = make_goal(user_id=support.USER, description="Flag off 不可见")
-        plan = make_plan(goal.id)
-        calls = (
-            (support.plan_url(""), {"user_id": support.USER}),
-            (support.plan_url(f"/{plan.id}"), {}),
-            (support.plan_url(f"/{plan.id}/steps"), {}),
-            (support.plan_url("/context"), {"user_id": support.USER, "goal_id": goal.id}),
-            (support.plan_url("/revisions"), {"goal_id": goal.id}),
-            (support.plan_url("/pending"), {"user_id": support.USER}),
-        )
-        for path, params in calls:
-            response = await support.plan_get(path, **params)
-            assert response.status_code == 404, path
-            assert response.json()["detail"].startswith("计划调试面未启用")
+class TestAlwaysOnCompat:
+    """I14 语义反转（v25 去门控）：端点恒可见（负例退役）、常开路径 prompt 摘要冻结。"""
 
     def test_planning_prompt_is_byte_identical(
         self, stub_planning_llm, make_goal, autonomy_on
     ):
-        """Flag 全 off 的规划 prompt 与 V2.4.0 逐字节一致（摘要冻结，同 PLAN-001 口径）。"""
+        """常开编排路径的规划 prompt 摘要冻结（同 PLAN-001 口径）。"""
         assert autonomy_on
         recorder: dict = {}
         stub_planning_llm(recorder=recorder)

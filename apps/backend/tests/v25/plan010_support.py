@@ -461,10 +461,8 @@ def code_text(path) -> str:
 
 
 def plan_reflection_env(override_settings):
-    """计划反思子闸的最小开启面（反思总闸 + 计划子闸 + 层级目标通路）。"""
+    """计划反思通道的基线环境（通道已随开关体系删除转常开，只钉世界与观测面）。"""
     override_settings(
-        plan_reflection_enabled="true",
-        planning_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 

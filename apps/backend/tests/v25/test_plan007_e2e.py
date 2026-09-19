@@ -1,4 +1,4 @@
-"""PLAN-007 §9.3 场景集：自治 tick 与计划推进的竞争（S1 ~ S7）。
+"""PLAN-007 §9.3 场景集：自治 tick 与计划推进的竞争（S1 ~ S6；S7 随开关删除退役）。
 
 | # | 场景 | 判定 |
 |---|---|---|
@@ -8,10 +8,9 @@
 | S4 | 装配失败（`list_active_plans` 抛错） | `plan_facts == {}`、tick 正常完成 |
 | S5 | 额度耗尽 | 见 `test_plan007_quota.py`（计划步骤执行入口即执行桥，已在彼处判定） |
 | S6 | 计划全部步骤终态 | `plan_facts` 仍可存在但 `current_step=None` → 自治不受抑制 |
-| S7 | 子闸 off | 同一 DB 状态下行为回到 V2.4.0（act），快照不含 `plan_facts` |
 
-S1 与 S7 构成同一状态的**对照面**：唯一差异是子闸 `plan_autonomy_enabled`——
-这正是「行为差异只在 Flag on 时出现」的可执行证据。
+v25 去门控（批次 6）：原 S7「子闸 off 回到 V2.4.0」的前提（`plan_autonomy_enabled`
+可关）已不存在——事实段采集恒发生，抑制语义即生产语义，S7 对照面整体退役。
 """
 
 import asyncio
@@ -106,7 +105,6 @@ class TestS1SameActionIsNotContested:
     def test_the_autonomy_yields_to_the_planning_step(
         self, autonomy_env, db_session_factory, fake_llm, override_settings
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         goal = _seed_advancing_plan()
         llm = fake_llm(response=["忙完了吗？"])
@@ -129,7 +127,6 @@ class TestS1SameActionIsNotContested:
     def test_the_plan_step_itself_is_untouched(
         self, autonomy_env, db_session_factory, fake_llm, override_settings
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         goal = _seed_advancing_plan()
         before = goal_repository.get_latest_plan(goal.id)
@@ -144,7 +141,6 @@ class TestS2DifferentActionIsNotSuppressed:
     def test_the_autonomy_still_acts(
         self, autonomy_env, db_session_factory, fake_llm, override_settings
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         _seed_advancing_plan(capability=support.OTHER_ACTION)
         llm = fake_llm(response=["忙完了吗？记得喝口水。"])
@@ -167,7 +163,6 @@ class TestS3HighPriorityCrosses:
     def test_a_scheduled_followup_still_acts(
         self, autonomy_env, db_session_factory, fake_llm, override_settings
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         _seed_advancing_plan()
         assert trigger_evaluator.register_followup(
@@ -198,7 +193,6 @@ class TestS4AssemblyFailureDoesNotBlockTheTick:
         override_settings,
         monkeypatch,
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         _seed_advancing_plan()
 
@@ -222,7 +216,6 @@ class TestS6FinishedPlanDoesNotSuppress:
     def test_a_terminal_plan_leaves_the_autonomy_free(
         self, autonomy_env, db_session_factory, fake_llm, override_settings
     ):
-        override_settings(plan_autonomy_enabled="true")
         _seed_conversation()
         goal = _care_goal()
         support.seed_plan(
@@ -241,41 +234,16 @@ class TestS6FinishedPlanDoesNotSuppress:
         assert facts["steps_total"] == 2
 
 
-class TestS7FlagOffParity:
-    """S7 / I11：子闸 off → 同一 DB 状态下行为回到 V2.4.0（act），快照无 `plan_facts`。"""
+class TestPacketAssembly:
+    """原 S7 对照面的保留半边：采集函数在有 active 计划时产出七键包（off 半边随开关退役）。"""
 
-    def test_the_same_state_acts_when_the_sub_gate_is_off(
-        self, autonomy_env, db_session_factory, fake_llm, override_settings
-    ):
-        override_settings(plan_autonomy_enabled="false")
-        _seed_conversation()
-        _seed_advancing_plan()
-        llm = fake_llm(response=["忙完了吗？记得喝口水。"])
-
-        delivered = _tick(llm)
-
-        assert len(delivered) == 1, "Flag off 时自治不被计划抑制"
-        records = _decisions()
-        assert records[0].decision == "act"
-        assert "plan_facts" not in records[0].input_snapshot
-        assert SUPPRESSION_NOTE not in records[0].reason
-
-    def test_the_two_flag_states_differ_only_by_the_packet(
+    def test_the_packet_is_assembled_from_the_active_plan(
         self, autonomy_env, db_session_factory, override_settings
     ):
-        """装配函数的唯一差异就是子闸：on 有包、off 无包（同一份 DB 状态）。"""
         _seed_conversation()
         goal = _seed_advancing_plan()
 
         override_settings(
-            plan_autonomy_enabled="false",
-            observability_persist_enabled="true",
-            action_enabled="true",
-            world_enabled="false")
-        assert autonomy_engine._collect_plan_facts(USER, TICK_AT) == {}
-
-        override_settings(
-            plan_autonomy_enabled="true",
             observability_persist_enabled="true",
             action_enabled="true",
             world_enabled="false")

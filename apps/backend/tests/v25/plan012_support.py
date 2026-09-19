@@ -85,54 +85,20 @@ INTERVIEW_STEPS: tuple[dict, ...] = (
 )
 
 FULL_CHAIN_ENVS = {
-    "PLANNING_ENABLED": "true",
-    "PLAN_CONTEXT_ENABLED": "true",
-    "PLAN_STEP_BINDING_ENABLED": "true",
-    "PLAN_SCHEDULER_ENABLED": "true",
-    "PLAN_EXECUTION_ENABLED": "true",
-    "PLAN_OBSERVATION_ENABLED": "true",
-    "PLAN_REVISION_ENABLED": "true",
-    "PLAN_MEMORY_ENABLED": "true",
-    "PLAN_REFLECTION_ENABLED": "true",
-    "PLAN_WORLD_FEEDBACK_ENABLED": "true",
-    "PLAN_AUTONOMY_ENABLED": "true",
-    "PLAN_DEBUG_ENABLED": "true",
-    "TOOL_SYSTEM_ENABLED": "true",
+    "PLAN_TOOL_REQUIRED": "true",
     "ACTION_ENABLED": "true",
     "WORLD_ENABLED": "false",
     "OBSERVABILITY_PERSIST_ENABLED": "false",
 }
 
 V25_FLAG_NAMES: tuple[str, ...] = (
-    "planning_enabled",
-    "plan_context_enabled",
-    "plan_step_binding_enabled",
-    "plan_scheduler_enabled",
-    "plan_execution_enabled",
-    "plan_observation_enabled",
-    "plan_revision_enabled",
-    "plan_memory_enabled",
-    "plan_reflection_enabled",
-    "plan_world_feedback_enabled",
-    "plan_autonomy_enabled",
     "plan_tool_required",
-    "plan_debug_enabled",
+    "plan_context_digest_enabled",
 )
 
 V25_DEFAULTS: dict[str, bool] = {
-    "planning_enabled": False,
-    "plan_context_enabled": False,
-    "plan_step_binding_enabled": False,
-    "plan_scheduler_enabled": False,
-    "plan_execution_enabled": False,
-    "plan_observation_enabled": False,
-    "plan_revision_enabled": False,
-    "plan_memory_enabled": False,
-    "plan_reflection_enabled": False,
-    "plan_world_feedback_enabled": False,
-    "plan_autonomy_enabled": False,
     "plan_tool_required": True,
-    "plan_debug_enabled": False,
+    "plan_context_digest_enabled": True,
 }
 
 GATE_IDS: tuple[str, ...] = (
@@ -206,7 +172,3 @@ def interview_context(*, tool_ids: tuple[str, ...] | None = None) -> PlanContext
         ),
         budget=plan_context.plan_budget(get_settings()),
     )
-
-
-def apply_full_chain(override_settings) -> None:
-    override_settings(**{k.lower(): v for k, v in FULL_CHAIN_ENVS.items()})

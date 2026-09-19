@@ -114,6 +114,13 @@ PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（�
 （`plan.py` 全域字段即该段集合），断言结构与数量不变。此改动使该用例不再依赖前缀命名，
 后续批次（v25 去门控）只需改默认值断言。
 
+**留痕（v25 去门控，批次 6）**：11 个门控 Flag 已删，`PLAN_002_SETTINGS_FLAGS` 收敛为保留的
+两个策略位（2 + 14 = 16 项）；`test_plan_002_settings_are_embedded_and_the_master_stays_off`
+按纪律改写为 `test_plan_002_settings_are_embedded_and_the_policy_bits_default_on`
+（总闸已不存在，「默认 off」反转为「策略位默认 on」），`PLAN_002_FLAG_CONTRACT_ASSERTIONS`
+同步更名。`services/reflection/evidence.py` 的 `plan_evidence_enabled` 子闸函数亦随批次删除，
+上文 74 行所述「子闸开启时追加」的扩源语义转为恒扩源（历史描述不改写）。
+
 本纪律由 `test_plan_002_flag_contract_assertions_survive_flag_removal` 消费
 （`PLAN_002_FLAG_CONTRACT_ASSERTIONS`）：若有人用「删掉用例」来消除开关删除引发的失败，
 该守卫会失败。
@@ -132,19 +139,8 @@ from app.models.goal import (
 from app.services.planning import goal_contract
 
 PLAN_002_SETTINGS_FLAGS = (
-    "planning_enabled",
-    "plan_context_enabled",
-    "plan_step_binding_enabled",
-    "plan_scheduler_enabled",
-    "plan_execution_enabled",
-    "plan_observation_enabled",
-    "plan_revision_enabled",
-    "plan_memory_enabled",
-    "plan_reflection_enabled",
-    "plan_world_feedback_enabled",
-    "plan_autonomy_enabled",
     "plan_tool_required",
-    "plan_debug_enabled",
+    "plan_context_digest_enabled",
 )
 
 PLAN_002_SETTINGS_PARAMS = (
@@ -165,13 +161,15 @@ PLAN_002_SETTINGS_PARAMS = (
 )
 
 PLAN_002_FLAG_CONTRACT_ASSERTIONS = (
-    "test_plan_002_settings_are_embedded_and_the_master_stays_off",
+    "test_plan_002_settings_are_embedded_and_the_policy_bits_default_on",
 )
 """vXX_ 开关体系删除时必须**显式改写**而非删除的用例（见模块文档末节）。
 
 开关固化 ON / 去前缀后该用例必然失败；正确做法是按纪律改写其断言，删除即丢失
 PLAN-002 的「范围越界已评审」留痕。由
 `test_plan_002_flag_contract_assertions_survive_flag_removal` 守卫。
+原用例名 `test_plan_002_settings_are_embedded_and_the_master_stays_off`
+在 v25 去门控批次按纪律改写并更名（见文档末节留痕）。
 """
 
 PLAN_002_SUB_GOAL_FIELDS = (
@@ -261,14 +259,14 @@ def _planning_dir() -> Path:
     return Path(goal_contract.__file__).parent
 
 
-def test_plan_002_settings_are_embedded_and_the_master_stays_off():
+def test_plan_002_settings_are_embedded_and_the_policy_bits_default_on():
     settings = get_settings()
     declared = set(PlanSettings.model_fields)
     assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
-    assert len(PLAN_002_SETTINGS_FLAGS) == 13
+    assert len(PLAN_002_SETTINGS_FLAGS) == 2
     assert len(PLAN_002_SETTINGS_PARAMS) == 14
-    assert settings.planning_enabled is False
     assert settings.plan_tool_required is True
+    assert settings.plan_context_digest_enabled is True
     assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
 
 

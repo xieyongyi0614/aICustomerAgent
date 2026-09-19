@@ -242,7 +242,6 @@ class TestRevisionBudget:
         from app.services.planning import context as plan_context
         from app.services.planning import engine as plan_engine
         override_settings(
-            planning_enabled="true",
             plan_revision_budget="1",
             world_enabled="false",
             observability_persist_enabled="false")

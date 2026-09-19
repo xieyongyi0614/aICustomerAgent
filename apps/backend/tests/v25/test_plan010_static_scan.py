@@ -233,14 +233,15 @@ class TestUniqueWiring:
                 importers.append(path.relative_to(support.repo_root()).as_posix())
         assert importers == ["app/main.py"]
 
-    def test_registration_is_gated_and_sits_in_the_lifespan(self):
+    def test_registration_is_unconditional_and_sits_in_the_lifespan(self):
+        """注册恒发生（子闸已随开关体系删除），仍只在 lifespan 一处。"""
         source = (support.repo_root() / "app" / "main.py").read_text(encoding="utf-8")
         assert source.count("register_plan_revision_listener()") == 1
-        block = source.split("register_plan_revision_listener()", 1)[0].rsplit(
-            "if get_settings()", 1
-        )[1]
-        assert "plan_reflection_enabled" in block
-        assert "self._enabled" not in block
+        call_line = next(
+            line for line in source.splitlines()
+            if line.strip() == "register_plan_revision_listener()"
+        )
+        assert not call_line.lstrip().startswith("if "), "注册不得再带条件"
 
 
 class TestStagePosition:
@@ -273,11 +274,11 @@ class TestStagePosition:
             if relative.startswith(("app/api/", "app/channels/")):
                 assert "revision_listener" not in path.read_text(encoding="utf-8")
 
-    def test_the_sub_flag_keeps_the_whole_channel_dark_by_default(self):
+    def test_the_channel_is_wired_by_default(self):
+        """通道常开（子闸已删）：监听器可取、证据通道不再有闸函数。"""
         settings = get_settings()
-        assert settings.plan_reflection_enabled is False
-        assert reflection_evidence.plan_evidence_enabled(settings) is False
         assert listener_mod.get_revision_listener() is not None
+        assert not hasattr(reflection_evidence, "plan_evidence_enabled")
 
 
 class TestZeroMigration:

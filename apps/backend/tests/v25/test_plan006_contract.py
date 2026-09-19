@@ -441,12 +441,11 @@ class TestFlagOffKeepsTheToolFaceOutOfPlanning:
 
     @pytest.mark.asyncio
     async def test_binding_off_skips_both_planning_gates(
-        self, db_session_factory, planning_gates_on, override_settings, make_goal, stub_planning_llm
+        self, db_session_factory, planning_gates_on, make_goal, stub_planning_llm
     ):
-        """绑定子闸 off：闸门 5/6 不生效（工具面不参与规划），计划内容原样落库。"""
+        """绑定开关注入 off（构造参数，供单列验证；settings 子闸已删）：闸门 5/6 不生效，计划内容原样落库。"""
         from app.repositories import goal_repository
 
-        override_settings(plan_step_binding_enabled="false")
         goal = make_goal(description="绑定子闸关闭目标")
         stub_planning_llm(
             sub_goals=[
@@ -460,7 +459,8 @@ class TestFlagOffKeepsTheToolFaceOutOfPlanning:
             ]
         )
         surface = support.resolve_surface()
-        outcome = await plan_engine.PlanningEngine().plan(
+        engine = plan_engine.PlanningEngine(tool_binding_enabled=False)
+        outcome = await engine.plan(
             goal, _plan_context(goal, surface), trigger=goal_planning.TRIGGER_CREATED
         )
         assert outcome.status == plan_engine.PLAN_STATUS_VALIDATED

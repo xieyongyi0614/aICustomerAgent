@@ -219,8 +219,6 @@ class TestExistingConsumersRegression:
         assert "evidence_refs" not in payload
 
     def test_i10_reflection_stays_in_the_background_step(self):
-        settings = get_settings()
-        assert settings.plan_reflection_enabled is False
         from app.application import life_loop
 
         source = life_loop.__file__
@@ -293,61 +291,6 @@ class TestNoPersonalityInsight:
             text = handle.read()
         assert "insight_types=PLAN_WINDOW_ALLOWED_INSIGHTS.get(kind, ())" in text
         assert "TOOL_INSIGHT_SCOPES" not in text.split("# --- PLAN-010", 1)[1]
-
-
-class TestFlagOffRegression:
-    """I13 / S10：子闸 off → 证据聚合只有两通道、无监听器、行为与 V2.4.0 一致。"""
-
-    def test_i13_no_plan_reads_when_the_sub_flag_is_off(
-        self, db_session_factory, override_settings, monkeypatch
-    ):
-        override_settings( plan_reflection_enabled="false")
-
-        def _boom(*args, **kwargs):
-            raise AssertionError("子闸 off 时不得读取计划数据")
-
-        monkeypatch.setattr(goal_repository, "list_active_plans", _boom)
-        monkeypatch.setattr(action_repository, "list_records", _boom)
-        package = reflection_evidence.aggregate_plan_evidence(USER, now=NOW)
-        assert package.windows == []
-        assert package.steps == 0 and package.executions == 0
-        assert reflection_evidence.aggregate_evidence_windows(USER, now=NOW) == []
-
-    def test_i13_no_listener_is_registered_when_off(
-        self, db_session_factory, override_settings
-    ):
-        override_settings( plan_reflection_enabled="false")
-        reflection_lifecycle.reset_insight_created_listeners()
-        listener_mod.register_runtime()
-        assert reflection_lifecycle._insight_created_listeners == []
-
-    def test_i13_prompt_bytes_are_unchanged_with_the_plan_gates_off(
-        self, db_session_factory, make_goal, autonomy_on, stub_planning_llm, override_settings
-    ):
-        override_settings(plan_reflection_enabled="false")
-        recorder: dict = {}
-        stub_planning_llm(recorder=recorder)
-        goal = make_goal(description="prompt 快照目标", priority=4, domain="relationship")
-        assert goal_planning.plan_goal(goal.id, goal_planning.TRIGGER_CREATED)["status"] == "ok"
-        assert _digest(recorder["messages"]) == FROZEN_PROMPT_DIGEST
-        assert json.loads(recorder["messages"][1][1]).get("evidence_refs") is None
-
-    def test_i13_plan_window_insight_types_are_not_consulted_when_off(
-        self, db_session_factory, override_settings, monkeypatch
-    ):
-        override_settings( plan_reflection_enabled="false")
-        probe_calls = []
-        original = reflection_evidence.plan_evidence_enabled
-
-        def _probe(settings=None):
-            probe_calls.append(True)
-            return original(settings)
-
-        monkeypatch.setattr(reflection_evidence, "_plan_channel_windows", lambda *a: [])
-        monkeypatch.setattr(
-            reflection_evidence, "aggregate_plan_evidence", lambda *a, **k: pytest.fail("off 时不得聚合计划窗")
-        )
-        assert reflection_evidence.aggregate_evidence_windows(USER, now=NOW) == []
 
 
 class TestEndToEndLoop:
@@ -442,21 +385,6 @@ class TestEndToEndLoop:
         assert before == after
         assert len(planning_jobs(db_session_factory)) == 1
         assert plan.status == "active"
-
-    def test_s10_flag_off_loop_stays_silent(
-        self, db_session_factory, override_settings, scripted_reflection_llm
-    ):
-        from .plan010_support import plan_reflection_env
-
-        plan_reflection_env(override_settings)
-        override_settings(plan_reflection_enabled="false")
-        seed_success_rate_series()
-        reflection_lifecycle.reset_insight_created_listeners()
-        listener_mod.register_runtime()
-        assert triggers.trigger_for_user(USER, now=NOW) == triggers.OUTCOME_SKIPPED
-        assert _count(db_session_factory, ReflectionRunRow) == 1
-        assert scripted_reflection_llm.calls == 0
-        assert planning_jobs(db_session_factory) == []
 
 
 class TestFrozenSurfaces:

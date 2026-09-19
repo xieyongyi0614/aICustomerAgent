@@ -471,16 +471,16 @@ class TestZeroMigration:
     def test_no_new_v25_setting_is_introduced(self):
         declared = set(PlanSettings.model_fields)
         assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
-        assert len(PLAN_002_SETTINGS_FLAGS) == 13
+        assert len(PLAN_002_SETTINGS_FLAGS) == 2
         assert len(PLAN_002_SETTINGS_PARAMS) == 14
-        assert "plan_autonomy_enabled" in declared
+        assert "plan_autonomy_enabled" not in declared
 
 
-class TestFlagOffParity:
-    """I11：Flag 全 off 时 `plan_facts` 不存在（`{}` 原状）、行为与 V2.4.0 逐字节一致。"""
+class TestPacketSemantics:
+    """I11 语义反转（v25 去门控）：`plan_facts` 采集恒发生；无 active 计划仍为空包，
+    对空包的调制是 no-op、审计行不加字段——与「无计划可抑制」的原状一致。"""
 
-    def test_the_packet_stays_empty_with_the_default_configuration(self):
-        assert get_settings().plan_autonomy_enabled is False
+    def test_the_packet_stays_empty_without_an_active_plan(self):
         snapshot = support.act_snapshot()
         assert snapshot.plan_facts == {}
         baseline = autonomy_policy.evaluate(

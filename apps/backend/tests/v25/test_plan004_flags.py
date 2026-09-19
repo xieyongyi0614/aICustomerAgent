@@ -1,7 +1,9 @@
-"""PLAN-004 阶段 Flag 门控与回归断言（Task Detail §8 Step 6 / §9.2 I8~I11 / §9.3 S6）。
+"""PLAN-004 阶段策略位与回归断言（Task Detail §8 Step 6 / §9.2 I8~I11 / §9.3 S6）。
 
-本模块**不导入** `plan004_binding_on` 夹具：默认即为出厂态（`plan_step_binding_enabled`
-off），「off 时零绑定、落库形状与 V2.4.0 逐字节一致」正是本模块的被测对象。
+语义反转（v25 去门控）：绑定子闸 `plan_step_binding_enabled` 已删，绑定生效只取决于
+保留的策略位 `plan_tool_required`（默认 on）。本模块**不导入** `plan004_binding_on`
+夹具：off 态用例显式把策略位钉到 `false`（H.6 裁决保留的合法策略态），「off 时零绑定、
+落库形状与 V2.4.0 逐字节一致」继续被钉住。
 """
 
 import re
@@ -49,9 +51,10 @@ V2_4_0_DEFAULTS = {
 
 
 class TestBindingSubGateOff:
-    """I8 / S6：绑定子闸 off → 不写 `tool_id`，绑定只在执行期由 `ToolSelector` 发生。"""
+    """I8 / S6（策略位 off 态）：`plan_tool_required=false` → 不写 `tool_id`，绑定只在执行期发生。"""
 
-    def test_no_binding_and_no_derived_fields_are_written(self):
+    def test_no_binding_and_no_derived_fields_are_written(self, override_settings):
+        override_settings(plan_tool_required="false")
         result = decompose(step(1), step(2, depends_on=[1]))
         assert result.bindings == []
         assert result.binding_errors == []
@@ -60,14 +63,16 @@ class TestBindingSubGateOff:
             for field_name, default in V2_4_0_DEFAULTS.items():
                 assert getattr(spec, field_name) == default, (spec.index, field_name)
 
-    def test_llm_tool_id_hint_is_passed_through_untouched(self):
+    def test_llm_tool_id_hint_is_passed_through_untouched(self, override_settings):
         """退化为 V2.4.0：提示原样保留（绑定与否是执行期 `ToolSelector` 的事）。"""
+        override_settings(plan_tool_required="false")
         result = decompose(step(1, tool_id=REMINDER_CREATE))
         assert [spec.tool_id for spec in result.steps] == [REMINDER_CREATE]
         assert result.steps[0].binding_reason is None
 
-    def test_landed_shape_is_byte_identical_to_the_v2_4_0_parse(self):
+    def test_landed_shape_is_byte_identical_to_the_v2_4_0_parse(self, override_settings):
         """I10：off 时 `sub_goals` 落库形状与 V2.4.0（= 既有解析产物）逐字节一致。"""
+        override_settings(plan_tool_required="false")
         raw = [
             step(1),
             step(2, depends_on=[1]),
@@ -82,8 +87,9 @@ class TestBindingSubGateOff:
             spec.model_dump() for spec in expected
         ]
 
-    def test_declared_extension_fields_are_not_overwritten_when_off(self):
+    def test_declared_extension_fields_are_not_overwritten_when_off(self, override_settings):
         """off 时阶段②整段跳过：声明过的字段也不改写（含 observation_keys 的声明权威）。"""
+        override_settings(plan_tool_required="false")
         result = decompose(
             step(
                 1,
@@ -107,35 +113,20 @@ class TestToolRequiredOff:
     """I9：`plan_tool_required` off → 允许无面规划并退化为 V2.4.0 行为。"""
 
     def test_surface_less_planning_stays_unbound_without_errors(self, override_settings):
-        override_settings(
-            plan_step_binding_enabled="true",
-            plan_tool_required="false",
-        )
+        override_settings(plan_tool_required="false")
         result = decompose(step(1), ctx=make_ctx())
         assert result.bindings == []
         assert result.binding_errors == []
         assert result.passed
         assert [spec.tool_id for spec in result.steps] == [None]
 
-    def test_binding_subgate_off_alone_is_also_enough(self, override_settings):
-        override_settings(
-            plan_step_binding_enabled="false",
-            plan_tool_required="true",
-        )
-        result = decompose(step(1), ctx=make_ctx())
-        assert result.bindings == [] and result.binding_errors == []
-        assert result.passed
-
-    def test_binding_is_active_only_when_both_gates_are_on(self, override_settings):
-        settings_obj = settings()
-        assert decompose_mod._binding_enabled(settings_obj) is False
-        override_settings(plan_step_binding_enabled="true")
+    def test_binding_follows_the_tool_required_policy_bit(self, override_settings):
+        """绑定生效判据收敛为单一策略位（绑定子闸已删）：默认 on，显式 off 才退化。"""
         assert decompose_mod._binding_enabled(settings()) is True
-        override_settings(plan_step_binding_enabled="true", plan_tool_required="false")
+        override_settings(plan_tool_required="false")
         assert decompose_mod._binding_enabled(settings()) is False
 
-    def test_checked_in_registry_is_read_only_when_binding_is_active(self, override_settings):
-        override_settings(plan_step_binding_enabled="true")
+    def test_checked_in_registry_is_read_only_when_binding_is_active(self):
         result = decompose(
             step(1), ctx=make_ctx(REMINDER_CREATE), registry=builtin_registry()
         )

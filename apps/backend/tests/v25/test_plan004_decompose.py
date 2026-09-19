@@ -510,13 +510,6 @@ class TestWeakValidationAtPlanTime:
         )
         assert result.passed, result.binding_errors
 
-    def test_weak_validation_follows_the_binding_gate(self, override_settings):
-        """绑定子闸 off → 不做弱校验（V2.4.0 不存在的拒绝路径不得新增）。"""
-        override_settings(plan_step_binding_enabled="false")
-        result = decompose(step(1, capability="create_reminder", params={}))
-        assert result.binding_errors == []
-        assert result.passed
-
     def test_unbound_step_is_not_weak_validated(self):
         result = decompose(
             step(1, capability="query_search", params={}), ctx=make_ctx(REMINDER_CREATE)

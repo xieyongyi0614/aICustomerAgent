@@ -49,12 +49,8 @@ ON_SURFACE_TOOL = "builtin.reminder.create"
 
 @pytest.fixture
 def planning_reflection_on(override_settings):
-    """计划反思 + 规划面（引擎 / 装配）同开。"""
+    """计划反思 + 规划面（引擎 / 装配）常开（子闸已删），只钉世界与观测面。"""
     plan_reflection_env(override_settings)
-    override_settings(
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
-    )
 
 
 def _context(goal, *, tool_ids=(ON_SURFACE_TOOL,), evidence_refs=()) -> PlanContext:
@@ -202,14 +198,6 @@ class TestIdempotency:
         assert len(jobs) == 1
         assert jobs[0].payload["trigger"] == goal_planning.TRIGGER_REPLAN
         assert jobs[0].payload["goal_id"] == goal.id
-
-    def test_enqueue_requires_the_sub_flag(self, db_session_factory, override_settings):
-        override_settings( plan_reflection_enabled="false")
-        goal = seed_goal(description="子闸关闭目标")
-        seed_plan(goal.id, [structure_step(1)])
-        listener = listener_mod.PlanningRevisionListener()
-        assert listener.enqueue_replan(goal.id, "ins-off") is False
-        assert planning_jobs(db_session_factory) == []
 
     def test_unknown_goal_is_not_triggered(self, db_session_factory, plan_reflection_on):
         listener = listener_mod.PlanningRevisionListener()
@@ -384,18 +372,7 @@ class TestIsolation:
 
 
 class TestRegistration:
-    """I5：第四个注册点，受 `plan_reflection_enabled` 门控。"""
-
-    def test_i5_not_registered_when_the_sub_flag_is_off(
-        self, db_session_factory, override_settings
-    ):
-        from app.core.settings import get_settings
-
-        override_settings( plan_reflection_enabled="false")
-        reflection_lifecycle.reset_insight_created_listeners()
-        listener_mod.register_runtime()
-        assert reflection_lifecycle._insight_created_listeners == []
-        assert get_settings().plan_reflection_enabled is False
+    """I5（语义反转）：第四个注册点恒注册（子闸已随开关体系删除）。"""
 
     def test_i5_registered_as_the_fourth_consumer(self, db_session_factory, plan_reflection_on):
         reflection_lifecycle.reset_insight_created_listeners()
@@ -417,16 +394,14 @@ class TestRegistration:
         assert len(planning_jobs(db_session_factory)) == 1
         assert listener_mod.evidence_refs_for(goal.id) == ("ins-i5",)
 
-    def test_i5_main_lifespan_registers_under_the_sub_flag(self):
+    def test_i5_main_lifespan_registers_unconditionally(self):
         from pathlib import Path
 
         from app import main
 
         source = Path(main.__file__).read_text(encoding="utf-8")
-        assert (
-            "if get_settings().plan_reflection_enabled:\n        "
-            "register_plan_revision_listener()" in source
-        )
+        assert "    register_plan_revision_listener()" in source
+        assert "plan_reflection_enabled" not in source
         assert (
             "from app.services.planning.revision_listener import (\n"
             "    register_runtime as register_plan_revision_listener,\n)" in source

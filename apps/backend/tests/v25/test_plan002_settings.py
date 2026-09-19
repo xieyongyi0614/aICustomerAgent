@@ -1,6 +1,10 @@
-"""PLAN-002 U6 / U12 / I1：`PlanSettings` 的 13 Flag、14 参数默认值与参数自校验。
+"""PLAN-002 U6 / U12 / I1：`PlanSettings` 的 2 策略位、14 参数默认值与参数自校验。
 
 默认值逐条写死（Task Detail §4.5.1 / §4.5.2），源码与表的任何差异即失败。
+
+语义反转（v25 去门控）：原 13 个 Flag 中 11 个已随 `vXX_` 开关体系删除，编排恒常开；
+保留的 `plan_tool_required` / `plan_context_digest_enabled` 是默认 ON 的策略位，
+不再是「激活计划编排」的闸门。本模块按此口径显式更新（范围标记纪律）。
 """
 
 import pytest
@@ -10,19 +14,8 @@ from app.core.settings._shared import SettingsError
 from app.core.settings.plan import PlanSettings
 
 V25_FLAG_DEFAULTS = {
-    "planning_enabled": False,
-    "plan_context_enabled": False,
-    "plan_step_binding_enabled": False,
-    "plan_scheduler_enabled": False,
-    "plan_execution_enabled": False,
-    "plan_observation_enabled": False,
-    "plan_revision_enabled": False,
-    "plan_memory_enabled": False,
-    "plan_reflection_enabled": False,
-    "plan_world_feedback_enabled": False,
-    "plan_autonomy_enabled": False,
     "plan_tool_required": True,
-    "plan_debug_enabled": False,
+    "plan_context_digest_enabled": True,
 }
 
 V25_PARAM_DEFAULTS = {
@@ -73,30 +66,43 @@ CONSTRAINED_PARAMS = (
 UNCONSTRAINED_PARAMS = ("plan_llm_profile", "plan_context_digest_enabled")
 
 
-def test_u6_plan_settings_declares_thirteen_flags_and_fourteen_params():
-    assert len(V25_FLAG_DEFAULTS) == 13
+def test_u6_plan_settings_declares_two_policy_flags_and_fourteen_params():
+    assert len(V25_FLAG_DEFAULTS) == 2
     assert len(V25_PARAM_DEFAULTS) == 14
     declared = set(PlanSettings.model_fields)
     assert declared == set(V25_FLAG_DEFAULTS) | set(V25_PARAM_DEFAULTS)
+
+
+def test_u6_removed_gates_are_absent_from_the_settings():
+    removed = (
+        "planning_enabled",
+        "plan_context_enabled",
+        "plan_step_binding_enabled",
+        "plan_scheduler_enabled",
+        "plan_execution_enabled",
+        "plan_observation_enabled",
+        "plan_revision_enabled",
+        "plan_memory_enabled",
+        "plan_reflection_enabled",
+        "plan_world_feedback_enabled",
+        "plan_autonomy_enabled",
+        "plan_debug_enabled",
+    )
+    for name in removed:
+        assert name not in PlanSettings.model_fields, name
+        assert name not in Settings.model_fields, name
 
 
 def test_u6_flag_defaults_match_the_flag_table():
     settings = get_settings()
     for flag, expected in V25_FLAG_DEFAULTS.items():
         assert getattr(settings, flag) is expected, flag
-    on_flags = [flag for flag, value in V25_FLAG_DEFAULTS.items() if value]
-    assert on_flags == ["plan_tool_required"]
 
 
-def test_u6_only_tool_required_is_on_by_default():
-    off_flags = [
-        flag
-        for flag, value in V25_FLAG_DEFAULTS.items()
-        if flag != "plan_tool_required"
-    ]
-    assert len(off_flags) == 12
+def test_u6_both_policy_flags_default_on():
+    assert all(V25_FLAG_DEFAULTS.values())
     assert V25_FLAG_DEFAULTS["plan_tool_required"] is True
-    assert all(V25_FLAG_DEFAULTS[flag] is False for flag in off_flags)
+    assert V25_FLAG_DEFAULTS["plan_context_digest_enabled"] is True
 
 
 def test_u6_param_defaults_match_the_param_table():
@@ -163,27 +169,27 @@ def test_i1_plan_settings_is_merged_into_the_global_settings():
     settings = get_settings()
     assert isinstance(settings, PlanSettings)
     assert isinstance(settings, Settings)
-    assert "planning_enabled" in Settings.model_fields
+    assert "plan_tool_required" in Settings.model_fields
     assert "plan_max_steps" in Settings.model_fields
-    assert settings.planning_enabled is False
+    assert settings.plan_tool_required is True
     assert settings.plan_max_steps == 5
 
 
-def test_i1_the_twenty_seven_v25_fields_are_readable_from_the_global_settings():
+def test_i1_the_fifteen_v25_fields_are_readable_from_the_global_settings():
     settings = get_settings()
     names = sorted(PlanSettings.model_fields)
-    assert len(names) == 27
+    assert len(names) == 15
     assert set(names) == set(V25_FLAG_DEFAULTS) | set(V25_PARAM_DEFAULTS)
 
 
 def test_plan_settings_reads_from_the_environment(monkeypatch):
-    monkeypatch.setenv("PLANNING_ENABLED", "true")
+    monkeypatch.setenv("PLAN_TOOL_REQUIRED", "false")
     monkeypatch.setenv("PLAN_MAX_STEPS", "9")
     monkeypatch.setenv("PLAN_LLM_PROFILE", "planning")
     get_settings.cache_clear()
     try:
         settings = get_settings()
-        assert settings.planning_enabled is True
+        assert settings.plan_tool_required is False
         assert settings.plan_max_steps == 9
         assert settings.plan_llm_profile == "planning"
     finally:

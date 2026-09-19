@@ -36,10 +36,8 @@ from .test_plan005_mount import AUTONOMOUS_TICK_STAGES
 
 @pytest.fixture
 def planning_on(override_settings):
+    """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_observation_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     life_loop_budget.reset_cache()

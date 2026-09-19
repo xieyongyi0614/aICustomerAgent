@@ -118,9 +118,6 @@ def tools_on(monkeypatch, override_settings):
     """
     reset_tool_registry(monkeypatch)
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
         plan_tool_required="true",
         feishu_enabled="true",
         feishu_app_id="plan6-app",
@@ -134,12 +131,9 @@ def tools_on(monkeypatch, override_settings):
 
 @pytest.fixture
 def planning_gates_on(monkeypatch, override_settings):
-    """规划期闸门用例的开关面（计划子闸 on + 工具总闸 on，世界/记忆/反思关闭）。"""
+    """规划期闸门用例的开关面（编排常开 + 工具总闸 on，世界/记忆/反思关闭）。"""
     reset_tool_registry(monkeypatch)
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
         plan_tool_required="true",
         world_enabled="false",
         observability_persist_enabled="false")
@@ -150,14 +144,13 @@ def planning_gates_on(monkeypatch, override_settings):
 def action_chain_on(monkeypatch, override_settings):
     """执行链用例的开关面：行动总闸 + 工具四子闸全开（校验 / 权限 / 观测 / 记忆）。
 
-    同时开 PLAN-004 的绑定子闸：Step 6 的两层校验对照（规划期弱校验 vs 执行期强校验）
-    需要规划期真的做弱校验，否则对照不成立。
+    同时开保留的策略位 `plan_tool_required`：Step 6 的两层校验对照（规划期弱校验 vs
+    执行期强校验）需要规划期真的做弱校验，否则对照不成立。
     """
     reset_tool_registry(monkeypatch)
     override_settings(
         action_enabled="true",
         action_max_active_per_user="5",
-        plan_step_binding_enabled="true",
         plan_tool_required="true",
         world_enabled="false",
         action_memory_policy_enabled="false",

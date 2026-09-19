@@ -241,7 +241,8 @@ def test_trace_records_pool_clusters_and_gate(db_session_factory):
     _seed_fatigue_cluster(db_session_factory, now=now)
     trace = StubTrace()
     evidence.aggregate_evidence_windows(USER, CHARACTER, now=now, trace=trace)
-    assert len(trace.steps) == 1
+    # v25 去门控（批次 6）：计划证据通道恒扩源，trace 追加第二步（本用例无计划数据，零窗）。
+    assert len(trace.steps) == 2
     step = trace.steps[0]
     assert step["name"] == "reflection_evidence"
     assert step["pool_size"] == 5
@@ -250,6 +251,8 @@ def test_trace_records_pool_clusters_and_gate(db_session_factory):
     assert step["windows"][0]["member_ids"] == [
         f"mem-fat-{i}" for i in range(5)
     ]
+    assert trace.steps[1]["name"] == "reflection_plan_evidence"
+    assert trace.steps[1]["windows"] == []
 
 
 def test_passes_gate_three_gates_independent():

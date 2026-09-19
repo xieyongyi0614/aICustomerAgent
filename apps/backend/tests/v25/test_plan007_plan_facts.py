@@ -60,8 +60,8 @@ def _plans_down(*_args, **_kwargs):
 
 @pytest.fixture
 def authority_on(override_settings):
-    """子闸 `plan_autonomy_enabled` 开启（装配门控的唯一开关，非本任务新增 Flag）。"""
-    override_settings(plan_autonomy_enabled="true", world_enabled="false")
+    """装配面锚点（历史名保留）：子闸已随开关体系删除，只钉世界面。"""
+    override_settings(world_enabled="false")
     return True
 
 
@@ -299,29 +299,8 @@ class TestDegradation:
 
 
 class TestGatingAndParity:
-    """I10 / I11 / D1 / D8：子闸 off → 不装配（`{}` 原状），行为与 V2.4.0 逐字节一致。"""
-
-    def test_sub_gate_off_keeps_the_packet_empty(self, db_session_factory, override_settings):
-        override_settings(plan_autonomy_enabled="false")
-        goal = support.seed_layered_goal(USER)
-        support.seed_plan(goal.id)
-        assert autonomy_engine._collect_plan_facts(USER, NOW) == {}
-
-    def test_sub_gate_off_touches_no_repository(self, monkeypatch, override_settings):
-        """off 是**零读取**短路：连计划只读入口都不触达（原状最有说服力的证据）。"""
-        override_settings(plan_autonomy_enabled="false")
-        calls: list = []
-
-        def _spy(*args, **kwargs):
-            calls.append((args, kwargs))
-            return []
-
-        monkeypatch.setattr(goal_repository, "list_active_plans", _spy)
-        assert autonomy_engine._collect_plan_facts(USER, NOW) == {}
-        assert calls == []
-
-    def test_default_configuration_is_off(self):
-        assert get_settings().plan_autonomy_enabled is False
+    """I10 / I11 / D1 / D8 语义反转（v25 去门控）：采集恒发生，「空包零额外读取」由
+    「无 active 计划 → 空包」承担；原子闸 off 三用例随开关退役，空包语义用例保留。"""
 
     def test_empty_packet_keeps_the_v24_verdict_bytes(self):
         baseline = autonomy_policy.evaluate(
@@ -352,9 +331,7 @@ class TestBoundedByTheExistingBudget:
     ):
         goal = support.seed_layered_goal(USER)
         support.seed_plan(goal.id)
-        override_settings(
-            plan_autonomy_enabled="true", observability_step_extra_max_chars=30
-        )
+        override_settings(observability_step_extra_max_chars=30)
         facts = autonomy_engine._collect_plan_facts(USER, NOW)
         assert list(facts) == ["truncated_summary"]
 

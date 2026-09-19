@@ -1,6 +1,8 @@
-"""PLAN-009 Step 6：门控与回归（Flag off 零写入 / 零迁移 / 三模块零改动）。
+"""PLAN-009 Step 6：门控与回归（语义反转：记忆通道常开 / 零迁移 / 三模块零改动）。
 
 覆盖 Task Detail §9.2 I5 / I7 / I8 / I10、§9.3 S9、§10.3 零迁移；对应 §8 Step 6。
+v25 去门控（批次 6）：记忆子闸与总闸已删，原「off 零写入」两用例的前提不存在，
+按纪律退役；`plan_memory_importance_floor` 策略生效用例保留（去开关注入）。
 """
 
 import re
@@ -65,41 +67,7 @@ PLAN_DEDUPE_KEY = "plan:plan9-goal:1:1"
 
 
 class TestFlagGating:
-    """I10 / S9：记忆子闸 off → 记忆通道零调用零写入（既有原路径）。"""
-
-    def test_memory_sub_gate_off_writes_nothing(
-        self, db_session_factory, make_goal, override_settings, monkeypatch
-    ):
-        probe = support.install_delivery_probe(monkeypatch)
-        override_settings(
-            planning_enabled="true",
-            plan_memory_enabled="false",
-            action_enabled="true",
-            world_enabled="false",
-            observability_persist_enabled="false")
-        goal = make_goal(description=support.COMPLETED_DESCRIPTION)
-        plan = support.plan(goal_id=goal.id)
-
-        settlement = observer_mod.PlanObserver().settle(
-            goal, plan, _completed(goal, plan)
-        )
-
-        assert settlement.transitioned is True
-        assert probe.order == []
-        assert support.memories(goal.user_id) == []
-
-    def test_master_gate_off_keeps_the_legacy_path(
-        self, db_session_factory, make_goal, monkeypatch
-    ):
-        probe = support.install_delivery_probe(monkeypatch)
-        goal = make_goal(description=support.COMPLETED_DESCRIPTION)
-        plan = support.plan(goal_id=goal.id)
-
-        result = observer_mod.deliver_goal_terminal_memory(goal, plan, "completed")
-
-        assert result is None
-        assert probe.order == []
-        assert support.memories(goal.user_id) == []
+    """I10 / S9 语义反转：记忆通道恒投递；`plan is None` / 投递失败仍零写入（D10）。"""
 
     def test_delivery_returns_none_without_a_plan(
         self, db_session_factory, planning_memory_on, make_goal, monkeypatch
@@ -129,8 +97,6 @@ class TestImportanceFloorParameter:
     ):
         probe = support.install_delivery_probe(monkeypatch)
         override_settings(
-            planning_enabled="true",
-            plan_memory_enabled="true",
             plan_memory_importance_floor="0.9",
             action_enabled="true",
             world_enabled="false",
@@ -272,16 +238,3 @@ class TestFrozenContracts:
             assert anchor in text
         assert tool_memory_policy.MEMORY_CONTENT_MAX_CHARS == 120
         assert tool_memory_policy.FAILED_IMPORTANCE_FLOOR == 0.6
-
-
-def _completed(goal, plan):
-    from app.models.plan import PlanAdvance
-
-    return PlanAdvance(
-        goal_id=goal.id,
-        plan_id=plan.id,
-        plan_version=plan.version,
-        decision="completed",
-        reason="goal_completed",
-        at=support.NOW,
-    )

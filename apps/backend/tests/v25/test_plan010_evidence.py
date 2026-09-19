@@ -405,22 +405,6 @@ class TestPlanEvidenceFromProjections:
         assert package.windows == []
         assert package.steps == 0
 
-    def test_plan_evidence_is_off_without_the_sub_flag(
-        self, db_session_factory, override_settings
-    ):
-        """D14：子闸 off → 计划窗零产出、零额外读取（证据聚合只有两通道）。"""
-        plan_reflection_env(override_settings)
-        override_settings(plan_reflection_enabled="false")
-        seed_success_rate_series()
-        package = reflection_evidence.aggregate_plan_evidence(USER, now=NOW)
-        assert package.windows == []
-        assert package.passing == 0
-        windows = reflection_evidence.aggregate_evidence_windows(USER, now=NOW)
-        assert all(
-            getattr(window, "window_kind", "") not in PLAN_WINDOWS for window in windows
-        )
-        assert reflection_evidence.plan_evidence_enabled() is False
-
 
 class TestPlanEvidenceReachesTheReflector:
     """Step 2 / U8：证据不足零 LLM；证据足够时窗口进既有聚合（reflector 零改动可见）。"""
@@ -615,12 +599,12 @@ class TestTriggerForUserIsUntouched:
             in source
         )
 
-    def test_i2_memory_channel_windows_are_unchanged_without_the_sub_flag(
+    def test_i2_memory_channel_windows_are_independent_of_the_plan_channel(
         self, db_session_factory, override_settings, monkeypatch
     ):
+        """记忆通道产物不被计划通道扩源改写：既有窗口在前、计划窗恒追加在后。"""
         from app.models.reflection import EvidenceMember, EvidenceWindow, WindowStats
 
-        override_settings( plan_reflection_enabled="false")
         window = EvidenceWindow(
             topic_digest="既有窗口",
             members=[
@@ -649,4 +633,8 @@ class TestTriggerForUserIsUntouched:
             },
         )
         seed_success_rate_series()
-        assert reflection_evidence.aggregate_evidence_windows(USER, now=NOW) == [window]
+        windows = reflection_evidence.aggregate_evidence_windows(USER, now=NOW)
+        assert windows[:1] == [window]
+        assert all(
+            getattr(item, "window_kind", "") in PLAN_WINDOWS for item in windows[1:]
+        ), windows

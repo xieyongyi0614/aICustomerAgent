@@ -51,10 +51,8 @@ def _step(index: int = 1, **overrides) -> dict:
 
 @pytest.fixture
 def planning_on(override_settings):
+    """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     override_settings(
-        planning_enabled="true",
-        plan_context_enabled="true",
-        plan_step_binding_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
 
@@ -251,12 +249,13 @@ class TestNewGatesAreIndependentlySwitchable:
 
     @pytest.mark.asyncio
     async def test_binding_switch_off_skips_both_new_gates(
-        self, db_session_factory, planning_on, engine, make_goal, stub_planning_llm, override_settings
+        self, db_session_factory, planning_on, make_goal, stub_planning_llm
     ):
+        """绑定开关注入 off（构造参数，供单列验证）→ 两道闸跳过，tool_id 原样保留。"""
         goal = make_goal(description="绑定子闸关闭目标")
-        override_settings(plan_step_binding_enabled="false")
         step = _step(1, tool_id=UNRESOLVABLE_TOOL)
         stub_planning_llm(sub_goals=[step])
+        engine = plan_engine.PlanningEngine(tool_binding_enabled=False)
         outcome = await engine.plan(goal, _context(goal), trigger=goal_planning.TRIGGER_CREATED)
         assert outcome.status == plan_engine.PLAN_STATUS_VALIDATED
         assert [spec.tool_id for spec in outcome.steps] == [UNRESOLVABLE_TOOL]

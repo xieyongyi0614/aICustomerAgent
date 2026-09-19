@@ -55,8 +55,8 @@ def advance_on(override_settings):
 
 
 @pytest.fixture
-def observation_on(advance_on, override_settings):
-    override_settings(planning_enabled="true", plan_observation_enabled="true")
+def observation_on(advance_on):
+    """观测接线锚点（历史名保留）：观测子闸已随开关体系删除，本夹具只链 `advance_on`。"""
 
 
 class TestShapeSnapshots:
@@ -91,14 +91,17 @@ class TestShapeSnapshots:
 
 
 class TestFlagGatedWiring:
-    """Step 8：Flag off 走原路径，Flag on 走 `PlanObserver`（同一签名、同一返回字段集）。"""
+    """Step 8（v25 去门控语义反转）：观测恒走 `PlanObserver`（同一签名、同一返回字段集）。
+
+    原「Flag off 走原路径 / 总闸 off 子闸不生效」两用例的前提已随开关删除退役；
+    旧路径 `goal_observation.advance_user_goals` 不再被编排调用。
+    """
 
     @staticmethod
     def _spy_observer(monkeypatch) -> dict:
         """记录两条观测入口的调用形态：`collect_facts(observation_keys=...)` 与 `observe_user_goals`。
 
-        兼容出口（Flag off）以 `observation_keys=()`（显式空白名单）调用——零额外读取；
-        接线路径（Flag on）不传白名单（`"derive"`）——由 active 计划的步骤声明反推。
+        接线路径不传白名单（`"derive"`）——由 active 计划的步骤声明反推。
         """
         calls: dict = {"collect": [], "observe": 0}
 
@@ -115,27 +118,7 @@ class TestFlagGatedWiring:
         return calls
 
     @pytest.mark.asyncio
-    async def test_flag_off_uses_the_legacy_paths(
-        self, db_session_factory, advance_on, make_goal, make_plan, monkeypatch
-    ):
-        calls = self._spy_observer(monkeypatch)
-        legacy: list = []
-        original = goal_observation.advance_user_goals
-        monkeypatch.setattr(
-            goal_observation,
-            "advance_user_goals",
-            lambda user_id, facts, now: legacy.append(user_id) or original(user_id, facts, now),
-        )
-        goal = make_goal(user_id=V25_USER, description="Flag off 原路径")
-        make_plan(goal.id)
-        result = await life_loop._step_goal_advance(V25_USER, V25_NOW)
-        assert legacy == [V25_USER]
-        assert calls == {"collect": [()], "observe": 0}
-        assert "plan_observe" not in result
-        assert result["goals"] == 1
-
-    @pytest.mark.asyncio
-    async def test_flag_on_uses_the_plan_observer(
+    async def test_step_uses_the_plan_observer(
         self, db_session_factory, observation_on, make_goal, make_plan, monkeypatch
     ):
         calls = self._spy_observer(monkeypatch)
@@ -145,7 +128,7 @@ class TestFlagGatedWiring:
             "advance_user_goals",
             lambda user_id, facts, now: legacy.append(user_id) or {},
         )
-        goal = make_goal(user_id=V25_USER, description="Flag on 计划观测")
+        goal = make_goal(user_id=V25_USER, description="计划观测接线")
         make_plan(goal.id)
         result = await life_loop._step_goal_advance(V25_USER, V25_NOW)
         assert legacy == []
@@ -154,27 +137,13 @@ class TestFlagGatedWiring:
         assert result["status"] == "ok"
 
     @pytest.mark.asyncio
-    async def test_return_field_set_is_stable_across_flags(
-        self, db_session_factory, advance_on, override_settings, make_goal, make_plan
+    async def test_return_field_set_is_stable(
+        self, db_session_factory, advance_on, make_goal, make_plan
     ):
         goal = make_goal(user_id=V25_USER, description="字段集对照")
         make_plan(goal.id)
-        off = await life_loop._step_goal_advance(V25_USER, V25_NOW)
-        override_settings(planning_enabled="true", plan_observation_enabled="true")
-        on = await life_loop._step_goal_advance(V25_USER, V25_NOW)
-        assert set(off) | {"plan_observe"} == set(on)
-
-    @pytest.mark.asyncio
-    async def test_master_flag_off_leaves_the_child_flag_inert(
-        self, db_session_factory, advance_on, override_settings, make_goal, make_plan, monkeypatch
-    ):
-        """总闸 off 时观测子闸不生效（串行链的运行时形态）。"""
-        calls = self._spy_observer(monkeypatch)
-        override_settings(plan_observation_enabled="true")
-        goal = make_goal(user_id=V25_USER, description="总闸 off")
-        make_plan(goal.id)
-        await life_loop._step_goal_advance(V25_USER, V25_NOW)
-        assert calls == {"collect": [()], "observe": 0}
+        result = await life_loop._step_goal_advance(V25_USER, V25_NOW)
+        assert "plan_observe" in result
 
 
 class TestFactProjectionParity:
