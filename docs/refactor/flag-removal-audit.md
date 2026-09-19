@@ -3,7 +3,7 @@
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
-> 当前状态（2026-09-19）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 / v24 已完成**（F.9~F.14、H.10~H.11）；剩余 **v25（批次 6） → v26（批次 7） → 收尾删 `enablement.py`（批次 8）**。
+> 当前状态（2026-09-19）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 / v24 / v25 已完成**（F.9~F.14、H.10~H.12）；剩余 **v26（批次 7） → 收尾删 `enablement.py`（批次 8）**。
 >
 > **剩余批次执行清单见 [附录 H](#附录-h剩余批次任务编排批次-58)**（2026-09-18 实测口径，替代 §8 表头的过时计数）。
 
@@ -1443,5 +1443,26 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 **提交**（本地，未推送）：`714a92d`（app 去门控）→ `c77efb7` / `e7c5927` / `e8ecb62` / `94d6d6e`（前三轮测试同步）→ `1fc2399` / `ddb37c5` / `c797074`（权限 / 确认 / 工具面）→ `f527f85` / `cfaafde`（时区与逻辑时钟 + 末批收口）。
 
 **批次 6 起点**：`app/core/settings/enablement.py` 的 v24 段与 `tool_permission_sub_layer_warnings` 已在 H.10 阶段删除，但文件本身仍在（v25 / v26 段）；`action_execution.py` 的 `V26_MASTER_FLAG` / `V26_SUB_FLAGS` 与 `validate_action_chain` 保留至批次 7。H.3 / H.4 的执行清单无需修订。
+
+### H.12 批次 6 执行记录（v25 计划编排，2026-09-19）
+
+**开批状态**：工作区存在半成品（12 个开关字段已删、`enablement.py` v25 段已删、11 个 app 文件已改但**未提交**），且 H.3 清单有两处**漏改的活门控**——`autonomy_engine.py:330` 仍读已删字段 `plan_autonomy_enabled`（自治 tick 跑到 `_collect_plan_facts` 即 AttributeError）、`evidence.py` 的 `plan_evidence_enabled()` 经 `getattr(…, False)` 恒 False（计划证据通道被静默关死）。本批先补齐 app 侧再收测试。
+
+| 项 | 内容 |
+|---|---|
+| 删除的 12 个开关 | `planning_enabled`、`plan_context_enabled`、`plan_step_binding_enabled`、`plan_scheduler_enabled`、`plan_execution_enabled`、`plan_observation_enabled`、`plan_revision_enabled`、`plan_memory_enabled`、`plan_reflection_enabled`、`plan_world_feedback_enabled`、`plan_autonomy_enabled`、`plan_debug_enabled` |
+| 保留（H.6 裁决） | `plan_tool_required`、`plan_context_digest_enabled`（默认 ON 的策略位）；字段 395 → **383**；`Settings.model_fields` 中 `plan_*` 仅剩 2 策略位 + 14 参数 |
+| 补齐的两处漏改 | `autonomy_engine._collect_plan_facts` 子闸早返回删除（保留 `settings = get_settings()`，`observability_step_extra` 预算裁剪仍用）；`evidence.plan_evidence_enabled()` 函数删除、两个调用点转恒扩源 |
+| enablement | v25 段（`V25_MASTER_FLAG` / `V25_TOOL_REQUIRED_FLAG` / `V25_SUB_FLAGS` / `V25_GATE_FLAGS` / `V25_DEPENDENCIES` + 判定段）整段删除，文件只剩 v26 段 |
+| 契约层 | `debug.py` 六个 `/debug/plans*` 端点去 `_require_plan_debug` 404 门控（端点恒可见，只读纪律不变） |
+| **真缺陷（fix 提交）** | `reflector.execute_run` 用真实墙钟重选证据（原 `:99` `datetime.now()`），与触发侧注入的周期时间口径分裂——计划窗在真实时间下 0 达标（`evidence_gone`）→ 反思空转、零 Insight。与 H.11.2 ③ 同源（周期时间 vs 真实墙钟）。修法：`run_queued_reflections` 把 `now` 绑进逻辑时钟、`execute_run` 改读 `logical_now()`（周期外直调回落真实时间，`reflection/evaluation.py` 等既有调用点行为不变）；**顺带关闭 H.11.3 移交的 `test_plan010_regression::test_s1` 基线红** |
+| 测试 | 34 文件约 215 处引用收敛（净 −910 行）：support 夹具去死 kwarg（`plan004_binding_on` 退化为锚点夹具、`plan_reflection_env` 只钉世界/观测面）；flag-off 用例按纪律退役（plan007 S7 对照面、plan009 记忆 off 两例、plan010 `TestFlagOffRegression`、plan011 端点 404 负例、plan012 执行/调度/重规划/广播 off 负例）；enablement 链矩阵改以 **v26 样本负例**钉住链机制（构造期 model 校验 + `enablement_violations` 打桩双路径）；`test_plan001_scope_markers.py` 按自身纪律显式改写留痕（用例更名 `…_policy_bits_default_on`、`PLAN_002_FLAG_CONTRACT_ASSERTIONS` 同步、docstring 追加批次 6 留痕段）；绑定 off 语义改走 `PlanningEngine(tool_binding_enabled=False)` 构造注入（引擎保留的独立验证开关） |
+| 跨版本连带 | `tests/v2/test_ref002_evidence.py::test_trace_records_pool_clusters_and_gate`：trace 断言 1 → 2 步（计划通道恒扩源后追加 `reflection_plan_evidence` 步，空计划数据零窗） |
+| 验证 | `tests/v25` **1354 passed / 1 skipped 全绿**；全量 `22 failed / 6215 passed / 22 skipped`，失败 ID 集合 ⊆ 豁免清单（feishu WIP 14 + F.8 既存 2 + 抖动池 e2e/计时/v65），**零未归因新增**；`compileall app`、`import app.main` 通过 |
+| 提交（本地，未推送） | `596c68f`（app 去门控）→ `999ff31`（fix 反思时钟）→ `94bb5d1`（test 同步，39 文件 +356/−910）→ docs（本条） |
+| env | v25 各键从未写入 `.env` / `.env.example` ⇒ 零 env 变更 |
+| 行为变化 | 计划编排**首次在生产配置下常开**：四源上下文装配、`PlanObserver` 观察推进、执行桥步骤执行、重规划裁决、终态记忆/世界广播、自治 tick 计划事实段与抑制、计划证据反思通道、调试面——全部转恒发生。**需执行 `docs/version/v2.5.0/planning-system/regression-checklist.md`（尚未跑，上线前置条件）** |
+
+**批次 7 起点**：在存开关 31 → **19**（v26 5 + 保留策略位/裁决项 4 + 基闸）；`enablement.py` 只剩 v26 段，批次 7 删 v26 段后批次 8 删整文件。H.4 执行清单不变。
 
 
