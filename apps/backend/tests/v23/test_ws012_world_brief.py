@@ -132,4 +132,4 @@ def test_prompt_builder_budget_switch(monkeypatch):
 
     settings = get_settings()
     assert settings.world_context_char_budget == 600
-    assert settings.world_context_char_budget_v23 == 1000
+    assert settings.world_prompt_char_budget == 1000

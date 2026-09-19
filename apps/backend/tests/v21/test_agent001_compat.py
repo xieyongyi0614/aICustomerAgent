@@ -1,19 +1,11 @@
 """AGENT-001 兼容回归测试。
 
-覆盖：前台收编常开后 chat 恒产生 foreground_chat 台账；enablement 无 v21 残留规则。
+覆盖：前台收编常开后 chat 恒产生 foreground_chat 台账。
 """
 
 from app.core.settings import get_settings
-from app.core.settings.enablement import enablement_violations
 from app.repositories import loop_run_repository
 
-
-class TestEnablement:
-    def test_no_v21_enablement_rules_remain(self, override_settings):
-        violations = [
-            v for v in enablement_violations(get_settings()) if "v21" in v
-        ]
-        assert violations == []
 
 
 class TestForegroundAlwaysOn:

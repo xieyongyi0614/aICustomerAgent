@@ -1,7 +1,7 @@
 """AGENT-006 Agent Evaluation 测试。
 
 覆盖：六指标出分（缺材料 None）、快照幂等、趋势越限与演化议题、
-Reflection 触发通道联动、Flag off 零行为、enablement 依赖。
+Reflection 触发通道联动、Flag off 零行为（enablement 依赖已随开关体系与空壳删除退役）。
 """
 
 from datetime import datetime, timedelta

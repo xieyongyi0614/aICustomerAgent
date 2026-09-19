@@ -10,7 +10,6 @@ import pytest
 
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
-from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 from app.services import goal_planning
 
 from . import plan012_support as support
@@ -48,43 +47,6 @@ class TestFlagDefaults:
         assert settings.plan_replan_min_confidence == 0.7
         assert settings.plan_memory_importance_floor == 0.6
 
-
-class TestEnablementChainMatrix:
-    """U2 语义反转（批次 7 收口）：V2.6.0 段亦已删除，enablement 只剩空实现——
-    任何组合零违规；链账本常量（V25_* / V26_*）全部消失。"""
-
-    def test_default_configuration_is_clean(self):
-        assert enablement_violations(get_settings()) == []
-
-    def test_full_chain_is_legal(self, monkeypatch):
-        settings = _settings_with(monkeypatch, **support.FULL_CHAIN_ENVS)
-        assert enablement_violations(settings) == []
-
-    def test_legacy_chain_violation_samples_are_all_clean(self):
-        """原各段负例样本（子闸无总闸 / 总闸无基闸）在新实现下零违规。"""
-        from types import SimpleNamespace
-
-        stub = SimpleNamespace(
-            action_execution_enabled=False,
-            action_scheduler_enabled=True,
-            action_enabled=False,
-            planning_enabled=True,
-        )
-        assert enablement_violations(stub) == []
-
-    def test_validate_enablement_chain_never_raises(self):
-        from types import SimpleNamespace
-
-        validate_enablement_chain(SimpleNamespace())
-
-    def test_ledger_has_no_chain_markers(self):
-        from app.core.settings import enablement
-
-        docstring = enablement.__doc__ or ""
-        assert "V2.0.0 ~ V2.6.0 段" in docstring and "已整体移除" in docstring
-        assert not any(
-            name.startswith(("V25_", "V26_")) for name in vars(enablement)
-        )
 
 
 class TestAlwaysOnPlanningCompat:

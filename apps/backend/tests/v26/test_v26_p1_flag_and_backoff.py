@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.core.settings import Settings, get_settings
-from app.core.settings.enablement import enablement_violations
 from app.models.action import ActionResult
 from app.repositories import action_repository
 from app.services.action import manager
@@ -32,10 +31,6 @@ class TestEnvExampleRegistration:
 
 
 class TestEnablementChain:
-    def test_v26_chain_rules_are_gone(self):
-        settings = get_settings()
-        assert enablement_violations(settings) == []
-
     def test_removed_flags_are_absent_from_settings(self):
         for flag in REMOVED_V26_FLAGS:
             assert flag not in Settings.model_fields, flag

@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from app.application import life_loop
 from app.core import llm_factory
 from app.core.settings import get_settings
-from app.core.settings.enablement import enablement_violations
 from app.main import app
 from app.repositories import (
     agent_metric_repository,
@@ -58,13 +57,6 @@ def _structured_llm(fake_llm):
         },
     )
 
-
-class TestEnablementMatrix:
-    def test_no_v21_rules_remain(self, override_settings):
-        override_settings()
-        assert [
-            v for v in enablement_violations(get_settings()) if "v21" in v
-        ] == []
 
 
 class TestEvolutionLoopE2E:
@@ -188,7 +180,3 @@ class TestEvolutionLoopE2E:
         assert all(r.status in ("done", "degraded") for r in runs)
 
 
-class TestEnablementBaseline:
-    def test_default_settings_have_no_violations(self, db_session_factory, override_settings):
-        override_settings()
-        assert enablement_violations(get_settings()) == []

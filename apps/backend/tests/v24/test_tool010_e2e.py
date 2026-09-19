@@ -85,7 +85,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/application/chat_pipeline.py": "64d9cea1b4ee4d5b805c073f179f687f4f550f3a946e31345f447acb55869c4e",
     "app/application/post_process.py": "3d7a2371ecf00f6c5937476debda2e3573773c6e7f8513eb6aaf15a7d32ad012",
     "app/application/action_engine.py": "ee300b6a71fc28af69ce1d944205a81b64423f4ac6ae5a76cfb6b131a9023660",
-    "app/prompts/builder.py": "636f77a969ffd4aa02195af9c5eedbc23647c084c503a5b25753548a8993a428",
+    "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }
 """整文件零 diff 冻结面。
 

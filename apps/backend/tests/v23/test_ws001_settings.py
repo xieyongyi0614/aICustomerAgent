@@ -1,11 +1,10 @@
-"""WS-001：World Simulation 调参与 enablement 现状（开关已固化删除）。"""
+"""WS-001：World Simulation 调参现状（开关已固化删除；enablement 空壳已随批次 8 删除）。"""
 
 import json
 
 import pytest
 
 from app.core.settings import get_settings
-from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 from app.core.settings._shared import SettingsError
 from app.core.settings import Settings
 
@@ -25,7 +24,7 @@ V23_PARAM_DEFAULTS = {
     "world_event_tick_cap": 8,
     "catch_up_max_days": 7,
     "world_brief_char_budget": 400,
-    "world_context_char_budget_v23": 1000,
+    "world_prompt_char_budget": 1000,
     "daily_plan_retention_days": 30,
     "user_situation_valid_hours": 48,
     "world_llm_assist_sample_rate": 0.2,
@@ -56,25 +55,3 @@ def test_v23_params_defaults():
         "calendar_event",
         "goal_completed",
     ]
-
-
-def test_no_v23_enablement_rules_remain():
-    settings = get_settings()
-    violations = enablement_violations(settings)
-    assert not any(
-        token in v
-        for v in violations
-        for token in (
-            "world_simulation_enabled",
-            "time_advance_enabled",
-            "daily_life_enabled",
-            "event_detection_enabled",
-            "world_llm_assist_enabled",
-            "scene_expansion_enabled",
-            "debug_tick_enabled",
-        )
-    )
-
-
-def test_default_settings_pass_chain():
-    validate_enablement_chain(get_settings())

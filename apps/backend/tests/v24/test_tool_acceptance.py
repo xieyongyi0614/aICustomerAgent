@@ -17,7 +17,6 @@ import pytest
 
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
-from app.core.settings.enablement import enablement_violations, validate_enablement_chain
 from app.models.tool import PermissionProfile
 from app.services.tool.registry import ToolRegistry
 from tests.v24 import tool012_support as support
@@ -75,11 +74,11 @@ def test_registry_ids_are_stable(monkeypatch):
 
 
 
-def test_flag_matrix_startup_calls_chain_validation():
-    """串行链校验挂在启动边界（main.lifespan），fail-fast 不是纸面约定。"""
+def test_flag_matrix_startup_chain_validation_is_gone():
+    """批次 8：enablement 空壳与启动校验调用已删除（链上无闸可校验）。"""
     source = (support.APP_ROOT / "main.py").read_text(encoding="utf-8")
 
-    assert "validate_enablement_chain(get_settings())" in source
+    assert "validate_enablement_chain" not in source
 
 
 # --- Flag 矩阵：各子闸的行为分支 ------------------------------------------------
