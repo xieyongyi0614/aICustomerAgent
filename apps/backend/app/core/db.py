@@ -448,12 +448,18 @@ def create_engine_from_url(url: str | None = None):
     if not database_url.startswith("postgresql"):
         raise ValueError(f"不支持的数据库 URL：{database_url}")
     settings = get_settings()
+    connect_args: dict = {}
+    if settings.db_statement_timeout_ms > 0:
+        connect_args["options"] = (
+            f"-c statement_timeout={settings.db_statement_timeout_ms}"
+        )
     return create_engine(
         database_url,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
         pool_recycle=settings.db_pool_recycle,
         pool_pre_ping=settings.db_pool_pre_ping,
+        connect_args=connect_args,
     )
 
 

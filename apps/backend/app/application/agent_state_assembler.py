@@ -87,7 +87,7 @@ def reset_run_state(run) -> None:
 
 
 def run_state_snapshot_stage(user_id: str, run) -> dict:
-    """autonomous_tick 的 state_snapshot 阶段实现（controller 经 run_stage 调用）。"""
+    """autonomous_tick 的 state_snapshot 阶段实现（controller 经 run_stage_async 调用）。"""
     snapshot = assemble(user_id)
     activate_run_state(snapshot, run)
     top = snapshot.interest_focus[0].topic if snapshot.interest_focus else ""

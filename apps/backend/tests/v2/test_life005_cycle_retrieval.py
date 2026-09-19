@@ -90,28 +90,31 @@ class TestListTopSalience:
 
 
 class TestMemoryDigestStep:
-    def test_step_sets_digest_and_records_ids(
+    @pytest.mark.asyncio
+    async def test_step_sets_digest_and_records_ids(
         self, db_session_factory, life_loop_on
     ):
         _seed_memory("m-x", "显式嘱托", 0.95)
         cycle_ctx: dict = {}
-        entry = life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        entry = await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert entry["status"] == "ok"
         assert entry["memory_ids"] == ["m-x"]
         assert "显式嘱托" in memory_digest_var.get()
         memory_digest_var.reset(cycle_ctx["digest_token"])
         assert memory_digest_var.get() is None
 
-    def test_digest_budget_truncated(self, db_session_factory, life_loop_on):
+    @pytest.mark.asyncio
+    async def test_digest_budget_truncated(self, db_session_factory, life_loop_on):
         _seed_memory("m-long", "长" * 300, 0.9)
         cycle_ctx: dict = {}
-        life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert len(memory_digest_var.get()) <= 600
         memory_digest_var.reset(cycle_ctx["digest_token"])
 
-    def test_no_salient_memory_skips(self, db_session_factory, life_loop_on):
+    @pytest.mark.asyncio
+    async def test_no_salient_memory_skips(self, db_session_factory, life_loop_on):
         cycle_ctx: dict = {}
-        entry = life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        entry = await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert entry["status"] == "skipped"
         assert entry["skip_reason"] == "no_salient_memory"
         assert "digest_token" not in cycle_ctx

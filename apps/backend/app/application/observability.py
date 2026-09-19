@@ -61,7 +61,7 @@ def prune_all() -> int:
 async def run_retention_loop() -> None:
     """lifespan 常驻低频清理：失败仅 log，下轮再清（V7.8-010）。"""
 
-    async def _tick():
+    def _tick():
         pruned = prune_all()
         if pruned:
             logger.info("观测数据保留清理：%d 行", pruned)

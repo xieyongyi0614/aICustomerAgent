@@ -12,7 +12,6 @@ from app.application.agent_runtime.controller import (
     open_run,
     run_autonomous_cycle,
     run_event_pregate,
-    run_stage,
     run_stage_async,
 )
 from app.application.agent_runtime.llm_gateway import (
@@ -51,7 +50,6 @@ __all__ = [
     "resolve_answer_llm",
     "run_autonomous_cycle",
     "run_event_pregate",
-    "run_stage",
     "run_stage_async",
     "snapshot_profile",
 ]

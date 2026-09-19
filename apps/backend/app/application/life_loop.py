@@ -10,6 +10,7 @@ trigger_registry 状态接口）；Controller 本体 0 LLM（周期内 LLM 仅�
 于 decision 步骤内部的既有 proactive 链，受 LIFE-003 预算约束）。
 """
 
+import asyncio
 import logging
 import time
 from dataclasses import fields, is_dataclass
@@ -80,8 +81,8 @@ async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
     settings = get_settings()
     now = now or datetime.now()
     stats: dict = {"user_cycles": 0, "maintenance": 0, "aborted": 0, "idle": False}
-    work_users = _collect_work_users(now)
-    maintenance_pending = _maintenance_pending(settings)
+    work_users = await asyncio.to_thread(_collect_work_users, now)
+    maintenance_pending = await asyncio.to_thread(_maintenance_pending, settings)
     if not work_users and not maintenance_pending:
         # Idle 短路（LIFE-003）：无 due trigger、无 goal 补扫、无维护到期
         # → 整轮跳过：0 LLM、0 run 行、仅时钟检查。
@@ -528,12 +529,16 @@ def _persist_goal_trace(trace, user_id: str) -> None:
         logger.exception("goal 观察 trace 落库失败，已忽略")
 
 
-def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:
+async def _step_memory_retrieval(user_id: str, now: datetime, cycle_ctx: dict) -> dict:
     """LIFE-005 周期记忆快查（显著度门槛，0 LLM）：digest 进 trace 并经
-    contextvar 注入 proactive 生成上下文（recent_context 追加段）。"""
+    contextvar 注入 proactive 生成上下文（recent_context 追加段）。
+
+    ContextVar 的 set/reset 必须在主上下文，DB 读经 to_thread 下放。
+    """
 
     settings = get_settings()
-    rows = memory_repository.list_top_salience(
+    rows = await asyncio.to_thread(
+        memory_repository.list_top_salience,
         user_id,
         min_salience=settings.life_loop_memory_min_salience,
         limit=settings.life_loop_memory_limit,
@@ -583,7 +588,7 @@ async def _run_maintenance(now: datetime) -> int:
         "world_maintenance", settings.world_maintenance_interval_seconds
     ):
         _mark_maintenance("world_maintenance")
-        entry = _safe_sync_call("world_maintenance", world_engine.run_maintenance)
+        entry = await _safe_sync_call("world_maintenance", world_engine.run_maintenance)
         _record_maintenance_run("world_maintenance", [entry], now)
         executed += 1
     if (
@@ -591,7 +596,7 @@ async def _run_maintenance(now: datetime) -> int:
         and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
     ):
         _mark_maintenance("world_simulation")
-        entry = _safe_sync_call("world_simulation", world_engine.run_simulation_maintenance)
+        entry = await _safe_sync_call("world_simulation", world_engine.run_simulation_maintenance)
         _record_maintenance_run("world_simulation", [entry], now)
         executed += 1
     if _maintenance_due(
@@ -701,9 +706,9 @@ def _mark_maintenance(kind: str) -> None:
     _maintenance_last[kind] = time.monotonic()
 
 
-def _safe_sync_call(kind: str, func) -> dict:
+async def _safe_sync_call(kind: str, func) -> dict:
     try:
-        result = func()
+        result = await asyncio.to_thread(func)
         if isinstance(result, dict):
             return {"step": kind, "status": "ok", **result}
         return {"step": kind, "status": "ok", "result": result}

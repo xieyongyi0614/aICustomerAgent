@@ -68,23 +68,6 @@ def open_foreground_run(user_id: str, now: datetime | None = None) -> RunContext
     return open_run(user_id, run_kind, trigger_type, "user_message", now)
 
 
-def run_stage(run: RunContext, steps: list, name: str, func, *args) -> dict:
-    """同步阶段执行原语（语义对齐 life_loop._record_step）。"""
-    started = time.perf_counter()
-    entry: dict = {"step": name}
-    try:
-        detail = func(*args) or {}
-        entry.update(detail)
-        entry.setdefault("status", "ok")
-    except Exception as exc:
-        logger.exception("agent run 步骤失败：%s", name)
-        entry.update({"status": "error", "error": exc.__class__.__name__})
-    entry["duration_ms"] = round((time.perf_counter() - started) * 1000, 2)
-    steps.append(entry)
-    loop_run_repository.mark_step(run.run_id, entry)
-    return entry
-
-
 async def run_stage_async(
     run: RunContext, steps: list, name: str, coro_factory, critical: bool = False
 ) -> dict:
@@ -152,30 +135,43 @@ def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: date
     """阶段名 → 既有步骤本体（Profile Registry 是唯一阶段序列来源）。
 
     未注册阶段名 fail-closed 抛错：注册表与实现不一致必须暴露，不得静默跳过。
+    同步阶段经 asyncio.to_thread 下放（同步 DB/纯函数离开事件循环）；
+    memory_retrieval 在 ContextVar 上置 digest token，必须留在主上下文。
     """
     from app.application import life_loop as life_loop_mod
 
     runners = {
-        "perception": lambda: life_loop_mod._step_perception(user_id, now),
-        "state_update": lambda: life_loop_mod._step_state_update(user_id, now),
+        "perception": lambda: asyncio.to_thread(
+            life_loop_mod._step_perception, user_id, now
+        ),
+        "state_update": lambda: asyncio.to_thread(
+            life_loop_mod._step_state_update, user_id, now
+        ),
         "state_snapshot": lambda: asyncio.to_thread(run_state_snapshot_stage, user_id, run),
-        "goal_check": lambda: life_loop_mod._step_goal_check(user_id, now),
-        "goal_stack": lambda: goal_stack.run_goal_stack_stage(user_id, run, now),
-        "goal_supply": lambda: life_loop_mod._step_goal_supply(user_id, now),
+        "goal_check": lambda: asyncio.to_thread(
+            life_loop_mod._step_goal_check, user_id, now
+        ),
+        "goal_stack": lambda: asyncio.to_thread(
+            goal_stack.run_goal_stack_stage, user_id, run, now
+        ),
+        "goal_supply": lambda: asyncio.to_thread(
+            life_loop_mod._step_goal_supply, user_id, now
+        ),
         "goal_advance": lambda: life_loop_mod._step_goal_advance(user_id, now),
         "memory_retrieval": lambda: life_loop_mod._step_memory_retrieval(
             user_id, now, run.data
         ),
-        "reflection_check": lambda: life_loop_mod._step_reflection_check(user_id, now),
-        "world_experience": lambda: life_loop_mod._step_world_experience(user_id, now),
+        "reflection_check": lambda: asyncio.to_thread(
+            life_loop_mod._step_reflection_check, user_id, now
+        ),
+        "world_experience": lambda: asyncio.to_thread(
+            life_loop_mod._step_world_experience, user_id, now
+        ),
     }
     try:
         return runners[name]
     except KeyError as exc:
         raise ValueError(f"Profile 声明了未实现的阶段：{name}") from exc
-
-
-_ASYNC_STAGES = frozenset({"goal_advance", "state_snapshot"})
 
 
 async def run_autonomous_cycle(
@@ -209,12 +205,9 @@ async def run_autonomous_cycle(
                     await _run_decision_stage(run, steps, user_id, llm, now, budget, settings)
                     continue
                 runner = _autonomous_stage_runner(name, user_id, run, now)
-                if name in _ASYNC_STAGES:
-                    await run_stage_async(
-                        run, steps, name, runner, critical=name in spec.critical
-                    )
-                else:
-                    run_stage(run, steps, name, runner)
+                await run_stage_async(
+                    run, steps, name, runner, critical=name in spec.critical
+                )
     except Exception as exc:
         logger.exception("agent run 用户周期中止：%s", user_id)
         status = TERMINAL_ABORTED

@@ -11,3 +11,4 @@ class DatabaseSettings(BaseSettings):
     db_max_overflow: int = 10
     db_pool_recycle: int = 1800
     db_pool_pre_ping: bool = True
+    db_statement_timeout_ms: int = 0
