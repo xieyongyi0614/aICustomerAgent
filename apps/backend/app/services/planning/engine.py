@@ -18,7 +18,7 @@
 
 闸门 5 与 6 的区别是评审要点：5 问「这个工具存在吗」（声明面），6 问「这一刻它能用吗」
 （运行时面）。`channel.feishu.send` 在 `late_night` 被工具面剔除时**闸门 5 过、闸门 6 拒**——
-计划步数与内容不变，只是暂不装配该步。两道闸门受 `plan_step_binding_enabled` 门控，
+计划步数与内容不变，只是暂不装配该步。两道闸门默认为 on（绑定子闸已随开关体系删除），
 且可分别独立关闭（构造参数），用于单列验证。
 
 PLAN-006 补齐的判定细节（Task Detail §6.1 的两个内部接口，实现为模块级纯函数以便单列验证）
@@ -149,7 +149,7 @@ class _Draft:
 class PlanningEngine:
     """七道闸规划引擎（`plan` / `revise` / `enqueue` / `run_jobs` / `register_runtime`）。
 
-    `tool_binding_enabled` 缺省取 `plan_step_binding_enabled`；`tool_resolvable_gate` /
+    `tool_binding_enabled` 缺省为 on（绑定子闸已随开关体系删除）；`tool_resolvable_gate` /
     `tool_surface_gate` 是闸门 5 / 6 的**独立开关**（Task Detail §8 Step 4.4 要求二者可分别
     关闭并单独验证）。两者仅在绑定子闸开启时生效。
     """
@@ -360,9 +360,7 @@ class PlanningEngine:
         可单列验证（Task Detail §9.1 U4）：两道闸门按序独立判定，前一道不通过即短路。
         """
         enabled = (
-            settings.plan_step_binding_enabled
-            if self._tool_binding_enabled is None
-            else self._tool_binding_enabled
+            True if self._tool_binding_enabled is None else self._tool_binding_enabled
         )
         if not enabled:
             return None

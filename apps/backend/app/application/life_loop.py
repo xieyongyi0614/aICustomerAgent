@@ -320,10 +320,10 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     """AUT-002 供给装配（纯规则 0 LLM）：三来源候选→层级 goal→规划 job 入队。
     World 事实由本编排步骤采集传入（GAP-AUT-02 编排投影），degraded 熔断。
 
-    V2.5.0 PLAN-003 接线：`planning_enabled` on 时本步内部改走
-    `PlanningEngine.enqueue` / `run_jobs`（规划在供给步内被处理完，不再只依赖后台
-    job worker）。入队幂等（`idempotency_key` 含 trigger），故对 `materialize` 已入队的
-    目标重复入队返回 False、不产生第二个 job；Flag off 时本步与 V2.4.0 逐字节一致。
+    V2.5.0 PLAN-003 接线（总闸已随开关体系删除，本步恒走）：`PlanningEngine.enqueue` /
+    `run_jobs`（规划在供给步内被处理完，不再只依赖后台 job worker）。入队幂等
+    （`idempotency_key` 含 trigger），故对 `materialize` 已入队的目标重复入队返回
+    False、不产生第二个 job。
     """
 
     settings = get_settings()
@@ -344,13 +344,11 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
 
 
 def _route_planning_jobs(user_id: str, result: dict, settings) -> None:
-    """V2.5.0 规划接线（Flag 门控）：规划入队经引擎 + 本步内处理本类型 job。
+    """V2.5.0 规划接线：规划入队经引擎 + 本步内处理本类型 job。
 
     入队幂等：`materialize` 已入队的目标在此重复入队返回 False，不产生第二个 job
     （`job_type` 仍为既有 `goal_planning`，`idempotency_key` 含 trigger）。
     """
-    if not settings.planning_enabled:
-        return
     engine = planning_engine.get_planning_engine()
     for goal_id in result.get("created") or []:
         engine.enqueue(user_id, str(goal_id), goal_planning.TRIGGER_CREATED)
@@ -372,39 +370,9 @@ def _observation_facts(user_id: str, now: datetime) -> dict:
     )
 
 
-def _plan_observation_enabled(settings) -> bool:
-    """V2.5.0 观测接线闸（总闸 + 观测子闸；串行链由 `settings/enablement.py` 在启动边界校验）。"""
-    return bool(settings.planning_enabled) and bool(
-        settings.plan_observation_enabled
-    )
-
-
-def _plan_scheduler_enabled(settings) -> bool:
-    """调度子闸：on 时就绪步取自 `PlanScheduler`（否则回退既有 `_current_step`）。"""
-    return bool(settings.planning_enabled) and bool(
-        settings.plan_scheduler_enabled
-    )
-
-
-def _plan_execution_enabled(settings) -> bool:
-    """执行子闸：on 时步骤执行走 `PlanExecutorBridge`（否则走既有 `goal_execution`）。"""
-    return bool(settings.planning_enabled) and bool(
-        settings.plan_execution_enabled
-    ) and bool(settings.action_enabled)
-
-
-def _plan_revision_enabled(settings) -> bool:
-    """重规划子闸：on 时执行后经 `PlanRevisionPolicy` 判定并入队 `TRIGGER_REPLAN`。"""
-    return bool(settings.planning_enabled) and bool(
-        settings.plan_revision_enabled
-    )
-
-
 def _current_plan_step(goal, plan, settings):
-    """当前可执行步：调度子闸 on 走 `PlanScheduler.current_step`，否则既有私有实现。"""
-    if _plan_scheduler_enabled(settings):
-        return plan_scheduler.PlanScheduler.current_step(plan)
-    return goal_observation._current_step(list(plan.sub_goals))  # pylint: disable=protected-access
+    """当前可执行步（`PlanScheduler.current_step`，§4.2 #11 收口后的唯一实现）。"""
+    return plan_scheduler.PlanScheduler.current_step(plan)
 
 
 def _execution_ctx(now: datetime, facts: dict):
@@ -435,7 +403,7 @@ def _revision_ctx(settings) -> SimpleNamespace:
 
 
 async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -> dict:
-    """V2.5.0 执行桥接线（总闸 + `plan_execution_enabled`）：一步走 `execute_step`。
+    """V2.5.0 执行桥接线：一步走 `execute_step`。
 
     链路：`current_step` → `execute_step`（两道防御性断言 + 六闸门）→ `reconcile`
     → `update_plan_progress`；重规划子闸 on 时追加 `PlanRevisionPolicy` 裁决入队。
@@ -457,15 +425,14 @@ async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -
             specs[position] = updated
             break
     goal_repository.update_plan_progress(plan.id, specs)
-    if _plan_revision_enabled(settings):
-        revised_plan = plan.model_copy(update={"sub_goals": specs})
-        reason = plan_revision.PlanRevisionPolicy().should_replan(
-            outcome, revised_plan, _revision_ctx(settings)
+    revised_plan = plan.model_copy(update={"sub_goals": specs})
+    reason = plan_revision.PlanRevisionPolicy().should_replan(
+        outcome, revised_plan, _revision_ctx(settings)
+    )
+    if reason:
+        goal_planning.enqueue_planning(
+            goal.user_id, goal.id, goal_planning.TRIGGER_REPLAN
         )
-        if reason:
-            goal_planning.enqueue_planning(
-                goal.user_id, goal.id, goal_planning.TRIGGER_REPLAN
-            )
     return {
         "status": "ok",
         "goal_id": goal.id,
@@ -478,28 +445,22 @@ async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -
 
 
 async def _execute_active_plans(user_id: str, now: datetime, facts: dict) -> list[dict]:
-    """步骤执行分派：执行子闸 on → 计划执行桥；off → 既有 `goal_execution` 原路径。"""
+    """步骤执行（计划执行桥，§4.2 #12 收口后的唯一路径）。
+
+    `action_enabled` off 时桥内部判 `hold`（`executor_bridge._normalize` 显式处理）——本步
+    不算被执行、也不判失败，与既有行动总闸语义一致。
+    """
     settings = get_settings()
     pairs = goal_repository.list_active_plans(user_id)
-    if not _plan_execution_enabled(settings):
-        return [
-            await goal_execution.attempt_current_step(goal, plan, now)
-            for goal, plan in pairs
-        ]
     return [await _execute_plan_step(goal, plan, now, facts, settings) for goal, plan in pairs]
 
 
 def _observe_goals(user_id: str, now: datetime) -> tuple[dict, dict, dict]:
-    """观察事实与推进裁决（PLAN-005 接线点，§5.6）。
+    """观察事实与推进裁决（PLAN-005 接线点 §5.6，§4.2 #13 收口后的唯一路径）。
 
-    on：`PlanObserver.collect_facts`（四源）+ `observe_user_goals`（推进裁决落
-    `decision_records`、终态经 `settle` 单一写面）；off：既有 `_observation_facts` +
-    `goal_observation.advance_user_goals` 原路径（行为与 V2.4.0 一致）。
+    `PlanObserver.collect_facts`（四源）+ `observe_user_goals`（推进裁决落
+    `decision_records`、终态经 `settle` 单一写面）。
     """
-    settings = get_settings()
-    if not _plan_observation_enabled(settings):
-        facts = _observation_facts(user_id, now)
-        return facts, goal_observation.advance_user_goals(user_id, facts, now), {}
     observer = plan_observer.PlanObserver()
     facts = observer.collect_facts(user_id, plan_observer.ObservationContext(now=now))
     advance = observer.observe_user_goals(user_id, facts, now=now)
@@ -513,9 +474,8 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     """AUT-004 仲裁（复活/冲突/放弃）→ AUT-003 观察调整 → Sub-Goal 执行尝试。
     仲裁与观察全确定性 0 LLM；执行走 V9 既有闸门。
 
-    V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测经 `_observe_goals` 分派、执行经
-    `_execute_active_plans` 分派（分别受 `plan_observation_enabled` /
-    `plan_execution_enabled` 门控）。**签名、九步序列与返回字段集不变**；计划阶段
+    V2.5.0 PLAN-005 接线（§5.6 / §8 Step 8）：观测经 `_observe_goals`、执行经
+    `_execute_active_plans`（二者均常开）。**签名、九步序列与返回字段集不变**；计划阶段
     子步骤以 `plan_observe` / `plan_execute` 记入返回投影。
     """
 
@@ -527,12 +487,10 @@ async def _step_goal_advance(user_id: str, now: datetime) -> dict:
     facts, advance, plan_observe = _observe_goals(user_id, now)
     arbitration = goal_arbitration.run_user_arbitration(user_id, facts, now)
     executions = await _execute_active_plans(user_id, now, facts)
-    plan_execute = None
-    if _plan_execution_enabled(settings):
-        plan_execute = {
-            "steps": len(executions),
-            "outcomes": [item.get("outcome") for item in executions],
-        }
+    plan_execute = {
+        "steps": len(executions),
+        "outcomes": [item.get("outcome") for item in executions],
+    }
     trace = TurnTraceSession()
     trace.record(
         "goal_observation",

@@ -14,7 +14,8 @@ TOOL-009 §2.3：追加工具效能证据源。`trigger_for_user(channel=tool)` 
 
 PLAN-010 §4.1.3 ②：追加计划效能证据源（`CHANNEL_PLAN`）。**本函数零改动**——计划通道
 不新增分支、不新增闸门、不新增幂等键：计划窗由 `evidence.aggregate_evidence_windows`
-在 `plan_reflection_enabled` 开启时**扩源**进既有窗口列表，故它与用户证据走的是
+**扩源**进既有窗口列表（`plan_reflection_enabled` 子闸已随开关体系删除，扩源恒发生），
+故它与用户证据走的是
 同一个 `channel=memory` 闸门序列（门槛 / 当日额度 / 幂等入队三层一字不差）。
 这就是本任务的「三道闸零豁免」：不是「也过一遍闸门」，而是**同一条路径**。
 """

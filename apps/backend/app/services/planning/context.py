@@ -270,7 +270,7 @@ class PlanContextAssembler:
 
     `assemble` 为 async：World 源的既有装配入口是同步阻塞的仓储读（与 `chat_pipeline`
     同款 `asyncio.to_thread` 卸载）。其余源同步只读。
-    `plan_context_enabled` off 时**不做四源装配**（只保硬依赖两源，`degraded` 为空）。
+    四源装配恒发生（`plan_context_enabled` 已随开关体系删除）。
     """
 
     async def assemble(
@@ -300,10 +300,8 @@ class PlanContextAssembler:
         settings,
         run: RunContext | None,
     ) -> PlanContext:
-        """汇总四源（`plan_context_enabled` 才装配）+ 硬依赖两源 → `PlanContext`。"""
-        sources = _PlanSources()
-        if settings.plan_context_enabled:
-            sources = await _gather_sources(goal, settings)
+        """汇总四源 + 硬依赖两源 → `PlanContext`（§4.2 #7 收口后的唯一路径）。"""
+        sources = await _gather_sources(goal, settings)
         degraded = list(sources.degraded)
         if not settings.plan_tool_required:
             degraded.append(DEGRADED_SURFACE_UNAVAILABLE)

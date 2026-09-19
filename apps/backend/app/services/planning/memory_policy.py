@@ -320,9 +320,6 @@ def deliver_plan_memory(goal, plan, event_kind: str, *, policy=None) -> dict | N
     执行）、`{"memory_id": ..., "content": ...}`（已沉淀）。任何异常只 log——政策闸未过与落库
     失败都**不回滚计划终态**（D10）。
     """
-    settings = get_settings()
-    if not settings.plan_memory_enabled:
-        return None
     try:
         return _deliver(goal, plan, event_kind, policy)
     except Exception:

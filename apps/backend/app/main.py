@@ -55,8 +55,7 @@ async def lifespan(application: FastAPI):
     register_goal_runtime()
     register_with_job_worker()
     register_executor()
-    if get_settings().plan_reflection_enabled:
-        register_plan_revision_listener()
+    register_plan_revision_listener()
     register_development_runtime()
     register_rollback_listener()
     register_narrative_listener()

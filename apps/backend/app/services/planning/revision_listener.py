@@ -135,8 +135,6 @@ class PlanningRevisionListener:
         也不影响已完成的 Insight 落库（既有 `notify_insight_created_listeners` 的隔离语义）。
         """
         settings = self._settings()
-        if not settings.plan_reflection_enabled:
-            return
         for item in list(created or []):
             try:
                 self._consider(user_id, item or {}, settings)
@@ -147,11 +145,9 @@ class PlanningRevisionListener:
         """唯一动作（幂等）：入一个 `TRIGGER_REPLAN` 规划 job。
 
         返回语义（§9.1 U13）：首次触发 → `True`；重复触发 / 既有 job 层已占用 /
-        目标不存在 / 子闸 off → `False`。**零其他副作用**：不碰计划内容、不碰 `GoalStatus`、
+        目标不存在 → `False`。**零其他副作用**：不碰计划内容、不碰 `GoalStatus`、
         不碰工具注册表。
         """
-        if not self._settings().plan_reflection_enabled:
-            return False
         key = replan_idempotency_key(goal_id, insight_id)
         if not key or key in self._replanned:
             return False
@@ -272,10 +268,8 @@ def get_revision_listener() -> PlanningRevisionListener:
 def register_runtime() -> None:
     """编排层入口（`main.lifespan` 调用）：注册第四个 `insight_created` 消费者。
 
-    子闸 `plan_reflection_enabled` off → **零注册零行为**（与既有三个消费者同款纪律）。
+    注册恒发生（子闸已随开关体系删除），与既有三个消费者同款纪律。
     """
-    if not get_settings().plan_reflection_enabled:
-        return
     from app.services.reflection import lifecycle as reflection_lifecycle
 
     reflection_lifecycle.register_insight_created_listener(on_insight_created)

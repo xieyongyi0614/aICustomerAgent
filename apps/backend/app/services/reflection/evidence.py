@@ -413,14 +413,12 @@ def _trace(trace, started: float, *, status: str = "ok", **extra) -> None:
 def _plan_channel_windows(
     user_id: str, now: datetime, trace
 ) -> list[PlanEvidenceWindow]:
-    """计划通道扩源（PLAN-010 §4.1.3 ①）：子闸 off 时零调用零读取。
+    """计划通道扩源（PLAN-010 §4.1.3 ①）：子闸已随开关体系删除，扩源恒发生。
 
     计划窗**追加在既有窗口之后**：既有优先序纪律（既有窗口优先、取不到才回退）与
     `reflector._select_evidence` 的用户通道同款；本任务不改变既有窗口的相对顺序。
     计划窗的聚合异常只降级为空窗（不拉垮既有窗口）。
     """
-    if not plan_evidence_enabled():
-        return []
     try:
         return list(aggregate_plan_evidence(user_id, now=now, trace=trace).windows)
     except Exception:
@@ -1261,15 +1259,6 @@ def plan_thresholds(window_kind: str = "", settings=None) -> dict[str, float]:
     return thresholds
 
 
-def plan_evidence_enabled(settings=None) -> bool:
-    """计划证据通道子闸：`plan_reflection_enabled`。
-
-    子闸 off 时**零计划窗、零额外读取**（`aggregate_evidence_windows` 的记忆通道行为不变）。
-    """
-    resolved = settings if settings is not None else get_settings()
-    return bool(getattr(resolved, "plan_reflection_enabled", False))
-
-
 @dataclass(frozen=True)
 class PlanStepFact:
     """一步计划执行的只读事实（`goal_plans.sub_goals` / `action_records` 投影）。
@@ -1510,15 +1499,12 @@ def aggregate_plan_evidence(
 ) -> PlanEvidencePackage:
     """计划效能证据包：三窗聚合 → 逐组门槛 → 达门槛窗口（纯读、零 LLM、零写入）。
 
-    子闸 off 时直接返回空包（**零计划窗、零额外读取**：Flag off 下与 V2.4.0 逐字节一致）。
-    证据不足（样本 < `plan_reflection_min_samples` 或跨度不足）→ 该组不成窗，
-    故不产 Insight：调用链上不存在「证据不足仍调 LLM」的路径。
+    子闸已随开关体系删除，聚合恒发生。证据不足（样本 < `plan_reflection_min_samples`
+    或跨度不足）→ 该组不成窗，故不产 Insight：调用链上不存在「证据不足仍调 LLM」的路径。
     """
     started = time.perf_counter()
     now = now or datetime.now()
     settings = get_settings()
-    if not plan_evidence_enabled(settings):
-        return PlanEvidencePackage()
     try:
         structure_facts, action_facts = _plan_facts(user_id, now, window_days)
         plan_windows = aggregate_plan_windows(

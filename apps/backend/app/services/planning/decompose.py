@@ -266,7 +266,7 @@ class PlanValidator:
 
     三闸**互不重叠**（Task Detail §6.2 D3）：形状闸只看结构，绑定闸只看工具面与绑定一致性，
     预算闸只看四项预算。`validate_binding` 的语义前提是绑定子闸开启
-    （`plan_step_binding_enabled` off 时不应调用，与 PLAN-003 闸门 5 / 6 的门控一致）。
+    （`plan_tool_required` off 时不应调用，与 PLAN-003 闸门 5 / 6 的门控一致）。
     """
 
     @staticmethod
@@ -436,10 +436,8 @@ def _parse_structure(
 
 
 def _binding_enabled(settings) -> bool:
-    """绑定生效的合取判据（§8 Step 6）：绑定子闸 off 或工具面非要 off，都退化为 V2.4.0。"""
-    return bool(settings.plan_step_binding_enabled) and bool(
-        settings.plan_tool_required
-    )
+    """绑定生效判据（§8 Step 6）：绑定子闸已随开关体系删除，只剩保留的策略位。"""
+    return bool(settings.plan_tool_required)
 
 
 def _bind_tools(

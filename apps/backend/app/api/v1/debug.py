@@ -927,30 +927,6 @@ def rollback_relationship(user_id: str, target_version: int):
     }
 
 
-def _plan_debug_enabled() -> bool:
-    """计划调试面门控（总闸 + 调试子闸）。
-
-    「调试总闸」即本面所属子系统的总闸 `planning_enabled`；`PlanSettings` / `enablement`
-    中不存在第三个独立「调试总闸」Flag（PLAN-011 §4.2.6 / §6.3 D8 的三闸表述即此二闸）。
-    """
-    settings = get_settings()
-    return bool(settings.planning_enabled) and bool(settings.plan_debug_enabled)
-
-
-def _require_plan_debug() -> None:
-    """Flag off → **404**（端点不可见，§6.5）。
-
-    与既有面板的差别及理由：既有面板以 `{"enabled": false}` 兑现「总闸 off」是因为其输出模型
-    带 `enabled` 字段；计划调试面的六个输出模型按 §6.3 字段契约**不含** `enabled`，故以 404
-    兑现「未注册 / 不可见」语义（对调用方等价于端点不存在）。
-    """
-    if not _plan_debug_enabled():
-        raise HTTPException(
-            status_code=404,
-            detail="计划调试面未启用（planning_enabled / plan_debug_enabled）",
-        )
-
-
 def _plan_statuses(status: str | None) -> tuple[str, ...]:
     """状态过滤（§6.1 D3）：缺省 = 全部五态；显式取值越界 → 400（不做静默收敛）。"""
     if status is None:
@@ -1205,7 +1181,6 @@ def _load_plan(plan_id: str) -> tuple:
 @debug_router.get("/debug/plans", response_model=PlansOut)
 def list_plans(user_id: str, status: str | None = None):
     """计划清单（含版本链与状态）：`goal_id` 相同的多行即该目标的版本链。"""
-    _require_plan_debug()
     plans = goal_repository.list_plans_by_status(user_id, _plan_statuses(status))
     return PlansOut(plans=[_plan_summary(plan) for plan in plans[:PLAN_PROJECTION_LIMIT]])
 
@@ -1217,7 +1192,6 @@ async def get_plan_context(user_id: str, goal_id: str):
     硬依赖不可得（工具系统 off / 注册表不可得 / 目标缺失）时返回**降级结构**
     （`degraded` 记 `PlanUnavailable.reason`），不抛错——与 §6.5 的投影读取异常同款处置。
     """
-    _require_plan_debug()
     goal = goal_repository.get_goal(goal_id)
     if goal is None or (user_id and goal.user_id != user_id):
         raise HTTPException(status_code=404, detail="目标不存在")
@@ -1239,7 +1213,6 @@ async def get_plan_context(user_id: str, goal_id: str):
 @debug_router.get("/debug/plans/revisions", response_model=PlanRevisionsOut)
 def list_plan_revisions(goal_id: str):
     """修订链（from/to version + reason + trigger_source + evidence_refs + kept_steps）。"""
-    _require_plan_debug()
     goal = goal_repository.get_goal(goal_id)
     if goal is None:
         raise HTTPException(status_code=404, detail="目标不存在")
@@ -1249,7 +1222,6 @@ def list_plan_revisions(goal_id: str):
 @debug_router.get("/debug/plans/pending", response_model=PlanPendingOut)
 def list_pending_plans(user_id: str):
     """待推进步骤（含 `off_surface` / 冷却中 / 前置失败原因）：每个被阻塞的活跃计划一行。"""
-    _require_plan_debug()
     settings = get_settings()
     now = datetime.now()
     ctx = _schedule_context(user_id, settings, now)
@@ -1276,7 +1248,6 @@ def list_pending_plans(user_id: str):
 @debug_router.get("/debug/plans/{plan_id}/steps", response_model=PlanStepsOut)
 def list_plan_steps(plan_id: str):
     """步骤视图：绑定（`tool_id` / `binding_reason`）与 `blocked_reason` 逐条可读。"""
-    _require_plan_debug()
     plan, goal = _load_plan(plan_id)
     ctx = _schedule_context(goal.user_id, get_settings(), datetime.now())
     return PlanStepsOut(steps=_plan_step_rows(plan, ctx))
@@ -1285,7 +1256,6 @@ def list_plan_steps(plan_id: str):
 @debug_router.get("/debug/plans/{plan_id}", response_model=PlanDetailOut)
 def get_plan(plan_id: str):
     """单计划详情：本体 + 步骤 + 绑定 + 判据 + 推进历史（`decision_records` 投影）。"""
-    _require_plan_debug()
     plan, goal = _load_plan(plan_id)
     ctx = _schedule_context(goal.user_id, get_settings(), datetime.now())
     return PlanDetailOut(

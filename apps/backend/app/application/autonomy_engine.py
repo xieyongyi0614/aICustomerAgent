@@ -320,15 +320,13 @@ def _advance_moment(snapshot: dict, fallback: datetime | None) -> datetime:
 def _collect_plan_facts(user_id: str, now: datetime | None = None) -> dict:
     """有界计划事实段（PLAN-007 §4.2.1 / §6.2）：固定七键、单目标、只读、失败降级为空包。
 
-    与既有事实段同款纪律：子闸 `plan_autonomy_enabled` off → `{}`（原状）；
-    无 active 计划 → `{}`；任何异常 → `{}` + 日志，**不阻塞 tick**；整体经既有
-    `observability.bound_extra` 预算裁剪（不新增预算机制）。字段契约见
+    与既有事实段同款纪律：无 active 计划 → `{}`；任何异常 → `{}` + 日志，**不阻塞
+    tick**；整体经既有 `observability.bound_extra` 预算裁剪（不新增预算机制）。
+    子闸 `plan_autonomy_enabled` 已随开关体系删除，本段常开。字段契约见
     `autonomy_policy.PLAN_FACTS_KEYS`（唯一声明处）。
     """
     try:
         settings = get_settings()
-        if not settings.plan_autonomy_enabled:
-            return {}
         pair = _latest_active_plan(user_id)
         if pair is None:
             return {}

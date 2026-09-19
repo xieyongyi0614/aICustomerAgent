@@ -1,11 +1,13 @@
-"""V2.5.0 Planning System 域设置（PLAN-002 / architecture.md §7.10）：计划编排总闸、12 个子闸与 14 个参数。
+"""V2.5.0 Planning System 域设置（PLAN-002 / architecture.md §7.10）：策略位与 14 个参数。
 
-总闸 off 时零行为：`goal_planning` 走原路径、`goal_observation` 三事实源不变、
-`goal_execution` 直构 `ActionIntent`、prompt 与 V2.4.0 逐字节一致。
+计划编排已随 `vXX_` 开关体系删除而**转正常开**：总闸 `planning_enabled` 与 11 个子闸
+不复存在，原「总闸 off ⇒ 走 V2.4.0 原路径」的退化分支整体消失（`goal_planning` /
+`goal_observation` / `goal_execution` 改为恒走计划编排路径）。
 
-`plan_tool_required` 是唯一默认为 on 的项：它不是「激活计划编排」的子闸，而是
-「一旦启用计划编排，就强制要求工具面可用」的策略修饰位（off 时允许无面规划、退化为
-V2.4.0 行为）。因此串行链校验把它按**总闸为前提**判定，否则默认配置会自我否决。
+保留两个**策略位**（默认 ON、已去版本前缀、零门控污染）：
+`plan_tool_required`（要求工具面可用时步骤必须绑定工具；off 允许无面规划）与
+`plan_context_digest_enabled`（计划上下文摘要）。二者都不是「激活计划编排」的开关，
+而是编排启用后的行为修饰位。
 """
 
 from pydantic import model_validator
@@ -14,23 +16,11 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 
 
 class PlanSettings(BaseSettings):
-    """13 个 `plan_*` Flag + 14 个参数（默认值即 architecture.md §7.10 两张表）。"""
+    """2 个 `plan_*` 策略位 + 14 个参数（默认值即 architecture.md §7.10 两张表）。"""
 
     model_config = DOMAIN_MODEL_CONFIG
 
-    planning_enabled: bool = False
-    plan_context_enabled: bool = False
-    plan_step_binding_enabled: bool = False
-    plan_scheduler_enabled: bool = False
-    plan_execution_enabled: bool = False
-    plan_observation_enabled: bool = False
-    plan_revision_enabled: bool = False
-    plan_memory_enabled: bool = False
-    plan_reflection_enabled: bool = False
-    plan_world_feedback_enabled: bool = False
-    plan_autonomy_enabled: bool = False
     plan_tool_required: bool = True
-    plan_debug_enabled: bool = False
 
     plan_max_steps: int = 5
     plan_max_depth: int = 2
