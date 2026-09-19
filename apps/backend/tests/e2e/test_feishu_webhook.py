@@ -20,6 +20,7 @@ APP_SETTINGS = {
     "feishu_app_id": "cli_e2e",
     "feishu_app_secret": "secret-e2e-value",
     "feishu_verification_token": VERIFICATION_TOKEN,
+    "feishu_encrypt_key": "",
 }
 
 FIXED_IV = bytes(range(16))
@@ -373,7 +374,6 @@ async def test_rate_limit_per_open_id(override_settings, dispatch_spy):
 
 @pytest.mark.asyncio
 async def test_no_secrets_in_rejection_logs(override_settings, dispatch_spy, caplog):
-    override_settings(**APP_SETTINGS, feishu_encrypt_key=ENCRYPT_KEY)
     payload = {"encrypt": "definitely-not-valid-base64!!!"}
     body = serialize(payload)
     with caplog.at_level(logging.INFO):
