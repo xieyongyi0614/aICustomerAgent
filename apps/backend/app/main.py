@@ -11,7 +11,6 @@ from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core.settings import get_settings, unknown_versioned_env_keys
-from app.core.settings.enablement import validate_enablement_chain
 from app.services import memory_service, proactive_delivery
 from app.services.tool import channel_tools
 from app.services.tool.ext_api import get_manifest_loader
@@ -43,7 +42,6 @@ async def lifespan(application: FastAPI):
     global _reclaim_task, _observability_cleanup_task
     global _job_worker_task
     global _life_loop_task, _agent_evolution_task
-    validate_enablement_chain(get_settings())
     for unknown_key in unknown_versioned_env_keys():
         logging.getLogger(__name__).warning(
             "环境变量 %s 不对应任何 settings 字段，已被静默忽略（字段是否已改名？）",
