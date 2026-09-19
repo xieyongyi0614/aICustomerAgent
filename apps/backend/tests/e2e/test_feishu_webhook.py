@@ -223,6 +223,20 @@ async def test_encrypted_challenge_end_to_end(override_settings, dispatch_spy):
 
 
 @pytest.mark.asyncio
+async def test_encrypted_challenge_without_signature_headers_200(override_settings, dispatch_spy):
+    """URL 校验请求可能不带签名头：解密成功即验真，challenge 照常回显。"""
+    inner = {"type": "url_verification", "token": VERIFICATION_TOKEN, "challenge": "enc-ch-2"}
+    payload = {"encrypt": encrypt_payload(ENCRYPT_KEY, inner)}
+    body = serialize(payload)
+    response = await post_event(
+        override_settings, raw=body, feishu_encrypt_key=ENCRYPT_KEY
+    )
+    assert response.status_code == 200
+    assert response.json() == {"challenge": "enc-ch-2"}
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
 async def test_unencrypted_event_end_to_end(override_settings, dispatch_spy):
     payload = event_payload(event_id="evt-plain-1")
     body = serialize(payload)

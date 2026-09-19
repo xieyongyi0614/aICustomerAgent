@@ -36,25 +36,32 @@ async def feishu_events(request: Request) -> JSONResponse:
         except FeishuAuthError:
             logger.warning("feishu webhook rejected: verification token mismatch")
             return _reject(401, "verification token mismatch")
-    try:
-        events.verify_signature(
-            raw,
-            request.headers.get("x-lark-request-timestamp"),
-            request.headers.get("x-lark-request-nonce"),
-            settings.feishu_encrypt_key,
-            request.headers.get("x-lark-signature"),
-        )
-    except FeishuAuthError:
-        logger.warning("feishu webhook rejected: signature or timestamp invalid")
-        return _reject(403, "signature verification failed")
 
-    decrypted = False
-    if "encrypt" in payload:
+    encrypted = isinstance(payload.get("encrypt"), str)
+    signature = request.headers.get("x-lark-signature")
+    if not encrypted or signature:
+        # 加密体且未带签名头时跳过验签：解密成功即验真（只有持 Encrypt Key 的一方
+        # 能产出可解密密文），URL 校验请求可能不带签名头；其余情况严格验签。
+        try:
+            events.verify_signature(
+                raw,
+                request.headers.get("x-lark-request-timestamp"),
+                request.headers.get("x-lark-request-nonce"),
+                settings.feishu_encrypt_key,
+                signature,
+            )
+        except FeishuAuthError as exc:
+            logger.warning("feishu webhook rejected: %s", exc)
+            return _reject(403, "signature verification failed")
+
+    if encrypted:
         try:
             payload = events.decrypt(settings.feishu_encrypt_key, payload["encrypt"])
-            decrypted = True
         except FeishuConfigError:
-            logger.error("feishu webhook decrypt failed: raw_len=%d", len(raw))
+            logger.error(
+                "feishu webhook decrypt failed（Encrypt Key 与控制台不一致？）: raw_len=%d",
+                len(raw),
+            )
             return _reject(400, "event decrypt failed")
 
     inner_token = _verification_token(payload)
@@ -64,7 +71,7 @@ async def feishu_events(request: Request) -> JSONResponse:
         except FeishuAuthError:
             logger.warning("feishu webhook rejected: verification token mismatch")
             return _reject(401, "verification token mismatch")
-    elif not decrypted:
+    elif not encrypted:
         logger.warning("feishu webhook rejected: verification token missing")
         return _reject(401, "verification token missing")
 
@@ -74,7 +81,7 @@ async def feishu_events(request: Request) -> JSONResponse:
             return _reject(400, "challenge field missing")
         return JSONResponse(content={"challenge": challenge})
 
-    if not decrypted and not isinstance(payload.get("header"), dict):
+    if not encrypted and not isinstance(payload.get("header"), dict):
         return _reject(400, "event header missing")
 
     parsed = events.parse_message_event(payload)
