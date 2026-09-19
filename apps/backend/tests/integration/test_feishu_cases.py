@@ -252,7 +252,7 @@ async def test_case_stream_incomplete_sends_partial(db_session_factory, monkeypa
 
 @pytest.mark.asyncio
 async def test_case_overload_then_recovery(db_session_factory, monkeypatch, override_settings):
-    override_settings(feishu_session_queue_limit=1)
+    override_settings(feishu_merge_window_ms=0, feishu_session_queue_limit=1)
     release = asyncio.Event()
     started = []
 
@@ -284,19 +284,22 @@ async def test_case_overload_then_recovery(db_session_factory, monkeypatch, over
             reply_ref=f"om_{open_id}_{text}",
             metadata={},
         )
-        return await adapter.handle_inbound_message(inbound)
+        await adapter.ingest_inbound_message(inbound)
 
-    first = asyncio.create_task(_dispatch("m1", "ou_case_q"))
+    await _dispatch("m1", "ou_case_q")
     await asyncio.sleep(0.03)
-    second = asyncio.create_task(_dispatch("m2", "ou_case_q"))
-    overloaded = await second
-    assert overloaded.error_kind == "overloaded"
+    await _dispatch("m2", "ou_case_q")
+    await asyncio.sleep(0.03)
+
+    assert delivered == [adapter.FALLBACK_TEXTS["overloaded"]]
     assert started == ["m1"]
+
     release.set()
-    first_outcome = await first
-    assert first_outcome.error_kind is None
-    recovered = await _dispatch("m3", "ou_case_q")
-    assert recovered.error_kind is None
-    assert recovered.outbound_text == "m3"
+    await asyncio.sleep(0.05)
+    await _dispatch("m3", "ou_case_q")
+    await asyncio.sleep(0.05)
+
+    assert delivered == [adapter.FALLBACK_TEXTS["overloaded"], "m1", "m3"]
+    assert started == ["m1", "m3"]
     assert delivered[0] == "你发得太快了，我一条条慢慢回你～"
     assert delivered[1:] == ["m1", "m3"]

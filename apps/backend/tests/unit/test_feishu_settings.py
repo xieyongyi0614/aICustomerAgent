@@ -35,6 +35,10 @@ EXPECTED_DEFAULTS = {
     "feishu_signature_window_seconds": 300,
     "feishu_max_concurrent_turns": 4,
     "feishu_session_queue_limit": 5,
+    "feishu_max_body_bytes": 262144,
+    "feishu_merge_window_ms": 800,
+    "feishu_merge_max_messages": 10,
+    "feishu_merge_max_chars": 20000,
     "feishu_http_max_attempts": 3,
     "feishu_http_backoff_seconds": 0.5,
     "feishu_http_backoff_max_seconds": 8.0,
@@ -55,6 +59,10 @@ ENV_OVERRIDES = {
     "FEISHU_SIGNATURE_WINDOW_SECONDS": "30",
     "FEISHU_MAX_CONCURRENT_TURNS": "2",
     "FEISHU_SESSION_QUEUE_LIMIT": "7",
+    "FEISHU_MAX_BODY_BYTES": "1024",
+    "FEISHU_MERGE_WINDOW_MS": "0",
+    "FEISHU_MERGE_MAX_MESSAGES": "3",
+    "FEISHU_MERGE_MAX_CHARS": "500",
     "FEISHU_HTTP_MAX_ATTEMPTS": "5",
     "FEISHU_HTTP_BACKOFF_SECONDS": "0.1",
     "FEISHU_HTTP_BACKOFF_MAX_SECONDS": "1.0",
@@ -75,6 +83,10 @@ FIELD_TO_ENV = {
     "feishu_signature_window_seconds": "FEISHU_SIGNATURE_WINDOW_SECONDS",
     "feishu_max_concurrent_turns": "FEISHU_MAX_CONCURRENT_TURNS",
     "feishu_session_queue_limit": "FEISHU_SESSION_QUEUE_LIMIT",
+    "feishu_max_body_bytes": "FEISHU_MAX_BODY_BYTES",
+    "feishu_merge_window_ms": "FEISHU_MERGE_WINDOW_MS",
+    "feishu_merge_max_messages": "FEISHU_MERGE_MAX_MESSAGES",
+    "feishu_merge_max_chars": "FEISHU_MERGE_MAX_CHARS",
     "feishu_http_max_attempts": "FEISHU_HTTP_MAX_ATTEMPTS",
     "feishu_http_backoff_seconds": "FEISHU_HTTP_BACKOFF_SECONDS",
     "feishu_http_backoff_max_seconds": "FEISHU_HTTP_BACKOFF_MAX_SECONDS",
@@ -87,7 +99,7 @@ def test_feishu_defaults():
         assert getattr(settings, field_name) == expected, field_name
 
 
-def test_feishu_env_overrides_all_17_keys(monkeypatch):
+def test_feishu_env_overrides_all_21_keys(monkeypatch):
     for env_name, value in ENV_OVERRIDES.items():
         monkeypatch.setenv(env_name, value)
     settings = FeishuSettings()
@@ -101,6 +113,10 @@ def test_feishu_env_overrides_all_17_keys(monkeypatch):
     assert settings.feishu_signature_window_seconds == 30
     assert settings.feishu_max_concurrent_turns == 2
     assert settings.feishu_session_queue_limit == 7
+    assert settings.feishu_max_body_bytes == 1024
+    assert settings.feishu_merge_window_ms == 0
+    assert settings.feishu_merge_max_messages == 3
+    assert settings.feishu_merge_max_chars == 500
     assert settings.feishu_http_max_attempts == 5
     assert settings.feishu_http_backoff_seconds == 0.1
     assert settings.feishu_http_backoff_max_seconds == 1.0
@@ -148,10 +164,16 @@ def test_feishu_timeout_positive(seconds):
         FeishuSettings(feishu_timeout_seconds=float(seconds))
 
 
-@pytest.mark.parametrize("field_name", ["feishu_max_reply_chars", "feishu_dedupe_ttl_seconds", "feishu_signature_window_seconds", "feishu_max_concurrent_turns", "feishu_session_queue_limit"])
+@pytest.mark.parametrize("field_name", ["feishu_max_reply_chars", "feishu_dedupe_ttl_seconds", "feishu_signature_window_seconds", "feishu_max_concurrent_turns", "feishu_session_queue_limit", "feishu_max_body_bytes", "feishu_merge_max_messages", "feishu_merge_max_chars"])
 def test_feishu_positive_int_fields(field_name):
     with pytest.raises(SettingsError):
         FeishuSettings(**{field_name: 0})
+
+
+def test_feishu_merge_window_allows_zero_and_rejects_negative():
+    assert FeishuSettings(feishu_merge_window_ms=0).feishu_merge_window_ms == 0
+    with pytest.raises(SettingsError):
+        FeishuSettings(feishu_merge_window_ms=-1)
 
 
 def test_feishu_http_retry_bounds():

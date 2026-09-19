@@ -18,6 +18,9 @@ _POSITIVE_INT_FIELDS = (
     "feishu_signature_window_seconds",
     "feishu_max_concurrent_turns",
     "feishu_session_queue_limit",
+    "feishu_max_body_bytes",
+    "feishu_merge_max_messages",
+    "feishu_merge_max_chars",
 )
 
 _REQUIRED_CREDENTIALS = (
@@ -44,6 +47,10 @@ class FeishuSettings(BaseSettings):
     feishu_signature_window_seconds: int = 300
     feishu_max_concurrent_turns: int = 4
     feishu_session_queue_limit: int = 5
+    feishu_max_body_bytes: int = 262144
+    feishu_merge_window_ms: int = 800
+    feishu_merge_max_messages: int = 10
+    feishu_merge_max_chars: int = 20000
     feishu_http_max_attempts: int = 3
     feishu_http_backoff_seconds: float = 0.5
     feishu_http_backoff_max_seconds: float = 8.0
@@ -57,6 +64,8 @@ class FeishuSettings(BaseSettings):
         for field_name in _POSITIVE_INT_FIELDS:
             if getattr(self, field_name) <= 0:
                 raise SettingsError(f"{field_name.upper()} 必须大于 0")
+        if self.feishu_merge_window_ms < 0:
+            raise SettingsError("FEISHU_MERGE_WINDOW_MS 必须 >= 0（0 表示关闭连发合并）")
         if self.feishu_http_max_attempts < 1:
             raise SettingsError("FEISHU_HTTP_MAX_ATTEMPTS 必须 >= 1")
         if self.feishu_http_backoff_seconds < 0:

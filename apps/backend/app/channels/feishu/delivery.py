@@ -7,6 +7,7 @@ API。所有入口**永不抛异常**；零 DB 访问；不 import 任何 Autono
 import logging
 import threading
 import time
+from collections import OrderedDict
 
 from app.channels.base import (
     ChannelAdapter,
@@ -23,7 +24,8 @@ from app.services import channel_identity_service
 
 logger = logging.getLogger(__name__)
 
-_delivered: dict[str, float] = {}
+# 插入序即时间序：过期项从头部批量摘除（O(过期数)），避免每次调用全表扫描。
+_delivered: OrderedDict[str, float] = OrderedDict()
 _delivered_lock = threading.Lock()
 
 
@@ -163,9 +165,11 @@ def _already_delivered(key: str) -> bool:
     ttl = get_settings().feishu_dedupe_ttl_seconds
     now = time.time()
     with _delivered_lock:
-        expired = [k for k, seen_at in _delivered.items() if now - seen_at > ttl]
-        for k in expired:
-            del _delivered[k]
+        while _delivered:
+            oldest = next(iter(_delivered))
+            if now - _delivered[oldest] <= ttl:
+                break
+            del _delivered[oldest]
         return key in _delivered
 
 

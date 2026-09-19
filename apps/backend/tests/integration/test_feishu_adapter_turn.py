@@ -128,7 +128,7 @@ async def test_user_b_not_blocked_by_user_a(db_session_factory, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_session_queue_limit_rejects_latest(db_session_factory, monkeypatch, override_settings):
-    override_settings(feishu_session_queue_limit=2)
+    override_settings(feishu_merge_window_ms=0, feishu_session_queue_limit=1)
     started_calls = []
     release = asyncio.Event()
 
@@ -139,24 +139,36 @@ async def test_session_queue_limit_rejects_latest(db_session_factory, monkeypatc
         yield {"kind": "done", "turn_id": content}
 
     monkeypatch.setattr(agent_service, "stream_chat", _stream)
-    first = asyncio.create_task(adapter.handle_inbound_message(_inbound("m1", "ou_q")))
-    await asyncio.sleep(0.03)
-    second = asyncio.create_task(adapter.handle_inbound_message(_inbound("m2", "ou_q")))
-    await asyncio.sleep(0.03)
-    third = asyncio.create_task(adapter.handle_inbound_message(_inbound("m3", "ou_q")))
-    overloaded = await third
-    assert overloaded.error_kind == "overloaded"
-    assert overloaded.outbound_text == FALLBACK_TEXTS["overloaded"]
-    assert started_calls == ["m1"]
-    release.set()
-    first_outcome = await first
-    second_outcome = await second
-    assert first_outcome.outbound_text == "m1"
-    assert second_outcome.outbound_text == "m2"
+    delivered = []
 
-    recovered = await adapter.handle_inbound_message(_inbound("m4", "ou_q"))
-    assert recovered.error_kind is None
-    assert recovered.outbound_text == "m4"
+    async def _record(outcome):
+        delivered.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
+
+    await adapter.ingest_inbound_message(_inbound("m1", "ou_q"))
+    await asyncio.sleep(0.05)
+    await adapter.ingest_inbound_message(_inbound("m2", "ou_q"))
+
+    assert [outcome.error_kind for outcome in delivered] == ["overloaded"]
+    assert delivered[0].outbound_text == FALLBACK_TEXTS["overloaded"]
+    assert started_calls == ["m1"]
+
+    release.set()
+    await asyncio.sleep(0.05)
+    assert [outcome.outbound_text for outcome in delivered] == [
+        FALLBACK_TEXTS["overloaded"],
+        "m1",
+    ]
+
+    await adapter.ingest_inbound_message(_inbound("m3", "ou_q"))
+    await asyncio.sleep(0.05)
+    assert [outcome.outbound_text for outcome in delivered] == [
+        FALLBACK_TEXTS["overloaded"],
+        "m1",
+        "m3",
+    ]
+    assert started_calls == ["m1", "m3"]
 
 
 @pytest.mark.asyncio
@@ -172,11 +184,11 @@ async def test_slot_released_after_pipeline_exception(db_session_factory, monkey
     monkeypatch.setattr(agent_service, "stream_chat", _broken)
     failed = await adapter.handle_inbound_message(_inbound("hi", "ou_rec"))
     assert failed.error_kind == "pipeline_error"
-    assert adapter._session_load.get("feishu:ou_rec") in (None, 0)
     monkeypatch.setattr(agent_service, "stream_chat", _healthy)
     recovered = await adapter.handle_inbound_message(_inbound("hi again", "ou_rec"))
     assert recovered.outbound_text == "恢复"
-    assert adapter._session_load.get("feishu:ou_rec") in (None, 0)
+    assert adapter._session_locks == {}
+    assert adapter._session_refs == {}
 
 
 @pytest.mark.asyncio

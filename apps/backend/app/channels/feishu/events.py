@@ -14,7 +14,7 @@ import json
 import logging
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -31,12 +31,15 @@ MESSAGE_EVENT_TYPE = "im.message.receive_v1"
 CHALLENGE_TYPE = "url_verification"
 RATE_WINDOW_SECONDS = 60.0
 AES_BLOCK_SIZE = 16
+RATE_SWEEP_EVERY = 256
 
 _now = time.time
-_seen_events: dict[str, float] = {}
+# 插入序即时间序：过期项从头部批量摘除，避免每次调用全表扫描（O(过期数) 而非 O(N)）。
+_seen_events: OrderedDict[str, float] = OrderedDict()
 _seen_lock = threading.Lock()
 _rate_windows: dict[str, deque[float]] = {}
 _rate_lock = threading.Lock()
+_rate_ops = 0
 
 
 def decrypt_bytes(encrypt_key: str, ciphertext_b64: str) -> bytes:
@@ -92,14 +95,61 @@ def verify_signature(
         return
     if not signature:
         raise FeishuAuthError("verify_signature", detail="signature header missing")
-    timestamp_value = _timestamp_value(timestamp)
-    if timestamp_value is None:
-        raise FeishuAuthError("verify_signature", detail="request timestamp invalid")
-    if abs(_now() - timestamp_value) > get_settings().feishu_signature_window_seconds:
-        raise FeishuAuthError("verify_signature", detail="request timestamp out of window")
+    verify_timestamp_freshness(timestamp)
     expected = calculate_signature(timestamp or "", nonce or "", encrypt_key, raw)
     if not hmac.compare_digest(expected.encode("utf-8"), signature.encode("utf-8")):
         raise FeishuAuthError("verify_signature", detail="signature mismatch")
+
+
+def verify_timestamp_freshness(timestamp: str | None) -> None:
+    """请求时间戳新鲜度（防重放）。与签名校验解耦：无签名头时也须独立调用。"""
+    timestamp_value = _timestamp_value(timestamp)
+    if timestamp_value is None:
+        raise FeishuAuthError("verify_timestamp", detail="request timestamp invalid")
+    _assert_within_window(timestamp_value, "request timestamp out of window")
+
+
+def verify_event_freshness(payload: dict) -> bool:
+    """回落用事件自带的 `header.create_time`（毫秒）证明新鲜度。
+
+    加密体不带签名头时，请求头时间戳未必存在；而消息事件必然携带 create_time，
+    故以它作为第二道防重放信号。返回是否找到了可校验的信号（无信号时调用方决定
+    是否放行——URL 校验等无 create_time 的来件不应被误杀）。
+    """
+    header = payload.get("header")
+    if not isinstance(header, dict):
+        return False
+    value = _timestamp_value_ms(_optional_str(header.get("create_time")))
+    if value is None:
+        return False
+    _assert_within_window(value, "event create_time out of window")
+    return True
+
+
+def verify_encrypted_freshness(timestamp: str | None, payload: dict) -> None:
+    """加密体无签名头时的防重放闸门：优先请求头时间戳，回落事件 `create_time`。
+
+    两者都不可得（如 URL 校验来件）时放行并记 warning——此时唯一残余保护是
+    事件去重表，故不得把该情形当作"已校验"。
+    """
+    if timestamp:
+        verify_timestamp_freshness(timestamp)
+        return
+    if verify_event_freshness(payload):
+        return
+    logger.warning(
+        "feishu encrypted request freshness unverifiable: no timestamp header, no create_time"
+    )
+
+
+def _assert_within_window(value: float, detail: str) -> None:
+    if abs(_now() - value) > get_settings().feishu_signature_window_seconds:
+        raise FeishuAuthError("verify_timestamp", detail=detail)
+
+
+def _timestamp_value_ms(timestamp: str | None) -> float | None:
+    seconds = _timestamp_value(timestamp)
+    return None if seconds is None else seconds / 1000.0
 
 
 def calculate_signature(timestamp: str, nonce: str, encrypt_key: str, raw: bytes) -> str:
@@ -130,7 +180,6 @@ def challenge_of(payload: dict) -> str | None:
 @dataclass(frozen=True, slots=True)
 class ParsedMessageEvent:
     event_id: str
-    event_type: str
     message_id: str
     chat_id: str
     chat_type: str
@@ -139,7 +188,6 @@ class ParsedMessageEvent:
     open_id: str
     create_time_ms: str | None = None
     tenant_key: str | None = None
-    app_id: str | None = None
     union_id: str | None = None
     user_id: str | None = None
 
@@ -194,7 +242,6 @@ def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
         return None
     return ParsedMessageEvent(
         event_id=event_id,
-        event_type=event_type,
         message_id=message_id,
         chat_id=chat_id,
         chat_type=chat_type,
@@ -203,7 +250,6 @@ def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
         open_id=open_id,
         create_time_ms=_optional_str(header.get("create_time")),
         tenant_key=_optional_str(header.get("tenant_key")),
-        app_id=_optional_str(header.get("app_id")),
         union_id=_optional_str(sender_id.get("union_id")),
         user_id=_optional_str(sender_id.get("user_id")),
     )
@@ -264,9 +310,11 @@ def accept_event(event_id: str) -> bool:
     ttl = get_settings().feishu_dedupe_ttl_seconds
     now = _now()
     with _seen_lock:
-        expired = [key for key, seen_at in _seen_events.items() if now - seen_at > ttl]
-        for key in expired:
-            del _seen_events[key]
+        while _seen_events:
+            oldest = next(iter(_seen_events))
+            if now - _seen_events[oldest] <= ttl:
+                break
+            del _seen_events[oldest]
         if event_id in _seen_events:
             return False
         _seen_events[event_id] = now
@@ -274,12 +322,19 @@ def accept_event(event_id: str) -> bool:
 
 
 def allow_rate(open_id: str) -> bool:
+    global _rate_ops
     limit = get_settings().chat_rate_limit_per_minute
     if limit <= 0:
         return True
     now = _now()
     with _rate_lock:
-        window = _rate_windows.setdefault(open_id, deque())
+        _rate_ops += 1
+        if _rate_ops % RATE_SWEEP_EVERY == 0:
+            _sweep_rate_windows(now)
+        window = _rate_windows.get(open_id)
+        if window is None:
+            window = deque()
+            _rate_windows[open_id] = window
         while window and now - window[0] > RATE_WINDOW_SECONDS:
             window.popleft()
         if len(window) >= limit:
@@ -288,10 +343,21 @@ def allow_rate(open_id: str) -> bool:
         return True
 
 
+def _sweep_rate_windows(now: float) -> None:
+    """摊还清理：已过窗的 open_id 条目连同空 deque 一并回收，避免 key 永久驻留。"""
+    for open_id in list(_rate_windows):
+        window = _rate_windows[open_id]
+        while window and now - window[0] > RATE_WINDOW_SECONDS:
+            window.popleft()
+        if not window:
+            del _rate_windows[open_id]
+
+
 def reset_event_state() -> None:
-    global _now
+    global _now, _rate_ops
     with _seen_lock:
         _seen_events.clear()
     with _rate_lock:
         _rate_windows.clear()
+        _rate_ops = 0
     _now = time.time

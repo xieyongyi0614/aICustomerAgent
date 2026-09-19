@@ -288,19 +288,42 @@ async def test_row11_duplicate_delivery_not_doubled(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_row12_overload_rejects_latest_and_recovers(monkeypatch):
-    adapter._session_load["feishu:ou_over"] = 99
-    stream = _mount_stream(
-        monkeypatch,
-        events_seq=[{"kind": "token", "text": "x"}, {"kind": "done", "turn_id": "t"}],
-    )
-    outcome = await adapter.handle_inbound_message(_inbound(open_id="ou_over"))
-    assert outcome.error_kind == "overloaded"
-    assert outcome.outbound_text == FALLBACK_TEXTS["overloaded"]
-    assert stream.calls == []
-    adapter._session_load.clear()
-    outcome = await adapter.handle_inbound_message(_inbound(open_id="ou_over"))
-    assert outcome.error_kind is None
+async def test_row12_overload_rejects_latest_and_recovers(monkeypatch, override_settings):
+    import asyncio
+
+    override_settings(feishu_merge_window_ms=0, feishu_session_queue_limit=1)
+    release = asyncio.Event()
+    calls = []
+
+    async def _blocking(session_id, user_id, content, llm=None, trace=None):
+        calls.append(content)
+        await release.wait()
+        yield {"kind": "token", "text": "x"}
+        yield {"kind": "done", "turn_id": "t"}
+
+    monkeypatch.setattr(adapter.agent_service, "stream_chat", _blocking)
+    delivered = []
+
+    async def _record(outcome):
+        delivered.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
+
+    await adapter.ingest_inbound_message(_inbound())
+    await asyncio.sleep(0.05)
+    await adapter.ingest_inbound_message(_inbound())
+
+    assert [outcome.error_kind for outcome in delivered] == ["overloaded"]
+    assert delivered[0].outbound_text == FALLBACK_TEXTS["overloaded"]
+    assert calls == ["你好"]
+
+    release.set()
+    await asyncio.sleep(0.05)
+    await adapter.ingest_inbound_message(_inbound())
+    await asyncio.sleep(0.05)
+
+    assert [outcome.error_kind for outcome in delivered] == ["overloaded", None, None]
+    assert calls == ["你好", "你好"]
 
 
 def test_row13_inbound_rate_limit_window(override_settings):

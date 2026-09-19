@@ -35,6 +35,19 @@ def _reset_feishu_state():
     adapter.reset_feishu_adapter()
 
 
+@pytest.fixture(autouse=True)
+def _reenable_app_loggers():
+    """防御 `logging.config.fileConfig(disable_existing_loggers=True)` 的跨用例副作用。
+
+    套件内存在进程内执行 alembic 迁移的用例（其 env.py 调用 fileConfig），会把
+    已存在的 app.* logger 置为 disabled，导致其后所有日志断言用例捕获为空。
+    """
+    for name, logger in list(logging.Logger.manager.loggerDict.items()):
+        if (name == "app" or name.startswith("app.")) and isinstance(logger, logging.Logger):
+            logger.disabled = False
+    yield
+
+
 def encrypt_payload(key: str, payload: dict) -> str:
     plain = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     pad = 16 - len(plain) % 16
@@ -89,7 +102,7 @@ def dispatch_spy(monkeypatch):
     async def _spy(inbound):
         calls.append(inbound)
 
-    monkeypatch.setattr(adapter, "handle_inbound_message", _spy)
+    monkeypatch.setattr(adapter, "ingest_inbound_message", _spy)
     return calls
 
 
@@ -344,7 +357,7 @@ async def test_ack_not_blocked_by_slow_handler(override_settings, monkeypatch):
 
         await asyncio.sleep(3.0)
 
-    monkeypatch.setattr(adapter, "handle_inbound_message", _slow_handler)
+    monkeypatch.setattr(adapter, "ingest_inbound_message", _slow_handler)
     started = time.perf_counter()
     response = await post_event(override_settings, payload=event_payload(event_id="evt-slow"))
     elapsed = time.perf_counter() - started
@@ -384,3 +397,105 @@ async def test_no_secrets_in_rejection_logs(override_settings, dispatch_spy, cap
     text = caplog.text + response.text
     for secret in (ENCRYPT_KEY, APP_SETTINGS["feishu_app_secret"], VERIFICATION_TOKEN):
         assert secret not in text
+
+
+def _fresh_create_time_ms() -> str:
+    return str(int(time.time() * 1000))
+
+
+def _encrypted_body(inner: dict) -> bytes:
+    return serialize({"encrypt": encrypt_payload(ENCRYPT_KEY, inner)})
+
+
+@pytest.mark.asyncio
+async def test_encrypted_event_without_signature_uses_create_time_freshness(
+    override_settings, dispatch_spy
+):
+    """无签名头的加密来件：create_time 新鲜 → 正常受理（修复重放不得误杀正常投递）。"""
+    inner = event_payload(event_id="evt-nosig-fresh")
+    inner["header"]["create_time"] = _fresh_create_time_ms()
+    response = await post_event(
+        override_settings, raw=_encrypted_body(inner), feishu_encrypt_key=ENCRYPT_KEY
+    )
+    assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert dispatch_spy[0].text == "你好"
+
+
+@pytest.mark.asyncio
+async def test_encrypted_replay_with_stale_create_time_403(override_settings, dispatch_spy):
+    """F-01：捕获的密文在去重 TTL 之后重放，必须被 create_time 新鲜度拦下。"""
+    inner = event_payload(event_id="evt-replay")
+    inner["header"]["create_time"] = str(int((time.time() - 3600) * 1000))
+    response = await post_event(
+        override_settings, raw=_encrypted_body(inner), feishu_encrypt_key=ENCRYPT_KEY
+    )
+    assert response.status_code == 403
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_encrypted_stale_timestamp_header_403(override_settings, dispatch_spy):
+    inner = event_payload(event_id="evt-stale-hdr")
+    inner["header"]["create_time"] = _fresh_create_time_ms()
+    response = await post_event(
+        override_settings,
+        raw=_encrypted_body(inner),
+        headers={"X-Lark-Request-Timestamp": str(int(time.time()) - 3600)},
+        feishu_encrypt_key=ENCRYPT_KEY,
+    )
+    assert response.status_code == 403
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_body_over_limit_413(override_settings, dispatch_spy):
+    response = await post_event(
+        override_settings,
+        raw=serialize(event_payload(event_id="evt-big")),
+        feishu_max_body_bytes=16,
+    )
+    assert response.status_code == 413
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_duplicate_event_does_not_consume_rate_quota(override_settings, dispatch_spy):
+    """F-03：去重前置后，飞书重投的重复事件不再吃掉该用户的限流配额。
+
+    限流阈值设为 3：修复前「重复事件也记账」会累计 4 次调用而使最后一个 429。
+    """
+    payload = event_payload(event_id="evt-quota-0")
+    for _ in range(2):
+        response = await post_event(
+            override_settings, payload=payload, chat_rate_limit_per_minute=3
+        )
+        assert response.status_code == 200
+    for index in (1, 2):
+        response = await post_event(
+            override_settings,
+            payload=event_payload(event_id=f"evt-quota-{index}"),
+            chat_rate_limit_per_minute=3,
+        )
+        assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 3)
+    assert len(dispatch_spy) == 3
+
+
+@pytest.mark.asyncio
+async def test_dispatch_failure_is_logged_not_silent(override_settings, monkeypatch, caplog):
+    """F-06：无可调度 loop 时协程被关闭，必须留痕而不是静默吞掉用户消息。"""
+
+    def _refuse(coro):
+        coro.close()
+        return False
+
+    monkeypatch.setattr(feishu_api.observability, "spawn_background", _refuse)
+    with caplog.at_level(logging.ERROR, logger="app.api.v1.feishu"):
+        response = await post_event(
+            override_settings, payload=event_payload(event_id="evt-noloop")
+        )
+    assert response.status_code == 200
+    assert any(
+        "no dispatchable event loop" in record.getMessage() for record in caplog.records
+    )

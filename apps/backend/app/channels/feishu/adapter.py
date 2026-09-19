@@ -1,8 +1,12 @@
-"""飞书入站编排：身份 → 会话串行 → LLM → 既有管线 → TurnOutcome（FEISHU-004）。
+"""飞书入站编排：收件箱（合并/排队）→ 身份 → 会话串行 → LLM → 既有管线 → TurnOutcome（FEISHU-004）。
 
 管线是唯一对话逻辑（零上下文构建/零落库/零后处理）；本模块只做
 "取身份 / 排队 / 取 LLM / 消费事件流 / 组装回复"。出站发送由 FEISHU-005
 消费 TurnOutcome（经通道无关 OutboundMessage 契约），不在本模块。
+
+顺序与背压：顺序由 `inbox.SessionInbox` 的 per-session FIFO 批次链显式保证；
+背压由 `feishu_session_queue_limit`（排队批次数上限）与
+`feishu_max_concurrent_turns`（进程内全局并发闸门）共同承担。
 """
 
 import asyncio
@@ -15,6 +19,7 @@ import openai
 from app.channels.base import InboundMessage
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
+from app.channels.feishu.inbox import SessionInbox
 from app.core import llm_factory
 from app.core.settings import get_settings
 from app.services import agent_service, channel_identity_service, trace_collector
@@ -22,11 +27,13 @@ from app.services.agent_service import EmptyLLMResponseError
 
 logger = logging.getLogger(__name__)
 
+_INTERNAL_ERROR_TEXT = "我这边出了点小问题，稍后再试。"
+
 FALLBACK_TEXTS: dict[str, str] = {
     "llm_error": "我这会儿有点走神，等下再说好不好？",
     "empty_response": "我一下子不知道说什么好…你再说一次？",
-    "pipeline_error": "我这边出了点小问题，稍后再试。",
-    "identity_error": "我这边出了点小问题，稍后再试。",
+    "pipeline_error": _INTERNAL_ERROR_TEXT,
+    "identity_error": _INTERNAL_ERROR_TEXT,
     "overloaded": "你发得太快了，我一条条慢慢回你～",
 }
 
@@ -43,20 +50,48 @@ class TurnOutcome:
 
 
 _session_locks: dict[str, asyncio.Lock] = {}
-_session_load: dict[str, int] = {}
+_session_refs: dict[str, int] = {}
+_turn_semaphore: asyncio.Semaphore | None = None
+_inbox: SessionInbox | None = None
 
 
 def reset_feishu_adapter() -> None:
+    global _turn_semaphore
     _session_locks.clear()
-    _session_load.clear()
+    _session_refs.clear()
+    _turn_semaphore = None
+    if _inbox is not None:
+        _inbox.reset()
     trace_collector.reset_trace_collector()
 
 
+async def ingest_inbound_message(inbound: InboundMessage) -> None:
+    """Webhook 派发入口：进收件箱合并/排队；队列已满则回兜底文案（FEISHU-007）。"""
+    if _get_inbox().offer(inbound):
+        return
+    await _deliver_outcome(
+        _outcome(
+            inbound,
+            session_id="",
+            user_id="",
+            outbound_text=FALLBACK_TEXTS["overloaded"],
+            error_kind="overloaded",
+        )
+    )
+
+
 async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
+    """处理一个批次：同会话严格串行（锁在首个 await 之前取得，保证到达顺序）。"""
     started = time.perf_counter()
     trace = _begin_trace()
+    return await _serialized(
+        inbound.external_user_id, lambda: _run_inbound(inbound, trace, started)
+    )
+
+
+async def _run_inbound(inbound: InboundMessage, trace, started: float) -> TurnOutcome:
     try:
-        resolved = _resolve_identity(inbound, trace)
+        resolved = await asyncio.to_thread(_resolve_identity, inbound, trace)
     except Exception:
         return _outcome(
             inbound,
@@ -66,7 +101,8 @@ async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
             error_kind="identity_error",
         )
     try:
-        outcome = await _process_turn(resolved, inbound, trace, started)
+        async with _get_turn_gate():
+            outcome = await _run_turn(resolved, inbound, trace, started)
     except Exception:
         logger.exception("feishu inbound handling failed")
         if trace is not None:
@@ -85,6 +121,22 @@ async def handle_inbound_message(inbound: InboundMessage) -> TurnOutcome:
         )
     await _deliver_outcome(outcome)
     return outcome
+
+
+async def _serialized(key: str, runner):
+    """按 key 串行执行；空闲且无人等待时回收锁，避免每见一个用户就永久留一个对象。"""
+    lock = _session_locks.setdefault(key, asyncio.Lock())
+    _session_refs[key] = _session_refs.get(key, 0) + 1
+    try:
+        async with lock:
+            return await runner()
+    finally:
+        remaining = _session_refs.get(key, 1) - 1
+        if remaining <= 0:
+            _session_refs.pop(key, None)
+            _session_locks.pop(key, None)
+        else:
+            _session_refs[key] = remaining
 
 
 async def _deliver_outcome(outcome: TurnOutcome) -> None:
@@ -142,29 +194,6 @@ def _resolve_identity(inbound: InboundMessage, trace):
         if trace is not None:
             trace.record("feishu_dispatch", 0.0, status="error", error=type(exc).__name__)
         raise
-
-
-async def _process_turn(resolved, inbound: InboundMessage, trace, started: float) -> TurnOutcome:
-    session_id = resolved.session_id
-    if not _try_acquire_slot(session_id):
-        logger.warning(
-            "feishu session overloaded: session_id=%s load=%d",
-            session_id,
-            _session_load.get(session_id, 0),
-        )
-        return _outcome(
-            inbound,
-            session_id=session_id,
-            user_id=resolved.internal_user_id,
-            outbound_text=FALLBACK_TEXTS["overloaded"],
-            error_kind="overloaded",
-        )
-    lock = _get_lock(session_id)
-    try:
-        async with lock:
-            return await _run_turn(resolved, inbound, trace, started)
-    finally:
-        _release_slot(session_id)
 
 
 async def _run_turn(resolved, inbound: InboundMessage, trace, started: float) -> TurnOutcome:
@@ -284,22 +313,25 @@ async def _consume_turn(resolved, inbound: InboundMessage, llm, trace):
     return chunks, turn_id, saw_done
 
 
-def _get_lock(session_id: str) -> asyncio.Lock:
-    return _session_locks.setdefault(session_id, asyncio.Lock())
+def _get_inbox() -> SessionInbox:
+    global _inbox
+    if _inbox is None:
+        _inbox = SessionInbox(handle_inbound_message)
+    return _inbox
 
 
-def _try_acquire_slot(session_id: str) -> bool:
-    limit = get_settings().feishu_session_queue_limit
-    current = _session_load.get(session_id, 0)
-    if current >= limit:
-        return False
-    _session_load[session_id] = current + 1
-    return True
-
-
-def _release_slot(session_id: str) -> None:
-    remaining = _session_load.get(session_id, 0) - 1
-    if remaining <= 0:
-        _session_load.pop(session_id, None)
-    else:
-        _session_load[session_id] = remaining
+def _get_turn_gate() -> asyncio.Semaphore:
+    """进程内全局并发闸门：让 `feishu_max_concurrent_turns` 真正生效。"""
+    global _turn_semaphore
+    if _turn_semaphore is None:
+        settings = get_settings()
+        limit = max(1, settings.feishu_max_concurrent_turns)
+        capacity = settings.db_pool_size + settings.db_max_overflow
+        if limit > capacity:
+            logger.warning(
+                "feishu_max_concurrent_turns=%d 超过 DB 连接池容量=%d，可能出现等待超时",
+                limit,
+                capacity,
+            )
+        _turn_semaphore = asyncio.Semaphore(limit)
+    return _turn_semaphore

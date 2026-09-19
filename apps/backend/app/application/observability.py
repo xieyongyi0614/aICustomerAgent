@@ -100,15 +100,33 @@ def spawn_background(coro) -> bool:
     except RuntimeError:
         loop = None
     if main is not None and main.is_running() and loop is not main:
-        asyncio.run_coroutine_threadsafe(coro, main)
+        future = asyncio.run_coroutine_threadsafe(coro, main)
+        future.add_done_callback(_log_future_exception)
         return True
     if loop is not None:
         task = loop.create_task(coro)
         background_tasks.add(task)
         task.add_done_callback(background_tasks.discard)
+        task.add_done_callback(_log_task_exception)
         return True
     coro.close()
     return False
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error is not None:
+        logger.error("后台任务异常未捕获: %r", error, exc_info=error)
+
+
+def _log_future_exception(future) -> None:
+    if future.cancelled():
+        return
+    error = future.exception()
+    if error is not None:
+        logger.error("后台任务异常未捕获（跨线程投递）: %r", error, exc_info=error)
 
 
 def _derive_status(trace) -> str:

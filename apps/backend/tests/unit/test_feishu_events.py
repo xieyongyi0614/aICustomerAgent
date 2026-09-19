@@ -228,7 +228,6 @@ def test_parse_valid_event_full_fields():
     parsed = events.parse_message_event(message_event())
     assert parsed is not None
     assert parsed.event_id == "evt-1"
-    assert parsed.event_type == "im.message.receive_v1"
     assert parsed.message_id == "om_1"
     assert parsed.chat_id == "oc_1"
     assert parsed.chat_type == "p2p"
@@ -236,7 +235,6 @@ def test_parse_valid_event_full_fields():
     assert parsed.text == "你好"
     assert parsed.open_id == "ou_alice"
     assert parsed.tenant_key == "tk_a"
-    assert parsed.app_id == "cli_a"
     assert parsed.union_id == "un_x"
     assert parsed.user_id == "uid_x"
     assert parsed.create_time_ms == "1767196800000"
@@ -409,3 +407,103 @@ def test_zero_real_network_during_event_processing():
     events.accept_event("evt-net")
     events.allow_rate("ou_net")
     assert feishu_client._transport is None
+
+
+def test_timestamp_freshness_window_boundaries():
+    events._now = lambda: 1_000_000.0
+    events.verify_timestamp_freshness("999700")
+    with pytest.raises(FeishuAuthError):
+        events.verify_timestamp_freshness("999699")
+    with pytest.raises(FeishuAuthError):
+        events.verify_timestamp_freshness("1000301")
+
+
+@pytest.mark.parametrize("timestamp", [None, "", "abc", "12.5"])
+def test_timestamp_freshness_rejects_invalid(timestamp):
+    with pytest.raises(FeishuAuthError):
+        events.verify_timestamp_freshness(timestamp)
+
+
+def test_event_freshness_reads_create_time_in_milliseconds():
+    events._now = lambda: 1_767_196_800.0
+    payload = message_event()
+    payload["header"]["create_time"] = "1767196800000"
+    assert events.verify_event_freshness(payload) is True
+
+
+def test_event_freshness_rejects_stale_create_time():
+    events._now = lambda: 1_767_196_800.0 + 3600
+    payload = message_event()
+    payload["header"]["create_time"] = "1767196800000"
+    with pytest.raises(FeishuAuthError):
+        events.verify_event_freshness(payload)
+
+
+def test_event_freshness_without_signal_returns_false():
+    assert events.verify_event_freshness({}) is False
+    assert events.verify_event_freshness({"header": {"create_time": "not-a-number"}}) is False
+
+
+def test_encrypted_freshness_prefers_header_timestamp():
+    events._now = lambda: 1_000_000.0
+    events.verify_encrypted_freshness("999700", {"header": {"create_time": "1"}})
+    with pytest.raises(FeishuAuthError):
+        events.verify_encrypted_freshness("999699", {"header": {"create_time": "1000000000000"}})
+
+
+def test_encrypted_freshness_falls_back_to_create_time():
+    """无请求头时间戳时用事件 create_time 拦重放——这正是 F-01 的修复点。"""
+    events._now = lambda: 1_767_196_800.0 + 3600
+    payload = message_event()
+    payload["header"]["create_time"] = "1767196800000"
+    with pytest.raises(FeishuAuthError):
+        events.verify_encrypted_freshness(None, payload)
+
+
+def test_encrypted_freshness_unverifiable_is_allowed_with_warning(caplog):
+    """URL 校验来件既无时间戳头也无 create_time，不得被误杀。"""
+    with caplog.at_level(logging.WARNING, logger="app.channels.feishu.events"):
+        events.verify_encrypted_freshness(
+            None, {"type": "url_verification", "challenge": "c-1"}
+        )
+    assert any("freshness unverifiable" in record.getMessage() for record in caplog.records)
+
+
+def test_seen_events_table_stays_bounded_after_ttl():
+    """去重表按插入序批量摘除，规模不随历史事件数线性增长（F-08）。"""
+    base = 1_000_000.0
+    events._now = lambda: base
+    for index in range(500):
+        assert events.accept_event(f"evt-{index}") is True
+    assert len(events._seen_events) == 500
+
+    events._now = lambda: base + 601
+    assert events.accept_event("evt-new") is True
+    assert len(events._seen_events) == 1
+
+
+def test_rate_windows_reclaim_stale_keys(override_settings):
+    """限流表已过窗的 open_id 条目会被摊还清理，key 不永久驻留（F-08）。"""
+    override_settings(chat_rate_limit_per_minute=5)
+    base = 1_000_000.0
+    events._now = lambda: base
+    for index in range(events.RATE_SWEEP_EVERY):
+        assert events.allow_rate(f"ou-{index}") is True
+    assert len(events._rate_windows) == events.RATE_SWEEP_EVERY
+
+    events._now = lambda: base + 61
+    for index in range(events.RATE_SWEEP_EVERY):
+        assert events.allow_rate(f"ou-new-{index}") is True
+
+    assert set(events._rate_windows) == {
+        f"ou-new-{index}" for index in range(events.RATE_SWEEP_EVERY)
+    }
+
+
+def test_dedupe_then_rate_does_not_consume_quota(override_settings):
+    """重复事件先被去重拦下，不得消耗该用户的限流配额（F-03 的纯函数侧）。"""
+    override_settings(chat_rate_limit_per_minute=1)
+    assert events.accept_event("evt-dup-quota") is True
+    assert events.allow_rate("ou_quota") is True
+    assert events.accept_event("evt-dup-quota") is False
+    assert events.allow_rate("ou_quota") is False

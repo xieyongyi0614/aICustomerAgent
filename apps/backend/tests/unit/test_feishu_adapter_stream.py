@@ -223,14 +223,37 @@ async def test_pipeline_receives_identity_and_content(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_overload_rejects_without_pipeline(monkeypatch):
-    adapter._session_load["feishu:ou_full"] = get_settings().feishu_session_queue_limit
-    stream = _mount_stream(monkeypatch, events=[{"kind": "token", "text": "x"}, {"kind": "done", "turn_id": "t"}])
-    outcome = await adapter.handle_inbound_message(_inbound(open_id="ou_full"))
-    assert outcome.error_kind == "overloaded"
-    assert outcome.outbound_text == FALLBACK_TEXTS["overloaded"]
-    assert stream.calls == []
-    adapter._session_load.clear()
+async def test_overload_rejects_without_pipeline(monkeypatch, override_settings):
+    import asyncio
+
+    override_settings(feishu_merge_window_ms=0, feishu_session_queue_limit=1)
+    release = asyncio.Event()
+    calls = []
+
+    async def _blocking(session_id, user_id, content, llm=None, trace=None):
+        calls.append(content)
+        await release.wait()
+        yield {"kind": "token", "text": "x"}
+        yield {"kind": "done", "turn_id": "t"}
+
+    monkeypatch.setattr(agent_service, "stream_chat", _blocking)
+    delivered = []
+
+    async def _record(outcome):
+        delivered.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
+
+    await adapter.ingest_inbound_message(_inbound(text="first"))
+    await asyncio.sleep(0.05)
+    await adapter.ingest_inbound_message(_inbound(text="second"))
+
+    assert [outcome.error_kind for outcome in delivered] == ["overloaded"]
+    assert delivered[0].outbound_text == FALLBACK_TEXTS["overloaded"]
+    assert calls == ["first"]
+
+    release.set()
+    await asyncio.sleep(0.05)
 
 
 @pytest.mark.asyncio
@@ -238,11 +261,9 @@ async def test_slot_released_after_pipeline_exception(monkeypatch):
     _mount_stream(monkeypatch, exc=ValueError("boom"))
     first = await adapter.handle_inbound_message(_inbound())
     assert first.error_kind == "pipeline_error"
-    assert adapter._session_load.get("feishu:ou_u1") in (None, 0)
     _mount_stream(monkeypatch, events=[{"kind": "token", "text": "恢复"}, {"kind": "done", "turn_id": "t2"}])
     second = await adapter.handle_inbound_message(_inbound())
     assert second.outbound_text == "恢复"
-    assert adapter._session_load.get("feishu:ou_u1") in (None, 0)
 
 
 def test_fallback_text_table_complete_and_human():
