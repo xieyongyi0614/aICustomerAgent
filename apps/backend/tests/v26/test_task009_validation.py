@@ -92,47 +92,38 @@ class TestFailureScenarios:
         assert len(result.effects) == 1
         assert not result_service.classify_retryable(result)
 
-    def test_timeout_flag_off_failed(self):
+    def test_timeout_maps_timeout(self):
         from app.models.action import CapabilityResult
 
         result = result_service.from_capability_result(
             CapabilityResult(status="timeout", error="t", payload={"failure_kind": "timeout"}),
             action_id="t",
         )
-        assert result.status == "failed"
+        # v26 去门控语义反转：timeout 语义恒生效（原 gate-off 退化为 failed 的分支已删）。
+        assert result.status == "timeout"
         assert result.failure_kind == "timeout"
 
 
 class TestFlagMatrix:
-    def test_defaults_off(self):
-        settings = get_settings()
-        assert settings.action_execution_enabled is False
-        assert settings.action_scheduler_enabled is False
-        assert settings.action_result_enabled is False
-        assert settings.action_feedback_enabled is False
+    """v26 去门控语义反转：Flag 矩阵随开关删除退役，改钉「字段已删 + 恒投影」。"""
 
-    def test_sub_flag_requires_master(self):
-        with pytest.raises(SettingsError):
-            Settings(
-                action_scheduler_enabled=True,
-                llm_profiles_json='[{"id":"p","label":"p","base_url":"u","model":"m","api_key":"k"}]',
-                default_llm_profile="p",
-            )
+    def test_removed_flags_are_absent(self):
+        from app.core.settings import Settings
 
-    def test_master_with_sub_flags_ok(self, monkeypatch):
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_feedback_enabled", True)
-        assert integration.feedback_enabled() is True
+        for flag in (
+            "action_execution_enabled",
+            "action_scheduler_enabled",
+            "action_result_enabled",
+            "action_feedback_enabled",
+            "action_debug_enabled",
+        ):
+            assert flag not in Settings.model_fields, flag
 
-    def test_master_off_feedback_legacy(self):
-        assert integration.feedback_enabled() is False
-
-    def test_schedule_step_flag_off(self):
+    def test_schedule_step_always_runs(self):
         import asyncio
 
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
-        assert result["status"] == "skipped"
+        assert result["status"] == "done"
 
 
 class TestDesignPrinciples:

@@ -50,7 +50,8 @@ class TestFlagDefaults:
 
 
 class TestEnablementChainMatrix:
-    """U2：链机制仍被 V2.6.0 段行使——非法组合 fail-fast；全链合法组合干净。"""
+    """U2 语义反转（批次 7 收口）：V2.6.0 段亦已删除，enablement 只剩空实现——
+    任何组合零违规；链账本常量（V25_* / V26_*）全部消失。"""
 
     def test_default_configuration_is_clean(self):
         assert enablement_violations(get_settings()) == []
@@ -59,59 +60,30 @@ class TestEnablementChainMatrix:
         settings = _settings_with(monkeypatch, **support.FULL_CHAIN_ENVS)
         assert enablement_violations(settings) == []
 
-    def test_v26_sub_flag_without_master_fails(self, monkeypatch):
-        """v26 链在 Settings 构造期即 fail-fast（model 级校验）。"""
-        with pytest.raises(SettingsError) as excinfo:
-            _settings_with(monkeypatch, ACTION_SCHEDULER_ENABLED="true")
-        assert "action_scheduler_enabled" in str(excinfo.value)
-        assert "action_execution_enabled" in str(excinfo.value)
-
-    def test_v26_master_without_base_gate_fails(self):
-        """总闸 ⇒ 基闸 `action_enabled` 由 enablement 层判定（model 级校验只管子闸）。"""
+    def test_legacy_chain_violation_samples_are_all_clean(self):
+        """原各段负例样本（子闸无总闸 / 总闸无基闸）在新实现下零违规。"""
         from types import SimpleNamespace
 
         stub = SimpleNamespace(
-            action_execution_enabled=True,
-            action_scheduler_enabled=False,
+            action_execution_enabled=False,
+            action_scheduler_enabled=True,
             action_enabled=False,
+            planning_enabled=True,
         )
-        reasons = enablement_violations(stub)
-        assert any("action_enabled" in reason for reason in reasons)
+        assert enablement_violations(stub) == []
 
-    def test_enablement_violations_reports_the_v26_chain(self):
-        """`enablement_violations` 对 v26 组合仍可独立判定（打桩 Settings）。"""
+    def test_validate_enablement_chain_never_raises(self):
         from types import SimpleNamespace
 
-        stub = SimpleNamespace(
-            action_execution_enabled=False,
-            action_scheduler_enabled=True,
-            action_enabled=True,
-        )
-        reasons = enablement_violations(stub)
-        assert any("action_execution_enabled" in reason for reason in reasons)
+        validate_enablement_chain(SimpleNamespace())
 
-    def test_validate_enablement_chain_raises_readable_error(self):
-        """`validate_enablement_chain` 对链上违规组合抛可读 SettingsError（打桩 Settings）。"""
-        from types import SimpleNamespace
-
-        stub = SimpleNamespace(
-            action_execution_enabled=False,
-            action_scheduler_enabled=True,
-            action_enabled=True,
-        )
-        with pytest.raises(SettingsError) as excinfo:
-            validate_enablement_chain(stub)
-        assert excinfo.value.args
-
-    def test_ledger_has_v26_chain_markers_only(self):
+    def test_ledger_has_no_chain_markers(self):
         from app.core.settings import enablement
 
         docstring = enablement.__doc__ or ""
-        for marker in ("①", "②"):
-            assert marker in docstring
-        assert "V2.5.0 段" in docstring and "已整体移除" in docstring
+        assert "V2.0.0 ~ V2.6.0 段" in docstring and "已整体移除" in docstring
         assert not any(
-            name.startswith("V25_") for name in vars(enablement)
+            name.startswith(("V25_", "V26_")) for name in vars(enablement)
         )
 
 

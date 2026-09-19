@@ -14,8 +14,6 @@ def _enabled(monkeypatch, **extra):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "action_enabled", True)
-    monkeypatch.setattr(settings, "action_execution_enabled", True)
-    monkeypatch.setattr(settings, "action_scheduler_enabled", True)
     monkeypatch.setattr(settings, "world_enabled", True)
     for key, value in extra.items():
         monkeypatch.setattr(settings, key, value)

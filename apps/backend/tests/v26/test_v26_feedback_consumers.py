@@ -19,8 +19,6 @@ def _due_at(hours: int = 2) -> str:
 def _enabled(monkeypatch, **flags):
     settings_flags = {
         "action_enabled": True,
-        "action_execution_enabled": True,
-        "action_feedback_enabled": True,
         "world_enabled": True,
     }
     settings_flags.update(flags)
@@ -62,27 +60,6 @@ class TestUniqueEntry:
         assert "plan_step" in loaded.result
         assert "world" in loaded.result["feedback_kinds"]
         assert "payload" in loaded.result
-
-    def test_feedback_off_no_projection_keys(self, monkeypatch):
-        from app.core.settings import get_settings
-
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_feedback_enabled", False)
-        monkeypatch.setattr(settings, "world_enabled", True)
-        world_engine.ensure_world("u_fb_off")
-        action = manager.create(
-            user_id="u_fb_off",
-            action_type="create_reminder",
-            params={"content": "无反馈投影", "due_at": _due_at()},
-        )
-        result = asyncio.run(manager.execute(action.id))
-        assert result is not None
-        loaded = action_repository.get_record(action.id)
-        assert loaded is not None
-        assert loaded.status == "succeeded"
-        assert "feedback_kinds" not in (loaded.result or {})
 
 
 class TestAutonomyConsumer:
@@ -126,7 +103,8 @@ class TestReflectionConsumer:
             "u_fb_ref", datetime.now(), window_days=7
         )
         assert facts, "带 tool_id 的步骤必须进证据窗"
-        assert facts[0].observations.get("feedback_kinds") == ["world"]
+        # v26 去门控裁决 B：工具路径效果含 memory+world，断言改子集语义。
+        assert "world" in facts[0].observations.get("feedback_kinds")
         assert facts[0].observations.get("temporary_execution") is False
 
 

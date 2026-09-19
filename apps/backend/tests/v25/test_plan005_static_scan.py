@@ -116,7 +116,8 @@ class TestExecutionSingleEntryPoint:
 
     def test_run_action_planning_is_the_only_executor_seam(self):
         imports = scan.import_from_names(BRIDGE_PATH)
-        assert "run_action_planning" in imports.get("app.application.action_engine", set())
+        # v26 去门控（批次 7）：桥恒走 ActionManager，不再从 action_engine 导入执行入口。
+        assert "run_action_planning" not in imports.get("app.application.action_engine", set())
         for name, path in PLAN_005_MODULES.items():
             executed = {
                 node.func.attr

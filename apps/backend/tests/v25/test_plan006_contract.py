@@ -78,6 +78,26 @@ TERMINAL_RECORD_STATUS_BY_TOOL_STATUS = {
 }
 """已触达能力的三种终态（`_settle_executed_record` 的重试分支已在 Action 层收敛）。"""
 
+TOOL_STEP_STATUS_BY_TOOL_STATUS = {
+    "succeeded": "succeeded",
+    "failed": "failed",
+    "timeout": "failed",
+    "unavailable": "skipped",
+    "denied": "skipped",
+    "invalid": "skipped",
+    "pending_confirmation": "skipped",
+}
+"""v26 去门控（批次 7）：原 `action_engine._TOOL_STEP_STATUSES` 冻结表随 ToolExecutor
+分派路径删除而本地化为构造输入（值不变，仍按七行契约逐条使用）。"""
+
+RECORD_OUTCOMES_BY_TOOL_STATUS = {
+    "unavailable": ("cancelled", "capability_unavailable"),
+    "denied": ("cancelled", "permission_denied"),
+    "invalid": ("cancelled", "invalid_params"),
+    "pending_confirmation": ("planned", "pending_confirmation"),
+}
+"""原 `action_engine._TOOL_RECORD_OUTCOMES` 冻结表本地化（同上）。"""
+
 
 def _plan_context(goal, surface) -> PlanContext:
     return PlanContext(
@@ -101,7 +121,7 @@ def _record_for(tool_status: str, *, tool_id: str = MEMORY_TOOL, failure_kind: s
             None,
         )
     else:
-        record_status, gate_reason = action_engine._TOOL_RECORD_OUTCOMES[tool_status]
+        record_status, gate_reason = RECORD_OUTCOMES_BY_TOOL_STATUS[tool_status]
     return ActionRecord(
         id="act-plan6",
         user_id=USER,
@@ -114,7 +134,7 @@ def _record_for(tool_status: str, *, tool_id: str = MEMORY_TOOL, failure_kind: s
                 "capability": "memory",
                 "action": "save",
                 "params": {},
-                "status": action_engine._TOOL_STEP_STATUSES[tool_status],
+                "status": TOOL_STEP_STATUS_BY_TOOL_STATUS[tool_status],
                 "tool_id": tool_id,
                 "result": {
                     "status": tool_status,
@@ -137,22 +157,11 @@ def _record_for(tool_status: str, *, tool_id: str = MEMORY_TOOL, failure_kind: s
 class TestStateMapping:
     """U11：`ToolExecutionStatus → ActionRecord.status → PlanStepOutcome.status` 七行逐条一致。"""
 
-    def test_the_engine_side_tables_match_the_frozen_rows(self):
-        assert action_engine._TOOL_STEP_STATUSES == {
-            "succeeded": "succeeded",
-            "failed": "failed",
-            "timeout": "failed",
-            "unavailable": "skipped",
-            "denied": "skipped",
-            "invalid": "skipped",
-            "pending_confirmation": "skipped",
-        }
-        assert action_engine._TOOL_RECORD_OUTCOMES == {
-            "unavailable": ("cancelled", "capability_unavailable"),
-            "denied": ("cancelled", "permission_denied"),
-            "invalid": ("cancelled", "invalid_params"),
-            "pending_confirmation": ("planned", "pending_confirmation"),
-        }
+    def test_engine_side_tables_are_gone(self):
+        """v26 去门控（批次 7）：ToolExecutor 分派路径删除，引擎侧冻结表随之消失；
+        七行契约的输入构造本地化到本模块（见文件头的两张本地表）。"""
+        assert not hasattr(action_engine, "_TOOL_STEP_STATUSES")
+        assert not hasattr(action_engine, "_TOOL_RECORD_OUTCOMES")
 
     @pytest.mark.parametrize(
         ("tool_status", "action_status", "record_failure_kind", "step_status", "failure_kind"),
@@ -257,7 +266,11 @@ class TestEffectsAndObservationsProjection:
     async def test_observations_from_the_real_normalizer_are_clipped(
         self, db_session_factory, action_chain_on, monkeypatch, repo_write_probe
     ):
-        """端到端：真实 `ObservationNormalizer` 产出的 observations 也被白名单裁剪。"""
+        """端到端：真实 `ObservationNormalizer` 产出的 observations 也被白名单裁剪。
+
+        v26 去门控裁决 B：工具绑定优先路由恢复后，工具归一观测保持 dotted key
+        （`memory.id`，工具定义声明形）；计划步 `observation_keys` 裁剪语义不变。
+        """
 
         capability = StubCapability(
             name="memory",

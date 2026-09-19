@@ -76,25 +76,14 @@ class TestFourOutcomes:
         assert result.failure_kind == "transient"
         assert result_service.classify_retryable(result)
 
-    def test_timeout_flag_off_maps_failed(self):
+    def test_timeout_maps_timeout(self):
+        """v26 去门控语义反转：timeout 语义恒生效（原 gate-off 退化为 failed 的分支已删）。"""
         result = result_service.from_capability_result(
             CapabilityResult(status="timeout", error="slow", payload={"failure_kind": "timeout"}),
             action_id="a3",
         )
-        assert result.status == "failed"
-        assert result.failure_kind == "timeout"
-
-    def test_timeout_flag_on_maps_timeout(self, monkeypatch):
-        from app.core.settings import get_settings
-
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_result_enabled", True)
-        result = result_service.from_capability_result(
-            CapabilityResult(status="timeout", error="slow", payload={"failure_kind": "timeout"}),
-            action_id="a4",
-        )
         assert result.status == "timeout"
-        assert result_service.classify_retryable(result)
+        assert result.failure_kind == "timeout"
 
     def test_partial_not_retried(self):
         result = ActionResult(status="partial", effects=[ActionEffect(kind="world", ref="w")])

@@ -1,74 +1,44 @@
-"""V2.6.1 P1：Flag 治理（登记/启用链）与 Manager 退避守卫。"""
+"""V2.6.1 P1：Flag 治理（v26 去门控语义反转：链规则已消失）与 Manager 退避守卫。"""
 
 import asyncio
 from datetime import datetime, timedelta
 
 import pytest
 
-from app.core.settings import get_settings
-from app.core.settings.enablement import (
-    enablement_violations,
-    validate_enablement_chain,
-)
-from app.core.settings._shared import SettingsError
-from app.core.settings.action_execution import V26_SUB_FLAGS
+from app.core.settings import Settings, get_settings
+from app.core.settings.enablement import enablement_violations
 from app.models.action import ActionResult
 from app.repositories import action_repository
 from app.services.action import manager
 
+REMOVED_V26_FLAGS = (
+    "action_execution_enabled",
+    "action_scheduler_enabled",
+    "action_result_enabled",
+    "action_feedback_enabled",
+    "action_debug_enabled",
+)
+
 
 class TestEnvExampleRegistration:
-    def test_env_example_has_v26_flags(self):
+    def test_env_example_has_no_v26_flag_keys(self):
         from pathlib import Path
 
         example = Path(__file__).resolve().parents[2] / ".env.example"
         text = example.read_text(encoding="utf-8")
-        for flag in (
-            "ACTION_EXECUTION_ENABLED",
-            "ACTION_SCHEDULER_ENABLED",
-            "ACTION_RESULT_ENABLED",
-            "ACTION_FEEDBACK_ENABLED",
-            "ACTION_DEBUG_ENABLED",
-            "ACTION_EXECUTING_TIMEOUT_MINUTES",
-        ):
-            assert flag in text, f".env.example 缺少 {flag}"
+        for flag in REMOVED_V26_FLAGS:
+            assert flag.upper() not in text, f".env.example 残留 {flag}"
+        assert "ACTION_EXECUTING_TIMEOUT_MINUTES" in text
 
 
 class TestEnablementChain:
-    def test_master_requires_action_enabled(self):
+    def test_v26_chain_rules_are_gone(self):
         settings = get_settings()
-        original = settings.action_enabled
-        original_v26 = settings.action_execution_enabled
-        try:
-            settings.action_enabled = False
-            settings.action_execution_enabled = True
-            violations = enablement_violations(settings)
-            assert any("action_execution_enabled 要求 action_enabled" in v for v in violations)
-        finally:
-            settings.action_enabled = original
-            settings.action_execution_enabled = original_v26
+        assert enablement_violations(settings) == []
 
-    def test_sub_flag_requires_master(self):
-        settings = get_settings()
-        original_v26 = settings.action_execution_enabled
-        original_sched = settings.action_scheduler_enabled
-        original_action = settings.action_enabled
-        try:
-            settings.action_enabled = True
-            settings.action_execution_enabled = False
-            settings.action_scheduler_enabled = True
-            violations = enablement_violations(settings)
-            assert any(
-                "action_scheduler_enabled 要求 action_execution_enabled" in v
-                for v in violations
-            )
-        finally:
-            settings.action_enabled = original_action
-            settings.action_execution_enabled = original_v26
-            settings.action_scheduler_enabled = original_sched
-
-    def test_sub_flags_cover_master_gate(self):
-        assert "action_scheduler_enabled" in V26_SUB_FLAGS
+    def test_removed_flags_are_absent_from_settings(self):
+        for flag in REMOVED_V26_FLAGS:
+            assert flag not in Settings.model_fields, flag
 
 
 class TestMultistepDecision:
@@ -99,7 +69,6 @@ class TestExecuteBackoffGuard:
     def test_execute_proceeds_when_backoff_elapsed(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", False)
         monkeypatch.setattr(settings, "world_enabled", True)
         from app.application import world_engine
 

@@ -33,7 +33,6 @@ class TestFunctionalAcceptance:
     def test_execute_reuses_record(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
         action = manager.create(
             user_id="u_acc_exec",
             action_type="remember_fact",
@@ -59,7 +58,6 @@ class TestFunctionalAcceptance:
     def test_result_generated(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_result_enabled", True)
         from app.models.action import CapabilityResult
 
         result = result_service.from_capability_result(
@@ -76,8 +74,6 @@ class TestFunctionalAcceptance:
 
     def test_feedback_produced(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_feedback_enabled", True)
         action = manager.create(
             user_id="u_acc_fb",
             action_type="create_reminder",
@@ -100,7 +96,6 @@ class TestSystemFlowAcceptance:
     def test_plan_action_execute_outcome(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
         intent = ActionIntent(
             action_type="remember_fact",
             confidence="confident",
@@ -140,7 +135,6 @@ class TestSystemFlowAcceptance:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:
@@ -231,7 +225,8 @@ class TestErrorAcceptance:
             CapabilityResult(status="timeout", error="slow", payload={"failure_kind": "timeout"}),
             action_id="e2",
         )
-        assert result.status == "failed"
+        # v26 去门控语义反转：timeout 语义恒生效（原 gate-off 退化为 failed 的分支已删）。
+        assert result.status == "timeout"
         assert result.failure_kind == "timeout"
 
     def test_invalid_params_create_still_works_and_gate_can_reject(self):
@@ -264,19 +259,26 @@ class TestErrorAcceptance:
 
 
 class TestRegressionCheck:
-    def test_flag_off_defaults(self):
-        settings = get_settings()
-        assert settings.action_execution_enabled is False
-        assert settings.action_scheduler_enabled is False
-        assert settings.action_feedback_enabled is False
-        assert settings.action_result_enabled is False
+    """v26 去门控语义反转：flag-off 负例随开关退役，改钉「字段已删 + 常开形态」。"""
 
-    def test_flag_off_no_schedule_step(self):
+    def test_removed_flags_are_absent(self):
+        from app.core.settings import Settings
+
+        for flag in (
+            "action_execution_enabled",
+            "action_scheduler_enabled",
+            "action_feedback_enabled",
+            "action_result_enabled",
+            "action_debug_enabled",
+        ):
+            assert flag not in Settings.model_fields, flag
+
+    def test_schedule_step_always_runs(self):
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
-        assert result["status"] == "skipped"
+        assert result["status"] == "done"
+        assert result["claimed"] == 0
 
-    def test_flag_off_feedback_legacy(self):
-        assert integration.feedback_enabled() is False
+    def test_feedback_always_projected(self):
         action = manager.create(
             user_id="u_legacy", action_type="create_reminder", params={"content": "legacy"}
         )
@@ -284,7 +286,7 @@ class TestRegressionCheck:
         summary = integration.apply_result_feedback(
             record, ActionResult(status="succeeded")
         )
-        assert summary["mode"] == "legacy"
+        assert summary["mode"] != "legacy"
 
     def test_world_relationship_memory_boundaries_in_integration(self):
         source = open(integration.__file__, encoding="utf-8").read()
@@ -300,17 +302,7 @@ class TestRegressionCheck:
         )
         assert migrations[-1].startswith("0049_")
 
-    def test_debug_flag_off_404(self, monkeypatch):
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", False)
-        with pytest.raises(HTTPException) as exc:
-            debug_api.list_execution_actions(user_id="u")
-        assert exc.value.status_code == 404
-
-    def test_debug_flag_on_works(self, monkeypatch):
-        settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_debug_enabled", True)
+    def test_debug_surface_always_served(self):
         action = manager.create(
             user_id="u_dbg", action_type="create_reminder", params={"content": "dbg"}
         )

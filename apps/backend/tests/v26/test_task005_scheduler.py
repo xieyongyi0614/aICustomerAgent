@@ -108,17 +108,16 @@ class TestQueue:
 
 
 class TestLifeLoopStep:
-    def test_flag_off_skips(self):
+    def test_always_runs_when_mounted(self):
+        """v26 去门控语义反转：双闸已删，维护步空载正常跑完（F.13 挂载点激活）。"""
         result = __import__("asyncio").run(scheduler.step_action_schedule(datetime.now()))
-        assert result["status"] == "skipped"
-        assert result["skip_reason"] == "flag_off"
+        assert result["status"] == "done"
+        assert result["claimed"] == 0
 
     def test_flag_on_claims_due(self, monkeypatch):
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_scheduler_enabled", True)
         action = _action("到期")
         scheduler.schedule(action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1))
         result = __import__("asyncio").run(scheduler.step_action_schedule(datetime.now()))

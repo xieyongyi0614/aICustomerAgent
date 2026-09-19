@@ -59,7 +59,7 @@ def test_u13_v25_chain_ledger_is_gone_from_the_module():
     ):
         assert not hasattr(enablement, name), name
     docstring = enablement.__doc__ or ""
-    assert "V2.5.0 段" in docstring and "已整体移除" in docstring
+    assert "V2.0.0 ~ V2.6.0 段" in docstring and "已整体移除" in docstring
 
 
 def test_u13_removed_flags_never_produce_violations(monkeypatch):
@@ -79,23 +79,12 @@ def test_i2_default_settings_pass_the_chain():
 
 
 def test_i2_violation_message_is_readable_chinese(monkeypatch):
-    """链机制仍被行使：v26 样本负例（子闸无总闸）在 Settings 构造期即报可读错误。"""
+    """批次 7 收口：v26 段亦删——构造期链校验消失，链机制只剩空实现。"""
     from types import SimpleNamespace
 
-    with pytest.raises(SettingsError) as excinfo:
-        _settings_with(monkeypatch, **{"action_scheduler_enabled": True})
-    message = str(excinfo.value)
-    assert "action_scheduler_enabled" in message
-    assert "总闸" in message
-
-    stub = SimpleNamespace(
-        action_execution_enabled=False,
-        action_scheduler_enabled=True,
-        action_enabled=True,
-    )
-    with pytest.raises(SettingsError) as chain_exc:
-        validate_enablement_chain(stub)
-    assert "V2 启用链配置错误" in str(chain_exc.value)
+    settings = _settings_with(monkeypatch, **{"action_scheduler_enabled": True})
+    assert enablement_violations(settings) == []
+    validate_enablement_chain(SimpleNamespace())
 
 
 def test_v25_chain_rules_are_gone(monkeypatch):

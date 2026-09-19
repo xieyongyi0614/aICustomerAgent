@@ -25,6 +25,7 @@ from app.repositories import (
     world_repository,
 )
 from app.services import decision_pipeline, trigger_evaluator
+from app.services.action.executor import ActionExecutor
 from app.services.tool.executor import ToolExecutor
 from tests.v24.tool006_support import (
     NOW,
@@ -265,10 +266,15 @@ async def test_autonomy_decision_to_world_write_through_outbox(
 
 
 def test_tool_execution_path_never_writes_world_directly():
-    """静态断言：工具执行路径不含任何直接世界写（世界写只经 outbox 消费器）。"""
+    """静态断言：工具执行路径不含任何直接世界写（世界写只经 outbox 消费器）。
+
+    v26 去门控（批次 7）：`_execute_plan_via_tools` 分派已并入统一主路径，
+    静态锚点换成主路径装配函数 + ToolExecutor + ActionExecutor。
+    """
     for source in (
-        inspect.getsource(action_engine._execute_plan_via_tools),
+        inspect.getsource(action_engine._execute_plan_via_action_executor),
         inspect.getsource(ToolExecutor),
+        inspect.getsource(ActionExecutor),
     ):
         assert "world_engine" not in source
         assert "world_repository" not in source

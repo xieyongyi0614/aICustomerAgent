@@ -95,7 +95,6 @@ class TestFlagOnInternalMainPath:
     def test_create_reminder_steps_full_shape(self, override_settings):
         override_settings(
             action_enabled=True,
-            action_execution_enabled=True,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t1_rem")
@@ -126,7 +125,6 @@ class TestFlagOnInternalMainPath:
     def test_remember_fact_steps_full_shape(self, override_settings):
         override_settings(
             action_enabled=True,
-            action_execution_enabled=True,
             world_enabled=True,
         )
         action = manager.create(
@@ -151,7 +149,6 @@ class TestFlagOnInternalMainPath:
     def test_failed_path_still_full_shape(self, override_settings):
         override_settings(
             action_enabled=True,
-            action_execution_enabled=True,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t1_fail")
@@ -164,7 +161,8 @@ class TestFlagOnInternalMainPath:
         assert result is not None
         loaded = action_repository.get_record(action.id)
         assert loaded is not None
-        assert loaded.status == "failed"
+        # v26 去门控裁决 B：校验段短路映射恢复（invalid → cancelled/invalid_params）。
+        assert loaded.status == "cancelled"
         step_result = (loaded.steps[0] or {}).get("result") or {}
         assert "payload" in step_result
         assert "status" in step_result

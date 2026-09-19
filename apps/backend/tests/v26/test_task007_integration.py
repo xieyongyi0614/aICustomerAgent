@@ -86,32 +86,10 @@ class TestEffectRouting:
 
 
 class TestFeedbackLoop:
-    def test_apply_feedback_flag_off_uses_legacy(self):
-        action = manager.create(
-            user_id="u_fb",
-            action_type="remember_fact",
-            params={"fact": "测试事实"},
-        )
-        from app.repositories import action_repository
-
-        record = action_repository.get_record(action.id)
-        record.status = "succeeded"
-        action_repository.save_record(record)
-        result = ActionResult(
-            status="succeeded",
-            effects=[ActionEffect(kind="memory", ref="m1", detail="已记住")],
-            observations={"memory_id": "m1"},
-        )
-        summary = integration.apply_result_feedback(record, result)
-        assert summary["mode"] == "legacy"
-        assert "memory" in summary["channels"]
-
     def test_apply_feedback_flag_on_enriched(self, monkeypatch):
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_feedback_enabled", True)
         action = manager.create(
             user_id="u_fb2",
             action_type="create_reminder",

@@ -8,29 +8,13 @@ from app.services.action import contracts, manager, scheduler
 from datetime import timedelta
 
 
-class TestDebugEndpointsFlagOff:
-    def test_list_404_when_flag_off(self):
-        with pytest.raises(HTTPException) as exc:
-            api.list_execution_actions(user_id="u1")
-        assert exc.value.status_code == 404
+class TestDebugEndpointsAlwaysServed:
+    """v26 去门控语义反转：调试端点恒可见（404 负例随开关删除退役）。"""
 
-    def test_detail_404_when_flag_off(self):
-        with pytest.raises(HTTPException):
-            api.get_execution_action("act_x")
-
-    def test_metrics_404_when_flag_off(self):
-        with pytest.raises(HTTPException):
-            api.execution_metrics()
-
-
-class TestDebugEndpointsFlagOn:
     def test_list_detail_schedule_metrics(self, monkeypatch):
         from app.core.settings import get_settings
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        monkeypatch.setattr(settings, "action_debug_enabled", True)
-
         action = manager.create(
             user_id="u_api",
             action_type="create_reminder",

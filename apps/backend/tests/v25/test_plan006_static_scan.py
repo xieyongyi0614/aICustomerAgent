@@ -105,7 +105,7 @@ ACTION_LAYER_IMPORT_PREFIXES: tuple[str, ...] = (
 )
 
 EXPECTED_ACTION_LAYER_IMPORT: dict[str, set[str]] = {
-    "executor_bridge.py": {"run_action_planning", "manager", "integration"},
+    "executor_bridge.py": {"manager", "integration"},
 }
 
 

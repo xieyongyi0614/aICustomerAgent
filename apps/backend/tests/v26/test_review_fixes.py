@@ -15,16 +15,14 @@ class TestActionScheduleConsumption:
     """REF-004/005 消费入口：挂 life_loop 维护步，不进 autonomous_tick Profile。
 
     裁决（docs/refactor/flag-removal-audit.md F.13）：到期调度认领是维护语义，
-    不进自治阶段序列；`step_action_schedule` 本体仍双闸自门控。
+    不进自治阶段序列。v26 去门控（批次 7）：双闸自门控已删，挂载点激活（H.4 验证点）。
     """
 
-    def test_flags_off_self_gate_in_scheduler(self):
-        settings = get_settings()
-        assert settings.action_execution_enabled is False
-        assert settings.action_scheduler_enabled is False
+    def test_scheduler_self_gate_is_gone(self):
+        """原「双闸 off 自门控 skipped」的前提随开关删除退役：空载时正常跑完（done）。"""
         result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
-        assert result["status"] == "skipped"
-        assert result["skip_reason"] == "flag_off"
+        assert result["status"] == "done"
+        assert result["claimed"] == 0
 
     def test_autonomous_profile_has_no_action_schedule_stage(self):
         from app.application.agent_runtime import profiles
@@ -116,13 +114,13 @@ class TestManagerExecuteWiring:
 
 
 class TestV26ExecutorPath:
-    def test_execute_plan_uses_action_executor_when_flag_on(self, monkeypatch):
+    """v26 去门控语义反转：分派辅助已删，执行恒经 ActionExecutor 主路径。"""
+
+    def test_execute_plan_uses_action_executor(self, monkeypatch):
         from app.application import action_engine
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
-        assert action_engine._action_execution_enabled(settings) is True
         action = manager.create(
             user_id="u_v26e",
             action_type="remember_fact",
@@ -136,12 +134,6 @@ class TestV26ExecutorPath:
             pytest.fail(f"gate/assemble cancelled: {loaded.gate_reason} result={loaded.result}")
         assert loaded.status in ("succeeded", "failed", "executing", "planned")
         assert loaded.id == action.id
-
-    def test_flag_off_does_not_enable_v26_path(self):
-        from app.application import action_engine
-
-        settings = get_settings()
-        assert action_engine._action_execution_enabled(settings) is False
 
 
 class TestSchedulerOwnerAndRecordSync:
@@ -165,7 +157,6 @@ class TestPlanningBridgeFlagOn:
 
         settings = get_settings()
         monkeypatch.setattr(settings, "action_enabled", True)
-        monkeypatch.setattr(settings, "action_execution_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:

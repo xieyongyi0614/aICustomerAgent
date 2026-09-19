@@ -219,7 +219,8 @@ def test_deferred_execution_single_entry_point():
     assert bridge.PlanExecutorBridge is not None
     assert "ToolExecutor" not in dir(bridge)
     assert "Capability" not in dir(bridge)
-    assert "run_action_planning" in dir(bridge)
+    # v26 去门控（批次 7）：执行恒经 ActionManager，桥不再引用 `run_action_planning`。
+    assert "run_action_planning" not in dir(bridge)
 
 
 def test_deferred_reflection_listener_registration():

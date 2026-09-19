@@ -7,6 +7,7 @@ import pytest
 
 from app.models.action import Action, ActionResult
 from app.services.action.executor import ActionExecutor, CapabilityExecutor, dispatch
+from app.core.settings import get_settings
 from app.services.action.registry import ExecutionContext, get_capability_registry
 
 
@@ -133,7 +134,7 @@ class TestToolPath:
         result = asyncio.run(
             executor.run(_action("query_environment", params={}), _ctx())
         )
-        assert result.status == "failed"
+        assert result.status == "timeout"
         assert result.failure_kind == "timeout"
 
 
@@ -161,7 +162,7 @@ class TestInternalPath:
 
         executor = ActionExecutor(FakeRegistry(), timeout_seconds=0.01)
         result = asyncio.run(executor.execute_internal(_action("create_reminder"), _ctx()))
-        assert result.status == "failed"
+        assert result.status == "timeout"
         assert result.failure_kind == "timeout"
 
 
@@ -173,3 +174,87 @@ class TestStaticNoDecision:
         assert "decision_pipeline" not in source
         assert "autonomy_policy" not in source
         assert "next_retry_at" not in source
+
+class TestPendingConfirmationRegistration:
+    """v26 去门控（批次 7）：确认登记移植到主路径唯一登记点（原 `_register_confirmation`）。
+
+    ToolExecutor 权限段产 `pending_confirmation` → 主路径登记确认请求、记录转
+    `planned` + `gate_reason=pending_confirmation`（TOOL-005 §2.3 语义在统一分派下的落地）。
+    """
+
+    def _definition(self):
+        from tests.v24.tool005_support import sensitive_definition
+
+        return sensitive_definition()
+
+    def _meta_result(self, definition):
+        from app.models.action import ActionResult
+
+        return ActionResult(
+            status="failed",
+            failure_kind="transient",
+            error="等待用户确认",
+            metadata={
+                "tool_status": "pending_confirmation",
+                "permission": {
+                    "decision": "confirm_required",
+                    "level": "sensitive",
+                    "reason": "level_confirm_required",
+                },
+            },
+        )
+
+    def test_register_pending_confirmation_lands_request(self, override_settings):
+        import asyncio
+        from datetime import datetime
+
+        from app.application import action_engine
+        from app.services.tool import confirmation as confirmation_mod
+        from app.services.tool.context import ToolContext
+
+        override_settings(action_enabled="true")
+        definition = self._definition()
+        tool_registry = SimpleNamespace(get=lambda tool_id: definition)
+        binding = SimpleNamespace(tool_id=definition.id)
+        invocation = SimpleNamespace(
+            tool_id=definition.id,
+            params={"content": "hi"},
+            dedupe_key="pending:reg:1",
+            intent=None,
+            rationale="",
+            source="autonomy",
+            goal_id=None,
+            run_id=None,
+        )
+        tool_resolver = lambda action: (binding, invocation)
+        tool_ctx = ToolContext(run_kind="autonomous_tick", user_id="u_pending")
+        settings = get_settings()
+        action = SimpleNamespace(parameters={"content": "hi"})
+
+        prompt = action_engine._register_pending_confirmation(
+            action,
+            {"permission": {"decision": "confirm_required", "level": "sensitive"}},
+            tool_registry,
+            tool_resolver,
+            tool_ctx,
+            settings,
+        )
+        assert prompt
+        pending = confirmation_mod.get_confirmation_service().pending("u_pending")
+        assert any(item.tool_id == definition.id for item in pending)
+
+    def test_apply_result_maps_pending_to_planned(self):
+        from app.application import action_engine
+        from app.models.action import ActionRecord
+
+        result = self._meta_result(None)
+        record = ActionRecord(
+            id="act-pending-map",
+            user_id="u_pending",
+            action_type="query_environment",
+            status="executing",
+            attempt=1,
+        )
+        action_engine._apply_action_result_to_record(record, result, get_settings())
+        assert record.status == "planned"
+        assert record.gate_reason == "pending_confirmation"
