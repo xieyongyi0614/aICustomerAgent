@@ -40,7 +40,7 @@ FROZEN_SOURCES: dict[str, str] = {
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
     "app/models/memory.py": "4371cd849a76f8de2fcf7fcff9a1b1a4f66163329b56b59367d2a8d993591fa1",
     "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
-    "app/character/asuna/action.py": "fb14436f9e7f929b7a2f1f19ed4cdabf252b6f1433c40ac36de14929f814e992",
+    "app/character/asuna/action.py": "6915eabd0e13bfb2caf57f81f9e9cf17bcd813a095557cc2e954d8fbaa2281d1",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 

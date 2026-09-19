@@ -65,6 +65,13 @@ ACTION_TRIGGER_LEXICON: dict[str, tuple[str, ...]] = {
         "煎",
         "蒸",
         "炖",
+        "加个",
+        "加俩",
+        "加两",
+        "加点",
+        "来个",
+        "来点",
+        "多加",
     ),
     "query_environment": (
         "今天天气",
@@ -93,6 +100,20 @@ ACTION_LEXICON_PRIORITY: tuple[str, ...] = (
     "query_environment",
     "query_search",
     "send_notification",
+)
+
+# 自带祈使语气的触发词（中文无主语祈使句，如"加俩个蛋"）：命中即视为祈使，
+# 不再要求句中出现"我/帮我"等主语标记。
+SELF_IMPERATIVE_TRIGGERS: frozenset[str] = frozenset(
+    {
+        "加个",
+        "加俩",
+        "加两",
+        "加点",
+        "来个",
+        "来点",
+        "多加",
+    }
 )
 
 # 各行动类型的必需参数表（planner.md §1.2）。

@@ -33,7 +33,11 @@ def _extract_json_text(content: str) -> str:
 
 def _strip_nulls(data):
     if isinstance(data, dict):
-        return {key: _strip_nulls(value) for key, value in data.items() if value is not None}
+        return {
+            key: _strip_nulls(value)
+            for key, value in data.items()
+            if value is not None and value != ""
+        }
     if isinstance(data, list):
         return [_strip_nulls(item) for item in data]
     return data

@@ -13,6 +13,7 @@ from app.character.asuna.action import (
     ACTION_LEXICON_PRIORITY,
     ACTION_TRIGGER_LEXICON,
     REQUIRED_PARAMS,
+    SELF_IMPERATIVE_TRIGGERS,
 )
 from app.core.settings import get_settings
 from app.models.action import ActionIntent, make_dedupe_key
@@ -190,7 +191,11 @@ def _detect(content: str, now: datetime) -> ActionIntent | None:
     if hit is None:
         return None
     action_type, trigger = hit
-    if action_type not in _IMPERATIVE_EXEMPT_TYPES and not _is_imperative(content, trigger):
+    if (
+        action_type not in _IMPERATIVE_EXEMPT_TYPES
+        and trigger not in SELF_IMPERATIVE_TRIGGERS
+        and not _is_imperative(content, trigger)
+    ):
         return None
 
     params, missing = _extract_params(action_type, content, trigger, now)

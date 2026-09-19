@@ -79,7 +79,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
     "app/services/action/capabilities/world_action.py": "345912ee8452d4d03c572e5e734f3b5900223be15a80524c1a6386bbffd40048",
     "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
-    "app/character/asuna/action.py": "fb14436f9e7f929b7a2f1f19ed4cdabf252b6f1433c40ac36de14929f814e992",
+    "app/character/asuna/action.py": "6915eabd0e13bfb2caf57f81f9e9cf17bcd813a095557cc2e954d8fbaa2281d1",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     "app/services/decision_pipeline.py": "0afb670900820ffe3af959516e3e8741c32e5c7c8c502fa4edfe987241411aac",
     "app/application/chat_pipeline.py": "90dd510fcdff0ddc7c2560cf3882b245e377c20a549afe15f57e63fccfc88e68",

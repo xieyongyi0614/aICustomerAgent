@@ -257,6 +257,19 @@ def llm_override():
 
 
 @pytest.fixture(autouse=True)
+def _default_channel_gate_off(monkeypatch):
+    """Autouse：默认档钉住频道总闸 off，隔离真实 .env 的 FEISHU_ENABLED 值。
+
+    channel 工具的 registry 状态用例依赖默认关闭档；显式 override_settings
+    的用例在本夹具之后应用，不受影响。
+    """
+    monkeypatch.setenv("FEISHU_ENABLED", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _offline_repos(monkeypatch):
     """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory2 服务的 SessionLocal 指向内存 SQLite。
 
