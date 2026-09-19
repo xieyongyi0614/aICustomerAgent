@@ -1486,3 +1486,21 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | 行为变化 | 行动执行层**首次在生产配置下常开**：ActionManager 主路径、到期调度维护步、结果反馈投影、调试面恒可见；经裁决 B，internal 动作保有工具五段保障。**需执行 `docs/version/v2.6.0/regression-checklist.md`（尚未跑，上线前置条件）** |
 
 **批次 8 起点**：在存开关 19 → **14**（保留策略位/裁决项 5：`plan_tool_required`、`plan_context_digest_enabled`、`tool_confirm_ttl_reuse`、`foreground_gateway_enforced`、`action_outbox_enabled` + 基闸）。剩余收尾项见 H.5（删 `enablement.py` 空壳、`world_context_char_budget_v23` 改名裁决、本地 `.env` 旧键漂移修复、G.2 残留扫描）。
+
+### H.14 批次 8 执行记录（收尾，2026-09-19）——重构收官
+
+| 项 | 内容 |
+|---|---|
+| 删 `enablement.py` | 空壳（空 `enablement_violations` + 包装）整文件删除；`main.py` 的 import 与 `validate_enablement_chain(get_settings())` 启动调用删除；G.1 配置层/代码层/契约层三清 |
+| 测试面收口 | 删 `tests/v24/test_tool001_enablement.py`、`tests/v25/test_plan002_enablement.py` 两个以模块为被测对象的文件；`tests/v21`（agent001/006/007）、`tests/v23/ws001`、`tests/v24/tool_acceptance`（启动断言反转为「调用已删除」）、`tests/v26/p1`、`tests/v25/plan012_flag_matrix` 的反向断言与类随模块退役 |
+| 命名残留清零 | `world_context_char_budget_v23` → **`world_prompt_char_budget`**（H.5 建议名 `world_brief_char_budget` 已被同类占用（400），按语义改取现名：约束 prompt 世界段渲染预算；与 `world.py` 的 `world_context_char_budget`（600）无冲突）；env 键 `WORLD_CONTEXT_CHAR_BUDGET_V23` → `WORLD_PROMPT_CHAR_BUDGET`，`.env.example` 同步 |
+| `.env` 漂移修复 | 本地 `.env` 清理 38 个 `V<数字>_` 死键（V23 11 + V24 15 + V26 8 + 其它 4）；4 个改名键落回（`CHARACTER_ACTION_SYNC_*` / `INVENTORY_GROUNDING_*`，**两个 true 开关恢复显式生效**）；13 个存活字段按现名以代码默认值显式落回（此前被 `extra="ignore"` 静默吞掉，运行时本就取默认，无行为差）；`grep -cE "^(V[0-9]+_)" .env` = **0** |
+| 收口扫描 | G.2 ①：app 侧（除 `core/settings`）`v[0-9]` 候选 44 行全部为 docstring/注释续行，**可执行门控表达式 0**；G.2 ⑧：契约层（app/api + frontend）`v2[1-6]_` **0 命中** |
+| 全量基线 | **21 failed / 6171 passed / 22 skipped**，失败 ID 集合 ⊆ 豁免清单（feishu WIP 14 + 抖动池 e2e/计时 5 + F.8 既存 2），零未归因新增；v22 experience acceptance 单跑复核绿（抖动） |
+| 提交（本地，未推送） | `a9cbb55`（refactor 删壳）→ `7476539`（refactor 字段改名）→ `3a8f898`（test 收口）→ docs（本条） |
+
+### 收官对账（2026-09-19）
+
+- **开关盘子**：改造前 61 个 bool 开关 → 删除 7（批次 1 v2 段）+ 死开关 3（第 0 步）+ 转正常开 v22 5 / v21 6 / v23 7 / v24 10 / v25 12 / v26 5 = **55**；**保留 6**：策略位 `tool_confirm_ttl_reuse` / `plan_tool_required` / `plan_context_digest_enabled`（H.6）+ 裁决保留 `foreground_gateway_enforced`（F.10）/ `action_outbox_enabled`（附录 E）+ 基闸外无版本号开关不计。调参字段 149 + 批次 1 的 5 个全部去前缀；后缀式残留 `world_context_char_budget_v23` 批次 8 改名。
+- **done 判据达成（G.1）**：配置层字段名与 `.env.example` 键名无版本号 ✓；代码层门控表达式 0 ✓；契约层（API flags / 前端读取）0 ✓；历史层（docstring 说明 / 测试目录名 / 迁移文件名 / docs）按约保留 ✓。
+- **遗留待办**：① 各版本 regression-checklist 人工回归（v2.0.0×6 phase / v2.1.0 / v2.2.0 / v2.3.0 / v2.5.0 / v2.6.0；**v2.4.0 清单缺失需先补建**）——每批常开的上线前置条件；② 部署侧 `.env` 副本按 `flag-rename-map.md`「旧 env」列同批改名（本仓库本地件已清）；③ `flag-rename-map.md` §七 命名一致性建议维持「未采纳」关单；④ 转正后首轮建议在独立数据库执行（§9.3）。
