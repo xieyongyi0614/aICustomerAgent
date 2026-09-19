@@ -3,7 +3,7 @@
 > 审查对象：`apps/backend` 中以版本号作前缀的 settings 配置与开关体系（`v2_*` / `v21_*` / `v22_*` / `v23_*` / `v24_*` / `v25_*` / `v26_*`）
 > 审查范围：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > 本文正文的数据均为**改造前**口径实测（非估算），不回写执行结果；执行进展一律记在**附录 F**。
-> 当前状态（2026-09-19）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 / v24 / v25 已完成**（F.9~F.14、H.10~H.12）；剩余 **v26（批次 7） → 收尾删 `enablement.py`（批次 8）**。
+> 当前状态（2026-09-19）：批次 1（v2 段）与轨道 A（200 字段去前缀）**已完成并提交**；附录 A/B 的旧字段名已失效，剩余执行清单以 `flag-rename-map.md` §四/§五 的新名为准。轨道 B：**v22 / v21 / v23 / v24 / v25 / v26 已完成**（F.9~F.14、H.10~H.13）；剩余 **收尾删 `enablement.py`（批次 8）**。
 >
 > **剩余批次执行清单见 [附录 H](#附录-h剩余批次任务编排批次-58)**（2026-09-18 实测口径，替代 §8 表头的过时计数）。
 
@@ -1466,3 +1466,23 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 **批次 7 起点**：在存开关 31 → **19**（v26 5 + 保留策略位/裁决项 4 + 基闸）；`enablement.py` 只剩 v26 段，批次 7 删 v26 段后批次 8 删整文件。H.4 执行清单不变。
 
 
+
+### H.13 批次 7 执行记录（v26 行动执行 + 裁决 B，2026-09-19）
+
+| 项 | 内容 |
+|---|---|
+| 删除的 5 个开关 | `action_execution_enabled`、`action_scheduler_enabled`、`action_result_enabled`、`action_feedback_enabled`、`action_debug_enabled`（字段 383 → **378**，`Settings.model_fields` 中 `action_*` 仅剩调参与基闸/裁决保留项） |
+| enablement | v26 段删除；文件只剩空 `enablement_violations` + `validate_enablement_chain` 包装（批次 8 删除对象）；`action_execution.py` 的 `V26_*` 常量与 `validate_action_chain` 链校验删除，`action_schedule_default_priority >= 0` 校验按 `validate_plan_config` 同款保留 |
+| 契约层 | `/debug/action-execution/*` 四端点去 404 门控（恒可见）；`.env.example` 删 5 个死键与失准注释 |
+| **裁决 B（用户 2026-09-19）** | H.4 未预见：统一分派使 **internal 类动作绕过整个工具层**（无 tool_id、世界写不走 outbox、无权限/确认/脱敏），v24 时代 ~29 条集成测试前提失效。用户选 **B：补回保障**——实现为「**工具绑定优先路由**」：`ActionExecutor.run` 先经 `tool_resolver` 解析绑定，解析出绑定（含 internal / external 类）一律走工具五段（权限→确认→校验→调用→归一）；解析不出绑定才按 `ACTION_EXECUTION_MAP` 落位（internal 直连能力 / external 保留位）。v26 结构保留，v2.4.0 工具层保障（outbox 延迟投递、权限七步、确认流、脱敏、健康记录）对全部有绑定动作生效 |
+| **生产移植 1：确认登记** | 原 `_register_confirmation` 随分派删除会使确认登记孤立（ToolExecutor 红线零 DB 写）。移植为 `_register_pending_confirmation`（主路径唯一登记点）：`tool_status=pending_confirmation` 时经 `get_confirmation_service().request()` 登记，话术写回 `result.error`，记录转 `planned` + `gate_reason=pending_confirmation`；配套 `TOOL_SHORT_CIRCUIT_OUTCOMES` 记录终态表（原 `_TOOL_RECORD_OUTCOMES` 契约恢复：unavailable/denied/invalid → cancelled 族） |
+| **生产移植 2：绑定短路** | 计划步绑定不可解析 → 五段不执行，记录短路 `unavailable`（E8：未执行 ≠ 执行失败），`_unresolved_binding_short_circuit` |
+| 语义收敛 | `from_tool_execution`：观测只取工具归一产物（dotted key），工具未产观测时回退输出白名单；`pending_confirmation` → failure_kind permanent；能力侧 failure_kind 透传（permanent 不再被抹成 transient，重试语义保真）；`metadata` 透传 params（脱敏后）/usage；`step_extras_from_result.duration_ms` 整形；效果收敛丢弃 ActionEffect 值域外 kind（`external`）；`action_schedule` 维护步回挂基闸 `action_enabled`（与 action_retry 对齐，F.13 挂载点激活） |
+| 测试 | v26 全量收口（Flag 矩阵反转为「字段已删+恒投影」、debug 404 负例退役、F.13 `TestActionScheduleConsumption` 断言反转为常开确实跑）；v24 短路/形状/确认/outbox 测试凭路由恢复**原样通过**（含 tool005 九用例 git 恢复）；v25 静态断言（单一执行 seam 由 `run_action_planning` 反转为「不再从引擎导入」）、`plan006_contract` 冻结表本地化（七行契约输入构造）、`plan012_flag_matrix`/`plan002_enablement` 链矩阵收敛为「enablement 全空」；新增 `TestPendingConfirmationRegistration` 保护登记移植 |
+| 冻结面 | `test_tool010_e2e.ZERO_DIFF_HASHES` 的 `action_engine.py` 哈希重建（允许改动） |
+| 提交（本地，未推送） | `0beb427`（refactor 去门控）→ `90bda4c`（fix 裁决 B 路由）→ `26660eb`（test 同步）→ docs（本条） |
+| 验证 | 全量 **21 failed / 6203 passed / 22 skipped**，失败 ID 集合 ⊆ 豁免清单（feishu WIP 14 + 抖动池 e2e/计时 5 + F.8 既存 2），**零未归因新增**；`compileall`、`import app.main` 通过 |
+| env | 部署侧需移除 `ACTION_EXECUTION_ENABLED` 等 5 键（删除后静默无效）；`unknown_versioned_env_keys()` 不覆盖无前缀键（F.4 限定） |
+| 行为变化 | 行动执行层**首次在生产配置下常开**：ActionManager 主路径、到期调度维护步、结果反馈投影、调试面恒可见；经裁决 B，internal 动作保有工具五段保障。**需执行 `docs/version/v2.6.0/regression-checklist.md`（尚未跑，上线前置条件）** |
+
+**批次 8 起点**：在存开关 19 → **14**（保留策略位/裁决项 5：`plan_tool_required`、`plan_context_digest_enabled`、`tool_confirm_ttl_reuse`、`foreground_gateway_enforced`、`action_outbox_enabled` + 基闸）。剩余收尾项见 H.5（删 `enablement.py` 空壳、`world_context_char_budget_v23` 改名裁决、本地 `.env` 旧键漂移修复、G.2 残留扫描）。
