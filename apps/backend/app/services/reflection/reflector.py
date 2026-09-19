@@ -19,6 +19,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.application.logical_clock import bind as _bind_logical_clock
+from app.application.logical_clock import logical_now, unbind as _unbind_logical_clock
 from app.chains.structured import build_structured_chain
 from app.core.db import EvidenceLinkRow, InsightRow, ReflectionRunRow, SessionLocal
 from app.core.llm_factory import get_llm
@@ -76,27 +78,39 @@ def register_executor() -> None:
 
 
 def run_queued_reflections(now: datetime | None = None, trace=None) -> int:
-    """调度循环入口：回收超时 running → 逐条认领 queued → 执行。"""
+    """调度循环入口：回收超时 running → 逐条认领 queued → 执行。
+
+    注入的（或默认真实的）`now` 作为周期时间绑定进逻辑时钟：run 执行内的证据重聚合
+    与认领/回收用**同一**时间口径（reflector 与行动域 H.11.2 ③ 同源修法——周期内
+    一切时间口径一致）。
+    """
     now = now or datetime.now()
     _recover_timed_out_runs(now)
     executed = 0
-    for run_id in _list_queued_run_ids():
-        if not _claim_run(run_id, now):
-            continue
-        try:
-            execute_run(run_id, trace=trace)
-            executed += 1
-        except Exception as exc:
-            logger.exception("反思执行异常，run 标记失败：%s", run_id)
-            _mark_failed(run_id, f"executor_error:{exc.__class__.__name__}", now)
-            executed += 1
+    token = _bind_logical_clock(now)
+    try:
+        for run_id in _list_queued_run_ids():
+            if not _claim_run(run_id, now):
+                continue
+            try:
+                execute_run(run_id, trace=trace)
+                executed += 1
+            except Exception as exc:
+                logger.exception("反思执行异常，run 标记失败：%s", run_id)
+                _mark_failed(run_id, f"executor_error:{exc.__class__.__name__}", now)
+                executed += 1
+    finally:
+        _unbind_logical_clock(token)
     return executed
 
 
 def execute_run(run_id: str, trace=None) -> str:
-    """单 run 执行：证据重聚合 → LLM → 校准/复检 → 单事务落库；返回终态。"""
+    """单 run 执行：证据重聚合 → LLM → 校准/复检 → 单事务落库；返回终态。
+
+    时间取逻辑时钟：调度循环内即周期时间（口径一致）；周期外直调回落真实时间。
+    """
     started = time.perf_counter()
-    now = datetime.now()
+    now = logical_now()
     run = _get_run(run_id)
     if run is None:
         return "gone"
