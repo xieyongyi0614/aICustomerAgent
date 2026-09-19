@@ -67,7 +67,7 @@ class TestRelationshipMapCoverage:
 
 class TestAutonomyQuotaCountsPlan:
     def test_plan_source_counts_toward_daily_limit(self, override_settings):
-        override_settings(action_enabled=True, world_enabled=True)
+        override_settings(world_enabled=True)
         now = datetime.now()
         user_id = "u_t7_quota"
         world_engine.ensure_world(user_id)
@@ -86,7 +86,7 @@ class TestAutonomyQuotaCountsPlan:
         assert count >= 1
 
     def test_conversation_source_not_counted(self, override_settings):
-        override_settings(action_enabled=True, world_enabled=True)
+        override_settings(world_enabled=True)
         now = datetime.now()
         user_id = "u_t7_conv"
         world_engine.ensure_world(user_id)
@@ -107,7 +107,6 @@ class TestAutonomyQuotaCountsPlan:
 class TestPlanBridgeSourceAndDelivery:
     def test_bridge_dispatch_plan_source_and_relationship_event(self, override_settings):
         override_settings(
-            action_enabled=True,
             action_relationship_enabled=True,
             world_enabled=True,
         )

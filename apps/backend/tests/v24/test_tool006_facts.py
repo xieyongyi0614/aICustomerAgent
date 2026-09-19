@@ -326,7 +326,7 @@ def test_binding_absent_for_tool_outside_surface(monkeypatch, v24_tool_env):
 def test_collect_action_facts_unchanged_when_tool_facts_empty(
     monkeypatch, override_settings, v24_tool_env
 ):
-    override_settings(action_enabled="true")
+    override_settings()
     v24_tool_env()
     monkeypatch.setattr(
         autonomy_engine, "collect_facts", lambda user_id: {"active_plans": 2}

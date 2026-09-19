@@ -176,7 +176,6 @@ class TestDedupeKey:
 class TestSettingsActionGroup:
     def test_defaults(self):
         settings = get_settings()
-        assert settings.action_enabled is False
         assert settings.action_detector_enabled is True
         assert settings.action_plan_max_steps == 1
         assert settings.action_max_active_per_user == 5

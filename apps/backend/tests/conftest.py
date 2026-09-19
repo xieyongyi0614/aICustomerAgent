@@ -392,7 +392,6 @@ def override_settings(monkeypatch):
             "world_interpreter_enabled": "WORLD_INTERPRETER_ENABLED",
             "world_memory_bridge_enabled": "WORLD_MEMORY_BRIDGE_ENABLED",
             "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
-            "action_enabled": "ACTION_ENABLED",
             "action_detector_enabled": "ACTION_DETECTOR_ENABLED",
             "action_plan_max_steps": "ACTION_PLAN_MAX_STEPS",
             "action_plan_expires_minutes": "ACTION_PLAN_EXPIRES_MINUTES",

@@ -472,8 +472,6 @@ async def execute_existing_record(
 ) -> ActionResult | None:
     """复用既有 ActionRecord 执行（Manager.execute 唯一委托入口，不新建记录）。"""
     settings = get_settings()
-    if not settings.action_enabled:
-        return None
     if record.status not in ("created", "planned", "executing"):
         return None
     intent_data = record.intent or {}
@@ -637,11 +635,10 @@ def integrate_result(record: ActionRecord, result: ActionResult) -> None:
         _integrate_via_outbox(record)
         return
 
-    if settings.action_enabled:
-        memory_payload = _deliver_memory(record, settings)
-        if memory_payload:
-            _append_effect(record, "memory", memory_payload.get("memory_id", ""), "已记住")
-        relationship_bridge.deliver_action_signal(record, record.user_id)
+    memory_payload = _deliver_memory(record, settings)
+    if memory_payload:
+        _append_effect(record, "memory", memory_payload.get("memory_id", ""), "已记住")
+    relationship_bridge.deliver_action_signal(record, record.user_id)
 
     record.updated_at = _now()
     action_repository.save_record(record)
@@ -682,14 +679,40 @@ def _detail_for(record: ActionRecord) -> str:
     return f"创建提醒 WorldEvent due {due}" if due else f"创建提醒 {content}"
 
 
+def _normalize_use_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
+    """use_object 参数归一（引擎侧唯一读 IO 点）：raw 参照 → 世界实体名 + 数量清单。
+
+    "煮碗面要俩鸡蛋" → items=[面条×1, 鸡蛋×2]；主对象无法归一时保持原样
+    （下游库存校验自然失败，宁缺毋滥）。
+    """
+    if intent.action_type != "use_object":
+        return intent
+    params = dict(intent.params)
+    items: list[dict] = []
+    for item in params.get("items") or []:
+        obj = world_engine.resolve_inventory_ref(user_id, str(item.get("object", "")))
+        if obj is not None:
+            items.append({"object": obj.id, "quantity": float(item.get("quantity") or 1)})
+    primary = world_engine.resolve_inventory_ref(user_id, str(params.get("object", "")))
+    if primary is not None:
+        params["object"] = primary.name
+        if all(item["object"] != primary.id for item in items):
+            items.insert(0, {"object": primary.id, "quantity": 1.0})
+    if not items:
+        return intent
+    params["items"] = items
+    return intent.model_copy(update={"params": params})
+
+
 async def run_action_planning(
     user_id: str, intent: ActionIntent, session_id: str | None = None,
     goal_id: str | None = None, source: str = "conversation",
 ) -> ActionRecord | None:
-    """第 9 步入口：门控 + 建记录 + 六闸门 + 装配 + 执行 + 整合。"""
+    """第 9 步入口：建记录 + 闸门 + 装配 + 执行 + 整合。"""
     settings = get_settings()
-    if not settings.action_enabled or intent is None:
+    if intent is None:
         return None
+    intent = _normalize_use_intent(intent, user_id)
     record = new_record(intent, user_id, session_id, source)
 
     snapshot = _build_snapshot(user_id, settings)
@@ -743,8 +766,6 @@ async def run_confirmation_round(
     `cancelled` + `permission_denied`，工具不执行（零外部调用）。
     """
     settings = get_settings()
-    if not settings.action_enabled:
-        return None
     service = get_confirmation_service(settings)
     outcome = service.resolve(request_id, approved=approved, source="user_confirm")
     request = outcome.request
@@ -841,8 +862,6 @@ def _pending_confirmation_record(user_id: str, dedupe_key: str) -> ActionRecord 
 def collect_facts(user_id: str) -> dict:
     """有界 action_facts 事实包（autonomy-integration.md §2，H-A5）。失败返回 {}。"""
     try:
-        if not get_settings().action_enabled:
-            return {}
         records = action_repository.list_records(user_id, limit=50)
         active = [r for r in records if r.status in ACTIVE_STATUSES]
         reminders = [
@@ -900,12 +919,11 @@ def collect_facts(user_id: str) -> dict:
 
 
 async def run_action_retry_loop():
-    """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划（action_enabled 门控）。"""
+    """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划。"""
 
     async def _tick():
-        if get_settings().action_enabled:
-            await _process_due_retries()
-            _expire_planned()
+        await _process_due_retries()
+        _expire_planned()
 
     await run_worker_loop(
         "action retry loop",

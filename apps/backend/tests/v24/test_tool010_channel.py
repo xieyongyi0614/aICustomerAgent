@@ -677,7 +677,6 @@ async def test_recipient_intent_reaches_channel_tool_through_confirmation(
     from app.services.tool.confirmation import get_confirmation_service
 
     override_settings(
-        action_enabled=True,
         world_enabled=False,
         feishu_enabled=True,
         tool_confirm_ttl_reuse=True,

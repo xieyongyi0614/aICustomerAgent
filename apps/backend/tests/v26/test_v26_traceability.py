@@ -69,7 +69,6 @@ class TestPlanStepTraceability:
         from app.services.planning.executor_bridge import PlanExecutorBridge
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         monkeypatch.setattr(settings, "world_enabled", True)
         world_engine.ensure_world("u_bridge_trace")
         bridge = PlanExecutorBridge()
@@ -95,7 +94,6 @@ class TestPlanStepTraceability:
         from app.models.action import ActionIntent
 
         s = get_settings()
-        monkeypatch.setattr(s, "action_enabled", True)
         record = action_engine.new_record(
             ActionIntent(
                 action_type="remember_fact",

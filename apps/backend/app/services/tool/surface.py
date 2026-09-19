@@ -166,7 +166,7 @@ class ToolSurfacePolicy:
         """日时段维度：late_night 剔除通道命名空间与社交标签；未装配则降级不裁剪。"""
         part = ctx.part_of_day()
         if part is None:
-            logger.info("surface_part_of_day_degraded:ToolContext.world 未装配（TOOL-007）")
+            logger.debug("surface_part_of_day_degraded:ToolContext.world 未装配（TOOL-007）")
             return None
         if part not in LATE_NIGHT_PARTS:
             return None
@@ -180,7 +180,7 @@ class ToolSurfacePolicy:
         """场景维度：工作型收紧（剔除 ambient），放松型放开；未知语气保守不裁剪（E14）。"""
         tone = ctx.scene_tone_bias()
         if tone is None:
-            logger.info("surface_scene_degraded:ToolContext.scene 未装配（TOOL-007）")
+            logger.debug("surface_scene_degraded:ToolContext.scene 未装配（TOOL-007）")
             return None
         if tone not in known_tone_biases():
             logger.warning("surface_unknown_tone_bias:%s（保守：不做场景维度裁剪）", tone)
@@ -194,7 +194,7 @@ class ToolSurfacePolicy:
         """关系阶段维度：阶段低于 friend 剔除亲密标签；未装配 / 未知阶段不裁剪。"""
         stage = ctx.relationship_stage()
         if stage is None:
-            logger.info("surface_relationship_degraded:ToolContext.relationship 未装配（TOOL-007）")
+            logger.debug("surface_relationship_degraded:ToolContext.relationship 未装配（TOOL-007）")
             return None
         rank = relationship_stage_rank(stage)
         if rank is None:

@@ -51,13 +51,13 @@ def _verdict(intention="check_in") -> AutonomyVerdict:
 
 @pytest.mark.asyncio
 async def test_poll_due_actions_disabled_empty(override_settings, db_session_factory):
-    override_settings(action_enabled=False)
+    override_settings()
     assert trigger_evaluator.poll_due_actions(USER, NOW) is None
 
 
 @pytest.mark.asyncio
 async def test_poll_due_actions_hits_due_reminder(override_settings, db_session_factory):
-    override_settings(action_enabled=True, world_enabled=True)
+    override_settings(world_enabled=True)
     _seed_due_reminder(USER, due=NOW - timedelta(minutes=1))
     signal = trigger_evaluator.poll_due_actions(USER, NOW)
     assert signal is not None
@@ -68,14 +68,14 @@ async def test_poll_due_actions_hits_due_reminder(override_settings, db_session_
 
 @pytest.mark.asyncio
 async def test_poll_due_actions_ignores_future(override_settings, db_session_factory):
-    override_settings(action_enabled=True, world_enabled=True)
+    override_settings(world_enabled=True)
     _seed_due_reminder(USER, due=NOW + timedelta(hours=2))
     assert trigger_evaluator.poll_due_actions(USER, NOW) is None
 
 
 @pytest.mark.asyncio
 async def test_mark_action_reported_idempotent(override_settings, db_session_factory):
-    override_settings(action_enabled=True, world_enabled=True)
+    override_settings(world_enabled=True)
     event = _seed_due_reminder(USER, due=NOW - timedelta(minutes=1))
     assert trigger_evaluator.poll_due_actions(USER, NOW) is not None
     trigger_evaluator.mark_action_reported(USER, event.id)
@@ -86,7 +86,7 @@ async def test_mark_action_reported_idempotent(override_settings, db_session_fac
 async def test_produce_autonomy_action_disabled_zero_path(
     override_settings, db_session_factory
 ):
-    override_settings(action_enabled=True, autonomy_action_enabled=False)
+    override_settings(autonomy_action_enabled=False)
     produced = await _produce_autonomy_action(
         _verdict(), USER, session_id="s1", now=NOW
     )
@@ -99,7 +99,7 @@ async def test_produce_autonomy_action_enabled_creates_record(
     override_settings, db_session_factory
 ):
     override_settings(
-        action_enabled=True, world_enabled=True, autonomy_action_enabled=True
+        world_enabled=True, autonomy_action_enabled=True
     )
     produced = await _produce_autonomy_action(
         _verdict(), USER, session_id="s1", now=NOW
@@ -113,7 +113,7 @@ async def test_produce_autonomy_action_enabled_creates_record(
 @pytest.mark.asyncio
 async def test_autonomy_action_daily_limit(override_settings, db_session_factory):
     override_settings(
-        action_enabled=True, world_enabled=True, autonomy_action_enabled=True,
+        world_enabled=True, autonomy_action_enabled=True,
         autonomy_action_daily_limit=1,
     )
     assert await _produce_autonomy_action(_verdict(), USER, "s1", NOW) is True

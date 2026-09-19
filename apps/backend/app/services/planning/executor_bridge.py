@@ -414,8 +414,7 @@ def _plain_outcome(
 def _normalize(step, record, at: datetime) -> PlanStepOutcome:
     """`ActionRecord` → `PlanStepOutcome`（§4.3.4 映射 + `observations` 白名单裁剪）。
 
-    `record is None`（`action_enabled` off，编排器未建记录）→ `hold`：本步没被执行，也不该
-    被判失败（既有的行动总闸语义）。
+    `record is None`（编排器未建记录）→ `hold`：本步没被执行，也不该被判失败。
     V2.6.1：存在全形态 `record.result` 时经 `integration.to_plan_step_outcome` 投影。
     """
     if record is None:

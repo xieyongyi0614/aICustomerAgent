@@ -176,7 +176,7 @@ class TestMaintenanceAndIdle:
         self, db_session_factory, life_loop_on
     ):
         stats = await life_loop.run_life_loop_tick(now=NOW)
-        assert stats["maintenance"] == 1  # reconcile；world/action 已关
+        assert stats["maintenance"] == 3  # reconcile + action_retry + action_schedule
         runs = loop_run_repository.list_recent(kind="trigger_reconcile")
         assert len(runs) == 1 and runs[0].status == "done"
 

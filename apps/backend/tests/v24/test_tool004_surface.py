@@ -352,7 +352,7 @@ def test_e5_empty_world_degrades_without_cutting(caplog):
         tool_definition("builtin.reminder.create", priority=10),
         tool_definition("builtin.social.checkin", tags=("social",), priority=20),
     )
-    with caplog.at_level(logging.INFO, logger=SURFACE_LOGGER):
+    with caplog.at_level(logging.DEBUG, logger=SURFACE_LOGGER):
         surface = resolve(registry, surface_context())
     assert surface.excluded == ()
     assert "builtin.social.checkin" in surface.tool_ids
@@ -410,7 +410,7 @@ def test_unknown_relationship_stage_is_conservative(caplog):
 
 def test_unknown_scene_tone_missing_is_conservative(caplog):
     registry = registry_with(tool_definition("builtin.ambient.note", tags=("ambient",)))
-    with caplog.at_level(logging.INFO, logger=SURFACE_LOGGER):
+    with caplog.at_level(logging.DEBUG, logger=SURFACE_LOGGER):
         surface = resolve(registry, surface_context(scene={}))
     assert "builtin.ambient.note" in surface.tool_ids
     assert "surface_scene_degraded" in caplog.text

@@ -43,7 +43,6 @@ def _tool_path_env(override_settings, monkeypatch):
     monkeypatch.setattr(tool_registry, "_registry", None)
     override_settings(
         world_enabled="true",
-        action_enabled="true",
         action_outbox_enabled="true",
         world_household_autoseed_enabled="false",
         observability_persist_enabled="false",

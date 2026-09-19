@@ -28,15 +28,8 @@ def _intent(action_type="create_reminder", **params):
 
 
 @pytest.mark.asyncio
-async def test_action_planning_disabled_returns_none(override_settings, db_session_factory):
-    override_settings(action_enabled=False)
-    record = await run_action_planning(USER, _intent(content="喝水", due_at="20:00"))
-    assert record is None
-
-
-@pytest.mark.asyncio
 async def test_action_planning_records_created(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = await run_action_planning(USER, _intent(content="喝水", due_at="20:00"))
     assert record is not None
     assert record.action_type == "create_reminder"
@@ -44,7 +37,7 @@ async def test_action_planning_records_created(override_settings, db_session_fac
 
 
 def test_duplicate_gate_rejects(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     gsaf = get_settings()
     snapshot = GateSnapshot(settings=gsaf, registry=get_capability_registry(), now=datetime.now())
     snapshot.records = [
@@ -60,7 +53,7 @@ def test_duplicate_gate_rejects(override_settings, db_session_factory):
 
 
 def test_ambiguous_params_gate_rejects(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     snapshot = GateSnapshot(settings=get_settings(), registry=get_capability_registry(), now=datetime.now())
     intent = ActionIntent(
         action_type="create_reminder",
@@ -90,7 +83,7 @@ def test_assemble_plan_single_step(db_session_factory):
 async def test_action_planning_e2e_makes_world_event(override_settings, db_session_factory):
     from app.application import world_engine
 
-    override_settings(action_enabled=True)
+    override_settings()
     due = (datetime.now() + timedelta(hours=1)).isoformat()
     record = await run_action_planning(USER, _intent(content="吃药", due_at=due))
     assert record is not None

@@ -560,7 +560,6 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
 
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true")
@@ -636,7 +635,6 @@ def test_s5_tool_writes_world_only_through_outbox(
 ):
     """工具写世界先落 outbox，消费后才出现世界事件。"""
     override_settings(
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         ACTION_OUTBOX_ENABLED="true")
     support.apply_flag_env(monkeypatch, MASTER_ON)

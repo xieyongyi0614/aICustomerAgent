@@ -20,12 +20,12 @@ def _intent(action_type="create_reminder", **params):
 
 
 def test_list_empty_returns_empty_list(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     assert list_actions(user_id="dbg-user") == []
 
 
 def test_list_and_get_roundtrip(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(_intent(content="喝水", due_at="20:00"), "dbg-user", session_id="s1")
     record.status = "planned"
     action_repository.save_record(record)
@@ -36,14 +36,14 @@ def test_list_and_get_roundtrip(override_settings, db_session_factory):
 
 
 def test_get_missing_404(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     with pytest.raises(HTTPException) as exc:
         get_action("act_nonexistent_0000001")
     assert exc.value.status_code == 404
 
 
 def test_cancel_planned_action(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(_intent(content="取消测试", due_at="20:00"), "dbg-user", session_id="s1")
     record.status = "planned"
     action_repository.save_record(record)
@@ -53,7 +53,7 @@ def test_cancel_planned_action(override_settings, db_session_factory):
 
 
 def test_retry_failed_action(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(_intent(content="重试", due_at="20:00"), "dbg-user", session_id="s1")
     record.status = "failed"
     action_repository.save_record(record)

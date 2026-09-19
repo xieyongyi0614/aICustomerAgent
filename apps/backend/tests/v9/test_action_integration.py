@@ -22,7 +22,7 @@ def _intent(action_type="create_reminder", **params):
 async def test_world_event_created_via_action(override_settings, db_session_factory):
     from app.application import world_engine
 
-    override_settings(action_enabled=True)
+    override_settings()
     due = (datetime.now() + timedelta(hours=1)).isoformat()
     record = await run_action_planning("int-user-1", _intent(content="复诊", due_at=due), session_id="s1")
     assert record is not None
@@ -35,7 +35,7 @@ async def test_world_event_created_via_action(override_settings, db_session_fact
 async def test_remember_fact_writes_memory(override_settings, db_session_factory):
     from app.repositories import memory_repository
 
-    override_settings(action_enabled=True)
+    override_settings()
     record = await run_action_planning("int-user-2", _intent("remember_fact", fact="喜欢抹茶"), session_id="s1")
     assert record is not None
     if record.status == "succeeded":
@@ -45,7 +45,7 @@ async def test_remember_fact_writes_memory(override_settings, db_session_factory
 
 @pytest.mark.asyncio
 async def test_action_context_renders_within_budget(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     due = datetime.now().isoformat()
     await run_action_planning("int-user-3", _intent(content="吃药", due_at=due), session_id="s1")
     ctx: ActionContext | None = build_action_context("int-user-3")
@@ -56,15 +56,8 @@ async def test_action_context_renders_within_budget(override_settings, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_action_context_disabled_is_none(override_settings, db_session_factory):
-    override_settings(action_enabled=False)
-    await run_action_planning("int-user-4", _intent(content="喝水", due_at="20:00"), session_id="s1")
-    assert build_action_context("int-user-4") is None
-
-
-@pytest.mark.asyncio
 async def test_relationship_signal_lookup(override_settings, db_session_factory):
-    override_settings(action_enabled=True, action_relationship_enabled=True)
+    override_settings(action_relationship_enabled=True)
     record = await run_action_planning("int-user-5", _intent("remember_fact", fact="喜欢散步"), session_id="s1")
     assert record is not None
     if record.status == "succeeded":
@@ -75,7 +68,7 @@ async def test_relationship_signal_lookup(override_settings, db_session_factory)
 def test_overclaim_rule_fires_and_clears(override_settings, db_session_factory):
     from app.repositories import action_repository
 
-    override_settings(action_enabled=True)
+    override_settings()
     ctx = EvaluationContext(
         subject="turn",
         subject_id="t1",
@@ -103,7 +96,7 @@ def test_overclaim_rule_fires_and_clears(override_settings, db_session_factory):
 def test_unreported_failure_rule(override_settings, db_session_factory):
     from app.repositories import action_repository
 
-    override_settings(action_enabled=True)
+    override_settings()
     ctx = EvaluationContext(
         subject="turn", subject_id="t1", session_id="s1", user_id="int-user-7",
         reply="下次再说",

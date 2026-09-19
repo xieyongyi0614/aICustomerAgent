@@ -134,7 +134,6 @@ def _memory_capability() -> StubCapability:
 
 def _enable(override_settings, **extra):
     override_settings(
-        action_enabled=True,
         world_enabled=False,
         **extra,
     )
@@ -476,7 +475,7 @@ async def test_unknown_request_round_is_noop(monkeypatch, override_settings, db_
 async def test_confirmation_round_skipped_when_action_disabled(
     override_settings, db_session_factory
 ):
-    override_settings(action_enabled=False)
+    override_settings()
     assert await action_engine.run_confirmation_round(USER, "any", approved=True) is None
 
 
@@ -627,7 +626,7 @@ async def test_post_process_keeps_pending_for_unrelated_reply(
 
 @pytest.mark.asyncio
 async def test_post_process_confirmation_round_disabled_without_flag(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     assert await post_process._run_confirmation_round(_post_ctx("好")) is False
 
 
@@ -701,12 +700,11 @@ def test_gate_reasons_unchanged():
     )
 
 
-def test_v9_six_gates_order_unchanged():
+def test_v9_gates_order_unchanged():
     from app.services.action import planner
 
     source = inspect.getsource(planner.evaluate_gates)
     markers = (
-        "disabled",
         "ambiguous_params",
         "_check_g3",
         "_check_g4",

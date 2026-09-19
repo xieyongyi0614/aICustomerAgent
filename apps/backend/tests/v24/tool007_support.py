@@ -38,7 +38,6 @@ def world_settings(**overrides: Any) -> SimpleNamespace:
         "world_household_autoseed_enabled": False,
         "scene_expansion_enabled": False,
         "tool_surface_max_tools": 12,
-        "action_enabled": False,
         "action_plan_expires_minutes": 5,
         "action_dedupe_window_hours": 24,
         "action_max_active_per_user": 5,

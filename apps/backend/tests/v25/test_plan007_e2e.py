@@ -56,7 +56,6 @@ def autonomy_env(override_settings):
     """自治通路默认开闸（既有 V2.0.0 / V7 Flag），本任务的子闸由各用例显式开关。"""
     override_settings(
         observability_persist_enabled="true",
-        action_enabled="true",
         world_enabled="false")
     return True
 
@@ -245,7 +244,6 @@ class TestPacketAssembly:
 
         override_settings(
             observability_persist_enabled="true",
-            action_enabled="true",
             world_enabled="false")
         facts = autonomy_engine._collect_plan_facts(USER, TICK_AT)
         assert facts["active_goal_id"] == goal.id

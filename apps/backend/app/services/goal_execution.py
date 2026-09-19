@@ -33,8 +33,6 @@ def _in_quiet_hours(now: datetime) -> bool:
 async def attempt_current_step(goal, plan, now: datetime) -> dict:
     """当前 Sub-Goal 的一次执行尝试；cooldown 内/静音时段/闸门拒绝全 trace。"""
     settings = get_settings()
-    if not settings.action_enabled:
-        return {"status": "skipped", "skip_reason": "action_disabled"}
     specs = list(plan.sub_goals)
     current = goal_observation._current_step(specs)
     if current is None:

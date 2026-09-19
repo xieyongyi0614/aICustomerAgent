@@ -130,8 +130,7 @@ class TestSupplyOrigin:
         assert "medium" in layers
 
     def test_materialize_persists_origin(self, db_session_factory, stack_on, override_settings):
-        override_settings( ACTION_ENABLED="true"
-        )
+        
         override = {"salient_events": [{"importance": "high", "title": "面试日"}]}
         result = __import__("app.services.goal_planning", fromlist=["materialize"]).materialize(
             USER, world_facts=override, now=NOW

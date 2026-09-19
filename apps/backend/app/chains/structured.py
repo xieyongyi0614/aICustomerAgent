@@ -31,6 +31,14 @@ def _extract_json_text(content: str) -> str:
     return stripped
 
 
+def _strip_nulls(data):
+    if isinstance(data, dict):
+        return {key: _strip_nulls(value) for key, value in data.items() if value is not None}
+    if isinstance(data, list):
+        return [_strip_nulls(item) for item in data]
+    return data
+
+
 def _tolerant_schema(schema: type) -> type:
     class _Tolerant(schema):
         @classmethod
@@ -39,6 +47,13 @@ def _tolerant_schema(schema: type) -> type:
                 return super().model_validate_json(json_data, **kwargs)
             except ValidationError:
                 return cls.model_validate(_unwrap_json(json_data))
+
+        @classmethod
+        def model_validate(cls, obj, **kwargs):
+            try:
+                return super().model_validate(obj, **kwargs)
+            except ValidationError:
+                return super().model_validate(_strip_nulls(obj))
 
     _Tolerant.__name__ = schema.__name__
     return _Tolerant
@@ -49,7 +64,8 @@ def build_structured_chain(
 ) -> Runnable:
     model = llm or get_llm()
     prompt = ChatPromptTemplate.from_messages(list(messages))
-    primary = prompt | model.with_structured_output(_tolerant_schema(schema))
+    tolerant_model = _tolerant_schema(schema)
+    primary = prompt | model.with_structured_output(tolerant_model)
 
     parser = PydanticOutputParser(pydantic_object=schema)
     instructions = (
@@ -62,10 +78,7 @@ def build_structured_chain(
     def _parse(message):
         text = getattr(message, "content", "") or ""
         candidate = _extract_json_text(str(text))
-        try:
-            return schema.model_validate_json(candidate)
-        except ValidationError:
-            return schema.model_validate(_unwrap_json(candidate))
+        return tolerant_model.model_validate_json(candidate)
 
     fallback = fallback_prompt | model | RunnableLambda(_parse)
     return observe_structured_chain(primary.with_fallbacks([fallback]), prompt, schema, model)

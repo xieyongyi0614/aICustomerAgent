@@ -1,7 +1,7 @@
 """V9 ActionIntentDetector（planner.md §1）。
 
 确定性检出：词表 + 参数抽取的纯函数，零新增 LLM 调用。
-门控 action_enabled and action_detector_enabled；任何异常返回 None（宁缺毋滥）。
+门控 action_detector_enabled；任何异常返回 None（宁缺毋滥）。
 词表属角色资产（app/character/asuna/action.py），检出逻辑在此。
 """
 
@@ -22,6 +22,39 @@ logger = logging.getLogger(__name__)
 
 _QUESTION_GUARDS = ("能不能", "可不可以", "可以吗", "能吗", "会提醒我吗", "你会", "能不能帮我")
 _IMPERATIVE_SUBJECTS = ("帮我", "替我", "给我", "记得", "麻烦")
+
+# 数量清单抽取：数词/数字 + 量词 + 名词（"俩个鸡蛋" → 鸡蛋×2），供 use_object 批量消耗。
+_ITEM_PATTERN = re.compile(
+    r"([0-9]+|[一二两俩三四五六七八九十半]+)([个只瓶罐袋条碗份块杯桶片盒根包])\s*([\u4e00-\u9fa5]{1,4})"
+)
+_CN_NUMERALS = {
+    "一": 1.0,
+    "二": 2.0,
+    "两": 2.0,
+    "俩": 2.0,
+    "三": 3.0,
+    "四": 4.0,
+    "五": 5.0,
+    "六": 6.0,
+    "七": 7.0,
+    "八": 8.0,
+    "九": 9.0,
+    "十": 10.0,
+    "半": 0.5,
+}
+
+
+def _extract_items(content: str) -> list[dict]:
+    items: list[dict] = []
+    for numeral, _measure, noun in _ITEM_PATTERN.findall(content):
+        value = _CN_NUMERALS.get(numeral)
+        if value is None:
+            try:
+                value = float(numeral)
+            except ValueError:
+                continue
+        items.append({"object": noun, "quantity": value})
+    return items
 
 # 祈使主语豁免：把X放到Y 是天然指令；查询/取消是天然请求。
 _IMPERATIVE_EXEMPT_TYPES = ("move_object", "query_environment", "cancel_reminder")
@@ -105,6 +138,10 @@ def _extract_params(action_type: str, content: str, trigger: str, now: datetime)
         value = _text_after(content, trigger)
         if value:
             params[field] = value
+    if action_type == "use_object":
+        items = _extract_items(content)
+        if items:
+            params["items"] = items
     for name in REQUIRED_PARAMS[action_type]:
         if name not in params:
             missing.append(name)
@@ -133,9 +170,9 @@ def detect_action_intent(
     world_ctx=None,
     now: datetime | None = None,
 ) -> ActionIntent | None:
-    """确定性检出入口（H-A1）；门控 + 异常降级 None。"""
+    """确定性检出入口（H-A1）；异常降级 None。"""
     settings = get_settings()
-    if not settings.action_enabled or not settings.action_detector_enabled:
+    if not settings.action_detector_enabled:
         return None
     try:
         return _detect(content, now or datetime.now())

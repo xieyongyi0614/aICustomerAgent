@@ -44,7 +44,6 @@ class TestMultistepDecision:
 class TestExecuteBackoffGuard:
     def test_execute_holds_when_next_retry_in_future(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         action = manager.create(
             user_id="u_backoff",
             action_type="remember_fact",
@@ -63,7 +62,6 @@ class TestExecuteBackoffGuard:
 
     def test_execute_proceeds_when_backoff_elapsed(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         monkeypatch.setattr(settings, "world_enabled", True)
         from app.application import world_engine
 

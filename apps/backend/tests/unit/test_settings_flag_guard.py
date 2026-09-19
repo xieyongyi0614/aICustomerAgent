@@ -40,7 +40,7 @@ class TestEnvKeyGuard:
     def test_unknown_versioned_env_keys_reports_ghost(self):
         environ = {
             "V99_GHOST_ENABLED": "true",
-            "ACTION_ENABLED": "true",
+            "SOME_SETTING": "true",
             "PATH": "/usr/bin",
         }
         assert unknown_versioned_env_keys(environ) == ["V99_GHOST_ENABLED"]

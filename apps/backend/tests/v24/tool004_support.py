@@ -22,7 +22,6 @@ def tool_settings(**overrides: Any) -> SimpleNamespace:
     values: dict[str, Any] = {
         "tool_surface_max_tools": 12,
         "world_enabled": True,
-        "action_enabled": True,
         "action_plan_expires_minutes": 5,
         "action_execution_timeout_seconds": 5.0,
     }

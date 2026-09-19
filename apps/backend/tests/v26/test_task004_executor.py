@@ -212,7 +212,7 @@ class TestPendingConfirmationRegistration:
         from app.services.tool import confirmation as confirmation_mod
         from app.services.tool.context import ToolContext
 
-        override_settings(action_enabled="true")
+        override_settings()
         definition = self._definition()
         tool_registry = SimpleNamespace(get=lambda tool_id: definition)
         binding = SimpleNamespace(tool_id=definition.id)

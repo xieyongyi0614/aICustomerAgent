@@ -173,20 +173,6 @@ class TestRetry:
 
         assert asyncio.run(manager.retry("act_missing")) is None
 
-    def test_retry_resets_failed_when_action_disabled(self):
-        action = _create()
-        record = action_repository.get_record(action.id)
-        record.status = "failed"
-        action_repository.save_record(record)
-        record_action = manager.query(action.id)
-        assert record_action.status == "failed"
-        import asyncio
-
-        result = asyncio.run(manager.retry(action.id))
-        assert result is not None
-        status = manager.get_status(action.id)
-        assert status == "planned"
-
     def test_retry_reuses_dedupe_key(self):
         action = _create(content="重试测试")
         record = action_repository.get_record(action.id)

@@ -41,7 +41,7 @@ def test_transition_terminal_noop():
 async def test_execute_plan_single_success(db_session_factory, override_settings):
     from app.core.settings import get_settings as _gs
 
-    override_settings(action_enabled=True)
+    override_settings()
     intent = ActionIntent(action_type="remember_fact", confidence="confident", params={"fact": "喜欢柠檬"})
     record = new_record(intent, "exe-user", session_id=None)
     plan = ActionPlan(

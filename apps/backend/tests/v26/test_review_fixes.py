@@ -76,7 +76,6 @@ class TestManagerExecuteWiring:
 
     def test_execute_existing_record_reuses_id(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         action = manager.create(
             user_id="u_exec",
             action_type="query_environment",
@@ -92,7 +91,6 @@ class TestManagerExecuteWiring:
 
     def test_execute_plan_source_one_record(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         from app.services.action import integration
 
         intent = ActionIntent(
@@ -120,7 +118,6 @@ class TestV26ExecutorPath:
         from app.application import action_engine
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         action = manager.create(
             user_id="u_v26e",
             action_type="remember_fact",
@@ -156,7 +153,6 @@ class TestPlanningBridgeFlagOn:
         from app.services.planning.executor_bridge import PlanExecutorBridge
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:

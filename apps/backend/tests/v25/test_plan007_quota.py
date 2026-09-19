@@ -82,7 +82,7 @@ def _world_free_plan():
 
 @pytest.fixture
 def action_on(override_settings):
-    override_settings(action_enabled="true", world_enabled="false")
+    override_settings(world_enabled="false")
     return True
 
 

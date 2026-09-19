@@ -122,8 +122,6 @@ def _status_label(item: ActionItem) -> str:
 
 def build_action_context(user_id: str, session_id: str | None = None) -> ActionContext | None:
     settings = get_settings()
-    if not settings.action_enabled:
-        return None
     try:
         records = action_repository.list_records(user_id, limit=20)
         if not records:

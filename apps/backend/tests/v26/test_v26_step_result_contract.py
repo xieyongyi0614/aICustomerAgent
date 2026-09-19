@@ -94,7 +94,6 @@ class TestProjectionFunctions:
 class TestFlagOnInternalMainPath:
     def test_create_reminder_steps_full_shape(self, override_settings):
         override_settings(
-            action_enabled=True,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t1_rem")
@@ -124,7 +123,6 @@ class TestFlagOnInternalMainPath:
 
     def test_remember_fact_steps_full_shape(self, override_settings):
         override_settings(
-            action_enabled=True,
             world_enabled=True,
         )
         action = manager.create(
@@ -148,7 +146,6 @@ class TestFlagOnInternalMainPath:
 
     def test_failed_path_still_full_shape(self, override_settings):
         override_settings(
-            action_enabled=True,
             world_enabled=True,
         )
         world_engine.ensure_world("u_t1_fail")

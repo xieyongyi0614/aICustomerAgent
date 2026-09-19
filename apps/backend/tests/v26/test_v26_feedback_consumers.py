@@ -18,7 +18,6 @@ def _due_at(hours: int = 2) -> str:
 
 def _enabled(monkeypatch, **flags):
     settings_flags = {
-        "action_enabled": True,
         "world_enabled": True,
     }
     settings_flags.update(flags)
@@ -73,7 +72,7 @@ class TestAutonomyConsumer:
         )
         asyncio.run(manager.execute(action.id))
         facts = collect_facts("u_fb_aut")
-        assert facts, "action_enabled on 时 facts 不能为空"
+        assert facts, "facts 不能为空"
         recent = facts.get("recent_feedback") or []
         assert recent, "collect_facts 必须消费 feedback 投影"
         assert recent[0]["action"] == "create_reminder"

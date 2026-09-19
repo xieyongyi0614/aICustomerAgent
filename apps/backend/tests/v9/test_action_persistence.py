@@ -50,7 +50,7 @@ def test_retention_cleanup_removes_old(db_session_factory):
 
 @pytest.mark.asyncio
 async def test_list_records_newest_first(db_session_factory, override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     for i in range(3):
         await run_action_planning("persist-user-4", _intent(content=f"任务{i}"), session_id=None)
     records = action_repository.list_records("persist-user-4", limit=10)

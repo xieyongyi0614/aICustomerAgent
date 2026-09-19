@@ -44,10 +44,11 @@ WORLD_OP_WHITELIST: tuple[str, ...] = (
     "create_object",
     "move_object",
     "apply_object_action",
+    "consume_inventory",
     "set_environment",
     "set_location",
 )
-"""Task Detail §4.2.3 的合法世界操作白名单（七值，逐字对应文档表格）。"""
+"""Task Detail §4.2.3 的合法世界操作白名单（七值 + consume_inventory，逐字对应文档表格）。"""
 
 WORLD_OP_LITERAL_PRODUCERS: tuple[Path, ...] = (
     scan.PLANNING_PACKAGE_DIR.parent / "action" / "capabilities" / "reminder.py",
@@ -68,6 +69,7 @@ WORLD_WRITE_FACE: tuple[str, ...] = (
     "create_object",
     "move_object",
     "apply_object_action",
+    "consume_inventory",
     "discard_object",
     "consume_object",
     "expire_due_objects",
@@ -275,7 +277,6 @@ def planning_world_on(override_settings):
     """PLAN-008 装配面：编排常开（子闸已删）+ 世界（V2.3.0 事件链）+ 工具总闸；自动播种关闭（夹具确定）。"""
     override_settings(
         plan_tool_required="true",
-        action_enabled="true",
         world_enabled="true",
         world_household_autoseed_enabled="false",
         action_relationship_enabled="false",

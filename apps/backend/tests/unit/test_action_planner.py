@@ -37,7 +37,7 @@ def make_snapshot(override_settings=None, **overrides) -> GateSnapshot:
 
 @pytest.fixture
 def snapshot(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     return make_snapshot()
 
 

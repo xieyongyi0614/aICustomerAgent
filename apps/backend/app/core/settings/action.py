@@ -11,7 +11,6 @@ from app.models.action import ACTION_TYPES
 class ActionSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    action_enabled: bool = False
     action_detector_enabled: bool = True
     # V2.6.1 裁决：多步未交付；保持 1（多步 Flag 从未接线，已随死开关删除）。
     action_plan_max_steps: int = 1

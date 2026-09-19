@@ -11,11 +11,12 @@ NOW = datetime(2026, 9, 3, 14, 0, 0)
 
 @pytest.fixture
 def action_on(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     yield
 
 
-def test_disabled_returns_none():
+def test_detector_gate_off_returns_none(override_settings):
+    override_settings(action_detector_enabled=False)
     assert detect_action_intent("提醒我开会", now=NOW) is None
 
 

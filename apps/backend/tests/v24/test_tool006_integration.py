@@ -146,7 +146,6 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
 ):
     """断层 B7 关闭：自治 tick 的工具面首次进入决策管线候选（审计可见）。"""
     override_settings(
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true",
     )
@@ -205,7 +204,6 @@ async def test_autonomy_decision_to_world_write_through_outbox(
     Update World State（唯一合法路径：effects(world) → outbox → world_engine）。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         OBSERVABILITY_PERSIST_ENABLED="true")
@@ -289,7 +287,6 @@ async def test_daily_limit_not_relaxed_by_tool_system(
 ):
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         AUTONOMY_ACTION_DAILY_LIMIT="1")
@@ -313,7 +310,6 @@ async def test_max_active_per_user_not_relaxed_by_tool_system(
 ):
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         AUTONOMY_ACTION_DAILY_LIMIT="5",
@@ -342,7 +338,6 @@ async def test_daily_limit_hit_produces_no_tool_call(
     """E7：命中日额度上限 → 记录日志、不产行动、不消耗工具调用。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true",
         AUTONOMY_ACTION_DAILY_LIMIT="1")
@@ -367,7 +362,6 @@ async def test_tool_tripped_between_surface_and_execution(
     不产生行动副作用（无世界写入、无 outbox 登记）。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         AUTONOMY_ACTION_ENABLED="true")
     v24_tool_env()

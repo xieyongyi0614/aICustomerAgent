@@ -494,8 +494,6 @@ def collect_turn_context(ctx) -> EvaluationContext:
 def _collect_action(user_id: str) -> ActionSlice | None:
     """V9 行动审计切片（只读）：缺席为 None = action 规则全部跳过。"""
     try:
-        if not get_settings().action_enabled:
-            return None
         records = action_repository.list_records(user_id, limit=20)
         if not records:
             return None

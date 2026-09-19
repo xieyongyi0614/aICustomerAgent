@@ -63,7 +63,6 @@ TWO_STEP_PLAN = [
 @pytest.fixture()
 def gate_env(db_session_factory, override_settings, monkeypatch):
     override_settings(
-        action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="true",
         autonomy_subgoal_failure_threshold="3",

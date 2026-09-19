@@ -47,7 +47,6 @@ SCENARIOS = _load_scenarios()
 @pytest.mark.asyncio
 async def test_scenario(scenario, db_session_factory, override_settings):
     override_settings(
-        action_enabled=True,
         world_enabled=True,
         world_household_autoseed_enabled=False,
     )

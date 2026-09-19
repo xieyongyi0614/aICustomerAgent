@@ -107,8 +107,6 @@ def _check_g6(intent: ActionIntent, snapshot: GateSnapshot) -> GateDecision:
 
 def evaluate_gates(intent: ActionIntent, snapshot: GateSnapshot) -> GateDecision:
     """六闸门按序短路（V7 八步裁决同构）。"""
-    if not snapshot.settings.action_enabled:
-        return GateDecision(False, "disabled")
     if intent.confidence != "confident":
         return GateDecision(False, "ambiguous_params")
     decision = _check_g3(intent, snapshot)

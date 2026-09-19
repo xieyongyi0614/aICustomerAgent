@@ -89,7 +89,6 @@ def _stub_tools(*implementations):
 @pytest.mark.asyncio
 async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        action_enabled=True,
         action_retry_backoff_seconds=30,
         action_retry_max_attempts=2,
     )
@@ -116,7 +115,6 @@ async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch
 @pytest.mark.asyncio
 async def test_transient_exceeded_attempts_terminal(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        action_enabled=True,
         action_retry_backoff_seconds=30,
         action_retry_max_attempts=2,
     )
@@ -138,7 +136,7 @@ async def test_transient_exceeded_attempts_terminal(db_session_factory, monkeypa
 
 @pytest.mark.asyncio
 async def test_permanent_no_retry_fails(db_session_factory, monkeypatch, override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     reg = CapabilityRegistry()
     reg.register(PermanentCapability())
     monkeypatch.setattr(action_engine, "get_capability_registry", lambda: reg)
@@ -159,7 +157,7 @@ async def test_permanent_no_retry_fails(db_session_factory, monkeypatch, overrid
 async def test_failed_action_context_shows_remedy_hint(db_session_factory, override_settings):
     from app.services.action.context import build_action_context, render_action_section
 
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(
         _intent("create_reminder", content="开会", due_at="2026-09-05T08:00:00"),
         "rec-user-4", session_id=None,
@@ -176,7 +174,7 @@ def test_memory_bridge_failure_degrades_to_none(db_session_factory, monkeypatch,
     from app.repositories import memory_repository
     from app.services.action.memory_bridge import deliver_action_memory
 
-    override_settings(action_enabled=True, action_memory_policy_enabled=True)
+    override_settings(action_memory_policy_enabled=True)
 
     def boom(*args, **kwargs):
         raise RuntimeError("db down")

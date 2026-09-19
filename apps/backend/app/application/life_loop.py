@@ -268,11 +268,10 @@ async def _record_step_async(run_id, steps, name, coro_factory, critical=False) 
 def _step_perception(user_id: str, now: datetime) -> dict:
     world_facts = world_engine.collect_facts(user_id)
     action_facts: dict = {}
-    if get_settings().action_enabled:
-        try:
-            action_facts = action_engine.collect_facts(user_id)
-        except Exception:
-            logger.exception("行动事实收集失败，返回空包")
+    try:
+        action_facts = action_engine.collect_facts(user_id)
+    except Exception:
+        logger.exception("行动事实收集失败，返回空包")
     return {
         "status": "ok",
         "world_fact_keys": sorted(world_facts.keys()),
@@ -445,11 +444,7 @@ async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -
 
 
 async def _execute_active_plans(user_id: str, now: datetime, facts: dict) -> list[dict]:
-    """步骤执行（计划执行桥，§4.2 #12 收口后的唯一路径）。
-
-    `action_enabled` off 时桥内部判 `hold`（`executor_bridge._normalize` 显式处理）——本步
-    不算被执行、也不判失败，与既有行动总闸语义一致。
-    """
+    """步骤执行（计划执行桥，§4.2 #12 收口后的唯一路径）。"""
     settings = get_settings()
     pairs = goal_repository.list_active_plans(user_id)
     return [await _execute_plan_step(goal, plan, now, facts, settings) for goal, plan in pairs]
@@ -599,7 +594,7 @@ async def _run_maintenance(now: datetime) -> int:
         entry = _safe_sync_call("world_simulation", world_engine.run_simulation_maintenance)
         _record_maintenance_run("world_simulation", [entry], now)
         executed += 1
-    if settings.action_enabled and _maintenance_due(
+    if _maintenance_due(
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         _mark_maintenance("action_retry")
@@ -628,7 +623,7 @@ async def _run_maintenance(now: datetime) -> int:
         )
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
-    if settings.action_enabled and _maintenance_due(
+    if _maintenance_due(
         "action_schedule", settings.action_maintenance_interval_seconds
     ):
         _mark_maintenance("action_schedule")
@@ -688,11 +683,11 @@ def _maintenance_pending(settings) -> bool:
         "world_simulation", settings.world_sim_interval_seconds
     ):
         return True
-    if settings.action_enabled and _maintenance_due(
+    if _maintenance_due(
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         return True
-    if settings.action_enabled and _maintenance_due(
+    if _maintenance_due(
         "action_schedule", settings.action_maintenance_interval_seconds
     ):
         return True

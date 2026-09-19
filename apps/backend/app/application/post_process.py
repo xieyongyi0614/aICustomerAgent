@@ -403,7 +403,7 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
 async def run_action_planning(ctx: PostProcessContext) -> None:
     """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。
 
-    V2.4.0 TOOL-004：步骤**内部**增强（不新增步骤、不改序列）——总闸 + 工具面子闸开启时
+    V2.4.0 TOOL-004：步骤**内部**增强（不新增步骤、不改序列）——工具面子闸开启时
     先投影工具面，把 `surface.tool_ids` 作为 capability 候选喂给既有决策管线（工具候选
     只参与六维评分与审计落库，前台 `chat_response` 恒胜出），投影结果随既有
     `trace.record()` 进 `runtime_traces.steps`。子闸关闭时零行为差异。
@@ -413,9 +413,6 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
     行为与 TOOL-004 一致。确认话术以 `record.gate_reason=pending_confirmation` 的行动记录
     进入下一轮既有 `ActionContext` 回复素材（本步骤不改序列、不新增步骤）。
     """
-    if not get_settings().action_enabled:
-        return
-
     if await _run_confirmation_round(ctx):
         return
 

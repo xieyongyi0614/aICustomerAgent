@@ -250,7 +250,7 @@ class TestTriggerEvaluatorFlagOn:
         from app.models.world import EventStatus
         from app.repositories import world_repository
 
-        override_settings(action_enabled=True, world_enabled=True)
+        override_settings(world_enabled=True)
         world_engine.ensure_world("u1")
         event = world_engine.create_event(
             "u1", "reminder", title="复查", due_at=NOW - timedelta(minutes=1),

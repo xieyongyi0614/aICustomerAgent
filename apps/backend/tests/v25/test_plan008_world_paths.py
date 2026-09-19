@@ -124,9 +124,9 @@ def _world_write_callers(monkeypatch) -> list[tuple[str, str]]:
 
 
 class TestWorldOpWhitelist:
-    """§4.2.3：白名单七 op 即合法写面；白名单外无产出路径，未知 op 被既有消费器拒绝。"""
+    """§4.2.3：白名单八 op 即合法写面；白名单外无产出路径，未知 op 被既有消费器拒绝。"""
 
-    def test_seven_whitelisted_ops_are_the_world_engine_write_face(self):
+    def test_whitelisted_ops_are_the_world_engine_write_face(self):
         missing = [op for op in support.WORLD_OP_WHITELIST if not hasattr(world_engine, op)]
         assert missing == []
         assert all(
@@ -138,7 +138,12 @@ class TestWorldOpWhitelist:
         produced = support.produced_op_literals()
         assert produced == {
             "reminder.py": {"create_event", "cancel_events_by_type"},
-            "world_action.py": {"create_object", "move_object", "apply_object_action"},
+            "world_action.py": {
+                "create_object",
+                "move_object",
+                "apply_object_action",
+                "consume_inventory",
+            },
             "event_bridge.py": {"create_event"},
         }
         flat = {op for ops in produced.values() for op in ops}
@@ -182,7 +187,7 @@ class TestWorldOpWhitelist:
 
         source = inspect.getsource(outbox_consumer._apply_world_op)
         assert "hasattr(world_engine, op_name)" in source
-        assert len(support.WORLD_OP_WHITELIST) == 7
+        assert len(support.WORLD_OP_WHITELIST) == 8
 
 
 class TestReadOnlyWorldPath:

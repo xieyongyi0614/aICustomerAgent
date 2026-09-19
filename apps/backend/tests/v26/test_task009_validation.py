@@ -31,7 +31,7 @@ class TestLifecycle:
         assert manager.cancel(action.id, reason="user") is True
         assert manager.get_status(action.id) == "cancelled"
 
-    def test_failed_to_planned_via_retry(self):
+    def test_failed_to_succeeded_via_retry(self):
         action = manager.create(
             user_id="u_lc2",
             action_type="remember_fact",
@@ -40,7 +40,7 @@ class TestLifecycle:
         self._set_status(action.id, "failed")
         result = asyncio.run(manager.retry(action.id))
         assert result is not None
-        assert manager.get_status(action.id) == "planned"
+        assert manager.get_status(action.id) == "succeeded"
 
     def test_terminal_out_degree_zero(self):
         for status in ("succeeded", "cancelled"):

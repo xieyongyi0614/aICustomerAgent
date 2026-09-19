@@ -302,6 +302,13 @@ OBJECT_CREATION_HINTS = {
     "咖啡豆": "drink",
 }
 
+OBJECT_NAME_ALIASES: dict[str, tuple[str, ...]] = {
+    "面条": ("面",),
+    "鸡蛋": ("蛋",),
+    "大米": ("米",),
+    "牛奶": ("奶",),
+}
+
 DEFAULT_HOUSEHOLD = {
     "name": "默认家庭库存",
     "objects": [

@@ -59,6 +59,12 @@ ACTION_TRIGGER_LEXICON: dict[str, tuple[str, ...]] = {
         "帮我切开",
         "帮我吃掉",
         "帮我热一下",
+        "热一下",
+        "煮",
+        "炒",
+        "煎",
+        "蒸",
+        "炖",
     ),
     "query_environment": (
         "今天天气",

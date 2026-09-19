@@ -335,7 +335,7 @@ def test_g_action_domain_steps_shape_is_v9_plus_tool_fields(
     """行动域 steps[] = V9 六键 + V2.4.0 四键（工具面常开后恒为增量形态）。"""
     import asyncio
 
-    override_settings(ACTION_ENABLED="true", WORLD_ENABLED="true")
+    override_settings(WORLD_ENABLED="true")
     from app.application import action_engine, world_engine
 
     user = "u-tool012-compat"
@@ -360,7 +360,7 @@ def test_g_compat_action_domain_steps_gain_v24_keys_only_when_master_on(
     """反向对照：总闸 on 时 steps[] 才出现 V2.4.0 键（证明上一条断言非空转）。"""
     import asyncio
 
-    override_settings(ACTION_ENABLED="true", WORLD_ENABLED="true")
+    override_settings(WORLD_ENABLED="true")
     support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     from app.application import action_engine
     from app.application import world_engine
@@ -815,7 +815,6 @@ def test_g_world_outbox_is_the_only_write_path(
     import asyncio
 
     override_settings(
-        ACTION_ENABLED="true",
         WORLD_ENABLED="true",
         ACTION_OUTBOX_ENABLED="true")
     support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})

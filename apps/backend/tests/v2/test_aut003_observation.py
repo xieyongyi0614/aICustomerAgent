@@ -64,7 +64,6 @@ def _facts(**overrides):
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        action_enabled="true",
         world_enabled="false",
         observability_persist_enabled="false")
     yield
@@ -306,13 +305,6 @@ def _planning_jobs():
 
 
 class TestExecutionAttempt:
-    def test_action_disabled_skips(self, override_settings):
-        override_settings( action_enabled="false")
-        goal = _goal()
-        plan = _plan(goal.id, [_spec(index=1)])
-        result = _run_attempt(goal, plan)
-        assert result["skip_reason"] == "action_disabled"
-
     def test_cooldown_skips_second_attempt(self, aut_on, monkeypatch):
         goal = _goal()
         plan = _plan(goal.id, [_spec(index=1)])

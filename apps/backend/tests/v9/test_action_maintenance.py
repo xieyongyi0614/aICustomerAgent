@@ -43,7 +43,7 @@ def _verdict():
 
 @pytest.mark.asyncio
 async def test_expire_planned_scheduled_old(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(_intent(), "m-user", session_id="s1")
     record.status = "planned"
     record.scheduled_at = datetime.now() - timedelta(days=3)
@@ -56,7 +56,7 @@ async def test_expire_planned_scheduled_old(override_settings, db_session_factor
 
 @pytest.mark.asyncio
 async def test_expire_planned_recent_kept(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     record = new_record(_intent(), "m-user", session_id="s1")
     record.status = "planned"
     record.scheduled_at = datetime.now()
@@ -65,13 +65,8 @@ async def test_expire_planned_recent_kept(override_settings, db_session_factory)
     assert action_repository.get_record(record.id).status == "planned"
 
 
-def test_collect_facts_disabled_empty(override_settings, db_session_factory):
-    override_settings(action_enabled=False)
-    assert collect_facts("m-user") == {}
-
-
 def test_collect_facts_active_counts(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     intent = _intent(content="提醒")
     record = new_record(intent, "m-user", session_id=None)
     record.status = "planned"
@@ -81,7 +76,7 @@ def test_collect_facts_active_counts(override_settings, db_session_factory):
 
 
 def test_action_adjustment_adds_reason(override_settings, db_session_factory):
-    override_settings(action_enabled=True)
+    override_settings()
     snapshot = PolicySnapshot(
         action_facts={"pending_reminders": [{"title": "吃药", "due_in_hours": 2}], "recent_failures": []}
     )

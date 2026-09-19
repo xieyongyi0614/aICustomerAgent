@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from app.character.asuna.world import (
     DEFAULT_HOUSEHOLD,
     HOME_LOCATIONS,
+    OBJECT_NAME_ALIASES,
     OBJECT_STATE_MACHINES,
     WORLD_LOCATION_REGISTRY,
 )
@@ -144,6 +145,97 @@ def _find_inventory_object(world: World | None, ref: str) -> WorldObject | None:
         if obj.name == ref or ref in obj.aliases:
             return obj
     return None
+
+
+_INVENTORY_MEASURE_CHARS = "个只瓶罐袋条碗份块杯桶片盒根包斤"
+
+
+def resolve_inventory_ref(user_id: str, ref: str) -> WorldObject | None:
+    """use_object 参照归一：精确名称/别名 → 度量词剥离 → 角色资产别名表 → 包含匹配。
+
+    "给我煮碗面"的"碗面"即靠 度量词剥离 + 别名表 落到 面条；未命中返回 None（宁缺毋滥）。
+    """
+    ref = str(ref or "").strip()
+    if not ref:
+        return None
+    exact = _find_inventory_object(get_world(user_id), ref)
+    if exact is not None:
+        return exact
+    stripped = ref.lstrip(_INVENTORY_MEASURE_CHARS)
+    if stripped != ref:
+        stripped_match = _find_inventory_object(get_world(user_id), stripped)
+        if stripped_match is not None:
+            return stripped_match
+    for canonical, aliases in OBJECT_NAME_ALIASES.items():
+        candidates = (canonical, *aliases)
+        if any(candidate in stripped or stripped in candidate for candidate in candidates):
+            by_alias = _find_inventory_object(get_world(user_id), canonical)
+            if by_alias is not None:
+                return by_alias
+    world = get_world(user_id)
+    if world is None:
+        return None
+    for obj in world_repository.list_objects(world.world_id):
+        if obj.name in ref or any(alias in ref for alias in obj.aliases):
+            return obj
+    return None
+
+
+def consume_inventory(user_id: str, items: list[dict]) -> dict | None:
+    """批量 Consume（use_object 行动通道）：先全量预检再逐项扣减。
+
+    items: [{"object": 物品参照, "quantity": 数量}, ...]；任一项失败（解析失败 /
+    不可消耗 / 缺货）则整单拒绝，已扣项按原量补回；返回 None = 整单失败。
+    """
+    try:
+        world = get_world(user_id)
+        if world is None:
+            return None
+        merged: dict[str, float] = {}
+        for item in items:
+            obj = _find_inventory_object(world, str(item.get("object", "")))
+            if obj is None:
+                return None
+            merged[obj.id] = merged.get(obj.id, 0.0) + float(item.get("quantity") or 1)
+        resolved: list[tuple[WorldObject, float]] = []
+        for object_id, quantity in merged.items():
+            obj = _find_inventory_object(world, object_id)
+            if obj is None or not obj.consumable or quantity <= 0:
+                return None
+            if obj.quantity < quantity:
+                return None
+            resolved.append((obj, quantity))
+        consumed: list[dict] = []
+        for obj, quantity in resolved:
+            result = consume_object(user_id, obj.id, quantity)
+            if not result.ok:
+                _restore_consumed(user_id, consumed)
+                return None
+            consumed.append(
+                {
+                    "object": obj.name,
+                    "consumed": quantity,
+                    "remaining": result.object.quantity if result.object else None,
+                }
+            )
+        return {"items": consumed}
+    except Exception:
+        logger.exception("批量消耗世界物品失败")
+        return None
+
+
+def _restore_consumed(user_id: str, consumed: list[dict]) -> None:
+    world = get_world(user_id)
+    if world is None:
+        return
+    for entry in consumed:
+        obj = _find_inventory_object(world, str(entry["object"]))
+        if obj is None:
+            continue
+        obj.quantity = round(obj.quantity + float(entry["consumed"]), 2)
+        obj.last_action_at = datetime.now()
+        obj.updated_at = datetime.now()
+        world_repository.save_object(obj)
 
 
 def consume_object(

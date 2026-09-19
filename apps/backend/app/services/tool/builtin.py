@@ -317,6 +317,11 @@ def _definitions(settings: Any = None) -> tuple[ToolDefinition, ...]:
                         source_hint="user_message",
                     ),
                     _parameter("action", "string", description="使用动作细分"),
+                    _parameter(
+                        "items",
+                        "array",
+                        description="批量消耗清单（object 物品参照 + quantity 数量）",
+                    ),
                 ],
                 semantic_validators=("object_in_inventory",),
             ),

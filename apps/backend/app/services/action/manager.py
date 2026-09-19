@@ -211,13 +211,6 @@ async def retry(action_id: str) -> ActionResult | None:
     record.updated_at = _now()
     action_repository.save_record(record)
     logger.info("Action Retried action_id=%s attempt=%s", action_id, record.attempt)
-    if not settings.action_enabled:
-        return ActionResult(
-            status="failed",
-            error="retry_reset_only",
-            failure_kind="transient",
-            metadata={"retry_reset_only": True},
-        )
     return await action_engine.execute_existing_record(record)
 
 

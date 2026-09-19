@@ -61,14 +61,13 @@ ON_SURFACE_TOOL = REMINDER_CREATE
 FROZEN_FUTURE = NOW + timedelta(hours=2)
 
 GATE_ORDER: tuple[str, ...] = (
-    "disabled",
     "ambiguous_params",
     "capability_unavailable",
     "duplicate",
     "quota_exceeded",
     "effect_already_satisfied",
 )
-"""六闸门的固定判定序（`planner.evaluate_gates` 的短路序，Task Detail §4.2.3）。"""
+"""五闸门的固定判定序（`planner.evaluate_gates` 的短路序，Task Detail §4.2.3）。"""
 
 NAMED_GATE_CHECKS: tuple[str, ...] = ("_check_g3", "_check_g4", "_check_g6")
 """六闸门中**具名函数**的三道（其余三道是 `evaluate_gates` 内的内联判定）。"""
@@ -149,7 +148,6 @@ def action_chain_on(monkeypatch, override_settings):
     """
     reset_tool_registry(monkeypatch)
     override_settings(
-        action_enabled="true",
         action_max_active_per_user="5",
         plan_tool_required="true",
         world_enabled="false",
@@ -281,20 +279,7 @@ def registry_snapshot(registry: ToolRegistry) -> tuple:
     )
 
 
-# --- 六闸门探针 ---------------------------------------------------------------
-
-
-class RecordedFlag:
-    """`snapshot.settings.action_enabled` 的记录型布尔：在 `__bool__` 读取点记一笔。"""
-
-    def __init__(self, log: list[str], name: str, value: bool) -> None:
-        self.log = log
-        self.name = name
-        self.value = value
-
-    def __bool__(self) -> bool:
-        self.log.append(self.name)
-        return bool(self.value)
+# --- 五闸门探针 ---------------------------------------------------------------
 
 
 class RecordedCount(int):
@@ -341,20 +326,20 @@ class RecordedIntent:
 
 
 class GateOrderProbe:
-    """六闸门读取点探针：在**每一段的真实读取点**记一笔，不替换任何判定逻辑。
+    """五闸门读取点探针：在**每一段的真实读取点**记一笔，不替换任何判定逻辑。
 
-    六闸门在真实源码里是 `evaluate_gates` 内的六段短路——三道具名函数
-    （`_check_g3` / `_check_g4` / `_check_g6`）与三道内联判定（`disabled` /
-    `ambiguous_params` / `quota_exceeded`）。内联三段没有独立函数可打桩，故用记录型标量
+    五闸门在真实源码里是 `evaluate_gates` 内的五段短路——三道具名函数
+    （`_check_g3` / `_check_g4` / `_check_g6`）与两道内联判定（`ambiguous_params` /
+    `quota_exceeded`）。内联两段没有独立函数可打桩，故用记录型标量
     在它们的唯一读取点取证；具名三段经 `install_named_gates` 包一层同刻度记录。探针不改判定
-    （`evaluate_gates` 与三个 `_check_*` 的判断本体一行未动），只把六段的**经过事实**变成可断言序列。
+    （`evaluate_gates` 与三个 `_check_*` 的判断本体一行未动），只把五段的**经过事实**变成可断言序列。
     """
 
     def __init__(self) -> None:
         self.log: list[str] = []
 
     def install_named_gates(self, monkeypatch) -> None:
-        """把三道具名闸门函数的调用点并入同一份日志（刻度合成六闸门全序）。"""
+        """把三道具名闸门函数的调用点并入同一份日志（刻度合成五闸门全序）。"""
         from app.services.action import planner
 
         for check_name, label in GATE_LABEL_BY_CHECK.items():
@@ -367,10 +352,9 @@ class GateOrderProbe:
             monkeypatch.setattr(planner, check_name, _spy)
 
     def settings(
-        self, *, action_enabled: bool = True, max_active: int = 5, dedupe_hours: int = 24
+        self, *, max_active: int = 5, dedupe_hours: int = 24
     ) -> SimpleNamespace:
         return SimpleNamespace(
-            action_enabled=RecordedFlag(self.log, "disabled", action_enabled),
             action_max_active_per_user=max_active,
             action_dedupe_window_hours=dedupe_hours,
         )
@@ -379,7 +363,6 @@ class GateOrderProbe:
         self,
         *,
         registry=None,
-        action_enabled: bool = True,
         active_count: int = 0,
         max_active: int = 5,
         world_available: bool = True,
@@ -388,7 +371,7 @@ class GateOrderProbe:
         active_reminder_titles: list[str] | None = None,
     ) -> GateSnapshot:
         return GateSnapshot(
-            settings=self.settings(action_enabled=action_enabled, max_active=max_active),
+            settings=self.settings(max_active=max_active),
             registry=registry if registry is not None else get_capability_registry(),
             records=list(records or []),
             active_count=RecordedCount(active_count, self.log, "quota_exceeded"),

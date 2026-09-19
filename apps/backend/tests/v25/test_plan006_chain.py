@@ -1,4 +1,4 @@
-"""PLAN-006 Step 4 / Step 6：执行链路断言（六闸门 + 五段短路）与授权·校验分层。
+"""PLAN-006 Step 4 / Step 6：执行链路断言（五闸门 + 五段短路）与授权·校验分层。
 
 覆盖 Task Detail §9.2 I1~I4 / I8 / I9 / I10 与 §9.3 S4 / S5 / S9；对应 §8 Step 4 与 Step 6。
 
@@ -8,16 +8,14 @@
 
 三处与 Task Detail 的核对（按真实源码冻结，已在用例中留痕）
 
-1. **六闸门只有三道具名函数**：`planner.evaluate_gates` 内 `disabled` / `ambiguous_params` /
-   `quota_exceeded` 三段是内联判定（无独立函数可打桩）。故「六闸门各一次、顺序固定」由
-   `GateOrderProbe`（六段读取点全记录）判定；链路侧另以三道具名函数的调用序 + 各闸门
+1. **五闸门只有三道具名函数**：`planner.evaluate_gates` 内 `ambiguous_params` /
+   `quota_exceeded` 两段是内联判定（无独立函数可打桩）。故「五闸门各一次、顺序固定」由
+   `GateOrderProbe`（五段读取点全记录）判定；链路侧另以三道具名函数的调用序 + 各闸门
    端到端拒绝理由共同举证。
 2. **① `resolve` 段的失败路径在链路上不可达**：工具可用性由装配期面投影前置（不可用工具
    进不了面 → `assemble_plan` 直接返回 None），故该段的失败路径按 §4.2.4 在**执行器层**注入；
    链路层注入的是 ② `permission` / ③ `validate` 两段与 `confirm_required`。
-3. **「额度耗尽不产生 `ActionRecord`」的字面要求与 V9 既有语义不符**：V9 在闸门拒绝时**仍落
-   一条 `cancelled` 台账**（闸门裁决必须可事后归因），真正「零 `ActionRecord`」的只有
-   `action_enabled=False`（总闸）。本模块两者都断言，并按源码语义留痕。
+3. **闸门拒绝仍落一条 `cancelled` 台账**（闸门裁决必须可事后归因）。
 """
 
 from datetime import datetime, timedelta
@@ -127,21 +125,17 @@ class TestSixGates:
 
     @pytest.fixture
     def probe(self, monkeypatch):
-        """六闸门全序探针：三道内联闸门（记录型标量）+ 三道具名闸门（同刻度记录）。"""
+        """五闸门全序探针：两道内联闸门（记录型标量）+ 三道具名闸门（同刻度记录）。"""
         probe = support.GateOrderProbe()
         probe.install_named_gates(monkeypatch)
         return probe
 
-    def test_l1_six_gates_run_once_each_in_the_frozen_order(self, probe):
+    def test_l1_five_gates_run_once_each_in_the_frozen_order(self, probe):
         decision = evaluate_gates(probe.intent(), probe.snapshot())
         assert decision.allowed is True
         assert probe.log == list(support.GATE_ORDER)
 
     def test_l1_every_gate_is_independently_reachable(self, probe):
-        assert (
-            evaluate_gates(probe.intent(), probe.snapshot(action_enabled=False)).reason
-            == "disabled"
-        )
         assert (
             evaluate_gates(probe.intent(confidence="tentative"), probe.snapshot()).reason
             == "ambiguous_params"
@@ -174,7 +168,7 @@ class TestSixGates:
     def test_l1_quota_gate_short_circuits_before_effect_check(self, probe):
         decision = evaluate_gates(probe.intent(), probe.snapshot(active_count=5, max_active=5))
         assert decision.reason == "quota_exceeded"
-        assert probe.log == [*support.GATE_ORDER[:5]]
+        assert probe.log == [*support.GATE_ORDER[:4]]
 
     def test_l1_effect_already_satisfied_gate(self, probe):
         decision = evaluate_gates(
@@ -187,18 +181,16 @@ class TestSixGates:
     @pytest.mark.parametrize(
         ("cut", "expect"),
         (
-            (1, "disabled"),
-            (2, "ambiguous_params"),
-            (5, "quota_exceeded"),
+            (1, "ambiguous_params"),
+            (4, "quota_exceeded"),
         ),
     )
     def test_l1_short_circuit_stops_the_following_gates(self, probe, cut, expect):
         snapshot = probe.snapshot(
-            action_enabled=cut != 1,
-            active_count=5 if cut == 5 else 0,
+            active_count=5 if cut == 4 else 0,
             max_active=5,
         )
-        intent = probe.intent(confidence="tentative" if cut == 2 else "confident")
+        intent = probe.intent(confidence="tentative" if cut == 1 else "confident")
         assert evaluate_gates(intent, snapshot).reason == expect
         assert probe.log == list(support.GATE_ORDER[:cut])
 
@@ -664,15 +656,6 @@ class TestAuthorisationAndValidationLayers:
         assert repo_write_probe.outbox == []
         assert record.attempt == 1 and record.next_retry_at is None
         assert len(action_repository.list_records(USER)) == 2
-
-    @pytest.mark.asyncio
-    async def test_action_master_gate_off_creates_no_record_at_all(
-        self, db_session_factory, action_chain_on, override_settings
-    ):
-        """总闸 off 才是真正「不产生 `ActionRecord`」的路径（与额度拒绝区分）。"""
-        override_settings(action_enabled="false")
-        assert await action_engine.run_action_planning(USER, _memory_intent()) is None
-        assert action_repository.list_records(USER) == []
 
 
 def get_settings_snapshot():

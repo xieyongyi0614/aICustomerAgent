@@ -32,7 +32,7 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "8e48991da89c7572df86fb8739051b27b2c26897689db5e959ae9a28008e4eac",
+    "app/application/world_engine.py": "f26d7477f9d79c7986cc6e65ec7d730c9ac8d2e0fc658128ee7eec7b06949af8",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
@@ -225,10 +225,9 @@ def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_s
 
 def test_assemble_plan_uses_preloaded_facts_for_tool_choice(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        world_enabled="true", action_enabled="true"
-    )
+        world_enabled="true",     )
     seed_all()
-    settings = world_settings(action_enabled=True)
+    settings = world_settings()
     snapshot = action_engine._build_snapshot(USER, settings)
     intent = ActionIntent(
         action_type="move_object",

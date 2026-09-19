@@ -30,7 +30,6 @@ def outbox_on(override_settings):
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
         world_enabled="true",
-        action_enabled="true",
     )
     yield
 

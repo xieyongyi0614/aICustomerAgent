@@ -226,9 +226,6 @@ def collect_tool_insights(user_id: str) -> dict:
 
 
 def _collect_action_facts(user_id: str) -> dict:
-    if not get_settings().action_enabled:
-        _ACTION_FACTS_CACHE.pop(user_id, None)
-        return {}
     try:
         facts = collect_facts(user_id)
     except Exception:

@@ -90,7 +90,7 @@ PARAMS = {"content": "买牛奶", "due_at": "2026-06-02T08:00:00"}
 async def test_master_flag_on_adds_tool_fields_incrementally(
     monkeypatch, override_settings, db_session_factory
 ):
-    override_settings(action_enabled=True)
+    override_settings()
     capability = _reminder_capability(_success_behavior)
     _wire(monkeypatch, capability, registry_with(definition()))
     intent = _intent(PARAMS)
@@ -122,7 +122,6 @@ async def test_observation_flag_on_writes_tool_result_with_old_payload_key(
     monkeypatch, override_settings, db_session_factory
 ):
     override_settings(
-        action_enabled=True,
     )
     capability = _reminder_capability(_success_behavior)
     _wire(monkeypatch, capability, registry_with(definition()))
@@ -144,7 +143,6 @@ async def test_steps_round_trip_through_action_records(
     monkeypatch, override_settings, db_session_factory
 ):
     override_settings(
-        action_enabled=True,
     )
     capability = _reminder_capability(_success_behavior)
     _wire(monkeypatch, capability, registry_with(definition()))
@@ -197,7 +195,7 @@ async def test_short_circuit_status_mapping(
     expected_reason,
     expected_kind,
 ):
-    override_settings(action_enabled=True)
+    override_settings()
     capability = _reminder_capability(_success_behavior)
     _wire(monkeypatch, capability, registry_with(definition()))
     monkeypatch.setattr(
@@ -223,7 +221,7 @@ async def test_short_circuit_status_mapping(
 async def test_unavailable_capability_result_maps_to_cancelled_e8(
     monkeypatch, override_settings, db_session_factory
 ):
-    override_settings(action_enabled=True)
+    override_settings()
     capability = _reminder_capability(
         lambda params, ctx: CapabilityResult(
             status="unavailable", payload={"failure_kind": "unavailable"}, error="世界未启用"
@@ -246,7 +244,6 @@ async def test_timeout_keeps_v9_retry_semantics(
     monkeypatch, override_settings, db_session_factory
 ):
     override_settings(
-        action_enabled=True,
         action_retry_max_attempts=3,
     )
     capability = _reminder_capability(
@@ -272,7 +269,6 @@ async def test_timeout_exhausts_attempts_to_failed(
     monkeypatch, override_settings, db_session_factory
 ):
     override_settings(
-        action_enabled=True,
         action_retry_max_attempts=1,
     )
     capability = _reminder_capability(
@@ -295,7 +291,7 @@ async def test_timeout_exhausts_attempts_to_failed(
 async def test_unresolvable_step_binding_marks_tool_unavailable(
     monkeypatch, override_settings, db_session_factory
 ):
-    override_settings(action_enabled=True)
+    override_settings()
     capability = _reminder_capability(_success_behavior)
     _wire(monkeypatch, capability, ToolRegistry())
     intent = _intent(PARAMS)
@@ -312,7 +308,7 @@ async def test_unresolvable_step_binding_marks_tool_unavailable(
 async def test_sensitive_params_are_redacted_in_persisted_steps(
     monkeypatch, override_settings, db_session_factory
 ):
-    override_settings(action_enabled=True)
+    override_settings()
     capability = StubCapability(name="notification", action="send")
     _wire(monkeypatch, capability, registry_with(sensitive_definition()))
     intent = ActionIntent(

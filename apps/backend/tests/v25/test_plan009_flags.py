@@ -98,7 +98,6 @@ class TestImportanceFloorParameter:
         probe = support.install_delivery_probe(monkeypatch)
         override_settings(
             plan_memory_importance_floor="0.9",
-            action_enabled="true",
             world_enabled="false",
             observability_persist_enabled="false")
         goal = make_goal(description=support.FAILED_DESCRIPTION)

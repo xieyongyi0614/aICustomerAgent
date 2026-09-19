@@ -124,11 +124,8 @@ def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
 
     active 的 reminder/appointment 到期且未汇报（payload 无 reported_by_autonomy）→
     产出 action_due 信号。只读查询，置位由 mark_action_reported 在投递成功后完成，
-    保证静音/冷却期间的到期提醒顺延到可汇报时。无行动或开关外时返回 None。
+    保证静音/冷却期间的到期提醒顺延到可汇报时。无行动时返回 None。
     """
-    if not get_settings().action_enabled:
-        return None
-
     try:
         world = world_repository.get_world(user_id)
         if world is None:
@@ -178,9 +175,6 @@ def poll_due_actions(user_id: str, now: datetime) -> TriggerSignal | None:
 
 def mark_action_reported(user_id: str, event_id: str) -> None:
     """到期行动已由自治汇报过：置 world 事件 payload.reported_by_autonomy（幂等）。"""
-    if not get_settings().action_enabled:
-        return
-
     try:
         world = world_repository.get_world(user_id)
         if world is None:

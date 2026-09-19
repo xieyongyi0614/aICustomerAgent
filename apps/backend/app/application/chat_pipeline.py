@@ -518,9 +518,7 @@ async def run_chat_pipeline(
         first_token_ms = None
         goal_ctx = GoalContext(selected_goal=selected_goal, intention=validated_intention)
         active_generations[user_id] = True
-        action_ctx = None
-        if get_settings().action_enabled:
-            action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
+        action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
         settings = get_settings()
         grounding_mode = (
             settings.inventory_grounding_mode

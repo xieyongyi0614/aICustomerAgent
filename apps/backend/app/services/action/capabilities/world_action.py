@@ -18,6 +18,20 @@ def _failure(error: str) -> CapabilityResult:
     return CapabilityResult(status="failed", error=error, payload={"failure_kind": "permanent"})
 
 
+def _consume_items(params: dict) -> list[dict] | None:
+    raw = params.get("items")
+    if not isinstance(raw, list) or not raw:
+        return None
+    items: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict) or not str(entry.get("object", "")).strip():
+            continue
+        items.append(
+            {"object": str(entry["object"]), "quantity": float(entry.get("quantity") or 1)}
+        )
+    return items or None
+
+
 class WorldActionCapability:
     name = "world_action"
     description = "世界实体操作：创建/移动/使用物品（V8 引擎通道）"
@@ -108,6 +122,9 @@ class WorldActionCapability:
         )
 
     async def _use(self, params: dict, ctx: ExecutionContext) -> CapabilityResult:
+        items = _consume_items(params)
+        if items is not None:
+            return self._consume(ctx.user_id, items)
         obj = world_engine.find_object_by_name(ctx.user_id, str(params["object"]))
         if obj is None:
             return _failure("没有这个东西")
@@ -129,4 +146,29 @@ class WorldActionCapability:
         return CapabilityResult(
             status="succeeded",
             payload={"object_id": used.id, "state": used.state, "quantity": used.quantity, "failure_kind": None},
+        )
+
+    def _consume(self, user_id: str, items: list[dict]) -> CapabilityResult:
+        for item in items:
+            obj = world_engine.resolve_inventory_ref(user_id, str(item["object"]))
+            if obj is None or not obj.consumable:
+                return _failure(f"没有可消耗的{item['object']}")
+            item["object"] = obj.id
+        if get_settings().action_outbox_enabled:
+            return CapabilityResult(
+                status="succeeded",
+                payload={
+                    "deferred_world_op": {
+                        "op": "consume_inventory",
+                        "args": [user_id, items],
+                    },
+                    "failure_kind": None,
+                },
+            )
+        result = world_engine.consume_inventory(user_id, items)
+        if result is None:
+            return _failure("库存不足或物品不可消耗")
+        return CapabilityResult(
+            status="succeeded",
+            payload={"items": result["items"], "failure_kind": None},
         )

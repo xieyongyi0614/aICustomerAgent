@@ -1504,3 +1504,15 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 - **开关盘子**：改造前 61 个 bool 开关 → 批次 1 删除 7（v2 段）+ 第 0 步死开关 3 + 各批转正常开 **44**（v22 5 / v21 5 / v23 7 / v24 10 / v25 12 / v26 5）= **54**；**在存 7**：域内策略位 `tool_confirm_ttl_reuse` / `plan_tool_required` / `plan_context_digest_enabled`（H.6）+ `foreground_gateway_enforced`（F.10）+ 批次 1 改名保留 `action_outbox_enabled`（附录 E）/ `character_action_sync_enabled` / `inventory_grounding_enabled`（附录 E.6）。调参字段 149 + 批次 1 的 5 个全部去前缀；后缀式残留 `world_context_char_budget_v23` 批次 8 改名。
 - **done 判据达成（G.1）**：配置层字段名与 `.env.example` 键名无版本号 ✓；代码层门控表达式 0 ✓；契约层（API flags / 前端读取）0 ✓；历史层（docstring 说明 / 测试目录名 / 迁移文件名 / docs）按约保留 ✓。
 - **遗留待办**：① 各版本 regression-checklist 人工回归（v2.0.0×6 phase / v2.1.0 / v2.2.0 / v2.3.0 / v2.5.0 / v2.6.0；**v2.4.0 清单缺失需先补建**）——每批常开的上线前置条件；② 部署侧 `.env` 副本按 `flag-rename-map.md`「旧 env」列同批改名（本仓库本地件已清）；③ `flag-rename-map.md` §七 命名一致性建议维持「未采纳」关单；④ 转正后首轮建议在独立数据库执行（§9.3）。
+
+### H.15 基础闸退役：`action_enabled`（2026-09-19）
+
+| 项 | 内容 |
+|---|---|
+| 缘起与裁决 | 收官后基础闸清点：`action_enabled` 的保留理由（vXX_ ON 路径运行时依赖，见「前置说明」）已随 vXX_ 全删失效。用户裁决 **直接退役、动作引擎无条件常开**（起因：煮面场景排查发现总闸 off 导致动作引擎整链死路、世界库存零联动） |
+| 配置层 | `ActionSettings.action_enabled` 字段删除；`.env` / `.env.example` 的 V2.6.0 过期注释块收敛（总闸/enablement 校验/RESERVED 说明删除，enablement 校验本身已于批次 8 删除） |
+| 代码层 | 22 处引用改无条件：`chat_pipeline`(1) / `post_process`(1) / `action_engine`(7) / `life_loop`(4 处维护步 + 感知步 + docstring) / `autonomy_engine`(1) / `evaluation_context`(1) / `goal_execution`(1，删 `action_disabled` skip 语义) / `trigger_evaluator`(2) / `action/context`(1) / `action/planner`(1，**六闸门 → 五闸门**：`disabled` 段删除) / `action/manager`(1，删 `retry_reset_only` 语义) / `action/detector`(2，保留 `action_detector_enabled` 子闸) / `executor_bridge`(docstring)；`record is None → hold` 语义保留（编排器未建记录仍成立） |
+| 测试面 | 机械清理 54 文件 123 行（override 装饰器 / monkeypatch / 多行 kwarg / env dict 条目）；`plan006` 探针改五闸门口径（`GATE_ORDER` 六→五、`RecordedFlag` 删除、短路参数化重排、`disabled` 可达性断言删除）；`tool005` 六闸门源序断言改五；`tool010` 冻结面 4 文件哈希重建（planner / chat_pipeline / post_process / action_engine，允许改动）；退役用例删除：`tests/v9/test_action_regression.py` 整文件（关闸 no-op 语义失效）、aut003 `test_action_disabled_skips`、v9 disabled ×3、v26 `test_retry_resets_failed_when_action_disabled`；`task009` 重试终态断言改 `succeeded`（重试现在真执行）；detector 关闸用例改写为 `action_detector_enabled=False` 语义；conftest env 映射与 flag_guard 幽灵键样例同步 |
+| 验证 | 全量 **25 failed / 6165 passed / 2 skipped / 11 errors**，失败 ID 集合 ⊆ 存量豁免（feishu WIP + e2e 家族 15 + @migration 夹具 14 + 计时抖动 2 + aut005/agent008 既存 2——均经 `git stash` 基线逐一确认改动前即挂），**零未归因新增**；`compileall` app+tests 全绿 |
+| 行为变化 | 动作引擎（检出 → 规划 → 执行 → 重试/调度维护 → 事实收集/观测）在生产配置下无条件常开；世界库存联动链路（工具五段 → outbox → world 写）恢复可达。**上线前置：`docs/version/v2.6.0/regression-checklist.md` 人工回归仍待执行** |
+| 在存基础闸 | `world_enabled` / `autonomy_enabled` / `feishu_enabled`（3 个，保留理由同前；如需退役按本批流程另立批次） |

@@ -18,7 +18,6 @@ from tests.conftest import FakeLLM, wait_until
 
 _V2_FLAGS = {
     "action_outbox_enabled": "true",
-    "action_enabled": "true",
 }
 
 

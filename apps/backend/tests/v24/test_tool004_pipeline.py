@@ -298,7 +298,7 @@ async def test_step_nine_is_unchanged_when_surface_flag_is_off(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=False)
-    override_settings(action_enabled=True)
+    override_settings()
 
     def _forbidden(*args, **kwargs):
         raise AssertionError("子闸关闭时不得调用决策管线")
@@ -317,7 +317,7 @@ async def test_step_nine_with_surface_flag_on_feeds_capabilities_and_audits(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=True)
-    override_settings(action_enabled=True, observability_persist_enabled=True)
+    override_settings(observability_persist_enabled=True)
 
     registry = builtin_registry()
     monkeypatch.setattr(
@@ -372,7 +372,7 @@ async def test_step_nine_surface_failure_does_not_break_action_planning(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=True)
-    override_settings(action_enabled=True)
+    override_settings()
 
     def _boom(**kwargs):
         raise RuntimeError("decision pipeline down")
@@ -390,7 +390,7 @@ async def test_step_nine_surface_failure_does_not_break_action_planning(
 
 @pytest.mark.asyncio
 async def test_step_nine_without_intent_is_noop(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     trace = TurnTraceSession(user_id="u-tool")
     ctx = _post_process_ctx(trace, action_intent=None)
     ctx.action_intent = None

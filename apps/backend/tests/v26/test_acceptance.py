@@ -32,7 +32,6 @@ class TestFunctionalAcceptance:
 
     def test_execute_reuses_record(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         action = manager.create(
             user_id="u_acc_exec",
             action_type="remember_fact",
@@ -57,7 +56,6 @@ class TestFunctionalAcceptance:
 
     def test_result_generated(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         from app.models.action import CapabilityResult
 
         result = result_service.from_capability_result(
@@ -95,7 +93,6 @@ class TestFunctionalAcceptance:
 class TestSystemFlowAcceptance:
     def test_plan_action_execute_outcome(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         intent = ActionIntent(
             action_type="remember_fact",
             confidence="confident",
@@ -134,7 +131,6 @@ class TestSystemFlowAcceptance:
         from app.services.planning.executor_bridge import PlanExecutorBridge
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "action_enabled", True)
         bridge = PlanExecutorBridge()
 
         class Goal:

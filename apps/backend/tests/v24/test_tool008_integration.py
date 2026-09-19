@@ -40,7 +40,7 @@ FROZEN_SOURCES: dict[str, str] = {
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
     "app/models/memory.py": "4371cd849a76f8de2fcf7fcff9a1b1a4f66163329b56b59367d2a8d993591fa1",
     "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
-    "app/character/asuna/action.py": "af39c42cbe2b9a9fce61de609a552cad66c7a70cbc907a05f3c21485da66b572",
+    "app/character/asuna/action.py": "fb14436f9e7f929b7a2f1f19ed4cdabf252b6f1433c40ac36de14929f814e992",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 
@@ -79,7 +79,7 @@ MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 def tool_memory_on(v24_tool_env, override_settings):
     """工具记忆子闸 + 行动通道双开（V2.4.0 总闸下的最小开启面）。"""
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_MEMORY_ENABLED=True)
-    override_settings(action_enabled=True)
+    override_settings()
     yield
 
 
@@ -106,7 +106,6 @@ async def test_reminder_create_end_to_end_deposits_memory(
 
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_MEMORY_ENABLED=True)
     override_settings(
-        action_enabled=True,
         world_enabled=True,
         action_outbox_enabled=False,
         world_household_autoseed_enabled=False,

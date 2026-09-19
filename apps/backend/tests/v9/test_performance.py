@@ -14,7 +14,7 @@ NOW = datetime(2026, 9, 3, 14, 0, 0)
 
 
 def test_detector_average_under_1ms(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     iterations = 500
     started = time.perf_counter()
     for _ in range(iterations):
@@ -40,15 +40,8 @@ def test_render_section_under_5ms():
     assert (time.perf_counter() - started) * 1000 < 5.0
 
 
-def test_disabled_paths_short_circuit(override_settings):
-    """action_enabled=false：检出/渲染全部零执行路径。"""
-    override_settings(action_enabled=False)
-    assert detect_action_intent("帮我设个提醒", now=NOW) is None
-    assert render_action_section(None, 400) == ""
-
-
 def test_noop_intent_keeps_pipeline_unchanged(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     started = time.perf_counter()
     for _ in range(200):
         detect_action_intent("今天心情不错", now=NOW)
