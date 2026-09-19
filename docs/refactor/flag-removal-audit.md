@@ -1501,6 +1501,6 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 
 ### 收官对账（2026-09-19）
 
-- **开关盘子**：改造前 61 个 bool 开关 → 删除 7（批次 1 v2 段）+ 死开关 3（第 0 步）+ 转正常开 v22 5 / v21 6 / v23 7 / v24 10 / v25 12 / v26 5 = **55**；**保留 6**：策略位 `tool_confirm_ttl_reuse` / `plan_tool_required` / `plan_context_digest_enabled`（H.6）+ 裁决保留 `foreground_gateway_enforced`（F.10）/ `action_outbox_enabled`（附录 E）+ 基闸外无版本号开关不计。调参字段 149 + 批次 1 的 5 个全部去前缀；后缀式残留 `world_context_char_budget_v23` 批次 8 改名。
+- **开关盘子**：改造前 61 个 bool 开关 → 批次 1 删除 7（v2 段）+ 第 0 步死开关 3 + 各批转正常开 **44**（v22 5 / v21 5 / v23 7 / v24 10 / v25 12 / v26 5）= **54**；**在存 7**：域内策略位 `tool_confirm_ttl_reuse` / `plan_tool_required` / `plan_context_digest_enabled`（H.6）+ `foreground_gateway_enforced`（F.10）+ 批次 1 改名保留 `action_outbox_enabled`（附录 E）/ `character_action_sync_enabled` / `inventory_grounding_enabled`（附录 E.6）。调参字段 149 + 批次 1 的 5 个全部去前缀；后缀式残留 `world_context_char_budget_v23` 批次 8 改名。
 - **done 判据达成（G.1）**：配置层字段名与 `.env.example` 键名无版本号 ✓；代码层门控表达式 0 ✓；契约层（API flags / 前端读取）0 ✓；历史层（docstring 说明 / 测试目录名 / 迁移文件名 / docs）按约保留 ✓。
 - **遗留待办**：① 各版本 regression-checklist 人工回归（v2.0.0×6 phase / v2.1.0 / v2.2.0 / v2.3.0 / v2.5.0 / v2.6.0；**v2.4.0 清单缺失需先补建**）——每批常开的上线前置条件；② 部署侧 `.env` 副本按 `flag-rename-map.md`「旧 env」列同批改名（本仓库本地件已清）；③ `flag-rename-map.md` §七 命名一致性建议维持「未采纳」关单；④ 转正后首轮建议在独立数据库执行（§9.3）。

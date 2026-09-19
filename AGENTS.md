@@ -6,7 +6,7 @@
 
 - 当前开发分支：`feat/v2.0.0`
 - 开发阶段：V1~V9 全部完成（V7.5 Character Evaluation、V7.8 Character Runtime Intelligence、V8 World State System、V8.5 Relationship Evolution System、V9 Action Capability System 已实现）；后端架构 Refactor 完成；V2.0.0（Memory V2 / Reflection / Development / Life Loop / Action Engine / Autonomy Advanced）已实现；V2.1.0（Agent Runtime / Character State / Goal Stack / Decision Pipeline / Evolution / Agent Evaluation）已实现（迁移链至 0043）
-- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 / V2.1.0 已有清单）；V7.8-014 Metrics 周期快照留白已由 V2.1.0 AGENT-006（`agent_metric_snapshots`）关闭
+- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 六 phase / V2.1.0~V2.6.0 均已有清单，V2.4.0 于 2026-09-19 补建）；V7.8-014 Metrics 周期快照留白已由 V2.1.0 AGENT-006（`agent_metric_snapshots`）关闭
 
 ## 目录结构
 
@@ -40,5 +40,5 @@
 - 不添加代码注释，用命名表达意图。
 - 提交风格：`feat:` / `fix:` / `refactor:` / `docs:` + 简短中文描述。单行、≤ 30 字，只概括核心变更；不罗列修改文件清单、不写实现细节与测试结果。
 - 不要提交 `.env`、`__pycache__/`、`.venv/`。
-- 设置字段与 env 键**不带版本号前缀**（`vXX_` 开关体系删除中，见 `docs/refactor/`）：新增设置项按领域命名（如 `plan_max_steps` / `tool_system_enabled`），勿再引入版本前缀；环境变量名 = 字段名大写（无 alias 层），改名必须同批同步部署侧 `.env`。
+- 设置字段与 env 键**不带版本号前缀**（`vXX_` 开关体系删除已收官，2026-09-19，台账见 `docs/refactor/flag-removal-audit.md`）：新增设置项按领域命名（如 `plan_max_steps` / `world_prompt_char_budget`），勿再引入版本前缀；环境变量名 = 字段名大写（无 alias 层），改名必须同批同步部署侧 `.env`。
 - 只有用户明确要求时才提交 / 推送 / 建 PR。
