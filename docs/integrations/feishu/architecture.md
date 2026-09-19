@@ -50,10 +50,13 @@ User Message ───────┼── Feishu（本阶段新增，双向）
 User / Feishu Event
         │
         ▼
-api/v1/feishu.py          传输：验签 / 解密 / 过滤 / 去重 / 快速 ack
+api/v1/feishu.py          传输：限长 / 验签 / 解密 / 新鲜度 / 过滤 / 去重 / 限流 / 快速 ack
         │
         ▼
-channels/feishu/adapter.py   适配：身份映射 → 串行 → 管线 → 取回复文本
+channels/feishu/inbox.py     收件箱：连发合并 + per-session FIFO 批次链 + 队列背压
+        │
+        ▼
+channels/feishu/adapter.py   适配：身份映射（线程下放）→ 并发闸门 → 管线 → 取回复文本
         │
         │  (session_id, user_id, content, llm)
         ▼
@@ -186,9 +189,11 @@ app/channels/<impl>/     具体渠道实现（feishu/）
 Feishu User
     ↓  事件回调
 Webhook（api/v1/feishu.py）
-    ↓  验签 / 解密 / 过滤 / 去重 / 快速 ack
+    ↓  限长 / 验签 / 解密 / 新鲜度 / 过滤 / 去重 / 限流 / 快速 ack
+Inbox（channels/feishu/inbox.py）
+    ↓  连发合并 + per-session FIFO 批次链（顺序的单一真相源）
 Feishu Adapter（channels/feishu/adapter.py）
-    ↓  open_id → internal_user_id / session_id
+    ↓  open_id → internal_user_id / session_id（线程下放）+ 全局并发闸门
 Identity（services/channel_identity_service）
     ↓
 Existing Chat Pipeline（agent_service.stream_chat，零修改）
@@ -402,36 +407,48 @@ channel_identities
 Feishu Event（im.message.receive_v1）
    │  POST /api/v1/feishu/events        body 可能为 {"encrypt": "<base64>"}
    ▼
-[1] 传输层：读原始 body → 加密则 AES 解密 → 取 timestamp / nonce / signature
+[1] 传输层：按 FEISHU_MAX_BODY_BYTES 限长读取原始 body（超限 → 413）
+   → 加密则 AES 解密 → 取 timestamp / nonce / signature
    ▼
 [2] Event Validation
      ├─ header.token            == verification token （否则 401）
      ├─ X-Lark-Signature        == sha256(ts+nonce+encrypt_key+body) （否则 403）
      ├─ 时间戳窗口检查（防重放）
+     │    └─ 加密体且无签名头时：优先请求头时间戳，回落事件 header.create_time（否则 403）
      └─ type == "url_verification" → 原样返回 challenge（仅配置期命中）
    ▼
 [3] Event 解析（纯函数）
      ├─ event_type == im.message.receive_v1
      ├─ chat_type  == p2p
      ├─ message_type == text     → content 为 JSON 字符串 {"text": "..."} → 解析出 text
-     └─ 任一不满足 / event_id 已见过 → 记日志，返回 200（忽略）
+     └─ 任一不满足 → 记日志，返回 200（忽略）
    ▼
-[4] 快速 ack：立即 200（飞书要求 ~3s 内响应，否则重推）
+[4] 去重 → 限流（顺序不可颠倒）
+     ├─ event_id 命中去重窗口 → 返回 200（忽略，且不消耗限流配额）
+     └─ open_id 60s 滑窗超限   → 返回 429
+   ▼
+[5] 快速 ack：立即 200（飞书要求 ~3s 内响应，否则重推）
      └─ 处理体投递为后台 asyncio task（ack 与处理解耦）
    ▼
-[5] User / Session Mapping
-     channel_identities upsert（feishu, open_id）→ (user_id, session_id)
+[6] 会话收件箱（inbox.SessionInbox）
+     ├─ 按 open_id 分桶；短窗口内连发消息合并为一条（文本按到达顺序拼接，锚点取最后一条）
+     └─ 同会话 FIFO 批次链串行消费；队列超 FEISHU_SESSION_QUEUE_LIMIT → 回兜底文案，不调管线
    ▼
-[6] Chat Pipeline（既有，进程内直调）
+[7] User / Session Mapping
+     channel_identities upsert（feishu, open_id）→ (user_id, session_id)
+       └─ 同步 DB 调用经 asyncio.to_thread 下放，不阻塞事件循环
+   ▼
+[8] Chat Pipeline（既有，进程内直调）
      agent_service.stream_chat(session_id, user_id, text, llm, trace)
        ├─ 消费异步事件流：积攒 token；turn_meta 只用于观测，不进回复
        └─ done 事件 → 拿到完整回复文本（此时 save_turn 已在管线内完成）
+       └─ 全局并发闸门：FEISHU_MAX_CONCURRENT_TURNS 个进程内 Semaphore 名额
    ▼
-[7] AI Response（出站）
+[9] AI Response（出站）
      tenant_access_token（缓存）→ POST im/v1/messages/{message_id}/reply
        content = {"text": "<reply>"}   receive_id_type 无关（reply 走 message_id）
    ▼
-[8] Feishu Message API → 飞书用户
+[10] Feishu Message API → 飞书用户
      （下一轮：同 session_id → messages 续写 → Memory / World / Relationship 延续）
 ```
 
@@ -441,7 +458,11 @@ Feishu Event（im.message.receive_v1）
 - **消费内部流但不对外流式**：管线是 `AsyncIterator[dict]`（`turn_meta` / `token` / `done`），Adapter 逐块消费并拼接，**不向飞书做分片推送**。第一阶段的输出是"一条完整文本消息"。
 - **回复优先锚定（reply），但出站不只有 reply**：有锚点时用 `POST im/v1/messages/{message_id}/reply`——它天然锚定上下文（同一条消息的回复），比按 `chat_id` 群发更不容易错位，且**不需要收件人解析**。**但 reply 只是出站的一种形态**：主动消息没有 `message_id`，必须走 `POST im/v1/messages?receive_id_type=open_id`（见 §2.5.3）。两条路径由 `OutboundMessage.reply_ref` 的有无在选择，而非由调用方决定（§2.5.4）。
 - **落库时机不变**：`save_turn` 发生在管线内部（流式回答结束后）。Adapter **不重复落库**，也**不参与** `post_process`（scene / state / summary / memory / action 六步后台照旧）。飞书发送失败只影响"用户看不看得到"，不影响已落库的会话事实。
-- **同会话串行**：同一 `user_id` 的多条消息按到达顺序串行处理（进程内 per-user 锁，与既有"单用户写串行化"方向一致），避免同一会话的 `messages` 交错、上下文窗口读到半成品。
+- **同会话串行**：同一 `user_id` 的多条消息按到达顺序串行处理。**顺序与背压的单一真相源是 `inbox.SessionInbox`**——`offer()` 同步入缓冲（无 `await`），flush 时把批次压入该会话的 FIFO 队列，由**唯一**的 per-session worker 顺序消费；`adapter` 的 per-user `asyncio.Lock` 只是防御性兜底。**不得**在 `adapter` 内另建并发计数（会与收件箱的队列深度形成两套竞争机制）。
+  - 该顺序是**显式构造**的，不依赖"同步阻塞恰好不让出事件循环"这一副作用：身份解析已下放线程，若仍靠副作用保序，连发消息会被反序处理。
+  - **多实例限制**：合并窗口与批次链均只在**进程内**生效；跨实例的会话串行须由外置锁承担（见 `review-v1.1.md` §5）。
+- **连发合并**：同一 `open_id` 在 `FEISHU_MERGE_WINDOW_MS` 固定窗口内（首条起算，**不因新消息重置**，避免持续打字导致永不 flush）的连续消息合并为一条，文本按到达顺序以换行拼接、锚点取最后一条（reply 语义）。超 `FEISHU_MERGE_MAX_MESSAGES` / `FEISHU_MERGE_MAX_CHARS` 立即 flush；`FEISHU_MERGE_WINDOW_MS=0` 表示关闭合并（逐条处理，仍走链保序）。
+- **全局并发闸门**：`FEISHU_MAX_CONCURRENT_TURNS` 由进程内 `Semaphore` 实际消费（超限排队而非丢弃），并在首次创建时校验「上限 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`）」，超出记 warning。
 - **观测**：每轮由 Adapter 建 trace（复用 `trace_collector`），并把 `feishu.message_id` / `event_id` / `open_id` 记入日志用于排障。
 
 ---
@@ -466,8 +487,12 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_MAX_REPLY_CHARS` | int | `4000` | 单条回复字符上限，超出按段切分 |
 | `FEISHU_DEDUPE_TTL_SECONDS` | int | `600` | `event_id` 去重窗口 |
 | `FEISHU_SIGNATURE_WINDOW_SECONDS` | int | `300` | 时间戳允许偏差（防重放） |
-| `FEISHU_MAX_CONCURRENT_TURNS` | int | `4` | 全局并发处理上限 |
-| `FEISHU_SESSION_QUEUE_LIMIT` | int | `5` | 单用户待处理消息队列上限（超出丢弃并提示） |
+| `FEISHU_MAX_CONCURRENT_TURNS` | int | `4` | **全局并发处理上限（已实际生效）**：进程内 `Semaphore` 名额，超限排队；须 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`） |
+| `FEISHU_SESSION_QUEUE_LIMIT` | int | `5` | 单用户**待处理批次数**上限（超出拒绝新到消息并提示；批次由收件箱的合并窗口产生） |
+| `FEISHU_MAX_BODY_BYTES` | int | `262144` | 入站请求体上限；超限直接 `413`，不读入内存 |
+| `FEISHU_MERGE_WINDOW_MS` | int | `800` | 连发合并窗口（毫秒）；固定窗口，首条起算不重置；**`0` = 关闭合并**（允许 0，其余正数项不允许） |
+| `FEISHU_MERGE_MAX_MESSAGES` | int | `10` | 单批合并消息条数上限，超出立即 flush |
+| `FEISHU_MERGE_MAX_CHARS` | int | `20000` | 单批合并文本字符上限（对齐 `InboundMessage.TEXT_MAX_CHARS`），超出立即 flush |
 
 ### 5.2 配置原则
 
@@ -494,22 +519,25 @@ Feishu Event（im.message.receive_v1）
 
 | # | 场景 | 检测点 | 处理 | 返回给飞书 | 用户可见结果 |
 |---|---|---|---|---|---|
-| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线 | `401` / `403` | 无回复（安全拒绝） |
+| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线。**加密体无签名头**时仍须独立校验新鲜度：优先请求头时间戳，回落 `header.create_time`（毫秒） | `401` / `403` | 无回复（安全拒绝） |
 | 2 | **解密失败**（Encrypt Key 不匹配 / 密文损坏 / base64 非法 / 填充错误） | 传输层（步骤 [1]） | 记录告警（脱敏），标记配置类错误；**不进入解析、不去重、不派发**——即不建 identity / 不建 conversation / 不调管线 / 不产生任何 AI 回复 | `400` | 无回复 |
 | 2b | **解密成功但明文结构非法** | 解析（步骤 [3]） | 记**脱敏**日志后**忽略**（明文内容不入日志） | `200`（避免飞书无限重推） | 无回复 |
 | 3 | **Event 解析失败**（结构非预期 / `content` 非法 JSON） | 解析纯函数（步骤 [3]） | 记录 + trace，跳过该事件 | `200`（避免重推） | 无回复 |
 | 4 | **事件不适用**（群聊 / 非 text / 非 `im.message.receive_v1`） | 解析纯函数 | 记录后忽略 | `200` | 无回复 |
 | 5 | **重复事件**（`event_id` 命中去重窗口） | 去重检查 | 直接忽略（幂等） | `200` | 不重复回复 |
-| 6 | **Session 创建失败**（`channel_identities` 写入失败 / DB 不可用） | 身份映射（步骤 [5]） | **不调管线**；记录异常 | `200` | 尝试发一条兜底文案（"我这边出了点小问题，稍后再试"）；发不出则静默 |
-| 7 | **Chat Pipeline 异常** | 消费事件流（步骤 [6]） | 沿用 `api/v1/chat.py` 既有语义对齐：`EmptyLLMResponseError` → 友好提示；`APIStatusError` → LLM 失败提示；其他异常 → 通用失败提示。**不写入半成品回复** | `200`（已 ack） | 收到失败提示文案 |
+| 6 | **Session 创建失败**（`channel_identities` 写入失败 / DB 不可用） | 身份映射（步骤 [7]） | **不调管线**；记录异常 | `200` | 尝试发一条兜底文案（"我这边出了点小问题，稍后再试"）；发不出则静默 |
+| 7 | **Chat Pipeline 异常** | 消费事件流（步骤 [8]） | 沿用 `api/v1/chat.py` 既有语义对齐：`EmptyLLMResponseError` → 友好提示；`APIStatusError` → LLM 失败提示；其他异常 → 通用失败提示。**不写入半成品回复** | `200`（已 ack） | 收到失败提示文案 |
 | 8 | **AI 返回为空** | 累积结果为空串 | **不发空消息** → 发固定兜底文案（已冻结；静默被否决，见 FEISHU-004 §15.5） | `200` | 收到兜底文案 |
 | 9 | **Feishu API 调用失败**（Reply 与 Proactive 同规则） | 出站 | `429/5xx/超时` → 指数退避重试（有上限）；`4xx` → 不重试；终败记录错误日志，**不改会话状态** | 不适用 | 本轮回复丢失（下一轮仍正常）；主动消息本轮不达 |
 | 10 | **回复超长** | 出站前 | 按 `FEISHU_MAX_REPLY_CHARS` 切分为多条顺序发送；单条仍超限则截断并标记 | 不适用 | 消息分段到达 |
 | 11 | **发送重复** | 出站 | 幂等键分两种：**Reply** 用源 `message_id`；**Proactive** 用调用方提供的 `idempotency_key`（无 message_id 可依托）。进程内 TTL 表防自身重复投递；不覆盖"已送达但响应丢失"（协议无幂等键，残余风险显式登记） | 不适用 | 同一条只收到一次 |
-| 12 | **用户消息过载** | 排队 | 单会话队列超 `FEISHU_SESSION_QUEUE_LIMIT` → **拒绝新到消息**并提示（"丢弃最旧"因 `asyncio.Lock` 无法优雅取消排队协程而被否决，见 FEISHU-004 §15.3） | `200` | 收到"消息有点多"提示 |
-| 13 | **限流** | 传输层 | 注意：既有 `chat_rate_limit_middleware` **只保护 `POST /api/v1/chat/message`**（按客户端 IP），Webhook 路径不在其内 → 飞书侧需**独立**的按 `open_id` 窗口限流 | `429` | 收到限流提示 |
+| 12 | **用户消息过载** | 排队（收件箱） | 单会话**待处理批次数**超 `FEISHU_SESSION_QUEUE_LIMIT` → **拒绝新到消息**并回兜底文案，不调管线；队列释放后自动恢复受理。深度由 `inbox.SessionInbox` 的 FIFO 队列持有（"丢弃最旧"仍被否决，见 FEISHU-004 §15.3） | `200` | 收到"你发得太快了"提示 |
+| 13 | **限流** | 传输层 | 注意：既有 `chat_rate_limit_middleware` **只保护 `POST /api/v1/chat/message`**（按客户端 IP），Webhook 路径不在其内 → 飞书侧需**独立**的按 `open_id` 窗口限流。**去重必须先于限流**：飞书重投的重复事件不得消耗该用户的限流配额 | `429` | 收到限流提示 |
 | 14 | **收件人解析失败**（仅 Proactive） | 出站前（`resolve_recipient`） | 返回 `None` → **不发、不猜、不兜底到其他收件人**；记 warning（含 `internal_user_id`）。调用方（未来）据此跳过或标记 | 不适用（无入站请求） | 该用户收不到这条主动消息 |
 | 15 | **无锚点且无幂等键**（仅 Proactive） | 出站前校验 | 视为**调用方契约违规** → 拒绝发送 + 记 error（不得"先发了再说"） | 不适用 | 无 |
+| 16 | **请求体超限** | 传输层（步骤 [1]） | `Content-Length` 预检 + 分块累计读取，超限即中断；**不读入内存、不解析、不去重、不派发** | `413` | 无回复 |
+| 17 | **加密体无签名头且新鲜度不可校验** | 传输层（步骤 [2]） | 既无请求头时间戳、又无 `header.create_time`（典型为 URL 校验来件）→ **放行 + 记 warning**（此时残余保护仅剩 `event_id` 去重表，不得视为"已校验"） | `200` | 视事件而定 |
+| 18 | **派发失败**（无可调度事件循环） | 快速 ack 之后 | `spawn_background` 返回 `False` 时协程被关闭 → 记 error（不得静默吞掉用户消息） | `200`（已 ack） | 无回复（已留痕） |
 
 ### 6.3 与既有错误语义的对齐
 
@@ -528,12 +556,17 @@ Feishu Event（im.message.receive_v1）
 | **`X-Lark-Request-Nonce`** | 请求头 | 参与签名计算，防止同一签名被复用 | 参与签名，无独立判定 |
 | **`FEISHU_ENCRYPT_KEY`** | 配置 | **机密性**（承载事件内容的 AES 解密）+ **签名计算的密钥材料** | 解密失败 `400` |
 
-**两个明确结论**：
+**三个明确结论**：
 
 1. **token 与 signature 是并列的两道关，不是二选一**：token 解决"是不是给我的"，signature 解决"内容有没有被改过"。仅通过 token 而跳过签名，等于只验证了"信封上的收件人"而没验证"信有没有被拆开过"。
 2. **签名与加密都依赖 `Encrypt Key`**：因此 **`Encrypt Key` 非空是"完整验证姿态"的前提**（也是本项目推荐的生产姿态）。
    - `Encrypt Key` 非空 → 同时执行 **token 校验 + 时间戳窗口 + 签名校验 + （加密时）解密**。
    - `Encrypt Key` 为空 → 飞书侧不下发签名头，**此时可执行的校验只有 token + 时间戳窗口**。这是**安全能力降级**，不是等价替代：启动时记 `warning`，并且**实现阶段必须以飞书官方文档确认"未配置 Encrypt Key 时官方提供的校验要素"**，不得自行设计一套"看起来合理"的验证协议。
+3. **`X-Lark-Request-Timestamp` 的防重放职责不得随签名一起被跳过**（review v1.1 · F-01）。加密体未带签名头时，`verify_signature` 整体不执行，若时间戳窗口也随之失效，则**捕获到的密文可在 `FEISHU_DEDUPE_TTL_SECONDS` 过期后被无限重放**（每次触发一轮完整管线）。故该情形下仍须独立证明"新鲜"：
+   - 有 `X-Lark-Request-Timestamp` → 校验窗口；
+   - 无该头 → 回落事件自带的 `header.create_time`（毫秒）校验窗口；
+   - 两者皆无（URL 校验来件）→ 放行 + 记 warning，并显式承认"此时仅有去重表保护"。
+   - **取舍**：回落 `create_time` 比签名路径（校验的是*请求*时间）更严格——被飞书重投且已超窗的**旧消息**会被拒；窗口由 `FEISHU_SIGNATURE_WINDOW_SECONDS` 调节。
 
 > 实现期必读：§6.4 是**语义分工**的冻结描述，具体的 header 名、拼接顺序、时间戳单位等**协议细节**一律以飞书官方开放平台文档为最终依据（复核清单见 FEISHU-002 §6.5 / §15.2）。
 
@@ -575,6 +608,11 @@ Feishu Event（im.message.receive_v1）
 - ~~出站投递抽象~~ → **已升级为本次交付**：见 §2.5.4（`OutboundMessage` + `ChannelAdapter` Protocol）。剩余未决项是"**触发方如何拿到 adapter 实例**"（装配问题，§2.5.6 候选 A/B），留待 Autonomy 立项时决策。
 - **主动消息推送循环**：未来在 `channels/` 侧新增一个出站消费循环（拉取待推送的主动消息 → 反向解析收件人 → `send` → 回写推送态），由组合根在 lifespan 中启动。
 - **回复后处理**：若角色的回复含舞台指示/动作描述，未来可在 Adapter 出站前做"表现层转换"（属于 Channel 的表现问题，不属于角色核心）。
+- **多实例（多 worker）硬化 —— 开多 worker 的硬前置，未实现**：入站的 `event_id` 去重（`events._seen_events`）、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**当前全部是进程内状态**。在补齐以下两项之前**不得**开启多 worker / 多实例，否则同一 `event_id` 会被多个实例各处理一次（重复 LLM 调用 + 重复回复），且同一会话不再串行：
+  1. **去重落库**：新增 `feishu_events` 表（`event_id` 唯一约束）+ 迁移，`accept_event` 改为 DB insert + `IntegrityError` 判定；
+  2. **跨进程会话串行**：PG advisory lock（按 `session_id`）或会话行 `SELECT ... FOR UPDATE`。
+  - 另注：**连发合并窗口天然只在实例内生效**——多实例下同一 `open_id` 若落到不同 worker，其连发消息不会被合并（顺序仍须由跨进程锁保证）。若要求跨实例合并，需在 ingress 按 `open_id` 做 sticky 路由。
+  - 登记与验收条件见 `tasks.md` 的 **FEISHU-007**，发现明细见 `review-v1.1.md` §5。
 
 ---
 
@@ -583,7 +621,7 @@ Feishu Event（im.message.receive_v1）
 ```text
 app/
 ├── api/v1/
-│   ├── feishu.py                      # ★ 传输层：路由 / 验签 / 解密 / 快速 ack
+│   ├── feishu.py                      # ★ 传输层：路由 / 限长 / 验签 / 解密 / 新鲜度 / 去重 / 限流 / 快速 ack
 │   └── router.py                      #   +1 行注册（既有文件的最小接线）
 ├── channels/                          # ★ 新增：Channel Adapter 层（契约 + 实现两分）
 │   ├── base.py                        #   ★ 通道无关契约（零第三方依赖，可被核心层 import）：
@@ -591,8 +629,9 @@ app/
 │   │                                  #     出站 RecipientRef / OutboundMessage / SendResult /
 │   │                                  #          ChannelErrorKind / ChannelAdapter(Protocol)
 │   └── feishu/                        #   ★ 具体实现（核心层严禁 import）
-│       ├── adapter.py                 #     编排：事件 → 身份 → 管线 → 出站（入站入口）
-│       ├── events.py                  #     校验 + 解析 + 去重 + 限流（纯函数）
+│       ├── adapter.py                 #     编排：收件箱入口 + 批次执行（身份 → 并发闸门 → 管线）
+│       ├── inbox.py                   #     ★ 会话收件箱：连发合并 + per-session FIFO 批次链 + 队列背压
+│       ├── events.py                  #     校验 + 新鲜度 + 解析 + 去重 + 限流（纯函数）
 │       ├── identity.py                #     InboundMessage → ChannelIdentity（纯适配）
 │       ├── client.py                  #     token 缓存 + Reply / Send 两个 API（唯一持密钥处之一）
 │       ├── outbound.py                #     文本规范化 + 超长切分（纯函数）

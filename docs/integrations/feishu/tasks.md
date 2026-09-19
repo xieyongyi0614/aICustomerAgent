@@ -150,6 +150,37 @@
   7. `docs/integrations/feishu/regression-checklist.md`：人工步骤可执行（配置回调 URL → 发文本 → 收到回复 → 二次对话验证记忆延续 → 群聊不响应 → 关闭开关后端到端静默），含真模型抽查项。
   8. **Proactive 出口能力验证（本次修订新增）**：不实现 Autonomy，但验证"已知 `internal_user_id` → `resolve_recipient` → 正确 `external_id` → 假传输收到一次 `send`（`receive_id_type=open_id`）"；未知 `internal_user_id` → 零发送；无 `idempotency_key` 的 Proactive → 拒绝发送。
 
+### FEISHU-007 并发与去重硬化（P0，**部分实现**）
+
+- **ID**：FEISHU-007
+- **Priority**：P0
+- **来源**：[`review-v1.1.md`](./review-v1.1.md)（审核发现 F-01~F-16）
+- **状态**：**入站安全修复 + 连发合并已实现**（2026-09-19）；**多实例去重/锁未实现**，为开多 worker 的硬前置。
+- **Goal**：收口入站链路的真实缺陷（重放窗口、body 上限、限流/去重顺序、事件循环阻塞、同会话保序、内存表无界、后台任务可观测），并落地「同一用户连发合并」；同时为多实例部署预留去重与串行的外置方案。
+- **已实现 Scope**：
+  - `channels/feishu/events.py`：`verify_timestamp_freshness` / `verify_event_freshness` / `verify_encrypted_freshness`；`_seen_events` 与 `delivery._delivered` 改 `OrderedDict` 头部批量摘除；`_rate_windows` 摊还 sweep。
+  - `channels/feishu/inbox.py`（新增）：`SessionInbox` —— 固定窗口合并 + per-session FIFO 批次链 + 队列背压。
+  - `channels/feishu/adapter.py`：`ingest_inbound_message` 入口；`_resolve_identity` 线程下放；锁在首个 `await` 前取得；`_serialized` 引用计数回收；`_get_turn_gate` 全局并发闸门（激活 `feishu_max_concurrent_turns`）；移除 `_session_load` 三件套。
+  - `api/v1/feishu.py`：`_read_body` 限长；加密无签名分支的新鲜度校验；去重前置；`spawn_background` 返回值检查；派发入口切换。
+  - `application/observability.py`：后台任务异常 done-callback。
+  - `core/settings/feishu.py` + `.env.example`：`feishu_max_body_bytes` / `feishu_merge_window_ms` / `feishu_merge_max_messages` / `feishu_merge_max_chars`。
+- **未实现 Scope（多实例硬前置，必须在开多 worker 前完成）**：
+  1. `feishu_events` 表（`event_id` 唯一约束）+ 迁移 `0044`，`accept_event` 改 DB 去重。
+  2. PG advisory lock 或会话行 `SELECT ... FOR UPDATE`，做跨进程会话串行。
+  3. 出站幂等（`delivery._delivered`）落库。
+  - ⚠️ 新增仓储必须注册进 `tests/conftest.py::_REPO_MODULES`（含顶部 import），否则测试连真实 PG 挂起。
+- **Acceptance Criteria**：
+  1. 加密体无签名头且 `create_time` 过期 → 403 且零派发；`create_time` 新鲜 → 200 且正常派发；URL 校验来件（无时间戳、无 `create_time`）→ 放行并记 warning。
+  2. 请求体超过 `FEISHU_MAX_BODY_BYTES` → 413 且零派发（`Content-Length` 与实际分块两条路径都受限）。
+  3. 重复 `event_id` 不消耗限流配额（阈值 3 时连发 3 条有效事件全部 200）。
+  4. 同一 `open_id` 连发在窗口内合并为一轮，文本按到达顺序拼接、锚点取最后一条；窗口内新消息不重置计时；`window=0` 时逐条处理且仍严格按序。
+  5. 队列超过 `FEISHU_SESSION_QUEUE_LIMIT` → 回 `overloaded` 兜底文案且不调管线；队列释放后恢复受理。
+  6. `FEISHU_MAX_CONCURRENT_TURNS` 被实际消费；超过 DB 连接池容量时启动期记 warning。
+  7. 后台任务异常与「无可调度 loop」均有 error 日志。
+  8. 去重表/限流表/幂等表规模有界，不随历史事件数线性增长。
+  9. 通道边界 AST fail-closed 扫描保持通过（`inbox.py` 只依赖 `app.core` / `app.channels`）。
+- **Dependency**：FEISHU-002、FEISHU-004、FEISHU-005。
+
 ## 依赖图
 
 ```text
@@ -206,5 +237,5 @@ FEISHU-006 错误处理 + 测试收口（P1，全链收口，含 Proactive 出�
 
 | 候选 | 内容 | 前置条件 |
 |---|---|---|
-| **FEISHU-007（未来）出站触发方接入** | 让未来 Autonomy 产出的主动消息真正送达飞书。两条候选（**均未决**）：① 渠道侧消费者拉取既有 `proactive_actions` 的待推送行 → `resolve_recipient` → `send` → 回写推送态；② 调用方经 Channel 抽象直调（需先解决"谁能 import 具体实现"的装配问题） | 需要一次 schema 变更（`proactive_actions` 无"外部推送态"载体）；需要 Autonomy 立项（architecture §2.5.6） |
+| **FEISHU-008（未来）出站触发方接入** | 让未来 Autonomy 产出的主动消息真正送达飞书。两条候选（**均未决**）：① 渠道侧消费者拉取既有 `proactive_actions` 的待推送行 → `resolve_recipient` → `send` → 回写推送态；② 调用方经 Channel 抽象直调（需先解决"谁能 import 具体实现"的装配问题） | 需要一次 schema 变更（`proactive_actions` 无"外部推送态"载体）；需要 Autonomy 立项（architecture §2.5.6） |
 | 账号绑定（Web ↔ 飞书） | 改 `channel_identities.internal_user_id`，把飞书身份并入既有内部用户 | 架构 §7.2 明确不在本阶段 |
