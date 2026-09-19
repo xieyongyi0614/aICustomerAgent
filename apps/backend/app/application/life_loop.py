@@ -628,7 +628,7 @@ async def _run_maintenance(now: datetime) -> int:
         )
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
-    if _maintenance_due(
+    if settings.action_enabled and _maintenance_due(
         "action_schedule", settings.action_maintenance_interval_seconds
     ):
         _mark_maintenance("action_schedule")
@@ -692,7 +692,7 @@ def _maintenance_pending(settings) -> bool:
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         return True
-    if _maintenance_due(
+    if settings.action_enabled and _maintenance_due(
         "action_schedule", settings.action_maintenance_interval_seconds
     ):
         return True

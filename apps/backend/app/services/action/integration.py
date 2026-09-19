@@ -140,12 +140,15 @@ def apply_result_feedback(record: ActionRecord, result: ActionResult) -> dict[st
 
     V2.6.1：主路径唯一入口。反馈子闸已随 vXX_ 开关体系删除：integrate_result 后
     把 `feedback_kinds` / `temporary_execution` / `plan_step` 扩写进 `record.result`。
+    扩写底座取 `step_result_payload`（双写窗口：payload / world_event_id / memory_id
+    旧读键保留，outbox 与记忆沉淀下游依赖）。
     """
     from app.application import action_engine
+    from app.services.action.executor import step_result_payload
 
     action_engine.integrate_result(record, result)
 
-    stored = record.result if isinstance(record.result, dict) else {}
+    stored = step_result_payload(result)
     effects = stored.get("effects") if isinstance(stored.get("effects"), list) else []
     kinds: set[str] = set()
     rebuilt_effects: list[ActionEffect] = []

@@ -31,6 +31,8 @@ def ensure_result_identity(result: ActionResult, action_id: str) -> ActionResult
 
 
 def _coerce_effects(raw_effects: Any) -> list[ActionEffect]:
+    """工具/能力效果 → ActionEffect；`ActionEffect` 值域之外的 kind（如工具侧
+    `external`）在此丢弃——记录域效果通道只有 world/memory/relationship。"""
     effects: list[ActionEffect] = []
     if not isinstance(raw_effects, list):
         return effects
@@ -38,9 +40,12 @@ def _coerce_effects(raw_effects: Any) -> list[ActionEffect]:
         if isinstance(item, ActionEffect):
             effects.append(item)
         elif isinstance(item, dict):
+            kind = item.get("kind", "note")
+            if kind not in ("world", "memory", "relationship", "note"):
+                continue
             effects.append(
                 ActionEffect(
-                    kind=item.get("kind", "note"),
+                    kind=kind,
                     ref=str(item.get("ref", "")),
                     detail=str(item.get("detail", "")),
                 )
@@ -142,21 +147,29 @@ def from_tool_execution(execution: Any, *, action_id: str) -> ActionResult:
     duration_ms = getattr(execution, "duration_ms", None)
     permission = getattr(execution, "permission", None) or {}
     validation = getattr(execution, "validation", None)
+    params = getattr(execution, "params", None)
 
     output, _legacy_payload = _extract_output_and_payload(result_payload)
     raw_effects: Any = []
     tool_observations: dict[str, Any] = {}
+    tool_usage: dict[str, Any] = {}
     if isinstance(result_payload, dict):
         raw_effects = result_payload.get("effects") or []
         obs = result_payload.get("observations")
         if isinstance(obs, dict):
             tool_observations = dict(obs)
+        usage = result_payload.get("usage")
+        if isinstance(usage, dict):
+            tool_usage = dict(usage)
     elif result_payload is not None and hasattr(result_payload, "model_dump"):
         dumped = result_payload.model_dump(mode="json")
         raw_effects = dumped.get("effects") or []
         obs = dumped.get("observations")
         if isinstance(obs, dict):
             tool_observations = dict(obs)
+        usage = dumped.get("usage")
+        if isinstance(usage, dict):
+            tool_usage = dict(usage)
 
     if status_raw == "succeeded":
         status = "succeeded"
@@ -169,18 +182,31 @@ def from_tool_execution(execution: Any, *, action_id: str) -> ActionResult:
         failure_kind = "unavailable"
     else:
         status = "failed"
-        failure_kind = "permanent" if status_raw in ("denied", "invalid") else "transient"
+        if status_raw in ("denied", "invalid", "pending_confirmation"):
+            failure_kind = "permanent"
+        else:
+            # 能力侧判定的 failure_kind（permanent / transient / timeout…）优先保留，
+            # 否则重试语义会被抹平（E 契约：permanent 永不重试）。
+            payload_failure_kind = (
+                result_payload.get("failure_kind")
+                if isinstance(result_payload, dict)
+                else None
+            )
+            failure_kind = payload_failure_kind or "transient"
 
-    observations = _whitelist_observations(output, tool_observations)
+    # 观测优先取工具归一产物（dotted key 形态）；工具未产观测时回退输出白名单。
+    observations = dict(tool_observations) if tool_observations else _whitelist_observations(output)
     metadata: dict[str, Any] = {
         "tool_status": status_raw,
         "source": "tool",
         "tool_id": tool_id,
         "permission": permission,
         "validation": validation,
+        "params": dict(params) if isinstance(params, dict) else {},
+        "usage": tool_usage,
     }
     if duration_ms is not None:
-        metadata["duration_ms"] = duration_ms
+        metadata["duration_ms"] = int(duration_ms)
     return ensure_result_identity(
         ActionResult(
             status=status,  # type: ignore[arg-type]

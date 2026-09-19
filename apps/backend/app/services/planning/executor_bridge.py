@@ -445,9 +445,19 @@ def _outcome_from_result_projection(step, record, at: datetime) -> PlanStepOutco
 
     `record.result` 为全形态时启用（总闸已随 vXX_ 开关体系删除）；观测仍按
     `step.observation_keys` 裁剪。
+    工具五段前置短路（pending_confirmation / unavailable / denied / invalid）不投影：
+    未执行的动作由 `_record_outcome` 按记录状态归一（blocked / cancelled 族）。
     """
     stored = record.result if isinstance(record.result, dict) else None
     if not stored or "status" not in stored:
+        return None
+    meta = stored.get("metadata")
+    if isinstance(meta, dict) and meta.get("tool_status") in (
+        "pending_confirmation",
+        "unavailable",
+        "denied",
+        "invalid",
+    ):
         return None
     if "output" not in stored and "observations" not in stored:
         return None

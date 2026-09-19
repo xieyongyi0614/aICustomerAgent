@@ -76,13 +76,16 @@ def step_result_payload(result: ActionResult) -> dict[str, Any]:
 def step_extras_from_result(result: ActionResult) -> dict[str, Any]:
     meta = result.metadata or {}
     usage = meta.get("usage") if isinstance(meta.get("usage"), dict) else {}
+    duration = (
+        meta.get("duration_ms")
+        or (usage.get("duration_ms") if usage else 0)
+        or 0
+    )
     return {
         "tool_id": meta.get("tool_id"),
         "permission": meta.get("permission") or {},
         "validation": meta.get("validation"),
-        "duration_ms": meta.get("duration_ms")
-        or (usage.get("duration_ms") if usage else 0)
-        or 0,
+        "duration_ms": int(duration),
     }
 
 
@@ -176,6 +179,16 @@ class ActionExecutor:
                     error=f"no_execution_map: {action.type}",
                     failure_kind="permanent",
                 )
+            # 工具绑定优先（v26 去门控裁决 B）：凡能解析出工具绑定的动作一律经
+            # 工具五段执行（权限/确认/校验/归一/健康），解析不出绑定才按分派落位。
+            if self.tool_executor is not None and self.tool_resolver is not None:
+                try:
+                    binding, invocation = self.tool_resolver(action)
+                except Exception:
+                    logger.exception("工具绑定解析异常，回退分派路径 action_id=%s", action.id)
+                    binding = invocation = None
+                if binding is not None and invocation is not None:
+                    return await self.execute_tool(action, ctx)
             if kind == "internal":
                 return await self.execute_internal(action, ctx)
             if kind == "tool":

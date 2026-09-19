@@ -43,7 +43,7 @@ from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_ga
 from app.services.action.registry import ExecutionContext, get_capability_registry
 from app.services.tool.confirmation import get_confirmation_service
 from app.services.tool.context import DEFAULT_SOURCE, ToolContext
-from app.services.tool.executor import resolve_step_binding
+from app.services.tool.executor import ToolExecutor, resolve_step_binding
 from app.services.tool.permission import (
     CONFIRM_KIND_ALWAYS,
     CONFIRM_KIND_FIRST_TIME,
@@ -218,10 +218,13 @@ async def _execute_plan_via_action_executor(
     permission_snapshot: PermissionSnapshot | None = None,
     tool_context: ToolContext | None = None,
 ) -> ActionResult:
-    """V2.6.0 主路径：ActionExecutor 统一分派 Internal/Tool/External。"""
+    """V2.6.0 主路径：ActionExecutor 统一分派；可解析出工具绑定的动作经工具五段执行。
+
+    `ToolExecutor` 取模块级名字（测试经 `monkeypatch.setattr(action_engine, "ToolExecutor", …)`
+    注入五段探针）；工具绑定优先路由见 `ActionExecutor.run`（裁决 B）。
+    """
     from app.models.action import Action
     from app.services.action.executor import ActionExecutor
-    from app.services.tool.executor import ToolExecutor
     from app.services.tool.health import ToolHealthTracker
 
     exec_tool_ctx = tool_context
@@ -264,14 +267,6 @@ async def _execute_plan_via_action_executor(
     if exec_tool_ctx is None:
         exec_tool_ctx = _tool_context_for_execution(ctx, tool_context)
 
-    action_executor = ActionExecutor(
-        storage,
-        timeout_seconds=settings.action_execution_timeout_seconds,
-        tool_executor=tool_executor,
-        tool_resolver=tool_resolver,
-        permission_snapshot=permission_snapshot,
-        tool_context=exec_tool_ctx,
-    )
     action = Action(
         id=record.id,
         type=record.action_type,
@@ -285,15 +280,31 @@ async def _execute_plan_via_action_executor(
         dedupe_key=record.dedupe_key,
         run_id=record.session_id,
     )
+
+    binding, invocation = tool_resolver(action)
+
+    if plan.steps and binding is None:
+        return _unresolved_binding_short_circuit(record, plan, settings)
+
+    def resolved_resolver(_action: Action):
+        return binding, invocation
+
+    action_executor = ActionExecutor(
+        storage,
+        timeout_seconds=settings.action_execution_timeout_seconds,
+        tool_executor=tool_executor,
+        tool_resolver=resolved_resolver,
+        permission_snapshot=permission_snapshot,
+        tool_context=exec_tool_ctx,
+    )
     result_out = await action_executor.run(action, ctx)
     from app.services.action.executor import step_extras_from_result, step_result_payload
 
     tool_meta = result_out.metadata if isinstance(result_out.metadata, dict) else {}
-    pending_confirmation = tool_meta.get("tool_status") == "pending_confirmation"
     confirm_prompt: str | None = None
-    if pending_confirmation:
+    if tool_meta.get("tool_status") == "pending_confirmation":
         confirm_prompt = _register_pending_confirmation(
-            action, tool_meta, tool_registry, tool_resolver, exec_tool_ctx, settings
+            action, tool_meta, tool_registry, resolved_resolver, exec_tool_ctx, settings
         )
         if confirm_prompt:
             result_out = result_out.model_copy(update={"error": confirm_prompt})
@@ -302,27 +313,69 @@ async def _execute_plan_via_action_executor(
         record.action_type, ("", "")
     )
     extras = step_extras_from_result(result_out)
+    tool_status = tool_meta.get("tool_status")
     step_status = (
         "skipped"
-        if pending_confirmation
+        if tool_status in TOOL_SHORT_CIRCUIT_OUTCOMES
         else (
             "succeeded"
             if result_out.status == "succeeded"
             else ("partial" if result_out.status == "partial" else "failed")
         )
     )
+    step_result = step_result_payload(result_out)
+    if tool_meta.get("usage") is not None:
+        step_result.setdefault("usage", tool_meta.get("usage"))
     step_dicts = [
         {
             "index": 0,
             "capability": capability_name,
             "action": capability_action,
-            "params": dict(record.params or {}),
+            "params": tool_meta.get("params") or dict(record.params or {}),
             "status": step_status,
-            "result": step_result_payload(result_out),
+            "result": step_result,
             **extras,
         }
     ]
     record.steps = step_dicts
+    _apply_action_result_to_record(record, result_out, settings)
+    record.result = step_result_payload(result_out)
+    record.updated_at = _now()
+    action_repository.save_record(record)
+    return result_out
+
+
+def _unresolved_binding_short_circuit(record: ActionRecord, plan: ActionPlan, settings) -> ActionResult:
+    """绑定不可解析（能力无注册工具 / 面剔除后无候选）：五段不执行，记录短路为
+    `unavailable`（E8 契约：未执行 ≠ 执行失败）。"""
+    result_out = ActionResult(
+        status="failed",
+        failure_kind="unavailable",
+        error="工具不可用（未注册 / 已禁用 / 已熔断）",
+        metadata={"tool_status": "unavailable", "source": "tool"},
+    )
+    from app.services.action.executor import step_result_payload
+
+    capability_name, capability_action = ACTION_CAPABILITY_MAP.get(
+        record.action_type, ("", "")
+    )
+    record.steps = [
+        {
+            "index": 0,
+            "capability": plan.steps[0].capability or capability_name,
+            "action": plan.steps[0].action or capability_action,
+            "params": dict(record.params or {}),
+            "status": "skipped",
+            "result": {
+                "status": "unavailable",
+                "error": "工具不可用（未注册 / 已禁用 / 已熔断）",
+            },
+            "tool_id": None,
+            "permission": {},
+            "validation": None,
+            "duration_ms": 0,
+        }
+    ]
     _apply_action_result_to_record(record, result_out, settings)
     record.result = step_result_payload(result_out)
     record.updated_at = _now()
@@ -373,10 +426,24 @@ def _confirm_kind(definition) -> str:
     return CONFIRM_KIND_FIRST_TIME
 
 
+TOOL_SHORT_CIRCUIT_OUTCOMES: dict[str, tuple[str, str]] = {
+    "unavailable": ("cancelled", "capability_unavailable"),
+    "denied": ("cancelled", "permission_denied"),
+    "invalid": ("cancelled", "invalid_params"),
+    "pending_confirmation": ("planned", "pending_confirmation"),
+}
+"""工具五段前置短路的记录终态（原 `_TOOL_RECORD_OUTCOMES` 契约，裁决 B 恢复）：
+未执行的动作不落 failed（区别于执行失败），`cancelled`/`planned` 承载短路口径。"""
+
+
 def _apply_action_result_to_record(record: ActionRecord, result_out: ActionResult, settings) -> None:
-    if isinstance(result_out.metadata, dict) and result_out.metadata.get("tool_status") == "pending_confirmation":
-        record.status = "planned"
-        record.gate_reason = GATE_REASON_PENDING_CONFIRMATION
+    tool_status = (
+        result_out.metadata.get("tool_status")
+        if isinstance(result_out.metadata, dict)
+        else None
+    )
+    if tool_status in TOOL_SHORT_CIRCUIT_OUTCOMES:
+        record.status, record.gate_reason = TOOL_SHORT_CIRCUIT_OUTCOMES[tool_status]
         return
     if result_out.status == "succeeded":
         record.status = transition_action("executing", "step_all_succeeded") or record.status
