@@ -60,7 +60,6 @@ import json
 import logging
 from datetime import datetime
 
-from app.application.action_engine import run_action_planning
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
@@ -173,9 +172,9 @@ class PlanBridgeDefect(ValueError):
 class PlanExecutorBridge:
     """步骤 → `ActionIntent` → Action → `PlanStepOutcome` 的翻译与回收。
 
-    `runner` / `session_resolver` / `registry` / `settings` 均可注入，仅影响测试与后续任务
-    的复用场景；缺省即既有实现（`action_engine.run_action_planning` / 最近会话 / 工具系统
-    单例 / 全局设置），语义不变。
+    恒经 ActionManager 执行（总闸已随 vXX_ 开关体系删除）；`runner` 为显式注入点
+    （仅测试/复用打桩），`session_resolver` / `registry` / `settings` 同款可注入，
+    缺省即既有实现（最近会话 / 工具系统单例 / 全局设置），语义不变。
     """
 
     def __init__(
@@ -265,37 +264,36 @@ class PlanExecutorBridge:
         )
 
     async def _dispatch(self, goal, intent: ActionIntent, *, plan_step: str | None = None):
-        """既有编排器入口（唯一）：`source="autonomy"` 使额度与冷却结构性生效（§5.1）。
+        """既有编排器入口（唯一）：`source="plan"` 使额度与冷却结构性生效（§5.1）。
 
-        V2.6.0：总闸 on 时经 ActionManager.create(source=plan) + execute，保持
-        PlanStep 与 Action 1:1（不新建第二条记录）。
+        恒经 ActionManager.create(source=plan) + execute，保持 PlanStep 与 Action
+        1:1（不新建第二条记录；总闸已随 vXX_ 开关体系删除）。
         V2.6.1：回填 `plan_step`（`step_<index>`），保证计划↔行动 1:1 可溯源。
+        `_runner` 为显式执行注入点（构造参数，供单列验证打桩），缺省走 ActionManager。
         """
-        settings = get_settings()
-        if getattr(settings, "action_execution_enabled", False):
-            from app.repositories import action_repository
-            from app.services.action import manager as action_manager
+        from app.repositories import action_repository
+        from app.services.action import manager as action_manager
 
-            action = action_manager.create(
-                user_id=goal.user_id,
-                action_type=intent.action_type,
-                params=dict(intent.params or {}),
-                source="plan",
+        if self._runner is not None:
+            return await self._runner(
+                goal.user_id,
+                intent,
                 session_id=self._session_id(goal.user_id),
                 goal_id=goal.id,
-                intent=intent,
-                plan_step=plan_step,
+                source=PLAN_STEP_ACTION_SOURCE,
             )
-            await action_manager.execute(action.id)
-            return action_repository.get_record(action.id)
-        runner = run_action_planning if self._runner is None else self._runner
-        return await runner(
-            goal.user_id,
-            intent,
+        action = action_manager.create(
+            user_id=goal.user_id,
+            action_type=intent.action_type,
+            params=dict(intent.params or {}),
+            source="plan",
             session_id=self._session_id(goal.user_id),
             goal_id=goal.id,
-            source=PLAN_STEP_ACTION_SOURCE,
+            intent=intent,
+            plan_step=plan_step,
         )
+        await action_manager.execute(action.id)
+        return action_repository.get_record(action.id)
 
     def _session_id(self, user_id: str) -> str | None:
         """会话关联：与既有自治路径同源（最近会话），失败即降级为 `None`（不阻塞执行）。"""
@@ -445,12 +443,9 @@ def _normalize(step, record, at: datetime) -> PlanStepOutcome:
 def _outcome_from_result_projection(step, record, at: datetime) -> PlanStepOutcome | None:
     """V2.6 主路径全形态结果 → `to_plan_step_outcome` 生产投影；不适用返回 None。
 
-    仅在总闸 on 且 `record.result` 为全形态时启用；观测仍按 `step.observation_keys` 裁剪。
+    `record.result` 为全形态时启用（总闸已随 vXX_ 开关体系删除）；观测仍按
+    `step.observation_keys` 裁剪。
     """
-    from app.core.settings import get_settings
-
-    if not getattr(get_settings(), "action_execution_enabled", False):
-        return None
     stored = record.result if isinstance(record.result, dict) else None
     if not stored or "status" not in stored:
         return None

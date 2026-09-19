@@ -628,12 +628,8 @@ async def _run_maintenance(now: datetime) -> int:
         )
         _record_maintenance_run("action_retry", entries, now, status=status)
         executed += 1
-    if (
-        getattr(settings, "action_execution_enabled", False)
-        and getattr(settings, "action_scheduler_enabled", False)
-        and _maintenance_due(
-            "action_schedule", settings.action_maintenance_interval_seconds
-        )
+    if _maintenance_due(
+        "action_schedule", settings.action_maintenance_interval_seconds
     ):
         _mark_maintenance("action_schedule")
         from app.services.action import scheduler as action_scheduler
@@ -696,12 +692,8 @@ def _maintenance_pending(settings) -> bool:
         "action_retry", settings.action_maintenance_interval_seconds
     ):
         return True
-    if (
-        getattr(settings, "action_execution_enabled", False)
-        and getattr(settings, "action_scheduler_enabled", False)
-        and _maintenance_due(
-            "action_schedule", settings.action_maintenance_interval_seconds
-        )
+    if _maintenance_due(
+        "action_schedule", settings.action_maintenance_interval_seconds
     ):
         return True
     if settings.action_outbox_enabled:

@@ -25,14 +25,6 @@ def _now() -> datetime:
     return datetime.now()
 
 
-def feedback_enabled() -> bool:
-    settings = get_settings()
-    return bool(
-        getattr(settings, "action_execution_enabled", False)
-        and getattr(settings, "action_feedback_enabled", False)
-    )
-
-
 def create_from_plan_intent(
     intent: ActionIntent,
     *,
@@ -146,19 +138,12 @@ def is_temporary_execution(record: ActionRecord) -> bool:
 def apply_result_feedback(record: ActionRecord, result: ActionResult) -> dict[str, Any]:
     """统一反馈入口：四通道回写 + 三面反馈投影。复用 integrate_result，不新建机制。
 
-    V2.6.1：主路径唯一入口。feedback off 时仅委托 integrate_result；on 时在四通道
-    落库后把 `feedback_kinds` / `temporary_execution` / `plan_step` 扩写进 `record.result`。
+    V2.6.1：主路径唯一入口。反馈子闸已随 vXX_ 开关体系删除：integrate_result 后
+    把 `feedback_kinds` / `temporary_execution` / `plan_step` 扩写进 `record.result`。
     """
     from app.application import action_engine
 
     action_engine.integrate_result(record, result)
-
-    if not feedback_enabled():
-        routed = route_effects(result)
-        return {
-            "mode": "legacy",
-            "channels": {k: len(v) for k, v in routed.items()},
-        }
 
     stored = record.result if isinstance(record.result, dict) else {}
     effects = stored.get("effects") if isinstance(stored.get("effects"), list) else []

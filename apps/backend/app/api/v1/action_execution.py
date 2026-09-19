@@ -1,28 +1,12 @@
-"""V2.6.0 Action Execution 调试端点（受 v26 总闸 + debug 子闸门控）。"""
+"""V2.6.0 Action Execution 调试端点（门控已随 vXX_ 开关体系删除，恒可见）。"""
 
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.settings import get_settings
 from app.repositories import action_repository
 
 action_execution_router = APIRouter()
-
-
-def _action_debug_enabled() -> bool:
-    settings = get_settings()
-    return bool(settings.action_execution_enabled) and bool(
-        settings.action_debug_enabled
-    )
-
-
-def _require_debug() -> None:
-    if not _action_debug_enabled():
-        raise HTTPException(
-            status_code=404,
-            detail="Action 调试面未启用（action_execution_enabled / action_debug_enabled）",
-        )
 
 
 @action_execution_router.get("/debug/action-execution/actions")
@@ -31,7 +15,6 @@ def list_execution_actions(
     status: str | None = None,
     limit: int = 50,
 ):
-    _require_debug()
     records = action_repository.list_records(
         user_id or "", status=status, limit=max(1, min(limit, 200))
     )
@@ -40,7 +23,6 @@ def list_execution_actions(
 
 @action_execution_router.get("/debug/action-execution/actions/{action_id}")
 def get_execution_action(action_id: str):
-    _require_debug()
     record = action_repository.get_record(action_id)
     if record is None:
         raise HTTPException(status_code=404, detail="action record 不存在")
@@ -52,7 +34,6 @@ def get_execution_action(action_id: str):
 
 @action_execution_router.get("/debug/action-execution/schedules")
 def list_execution_schedules(now: datetime | None = None, limit: int = 50):
-    _require_debug()
     when = now or datetime.now()
     schedules = action_repository.list_due_schedules(when, limit=max(1, min(limit, 200)))
     return [s.model_dump(mode="json") for s in schedules]
@@ -60,7 +41,6 @@ def list_execution_schedules(now: datetime | None = None, limit: int = 50):
 
 @action_execution_router.get("/debug/action-execution/metrics")
 def execution_metrics(window_hours: float = 24):
-    _require_debug()
     since = datetime.now() - timedelta(hours=window_hours)
     statuses = ("created", "planned", "executing", "succeeded", "failed", "cancelled")
     buckets: dict[str, int] = {}

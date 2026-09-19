@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from app.core.settings import get_settings
 from app.models.action import (
     ActionEffect,
     ActionResult,
@@ -15,10 +14,6 @@ from app.models.action import (
 
 def _now() -> datetime:
     return datetime.now()
-
-
-def result_timeout_enabled() -> bool:
-    return bool(getattr(get_settings(), "action_result_enabled", False))
 
 
 def make_result_id() -> str:
@@ -113,7 +108,7 @@ def from_capability_result(
     if result.status == "succeeded":
         status = "succeeded"
     elif result.status == "timeout":
-        status = "timeout" if result_timeout_enabled() else "failed"
+        status = "timeout"
         failure_kind = failure_kind or "timeout"
     elif result.status == "unavailable":
         status = "failed"
@@ -167,7 +162,7 @@ def from_tool_execution(execution: Any, *, action_id: str) -> ActionResult:
         status = "succeeded"
         failure_kind = None
     elif status_raw == "timeout":
-        status = "timeout" if result_timeout_enabled() else "failed"
+        status = "timeout"
         failure_kind = "timeout"
     elif status_raw in ("unavailable",):
         status = "failed"
@@ -217,7 +212,7 @@ def from_plan_step_outcome(outcome: Any, *, action_id: str) -> ActionResult:
     elif status_raw == "partial":
         status = "partial"
     elif status_raw == "timeout":
-        status = "timeout" if result_timeout_enabled() else "failed"
+        status = "timeout"
     else:
         status = "failed"
     return ensure_result_identity(

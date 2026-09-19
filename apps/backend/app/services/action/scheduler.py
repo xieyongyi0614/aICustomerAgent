@@ -172,13 +172,8 @@ async def step_action_schedule(now: datetime | None = None) -> dict:
     """life_loop 维护步：到期调度认领 → 执行 → schedule/trigger 终态收口。
 
     V2.6.1 REF-004/005：消费端接线；成功后 trigger `done` 且终态不复活。
+    双闸已随 vXX_ 开关体系删除，本步常开（F.13 挂载点随之激活）。
     """
-    settings = get_settings()
-    if not (
-        getattr(settings, "action_execution_enabled", False)
-        and getattr(settings, "action_scheduler_enabled", False)
-    ):
-        return {"status": "skipped", "skip_reason": "flag_off"}
     when = now or _now()
     due = action_repository.list_due_schedules(when, limit=20)
     claimed = 0
