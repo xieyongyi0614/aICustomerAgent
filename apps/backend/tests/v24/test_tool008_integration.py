@@ -68,9 +68,9 @@ MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
     "behavior_pattern",
 )
 
-MIGRATION_COUNT = 49
+MIGRATION_COUNT = 50
 
-TABLE_COUNT = 43
+TABLE_COUNT = 44
 
 MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 
@@ -553,6 +553,7 @@ def test_memory_type_domain_unchanged():
 
 
 def test_no_new_tables_in_metadata():
+    """本任务交付时零新建表；后续版本新增的表由 v24 的 MIGRATION_ADDED_VS_BASELINE 登记。"""
     assert len(Base.metadata.tables) == TABLE_COUNT
 
 

@@ -168,19 +168,28 @@ class TestBoundaryRedLines:
 
 
 class TestZeroMigration:
-    """Z1~Z8：零迁移断言（迁移链头 0049：本任务零迁移，链头随后续版本推进）。"""
+    """Z1~Z8：零迁移断言——v2.5 交付时链头为 0049，本任务零迁移。
 
-    def test_migration_head_is_0049(self):
-        heads = sorted(path.name for path in MIGRATIONS_DIR.glob("0049_*.py"))
-        assert heads == ["0049_loop_runs_kind_maintenance_steps.py"]
+    链头随后续版本推进，故**不钉绝对版本号**：钉死会让守卫在每次正常迁移后
+    变成「必须跟着改的谎」。此处只断言链头自洽（唯一且为最大版本），以及本任务
+    未新增迁移文件。
+    """
 
-    def test_no_newer_revision_after_0049(self):
+    def test_migration_head_is_single_and_highest(self):
         numeric = sorted(
             int(match.group(1))
             for path in MIGRATIONS_DIR.glob("*.py")
             if (match := re.match(r"(\d+)_", path.name))
         )
-        assert max(numeric) == 49
+        assert numeric, "迁移目录为空"
+        assert numeric == list(range(numeric[0], numeric[-1] + 1)), "迁移版本号有空洞"
+        head = f"{numeric[-1]:04d}"
+        assert len(list(MIGRATIONS_DIR.glob(f"{head}_*.py"))) == 1
+        assert not list(MIGRATIONS_DIR.glob(f"{numeric[-1] + 1:04d}_*.py"))
+
+    def test_no_migration_added_by_this_task(self):
+        names = [path.name for path in MIGRATIONS_DIR.glob("*.py")]
+        assert not [name for name in names if "plan012" in name or "planning" in name]
 
     def test_decision_kind_stays_five_values(self):
         kinds = tuple(kind.value for kind in DecisionKindEnum)

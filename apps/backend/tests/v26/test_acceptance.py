@@ -290,13 +290,21 @@ class TestRegressionCheck:
         assert "relationship_bridge." not in source
         assert "memory_repository." not in source
 
-    def test_v25_migration_head_0049_documented(self):
+    def test_v25_migration_head_documented(self):
+        """v2.5 交付时链头为 0049；链头随后续版本推进，故只断言「≥ 0049 且自洽」。
+
+        钉死绝对版本号会让本守卫在每次正常迁移后变成必须跟着改的谎。本用例原名
+        `test_v25_migration_head_0049_documented`，在 FEISHU-010 加迁移 0050 时改写。
+        """
         from pathlib import Path
 
         migrations = sorted(
             p.name for p in Path("migrations/versions").glob("*.py")
         )
-        assert migrations[-1].startswith("0049_")
+        numeric = [int(name[:4]) for name in migrations if name[:4].isdigit()]
+        assert numeric
+        assert max(numeric) >= 49
+        assert migrations[-1].startswith(f"{max(numeric):04d}_")
 
     def test_debug_surface_always_served(self):
         action = manager.create(

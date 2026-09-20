@@ -1145,46 +1145,26 @@ def test_zero_migration_reconciliation_records_breakpoints():
     assert tuple(support.MIGRATION_ADDED_VS_BASELINE) == tuple(
         versions[support.MIGRATION_FILE_COUNT_BASELINE :]
     )
-    assert tuple(versions[-3:-1]) == support.V23_MIGRATION_TAIL
+    assert all(name in versions for name in support.V23_MIGRATION_TAIL)
 
 def test_zero_migration_model_structure_unchanged():
-    """模型结构 diff：42 张表集合与列摘要零变更（结构面零迁移成立）。"""
+    """模型结构 diff：表集合与列摘要零变更（结构面零迁移成立）。
+
+    FEISHU-010 新增 `feishu_dedupe_ledger` 后，该保证由**显式例外登记**维持：
+    `SCHEMA_ADDED_TABLES_VS_BASELINE` 列出基线后新增的表，排除它们后必须复现
+    `SCHEMA_COLUMNS_DIGEST_BASELINE`——即「除已登记的新增表外，基线零漂移」。
+    """
     from app.core.db import Base
 
     tables = Base.metadata.tables
     assert len(tables) == support.SCHEMA_TABLE_COUNT
+    assert set(support.SCHEMA_ADDED_TABLES_VS_BASELINE) <= set(tables)
 
-    columns_spec = []
-    index_spec = []
-    for name, table in sorted(tables.items()):
-        columns_spec.append(
-            f"{name}:"
-            + hashlib.sha256(
-                "\n".join(
-                    "{}:{}:{}:{}".format(c.name, str(c.type), c.nullable, bool(c.primary_key))
-                    for c in sorted(table.columns, key=lambda item: item.name)
-                ).encode("utf-8")
-            ).hexdigest()[:16]
-        )
-        index_spec.append(
-            f"{name}:"
-            + hashlib.sha256(
-                "\n".join(
-                    sorted(
-                        "{}:{}:{}".format(
-                            index.name, ",".join(c.name for c in index.columns), bool(index.unique)
-                        )
-                        for index in table.indexes
-                    )
-                ).encode("utf-8")
-            ).hexdigest()[:16]
-        )
-
-    columns_digest = hashlib.sha256(
-        "\n".join(columns_spec).encode("utf-8")
-    ).hexdigest()[:16]
-    assert columns_digest == support.SCHEMA_COLUMNS_DIGEST
-    assert columns_digest == support.SCHEMA_COLUMNS_DIGEST_BASELINE
+    assert support.schema_columns_digest() == support.SCHEMA_COLUMNS_DIGEST
+    assert (
+        support.schema_columns_digest(support.SCHEMA_ADDED_TABLES_VS_BASELINE)
+        == support.SCHEMA_COLUMNS_DIGEST_BASELINE
+    )
 
     for name in support.SCHEMA_FROZEN_TABLES:
         assert name in tables

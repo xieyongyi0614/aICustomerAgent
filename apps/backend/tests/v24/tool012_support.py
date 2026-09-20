@@ -60,25 +60,27 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 49
-MIGRATION_BREAKPOINT = "0049_loop_runs_kind_maintenance_steps.py"
+MIGRATION_FILE_COUNT_CURRENT = 50
+MIGRATION_BREAKPOINT = "0050_feishu_dedupe_ledger.py"
 MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0046_tool_insight_types.py",
     "0047_action_schedules_priority.py",
     "0048_action_records_run_id.py",
     "0049_loop_runs_kind_maintenance_steps.py",
+    "0050_feishu_dedupe_ledger.py",
 )
-MIGRATION_HEAD = "0049"
-MIGRATION_HEAD_PREVIOUS = "0048"
+MIGRATION_HEAD = "0050"
+MIGRATION_HEAD_PREVIOUS = "0049"
 V23_MIGRATION_TAIL: tuple[str, ...] = (
     "0047_action_schedules_priority.py",
     "0048_action_records_run_id.py",
 )
 
-SCHEMA_TABLE_COUNT = 43
-SCHEMA_TABLE_SET_DIGEST = "23d7c52d31112db1"
-SCHEMA_COLUMNS_DIGEST = "506ee5d5cf357bdf"
+SCHEMA_TABLE_COUNT = 44
+SCHEMA_TABLE_SET_DIGEST = "1cf7156e213309cc"
+SCHEMA_COLUMNS_DIGEST = "2a16743eb8154148"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "506ee5d5cf357bdf"
+SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = ("feishu_dedupe_ledger",)
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
 SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights",)
@@ -847,6 +849,22 @@ def table_set_digest() -> str:
     from app.core.db import Base
 
     return _digest_lines(sorted(Base.metadata.tables))
+
+
+def schema_columns_digest(exclude_tables: tuple[str, ...] = ()) -> str:
+    """全库列摘要；`exclude_tables` 用于**排除已登记的基线后新增表**。
+
+    这样「基线未漂移」仍可被证明：`schema_columns_digest()` == `SCHEMA_COLUMNS_DIGEST`
+    且 `schema_columns_digest(SCHEMA_ADDED_TABLES_VS_BASELINE)` ==
+    `SCHEMA_COLUMNS_DIGEST_BASELINE`。直接改基线摘要常量会让断言变成谎，故不采用。
+    """
+    from app.core.db import Base
+
+    return _digest_lines(
+        "{}:{}".format(name, table_column_digest(table))
+        for name, table in Base.metadata.tables.items()
+        if name not in exclude_tables
+    )
 
 
 def table_digests(name: str) -> tuple[str, str, str]:

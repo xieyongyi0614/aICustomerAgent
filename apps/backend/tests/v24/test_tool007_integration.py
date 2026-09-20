@@ -329,9 +329,12 @@ def test_character_domain_tables_unchanged(table, columns):
 
 
 def test_no_new_tables_in_metadata():
-    """零新建表：本任务不新增任何迁移/表（含"为 WorldIntent 建表"这一反模式）。"""
+    """零新建表：本任务不新增任何迁移/表（含"为 WorldIntent 建表"这一反模式）。
+
+    计数随版本演进推进（当前 44：FEISHU-010 的 `feishu_dedupe_ledger`）。
+    """
     assert set(WORLD_TABLES) <= set(Base.metadata.tables)
-    assert len(Base.metadata.tables) == 43
+    assert len(Base.metadata.tables) == 44
 
 
 def test_world_engine_has_no_tool_layer_dependency():
