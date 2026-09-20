@@ -234,18 +234,22 @@
 - **未实现 Scope（多实例前置的剩余两项）**：跨进程会话串行、出站幂等落库（见 architecture §7.3 第 2/3 项）。
 - **Dependency**：FEISHU-002、FEISHU-007。
 
-### FEISHU-011 跨进程会话串行（多实例硬前置之一，**方案 C 应用侧已实现；ingress 待落地**）
+### FEISHU-011 跨进程会话串行（多实例硬前置之一，**方案 C2 已实现**）
 
 - **ID**：FEISHU-011
 - **Priority**：P1（多实例前置；单实例下无影响）
 - **来源**：`review-v1.1.md` §5.1 第 2 项、`review-v1.2.md` §2.1 / §7.10
-- **状态**：**选定方案 C（入口按 `open_id` 粘性路由）**。应用侧契约已实现（2026-09-20）；**ingress 侧分流待落地**（属部署与运维）。五方案对比见 [`multi-instance-options.md`](./multi-instance-options.md)。
+- **状态**：**已实现**（2026-09-20）。方案 C，形态选定 **C2 轻量 router**（`POST /api/v1/feishu/ingress/events`）；运维侧仅剩「把飞书回调地址改指向 router + 配置实例 URL 列表」。五方案对比见 [`multi-instance-options.md`](./multi-instance-options.md)，三形态对比与 C1 排除理由见 [`ingress-routing-options.md`](./ingress-routing-options.md)。
 - **Goal**：让「同一 `session_id` 的轮次在任意实例间串行」，消除多实例下同会话消息交错与状态竞态写。方案 C 的做法是**不做分布式锁**，而是让入口把同会话事件恒定送到同一实例，于是进程内 `asyncio.Lock` 就够用。
 - **已实现 Scope（应用侧契约）**：
   - `channels/feishu/shards.py`：分片算法 `crc32(open_id) % FEISHU_INSTANCE_COUNT`（标准库 `zlib.crc32`，跨语言可实现）、`owns()`、错分片抽样留痕（每 100 次一条 error，含期望分片与实例下标）。
   - `core/settings/feishu.py`：`feishu_instance_index`（须 `< count`）；**多实例就绪契约** —— `enabled=true` 且 `count>1` 时必须同时声明 `feishu_ingress_sharded_routing_enabled` 与 `feishu_dedupe_persistent_enabled`，缺一即 `SettingsError`。
   - `api/v1/feishu.py`：`_owns_shard()` 归属校验，**在去重之前**判定；非本分片 → **503**（可重试）并抽样记 error。非文本兜底路径同样受检；challenge 无 `open_id` 不检。
   - `tests/unit/test_feishu_shards.py`：**golden 值锁定算法**（算法一改即红，提醒同步改 ingress）、分布均匀性、跨调用稳定、抽样留痕。
+  - `api/v1/feishu_ingress.py`：**C2 router 端点**——限长读体 → 解密（复用 `events.decrypt`）→ 取 `open_id` → `shards.shard_of` → 转发**原始 body 与原始签名头** → 原样回传下游响应。**不做鉴权决策**（校验全在下游）、**失败不自行改投**（503 让飞书重投）、取不到 `open_id` 时固定 shard 0。
+  - `api/v1/feishu_http.py`：与 webhook 共用的 `read_body_limited()` / `reject()`。
+  - `core/settings/feishu.py`：`feishu_router_enabled` / `feishu_router_instance_urls`（个数须等于 `FEISHU_INSTANCE_COUNT`，顺序即分片下标）/ `feishu_router_timeout_seconds`。
+  - `tests/unit/test_feishu_ingress_router.py`：14 用例（分片选择、原始 body/签名头转发、不鉴权、无 open_id → shard 0、无密钥/解密失败 → shard 0、加密体按解密后 open_id 分流、超限 413、下游响应原样回传、传输失败 503 且零改投）。
 - **Acceptance Criteria（应用侧）**：
   1. 单实例（`count=1`）时归属校验恒为真，行为与升级前完全一致。
   2. `count>1` 且 `index` 为错误分片 → **503** 且零派发、零出站。
@@ -254,9 +258,34 @@
   5. `feishu_instance_index >= feishu_instance_count` → `SettingsError`。
   6. challenge（无 `open_id`）不受归属校验影响，任何实例都能应答。
   7. 通道边界 AST fail-closed 扫描保持通过（`shards.py` 只依赖标准库）。
-- **未实现 Scope（ingress 侧，属运维）**：① 选形态（C1 LB 粘性 / C2 轻量 router / C3 分区队列）；② 按 `crc32(open_id) % FEISHU_INSTANCE_COUNT` 配置分流；③ 健康探测与实例故障时的会话再归属；④ **翻开关前验证分流真的生效**（否则事件大量落错分片 → 503 → 飞书重投 → 重试风暴）。
-- **相关登记**：出站幂等落库未做 —— 在 C 下风险大幅降低（同会话只由一个实例处理），但 `send_proactive` 不走会话锁，**Autonomy 接入飞书（FEISHU-008）前必须补**。
+- **未实现 Scope（运维侧）**：① 飞书回调地址改指向 `/api/v1/feishu/ingress/events`；② `FEISHU_ROUTER_INSTANCE_URLS` 按实例下标顺序配置；③ router 与所有实例的 `FEISHU_ENCRYPT_KEY` 保持一致；④ **翻开关前验证分流真的生效**（否则事件大量落错分片 → 503 → 飞书重投 → 重试风暴）。
+- **相关**：出站幂等落库见 **FEISHU-012**（已实现）。
 - **Dependency**：FEISHU-010（去重落库，已完成）、FEISHU-007。
+
+### FEISHU-012 出站投递幂等落库（多实例硬前置之一，**已实现，默认关闭**）
+
+- **ID**：FEISHU-012
+- **Priority**：P1（多实例前置；单实例下无行为变化）
+- **来源**：`review-v1.1.md` §5.1 第 3 项、`review-v1.2.md` §7.10
+- **状态**：**已实现**（2026-09-20），由 `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED` 控制，**默认关闭**。
+- **Goal**：把出站投递的幂等占位从进程内表落到持久化存储，使判定在多 worker / 多实例间共享，消除「同一逻辑消息被每个实例各投一次（重复回复用户）」。
+- **已实现 Scope**：
+  - `migrations/versions/0051_feishu_deliveries.py` + `core/db.py::FeishuDeliveryRow`：`feishu_deliveries(idempotency_key PK, delivered_at)` + `delivered_at` 索引（链尾 `0050 → 0051`）。
+  - `repositories/feishu_delivery_ledger_repository.py`：`claim`（先摘除该键的过期行再插入，`IntegrityError` 判定）/ `release` / `purge_before` / `exists`。
+  - `services/feishu_delivery_ledger_service.py`：TTL 折算、**fail-open**、每 `PURGE_EVERY=256` 次成功占位做摊还清理；对外是 **async API**（DB 调用经 `asyncio.to_thread` 下放，不阻塞事件循环）。
+  - `channels/feishu/delivery.py`：新增可注入 seam `set_persistent_idempotency()` / `clear_persistent_idempotency()`；`_claim_delivery` / `_release_delivery` 改为 async 并按 hook 分派。
+  - `app/main.py`：组合根在 `feishu_enabled` 分支内按配置安装 hook（通道层不得 import `app.repositories`）。
+  - `tests/conftest.py`：`feishu_delivery_ledger_repository` 注册进 `_REPO_MODULES`。
+- **Acceptance Criteria**：
+  1. 关闭时行为与升级前完全一致（仍走进程内表，`delivery._delivered` 有记录）。
+  2. 开启并安装 hook 后：清空进程内表（等价于换实例）再占位同一键仍返回 False；且 `delivery._delivered` 保持为空。
+  3. **对照组**：未安装 hook 时清空进程内表即失去判重（证明缺口真实存在、用例非空过）。
+  4. 存储故障时**放行投递**并记 `fail-open` warning（不得让用户收不到回复）。
+  5. `release` 回滚后同一键可再次占位（发送失败重试不被自己的幂等表挡死）。
+  6. 过 TTL 后同一键可再次投递（DB 路径与内存路径语义一致）。
+  7. 摊还清理：仅每 256 次成功占位触发一次 `purge_before`；重复占位不触发；清理失败不影响本次判定。
+  8. 两处 TTL 表达式（`delivery._idempotency_ttl_seconds` 与 service）**由用例锁死一致**。
+- **Dependency**：FEISHU-005、FEISHU-011。
 
 ## 依赖图
 

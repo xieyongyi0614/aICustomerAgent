@@ -650,3 +650,79 @@ except BaseException:
 - 飞书全量 **368 passed / 2 skipped**（+21 用例：分片 10 + 设置 6 + webhook 路由 5）。
 - **反向验证**：把 `api/v1/feishu.py` 回退到 HEAD、只留新用例 → 3 个分片用例**失败**（`503` 相关；`challenge 不受检` 与 `本分片正常` 是守卫，新旧都绿，符合预期），恢复后 md5 一致。
 - **算法锁定**：`test_shard_values_are_frozen` 记录 `ou_e2e_alice` 在 2/3/4 片下的 golden 分片值（1/0/3）——**算法一改此用例即红**，这正是提醒「必须同步改 ingress」的机制。
+
+### 7.13 FEISHU-011 形态选定 C2：内置轻量 router
+
+**决策**：方案 C 的三形态（C1 LB 粘性 / C2 轻量 router / C3 分区队列）中选定 **C2**，并已实现内置 router 端点。C1 **排除**、C3 **登记为后续演进选项**。完整对比与排除理由见 `ingress-routing-options.md`。
+
+#### 为什么排除 C1
+
+三条全中：
+
+1. **LB 必须持有 Encrypt Key 并实现 AES-256-CBC**——`open_id` 只在 body 里，而配了 Encrypt Key 时 body 是密文（外层只有 `encrypt` 一个字段）。这把 LB 从「转发组件」变成「持密钥 + 做加解密 + 实现哈希」的组件。
+2. **算法漂移风险最高**——LB 默认哈希几乎都不是 CRC-32（nginx `split_clients` 用 MurmurHash2、`hash ... consistent` 用 ketama）。不一致时事件大量落错分片，表现为偶发 503 与重投风暴，**不会崩溃、只会静默错**。
+3. **扩缩容需跨系统原子变更**——改 `FEISHU_INSTANCE_COUNT` 要同时改 LB 配置与所有实例配置。
+
+#### 为什么 C3 暂不实现
+
+C2 已解决同一问题（同会话恒落同实例）。C3 的增量收益是「重试 / 死信 / 崩溃恢复由队列承担」与「worker 可独立扩缩」，在当前规模下不构成瓶颈，却要付出改造 `SessionInbox`（合并窗口改为按入队时间戳聚合）+ ack/可见性超时/死信 + 新基础设施的代价。**启动信号**已写入文档：需要按会话量弹性扩缩 worker、飞书重投不可控成为实际痛点、或已在别处引入 MQ。
+
+#### 实现
+
+| 位置 | 内容 |
+|---|---|
+| `api/v1/feishu_ingress.py`（新增） | `POST /feishu/ingress/events`：限长读体 → 解密 → 取 `open_id` → `shards.shard_of` → 转发 → 原样回传 |
+| `api/v1/feishu_http.py`（新增） | 与 webhook 共用的 `read_body_limited()` / `reject()`（`feishu.py` 改为别名导入，函数体零改动） |
+| `core/settings/feishu.py` | `feishu_router_enabled` / `feishu_router_instance_urls`（个数须等于 `instance_count`）/ `feishu_router_timeout_seconds` |
+
+#### 五条不可动摇的设计约束
+
+1. **转发原始 body 与原始签名头**。飞书签名覆盖的是**密文 body**；转发明文会让下游验签必然失败（403）。只转发 `Content-Type` / `X-Lark-Request-Timestamp` / `X-Lark-Request-Nonce` / `X-Lark-Signature`。
+2. **router 不做鉴权决策**。校验全在下游，安全闸只有一处；token 错的请求也照转，由下游拒绝。
+3. **转发失败不得自行改投**。改投会破坏「同会话恒落同实例」，导致同会话并发。返回 503 让飞书重投。
+4. **取不到 `open_id` 时固定 shard 0**（challenge / 结构非法 / 无 Encrypt Key）。这些请求要么无需精确路由，要么会在下游被拦下。
+5. **应用侧归属校验保留**（`_owns_shard`）。router 分对是正常路径；万一配错，应用侧的 503 + 抽样 error 是最后一道可观测防线。
+
+#### 就绪契约扩展
+
+`FEISHU_ROUTER_ENABLED` 本身即是「ingress 已分流」的声明，无需再开 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED`（二者任一即可）。
+
+#### 验证
+
+- `tests/unit/test_feishu_ingress_router.py`：**14 passed**。
+- **反向验证**：把 `api/v1/feishu.py` 回退到 HEAD → 3 个分片用例失败（另 2 例是守卫，新旧都绿），恢复后 md5 一致。
+
+---
+
+### 7.14 FEISHU-012 出站投递幂等落库
+
+#### 实现
+
+| 位置 | 内容 |
+|---|---|
+| `migrations/versions/0051_feishu_deliveries.py` + `core/db.py::FeishuDeliveryRow` | `feishu_deliveries(idempotency_key PK, delivered_at)` + 索引 |
+| `repositories/feishu_delivery_ledger_repository.py` | `claim`（先摘除该键过期行再插入）/ `release` / `purge_before` / `exists` |
+| `services/feishu_delivery_ledger_service.py` | TTL 折算、**fail-open**、摊还清理；对外 **async API**（DB 经 `asyncio.to_thread` 下放） |
+| `channels/feishu/delivery.py` | 新增 seam `set_persistent_idempotency()` / `clear_persistent_idempotency()`；`_claim_delivery` / `_release_delivery` 改 async 并按 hook 分派 |
+| `app/main.py` | 组合根在 `feishu_enabled` 分支内按配置安装 hook |
+
+#### 三处关键取舍
+
+1. **注入而非直接依赖**。`app/channels/**` 的依赖 allowlist 禁止 import `app.repositories`（fail-closed），故持久化实现不能写在通道层。做法是 `delivery` 暴露一个 seam，由组合根 `app/main.py` 安装——与 FEISHU-010 的 `_claim_event` 同思路，只是那边是「按调用分派」、这边是「启动期安装」。
+2. **占位入口改为 async**。原 `_claim_delivery` 是同步函数（纯内存）；改为 async 后 DB 路径才能 `asyncio.to_thread` 下放，否则**同步 SQLAlchemy 会阻塞事件循环**。6 处调用点同步改为 `await`。
+3. **fail-open（放行投递）**。与入站去重同取向：fail-closed 会让用户**收不到任何回复**，而重复一条消息远比静默不回可接受。
+
+#### 🚨 迁移 0051 的守卫升级（第二次，流程已固化）
+
+照 FEISHU-010 §7.10 的五类处理：链头时间点钉测机械升到 0051；`SCHEMA_TABLE_COUNT` 44 → 45、两个摘要重算、`SCHEMA_ADDED_TABLES_VS_BASELINE` 追加 `feishu_deliveries`。**排除两张新增表后仍精确复现 `SCHEMA_COLUMNS_DIGEST_BASELINE = 506ee5d5cf357bdf`** —— 「基线零漂移」的保证依然成立，且没有把断言改谎。
+
+#### 验证
+
+- 飞书全量 **411 passed / 2 skipped**（+43 用例）。
+- `tests/v24 + v25 + v26`：与 HEAD 基线（**10 failed / 2991 passed**，用 `git worktree` 实测）逐条一致。中间一次运行出现 `test_tool006_integration::test_autonomy_decision_to_world_write_through_outbox`，经「单独跑 + HEAD 对拍」确认它在 HEAD 上也失败、且属 autonomy 三账对齐的**顺序敏感 flaky 家族**（下一轮即消失），与本批无关。
+- `tests/unit + integration + e2e + golden`：**4 failed / 2126 passed**，4 个全在既存 flaky 集合内。
+
+#### 连带修正
+
+就绪契约从两项扩为三项后，`test_feishu_webhook.py` 的 `SHARDED` 与 `test_feishu_ingress_router.py` 的 `ROUTER_SETTINGS` 都需补上 `feishu_outbound_idempotency_persistent_enabled`——否则设置构造在启动期就抛 `SettingsError`，两处共 19 个用例转红。这类失败不是回归，而是**被新不变量正确地判为「配置不完整」**。
+

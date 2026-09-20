@@ -517,6 +517,10 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_INSTANCE_COUNT` | int | `1` | 部署侧声明的实例（worker）数。`FEISHU_ENABLED=true` 且 `> 1` 时触发**多实例就绪契约**（见 §7.3）：必须同时声明 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED=true` 与 `FEISHU_DEDUPE_PERSISTENT_ENABLED=true`，否则启动期抛 `SettingsError`。⚠️ **改这个值会改变分片映射**（`crc32 % count` 的基数变了），必须同步改 ingress |
 | `FEISHU_INSTANCE_INDEX` | int | `0` | 本实例下标（0-based），须 `< FEISHU_INSTANCE_COUNT`。与 count 一起决定 `crc32(open_id) % count` 的归属（方案 C） |
 | `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED` | bool | `false` | 运维**声明**：ingress 已按分片算法把同会话事件恒定送到同一实例（方案 C）。这是就绪契约的一半，**不是功能开关**——打开前必须先在 ingress 侧真正落地分流，否则事件会大量落到错误分片并触发重投 |
+| `FEISHU_ROUTER_ENABLED` | bool | `false` | 开启内置的**轻量 router 端点**（`POST /api/v1/feishu/ingress/events`，FEISHU-011 方案 C2）：解密 → 算分片 → 把**原始 body 与原始签名头**转发到目标实例。它本身即是「ingress 已分流」的声明，无需再开 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED` |
+| `FEISHU_ROUTER_INSTANCE_URLS` | str | `""` | 逗号分隔的实例基址，**顺序即分片下标 0..N-1**，个数必须等于 `FEISHU_INSTANCE_COUNT`（启动期校验）。改 `FEISHU_INSTANCE_COUNT` 时必须同步改这里 |
+| `FEISHU_ROUTER_TIMEOUT_SECONDS` | float | `5.0` | router 转发到目标实例的超时；超时/不可达 → `503`（**不自行改投**，让飞书重投） |
+| `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED` | bool | `false` | 出站投递幂等落库（`feishu_deliveries` 表）。关闭时走进程内表；开启后跨进程共享，多实例下同一逻辑消息只投一次。**fail-open**：存储故障时放行投递（宁可重复一条，也不能让用户收不到回复） |
 
 ### 5.2 配置原则
 
@@ -643,16 +647,20 @@ Feishu Event（im.message.receive_v1）
      - **存储分派在组合根**：`api/v1/feishu.py` 的 `_claim_event()` 按配置选择通道层的内存表或 `services/feishu_dedupe_service`（DB 路径经 `asyncio.to_thread` 下放，不阻塞事件循环）。**不得**让 `app/channels/**` 直接 import `app.repositories`——通道依赖 allowlist 是 fail-closed 的（`tests/unit/test_feishu_boundary.py`）。
      - **失败语义 fail-open**：存储不可用时**放行**并记 warning。去重的收益是省掉重复处理，fail-closed 会直接丢掉用户消息。（与限流取向相反。）
      - **TTL 语义与内存表对齐**：`claim` 先摘除该 `event_id` 的过期行再插入（主键约束本身不知道过期），并每 `PURGE_EVERY=256` 次成功占位做一次摊还清理。
-  2. ✅ **跨进程会话串行 —— 由方案 C（入口按 `open_id` 粘性路由）承担，应用侧已实现，ingress 待落地**。做法、收益、代价与 ingress 落地形态见 **`multi-instance-options.md`**。
+  2. ✅ **跨进程会话串行 —— 由方案 C 承担，形态选定 C2（轻量 router）并已落地**。做法、收益、代价与三种 ingress 形态的对比/排除理由见 **`ingress-routing-options.md`**。
      - **分片算法（ingress 必须逐字复刻）**：`crc32(open_id.encode("utf-8")) % FEISHU_INSTANCE_COUNT`。用标准库 `zlib.crc32`，取值稳定且各语言都有等价实现。**`open_id` 是飞书用户 open_id**，不是 `session_id`（后者形如 `feishu:{open_id}`，整串哈希结果不同）。
      - **应用侧契约**：`channels/feishu/shards.py`（`shard_of` / `owns`，纯函数、无状态）；`api/v1/feishu.py::_owns_shard` 做归属校验——非本分片返回 **503**（可重试）并抽样记 error。
      - **归属校验必须在去重之前**：否则飞书重投会被去重表吞掉（FEISHU-009 修过的坑）。返回 503 而非 200，是为了让重投有机会落到正确实例；静默丢弃会让消息永久丢失且无任何可观测信号。
-     - **多实例就绪契约**：`FEISHU_ENABLED=true` 且 `count>1` 时必须同时声明 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED=true`（ingress 已分流）与 `FEISHU_DEDUPE_PERSISTENT_ENABLED=true`（跨进程去重作为路由配错时的兜底），缺一即启动期失败。
+     - **多实例就绪契约**：`FEISHU_ENABLED=true` 且 `count>1` 时必须显式声明三项——`FEISHU_ROUTER_ENABLED`（或 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED`，表示 ingress 已分流）+ `FEISHU_DEDUPE_PERSISTENT_ENABLED` + `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED`，缺一即启动期 `SettingsError`。
+     - **形态已选定 C2（内置轻量 router 端点 `/feishu/ingress/events`）**：解密 → 算分片 → 把**原始 body 与原始签名头**转发到目标实例，**不做鉴权决策**（校验全在下游）、**失败不自行改投**（返回 503 让飞书重投）。C1（LB 粘性）因「需 LB 持密钥做加解密 + 算法漂移风险最高 + 扩缩容需跨系统原子变更」已排除；C3（分区队列）已评估、登记为后续演进选项。详见 `ingress-routing-options.md`。
+     - **一致性自测**：`python -m scripts.print_feishu_shard_vectors --count N` 输出测试向量，ingress 侧用同样输入比对，**必须逐行一致**（nginx `split_clients` 用 MurmurHash2、`hash ... consistent` 用 ketama，**都与 crc32 不匹配**）。
      - **改 `count` 会改变分片映射**：几乎所有会话都会换实例。变更时必须同步改 ingress，并预期一段「会话重新归属」窗口（跨进程去重兜底保证不重复处理）。
-     - **出站幂等落库仍未做**：在 C 下风险大幅降低（同会话只由一个实例处理），但 `send_proactive` 不走会话锁 → **Autonomy 接入飞书（FEISHU-008）前必须补**。
-  3. ❌ **出站幂等落库**：`delivery._delivered` 同理。
+  3. ✅ **出站幂等落库（已实现，默认关闭）**：`feishu_deliveries(idempotency_key PK, delivered_at)` + 迁移 `0051`；开启 `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED` 后，`delivery` 的占位判定改走该表（跨进程共享）。
+     - **注入方式**：`delivery` 暴露 `set_persistent_idempotency()` seam，由组合根 `app/main.py` 安装——`app/channels/**` 的依赖 allowlist 禁止 import `app.repositories`，故持久化实现不能在这里构造。
+     - **fail-open**：存储不可用时**放行投递**并记 warning。fail-closed 会让用户收不到任何回复；重复一条消息远比静默不回可接受（与入站去重同取向）。
+     - **TTL 语义与内存路径一致**：`claim` 先摘除该键的过期行再插入；TTL 表达式与 `delivery._idempotency_ttl_seconds` 由用例锁死一致。
   - 另注：**连发合并窗口天然只在实例内生效**——多实例下同一 `open_id` 若落到不同 worker，其连发消息不会被合并（顺序仍须由跨进程锁保证）。若要求跨实例合并，需在 ingress 按 `open_id` 做 sticky 路由。
-  - 登记与验收条件见 `tasks.md` 的 **FEISHU-007**（原）与 **FEISHU-010**（去重落库），发现明细见 `review-v1.1.md` §5 与 `review-v1.2.md` §7.10。
+  - **三项前置已全齐**（去重落库 / 跨进程会话串行 / 出站幂等落库）；运维侧仍需把飞书回调地址改指向 router 并配置实例 URL 列表。登记与验收条件见 `tasks.md` 的 **FEISHU-007 / FEISHU-010 / FEISHU-011**，实施明细见 `review-v1.2.md` §7.10~§7.14。
 
 ---
 
