@@ -357,9 +357,13 @@ def _get_inbox() -> SessionInbox:
 def _get_turn_gate() -> asyncio.Semaphore:
     """进程内全局并发闸门：让 `feishu_max_concurrent_turns` 真正生效。
 
-    ⚠️ 作用域仅限本进程：多实例部署下实际并发是 `limit × 实例数`，而 DB 连接池是
-    **共享**的。故一致性校验按 `feishu_instance_count`（部署侧声明，单实例填 1）折算，
-    开多 worker 前必须先把本闸门换成跨进程实现（PG advisory lock 计数或 Redis 信号量）。
+    ⚠️ 作用域仅限本进程。多实例下实际并发是 `limit × 实例数`，而 DB 连接池是
+    **共享**的，故容量校验按 `feishu_instance_count` 折算。
+
+    当前该折算**只是防御性校验**：`feishu_enabled=true` 且 `feishu_instance_count > 1`
+    已被启动期硬闸拦下（FEISHU-011 方案 E）。将来实现跨进程会话串行后硬闸会放开，
+    这条折算即恢复为真实保护——届时必须同时把本闸门换成跨进程实现
+    （PG advisory lock 计数或 Redis 信号量）。
     """
     global _turn_semaphore
     if _turn_semaphore is None:

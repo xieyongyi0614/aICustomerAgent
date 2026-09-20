@@ -514,7 +514,7 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_MERGE_MAX_CHARS` | int | `20000` | 单批合并文本字符上限（对齐 `InboundMessage.TEXT_MAX_CHARS`），超出立即 flush |
 | `FEISHU_RATE_LIMIT_PER_MINUTE` | int | `0` | 入站按 `open_id` 的 60s 滑窗阈值；**`0` = 沿用 `CHAT_RATE_LIMIT_PER_MINUTE`**（Web 侧共用键）。设独立值可避免调 Web 限流误伤飞书 |
 | `FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS` | int | `0` | 出站幂等窗口；**`0` = 沿用 `FEISHU_DEDUPE_TTL_SECONDS`**。主动消息的重试间隔可能远超入站去重窗口，故可独立放宽 |
-| `FEISHU_INSTANCE_COUNT` | int | `1` | 部署侧声明的实例（worker）数，**仅用于并发容量校验折算**（单实例填 1）。它不改变闸门的进程内本质，只是让「多实例压满连接池」在启动期可见 |
+| `FEISHU_INSTANCE_COUNT` | int | `1` | 部署侧声明的实例（worker）数。**当 `FEISHU_ENABLED=true` 时它是硬闸**：`> 1` 直接抛 `SettingsError`（多 worker 的硬前置未补齐，见 §7.3）；未启用飞书时不拦。将来实现跨进程会话串行后放开此闸 |
 
 ### 5.2 配置原则
 
@@ -635,13 +635,14 @@ Feishu Event（im.message.receive_v1）
 - ~~出站投递抽象~~ → **已升级为本次交付**：见 §2.5.4（`OutboundMessage` + `ChannelAdapter` Protocol）。剩余未决项是"**触发方如何拿到 adapter 实例**"（装配问题，§2.5.6 候选 A/B），留待 Autonomy 立项时决策。
 - **主动消息推送循环**：未来在 `channels/` 侧新增一个出站消费循环（拉取待推送的主动消息 → 反向解析收件人 → `send` → 回写推送态），由组合根在 lifespan 中启动。
 - **回复后处理**：若角色的回复含舞台指示/动作描述，未来可在 Adapter 出站前做"表现层转换"（属于 Channel 的表现问题，不属于角色核心）。
-- **多实例（多 worker）硬化 —— 开多 worker 的硬前置，部分实现**：入站的 `event_id` 去重、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**默认全部是进程内状态**。开启多 worker / 多实例前必须补齐：
+- **多实例（多 worker）硬化 —— 开多 worker 的硬前置，部分实现 + 已上闸**：入站的 `event_id` 去重、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**默认全部是进程内状态**。当前进度：
+  0. ✅ **启动期硬闸（FEISHU-011 方案 E，已实现）**：`FEISHU_ENABLED=true` 且 `FEISHU_INSTANCE_COUNT > 1` → **抛 `SettingsError`，服务起不来**。把「无人拦截的静默风险」换成显式失败——多实例的故障形态是**偶发**的（同会话 + 跨实例 + 时间重叠），比启动报错贵得多。将来补齐前置后放开此闸。
   1. ✅ **去重落库（FEISHU-010，已实现，默认关闭）**：新增 `feishu_dedupe_ledger` 表（`event_id` 主键 + `received_at`）与迁移 `0050`；开启 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 后判定改由该表唯一约束承担，跨进程共享。**未开启时行为与以前完全一致**。
      - **存储分派在组合根**：`api/v1/feishu.py` 的 `_claim_event()` 按配置选择通道层的内存表或 `services/feishu_dedupe_service`（DB 路径经 `asyncio.to_thread` 下放，不阻塞事件循环）。**不得**让 `app/channels/**` 直接 import `app.repositories`——通道依赖 allowlist 是 fail-closed 的（`tests/unit/test_feishu_boundary.py`）。
      - **失败语义 fail-open**：存储不可用时**放行**并记 warning。去重的收益是省掉重复处理，fail-closed 会直接丢掉用户消息。（与限流取向相反。）
      - **TTL 语义与内存表对齐**：`claim` 先摘除该 `event_id` 的过期行再插入（主键约束本身不知道过期），并每 `PURGE_EVERY=256` 次成功占位做一次摊还清理。
-  2. ❌ **跨进程会话串行**：**尚未实现**。可选方案（PG advisory lock / 租约表 / 入口粘性路由 / 忙则拒收 / 显式不支持多实例）的完整对比、做法与代价见 **`multi-instance-options.md`**。
-     - 当前推荐：**先落「显式不支持多实例」的启动期硬闸**（把 `feishu_instance_count > 1` 变成 `SettingsError`），把静默的正确性风险换成显式失败；真正横向扩展时再按「能否控制入口」在方案 C（能）与方案 A（不能）之间选。
+  2. ❌ **跨进程会话串行**：**尚未实现**；但**已上启动期硬闸**（见上第 0 项），故当前不存在「未实现却误开多实例」的窗口。可选方案（PG advisory lock / 租约表 / 入口粘性路由 / 忙则拒收 / 显式不支持多实例）的完整对比、做法与代价见 **`multi-instance-options.md`**。
+     - 将来真要横向扩展：**能控制入口（有网关/队列）→ 方案 C**（零分布式锁，且顺带解决跨实例连发合并）；**不能控制入口 → 方案 A**（PG advisory lock + 持锁数闸门）。**不建议 B**（租约过期与长轮次的张力会在「LLM 偶发慢」时制造最难复现的交错）、**不建议 D**（用户可见行为降级）。
      - 注意：会话锁是**跨整轮持有**的，而 `feishu_max_concurrent_turns` 闸门嵌在会话锁**之内**；任何「持锁期间占连接」的方案都必须额外加一道**持锁数闸门**，否则并发会话会压满连接池（容量 15）。
   3. ❌ **出站幂等落库**：`delivery._delivered` 同理。
   - 另注：**连发合并窗口天然只在实例内生效**——多实例下同一 `open_id` 若落到不同 worker，其连发消息不会被合并（顺序仍须由跨进程锁保证）。若要求跨实例合并，需在 ingress 按 `open_id` 做 sticky 路由。

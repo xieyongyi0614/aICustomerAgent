@@ -234,21 +234,22 @@
 - **未实现 Scope（多实例前置的剩余两项）**：跨进程会话串行、出站幂等落库（见 architecture §7.3 第 2/3 项）。
 - **Dependency**：FEISHU-002、FEISHU-007。
 
-### FEISHU-011 跨进程会话串行（多实例硬前置之一，**待决策**）
+### FEISHU-011 跨进程会话串行（多实例硬前置之一，**方案 E 已实现；A/B/C 待选**）
 
 - **ID**：FEISHU-011
 - **Priority**：P1（多实例前置；单实例下无影响）
 - **来源**：`review-v1.1.md` §5.1 第 2 项、`review-v1.2.md` §2.1 / §7.10
-- **状态**：**未实现，方案已备齐待选**。五个可选方案（A PG advisory lock / B 租约表 + 心跳 / C 入口粘性路由 / D 忙则拒收 / E 显式不支持多实例 + 启动期硬闸）的**做法、收益、代价、工作量清单**见 [`multi-instance-options.md`](./multi-instance-options.md)。
+- **状态**：**方案 E 已实现**（2026-09-20）——启动期硬闸拦住多实例。**真正的跨进程会话串行（方案 A/B/C）待选**，五个方案的做法、收益、代价、工作量清单见 [`multi-instance-options.md`](./multi-instance-options.md)。
 - **Goal**：让「同一 `session_id` 的轮次在任意实例间串行」，消除多实例下同会话消息交错与状态竞态写。
-- **当前推荐路径**：
-  1. **现在 → 方案 E**：`FEISHU_ENABLED=true` 且 `feishu_instance_count > 1` 时**启动期抛 `SettingsError`**。把「无人拦截的静默风险」换成「启动就报错」，几行成本，且不排斥将来选 A/B/C/D。
-  2. **将来真要横向扩展 → 按入口控制力二选一**：能控制入口（有网关/队列）→ 方案 C；不能 → 方案 A。**不建议 B**（租约过期与长轮次的张力会在「LLM 偶发慢」时制造最难复现的交错），**不建议 D**（用户可见行为降级）。
-- **关键约束（选型时必须遵守）**：
-  - 会话锁**跨整轮持有**，而 `feishu_max_concurrent_turns` 闸门嵌在会话锁**之内** → 「持锁占连接」的方案（A）必须额外加**持锁数闸门**，容量须 < 连接池总容量（`db_pool_size + db_max_overflow` = 15）。
-  - 分派/注入必须写在**组合根**（`api/v1/`）：`app/channels/**` 的依赖 allowlist 禁止 import `app.repositories`（fail-closed）。
-  - 需新表的方案（B/D）会再触发一次「22 个跨版本迁移钉测」升级，成本见 `review-v1.2.md` §7.10。
-  - 本机 **PG 不可用** → PG 专有机制（advisory lock）只能靠 CI/预发验证。
+- **已实现 Scope（方案 E）**：
+  - `core/settings/feishu.py`：`FEISHU_ENABLED=true` 且 `FEISHU_INSTANCE_COUNT > 1` → 抛 `SettingsError`，错误信息列出三项前置进度并指向 `multi-instance-options.md`；未启用飞书时不拦（与凭据校验同口径）。
+  - `channels/feishu/adapter.py`：`_get_turn_gate` docstring 说明「折算校验当前只是防御性，将来硬闸放开后即恢复为真实保护」。
+- **Acceptance Criteria（方案 E）**：
+  1. `enabled=true` + `instance_count=2` → 启动期 `SettingsError`，信息含「不支持多实例」「FEISHU_INSTANCE_COUNT=2」与文档路径，且**不含任何凭据明文**。
+  2. `enabled=true` + `instance_count=1` → 正常加载。
+  3. `enabled=false` + `instance_count>1` → 正常加载（无 webhook 即无并发风险）。
+- **未实现 Scope（真正的跨进程串行）**：方案 A / B / C。选型取决于「能否控制入口」（能 → C，不能 → A）。
+- **放开硬闸的前置**：三项全齐（去重落库 ✅ / 跨进程会话串行 / 出站幂等落库），且把硬闸替换为所选方案的实现。
 - **Dependency**：FEISHU-010（去重落库，已完成）、FEISHU-007。
 
 ## 依赖图

@@ -590,3 +590,23 @@ except BaseException:
 - **PG 路径未验证**：本机 docker daemon 未运行、无 `docker compose`、5432 未监听 → 所有 PG 迁移测试 SKIP。**SQLite 上整链 `upgrade head` / `downgrade 0049` / 再 `upgrade` 往返已验证**（列 / PK / 索引与 ORM 逐项一致），但 PG 的 `IntegrityError` 语义与并发插入行为未实测。
 - **技术债登记（新增 P1）**：迁移链头钉测散落在 15 个测试文件、每加迁移需机械升级一遍。本次已按「该钉的钉、不该钉的改写为语义断言」处理，但 `v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名仍会随升级逐渐名不副实，建议后续统一改为「相对当前 head」的断言（已写入 `docs/current-system-architecture-baseline.md` 技术债表）。
 - **多实例前置进度**：去重落库 ✅（本次）；跨进程会话串行 ❌、出站幂等落库 ❌ —— **三项全齐前仍不得开多 worker**。
+
+### 7.11 FEISHU-011 方案 E：多实例启动期硬闸
+
+**背景**：`feishu_instance_count` 此前只影响一条启动 warning（容量校验折算），语义上容易被误读为「已经支持多实例」。而三项硬前置只完成 1/3，此时开多 worker 的故障形态是**偶发**的（需同时满足同会话 + 跨实例 + 时间重叠）——回复交错、`conversations` / `memory` / `character_state` 竞态写，极难复现定位。
+
+**改动**：`core/settings/feishu.py` 的 `validate_feishu_config` 在 `feishu_enabled` 分支内（紧随凭据校验）加硬闸——`FEISHU_INSTANCE_COUNT > 1` → 抛 `SettingsError`，错误信息列出三项前置进度并指向 `multi-instance-options.md`。未启用飞书时不拦（与凭据校验同口径：无 webhook 即无并发风险）。
+
+**取舍登记**：
+- 代价是**暂时零横向扩展能力**，只能纵向扩（单实例内调 `feishu_max_concurrent_turns` 与池容量）。
+- `adapter._get_turn_gate` 里的「`limit × 实例数` 折算」**保留**：当前只是防御性校验，将来放开硬闸后即恢复为真实保护。docstring 已注明这一点。
+- 错误信息**不含任何凭据明文**（已加断言）。
+
+**验证**：
+- 飞书全量 **347 passed / 2 skipped**；设置测试 +3 例。
+- `tests/v24 + v25 + v26`：**10 failed / 2991 passed**，与 HEAD 基线逐条一致（E 不涉及迁移，故不触发钉测）。
+- `tests/unit + integration + e2e + golden`：**3~6 failed / 2060 passed**，失败成员逐轮互换且全部落在既存 flaky 集合内（流式 SSE、日志断言、顺序敏感）。已单独复核可疑项：单独运行通过，且所在文件 0 处飞书引用。
+- **反向验证**：把 `settings/feishu.py` 回退到 HEAD、只留新用例 → `test_feishu_enabled_rejects_multi_instance` **失败**（另两例是「不该拦」的守卫，新旧代码都绿，符合预期），恢复后 md5 一致。
+- **连带修正**：`test_row13b_concurrency_gate_accounts_for_instance_count`（本报告 §7.8 新增）原用 `feishu_enabled=true` + `instance_count=4` 触发折算校验——被 E 的硬闸封死。已改为 `feishu_enabled=false`（折算校验在当前只走防御性路径），并在 docstring 注明「将来放开硬闸后应改回 `enabled=true` 并额外断言闸门真的生效」。
+
+**放开硬闸的前置**：三项前置全齐，且硬闸已被替换为所选方案（A 或 C）的实现。**只放开硬闸而不落实现，等于把今天封死的故障重新放出来** —— 这一句已写进 `multi-instance-options.md` §4。

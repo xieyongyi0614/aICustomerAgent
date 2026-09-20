@@ -204,9 +204,47 @@ def test_feishu_zero_means_inherit_and_negative_rejected(field_name):
 
 
 def test_feishu_instance_count_must_be_positive():
-    assert FeishuSettings(feishu_instance_count=3).feishu_instance_count == 3
     with pytest.raises(SettingsError):
         FeishuSettings(feishu_instance_count=0)
+
+
+def test_feishu_enabled_rejects_multi_instance():
+    """FEISHU-011 方案 E：多实例硬闸。
+
+    多 worker 的三项硬前置只完成 1/3（去重落库 ✅ / 跨进程会话串行 ❌ /
+    出站幂等落库 ❌），此时开多实例会让同一会话被多个实例交错处理，且故障偶发
+    难查。故 `enabled=true` + `instance_count>1` 必须**启动期失败**，而不是记一条
+    warning 后照跑。
+    """
+    with pytest.raises(SettingsError) as exc_info:
+        FeishuSettings(
+            feishu_enabled=True,
+            feishu_app_id="cli_app",
+            feishu_app_secret="s3cret",
+            feishu_verification_token="token-x",
+            feishu_instance_count=2,
+        )
+    message = str(exc_info.value)
+    assert "不支持多实例" in message
+    assert "FEISHU_INSTANCE_COUNT=2" in message
+    assert "multi-instance-options.md" in message
+    assert "s3cret" not in message
+
+
+def test_feishu_enabled_allows_single_instance():
+    settings = FeishuSettings(
+        feishu_enabled=True,
+        feishu_app_id="cli_app",
+        feishu_app_secret="s3cret",
+        feishu_verification_token="token-x",
+        feishu_instance_count=1,
+    )
+    assert settings.feishu_instance_count == 1
+
+
+def test_feishu_disabled_tolerates_multi_instance():
+    """未启用飞书时无 webhook，不存在并发风险，故不拦（与凭据校验同口径）。"""
+    assert FeishuSettings(feishu_instance_count=3).feishu_instance_count == 3
 
 
 def test_feishu_http_retry_bounds():

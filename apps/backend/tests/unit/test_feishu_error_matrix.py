@@ -337,8 +337,15 @@ def test_row13_inbound_rate_limit_window(override_settings):
 
 
 def test_row13b_concurrency_gate_accounts_for_instance_count(override_settings, caplog):
-    """多实例下进程内闸门无法收敛：容量校验须按「上限 × 实例数」折算（N-05）。"""
+    """并发容量校验须按「上限 × 实例数」折算（N-05）。
+
+    注意 `feishu_enabled=False`：`enabled=true` + `instance_count>1` 已被
+    FEISHU-011 方案 E 的启动期硬闸拦下，故这条折算在当前只走「防御性」路径。
+    将来实现跨进程串行、放开硬闸后，它才恢复为真实保护——届时本用例应改为
+    用 `enabled=true` 并额外断言闸门真的生效。
+    """
     override_settings(
+        feishu_enabled=False,
         feishu_max_concurrent_turns=4,
         feishu_instance_count=4,
         db_pool_size=5,
@@ -352,6 +359,7 @@ def test_row13b_concurrency_gate_accounts_for_instance_count(override_settings, 
 
 def test_row13c_concurrency_gate_silent_within_capacity(override_settings, caplog):
     override_settings(
+        feishu_enabled=False,
         feishu_max_concurrent_turns=4,
         feishu_instance_count=1,
         db_pool_size=5,

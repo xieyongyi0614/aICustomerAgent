@@ -103,6 +103,16 @@ class FeishuSettings(BaseSettings):
                 raise SettingsError(
                     f"FEISHU_ENABLED=true 时缺少必需配置: {', '.join(missing)}"
                 )
+            if self.feishu_instance_count > 1:
+                raise SettingsError(
+                    f"FEISHU_ENABLED=true 时不支持多实例（FEISHU_INSTANCE_COUNT="
+                    f"{self.feishu_instance_count}）：多 worker / 多实例的硬前置尚未补齐"
+                    "（去重落库 已实现 / 跨进程会话串行 未实现 / 出站幂等落库 未实现）。"
+                    "强行开启会让同一会话的消息被多个实例交错处理、状态竞态写，"
+                    "且故障偶发、极难定位。选型与做法见 "
+                    "docs/integrations/feishu/multi-instance-options.md；"
+                    "确需横向扩展请先完成 FEISHU-011，并把本闸门替换为所选方案。"
+                )
         if not self.feishu_encrypt_key:
             logger.warning(
                 "FEISHU_ENCRYPT_KEY 为空: 仅接受未加密事件且不校验签名，安全性降级"
