@@ -457,14 +457,20 @@ except BaseException:
 3. **去重与限流的时长判断改走单调钟**：wall clock 回拨不再影响 TTL/滑窗。副作用是 `events._mono` 成为新的测试注入点（`_now` 仍用于新鲜度）。
 4. `delivery` 新增 `_now` 注入钩子；`reset_delivery_state()` 会一并复位。
 
-### 7.6 仍未处理
+### 7.6 剩余项状态（截至第二批修复后）
 
 | 项 | 状态 |
 |---|---|
-| N-05 多实例并发闸门失效 | 仅落 docstring 标注；跨进程闸门未实现 |
-| N-06 / N-07 / N-08 / N-09 / N-10 | 未动，仍为登记项（N-10 的「时钟注入点」部分已随 N-03 修复；仅剩「出站幂等 TTL 复用入站 TTL」的配置耦合） |
-| 判断 1（多实例全套外置） | 未动。**在补齐前仍不得开多 worker**（v1.1 §5.1 硬前置） |
-| 判断 2 的容量上界 | 未加。单调钟已消除「回拨导致永不淘汰」，该上界降为兜底项 |
+| N-01 / N-02 / N-03 / N-04 | ✅ 已修（第一批） |
+| 判断 3（时钟分离） | ✅ 已修（第一批 + `delivery` 补齐） |
+| N-05（多实例并发闸门） | ⚠️ 部分：容量校验已按 `feishu_max_concurrent_turns × feishu_instance_count` 折算，风险在启动期可见；**跨进程闸门仍未实现** |
+| N-06（加密体缺内层 token） | ✅ 已修 |
+| N-07（配置缺失 vs 鉴权失败） | ✅ 已修 |
+| N-08（非文本消息静默丢弃） | ⏸ **待产品决策**。FEISHU-002 与 architecture §7.2 把非文本列为第一阶段范围外，故「忽略」是有意设计而非缺陷；改为回文案属产品变更 |
+| N-09（限流阈值共用配置键） | ✅ 已修（新增 `FEISHU_RATE_LIMIT_PER_MINUTE`，0 = 沿用共用键，**向后兼容**） |
+| N-10（出站幂等 TTL 复用入站 TTL） | ✅ 已修（新增 `FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS`，0 = 沿用） |
+| 判断 1（多实例全套外置） | ❌ 未动。**在补齐前仍不得开多 worker**（v1.1 §5.1 硬前置） |
+| 判断 2 的容量上界 | ❌ 未加。单调钟已消除「回拨导致永不淘汰」，该上界降为兜底项 |
 
 ### 7.7 文档对齐（仓库约定：架构演进须先更新基线）
 
@@ -478,3 +484,34 @@ except BaseException:
 
 **刻意未改**：`task-details/FEISHU-002.md` / `FEISHU-006.md` 中仍写着「入站限流 → 429」的段落。理由：本仓库**从未**对冻结的 task-details 做后续 review 的反向标注（v1.1 改了 F-02/F-03/F-10 同样未回填），保持其「当时交付内容的记录」语义；变更以 FEISHU-009 + architecture.md（活文档）+ 本报告为准。
 ⚠️ 但这留下一个**回归风险**：只看 FEISHU-002 规格的人可能把限流「修回」429 而重新引入 N-01。若你希望消除该风险，可在这两处加一行指向 FEISHU-009 的指针（属对冻结文档的编辑，故未擅自执行）。
+
+### 7.8 第二批修复（N-05 / N-06 / N-07 / N-09 / N-10）
+
+#### 代码改动
+
+| 文件 | 改动 |
+|---|---|
+| `app/core/settings/feishu.py` | 新增 `feishu_rate_limit_per_minute` / `feishu_outbound_idempotency_ttl_seconds`（均允许 `0` = 沿用共用键）/ `feishu_instance_count`（须 ≥ 1），并补三条校验 |
+| `.env.example` | 补三个新键占位 |
+| `app/channels/feishu/events.py` | 新增 `rate_limit_per_minute()`：`feishu_rate_limit_per_minute` 为 0 时回落 `chat_rate_limit_per_minute`（N-09）；`verify_token` 在 `expected` 为空时改抛 `FeishuConfigError`（N-07） |
+| `app/channels/feishu/delivery.py` | 新增 `_idempotency_ttl_seconds()`：`feishu_outbound_idempotency_ttl_seconds` 为 0 时回落 `feishu_dedupe_ttl_seconds`（N-10） |
+| `app/channels/feishu/adapter.py` | 并发容量校验按 `feishu_max_concurrent_turns × feishu_instance_count` 折算，warning 文案带出折算过程（N-05） |
+| `app/api/v1/feishu.py` | token 校验改为**无条件要求**（删 `elif not encrypted` 分支）；`FeishuConfigError` 与 `FeishuAuthError` 分流到 error / warning 日志，响应码统一为 `401`（N-06 / N-07） |
+
+#### 两个刻意的设计取舍
+
+1. **N-09 / N-10 用「0 = 沿用共用键」而非直接换新键**。若新键默认给 30 / 600 并直接取代共用键，则运维此前为 Web 侧调过的 `CHAT_RATE_LIMIT_PER_MINUTE` 会被静默忽略（飞书阈值回落到默认值）——这正是本仓库已知的 `extra="ignore"` 类静默陷阱。用 0 表示继承，**默认行为零变化**，运维想解耦再显式配置。
+2. **N-05 只让风险可见，不改闸门本质**。真正的修复（跨进程信号量）属多实例前置，与 v1.1 §5.1 的两项（去重落库、跨进程会话串行）必须同批做，否则只把并发问题挪个位置。故本批只做「把 `limit × 实例数` 纳入校验」，并把这一点写进 docstring 与架构文档，避免读者误以为闸门已跨实例。
+
+#### N-06 撞上既有契约的处理
+
+收紧后 `test_decryptable_but_malformed_inner_200_no_dispatch` 失败：它的载荷 `{"surprise": True}` 既缺 token 又结构非法，把两个场景混在一起。处理方式是把契约拆清：
+
+- 「**token 合法**但明文结构非法」→ `200` + 零派发（错误矩阵 2b 的原意，避免飞书无限重推）——原用例改为带上合法 token；
+- 「解密后**缺 token**」→ `401` + 零派发（新增用例 `test_encrypted_without_inner_token_401`）。
+
+**风险登记**：这是本批唯一收窄的对外契约。若飞书某类事件合法地不带 `header.token`，会从「放行」变为 `401`。判定依据是飞书 v2 事件回调恒带 `header.token`、且 e2e 夹具一直如此；属 fail-closed，出问题时日志会明确指向 `verification token missing`。
+
+#### 验证
+
+飞书全量（`-p no:xdist -o addopts=""`）：**292 passed, 2 skipped**（第一批结束时 281 → 新增 11 个用例，零回归）。新增用例覆盖：token 未配置抛 `FeishuConfigError`、加密体缺 token → `401`、限流阈值继承与解耦、出站幂等 TTL 继承与解耦、并发闸门按实例数折算的 warning 与其静默路径、三个新配置键的 0 值语义与边界校验。

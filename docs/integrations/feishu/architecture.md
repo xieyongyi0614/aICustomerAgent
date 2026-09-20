@@ -412,6 +412,7 @@ Feishu Event（im.message.receive_v1）
    ▼
 [2] Event Validation
      ├─ header.token            == verification token （否则 401）
+     │    └─ **所有来件都校验**（加密体在解密后同样校验）；token 未配置 → error 日志
      ├─ X-Lark-Signature        == sha256(ts+nonce+encrypt_key+body) （否则 403）
      ├─ 时间戳窗口检查（防重放）—— **必须覆盖所有来件**（review v1.2 · N-02）
      │    ├─ 签名路径（Encrypt Key 与签名头齐备）内部已含该检查，不重复执行
@@ -466,8 +467,10 @@ Feishu Event（im.message.receive_v1）
   - 该顺序是**显式构造**的，不依赖"同步阻塞恰好不让出事件循环"这一副作用：身份解析已下放线程，若仍靠副作用保序，连发消息会被反序处理。
   - **多实例限制**：合并窗口与批次链均只在**进程内**生效；跨实例的会话串行须由外置锁承担（见 `review-v1.1.md` §5）。
 - **连发合并**：同一 `open_id` 在 `FEISHU_MERGE_WINDOW_MS` 固定窗口内（首条起算，**不因新消息重置**，避免持续打字导致永不 flush）的连续消息合并为一条，文本按到达顺序以换行拼接、锚点取最后一条（reply 语义）。超 `FEISHU_MERGE_MAX_MESSAGES` / `FEISHU_MERGE_MAX_CHARS` 立即 flush；`FEISHU_MERGE_WINDOW_MS=0` 表示关闭合并（逐条处理，仍走链保序）。
-- **全局并发闸门**：`FEISHU_MAX_CONCURRENT_TURNS` 由**进程内** `Semaphore` 实际消费（超限排队而非丢弃），并在首次创建时校验「上限 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`）」，超出记 warning。
-  - **该闸门与上述校验都只在单实例成立**：多实例下实际并发是 `limit × 实例数`，而 DB 连接池是共享的（`review-v1.2.md` · N-05）。开多 worker 前必须改为跨进程闸门（PG advisory lock 计数或 Redis 信号量）。
+- **全局并发闸门**：`FEISHU_MAX_CONCURRENT_TURNS` 由**进程内** `Semaphore` 实际消费（超限排队而非丢弃），并在首次创建时按 `上限 × FEISHU_INSTANCE_COUNT` 与 DB 连接池容量（`db_pool_size + db_max_overflow`）比对，超出记 warning。
+  - 该闸门仍是**进程内**的：多实例下实际并发是 `limit × 实例数`，而 DB 连接池是**共享**的（`review-v1.2.md` · N-05）。`FEISHU_INSTANCE_COUNT` 只是让这一风险在启动期可见，**不改变闸门的进程内本质**——开多 worker 前必须把它换成跨进程实现（PG advisory lock 计数或 Redis 信号量）。
+- **token 校验覆盖所有来件**（review v1.2 · N-06）：加密体解密后同样必须携带 `token`，**不得因「已加密」而整段跳过**。此前的 `elif not encrypted` 分支使「加密 + 无内层 token」成为唯一放行口；虽然伪造者需先持有 `Encrypt Key`（否则密文无法构造），但非对称的闸门是隐性风险。
+- **配置缺失与鉴权失败必须可区分**（review v1.2 · N-07）：`FEISHU_VERIFICATION_TOKEN` 为空属**配置缺失**（`FeishuConfigError` + `logger.error`），不是鉴权失败（`FeishuAuthError` + `logger.warning`）。两者对飞书返回同一个 `401`（不泄露配置状态），但日志级别与文案必须能区分，否则运维会把「没配 token」误判为攻击。
 - **限流不以 4xx 拒收**（review v1.2 · N-01）：命中限流时返回 `200` 并回兜底文案（`FALLBACK_TEXTS["overloaded"]`），**不返回 `429`**。原因是飞书对非 2xx 会重投**同一个 `event_id`**，而该 id 此时已落去重表 → 重投被静默吞掉，用户既收不到回复也无任何留痕。**改回 429 会重新引入该缺陷**。
 - **两个时钟职责分离，不可互换**（review v1.2）：`events._mono = time.monotonic` 承担**一切时长判断**（`event_id` 去重 TTL、`open_id` 限流滑窗）；`events._now = time.time` 只用于与飞书**外部时间戳**比对（新鲜度窗口）。`delivery` 的出站幂等 TTL 同样走单调钟（注入点 `delivery._mono`）——**只有"与外部时间戳比对"这一件事必须用 wall clock**。
   - wall clock 回拨会让"时长"变成负数 → 去重表永不淘汰（内存只增不减）、限流窗口永不排空（用户被永久拒绝）、出站幂等条目永不淘汰（重投被自己的幂等表静默跳过）。
@@ -496,12 +499,15 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_MAX_REPLY_CHARS` | int | `4000` | 单条回复字符上限，超出按段切分 |
 | `FEISHU_DEDUPE_TTL_SECONDS` | int | `600` | `event_id` 去重窗口 |
 | `FEISHU_SIGNATURE_WINDOW_SECONDS` | int | `300` | 时间戳允许偏差（防重放） |
-| `FEISHU_MAX_CONCURRENT_TURNS` | int | `4` | **全局并发处理上限（已实际生效）**：进程内 `Semaphore` 名额，超限排队；须 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`） |
+| `FEISHU_MAX_CONCURRENT_TURNS` | int | `4` | **全局并发处理上限（已实际生效）**：进程内 `Semaphore` 名额，超限排队。容量校验按 `FEISHU_MAX_CONCURRENT_TURNS × FEISHU_INSTANCE_COUNT` 与 DB 连接池容量（`db_pool_size + db_max_overflow`）比对，超出记 warning |
 | `FEISHU_SESSION_QUEUE_LIMIT` | int | `5` | 单用户**待处理批次数**上限（超出拒绝新到消息并提示；批次由收件箱的合并窗口产生） |
 | `FEISHU_MAX_BODY_BYTES` | int | `262144` | 入站请求体上限；超限直接 `413`，不读入内存 |
 | `FEISHU_MERGE_WINDOW_MS` | int | `800` | 连发合并窗口（毫秒）；固定窗口，首条起算不重置；**`0` = 关闭合并**（允许 0，其余正数项不允许） |
 | `FEISHU_MERGE_MAX_MESSAGES` | int | `10` | 单批合并消息条数上限，超出立即 flush |
 | `FEISHU_MERGE_MAX_CHARS` | int | `20000` | 单批合并文本字符上限（对齐 `InboundMessage.TEXT_MAX_CHARS`），超出立即 flush |
+| `FEISHU_RATE_LIMIT_PER_MINUTE` | int | `0` | 入站按 `open_id` 的 60s 滑窗阈值；**`0` = 沿用 `CHAT_RATE_LIMIT_PER_MINUTE`**（Web 侧共用键）。设独立值可避免调 Web 限流误伤飞书 |
+| `FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS` | int | `0` | 出站幂等窗口；**`0` = 沿用 `FEISHU_DEDUPE_TTL_SECONDS`**。主动消息的重试间隔可能远超入站去重窗口，故可独立放宽 |
+| `FEISHU_INSTANCE_COUNT` | int | `1` | 部署侧声明的实例（worker）数，**仅用于并发容量校验折算**（单实例填 1）。它不改变闸门的进程内本质，只是让「多实例压满连接池」在启动期可见 |
 
 ### 5.2 配置原则
 
@@ -528,9 +534,9 @@ Feishu Event（im.message.receive_v1）
 
 | # | 场景 | 检测点 | 处理 | 返回给飞书 | 用户可见结果 |
 |---|---|---|---|---|---|
-| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线。时间戳窗口**覆盖所有来件**：签名路径（Encrypt Key 与签名头齐备）内部已含该检查；签名路径未生效时（明文 / 空 Encrypt Key / 缺签名头）独立校验——优先请求头时间戳，回落 `header.create_time`（毫秒） | `401` / `403` | 无回复（安全拒绝） |
+| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线。**token 校验覆盖所有来件**（含加密体解密后的载荷）；`FEISHU_VERIFICATION_TOKEN` 为空属配置缺失，记 `error` 而非 `warning`（响应码不变，不泄露配置状态）。时间戳窗口**覆盖所有来件**：签名路径（Encrypt Key 与签名头齐备）内部已含该检查；签名路径未生效时（明文 / 空 Encrypt Key / 缺签名头）独立校验——优先请求头时间戳，回落 `header.create_time`（毫秒） | `401` / `403` | 无回复（安全拒绝） |
 | 2 | **解密失败**（Encrypt Key 不匹配 / 密文损坏 / base64 非法 / 填充错误） | 传输层（步骤 [1]） | 记录告警（脱敏），标记配置类错误；**不进入解析、不去重、不派发**——即不建 identity / 不建 conversation / 不调管线 / 不产生任何 AI 回复 | `400` | 无回复 |
-| 2b | **解密成功但明文结构非法** | 解析（步骤 [3]） | 记**脱敏**日志后**忽略**（明文内容不入日志） | `200`（避免飞书无限重推） | 无回复 |
+| 2b | **解密成功但明文结构非法**（前提：`token` 已通过校验；缺 `token` 走 #1 的 `401`） | 解析（步骤 [3]） | 记**脱敏**日志后**忽略**（明文内容不入日志） | `200`（避免飞书无限重推） | 无回复 |
 | 3 | **Event 解析失败**（结构非预期 / `content` 非法 JSON） | 解析纯函数（步骤 [3]） | 记录 + trace，跳过该事件 | `200`（避免重推） | 无回复 |
 | 4 | **事件不适用**（群聊 / 非 text / 非 `im.message.receive_v1`） | 解析纯函数 | 记录后忽略 | `200` | 无回复 |
 | 5 | **重复事件**（`event_id` 命中去重窗口） | 去重检查 | 直接忽略（幂等） | `200` | 不重复回复 |
