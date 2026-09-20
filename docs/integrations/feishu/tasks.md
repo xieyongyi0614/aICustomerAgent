@@ -181,6 +181,29 @@
   9. 通道边界 AST fail-closed 扫描保持通过（`inbox.py` 只依赖 `app.core` / `app.channels`）。
 - **Dependency**：FEISHU-002、FEISHU-004、FEISHU-005。
 
+### FEISHU-009 去重 / 时钟 / 限流正确性硬化（P0+P1，**已实现**）
+
+- **ID**：FEISHU-009
+- **Priority**：P0（N-01 / N-02）+ P1（N-03 / N-04）
+- **来源**：[`review-v1.2.md`](./review-v1.2.md)（审核发现 N-01~N-10）
+- **状态**：**N-01 / N-02 / N-03 / N-04 + 时钟分离已实现**（2026-09-20）；N-05~N-10 与多实例前置未动。
+- **Goal**：收口 v1.1 两处修复的遗漏（F-01 的明文路径缺口、F-03 与 F-09 叠加出的消息丢失），并把「时长判断」从 wall clock 解耦到单调钟。
+- **已实现 Scope**：
+  - `api/v1/feishu.py`：新鲜度闸门由「仅加密分支」提升为**全路径统一**（判据 `freshness_covered_by_signature = bool(encrypt_key and signature)`）；限流由 `429` 改为 `200` + 派发 `adapter.reject_inbound_message`。
+  - `channels/feishu/events.py`：拆出 `_mono = time.monotonic` 承担去重 TTL 与限流滑窗；`_assert_within_window` 记录 `skew`；`_timestamp_value` 加 `TIMESTAMP_MAX_ABS` 上界；淘汰改 `popitem(last=False)`。
+  - `channels/feishu/delivery.py`：`_claim_delivery` / `_release_delivery` 原子占位（删 `_already_delivered` / `_mark_delivered`）；**发送抛异常时也回滚占位**；新增 `_now` 注入点。
+  - `channels/feishu/adapter.py`：新增 `reject_inbound_message` + 共享 `_reply_overloaded`；`_get_turn_gate` 标注进程内语义。
+- **Acceptance Criteria**：
+  1. 限流命中 → `200` + `overloaded` 兜底文案；**飞书重投同一 `event_id` 后用户仍收到该文案**，消息不丢（N-01）。
+  2. 明文 / 空 `Encrypt Key` / 缺签名头三种组合下，陈旧 `create_time` 或陈旧时间戳头 → `403` 且零派发；新鲜事件 → `200` 且正常派发（N-02）。
+  3. wall clock 回拨时，去重表仍按 TTL 淘汰、限流窗口仍正常排空（单调钟）。
+  4. 并发调用同一出站幂等键只投递一次；**发送返回失败与发送抛异常两条路径都能回滚占位并可重试**（N-03）。
+  5. 超长时间戳头（含负数、超 20 位）→ `403`，不产生未捕获 `OverflowError` / 500（N-04）。
+  6. 新鲜度拒绝时日志含 `skew`，可与 NTP 漂移建立联系。
+- **行为变更登记**：入站限流 `429 → 200 + 兜底文案`（用户可见）；明文来件开始受新鲜度窗口约束（窗口 = `FEISHU_SIGNATURE_WINDOW_SECONDS`，默认 300s）。
+- **未实现 Scope**：N-05（多实例并发闸门）、N-06（加密体缺内层 token 时跳过校验）、N-07（配置缺失与鉴权失败不可区分）、N-08（非文本消息静默丢弃）、N-09（限流阈值与 Web 共用配置键）、N-10（出站幂等 TTL 复用入站 TTL）。
+- **Dependency**：FEISHU-002、FEISHU-007。
+
 ## 依赖图
 
 ```text

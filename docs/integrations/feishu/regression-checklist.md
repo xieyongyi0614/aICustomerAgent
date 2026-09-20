@@ -46,7 +46,10 @@
 
 ## 运维
 
-- [ ] 限流：同账号快速连发超过 `CHAT_RATE_LIMIT_PER_MINUTE` → 收到限流提示（HTTP 429 侧记日志）
+- [ ] 限流：同账号快速连发超过 `CHAT_RATE_LIMIT_PER_MINUTE` → 收到「你发得太快了」兜底文案（**响应为 HTTP 200，不是 429**；侧记限流 warning 日志）
+  - ⚠️ 该条为 FEISHU-009 的行为变更（`review-v1.2.md` · N-01）。若观察到 429，说明回退到了旧实现——飞书会重投同一 `event_id`，重投将被去重表静默吞掉，用户消息永久丢失
+- [ ] 明文新鲜度：伪造一个 `create_time` 早于 `FEISHU_SIGNATURE_WINDOW_SECONDS`（默认 300s）的明文事件 → 403 且零派发（N-02）
+- [ ] 新鲜度拒绝日志含 `skew=<偏差秒数>`，可与服务器时钟漂移（NTP）建立联系
 - [ ] 消息轰炸（超过 `FEISHU_SESSION_QUEUE_LIMIT`）→ 收到「消息有点多」过载提示，且此前已接受的消息仍按序回复
 - [ ] 临时改错 `FEISHU_APP_SECRET` → 启动或首个事件日志出现明确错误分类（可定位是凭据问题）
 - [ ] 临时改错 `FEISHU_ENCRYPT_KEY`（与平台不一致）→ 加密事件解密失败 → 400 且服务不崩

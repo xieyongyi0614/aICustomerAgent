@@ -413,8 +413,10 @@ Feishu Event（im.message.receive_v1）
 [2] Event Validation
      ├─ header.token            == verification token （否则 401）
      ├─ X-Lark-Signature        == sha256(ts+nonce+encrypt_key+body) （否则 403）
-     ├─ 时间戳窗口检查（防重放）
-     │    └─ 加密体且无签名头时：优先请求头时间戳，回落事件 header.create_time（否则 403）
+     ├─ 时间戳窗口检查（防重放）—— **必须覆盖所有来件**（review v1.2 · N-02）
+     │    ├─ 签名路径（Encrypt Key 与签名头齐备）内部已含该检查，不重复执行
+     │    └─ 签名路径未生效时（明文 / 空 Encrypt Key / 缺签名头）→ 独立校验：
+     │       优先请求头时间戳，回落事件 header.create_time（毫秒）（否则 403）
      └─ type == "url_verification" → 原样返回 challenge（仅配置期命中）
    ▼
 [3] Event 解析（纯函数）
@@ -425,7 +427,9 @@ Feishu Event（im.message.receive_v1）
    ▼
 [4] 去重 → 限流（顺序不可颠倒）
      ├─ event_id 命中去重窗口 → 返回 200（忽略，且不消耗限流配额）
-     └─ open_id 60s 滑窗超限   → 返回 429
+     └─ open_id 60s 滑窗超限   → 返回 200 + 兜底文案
+          （**不得返回 4xx**：飞书会重投同一 event_id，而该 id 已落去重表，
+            重投将被静默吞掉 → 消息永久丢失。见 §6.2 #13）
    ▼
 [5] 快速 ack：立即 200（飞书要求 ~3s 内响应，否则重推）
      └─ 处理体投递为后台 asyncio task（ack 与处理解耦）
@@ -462,7 +466,12 @@ Feishu Event（im.message.receive_v1）
   - 该顺序是**显式构造**的，不依赖"同步阻塞恰好不让出事件循环"这一副作用：身份解析已下放线程，若仍靠副作用保序，连发消息会被反序处理。
   - **多实例限制**：合并窗口与批次链均只在**进程内**生效；跨实例的会话串行须由外置锁承担（见 `review-v1.1.md` §5）。
 - **连发合并**：同一 `open_id` 在 `FEISHU_MERGE_WINDOW_MS` 固定窗口内（首条起算，**不因新消息重置**，避免持续打字导致永不 flush）的连续消息合并为一条，文本按到达顺序以换行拼接、锚点取最后一条（reply 语义）。超 `FEISHU_MERGE_MAX_MESSAGES` / `FEISHU_MERGE_MAX_CHARS` 立即 flush；`FEISHU_MERGE_WINDOW_MS=0` 表示关闭合并（逐条处理，仍走链保序）。
-- **全局并发闸门**：`FEISHU_MAX_CONCURRENT_TURNS` 由进程内 `Semaphore` 实际消费（超限排队而非丢弃），并在首次创建时校验「上限 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`）」，超出记 warning。
+- **全局并发闸门**：`FEISHU_MAX_CONCURRENT_TURNS` 由**进程内** `Semaphore` 实际消费（超限排队而非丢弃），并在首次创建时校验「上限 ≤ DB 连接池容量（`db_pool_size + db_max_overflow`）」，超出记 warning。
+  - **该闸门与上述校验都只在单实例成立**：多实例下实际并发是 `limit × 实例数`，而 DB 连接池是共享的（`review-v1.2.md` · N-05）。开多 worker 前必须改为跨进程闸门（PG advisory lock 计数或 Redis 信号量）。
+- **限流不以 4xx 拒收**（review v1.2 · N-01）：命中限流时返回 `200` 并回兜底文案（`FALLBACK_TEXTS["overloaded"]`），**不返回 `429`**。原因是飞书对非 2xx 会重投**同一个 `event_id`**，而该 id 此时已落去重表 → 重投被静默吞掉，用户既收不到回复也无任何留痕。**改回 429 会重新引入该缺陷**。
+- **两个时钟职责分离，不可互换**（review v1.2）：`events._mono = time.monotonic` 承担**一切时长判断**（`event_id` 去重 TTL、`open_id` 限流滑窗）；`events._now = time.time` 只用于与飞书**外部时间戳**比对（新鲜度窗口）。`delivery` 的出站幂等 TTL 同样走单调钟（注入点 `delivery._mono`）——**只有"与外部时间戳比对"这一件事必须用 wall clock**。
+  - wall clock 回拨会让"时长"变成负数 → 去重表永不淘汰（内存只增不减）、限流窗口永不排空（用户被永久拒绝）、出站幂等条目永不淘汰（重投被自己的幂等表静默跳过）。
+  - 新鲜度拒绝时记录 `skew`，使"全部事件 403"可与 NTP 漂移直接建立联系（`abs(skew) > 窗口` 时快慢对称地全拒）。
 - **观测**：每轮由 Adapter 建 trace（复用 `trace_collector`），并把 `feishu.message_id` / `event_id` / `open_id` 记入日志用于排障。
 
 ---
@@ -519,7 +528,7 @@ Feishu Event（im.message.receive_v1）
 
 | # | 场景 | 检测点 | 处理 | 返回给飞书 | 用户可见结果 |
 |---|---|---|---|---|---|
-| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线。**加密体无签名头**时仍须独立校验新鲜度：优先请求头时间戳，回落 `header.create_time`（毫秒） | `401` / `403` | 无回复（安全拒绝） |
+| 1 | **Webhook 验证失败**（token / 签名 / 时间戳） | 传输层（步骤 [2]） | 记录告警日志，不解析事件、不调管线。时间戳窗口**覆盖所有来件**：签名路径（Encrypt Key 与签名头齐备）内部已含该检查；签名路径未生效时（明文 / 空 Encrypt Key / 缺签名头）独立校验——优先请求头时间戳，回落 `header.create_time`（毫秒） | `401` / `403` | 无回复（安全拒绝） |
 | 2 | **解密失败**（Encrypt Key 不匹配 / 密文损坏 / base64 非法 / 填充错误） | 传输层（步骤 [1]） | 记录告警（脱敏），标记配置类错误；**不进入解析、不去重、不派发**——即不建 identity / 不建 conversation / 不调管线 / 不产生任何 AI 回复 | `400` | 无回复 |
 | 2b | **解密成功但明文结构非法** | 解析（步骤 [3]） | 记**脱敏**日志后**忽略**（明文内容不入日志） | `200`（避免飞书无限重推） | 无回复 |
 | 3 | **Event 解析失败**（结构非预期 / `content` 非法 JSON） | 解析纯函数（步骤 [3]） | 记录 + trace，跳过该事件 | `200`（避免重推） | 无回复 |
@@ -532,11 +541,11 @@ Feishu Event（im.message.receive_v1）
 | 10 | **回复超长** | 出站前 | 按 `FEISHU_MAX_REPLY_CHARS` 切分为多条顺序发送；单条仍超限则截断并标记 | 不适用 | 消息分段到达 |
 | 11 | **发送重复** | 出站 | 幂等键分两种：**Reply** 用源 `message_id`；**Proactive** 用调用方提供的 `idempotency_key`（无 message_id 可依托）。进程内 TTL 表防自身重复投递；不覆盖"已送达但响应丢失"（协议无幂等键，残余风险显式登记） | 不适用 | 同一条只收到一次 |
 | 12 | **用户消息过载** | 排队（收件箱） | 单会话**待处理批次数**超 `FEISHU_SESSION_QUEUE_LIMIT` → **拒绝新到消息**并回兜底文案，不调管线；队列释放后自动恢复受理。深度由 `inbox.SessionInbox` 的 FIFO 队列持有（"丢弃最旧"仍被否决，见 FEISHU-004 §15.3） | `200` | 收到"你发得太快了"提示 |
-| 13 | **限流** | 传输层 | 注意：既有 `chat_rate_limit_middleware` **只保护 `POST /api/v1/chat/message`**（按客户端 IP），Webhook 路径不在其内 → 飞书侧需**独立**的按 `open_id` 窗口限流。**去重必须先于限流**：飞书重投的重复事件不得消耗该用户的限流配额 | `429` | 收到限流提示 |
+| 13 | **限流** | 传输层 | 注意：既有 `chat_rate_limit_middleware` **只保护 `POST /api/v1/chat/message`**（按客户端 IP），Webhook 路径不在其内 → 飞书侧需**独立**的按 `open_id` 窗口限流。**去重必须先于限流**：飞书重投的重复事件不得消耗该用户的限流配额。**命中限流不得返回 4xx**（review v1.2 · N-01）：飞书对非 2xx 会重投同一 `event_id`，而该 id 已落去重表 → 重投被静默吞掉、消息永久丢失。故改为回兜底文案 | `200` | 收到"你发得太快了"提示 |
 | 14 | **收件人解析失败**（仅 Proactive） | 出站前（`resolve_recipient`） | 返回 `None` → **不发、不猜、不兜底到其他收件人**；记 warning（含 `internal_user_id`）。调用方（未来）据此跳过或标记 | 不适用（无入站请求） | 该用户收不到这条主动消息 |
 | 15 | **无锚点且无幂等键**（仅 Proactive） | 出站前校验 | 视为**调用方契约违规** → 拒绝发送 + 记 error（不得"先发了再说"） | 不适用 | 无 |
 | 16 | **请求体超限** | 传输层（步骤 [1]） | `Content-Length` 预检 + 分块累计读取，超限即中断；**不读入内存、不解析、不去重、不派发** | `413` | 无回复 |
-| 17 | **加密体无签名头且新鲜度不可校验** | 传输层（步骤 [2]） | 既无请求头时间戳、又无 `header.create_time`（典型为 URL 校验来件）→ **放行 + 记 warning**（此时残余保护仅剩 `event_id` 去重表，不得视为"已校验"） | `200` | 视事件而定 |
+| 17 | **签名路径未生效且新鲜度不可校验**（明文 / 空 Encrypt Key / 缺签名头，且无时间戳信号） | 传输层（步骤 [2]） | 既无请求头时间戳、又无 `header.create_time`（典型为 URL 校验来件）→ **放行 + 记 warning**（此时残余保护仅剩 `event_id` 去重表，不得视为"已校验"） | `200` | 视事件而定 |
 | 18 | **派发失败**（无可调度事件循环） | 快速 ack 之后 | `spawn_background` 返回 `False` 时协程被关闭 → 记 error（不得静默吞掉用户消息） | `200`（已 ack） | 无回复（已留痕） |
 
 ### 6.3 与既有错误语义的对齐
@@ -562,11 +571,14 @@ Feishu Event（im.message.receive_v1）
 2. **签名与加密都依赖 `Encrypt Key`**：因此 **`Encrypt Key` 非空是"完整验证姿态"的前提**（也是本项目推荐的生产姿态）。
    - `Encrypt Key` 非空 → 同时执行 **token 校验 + 时间戳窗口 + 签名校验 + （加密时）解密**。
    - `Encrypt Key` 为空 → 飞书侧不下发签名头，**此时可执行的校验只有 token + 时间戳窗口**。这是**安全能力降级**，不是等价替代：启动时记 `warning`，并且**实现阶段必须以飞书官方文档确认"未配置 Encrypt Key 时官方提供的校验要素"**，不得自行设计一套"看起来合理"的验证协议。
-3. **`X-Lark-Request-Timestamp` 的防重放职责不得随签名一起被跳过**（review v1.1 · F-01）。加密体未带签名头时，`verify_signature` 整体不执行，若时间戳窗口也随之失效，则**捕获到的密文可在 `FEISHU_DEDUPE_TTL_SECONDS` 过期后被无限重放**（每次触发一轮完整管线）。故该情形下仍须独立证明"新鲜"：
+   - ⚠️ **该形态的残余风险必须明确承认**（review v1.2 · N-02）：`FEISHU_ENCRYPT_KEY` 为空是**被支持的部署形态**（`_REQUIRED_CREDENTIALS` 只含 `APP_ID` / `APP_SECRET` / `VERIFICATION_TOKEN`，缺失仅记 warning）。此形态下 `verification token` 是**唯一凭据**，而它是静态共享密钥 —— 既不提供重放保护（依赖时间戳窗口 + 去重表），也**不绑定来源身份**：持有该 token 即可伪造任意 `open_id` 的消息（冒充用户、烧 LLM 额度、污染记忆与库表）。**生产环境应配置 `Encrypt Key`**。
+3. **`X-Lark-Request-Timestamp` 的防重放职责不得随签名一起被跳过**（review v1.1 · F-01；v1.2 · N-02 补齐覆盖范围）。**签名路径未生效时**（明文来件 / 空 `Encrypt Key` / 缺签名头），`verify_signature` 整体不执行（空 `Encrypt Key` 时它在时间戳校验前就 `return`），若时间戳窗口也随之失效，则**捕获到的 body 可在 `FEISHU_DEDUPE_TTL_SECONDS` 过期后被无限重放**（每次触发一轮完整管线）。故上述情形下必须独立证明"新鲜"：
    - 有 `X-Lark-Request-Timestamp` → 校验窗口；
    - 无该头 → 回落事件自带的 `header.create_time`（毫秒）校验窗口；
    - 两者皆无（URL 校验来件）→ 放行 + 记 warning，并显式承认"此时仅有去重表保护"。
    - **取舍**：回落 `create_time` 比签名路径（校验的是*请求*时间）更严格——被飞书重投且已超窗的**旧消息**会被拒；窗口由 `FEISHU_SIGNATURE_WINDOW_SECONDS` 调节。
+   - **回归陷阱**：窗口 = `300s`，因此**任何把 `create_time` 写死为固定旧值的测试夹具都会在全线 403**。夹具必须默认取当前时间，需要陈旧值的用例显式覆盖（`tests/e2e/test_feishu_webhook.py` 的 `_fresh_create_time_ms()`）。
+   - ⚠️ 本点与第 2 点的关系：第 2 点声明"`Encrypt Key` 为空时**可执行的校验只有 token + 时间戳窗口**"，而 v1.2 之前**实现并未执行该窗口**（空 `Encrypt Key` 导致 `verify_signature` 早退，而窗口检查当时只挂在该函数内部）——属**文档与实现的背离**，N-02 已修复对齐。
 
 > 实现期必读：§6.4 是**语义分工**的冻结描述，具体的 header 名、拼接顺序、时间戳单位等**协议细节**一律以飞书官方开放平台文档为最终依据（复核清单见 FEISHU-002 §6.5 / §15.2）。
 
