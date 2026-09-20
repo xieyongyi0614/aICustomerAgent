@@ -53,6 +53,45 @@ def test_shards_are_evenly_distributed():
     assert all(count == 1000 for count in counts.values())
 
 
+DOCUMENTED_VECTORS: dict[int, dict[str, int]] = {
+    2: {
+        "ou_e2e_alice": 1,
+        "ou_B_iso": 0,
+        "ou_1": 1,
+        "ou_2": 1,
+        "ou_demo_user": 0,
+        "ou_0000000000000000": 1,
+        "ou_zzzzzzzzzzzzzzzz": 1,
+        "ou_测试用户": 0,
+    },
+    4: {
+        "ou_e2e_alice": 3,
+        "ou_B_iso": 2,
+        "ou_1": 3,
+        "ou_2": 1,
+        "ou_demo_user": 0,
+        "ou_0000000000000000": 3,
+        "ou_zzzzzzzzzzzzzzzz": 1,
+        "ou_测试用户": 0,
+    },
+}
+
+
+@pytest.mark.parametrize("count", [2, 4])
+def test_documented_vectors_match_implementation(count):
+    """文档 `ingress-routing-options.md` §1.4 的向量表必须与实现一致。
+
+    运维会照着这张表在 ingress 侧比对一致性；**表错了会让人误判「算法一致」**，
+    从而放过真正的分片漂移。故把它钉成用例。
+    """
+    from scripts import print_feishu_shard_vectors as vectors
+
+    expected = DOCUMENTED_VECTORS[count]
+    for open_id, shard in expected.items():
+        assert shards.shard_of(open_id, count) == shard, f"{open_id} @ n={count}"
+    assert set(vectors.DEFAULT_VECTORS) == set(expected)
+
+
 def test_owns_matches_shard_of():
     for index in range(4):
         for candidate in range(4):

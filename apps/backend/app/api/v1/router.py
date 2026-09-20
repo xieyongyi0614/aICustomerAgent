@@ -5,6 +5,7 @@ from app.api.v1 import (
     chat,
     debug,
     feishu,
+    feishu_ingress,
     history,
     llm,
     proactive,
@@ -16,6 +17,7 @@ api_router = APIRouter()
 api_router.include_router(chat.chat_router)
 api_router.include_router(debug.debug_router)
 api_router.include_router(feishu.feishu_router)
+api_router.include_router(feishu_ingress.feishu_ingress_router)
 api_router.include_router(action.action_router)
 api_router.include_router(action_execution.action_execution_router)
 api_router.include_router(state.state_router)

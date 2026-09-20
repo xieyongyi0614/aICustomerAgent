@@ -7,6 +7,8 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from app.api.v1.feishu_http import read_body_limited as _read_body
+from app.api.v1.feishu_http import reject as _reject
 from app.application import observability
 from app.channels.feishu import adapter, events, shards
 from app.channels.feishu.errors import FeishuAuthError, FeishuConfigError
@@ -207,25 +209,6 @@ def _owns_shard(open_id: str) -> bool:
     return False
 
 
-async def _read_body(request: Request, max_bytes: int) -> bytes | None:
-    """按块读取并限长；超限返回 None（不把超大 body 读进内存）。"""
-    declared = request.headers.get("content-length")
-    if declared is not None:
-        try:
-            if int(declared) > max_bytes:
-                return None
-        except ValueError:
-            return None
-    chunks: list[bytes] = []
-    total = 0
-    async for chunk in request.stream():
-        total += len(chunk)
-        if total > max_bytes:
-            return None
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
 def _verification_token(payload: dict) -> str | None:
     header = payload.get("header")
     if isinstance(header, dict):
@@ -234,7 +217,3 @@ def _verification_token(payload: dict) -> str | None:
             return token
     token = payload.get("token")
     return token if isinstance(token, str) and token else None
-
-
-def _reject(status: int, detail: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"detail": detail})

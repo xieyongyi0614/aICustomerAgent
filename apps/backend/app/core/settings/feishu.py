@@ -41,6 +41,10 @@ class FeishuSettings(BaseSettings):
     feishu_dedupe_persistent_enabled: bool = False
     feishu_instance_index: int = 0
     feishu_ingress_sharded_routing_enabled: bool = False
+    feishu_router_enabled: bool = False
+    feishu_router_instance_urls: str = ""
+    feishu_router_timeout_seconds: float = 5.0
+    feishu_outbound_idempotency_persistent_enabled: bool = False
     feishu_api_base: str = "https://open.feishu.cn"
     feishu_llm_profile: str = ""
     feishu_timeout_seconds: float = 10.0
@@ -113,11 +117,38 @@ class FeishuSettings(BaseSettings):
                 )
             if self.feishu_instance_count > 1:
                 self._assert_multi_instance_ready()
+        if self.feishu_router_timeout_seconds <= 0:
+            raise SettingsError("FEISHU_ROUTER_TIMEOUT_SECONDS 必须大于 0")
+        if self.feishu_router_enabled:
+            targets = self.router_target_urls()
+            if not targets:
+                raise SettingsError(
+                    "FEISHU_ROUTER_ENABLED=true 时必须配置 FEISHU_ROUTER_INSTANCE_URLS"
+                    "（逗号分隔的实例基址，顺序即分片下标 0..N-1）"
+                )
+            if len(targets) != self.feishu_instance_count:
+                raise SettingsError(
+                    f"FEISHU_ROUTER_INSTANCE_URLS 个数（{len(targets)}）必须等于"
+                    f" FEISHU_INSTANCE_COUNT（{self.feishu_instance_count}）"
+                )
+            for url in targets:
+                if not url.startswith(("http://", "https://")):
+                    raise SettingsError(
+                        "FEISHU_ROUTER_INSTANCE_URLS 每项必须以 http:// 或 https:// 开头"
+                    )
         if not self.feishu_encrypt_key:
             logger.warning(
                 "FEISHU_ENCRYPT_KEY 为空: 仅接受未加密事件且不校验签名，安全性降级"
             )
         return self
+
+    def router_target_urls(self) -> tuple[str, ...]:
+        """`FEISHU_ROUTER_INSTANCE_URLS` 解析为元组；顺序即分片下标。"""
+        return tuple(
+            item.strip().rstrip("/")
+            for item in self.feishu_router_instance_urls.split(",")
+            if item.strip()
+        )
 
     def _assert_multi_instance_ready(self) -> None:
         """多实例就绪契约（FEISHU-011 方案 C）。
@@ -137,12 +168,16 @@ class FeishuSettings(BaseSettings):
             name
             for name, ok in (
                 (
-                    "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED",
-                    self.feishu_ingress_sharded_routing_enabled,
+                    "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED（或 FEISHU_ROUTER_ENABLED）",
+                    self.feishu_ingress_sharded_routing_enabled or self.feishu_router_enabled,
                 ),
                 (
                     "FEISHU_DEDUPE_PERSISTENT_ENABLED",
                     self.feishu_dedupe_persistent_enabled,
+                ),
+                (
+                    "FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED",
+                    self.feishu_outbound_idempotency_persistent_enabled,
                 ),
             )
             if not ok

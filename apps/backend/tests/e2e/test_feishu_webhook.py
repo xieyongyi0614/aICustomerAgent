@@ -750,6 +750,7 @@ SHARDED = {
     "feishu_instance_count": 2,
     "feishu_ingress_sharded_routing_enabled": True,
     "feishu_dedupe_persistent_enabled": True,
+    "feishu_outbound_idempotency_persistent_enabled": True,
 }
 
 

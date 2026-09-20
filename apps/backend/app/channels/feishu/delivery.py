@@ -8,6 +8,7 @@ import logging
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 
 from app.channels.base import (
     ChannelAdapter,
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 _delivered: OrderedDict[str, float] = OrderedDict()
 _delivered_lock = threading.Lock()
 _mono = time.monotonic
+
+ClaimHook = Callable[[str], Awaitable[bool]]
+ReleaseHook = Callable[[str], Awaitable[None]]
 
 
 def reset_delivery_state() -> None:
@@ -121,15 +125,15 @@ async def _send_reply_parts(message_ref: str, parts: list[str]) -> SendResult:
     external_message_id = None
     for index, part in enumerate(parts):
         key = f"reply:{message_ref}:{index}"
-        if not _claim_delivery(key):
+        if not await _claim_delivery(key):
             continue
         try:
             result = await client.reply_message(message_ref, part)
         except BaseException:
-            _release_delivery(key)
+            await _release_delivery(key)
             raise
         if not result.ok:
-            _release_delivery(key)
+            await _release_delivery(key)
             logger.error(
                 "feishu reply stopped: message_ref=%s segment=%d/%d error=%s",
                 message_ref,
@@ -152,15 +156,15 @@ async def _send_proactive_parts(
     )
     for index, part in enumerate(parts):
         key = f"{base_key}:{index}"
-        if not _claim_delivery(key):
+        if not await _claim_delivery(key):
             continue
         try:
             result = await client.send_message(message.recipient.external_id, part)
         except BaseException:
-            _release_delivery(key)
+            await _release_delivery(key)
             raise
         if not result.ok:
-            _release_delivery(key)
+            await _release_delivery(key)
             logger.error(
                 "feishu proactive send stopped: recipient=%s segment=%d/%d error=%s",
                 message.recipient.external_id,
@@ -172,6 +176,41 @@ async def _send_proactive_parts(
     return SendResult(ok=True)
 
 
+_claim_hook: ClaimHook | None = None
+_release_hook: ReleaseHook | None = None
+
+
+def set_persistent_idempotency(claim: ClaimHook, release: ReleaseHook) -> None:
+    """由**组合根**安装持久化幂等实现（FEISHU-011 出站幂等落库）。
+
+    通道层的依赖 allowlist 是 fail-closed 的（不得 import `app.repositories`），
+    故持久化实现不能在这里直接构造，只能由 `app/main.py` 注入。未安装时走进程内表。
+    """
+    global _claim_hook, _release_hook
+    _claim_hook = claim
+    _release_hook = release
+
+
+def clear_persistent_idempotency() -> None:
+    global _claim_hook, _release_hook
+    _claim_hook = None
+    _release_hook = None
+
+
+async def _claim_delivery(key: str) -> bool:
+    """占位入口：装了持久化实现就走它（跨进程），否则走进程内表。"""
+    if _claim_hook is not None:
+        return await _claim_hook(key)
+    return _claim_delivery_memory(key)
+
+
+async def _release_delivery(key: str) -> None:
+    if _release_hook is not None:
+        await _release_hook(key)
+        return
+    _release_delivery_memory(key)
+
+
 def _idempotency_ttl_seconds() -> int:
     """出站幂等窗口：`feishu_outbound_idempotency_ttl_seconds` 为 0 时沿用入站去重 TTL。"""
     settings = get_settings()
@@ -181,8 +220,8 @@ def _idempotency_ttl_seconds() -> int:
     )
 
 
-def _claim_delivery(key: str) -> bool:
-    """原子「查 + 占位」：同一幂等键至多一个并发调用者拿到 True。
+def _claim_delivery_memory(key: str) -> bool:
+    """进程内「原子查 + 占位」：同一幂等键至多一个并发调用者拿到 True。
 
     幂等必须由**单次加锁内**的判定保证：若拆成「先查、再发（await）、后记账」，
     并发调用者会在 `await` 处交错而同时看到「未投递」，导致重复投递。
@@ -201,7 +240,7 @@ def _claim_delivery(key: str) -> bool:
         return True
 
 
-def _release_delivery(key: str) -> None:
+def _release_delivery_memory(key: str) -> None:
     with _delivered_lock:
         _delivered.pop(key, None)
 

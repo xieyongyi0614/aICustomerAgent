@@ -1330,6 +1330,15 @@ class FeishuDedupeLedgerRow(Base):
     __table_args__ = (Index("idx_feishu_dedupe_ledger_received_at", "received_at"),)
 
 
+class FeishuDeliveryRow(Base):
+    __tablename__ = "feishu_deliveries"
+
+    idempotency_key: Mapped[str] = mapped_column(String, primary_key=True)
+    delivered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("idx_feishu_deliveries_delivered_at", "delivered_at"),)
+
+
 class PersonalityStateRow(Base):
     __tablename__ = "personality_state"
 
