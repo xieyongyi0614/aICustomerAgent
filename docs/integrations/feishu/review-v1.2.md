@@ -466,7 +466,7 @@ except BaseException:
 | N-05（多实例并发闸门） | ⚠️ 部分：容量校验已按 `feishu_max_concurrent_turns × feishu_instance_count` 折算，风险在启动期可见；**跨进程闸门仍未实现** |
 | N-06（加密体缺内层 token） | ✅ 已修 |
 | N-07（配置缺失 vs 鉴权失败） | ✅ 已修 |
-| N-08（非文本消息静默丢弃） | ⏸ **待产品决策**。FEISHU-002 与 architecture §7.2 把非文本列为第一阶段范围外，故「忽略」是有意设计而非缺陷；改为回文案属产品变更 |
+| N-08（非文本消息静默丢弃） | ✅ 已修（第三批，按产品决策改为回兜底文案） |
 | N-09（限流阈值共用配置键） | ✅ 已修（新增 `FEISHU_RATE_LIMIT_PER_MINUTE`，0 = 沿用共用键，**向后兼容**） |
 | N-10（出站幂等 TTL 复用入站 TTL） | ✅ 已修（新增 `FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS`，0 = 沿用） |
 | 判断 1（多实例全套外置） | ❌ 未动。**在补齐前仍不得开多 worker**（v1.1 §5.1 硬前置） |
@@ -515,3 +515,26 @@ except BaseException:
 #### 验证
 
 飞书全量（`-p no:xdist -o addopts=""`）：**292 passed, 2 skipped**（第一批结束时 281 → 新增 11 个用例，零回归）。新增用例覆盖：token 未配置抛 `FeishuConfigError`、加密体缺 token → `401`、限流阈值继承与解耦、出站幂等 TTL 继承与解耦、并发闸门按实例数折算的 warning 与其静默路径、三个新配置键的 0 值语义与边界校验。
+
+### 7.9 第三批修复（N-08，按产品决策）
+
+**决策依据**：N-08 严格说不是缺陷——FEISHU-002 与 architecture §7.2 把「非文本」列为第一阶段范围外，「忽略」是有意设计。但从用户视角，「发了图片没反应」与「机器人挂了」无法区分。经产品确认，改为**回一句兜底文案**，内容理解仍不做。
+
+#### 设计要点
+
+| 关注点 | 处理 |
+|---|---|
+| 判定 | 新增纯函数 `events.parse_unhandled_message(payload) -> UnhandledMessage \| None`，只覆盖「私聊 + 非文本或空白 + 回复锚点齐全」。群聊、非消息事件、缺 `message_id` / `chat_id` / `open_id` 一律返回 `None`（**不回**） |
+| 闸门 | 兜底回复**走与正常消息完全相同的去重与限流**（`accept_event` → `allow_rate`）。理由：它同样是出站流量。故飞书重投不产生第二次回复；用户刷屏时连兜底也不回（再回只会放大） |
+| 幂等 | 复用 `delivery` 的原子占位，键为 `reply:{message_id}:0`，与正常回复同一条路径 |
+| 抽取 | 把 `parse_message_event` 的信封校验抽成共享的 `_envelope()`。**既有诊断日志一行未少**（只是位置从函数内移到 helper 内），且所有 `parse_message_event(...) is None` 断言的返回值语义逐字不变——这是能在不改 30+ 条既有断言的前提下重构的前提 |
+| 边界 | 明确区分「反馈」与「支持」：`architecture.md` §7.2 补一行，防止读者把 N-08 误解为「非文本已被支持」 |
+
+#### 验证
+
+- 飞书全量：**309 passed, 2 skipped**（第三批新增 17 个用例，零回归）。
+- **反向验证**：把 `api/v1/feishu.py` / `events.py` / `adapter.py` 三个文件 `git checkout --` 回退到 HEAD、只保留新用例 → **16 failed**，确认用例不是空过（`test_group_non_text_message_gets_no_reply` 在旧代码上通过，因为它是「不该回」的守卫，符合预期）。回退后按 md5 逐文件比对恢复一致。
+
+#### 用户可见行为变更
+
+私聊里的表情 / 图片 / 语音 / 文件 / 纯空白消息，从**完全静默**变为回一句「我目前只能读文字哦～」。群聊行为不变（仍静默）。
