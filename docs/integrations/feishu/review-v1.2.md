@@ -725,4 +725,47 @@ C2 已解决同一问题（同会话恒落同实例）。C3 的增量收益是�
 #### 连带修正
 
 就绪契约从两项扩为三项后，`test_feishu_webhook.py` 的 `SHARDED` 与 `test_feishu_ingress_router.py` 的 `ROUTER_SETTINGS` 都需补上 `feishu_outbound_idempotency_persistent_enabled`——否则设置构造在启动期就抛 `SettingsError`，两处共 19 个用例转红。这类失败不是回归，而是**被新不变量正确地判为「配置不完整」**。
+> ⚠️ 该「三项契约」在 §7.15 已被推翻：出站幂等的开关被移除（必需能力不该有开关），契约回到两项。
 
+---
+
+### 7.15 移除出站幂等开关：必需能力不该有开关
+
+**背景**：FEISHU-012 初版给了 `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED`，默认关闭，并把「开启它」写进了多实例就绪契约。**这是错的**——跨进程出站幂等不是可选优化，而是多实例下的**正确性前提**：没有它，同一逻辑消息会被每个实例各投一次（重复回复用户）。给它加开关等于给「重复回复」留了一个合法配置。
+
+#### 改动
+
+| 项 | 之前 | 现在 |
+|---|---|---|
+| 配置项 | `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED`（默认 `false`） | **删除** |
+| 组合根 | `if 开关: 安装 hook` | `FEISHU_ENABLED` 时**无条件安装** |
+| 存储实现 | 双路径：进程内表 / 持久化表，按开关切换 | **单路径**：只有注入的持久化实现 |
+| 就绪契约 | 三项（分流 + 去重 + 出站幂等） | **两项**（分流 + 去重）——出站幂等已无条件生效，无需声明 |
+| `delivery` 模块 | `_delivered` / `_mono` / `_claim_delivery_memory` / `_evict_delivered` / `_idempotency_ttl_seconds` / `reset_delivery_state` | 全部删除；只保留注入 seam |
+| hook 缺失时 | 静默回落到进程内表 | 记一次 `error` 后**放行发送**（重复一条 > 用户收不到回复） |
+
+**为什么连内存实现一起删**：留着它意味着「持久化路径可以被静默绕过」——又一个隐式开关。单一实现让「哪条路径是活的」不再需要判断；hook 缺失是**配置缺陷**，用 error 日志暴露，而不是用一条降级路径掩盖。
+
+#### 测试侧的连带调整
+
+- `tests/conftest.py` 新增 autouse 夹具 `_persistent_outbound_idempotency`：与生产一致地安装持久化 hook。否则测试会走「hook 未安装」的降级路径，幂等用例失去意义。
+- 删除 `reset_delivery_state()` 及其 24 处调用（幂等状态现在在库里，而 conftest 的内存 SQLite **每个用例都是全新的**，不需要重置）。
+- 删除 3 个只测内存实现内部结构的用例（`_mono` 注入的 TTL 过期、两处 TTL 表达式一致性）——其意图已由 `test_feishu_delivery_ledger_service.py` 覆盖。
+- `test_row11_duplicate_delivery_not_doubled` 的断言从「进程内表有一条」改为「`feishu_deliveries` 里有该键，且只发出一次请求」。
+
+#### 🚨 一个重要的测试环境陷阱：StaticPool 复现不出并发竞态
+
+`test_concurrent_same_key_sends_once` 在改成 DB 路径后**失败**（两次都发出）。排查结论：**不是代码 bug，是测试环境**——`tests/conftest.py` 的内存 SQLite 用 `StaticPool`，**所有 session 共享同一条连接**，两个线程的 `DELETE + INSERT + COMMIT` 会在同一连接上交错，双双判为「首次」。
+
+验证：改用**文件库 + `NullPool`**（每个 session 一条独立连接，与生产 PG 一致）后，5 次试验**全部恰一个成功**。
+
+因此：
+- `tests/unit/test_feishu_delivery_ledger_repository.py::test_concurrent_claim_arbitrated_by_unique_constraint` —— 新增跨连接并发用例（仓储层，5 轮）。
+- `test_feishu_delivery.py::test_concurrent_same_key_sends_once` —— 改为用独立连接的文件库，保留端到端覆盖。
+
+**通用教训**：凡是靠「数据库唯一约束/行锁」保证的原子性，用 `StaticPool` 的内存 SQLite 都测不出来——必须换成独立连接（文件库 + `NullPool`），否则要么假红（像本次），要么假绿。
+
+#### 验证
+
+- 飞书全量 **410 passed / 2 skipped**。
+- `tests/unit + integration + e2e + golden`：**3 failed / 2126 passed**（3 个全在既存 flaky 流式集合内；中间一轮出现的 `test_feishu_isolation::test_two_users_six_resources_isolated` 与 `test_goal_e2e` 经「单独跑 + 复跑」确认是既存顺序敏感 flake，与本次无关）。

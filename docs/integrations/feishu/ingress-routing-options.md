@@ -166,6 +166,6 @@ C2 用「多一跳 HTTP（同机房 ~1ms）」换掉了全部三条，**这笔�
 - [ ] 飞书开放平台的回调地址已改为 `/api/v1/feishu/ingress/events`
 - [ ] `FEISHU_ROUTER_INSTANCE_URLS` 的个数 == `FEISHU_INSTANCE_COUNT`，顺序与实例下标一致（启动期会校验）
 - [ ] router 与所有实例的 `FEISHU_ENCRYPT_KEY` 一致（否则 router 解不出 `open_id`，全部落到 shard 0）
-- [ ] 就绪契约三项齐备（`FEISHU_ROUTER_ENABLED` + `FEISHU_DEDUPE_PERSISTENT_ENABLED` + `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED`）
+- [ ] 就绪契约两项齐备（`FEISHU_ROUTER_ENABLED` + `FEISHU_DEDUPE_PERSISTENT_ENABLED`）；出站幂等无开关，由组合根无条件安装
 - [ ] 灰度期盯 `feishu event landed on wrong shard`（应为 0）
 - [ ] 变更手册写明：**改 `FEISHU_INSTANCE_COUNT` 必须同步改 router 的 URL 列表**——取模基数一变，几乎所有会话都会换实例

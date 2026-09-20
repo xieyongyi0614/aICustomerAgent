@@ -262,29 +262,30 @@
 - **相关**：出站幂等落库见 **FEISHU-012**（已实现）。
 - **Dependency**：FEISHU-010（去重落库，已完成）、FEISHU-007。
 
-### FEISHU-012 出站投递幂等落库（多实例硬前置之一，**已实现，默认关闭**）
+### FEISHU-012 出站投递幂等落库（多实例硬前置之一，**已实现，无开关**）
 
 - **ID**：FEISHU-012
 - **Priority**：P1（多实例前置；单实例下无行为变化）
 - **来源**：`review-v1.1.md` §5.1 第 3 项、`review-v1.2.md` §7.10
-- **状态**：**已实现**（2026-09-20），由 `FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED` 控制，**默认关闭**。
+- **状态**：**已实现**（2026-09-20），**无开关**——跨进程幂等是必需能力，由组合根在飞书启用时无条件安装。
 - **Goal**：把出站投递的幂等占位从进程内表落到持久化存储，使判定在多 worker / 多实例间共享，消除「同一逻辑消息被每个实例各投一次（重复回复用户）」。
 - **已实现 Scope**：
   - `migrations/versions/0051_feishu_deliveries.py` + `core/db.py::FeishuDeliveryRow`：`feishu_deliveries(idempotency_key PK, delivered_at)` + `delivered_at` 索引（链尾 `0050 → 0051`）。
   - `repositories/feishu_delivery_ledger_repository.py`：`claim`（先摘除该键的过期行再插入，`IntegrityError` 判定）/ `release` / `purge_before` / `exists`。
   - `services/feishu_delivery_ledger_service.py`：TTL 折算、**fail-open**、每 `PURGE_EVERY=256` 次成功占位做摊还清理；对外是 **async API**（DB 调用经 `asyncio.to_thread` 下放，不阻塞事件循环）。
-  - `channels/feishu/delivery.py`：新增可注入 seam `set_persistent_idempotency()` / `clear_persistent_idempotency()`；`_claim_delivery` / `_release_delivery` 改为 async 并按 hook 分派。
-  - `app/main.py`：组合根在 `feishu_enabled` 分支内按配置安装 hook（通道层不得 import `app.repositories`）。
-  - `tests/conftest.py`：`feishu_delivery_ledger_repository` 注册进 `_REPO_MODULES`。
+  - `channels/feishu/delivery.py`：新增可注入 seam `set_persistent_idempotency()` / `clear_persistent_idempotency()`；`_claim_delivery` / `_release_delivery` 改为 async 并**只走注入的持久化实现**（原进程内表 `_delivered` / `_evict_delivered` / `reset_delivery_state` 已删除——保留它等于给持久化路径留一个可被静默绕过的隐式开关）。
+  - `app/main.py`：组合根在 `feishu_enabled` 分支内**无条件**安装 hook（通道层不得 import `app.repositories`）。**无开关**。
+  - `tests/conftest.py`：`feishu_delivery_ledger_repository` 注册进 `_REPO_MODULES`；新增 autouse 夹具 `_persistent_outbound_idempotency` 与生产一致地安装 hook。
+  - ⚠️ **并发用例必须用独立连接**：conftest 的内存 SQLite 用 `StaticPool` 共享单连接，复现不出「两个实例各占一次」的竞态。相关用例改用文件库 + `NullPool`（见 `review-v1.2.md` §7.15）。
 - **Acceptance Criteria**：
-  1. 关闭时行为与升级前完全一致（仍走进程内表，`delivery._delivered` 有记录）。
-  2. 开启并安装 hook 后：清空进程内表（等价于换实例）再占位同一键仍返回 False；且 `delivery._delivered` 保持为空。
-  3. **对照组**：未安装 hook 时清空进程内表即失去判重（证明缺口真实存在、用例非空过）。
+  1. 占位判定**始终**落在 `feishu_deliveries`（无开关、无双路径）。
+  2. 卸载 hook 再安装（等价于实例重启、进程内状态清零）后，同一键仍判重。
+  3. **跨连接并发**：两个线程各用独立连接占位同一键，**恰一个**成功（唯一约束裁决）。
   4. 存储故障时**放行投递**并记 `fail-open` warning（不得让用户收不到回复）。
   5. `release` 回滚后同一键可再次占位（发送失败重试不被自己的幂等表挡死）。
-  6. 过 TTL 后同一键可再次投递（DB 路径与内存路径语义一致）。
+  6. 过 TTL 后同一键可再次投递（长时间后的重试不应被永久挡住）。
   7. 摊还清理：仅每 256 次成功占位触发一次 `purge_before`；重复占位不触发；清理失败不影响本次判定。
-  8. 两处 TTL 表达式（`delivery._idempotency_ttl_seconds` 与 service）**由用例锁死一致**。
+  8. **hook 未安装属配置缺陷**：记一次 `error` 后放行发送，且该告警只记一次（不刷日志）。
 - **Dependency**：FEISHU-005、FEISHU-011。
 
 ## 依赖图
