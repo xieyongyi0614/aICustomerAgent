@@ -103,7 +103,7 @@ async def feishu_events(request: Request) -> JSONResponse:
 
     parsed = events.parse_message_event(payload)
     if parsed is None:
-        return JSONResponse(content={})
+        return _reply_unsupported(payload)
 
     # 去重先于限流：飞书重投的重复事件不得消耗该用户的限流配额。
     if not events.accept_event(parsed.event_id):
@@ -130,6 +130,36 @@ async def feishu_events(request: Request) -> JSONResponse:
         logger.error(
             "feishu event dropped: no dispatchable event loop event_id=%s",
             parsed.event_id,
+        )
+    return JSONResponse(content={})
+
+
+def _reply_unsupported(payload: dict) -> JSONResponse:
+    """非文本 / 空白私聊消息：回一句兜底文案，且与正常消息共用去重与限流闸门。
+
+    群聊、非消息事件、缺回复锚点一律不回复（`parse_unhandled_message` 返回 `None`）。
+    限流命中时连兜底也不回——用户本就在刷屏，此时再回只会放大。
+    """
+    unhandled = events.parse_unhandled_message(payload)
+    if unhandled is None:
+        return JSONResponse(content={})
+    if not events.accept_event(unhandled.event_id):
+        return JSONResponse(content={})
+    if not events.allow_rate(unhandled.open_id):
+        logger.warning(
+            "feishu unsupported reply skipped: rate limited open_id=%s", unhandled.open_id
+        )
+        return JSONResponse(content={})
+    logger.info(
+        "feishu unsupported message: event_id=%s reason=%s open_id=%s",
+        unhandled.event_id,
+        unhandled.reason,
+        unhandled.open_id,
+    )
+    if not observability.spawn_background(adapter.reply_unsupported_message(unhandled)):
+        logger.error(
+            "feishu unsupported reply dropped: no dispatchable event loop event_id=%s",
+            unhandled.event_id,
         )
     return JSONResponse(content={})
 

@@ -210,16 +210,27 @@ class ParsedMessageEvent:
     user_id: str | None = None
 
 
-def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
+@dataclass(frozen=True, slots=True)
+class UnhandledMessage:
+    """私聊里收到、但本轮不处理的消息（供上游回兜底文案，避免用户面对静默）。"""
+
+    event_id: str
+    message_id: str
+    chat_id: str
+    open_id: str
+    reason: str
+
+
+def _envelope(payload: object) -> tuple[dict, dict, dict] | None:
+    """提取消息信封：`header` / `message` / `sender_id` 三个必需字典。
+
+    只回答「这是不是一条消息事件」；字段级校验与诊断留在调用方。
+    """
     if not isinstance(payload, dict):
         return None
     header = payload.get("header")
     event = payload.get("event")
     if not isinstance(header, dict) or not isinstance(event, dict):
-        return None
-    event_id = header.get("event_id")
-    if not isinstance(event_id, str) or not event_id:
-        logger.warning("feishu event ignored: event_id missing")
         return None
     event_type = header.get("event_type")
     if event_type != MESSAGE_EVENT_TYPE:
@@ -229,6 +240,22 @@ def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
     sender = event.get("sender")
     if not isinstance(message, dict) or not isinstance(sender, dict):
         logger.info("feishu event ignored: message/sender malformed")
+        return None
+    sender_id = sender.get("sender_id")
+    if not isinstance(sender_id, dict):
+        logger.info("feishu event ignored: sender_id malformed")
+        return None
+    return header, message, sender_id
+
+
+def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
+    shape = _envelope(payload)
+    if shape is None:
+        return None
+    header, message, sender_id = shape
+    event_id = header.get("event_id")
+    if not isinstance(event_id, str) or not event_id:
+        logger.warning("feishu event ignored: event_id missing")
         return None
     chat_type = message.get("chat_type")
     if chat_type != "p2p":
@@ -241,10 +268,6 @@ def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
     text = _extract_text(message.get("content"))
     if not text:
         logger.info("feishu event ignored: text content empty or invalid")
-        return None
-    sender_id = sender.get("sender_id")
-    if not isinstance(sender_id, dict):
-        logger.info("feishu event ignored: sender_id malformed")
         return None
     open_id = sender_id.get("open_id")
     if not isinstance(open_id, str) or not open_id:
@@ -270,6 +293,37 @@ def parse_message_event(payload: dict) -> ParsedMessageEvent | None:
         tenant_key=_optional_str(header.get("tenant_key")),
         union_id=_optional_str(sender_id.get("union_id")),
         user_id=_optional_str(sender_id.get("user_id")),
+    )
+
+
+def parse_unhandled_message(payload: dict) -> UnhandledMessage | None:
+    """识别「私聊里收到、但本轮不处理」的消息，供上游回一句兜底文案。
+
+    覆盖两类：`message_type != "text"`（表情 / 图片 / 语音 / 文件）与 `text` 为空白。
+    群聊、非消息事件、缺回复锚点（`message_id` / `chat_id` / `open_id`）一律返回 `None`
+    ——这些情形**不回复**，避免对不该回的消息产生出站流量。
+    """
+    shape = _envelope(payload)
+    if shape is None:
+        return None
+    header, message, sender_id = shape
+    if message.get("chat_type") != "p2p":
+        return None
+    message_type = message.get("message_type")
+    if message_type == "text" and _extract_text(message.get("content")):
+        return None
+    event_id = _optional_str(header.get("event_id"))
+    message_id = _optional_str(message.get("message_id"))
+    chat_id = _optional_str(message.get("chat_id"))
+    open_id = _optional_str(sender_id.get("open_id"))
+    if not (event_id and message_id and chat_id and open_id):
+        return None
+    return UnhandledMessage(
+        event_id=event_id,
+        message_id=message_id,
+        chat_id=chat_id,
+        open_id=open_id,
+        reason="non_text" if message_type != "text" else "empty_text",
     )
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import json
@@ -556,6 +557,81 @@ async def test_huge_timestamp_header_does_not_500(override_settings, dispatch_sp
     )
     assert response.status_code == 403
     assert dispatch_spy == []
+
+
+@pytest.fixture
+def reply_spy(monkeypatch):
+    replies = []
+
+    async def _record(outcome):
+        replies.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
+    return replies
+
+
+@pytest.mark.asyncio
+async def test_non_text_message_gets_unsupported_reply(override_settings, dispatch_spy, reply_spy):
+    """非文本私聊消息：不跑管线，但回一句兜底，避免用户面对「机器人没反应」。"""
+    response = await post_event(
+        override_settings, payload=event_payload(event_id="evt-img", message_type="image")
+    )
+    assert response.status_code == 200
+    assert dispatch_spy == []
+    assert await wait_for(lambda: len(reply_spy) == 1)
+    assert [outcome.error_kind for outcome in reply_spy] == ["unsupported"]
+    assert reply_spy[0].outbound_text == FALLBACK_TEXTS["unsupported"]
+    assert reply_spy[0].source_message_ref == "om_e2e_1"
+
+
+@pytest.mark.asyncio
+async def test_whitespace_only_message_gets_unsupported_reply(
+    override_settings, dispatch_spy, reply_spy
+):
+    response = await post_event(
+        override_settings, payload=event_payload(event_id="evt-blank", text="   ")
+    )
+    assert response.status_code == 200
+    assert dispatch_spy == []
+    assert await wait_for(lambda: len(reply_spy) == 1)
+    assert [outcome.error_kind for outcome in reply_spy] == ["unsupported"]
+
+
+@pytest.mark.asyncio
+async def test_group_non_text_message_gets_no_reply(override_settings, dispatch_spy, reply_spy):
+    """群聊一律不回复——兜底只针对私聊。"""
+    response = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-grp", chat_type="group", message_type="image"),
+    )
+    assert response.status_code == 200
+    assert dispatch_spy == []
+    assert reply_spy == []
+
+
+@pytest.mark.asyncio
+async def test_duplicate_non_text_event_replies_once(override_settings, dispatch_spy, reply_spy):
+    """兜底回复同样受 event_id 去重约束：飞书重投不产生第二次回复。"""
+    payload = event_payload(event_id="evt-img-dup", message_type="image")
+    for _ in range(3):
+        response = await post_event(override_settings, payload=payload)
+        assert response.status_code == 200
+    assert await wait_for(lambda: len(reply_spy) == 1)
+    assert len(reply_spy) == 1
+
+
+@pytest.mark.asyncio
+async def test_non_text_reply_respects_rate_limit(override_settings, dispatch_spy, reply_spy):
+    """用户刷屏时连兜底也不回（否则回复本身会放大流量）。"""
+    for index in range(2):
+        await post_event(
+            override_settings,
+            payload=event_payload(event_id=f"evt-img-rl-{index}", message_type="image"),
+            chat_rate_limit_per_minute=1,
+        )
+    assert await wait_for(lambda: len(reply_spy) == 1)
+    await asyncio.sleep(0.05)
+    assert len(reply_spy) == 1
 
 
 @pytest.mark.asyncio

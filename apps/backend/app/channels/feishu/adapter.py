@@ -18,6 +18,7 @@ import openai
 
 from app.channels.base import InboundMessage
 from app.channels.feishu import delivery
+from app.channels.feishu.events import UnhandledMessage
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.channels.feishu.inbox import SessionInbox
 from app.core import llm_factory
@@ -35,6 +36,7 @@ FALLBACK_TEXTS: dict[str, str] = {
     "pipeline_error": _INTERNAL_ERROR_TEXT,
     "identity_error": _INTERNAL_ERROR_TEXT,
     "overloaded": "你发得太快了，我一条条慢慢回你～",
+    "unsupported": "我目前只能读文字哦～",
 }
 
 
@@ -80,6 +82,24 @@ async def reject_inbound_message(inbound: InboundMessage) -> None:
     文案并返回 200 既保住消息，也让用户知道是「发太快」。
     """
     await _reply_overloaded(inbound)
+
+
+async def reply_unsupported_message(unhandled: UnhandledMessage) -> None:
+    """非文本 / 空白私聊消息：不跑管线，只回一句「只能读文字」。
+
+    不回会让用户无法区分「机器人不支持」与「机器人挂了」；且该兜底与普通轮次
+    走同一套出站幂等，重投不会重复发送。
+    """
+    await _deliver_outcome(
+        TurnOutcome(
+            session_id="",
+            user_id="",
+            outbound_text=FALLBACK_TEXTS["unsupported"],
+            error_kind="unsupported",
+            source_message_ref=unhandled.message_id,
+            thread_ref=unhandled.chat_id,
+        )
+    )
 
 
 async def _reply_overloaded(inbound: InboundMessage) -> None:

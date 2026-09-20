@@ -304,6 +304,52 @@ def test_content_missing_text_ignored():
     assert events.parse_message_event(payload) is None
 
 
+@pytest.mark.parametrize("message_type", ["image", "audio", "file", "sticker", "post"])
+def test_unhandled_message_detects_non_text(message_type):
+    unhandled = events.parse_unhandled_message(message_event(message_type=message_type))
+    assert unhandled is not None
+    assert unhandled.reason == "non_text"
+    assert unhandled.event_id == "evt-1"
+    assert unhandled.message_id == "om_1"
+    assert unhandled.chat_id == "oc_1"
+    assert unhandled.open_id == "ou_alice"
+
+
+def test_unhandled_message_detects_whitespace_only_text():
+    unhandled = events.parse_unhandled_message(message_event(text="   "))
+    assert unhandled is not None
+    assert unhandled.reason == "empty_text"
+
+
+def test_unhandled_message_skips_handled_text():
+    assert events.parse_unhandled_message(message_event()) is None
+
+
+def test_unhandled_message_skips_group_and_non_message():
+    """群聊与非消息事件不得产生出站流量（仅私聊回兜底）。"""
+    assert events.parse_unhandled_message(message_event(chat_type="group", message_type="image")) is None
+    assert events.parse_unhandled_message(message_event(with_header=False)) is None
+    payload = message_event(message_type="image")
+    payload["header"]["event_type"] = "im.chat.updated_v1"
+    assert events.parse_unhandled_message(payload) is None
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda p: p["header"].pop("event_id"),
+        lambda p: p["event"]["message"].pop("message_id"),
+        lambda p: p["event"]["message"].pop("chat_id"),
+        lambda p: p["event"]["sender"]["sender_id"].pop("open_id"),
+    ],
+)
+def test_unhandled_message_requires_reply_anchors(mutate):
+    """缺任一回复锚点就不回——宁可不回，也不要往错误的目标发消息。"""
+    payload = message_event(message_type="image")
+    mutate(payload)
+    assert events.parse_unhandled_message(payload) is None
+
+
 def test_unknown_fields_tolerated():
     payload = message_event()
     payload["header"]["unknown_field"] = "x"
