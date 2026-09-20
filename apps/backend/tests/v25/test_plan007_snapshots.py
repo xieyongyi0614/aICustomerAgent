@@ -195,7 +195,7 @@ TRIGGER_PRIORITY_SNAPSHOT = {
     "conversation_inactivity": "P3",
 }
 
-MIGRATION_HEAD = "0050"
+MIGRATION_HEAD = "0051"
 
 
 def _statement_heads(path: Path, function: str) -> tuple[str, ...]:
@@ -442,7 +442,7 @@ class TestSingleAssemblyPoint:
 class TestZeroMigration:
     """I12 / §7：迁移链头 `0046`、`decision_records.kind` 五值、零新表新列。"""
 
-    def test_migration_chain_head_is_still_0050(self):
+    def test_migration_chain_head_is_still_0051(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))

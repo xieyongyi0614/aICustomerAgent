@@ -68,9 +68,9 @@ MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
     "behavior_pattern",
 )
 
-MIGRATION_COUNT = 50
+MIGRATION_COUNT = 51
 
-TABLE_COUNT = 44
+TABLE_COUNT = 45
 
 MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 
