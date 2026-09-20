@@ -165,7 +165,7 @@
   - `application/observability.py`：后台任务异常 done-callback。
   - `core/settings/feishu.py` + `.env.example`：`feishu_max_body_bytes` / `feishu_merge_window_ms` / `feishu_merge_max_messages` / `feishu_merge_max_chars`。
 - **未实现 Scope（多实例硬前置，必须在开多 worker 前完成）**：
-  1. `feishu_events` 表（`event_id` 唯一约束）+ 迁移 `0044`，`accept_event` 改 DB 去重。
+  1. `feishu_dedupe_ledger` 表（`event_id` 唯一约束）+ 迁移 `0044`，`accept_event` 改 DB 去重。
   2. PG advisory lock 或会话行 `SELECT ... FOR UPDATE`，做跨进程会话串行。
   3. 出站幂等（`delivery._delivered`）落库。
   - ⚠️ 新增仓储必须注册进 `tests/conftest.py::_REPO_MODULES`（含顶部 import），否则测试连真实 PG 挂起。
@@ -207,6 +207,31 @@
   10. 私聊非文本 / 空白消息 → `200` + 一句「我目前只能读文字哦～」，**零派发**；同一 `event_id` 重投只回一次；限流命中时不回；群聊与非消息事件完全不回；缺回复锚点不回（N-08）。
 - **行为变更登记**：入站限流 `429 → 200 + 兜底文案`（用户可见）；明文来件开始受新鲜度窗口约束（窗口 = `FEISHU_SIGNATURE_WINDOW_SECONDS`，默认 300s）；**加密体缺内层 token 由「放行」改为 `401`**（此前 `解密成功但明文结构非法 → 200` 的契约收窄为「token 合法但结构非法 → 200」）；**私聊非文本 / 空白消息由「静默忽略」改为「回一句兜底文案」**（N-08，用户可见）。
 - **未实现 Scope**：无（N-01~N-10 全部处置完毕；多实例全套外置仍按 v1.1 §5.1 作为独立前置）。
+- **Dependency**：FEISHU-002、FEISHU-007。
+
+### FEISHU-010 入站去重落库（多实例硬前置之一，**已实现，默认关闭**）
+
+- **ID**：FEISHU-010
+- **Priority**：P1（多实例前置；单实例下无行为变化）
+- **来源**：`review-v1.1.md` §5.1 第 1 项、`review-v1.2.md` §2.1
+- **状态**：**已实现**（2026-09-20），由 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 控制，**默认关闭**。
+- **Goal**：把 `event_id` 去重从进程内表落到有 WAL 持久化的存储，使判定在多 worker / 多实例间共享，消除「同一 `event_id` 被每个实例各受理一次」。
+- **已实现 Scope**：
+  - `migrations/versions/0050_feishu_dedupe_ledger.py` + `app/core/db.py::FeishuEventRow`：`feishu_dedupe_ledger(event_id PK, received_at)` + `received_at` 索引（链尾 `0049 → 0050`）。
+  - `app/repositories/feishu_dedupe_ledger_repository.py`：`claim`（先摘除同 id 的过期行再插入，`IntegrityError` 判定）/ `purge_before` / `exists`。
+  - `app/services/feishu_dedupe_service.py`：TTL 折算、**fail-open**、每 `PURGE_EVERY=256` 次成功占位做摊还清理。
+  - `app/api/v1/feishu.py`：`_claim_event()` 按配置分派内存表 / DB 路径（DB 经 `asyncio.to_thread`）。
+  - `app/core/settings/feishu.py` + `.env.example`：`feishu_dedupe_persistent_enabled`（默认 `false`）。
+  - `tests/conftest.py`：`feishu_dedupe_ledger_repository` 注册进 `_REPO_MODULES`。
+- **Acceptance Criteria**：
+  1. 关闭时行为与升级前完全一致（仍走进程内表，`events._seen_events` 有记录）。
+  2. 开启时清空进程内表后重投同一 `event_id` 仍被判重（跨进程判定）；且 `events._seen_events` 保持为空。
+  3. **对照组**：关闭时清空进程内表后同一 `event_id` 会被再次受理（证明缺口真实存在、且用例非空过）。
+  4. 存储故障时**放行**并记 `fail-open` warning（不得丢消息）。
+  5. 过 TTL 后同一 `event_id` 可再次受理（与进程内表语义一致）。
+  6. 摊还清理：仅每 256 次成功占位触发一次 `purge_before`；重复事件不触发；清理失败不影响本次判定。
+  7. 通道边界 AST fail-closed 扫描保持通过（`app/channels/**` 不得 import `app.repositories`）。
+- **未实现 Scope（多实例前置的剩余两项）**：跨进程会话串行、出站幂等落库（见 architecture §7.3 第 2/3 项）。
 - **Dependency**：FEISHU-002、FEISHU-007。
 
 ## 依赖图

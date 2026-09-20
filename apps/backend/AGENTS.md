@@ -37,7 +37,7 @@ api → application（编排） → services → repositories → core
 - **通道层边界**：`channels/` 只做「消息归一为 `InboundMessage` + 经 `OutboundMessage` 契约出站」，**不得**包含 Agent / Memory / World 逻辑，也不得 import 任何 Autonomy 模块；核心层（`application` / `services` / `repositories` / `chains` / `core` / `character`）**不得** import `app.channels.<impl>`（如 `app.channels.feishu`），**仅可** import `app.channels.base`（零第三方依赖、零 `app.*` 依赖的契约）。
 - LLM 实例必须来自 `core/llm_factory.get_llm()`（profile 机制），禁止各处新建 `ChatOpenAI`；结构化输出统一走 `chains/structured.py` 的 `build_structured_chain`（主链 + 一层降级），禁止自由解析。
 - DB 访问只能走 `repositories/`，业务层禁止直接操作 ORM。
-- 数据库结构变更只走 Alembic（`migrations/`，**当前链尾 `0049`**），`create_all` 已退役（单元测试内存建表属豁免）。
+- 数据库结构变更只走 Alembic（`migrations/`，**当前链尾 `0050`**），`create_all` 已退役（单元测试内存建表属豁免）。
 - 所有阈值/魔法数字放 `core/settings/` 包（**21 个领域模块**，平铺字段名），禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理（post_process）失败不得影响已产出的回答。
 - 单一写面纪律：计划落库只经 `goal_repository` 计划面；行动写世界只走 `deferred_world_op → outbox → world_engine`；Run 只写 `loop_runs`；关系状态只经 `relationship_evolution` / 状态只经 `state_service`。

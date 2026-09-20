@@ -1,7 +1,7 @@
 # Current System Architecture Baseline
 
 > **性质**：本文档是当前系统**唯一可信架构基线**，描述当下真实存在并已实现的系统，非未来规划。
-> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` 0001~0049 + `core/db.py`）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
+> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` 0001~0050 + `core/db.py`）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
 > **纪律**：不设计新功能、不修改架构、不把未实现的模块当作现状描述。后续 Agent Runtime / Memory Evolution / Self Improvement / Multi Channel 开发均以此为基准。
 > **生成时间**：2026-09-20。
 
@@ -88,7 +88,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 - **LLM 唯一来源**：`core/llm_factory.get_llm()`（profile 机制）；结构化输出统一走 `chains/structured.py::build_structured_chain`（主链 + 一层降级）。
 - **DB 唯一写面**：业务层禁止直接操作 ORM，一律经 `repositories/`。
-- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，当前链尾 `0049`），`create_all` 已退役（测试内存 SQLite 属豁免）。
+- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，当前链尾 `0050`），`create_all` 已退役（测试内存 SQLite 属豁免）。
 - **数据流纪律**：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理失败不影响已产出回答。
 
 ---
@@ -318,7 +318,7 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0049）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0050）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
@@ -333,7 +333,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0049）；
 | 行动 | `action_records`、`action_schedules` | records 台账（run_id/status 状态机）；schedules 1:1 action 定时 |
 | 自主 | `proactive_actions`、`trigger_registry`、`outbox_events`、`background_jobs` | proactive dedupe_key 幂等；trigger registry 触发登记；outbox 事件投递 |
 | Agent 运行时 | `loop_runs`、`agent_state_snapshots`、`agent_metric_snapshots`、`decision_records` | loop_runs 为 Run 台账（steps/预算）；decision_records 为决策审计 |
-| 通道 | `channel_identities` | 复合主键 (channel, external_id) |
+| 通道 | `channel_identities`、`feishu_dedupe_ledger` | identities 复合主键 (channel, external_id)；dedupe_ledger 以 `event_id` 为主键承载跨进程入站去重（FEISHU-010，`FEISHU_DEDUPE_PERSISTENT_ENABLED` 控制，默认关闭） |
 | 观测 | `runtime_traces`、`llm_call_records`、`prompt_snapshots`、`evaluation_reports` | 按 request_id/turn_id 关联 |
 
 ### 6.2 生命周期
@@ -408,8 +408,8 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0049）；
 | 问题 | 影响 | 优先级 |
 |-|-|-|
 | `services/agent_service.py` 是"兼容壳"，编排已迁 `chat_pipeline` 但壳仍保留供 api/测试依赖 | 双入口符号残留，新同学易误入旧路径 | P2 |
-| ORM 模型集中于 `core/db.py`（49 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
-| 文档迁移链版本号滞后（`backend/README.md` 写 0032、`backend/AGENTS.md` 写 0043，实际 0049） | 误导新开发者对 schema 进度的判断 | P2 |
+| ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
+| **迁移链头钉测散落在 v24/v25/v26 共 15 个测试文件**（`MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`max(numbered) == NN`、`SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`）。每加一个迁移都要机械升级一遍（FEISHU-010 加 `0050` 时实测 **22 个用例由绿转红**，见 `review-v1.2.md` §7.10） | 加迁移的隐性成本高、易漏改；`v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名会随升级逐渐名不副实 | P1 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
 | `docs/` 169 文件、1589 处 `vXX_` 引用未改写（历史文档不改写是约定，靠 `flag-rename-map.md` 桥接） | 读历史文档需查对照表，存在导航断层 | P2 |
 | 测试侧版本标记残留 188 处（fixture 名/函数名如 `v24_tool_env`、`v21_on`） | 测试命名仍带历史版本号，语义混淆 | P3 |

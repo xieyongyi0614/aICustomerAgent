@@ -478,6 +478,9 @@ Feishu Event（im.message.receive_v1）
 - **两个时钟职责分离，不可互换**（review v1.2）：`events._mono = time.monotonic` 承担**一切时长判断**（`event_id` 去重 TTL、`open_id` 限流滑窗）；`events._now = time.time` 只用于与飞书**外部时间戳**比对（新鲜度窗口）。`delivery` 的出站幂等 TTL 同样走单调钟（注入点 `delivery._mono`）——**只有"与外部时间戳比对"这一件事必须用 wall clock**。
   - wall clock 回拨会让"时长"变成负数 → 去重表永不淘汰（内存只增不减）、限流窗口永不排空（用户被永久拒绝）、出站幂等条目永不淘汰（重投被自己的幂等表静默跳过）。
   - 新鲜度拒绝时记录 `skew`，使"全部事件 403"可与 NTP 漂移直接建立联系（`abs(skew) > 窗口` 时快慢对称地全拒）。
+- **去重存储可切持久化，分派写在组合根**（review v1.2 · FEISHU-010）：`event_id` 去重默认走通道层的进程内表；`FEISHU_DEDUPE_PERSISTENT_ENABLED=true` 时改走 `feishu_dedupe_ledger` 表的唯一约束（跨进程共享）。
+  - 分派点是 `api/v1/feishu.py` 的 `_claim_event()`：**`app/channels/**` 的依赖 allowlist 是 fail-closed 的，禁止它 import `app.repositories`**；而 `app/api/` 与 `app/main.py` 是刻意豁免的组合根（`test_feishu_boundary.py::test_direction2_api_and_main_excluded_from_scan`）。新增跨层依赖时必须遵守这条边界。
+  - DB 路径经 `asyncio.to_thread` 下放（同步 SQLAlchemy 不得跑在事件循环线程上，与身份解析同一处理）。
 - **观测**：每轮由 Adapter 建 trace（复用 `trace_collector`），并把 `feishu.message_id` / `event_id` / `open_id` 记入日志用于排障。
 
 ---
@@ -495,6 +498,7 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_APP_SECRET` | str | `""` | 飞书应用 App Secret（**敏感**） |
 | `FEISHU_VERIFICATION_TOKEN` | str | `""` | 事件订阅 Verification Token（**敏感**） |
 | `FEISHU_ENCRYPT_KEY` | str | `""` | 事件 **Encrypt Key（正式支持的配置项，非"未来再实现"）**（**敏感**）。非空 → 支持**加密事件**（AES 解密）并启用**签名校验**；为空 → 只接受**未加密事件**（安全性降级，启动时告警） |
+| `FEISHU_DEDUPE_PERSISTENT_ENABLED` | bool | `false` | **默认关闭**。开启后 `event_id` 去重改走 `feishu_dedupe_ledger` 表（跨进程共享），是开多 worker 的硬前置之一（FEISHU-010）；关闭时行为与以前完全一致 |
 | `FEISHU_API_BASE` | str | `https://open.feishu.cn` | API 基址（便于测试指向假服务） |
 | `FEISHU_LLM_PROFILE` | str | `""` | 指定本轮使用的 LLM profile；空则走 `DEFAULT_LLM_PROFILE` |
 | `FEISHU_TIMEOUT_SECONDS` | float | `10.0` | 出站 HTTP 超时 |
@@ -631,11 +635,15 @@ Feishu Event（im.message.receive_v1）
 - ~~出站投递抽象~~ → **已升级为本次交付**：见 §2.5.4（`OutboundMessage` + `ChannelAdapter` Protocol）。剩余未决项是"**触发方如何拿到 adapter 实例**"（装配问题，§2.5.6 候选 A/B），留待 Autonomy 立项时决策。
 - **主动消息推送循环**：未来在 `channels/` 侧新增一个出站消费循环（拉取待推送的主动消息 → 反向解析收件人 → `send` → 回写推送态），由组合根在 lifespan 中启动。
 - **回复后处理**：若角色的回复含舞台指示/动作描述，未来可在 Adapter 出站前做"表现层转换"（属于 Channel 的表现问题，不属于角色核心）。
-- **多实例（多 worker）硬化 —— 开多 worker 的硬前置，未实现**：入站的 `event_id` 去重（`events._seen_events`）、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**当前全部是进程内状态**。在补齐以下两项之前**不得**开启多 worker / 多实例，否则同一 `event_id` 会被多个实例各处理一次（重复 LLM 调用 + 重复回复），且同一会话不再串行：
-  1. **去重落库**：新增 `feishu_events` 表（`event_id` 唯一约束）+ 迁移，`accept_event` 改为 DB insert + `IntegrityError` 判定；
-  2. **跨进程会话串行**：PG advisory lock（按 `session_id`）或会话行 `SELECT ... FOR UPDATE`。
+- **多实例（多 worker）硬化 —— 开多 worker 的硬前置，部分实现**：入站的 `event_id` 去重、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**默认全部是进程内状态**。开启多 worker / 多实例前必须补齐：
+  1. ✅ **去重落库（FEISHU-010，已实现，默认关闭）**：新增 `feishu_dedupe_ledger` 表（`event_id` 主键 + `received_at`）与迁移 `0050`；开启 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 后判定改由该表唯一约束承担，跨进程共享。**未开启时行为与以前完全一致**。
+     - **存储分派在组合根**：`api/v1/feishu.py` 的 `_claim_event()` 按配置选择通道层的内存表或 `services/feishu_dedupe_service`（DB 路径经 `asyncio.to_thread` 下放，不阻塞事件循环）。**不得**让 `app/channels/**` 直接 import `app.repositories`——通道依赖 allowlist 是 fail-closed 的（`tests/unit/test_feishu_boundary.py`）。
+     - **失败语义 fail-open**：存储不可用时**放行**并记 warning。去重的收益是省掉重复处理，fail-closed 会直接丢掉用户消息。（与限流取向相反。）
+     - **TTL 语义与内存表对齐**：`claim` 先摘除该 `event_id` 的过期行再插入（主键约束本身不知道过期），并每 `PURGE_EVERY=256` 次成功占位做一次摊还清理。
+  2. ❌ **跨进程会话串行**：PG advisory lock（按 `session_id`）或会话行 `SELECT ... FOR UPDATE`。**尚未实现，且存在未决取舍**——两种做法都要把连接持有到整轮 LLM 结束，而当前 `feishu_max_concurrent_turns` 闸门是在**会话锁之后**才取得的，故并发会话数不受闸门约束，可能压满连接池。实现前需先决定「把全局闸门提到会话锁之前」还是改用租约表（lease + 心跳），见 `review-v1.2.md` §7.10。
+  3. ❌ **出站幂等落库**：`delivery._delivered` 同理。
   - 另注：**连发合并窗口天然只在实例内生效**——多实例下同一 `open_id` 若落到不同 worker，其连发消息不会被合并（顺序仍须由跨进程锁保证）。若要求跨实例合并，需在 ingress 按 `open_id` 做 sticky 路由。
-  - 登记与验收条件见 `tasks.md` 的 **FEISHU-007**，发现明细见 `review-v1.1.md` §5。
+  - 登记与验收条件见 `tasks.md` 的 **FEISHU-007**（原）与 **FEISHU-010**（去重落库），发现明细见 `review-v1.1.md` §5 与 `review-v1.2.md` §7.10。
 
 ---
 

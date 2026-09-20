@@ -76,7 +76,7 @@
 | 可覆盖范围 | 去重 + 限流 + 会话锁 + 合并窗口（4 项） | 去重 + 会话锁（2 项） |
 | 性能 | 微秒级 | 单次往返 + 写 WAL |
 
-- **只解决去重** → 用 PG。`feishu_events(event_id PK)` + `INSERT ... ON CONFLICT DO NOTHING` 返回 rowcount 判定，与 `review-v1.1` §5.1 的既有方案一致（迁移 `0044`，链尾需对齐当前 `0049`），且复用已有依赖、不引入新运维面。
+- **只解决去重** → 用 PG。`feishu_dedupe_ledger(event_id PK)` + `INSERT ... ON CONFLICT DO NOTHING` 返回 rowcount 判定，与 `review-v1.1` §5.1 的既有方案一致（迁移 `0044`，链尾需对齐当前 `0049`），且复用已有依赖、不引入新运维面。
 - **要做全套（跨实例限流 + 跨实例合并 + 跨实例会话锁）** → Redis 才有独立价值；即便如此，**去重仍建议留 PG**（因为需要 durable）。
 - 跨实例会话串行：PG advisory lock（`pg_try_advisory_lock(hashtext(session_id))`）或会话行 `SELECT ... FOR UPDATE`。
 - 实施提醒：新增仓储必须注册进 `tests/conftest.py` 的 `_REPO_MODULES` / `_SERVICE_DB_MODULES`（含顶部 import），否则测试会绕过内存库补丁、连真实 PG 而挂起。
@@ -403,7 +403,7 @@ N-05~N-10 与多实例前置（判断 1）**本次未动**，仍为登记项。
 
 | 文件 | 改动 |
 |---|---|
-| `tests/unit/test_feishu_events.py` | 时长类用例的注入点由 `_now` 改为 `_mono`（5 处）；`reset_event_state` 增断言 `_mono is time.monotonic`；**新增**：wall clock 回拨下去重仍淘汰 / 限流窗口仍排空、超长时间戳三种形态（含负数）不溢出、时间戳单位兼容、新鲜度拒绝时记录 skew |
+| `tests/unit/test_feishu_dedupe_ledger.py` | 时长类用例的注入点由 `_now` 改为 `_mono`（5 处）；`reset_event_state` 增断言 `_mono is time.monotonic`；**新增**：wall clock 回拨下去重仍淘汰 / 限流窗口仍排空、超长时间戳三种形态（含负数）不溢出、时间戳单位兼容、新鲜度拒绝时记录 skew |
 | `tests/unit/test_feishu_delivery.py` | **新增**：并发同键只投递一次（用会让出事件循环的 transport 固定竞态）、失败返回时回滚占位可重试、**抛异常时回滚占位可重试**、单调钟跨过 TTL 后同键可重发 |
 | `tests/e2e/test_feishu_webhook.py` | `event_payload()` 的 `create_time` 改为**当前时间**（否则明文路径开启新鲜度校验后会全线 403）；`test_rate_limit_per_open_id` 由断言 429 改为断言 200 + 兜底文案；**新增**：限流消息经重投不丢、明文陈旧 `create_time` / 陈旧时间戳头 403、明文新鲜事件仍受理、超长时间戳头不 500 |
 | `tests/unit/test_feishu_error_matrix.py` | `test_row13_inbound_rate_limit_window` 的注入点改为 `_mono` |
@@ -538,3 +538,55 @@ except BaseException:
 #### 用户可见行为变更
 
 私聊里的表情 / 图片 / 语音 / 文件 / 纯空白消息，从**完全静默**变为回一句「我目前只能读文字哦～」。群聊行为不变（仍静默）。
+
+### 7.10 FEISHU-010 入站去重落库（多实例前置第 1/3 项）
+
+#### 分层约束（本次最重要的发现）
+
+`tests/unit/test_feishu_boundary.py` 的 `CHANNELS_ALLOWLIST_PREFIXES` **不含 `app.repositories`**，`CHANNELS_APP_DENY_EXACT` 含 `app.core.db` → **`app/channels/**` 不得 import `app.repositories`**（fail-closed）。而 `app/api/` 与 `app/main.py` 被**刻意排除在扫描外**（`test_direction2_api_and_main_excluded_from_scan`）——它们是组合根。
+
+因此去重存储的**分派必须写在 `api/v1/feishu.py`**：通道层保持纯函数、不感知存储；DB 路径经 `asyncio.to_thread` 下放（同步 SQLAlchemy 不得跑在事件循环线程上）。
+
+#### 实现
+
+| 位置 | 内容 |
+|---|---|
+| `migrations/versions/0050_feishu_dedupe_ledger.py` + `core/db.py::FeishuDedupeLedgerRow` | `feishu_dedupe_ledger(event_id PK, received_at)` + `received_at` 索引 |
+| `repositories/feishu_dedupe_ledger_repository.py` | `claim`（先摘除同 id 的过期行再插入，`IntegrityError` 判定）/ `purge_before` / `exists` |
+| `services/feishu_dedupe_service.py` | TTL 折算、**fail-open**、每 `PURGE_EVERY=256` 次成功占位摊还清理 |
+| `api/v1/feishu.py` | `_claim_event()` 按 `feishu_dedupe_persistent_enabled` 分派内存表 / DB 路径 |
+| `core/settings/feishu.py` + `.env.example` | `feishu_dedupe_persistent_enabled`（默认 `false`） |
+
+**表名为何不叫 `feishu_events`**：v24 有一条架构禁令 `test_ban_no_second_event_tables_unchanged`，断言「名字含 `event` 的表恰为 `world_events` / `outbox_events` / `relationship_events`」——守卫的是「`world_events` 是唯一事件 SoT」。`feishu_events` 会撞上它。与其放宽该禁令，不如把表命名为它本来的身份：一张**去重账本**，不是事件存储。
+
+#### 关键取舍
+
+1. **fail-open**：存储不可用时放行并记 warning。去重的收益是省掉重复处理，fail-closed 会直接丢掉用户消息。**与限流取向相反**（限流失败应保守拒绝以保护 LLM）。
+2. **TTL 语义必须与内存表对齐**：主键约束本身不知道「过期」，故 `claim` 先摘除该 `event_id` 的过期行再插入；否则过 TTL 的事件会被永久判重。
+3. **默认关闭**：开启才是多实例姿态；关闭时行为与升级前完全一致。多 worker 仍需另两项前置，故不在本次默认开启。
+
+#### 🚨 加一个迁移的真实代价：22 个跨版本钉测
+
+用 `git worktree` 取 HEAD 干净基线实测（v24+v25+v26）：
+
+| | 结果 |
+|---|---|
+| HEAD 基线 | 10 failed / 2991 passed |
+| 加迁移后（未升级守卫） | **32 failed** → 我的迁移造成 **22 个新失败** |
+| 升级守卫后 | **10 failed / 2991 passed**，与基线**逐条一致** |
+
+22 个失败分布在 v25（12 文件）、v24（tool003 / tool012_support / tool007 / tool008 / tool012_bans / tool_acceptance）、v26。处理时按性质分两类：
+
+| 类别 | 处理 | 理由 |
+|---|---|---|
+| **链头钉测**（`MIGRATION_HEAD`、`test_migration_chain_head_is_still_00NN`、`max(numbered) == NN`、`MIGRATION_FILE_COUNT_CURRENT`、`MIGRATION_BREAKPOINT`、`MIGRATION_ADDED_VS_BASELINE`、`MIGRATION_HEAD_PREVIOUS`） | **机械升级到 0050** | `flag-removal-audit.md` 明确记录过 0048→0049 的同款操作，有先例 |
+| **v24「零 schema 变更」保证**（`SCHEMA_COLUMNS_DIGEST_BASELINE`） | **引入显式例外登记** `SCHEMA_ADDED_TABLES_VS_BASELINE = ("feishu_dedupe_ledger",)` + 新增 `support.schema_columns_digest(exclude_tables=())`；断言变为「全库摘要 == `SCHEMA_COLUMNS_DIGEST`」且「排除已登记新增表后 == `SCHEMA_COLUMNS_DIGEST_BASELINE`」 | 直接改基线摘要常量等于**把断言改谎**。排除后实测精确复现 `506ee5d5cf357bdf`，证明「除已登记的新增表外基线零漂移」——保证仍在 |
+| **v25 `ZeroMigration` 的 `test_no_newer_revision_after_0050`** | 改写为**不钉绝对版本号**：断言版本号连续无空洞 + 链头唯一 + 本任务未新增迁移文件 | 原断言（`max == 49`）在每次正常迁移后都会失败，且重命名后语义自相矛盾 |
+| **v26 `test_v25_migration_head_0049_documented`** | 改写为「≥ 0049 且链头自洽」 | 机械改成 `_0050_` 会**事实错误**：0050 是飞书迁移，不是 v2.5 的链头 |
+| **v24 `test_ban_no_second_event_tables_unchanged`** | **改表名**（`feishu_events` → `feishu_dedupe_ledger`） | 该禁令守的是「`world_events` 唯一事件 SoT」，不该为迁就命名而放宽 |
+
+#### 未验证项与登记
+
+- **PG 路径未验证**：本机 docker daemon 未运行、无 `docker compose`、5432 未监听 → 所有 PG 迁移测试 SKIP。**SQLite 上整链 `upgrade head` / `downgrade 0049` / 再 `upgrade` 往返已验证**（列 / PK / 索引与 ORM 逐项一致），但 PG 的 `IntegrityError` 语义与并发插入行为未实测。
+- **技术债登记（新增 P1）**：迁移链头钉测散落在 15 个测试文件、每加迁移需机械升级一遍。本次已按「该钉的钉、不该钉的改写为语义断言」处理，但 `v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名仍会随升级逐渐名不副实，建议后续统一改为「相对当前 head」的断言（已写入 `docs/current-system-architecture-baseline.md` 技术债表）。
+- **多实例前置进度**：去重落库 ✅（本次）；跨进程会话串行 ❌、出站幂等落库 ❌ —— **三项全齐前仍不得开多 worker**。
