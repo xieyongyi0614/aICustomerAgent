@@ -746,6 +746,90 @@ async def test_persistent_dedupe_fails_open(override_settings, dispatch_spy, mon
     assert any("fail-open" in record.getMessage() for record in caplog.records)
 
 
+SHARDED = {
+    "feishu_instance_count": 2,
+    "feishu_ingress_sharded_routing_enabled": True,
+    "feishu_dedupe_persistent_enabled": True,
+}
+
+
+@pytest.mark.asyncio
+async def test_event_for_other_shard_returns_503(override_settings, dispatch_spy):
+    """方案 C：落到错误分片的事件必须 503（可重试），不得静默处理也不得静默丢弃。
+
+    `ou_e2e_alice` 在 2 片下归属 shard 1（golden 值见 `test_feishu_shards.py`），
+    故 `instance_index=0` 的实例应当拒绝。
+    """
+    response = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-shard-wrong"),
+        **SHARDED,
+        feishu_instance_index=0,
+    )
+    assert response.status_code == 503
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_event_for_own_shard_is_processed(override_settings, dispatch_spy):
+    response = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-shard-ok"),
+        **SHARDED,
+        feishu_instance_index=1,
+    )
+    assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+
+
+@pytest.mark.asyncio
+async def test_wrong_shard_does_not_consume_dedupe(override_settings, dispatch_spy):
+    """归属校验在去重**之前**：错误分片的拒绝不得落去重账。
+
+    否则飞书重投到正确实例时会被去重表静默吞掉——这正是 FEISHU-009 修过的坑。
+    """
+    payload = event_payload(event_id="evt-shard-retry")
+    wrong = await post_event(
+        override_settings, payload=payload, **SHARDED, feishu_instance_index=0
+    )
+    assert wrong.status_code == 503
+    right = await post_event(
+        override_settings, payload=payload, **SHARDED, feishu_instance_index=1
+    )
+    assert right.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert len(dispatch_spy) == 1
+
+
+@pytest.mark.asyncio
+async def test_non_text_message_also_shard_checked(override_settings, dispatch_spy, reply_spy):
+    """非文本兜底路径同样受归属校验约束（不能绕过分片）。"""
+    response = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-shard-img", message_type="image"),
+        **SHARDED,
+        feishu_instance_index=0,
+    )
+    assert response.status_code == 503
+    assert dispatch_spy == []
+    assert reply_spy == []
+
+
+@pytest.mark.asyncio
+async def test_challenge_is_not_shard_checked(override_settings, dispatch_spy):
+    """challenge 无 `open_id`，任何实例都应能应答（否则回调 URL 校验会随机失败）。"""
+    payload = {
+        "type": "url_verification",
+        "token": VERIFICATION_TOKEN,
+        "challenge": "c-shard",
+    }
+    response = await post_event(
+        override_settings, payload=payload, **SHARDED, feishu_instance_index=0
+    )
+    assert response.status_code == 200
+    assert response.json() == {"challenge": "c-shard"}
+
+
 @pytest.mark.asyncio
 async def test_dispatch_failure_is_logged_not_silent(override_settings, monkeypatch, caplog):
     """F-06：无可调度 loop 时协程被关闭，必须留痕而不是静默吞掉用户消息。"""

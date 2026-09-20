@@ -39,6 +39,8 @@ class FeishuSettings(BaseSettings):
     feishu_verification_token: str = ""
     feishu_encrypt_key: str = ""
     feishu_dedupe_persistent_enabled: bool = False
+    feishu_instance_index: int = 0
+    feishu_ingress_sharded_routing_enabled: bool = False
     feishu_api_base: str = "https://open.feishu.cn"
     feishu_llm_profile: str = ""
     feishu_timeout_seconds: float = 10.0
@@ -81,6 +83,12 @@ class FeishuSettings(BaseSettings):
             )
         if self.feishu_instance_count < 1:
             raise SettingsError("FEISHU_INSTANCE_COUNT 必须 >= 1（单实例填 1）")
+        if not 0 <= self.feishu_instance_index < self.feishu_instance_count:
+            raise SettingsError(
+                "FEISHU_INSTANCE_INDEX 必须在 [0, FEISHU_INSTANCE_COUNT) 内"
+                f"（当前 index={self.feishu_instance_index}, "
+                f"count={self.feishu_instance_count}）"
+            )
         if self.feishu_http_max_attempts < 1:
             raise SettingsError("FEISHU_HTTP_MAX_ATTEMPTS 必须 >= 1")
         if self.feishu_http_backoff_seconds < 0:
@@ -104,20 +112,50 @@ class FeishuSettings(BaseSettings):
                     f"FEISHU_ENABLED=true 时缺少必需配置: {', '.join(missing)}"
                 )
             if self.feishu_instance_count > 1:
-                raise SettingsError(
-                    f"FEISHU_ENABLED=true 时不支持多实例（FEISHU_INSTANCE_COUNT="
-                    f"{self.feishu_instance_count}）：多 worker / 多实例的硬前置尚未补齐"
-                    "（去重落库 已实现 / 跨进程会话串行 未实现 / 出站幂等落库 未实现）。"
-                    "强行开启会让同一会话的消息被多个实例交错处理、状态竞态写，"
-                    "且故障偶发、极难定位。选型与做法见 "
-                    "docs/integrations/feishu/multi-instance-options.md；"
-                    "确需横向扩展请先完成 FEISHU-011，并把本闸门替换为所选方案。"
-                )
+                self._assert_multi_instance_ready()
         if not self.feishu_encrypt_key:
             logger.warning(
                 "FEISHU_ENCRYPT_KEY 为空: 仅接受未加密事件且不校验签名，安全性降级"
             )
         return self
+
+    def _assert_multi_instance_ready(self) -> None:
+        """多实例就绪契约（FEISHU-011 方案 C）。
+
+        开多实例必须**显式声明**两件事，缺一即启动期失败：
+
+        1. `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED=true` —— ingress 已按
+           `crc32(open_id) % FEISHU_INSTANCE_COUNT` 把同会话事件恒定送到同一实例
+           （方案 C 的会话串行来源）；
+        2. `FEISHU_DEDUPE_PERSISTENT_ENABLED=true` —— 跨进程去重，作为 ingress
+           配错时的**兜底**：即使同一 `event_id` 被两个实例收到，也只有一次会真正处理。
+
+        理由：未声明的多实例会让同一会话被多个实例交错处理、状态竞态写，且故障
+        偶发（需同时满足同会话 + 跨实例 + 时间重叠）、极难定位。
+        """
+        missing = [
+            name
+            for name, ok in (
+                (
+                    "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED",
+                    self.feishu_ingress_sharded_routing_enabled,
+                ),
+                (
+                    "FEISHU_DEDUPE_PERSISTENT_ENABLED",
+                    self.feishu_dedupe_persistent_enabled,
+                ),
+            )
+            if not ok
+        ]
+        if not missing:
+            return
+        raise SettingsError(
+            f"FEISHU_ENABLED=true 且 FEISHU_INSTANCE_COUNT={self.feishu_instance_count}"
+            f">1 时，多实例就绪契约未满足，缺少: {', '.join(missing)}。"
+            "多实例的会话串行依赖 ingress 按会话分片分流，跨进程去重作为路由配错时的兜底；"
+            "两者都必须显式开启。选型与做法见 "
+            "docs/integrations/feishu/multi-instance-options.md 方案 C。"
+        )
 
     def secret_values(self) -> tuple[str, ...]:
         return tuple(

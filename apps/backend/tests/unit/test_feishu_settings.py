@@ -27,6 +27,8 @@ EXPECTED_DEFAULTS = {
     "feishu_verification_token": "",
     "feishu_encrypt_key": "",
     "feishu_dedupe_persistent_enabled": False,
+    "feishu_instance_index": 0,
+    "feishu_ingress_sharded_routing_enabled": False,
     "feishu_api_base": "https://open.feishu.cn",
     "feishu_llm_profile": "",
     "feishu_timeout_seconds": 10.0,
@@ -55,6 +57,8 @@ ENV_OVERRIDES = {
     "FEISHU_VERIFICATION_TOKEN": "env-token",
     "FEISHU_ENCRYPT_KEY": "env-encrypt",
     "FEISHU_DEDUPE_PERSISTENT_ENABLED": "true",
+    "FEISHU_INSTANCE_INDEX": "2",
+    "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED": "true",
     "FEISHU_API_BASE": "https://feishu.example.com/",
     "FEISHU_LLM_PROFILE": "longcat",
     "FEISHU_TIMEOUT_SECONDS": "3.5",
@@ -83,6 +87,8 @@ FIELD_TO_ENV = {
     "feishu_verification_token": "FEISHU_VERIFICATION_TOKEN",
     "feishu_encrypt_key": "FEISHU_ENCRYPT_KEY",
     "feishu_dedupe_persistent_enabled": "FEISHU_DEDUPE_PERSISTENT_ENABLED",
+    "feishu_instance_index": "FEISHU_INSTANCE_INDEX",
+    "feishu_ingress_sharded_routing_enabled": "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED",
     "feishu_api_base": "FEISHU_API_BASE",
     "feishu_llm_profile": "FEISHU_LLM_PROFILE",
     "feishu_timeout_seconds": "FEISHU_TIMEOUT_SECONDS",
@@ -118,6 +124,8 @@ def test_feishu_env_overrides_all_keys(monkeypatch):
     assert settings.feishu_enabled is False
     assert settings.feishu_app_id == "cli_env_id"
     assert settings.feishu_dedupe_persistent_enabled is True
+    assert settings.feishu_instance_index == 2
+    assert settings.feishu_ingress_sharded_routing_enabled is True
     assert settings.feishu_api_base == "https://feishu.example.com"
     assert settings.feishu_timeout_seconds == 3.5
     assert settings.feishu_token_refresh_ratio == 0.5
@@ -209,12 +217,11 @@ def test_feishu_instance_count_must_be_positive():
 
 
 def test_feishu_enabled_rejects_multi_instance():
-    """FEISHU-011 方案 E：多实例硬闸。
+    """FEISHU-011 方案 C：多实例**就绪契约**。
 
-    多 worker 的三项硬前置只完成 1/3（去重落库 ✅ / 跨进程会话串行 ❌ /
-    出站幂等落库 ❌），此时开多实例会让同一会话被多个实例交错处理，且故障偶发
-    难查。故 `enabled=true` + `instance_count>1` 必须**启动期失败**，而不是记一条
-    warning 后照跑。
+    多实例的会话串行依赖 ingress 按会话分片分流（方案 C），跨进程去重作为路由
+    配错时的兜底。两者都必须显式声明，否则启动期失败——而不是记一条 warning
+    后照跑（故障会以「偶发消息交错」的形式出现，极难定位）。
     """
     with pytest.raises(SettingsError) as exc_info:
         FeishuSettings(
@@ -225,10 +232,54 @@ def test_feishu_enabled_rejects_multi_instance():
             feishu_instance_count=2,
         )
     message = str(exc_info.value)
-    assert "不支持多实例" in message
-    assert "FEISHU_INSTANCE_COUNT=2" in message
+    assert "多实例就绪契约未满足" in message
+    assert "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED" in message
+    assert "FEISHU_DEDUPE_PERSISTENT_ENABLED" in message
     assert "multi-instance-options.md" in message
     assert "s3cret" not in message
+
+
+@pytest.mark.parametrize(
+    "extra,missing",
+    [
+        ({"feishu_ingress_sharded_routing_enabled": True}, "FEISHU_DEDUPE_PERSISTENT_ENABLED"),
+        ({"feishu_dedupe_persistent_enabled": True}, "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED"),
+    ],
+)
+def test_feishu_multi_instance_requires_both_declarations(extra, missing):
+    """只声明一半同样拒绝，且错误信息点名缺的那一个。"""
+    with pytest.raises(SettingsError) as exc_info:
+        FeishuSettings(
+            feishu_enabled=True,
+            feishu_app_id="cli_app",
+            feishu_app_secret="s3cret",
+            feishu_verification_token="token-x",
+            feishu_instance_count=3,
+            **extra,
+        )
+    assert missing in str(exc_info.value)
+
+
+def test_feishu_multi_instance_ready_when_both_declared():
+    settings = FeishuSettings(
+        feishu_enabled=True,
+        feishu_app_id="cli_app",
+        feishu_app_secret="s3cret",
+        feishu_verification_token="token-x",
+        feishu_instance_count=3,
+        feishu_instance_index=2,
+        feishu_ingress_sharded_routing_enabled=True,
+        feishu_dedupe_persistent_enabled=True,
+    )
+    assert settings.feishu_instance_index == 2
+    assert settings.feishu_instance_count == 3
+
+
+@pytest.mark.parametrize("index", [3, 4, -1])
+def test_feishu_instance_index_must_be_within_count(index):
+    with pytest.raises(SettingsError) as exc_info:
+        FeishuSettings(feishu_instance_index=index, feishu_instance_count=3)
+    assert "FEISHU_INSTANCE_INDEX" in str(exc_info.value)
 
 
 def test_feishu_enabled_allows_single_instance():

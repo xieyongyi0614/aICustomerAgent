@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.application import observability
-from app.channels.feishu import adapter, events
+from app.channels.feishu import adapter, events, shards
 from app.channels.feishu.errors import FeishuAuthError, FeishuConfigError
 from app.core.settings import get_settings
 from app.services import feishu_dedupe_service
@@ -107,6 +107,9 @@ async def feishu_events(request: Request) -> JSONResponse:
     if parsed is None:
         return await _reply_unsupported(payload)
 
+    if not _owns_shard(parsed.open_id):
+        return _reject(503, "event belongs to another shard")
+
     # 去重先于限流：飞书重投的重复事件不得消耗该用户的限流配额。
     if not await _claim_event(parsed.event_id):
         return JSONResponse(content={})
@@ -157,6 +160,8 @@ async def _reply_unsupported(payload: dict) -> JSONResponse:
     unhandled = events.parse_unhandled_message(payload)
     if unhandled is None:
         return JSONResponse(content={})
+    if not _owns_shard(unhandled.open_id):
+        return _reject(503, "event belongs to another shard")
     if not await _claim_event(unhandled.event_id):
         return JSONResponse(content={})
     if not events.allow_rate(unhandled.open_id):
@@ -176,6 +181,30 @@ async def _reply_unsupported(payload: dict) -> JSONResponse:
             unhandled.event_id,
         )
     return JSONResponse(content={})
+
+
+def _owns_shard(open_id: str) -> bool:
+    """方案 C 的归属校验：本实例是否负责该 `open_id`（单实例时恒为真）。
+
+    非本分片返回 `503` 而非 `200`：这是**契约被违反**（ingress 未按分片分流）。
+    返回可重试状态码让飞书重投、有机会落到正确实例；且该校验**在去重之前**，
+    故重投不会被去重表吞掉。若返回 200 静默丢弃，消息会永久丢失且无任何可观测信号。
+    """
+    settings = get_settings()
+    if settings.feishu_instance_count <= 1:
+        return True
+    if shards.owns(
+        open_id,
+        instance_index=settings.feishu_instance_index,
+        instance_count=settings.feishu_instance_count,
+    ):
+        return True
+    shards.note_wrong_shard(
+        open_id,
+        instance_index=settings.feishu_instance_index,
+        instance_count=settings.feishu_instance_count,
+    )
+    return False
 
 
 async def _read_body(request: Request, max_bytes: int) -> bytes | None:
