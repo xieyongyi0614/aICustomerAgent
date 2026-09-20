@@ -5,6 +5,10 @@
   `X-Lark-Request-Timestamp` / `X-Lark-Request-Nonce` / `X-Lark-Signature`；
 - 解密 = base64 解码 → 前 16 字节为 IV → AES-256-CBC(key=sha256(encrypt_key)) →
   PKCS#7 去填充，明文即事件 JSON（官方示例向量实测无 16 字节随机前缀）。
+
+两个时钟职责分离，不可互换：`_now` 是 wall clock，只用于与飞书外部时间戳比对（新鲜度）；
+`_mono` 是单调钟，用于一切「时长」判断（去重 TTL / 限流滑窗）。wall clock 回拨会让时长
+变成负数，导致去重永不淘汰（内存只增不减）、限流窗口永不排空（用户被永久拒绝）。
 """
 
 import base64
@@ -32,8 +36,10 @@ CHALLENGE_TYPE = "url_verification"
 RATE_WINDOW_SECONDS = 60.0
 AES_BLOCK_SIZE = 16
 RATE_SWEEP_EVERY = 256
+TIMESTAMP_MAX_ABS = 10**20
 
 _now = time.time
+_mono = time.monotonic
 # 插入序即时间序：过期项从头部批量摘除，避免每次调用全表扫描（O(过期数) 而非 O(N)）。
 _seen_events: OrderedDict[str, float] = OrderedDict()
 _seen_lock = threading.Lock()
@@ -143,7 +149,14 @@ def verify_encrypted_freshness(timestamp: str | None, payload: dict) -> None:
 
 
 def _assert_within_window(value: float, detail: str) -> None:
-    if abs(_now() - value) > get_settings().feishu_signature_window_seconds:
+    window = get_settings().feishu_signature_window_seconds
+    skew = _now() - value
+    if abs(skew) > window:
+        logger.warning(
+            "feishu request outside freshness window: skew=%.1fs window=%ds",
+            skew,
+            window,
+        )
         raise FeishuAuthError("verify_timestamp", detail=detail)
 
 
@@ -158,12 +171,16 @@ def calculate_signature(timestamp: str, nonce: str, encrypt_key: str, raw: bytes
 
 
 def _timestamp_value(timestamp: str | None) -> float | None:
+    """解析外部时间戳；超界一律视为无效（`float(int(...))` 对超长数字会抛 OverflowError）。"""
     if not timestamp:
         return None
     try:
-        return float(int(timestamp))
+        value = int(timestamp)
     except ValueError:
         return None
+    if abs(value) > TIMESTAMP_MAX_ABS:
+        return None
+    return float(value)
 
 
 def is_challenge(payload: dict) -> bool:
@@ -308,17 +325,20 @@ def _received_at(create_time_ms: str | None) -> datetime:
 
 def accept_event(event_id: str) -> bool:
     ttl = get_settings().feishu_dedupe_ttl_seconds
-    now = _now()
+    now = _mono()
     with _seen_lock:
-        while _seen_events:
-            oldest = next(iter(_seen_events))
-            if now - _seen_events[oldest] <= ttl:
-                break
-            del _seen_events[oldest]
+        _evict_seen(now, ttl)
         if event_id in _seen_events:
             return False
         _seen_events[event_id] = now
         return True
+
+
+def _evict_seen(now: float, ttl: float) -> None:
+    while _seen_events:
+        if now - next(iter(_seen_events.values())) <= ttl:
+            break
+        _seen_events.popitem(last=False)
 
 
 def allow_rate(open_id: str) -> bool:
@@ -326,7 +346,7 @@ def allow_rate(open_id: str) -> bool:
     limit = get_settings().chat_rate_limit_per_minute
     if limit <= 0:
         return True
-    now = _now()
+    now = _mono()
     with _rate_lock:
         _rate_ops += 1
         if _rate_ops % RATE_SWEEP_EVERY == 0:
@@ -335,29 +355,33 @@ def allow_rate(open_id: str) -> bool:
         if window is None:
             window = deque()
             _rate_windows[open_id] = window
-        while window and now - window[0] > RATE_WINDOW_SECONDS:
-            window.popleft()
+        _drain_window(window, now)
         if len(window) >= limit:
             return False
         window.append(now)
         return True
 
 
+def _drain_window(window: deque[float], now: float) -> None:
+    while window and now - window[0] > RATE_WINDOW_SECONDS:
+        window.popleft()
+
+
 def _sweep_rate_windows(now: float) -> None:
     """摊还清理：已过窗的 open_id 条目连同空 deque 一并回收，避免 key 永久驻留。"""
     for open_id in list(_rate_windows):
         window = _rate_windows[open_id]
-        while window and now - window[0] > RATE_WINDOW_SECONDS:
-            window.popleft()
+        _drain_window(window, now)
         if not window:
             del _rate_windows[open_id]
 
 
 def reset_event_state() -> None:
-    global _now, _rate_ops
+    global _now, _mono, _rate_ops
     with _seen_lock:
         _seen_events.clear()
     with _rate_lock:
         _rate_windows.clear()
         _rate_ops = 0
     _now = time.time
+    _mono = time.monotonic

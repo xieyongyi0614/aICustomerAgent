@@ -69,6 +69,20 @@ async def ingest_inbound_message(inbound: InboundMessage) -> None:
     """Webhook 派发入口：进收件箱合并/排队；队列已满则回兜底文案（FEISHU-007）。"""
     if _get_inbox().offer(inbound):
         return
+    await _reply_overloaded(inbound)
+
+
+async def reject_inbound_message(inbound: InboundMessage) -> None:
+    """限流命中时的入站处理：不拒收，只回兜底文案。
+
+    上游不得以 429 拒收——飞书对非 2xx 会重投同一个 `event_id`，而该 id 此时
+    已落去重表，重投会被静默吞掉（用户既收不到回复、也没有任何留痕）。回兜底
+    文案并返回 200 既保住消息，也让用户知道是「发太快」。
+    """
+    await _reply_overloaded(inbound)
+
+
+async def _reply_overloaded(inbound: InboundMessage) -> None:
     await _deliver_outcome(
         _outcome(
             inbound,
@@ -321,7 +335,12 @@ def _get_inbox() -> SessionInbox:
 
 
 def _get_turn_gate() -> asyncio.Semaphore:
-    """进程内全局并发闸门：让 `feishu_max_concurrent_turns` 真正生效。"""
+    """进程内全局并发闸门：让 `feishu_max_concurrent_turns` 真正生效。
+
+    ⚠️ 作用域仅限本进程：多实例部署下实际并发是 `limit × 实例数`，因此下方
+    「≤ DB 连接池容量」的一致性校验也只在单实例成立。开多 worker 前必须改为
+    跨进程闸门（PG advisory lock 计数或 Redis 信号量），否则共享连接池会被压满。
+    """
     global _turn_semaphore
     if _turn_semaphore is None:
         settings = get_settings()

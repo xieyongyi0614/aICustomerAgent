@@ -27,11 +27,14 @@ logger = logging.getLogger(__name__)
 # 插入序即时间序：过期项从头部批量摘除（O(过期数)），避免每次调用全表扫描。
 _delivered: OrderedDict[str, float] = OrderedDict()
 _delivered_lock = threading.Lock()
+_mono = time.monotonic
 
 
 def reset_delivery_state() -> None:
+    global _mono
     with _delivered_lock:
         _delivered.clear()
+    _mono = time.monotonic
 
 
 class FeishuChannelAdapter:
@@ -118,10 +121,15 @@ async def _send_reply_parts(message_ref: str, parts: list[str]) -> SendResult:
     external_message_id = None
     for index, part in enumerate(parts):
         key = f"reply:{message_ref}:{index}"
-        if _already_delivered(key):
+        if not _claim_delivery(key):
             continue
-        result = await client.reply_message(message_ref, part)
+        try:
+            result = await client.reply_message(message_ref, part)
+        except BaseException:
+            _release_delivery(key)
+            raise
         if not result.ok:
+            _release_delivery(key)
             logger.error(
                 "feishu reply stopped: message_ref=%s segment=%d/%d error=%s",
                 message_ref,
@@ -130,7 +138,6 @@ async def _send_reply_parts(message_ref: str, parts: list[str]) -> SendResult:
                 result.error.value if result.error else "unknown",
             )
             return result
-        _mark_delivered(key)
         if result.external_message_id:
             external_message_id = result.external_message_id
     return SendResult(ok=True, external_message_id=external_message_id)
@@ -145,10 +152,15 @@ async def _send_proactive_parts(
     )
     for index, part in enumerate(parts):
         key = f"{base_key}:{index}"
-        if _already_delivered(key):
+        if not _claim_delivery(key):
             continue
-        result = await client.send_message(message.recipient.external_id, part)
+        try:
+            result = await client.send_message(message.recipient.external_id, part)
+        except BaseException:
+            _release_delivery(key)
+            raise
         if not result.ok:
+            _release_delivery(key)
             logger.error(
                 "feishu proactive send stopped: recipient=%s segment=%d/%d error=%s",
                 message.recipient.external_id,
@@ -157,22 +169,36 @@ async def _send_proactive_parts(
                 result.error.value if result.error else "unknown",
             )
             return result
-        _mark_delivered(key)
     return SendResult(ok=True)
 
 
-def _already_delivered(key: str) -> bool:
+def _claim_delivery(key: str) -> bool:
+    """原子「查 + 占位」：同一幂等键至多一个并发调用者拿到 True。
+
+    幂等必须由**单次加锁内**的判定保证：若拆成「先查、再发（await）、后记账」，
+    并发调用者会在 `await` 处交错而同时看到「未投递」，导致重复投递。
+    发送失败时调用 `_release_delivery` 回滚，使重试仍可继续。
+
+    窗口是「时长」，故用单调钟（`_mono`）而非 wall clock：回拨会让条目永不淘汰，
+    使后续重投被自己的幂等表静默跳过（与 `events` 的时钟约定一致）。
+    """
     ttl = get_settings().feishu_dedupe_ttl_seconds
-    now = time.time()
+    now = _mono()
     with _delivered_lock:
-        while _delivered:
-            oldest = next(iter(_delivered))
-            if now - _delivered[oldest] <= ttl:
-                break
-            del _delivered[oldest]
-        return key in _delivered
+        _evict_delivered(now, ttl)
+        if key in _delivered:
+            return False
+        _delivered[key] = now
+        return True
 
 
-def _mark_delivered(key: str) -> None:
+def _release_delivery(key: str) -> None:
     with _delivered_lock:
-        _delivered[key] = time.time()
+        _delivered.pop(key, None)
+
+
+def _evict_delivered(now: float, ttl: float) -> None:
+    while _delivered:
+        if now - next(iter(_delivered.values())) <= ttl:
+            break
+        _delivered.popitem(last=False)

@@ -328,7 +328,7 @@ async def test_row12_overload_rejects_latest_and_recovers(monkeypatch, override_
 
 def test_row13_inbound_rate_limit_window(override_settings):
     override_settings(chat_rate_limit_per_minute=2)
-    events._now = lambda: 5_000.0
+    events._mono = lambda: 5_000.0
     assert events.allow_rate("ou_rate_mx") is True
     assert events.allow_rate("ou_rate_mx") is True
     assert events.allow_rate("ou_rate_mx") is False

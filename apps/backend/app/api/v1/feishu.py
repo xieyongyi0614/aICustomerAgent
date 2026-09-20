@@ -18,6 +18,16 @@ feishu_router = APIRouter()
 
 @feishu_router.post("/feishu/events")
 async def feishu_events(request: Request) -> JSONResponse:
+    """入站闸门链：限长 → 验签 → 解密 → 新鲜度 → token → challenge → 解析 → 去重 → 限流 → 派发。
+
+    两条不可回退的顺序约束：
+
+    1. **新鲜度校验必须覆盖所有来件**。签名路径（Encrypt Key 与签名头齐备）内部已含新鲜度
+       校验；明文来件、空 Encrypt Key、缺签名头这三种组合下签名路径不生效，必须独立补校验，
+       否则捕获到的 body 可在去重 TTL 过期后被无限重放。
+    2. **限流不得以 4xx 拒收**。飞书对非 2xx 会重投同一个 `event_id`，而该 id 此时已落去重表，
+       重投会被静默吞掉——用户既收不到回复、也无任何留痕。故限流改为回兜底文案并返回 200。
+    """
     settings = get_settings()
     if not settings.feishu_enabled:
         return _reject(404, "Not Found")
@@ -34,12 +44,14 @@ async def feishu_events(request: Request) -> JSONResponse:
 
     encrypted = isinstance(payload.get("encrypt"), str)
     signature = request.headers.get("x-lark-signature")
+    timestamp = request.headers.get("x-lark-request-timestamp")
+    freshness_covered_by_signature = bool(settings.feishu_encrypt_key and signature)
     if not encrypted or signature:
         # 明文一律严格验签；加密体带签名头时同样验签。
         try:
             events.verify_signature(
                 raw,
-                request.headers.get("x-lark-request-timestamp"),
+                timestamp,
                 request.headers.get("x-lark-request-nonce"),
                 settings.feishu_encrypt_key,
                 signature,
@@ -57,16 +69,13 @@ async def feishu_events(request: Request) -> JSONResponse:
                 len(raw),
             )
             return _reject(400, "event decrypt failed")
-        if signature is None:
-            # 加密体且未带签名头：解密成功即验真，但新鲜度仍须独立校验，
-            # 否则捕获到的密文可在去重 TTL 过期后被无限重放。
-            try:
-                events.verify_encrypted_freshness(
-                    request.headers.get("x-lark-request-timestamp"), payload
-                )
-            except FeishuAuthError as exc:
-                logger.warning("feishu webhook rejected: %s", exc)
-                return _reject(403, "stale request rejected")
+
+    if not freshness_covered_by_signature:
+        try:
+            events.verify_encrypted_freshness(timestamp, payload)
+        except FeishuAuthError as exc:
+            logger.warning("feishu webhook rejected: %s", exc)
+            return _reject(403, "stale request rejected")
 
     inner_token = _verification_token(payload)
     if inner_token is not None:
@@ -96,11 +105,16 @@ async def feishu_events(request: Request) -> JSONResponse:
     if not events.accept_event(parsed.event_id):
         return JSONResponse(content={})
 
+    inbound = events.to_inbound_message(parsed)
     if not events.allow_rate(parsed.open_id):
         logger.warning("feishu webhook rate limited: open_id=%s", parsed.open_id)
-        return _reject(429, "too many requests")
+        if not observability.spawn_background(adapter.reject_inbound_message(inbound)):
+            logger.error(
+                "feishu overloaded reply dropped: no dispatchable event loop event_id=%s",
+                parsed.event_id,
+            )
+        return JSONResponse(content={})
 
-    inbound = events.to_inbound_message(parsed)
     logger.info(
         "feishu event accepted: event_id=%s message_id=%s open_id=%s chat_id=%s",
         parsed.event_id,

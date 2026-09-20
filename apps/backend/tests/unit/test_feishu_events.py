@@ -341,7 +341,7 @@ def test_accept_event_first_true_then_false():
 
 def test_accept_event_ttl_expiry_with_injected_clock():
     virtual = {"now": 1000.0}
-    events._now = lambda: virtual["now"]
+    events._mono = lambda: virtual["now"]
     assert events.accept_event("evt-ttl") is True
     virtual["now"] += 601
     assert events.accept_event("evt-ttl") is True
@@ -349,10 +349,23 @@ def test_accept_event_ttl_expiry_with_injected_clock():
 
 def test_accept_event_within_ttl_not_expired():
     virtual = {"now": 1000.0}
-    events._now = lambda: virtual["now"]
+    events._mono = lambda: virtual["now"]
     assert events.accept_event("evt-ttl2") is True
     virtual["now"] += 599
     assert events.accept_event("evt-ttl2") is False
+
+
+def test_accept_event_survives_wall_clock_rollback():
+    """去重 TTL 走单调钟：wall clock 回拨不得让过期项永不淘汰。"""
+    monotonic = {"now": 5000.0}
+    events._mono = lambda: monotonic["now"]
+    events._now = lambda: 9_000_000.0
+    assert events.accept_event("evt-rollback") is True
+
+    monotonic["now"] += 601
+    events._now = lambda: 1.0
+    assert events.accept_event("evt-rollback") is True
+    assert list(events._seen_events) == ["evt-rollback"]
 
 
 def test_accept_event_concurrent_exactly_one_true():
@@ -379,7 +392,7 @@ def test_allow_rate_limit_and_window(monkeypatch):
     get_settings.cache_clear()
     try:
         virtual = {"now": 2000.0}
-        events._now = lambda: virtual["now"]
+        events._mono = lambda: virtual["now"]
         assert events.allow_rate("ou_r") is True
         assert events.allow_rate("ou_r") is True
         assert events.allow_rate("ou_r") is False
@@ -388,6 +401,19 @@ def test_allow_rate_limit_and_window(monkeypatch):
         assert events.allow_rate("ou_r") is True
     finally:
         get_settings.cache_clear()
+
+
+def test_allow_rate_window_survives_wall_clock_rollback(override_settings):
+    """限流滑窗走单调钟：wall clock 回拨不得把用户永久锁在 429。"""
+    override_settings(chat_rate_limit_per_minute=1)
+    monotonic = {"now": 7000.0}
+    events._mono = lambda: monotonic["now"]
+    assert events.allow_rate("ou_rollback") is True
+    assert events.allow_rate("ou_rollback") is False
+
+    monotonic["now"] += 61
+    events._now = lambda: 1.0
+    assert events.allow_rate("ou_rollback") is True
 
 
 def test_reset_event_state_clears_everything():
@@ -399,6 +425,7 @@ def test_reset_event_state_clears_everything():
     import time as time_module
 
     assert events._now is time_module.time
+    assert events._mono is time_module.monotonic
 
 
 def test_zero_real_network_during_event_processing():
@@ -469,15 +496,39 @@ def test_encrypted_freshness_unverifiable_is_allowed_with_warning(caplog):
     assert any("freshness unverifiable" in record.getMessage() for record in caplog.records)
 
 
+@pytest.mark.parametrize("timestamp", ["9" * 400, "-" + "9" * 400, str(10**20 + 1)])
+def test_timestamp_value_rejects_out_of_range_without_overflow(timestamp):
+    """超长数字不得触发 `float(int(...))` 的 OverflowError（外部输入直达未捕获异常）。"""
+    assert events._timestamp_value(timestamp) is None
+    with pytest.raises(FeishuAuthError):
+        events.verify_timestamp_freshness(timestamp)
+
+
+def test_timestamp_value_accepts_all_real_units():
+    assert events._timestamp_value("1767196800") == 1_767_196_800.0
+    assert events._timestamp_value("1767196800000") == 1_767_196_800_000.0
+    assert events._timestamp_value(" 1767196800 ") == 1_767_196_800.0
+    assert events._timestamp_value(str(10**20)) == float(10**20)
+
+
+def test_freshness_rejection_logs_clock_skew(caplog):
+    """时钟偏差必须留痕，否则「全部事件 403」无法与 NTP 漂移建立联系。"""
+    events._now = lambda: 1_000_000.0
+    with caplog.at_level(logging.WARNING, logger="app.channels.feishu.events"):
+        with pytest.raises(FeishuAuthError):
+            events.verify_timestamp_freshness("999699")
+    assert any("skew=301.0s" in record.getMessage() for record in caplog.records)
+
+
 def test_seen_events_table_stays_bounded_after_ttl():
     """去重表按插入序批量摘除，规模不随历史事件数线性增长（F-08）。"""
     base = 1_000_000.0
-    events._now = lambda: base
+    events._mono = lambda: base
     for index in range(500):
         assert events.accept_event(f"evt-{index}") is True
     assert len(events._seen_events) == 500
 
-    events._now = lambda: base + 601
+    events._mono = lambda: base + 601
     assert events.accept_event("evt-new") is True
     assert len(events._seen_events) == 1
 
@@ -486,12 +537,12 @@ def test_rate_windows_reclaim_stale_keys(override_settings):
     """限流表已过窗的 open_id 条目会被摊还清理，key 不永久驻留（F-08）。"""
     override_settings(chat_rate_limit_per_minute=5)
     base = 1_000_000.0
-    events._now = lambda: base
+    events._mono = lambda: base
     for index in range(events.RATE_SWEEP_EVERY):
         assert events.allow_rate(f"ou-{index}") is True
     assert len(events._rate_windows) == events.RATE_SWEEP_EVERY
 
-    events._now = lambda: base + 61
+    events._mono = lambda: base + 61
     for index in range(events.RATE_SWEEP_EVERY):
         assert events.allow_rate(f"ou-new-{index}") is True
 

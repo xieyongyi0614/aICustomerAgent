@@ -349,6 +349,74 @@ async def test_proactive_idempotency_no_double_send(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_concurrent_same_key_sends_once(monkeypatch):
+    """幂等占位必须原子：并发调用同一键不得重复投递。
+
+    「先查、再发（await）、后记账」的写法会在 `await` 处交错，两个调用者同时
+    看到「未投递」而各发一次；本用例用会让出事件循环的 transport 固定该场景。
+    """
+
+    class _YieldingTransport(FakeTransport):
+        async def post_json(self, url, body, timeout, headers=None):
+            await asyncio.sleep(0)
+            return await super().post_json(url, body, timeout, headers)
+
+    fake = _YieldingTransport(_ok_responder)
+    feishu_client.set_transport(fake)
+    adapter = FeishuChannelAdapter()
+    results = await asyncio.gather(
+        adapter.send(_reply_message()),
+        adapter.send(_reply_message()),
+    )
+    assert all(result.ok for result in results)
+    assert len(_im_calls(fake)) == 1
+
+
+@pytest.mark.asyncio
+async def test_failed_send_releases_claim_and_allows_retry(monkeypatch, fake_sleep):
+    """投递失败必须回滚占位，否则重试会被自己的幂等表永久挡住。"""
+    state = {"n": 0}
+
+    def _respond(url, body):
+        if _is_token_call(url):
+            return 200, _token_body()
+        state["n"] += 1
+        if state["n"] == 1:
+            return 400, {"code": 99991400, "msg": "err"}
+        return 200, SUCCESS_BODY
+
+    _mount(monkeypatch, _respond)
+    adapter = FeishuChannelAdapter()
+    first = await adapter.send(_reply_message())
+    second = await adapter.send(_reply_message())
+    assert first.ok is False
+    assert second.ok is True
+    assert state["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_raised_send_releases_claim_and_allows_retry(monkeypatch):
+    """发送**抛异常**（而非返回失败结果）时同样要回滚占位，否则重试被静默跳过。"""
+    state = {"n": 0}
+
+    class _FlakyTransport(FakeTransport):
+        async def post_json(self, url, body, timeout, headers=None):
+            if not _is_token_call(url):
+                state["n"] += 1
+                if state["n"] == 1:
+                    raise RuntimeError("boom")
+            return await super().post_json(url, body, timeout, headers)
+
+    feishu_client.set_transport(_FlakyTransport(_ok_responder))
+    adapter = FeishuChannelAdapter()
+    first = await adapter.send(_reply_message())
+    second = await adapter.send(_reply_message())
+    assert first.ok is False
+    assert second.ok is True
+    assert state["n"] == 2
+
+
+@pytest.mark.asyncio
 async def test_proactive_different_keys_both_sent(monkeypatch):
     fake = _mount(monkeypatch, _ok_responder)
     adapter = FeishuChannelAdapter()
@@ -363,6 +431,21 @@ async def test_reset_delivery_state_allows_resend(monkeypatch):
     adapter = FeishuChannelAdapter()
     await adapter.send(_reply_message())
     reset_delivery_state()
+    await adapter.send(_reply_message())
+    assert len(_im_calls(fake)) == 2
+
+
+@pytest.mark.asyncio
+async def test_delivery_idempotency_window_expires_on_monotonic_clock(monkeypatch):
+    """幂等窗口是「时长」，由单调钟推进：跨过 TTL 后同一键可重发。"""
+    monkeypatch.setattr(delivery, "_mono", lambda: 1_000.0)
+    fake = _mount(monkeypatch, _ok_responder)
+    adapter = FeishuChannelAdapter()
+    await adapter.send(_reply_message())
+    await adapter.send(_reply_message())
+    assert len(_im_calls(fake)) == 1
+
+    monkeypatch.setattr(delivery, "_mono", lambda: 1_000.0 + 601)
     await adapter.send(_reply_message())
     assert len(_im_calls(fake)) == 2
 

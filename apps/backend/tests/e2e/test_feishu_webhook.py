@@ -10,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.v1 import feishu as feishu_api
 from app.channels.feishu import adapter, events
+from app.channels.feishu.adapter import FALLBACK_TEXTS
 from app.main import app
 
 URL = "/api/v1/feishu/events"
@@ -59,12 +60,16 @@ def encrypt_payload(key: str, payload: dict) -> str:
     ).decode()
 
 
+def _fresh_create_time_ms() -> str:
+    return str(int(time.time() * 1000))
+
+
 def event_payload(event_id="evt-e2e-1", chat_type="p2p", message_type="text", text="你好", open_id="ou_e2e_alice"):
     return {
         "header": {
             "event_id": event_id,
             "event_type": "im.message.receive_v1",
-            "create_time": "1767196800000",
+            "create_time": _fresh_create_time_ms(),
             "tenant_key": "tk_e2e",
             "app_id": "cli_e2e",
             "token": VERIFICATION_TOKEN,
@@ -367,7 +372,15 @@ async def test_ack_not_blocked_by_slow_handler(override_settings, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_per_open_id(override_settings, dispatch_spy):
+async def test_rate_limit_per_open_id(override_settings, dispatch_spy, monkeypatch):
+    """超限不返回 429：飞书会重投同一 event_id，而该 id 已落去重表，
+    重投会被静默吞掉（消息永久丢失）。改为回兜底文案并保持 200。"""
+    replies = []
+
+    async def _record(outcome):
+        replies.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
     for index in range(2):
         response = await post_event(
             override_settings,
@@ -380,9 +393,48 @@ async def test_rate_limit_per_open_id(override_settings, dispatch_spy):
         payload=event_payload(event_id="evt-rate-2"),
         chat_rate_limit_per_minute=2,
     )
-    assert limited.status_code == 429
+    assert limited.status_code == 200
     assert await wait_for(lambda: len(dispatch_spy) == 2)
     assert len(dispatch_spy) == 2
+    assert await wait_for(lambda: len(replies) == 1)
+    assert [outcome.error_kind for outcome in replies] == ["overloaded"]
+    assert replies[0].outbound_text == FALLBACK_TEXTS["overloaded"]
+    assert replies[0].source_message_ref == "om_e2e_1"
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_message_is_not_lost_on_retry(override_settings, dispatch_spy, monkeypatch):
+    """限流后飞书重投同一 event_id：不得被去重表静默吞掉，用户必须收到兜底文案。"""
+    replies = []
+
+    async def _record(outcome):
+        replies.append(outcome)
+
+    monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
+    allowed = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-lost-1"),
+        chat_rate_limit_per_minute=1,
+    )
+    assert allowed.status_code == 200
+    blocked = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-lost-2"),
+        chat_rate_limit_per_minute=1,
+    )
+    assert blocked.status_code == 200
+    retry = await post_event(
+        override_settings,
+        payload=event_payload(event_id="evt-lost-2"),
+        chat_rate_limit_per_minute=1,
+    )
+    assert retry.status_code == 200
+
+    assert await wait_for(lambda: len(replies) == 1)
+    assert [outcome.error_kind for outcome in replies] == ["overloaded"]
+    assert replies[0].outbound_text == FALLBACK_TEXTS["overloaded"]
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert len(dispatch_spy) == 1
 
 
 @pytest.mark.asyncio
@@ -397,10 +449,6 @@ async def test_no_secrets_in_rejection_logs(override_settings, dispatch_spy, cap
     text = caplog.text + response.text
     for secret in (ENCRYPT_KEY, APP_SETTINGS["feishu_app_secret"], VERIFICATION_TOKEN):
         assert secret not in text
-
-
-def _fresh_create_time_ms() -> str:
-    return str(int(time.time() * 1000))
 
 
 def _encrypted_body(inner: dict) -> bytes:
@@ -442,6 +490,51 @@ async def test_encrypted_stale_timestamp_header_403(override_settings, dispatch_
         override_settings,
         raw=_encrypted_body(inner),
         headers={"X-Lark-Request-Timestamp": str(int(time.time()) - 3600)},
+        feishu_encrypt_key=ENCRYPT_KEY,
+    )
+    assert response.status_code == 403
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_plaintext_stale_create_time_403(override_settings, dispatch_spy):
+    """明文 + 空 Encrypt Key：验签早退不得连新鲜度校验一起跳过（否则可无限重放）。"""
+    payload = event_payload(event_id="evt-plain-replay")
+    payload["header"]["create_time"] = str(int((time.time() - 100000) * 1000))
+    response = await post_event(override_settings, payload=payload)
+    assert response.status_code == 403
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_plaintext_stale_timestamp_header_403(override_settings, dispatch_spy):
+    payload = event_payload(event_id="evt-plain-hdr")
+    response = await post_event(
+        override_settings,
+        payload=payload,
+        headers={"X-Lark-Request-Timestamp": str(int(time.time()) - 100000)},
+    )
+    assert response.status_code == 403
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_plaintext_fresh_event_still_accepted(override_settings, dispatch_spy):
+    """补上明文新鲜度校验后，正常投递不得被误杀。"""
+    response = await post_event(override_settings, payload=event_payload(event_id="evt-plain-ok"))
+    assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+
+
+@pytest.mark.asyncio
+async def test_huge_timestamp_header_does_not_500(override_settings, dispatch_spy):
+    """超长时间戳头不得触发未捕获 OverflowError（外部输入直达异常）。"""
+    inner = event_payload(event_id="evt-huge-ts")
+    inner["header"]["create_time"] = _fresh_create_time_ms()
+    response = await post_event(
+        override_settings,
+        raw=_encrypted_body(inner),
+        headers={"X-Lark-Request-Timestamp": "9" * 400},
         feishu_encrypt_key=ENCRYPT_KEY,
     )
     assert response.status_code == 403
