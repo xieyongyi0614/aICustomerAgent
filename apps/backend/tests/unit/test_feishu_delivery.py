@@ -10,7 +10,6 @@ from app.channels.feishu import delivery
 from app.channels.feishu.delivery import (
     FeishuChannelAdapter,
     deliver_reply,
-    reset_delivery_state,
     send_proactive,
 )
 from app.channels.feishu.outbound import split_text
@@ -52,10 +51,8 @@ def _is_token_call(url):
 @pytest.fixture(autouse=True)
 def _reset_state(override_settings):
     override_settings(**APP_SETTINGS)
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
     yield
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
 
 
@@ -348,13 +345,41 @@ async def test_proactive_idempotency_no_double_send(monkeypatch):
     assert len(_im_calls(fake)) == 1
 
 
+def _use_independent_connections(monkeypatch, tmp_path):
+    """把出站幂等仓储指向**独立连接**的文件库，以复现真实并发语义。
+
+    conftest 的内存 SQLite 用 StaticPool **共享单连接**：多线程会在同一连接上交错，
+    「两个进程各占一次」的竞态复现不出来（两者都会判为成功）。真实部署（PG）每个
+    占位各用一条连接，故这里必须用文件库 + NullPool 才能测到唯一约束的裁决作用。
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    from app.core.db import Base
+    from app.repositories import feishu_delivery_ledger_repository
+
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'delivery.db'}",
+        poolclass=NullPool,
+        connect_args={"timeout": 5},
+    )
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(
+        feishu_delivery_ledger_repository,
+        "SessionLocal",
+        sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
+    )
+
+
 @pytest.mark.asyncio
-async def test_concurrent_same_key_sends_once(monkeypatch):
+async def test_concurrent_same_key_sends_once(monkeypatch, tmp_path):
     """幂等占位必须原子：并发调用同一键不得重复投递。
 
     「先查、再发（await）、后记账」的写法会在 `await` 处交错，两个调用者同时
     看到「未投递」而各发一次；本用例用会让出事件循环的 transport 固定该场景。
     """
+    _use_independent_connections(monkeypatch, tmp_path)
 
     class _YieldingTransport(FakeTransport):
         async def post_json(self, url, body, timeout, headers=None):
@@ -425,51 +450,8 @@ async def test_proactive_different_keys_both_sent(monkeypatch):
     assert len(_im_calls(fake)) == 2
 
 
-@pytest.mark.asyncio
-async def test_reset_delivery_state_allows_resend(monkeypatch):
-    fake = _mount(monkeypatch, _ok_responder)
-    adapter = FeishuChannelAdapter()
-    await adapter.send(_reply_message())
-    reset_delivery_state()
-    await adapter.send(_reply_message())
-    assert len(_im_calls(fake)) == 2
-
-
-@pytest.mark.asyncio
-async def test_delivery_idempotency_window_expires_on_monotonic_clock(monkeypatch):
-    """幂等窗口是「时长」，由单调钟推进：跨过 TTL 后同一键可重发。"""
-    monkeypatch.setattr(delivery, "_mono", lambda: 1_000.0)
-    fake = _mount(monkeypatch, _ok_responder)
-    adapter = FeishuChannelAdapter()
-    await adapter.send(_reply_message())
-    await adapter.send(_reply_message())
-    assert len(_im_calls(fake)) == 1
-
-    monkeypatch.setattr(delivery, "_mono", lambda: 1_000.0 + 601)
-    await adapter.send(_reply_message())
-    assert len(_im_calls(fake)) == 2
-
-
-def test_delivery_idempotency_ttl_inherits_inbound_ttl_by_default(override_settings):
-    override_settings(feishu_dedupe_ttl_seconds=600, feishu_outbound_idempotency_ttl_seconds=0)
-    assert delivery._idempotency_ttl_seconds() == 600
-
-
-@pytest.mark.asyncio
-async def test_delivery_idempotency_ttl_can_be_decoupled(monkeypatch, override_settings):
-    """主动消息的重试间隔可能远超入站去重窗口，故出站 TTL 可独立配置。"""
-    override_settings(feishu_dedupe_ttl_seconds=600, feishu_outbound_idempotency_ttl_seconds=5)
-    assert delivery._idempotency_ttl_seconds() == 5
-    monkeypatch.setattr(delivery, "_mono", lambda: 2_000.0)
-    fake = _mount(monkeypatch, _ok_responder)
-    adapter = FeishuChannelAdapter()
-    await adapter.send(_proactive_message(key="k-ttl"))
-    await adapter.send(_proactive_message(key="k-ttl"))
-    assert len(_im_calls(fake)) == 1
-
-    monkeypatch.setattr(delivery, "_mono", lambda: 2_000.0 + 6)
-    await adapter.send(_proactive_message(key="k-ttl"))
-    assert len(_im_calls(fake)) == 2
+# 幂等窗口（TTL 推导、过期后可重发、摊还清理）由 `test_feishu_delivery_ledger_service.py`
+# 覆盖——出站幂等只有一条路径（注入的持久化实现），故不再在本文件重复。
 
 
 @pytest.mark.asyncio

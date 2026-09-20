@@ -17,12 +17,10 @@ from app.services import agent_service
 def _reset_state(override_settings):
     override_settings(feishu_enabled=False)
     events.reset_event_state()
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
     adapter.reset_feishu_adapter()
     yield
     events.reset_event_state()
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
     adapter.reset_feishu_adapter()
 

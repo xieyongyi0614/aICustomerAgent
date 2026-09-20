@@ -44,7 +44,6 @@ class FeishuSettings(BaseSettings):
     feishu_router_enabled: bool = False
     feishu_router_instance_urls: str = ""
     feishu_router_timeout_seconds: float = 5.0
-    feishu_outbound_idempotency_persistent_enabled: bool = False
     feishu_api_base: str = "https://open.feishu.cn"
     feishu_llm_profile: str = ""
     feishu_timeout_seconds: float = 10.0
@@ -174,10 +173,6 @@ class FeishuSettings(BaseSettings):
                 (
                     "FEISHU_DEDUPE_PERSISTENT_ENABLED",
                     self.feishu_dedupe_persistent_enabled,
-                ),
-                (
-                    "FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED",
-                    self.feishu_outbound_idempotency_persistent_enabled,
                 ),
             )
             if not ok

@@ -32,7 +32,6 @@ EXPECTED_DEFAULTS = {
     "feishu_router_enabled": False,
     "feishu_router_instance_urls": "",
     "feishu_router_timeout_seconds": 5.0,
-    "feishu_outbound_idempotency_persistent_enabled": False,
     "feishu_api_base": "https://open.feishu.cn",
     "feishu_llm_profile": "",
     "feishu_timeout_seconds": 10.0,
@@ -64,7 +63,6 @@ ENV_OVERRIDES = {
     "FEISHU_INSTANCE_INDEX": "2",
     "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED": "true",
     "FEISHU_ROUTER_TIMEOUT_SECONDS": "2.5",
-    "FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED": "true",
     "FEISHU_API_BASE": "https://feishu.example.com/",
     "FEISHU_LLM_PROFILE": "longcat",
     "FEISHU_TIMEOUT_SECONDS": "3.5",
@@ -98,8 +96,6 @@ FIELD_TO_ENV = {
     "feishu_router_enabled": "FEISHU_ROUTER_ENABLED",
     "feishu_router_instance_urls": "FEISHU_ROUTER_INSTANCE_URLS",
     "feishu_router_timeout_seconds": "FEISHU_ROUTER_TIMEOUT_SECONDS",
-    "feishu_outbound_idempotency_persistent_enabled":
-        "FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED",
     "feishu_api_base": "FEISHU_API_BASE",
     "feishu_llm_profile": "FEISHU_LLM_PROFILE",
     "feishu_timeout_seconds": "FEISHU_TIMEOUT_SECONDS",
@@ -138,7 +134,6 @@ def test_feishu_env_overrides_all_keys(monkeypatch):
     assert settings.feishu_instance_index == 2
     assert settings.feishu_ingress_sharded_routing_enabled is True
     assert settings.feishu_router_timeout_seconds == 2.5
-    assert settings.feishu_outbound_idempotency_persistent_enabled is True
     assert settings.feishu_api_base == "https://feishu.example.com"
     assert settings.feishu_timeout_seconds == 3.5
     assert settings.feishu_token_refresh_ratio == 0.5
@@ -232,9 +227,6 @@ def test_feishu_instance_count_must_be_positive():
 MULTI_INSTANCE_DECLARATIONS = {
     "feishu_ingress_sharded_routing_enabled": "FEISHU_INGRESS_SHARDED_ROUTING_ENABLED",
     "feishu_dedupe_persistent_enabled": "FEISHU_DEDUPE_PERSISTENT_ENABLED",
-    "feishu_outbound_idempotency_persistent_enabled": (
-        "FEISHU_OUTBOUND_IDEMPOTENCY_PERSISTENT_ENABLED"
-    ),
 }
 
 
@@ -252,10 +244,11 @@ def _multi_instance_kwargs(**extra):
 def test_feishu_enabled_rejects_multi_instance():
     """FEISHU-011 方案 C：多实例**就绪契约**。
 
-    多实例的会话串行依赖 ingress 按会话分片分流（方案 C）；跨进程去重与出站幂等
-    分别兜住「路由配错」与「重复投递」。三者都必须显式声明，否则启动期失败——
-    而不是记一条 warning 后照跑（故障会以「偶发消息交错 / 重复回复」的形式出现，
-    极难定位）。
+    多实例的会话串行依赖 ingress 按会话分片分流（方案 C）；跨进程去重兜住「路由配错」
+    时的重复处理。两者都必须显式声明，否则启动期失败——而不是记一条 warning 后照跑
+    （故障会以「偶发消息交错」的形式出现，极难定位）。
+
+    出站幂等（FEISHU-012）**不在契约里**：它是必需能力、无开关，由组合根无条件安装。
     """
     with pytest.raises(SettingsError) as exc_info:
         FeishuSettings(**_multi_instance_kwargs())
@@ -286,7 +279,6 @@ def test_feishu_router_enabled_counts_as_sharded_routing_declaration():
             feishu_router_enabled=True,
             feishu_router_instance_urls="http://i0.test,http://i1.test",
             feishu_dedupe_persistent_enabled=True,
-            feishu_outbound_idempotency_persistent_enabled=True,
         )
     )
     assert settings.feishu_router_enabled is True

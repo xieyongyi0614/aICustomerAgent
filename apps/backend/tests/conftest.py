@@ -306,6 +306,26 @@ def _offline_repos(monkeypatch):
     engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _persistent_outbound_idempotency():
+    """Autouse：与生产一致地安装出站幂等持久化实现。
+
+    生产由 `app/main.py` 在 `FEISHU_ENABLED` 时**无条件安装**（出站幂等是必需能力，
+    没有开关）。测试里必须同样安装，否则 `delivery` 会走「hook 未安装」的降级路径
+    （放行发送），幂等用例会失去意义。`_offline_repos` 已把仓储的 SessionLocal 指向
+    内存 SQLite，故这里装的就是真实实现。
+    """
+    from app.channels.feishu import delivery
+    from app.services import feishu_delivery_ledger_service
+
+    delivery.set_persistent_idempotency(
+        feishu_delivery_ledger_service.claim,
+        feishu_delivery_ledger_service.release,
+    )
+    yield
+    delivery.clear_persistent_idempotency()
+
+
 @pytest.fixture
 def db_session_factory(_offline_repos):
     return _offline_repos

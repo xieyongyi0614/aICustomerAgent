@@ -1,13 +1,16 @@
 """飞书出站编排：形态判定 → 收件人解析 → 切分 → 逐段发送 → 幂等 → 收口（FEISHU-005）。
 
 Reply（有锚点）与 Proactive（无锚点）共用同一切分/幂等/收口实现，差异仅在底层
-API。所有入口**永不抛异常**；零 DB 访问；不 import 任何 Autonomy 模块（R3）。
+API。所有入口**永不抛异常**；零 DB 访问（幂等存储经注入的 hook，见文件末尾）；不
+import 任何 Autonomy 模块（R3）。
+
+**幂等存储是必需能力，不是可选项**：占位判定必须跨进程共享，否则多 worker / 多实例下
+同一逻辑消息会被每个实例各投一次（重复回复用户）。实现由组合根 `app/main.py` 在飞书
+启用时**无条件安装**（`set_persistent_idempotency`）——通道层不得 import
+`app.repositories`（依赖 allowlist fail-closed），故只能注入。
 """
 
 import logging
-import threading
-import time
-from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 
 from app.channels.base import (
@@ -25,20 +28,8 @@ from app.services import channel_identity_service
 
 logger = logging.getLogger(__name__)
 
-# 插入序即时间序：过期项从头部批量摘除（O(过期数)），避免每次调用全表扫描。
-_delivered: OrderedDict[str, float] = OrderedDict()
-_delivered_lock = threading.Lock()
-_mono = time.monotonic
-
 ClaimHook = Callable[[str], Awaitable[bool]]
 ReleaseHook = Callable[[str], Awaitable[None]]
-
-
-def reset_delivery_state() -> None:
-    global _mono
-    with _delivered_lock:
-        _delivered.clear()
-    _mono = time.monotonic
 
 
 class FeishuChannelAdapter:
@@ -181,72 +172,50 @@ _release_hook: ReleaseHook | None = None
 
 
 def set_persistent_idempotency(claim: ClaimHook, release: ReleaseHook) -> None:
-    """由**组合根**安装持久化幂等实现（FEISHU-011 出站幂等落库）。
+    """由**组合根**安装持久化幂等实现（FEISHU-012）。
 
-    通道层的依赖 allowlist 是 fail-closed 的（不得 import `app.repositories`），
-    故持久化实现不能在这里直接构造，只能由 `app/main.py` 注入。未安装时走进程内表。
+    通道层的依赖 allowlist 是 fail-closed 的（不得 import `app.repositories`），故持久化
+    实现只能由 `app/main.py` 在飞书启用时**无条件安装**——出站幂等是必需能力，没有开关。
     """
-    global _claim_hook, _release_hook
+    global _claim_hook, _release_hook, _missing_hook_logged
     _claim_hook = claim
     _release_hook = release
+    _missing_hook_logged = False
 
 
 def clear_persistent_idempotency() -> None:
-    global _claim_hook, _release_hook
+    """卸载注入（仅供测试夹具使用；生产不会走到未安装状态）。"""
+    global _claim_hook, _release_hook, _missing_hook_logged
     _claim_hook = None
     _release_hook = None
+    _missing_hook_logged = False
+
+
+_claim_hook: ClaimHook | None = None
+_release_hook: ReleaseHook | None = None
+_missing_hook_logged = False
 
 
 async def _claim_delivery(key: str) -> bool:
-    """占位入口：装了持久化实现就走它（跨进程），否则走进程内表。"""
-    if _claim_hook is not None:
-        return await _claim_hook(key)
-    return _claim_delivery_memory(key)
+    """占位入口：调注入的持久化实现（跨进程唯一约束）。
+
+    **未安装 hook 属配置缺陷**（组合根没跑）：记一次 error 后**放行发送**。放行而非
+    跳过，是因为「重复一条消息」远比「用户收不到回复」可接受。
+    """
+    global _missing_hook_logged
+    if _claim_hook is None:
+        if not _missing_hook_logged:
+            _missing_hook_logged = True
+            logger.error(
+                "feishu outbound idempotency hook 未安装，已降级为放行发送（可能重复投递）："
+                "应由 app/main.py 在 FEISHU_ENABLED 时安装"
+            )
+        return True
+    return await _claim_hook(key)
 
 
 async def _release_delivery(key: str) -> None:
-    if _release_hook is not None:
-        await _release_hook(key)
+    """回滚占位，使重试仍可继续（发送失败/抛异常时调用）。"""
+    if _release_hook is None:
         return
-    _release_delivery_memory(key)
-
-
-def _idempotency_ttl_seconds() -> int:
-    """出站幂等窗口：`feishu_outbound_idempotency_ttl_seconds` 为 0 时沿用入站去重 TTL。"""
-    settings = get_settings()
-    return (
-        settings.feishu_outbound_idempotency_ttl_seconds
-        or settings.feishu_dedupe_ttl_seconds
-    )
-
-
-def _claim_delivery_memory(key: str) -> bool:
-    """进程内「原子查 + 占位」：同一幂等键至多一个并发调用者拿到 True。
-
-    幂等必须由**单次加锁内**的判定保证：若拆成「先查、再发（await）、后记账」，
-    并发调用者会在 `await` 处交错而同时看到「未投递」，导致重复投递。
-    发送失败时调用 `_release_delivery` 回滚，使重试仍可继续。
-
-    窗口是「时长」，故用单调钟（`_mono`）而非 wall clock：回拨会让条目永不淘汰，
-    使后续重投被自己的幂等表静默跳过（与 `events` 的时钟约定一致）。
-    """
-    ttl = _idempotency_ttl_seconds()
-    now = _mono()
-    with _delivered_lock:
-        _evict_delivered(now, ttl)
-        if key in _delivered:
-            return False
-        _delivered[key] = now
-        return True
-
-
-def _release_delivery_memory(key: str) -> None:
-    with _delivered_lock:
-        _delivered.pop(key, None)
-
-
-def _evict_delivered(now: float, ttl: float) -> None:
-    while _delivered:
-        if now - next(iter(_delivered.values())) <= ttl:
-            break
-        _delivered.popitem(last=False)
+    await _release_hook(key)

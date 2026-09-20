@@ -58,10 +58,8 @@ def _error_responder(url, body):
 @pytest.fixture(autouse=True)
 def _reset_state(override_settings):
     override_settings(**APP_SETTINGS)
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
     yield
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
 
 

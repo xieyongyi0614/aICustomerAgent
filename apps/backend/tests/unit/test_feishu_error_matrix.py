@@ -14,6 +14,7 @@ from app.channels.feishu import adapter, delivery
 from app.channels.feishu.adapter import FALLBACK_TEXTS
 from app.channels.feishu import client as feishu_client
 from app.channels.feishu.delivery import FeishuChannelAdapter, send_proactive
+from app.repositories import feishu_delivery_ledger_repository
 from app.channels.feishu.errors import (
     FeishuAuthError,
     FeishuClientError,
@@ -33,12 +34,10 @@ from app.services.agent_service import EmptyLLMResponseError
 @pytest.fixture(autouse=True)
 def _reset_state():
     events.reset_event_state()
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
     adapter.reset_feishu_adapter()
     yield
     events.reset_event_state()
-    delivery.reset_delivery_state()
     feishu_client.reset_feishu_client()
     adapter.reset_feishu_adapter()
 
@@ -279,13 +278,14 @@ def test_row10_overlong_reply_is_split_losslessly():
 
 @pytest.mark.asyncio
 async def test_row11_duplicate_delivery_not_doubled(monkeypatch):
-    _mount_transport(monkeypatch, status=200, code=0)
+    """重复投递不得加倍：幂等占位落在持久化表（跨进程），第二次被跳过。"""
+    fake = _mount_transport(monkeypatch, status=200, code=0)
     fake_adapter = FeishuChannelAdapter()
     first = await fake_adapter.send(_reply_message())
     second = await fake_adapter.send(_reply_message())
     assert first.ok and second.ok
-    assert delivery._delivered
-    assert len([k for k in delivery._delivered if k.startswith("reply:om_m")]) == 1
+    assert feishu_delivery_ledger_repository.exists("reply:om_m:0")
+    assert len([url for url in fake.calls if "tenant_access_token" not in url]) == 1
 
 
 @pytest.mark.asyncio

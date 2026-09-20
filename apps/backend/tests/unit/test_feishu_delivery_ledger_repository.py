@@ -1,8 +1,14 @@
-"""feishu_deliveries 仓储：跨进程出站幂等的原子性、回滚与 TTL（FEISHU-011）。"""
+"""feishu_deliveries 仓储：跨进程出站幂等的原子性、回滚与 TTL（FEISHU-012）。"""
 
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+
+from app.core.db import Base
 
 from app.repositories import feishu_delivery_ledger_repository as repo
 
@@ -73,3 +79,32 @@ def test_segments_are_independent():
 def test_claim_accepts_arbitrary_key(key):
     assert repo.claim(key, BASE, NOT_EXPIRED) is True
     assert repo.claim(key, BASE, NOT_EXPIRED) is False
+
+
+@pytest.mark.asyncio
+async def test_concurrent_claim_arbitrated_by_unique_constraint(tmp_path, monkeypatch):
+    """跨连接并发占位：唯一约束必须让两者**只有一个**成功。
+
+    这是幂等的核心保证。必须用**独立连接**（文件库 + NullPool）才复现得出来——
+    conftest 的内存 SQLite 用 StaticPool 共享单连接，两个线程会在同一连接上交错，
+    双双判为「首次」。
+    """
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'ledger.db'}",
+        poolclass=NullPool,
+        connect_args={"timeout": 5},
+    )
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(
+        repo,
+        "SessionLocal",
+        sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
+    )
+
+    for trial in range(5):
+        key = f"reply:om_conc:{trial}"
+        results = await asyncio.gather(
+            asyncio.to_thread(repo.claim, key, BASE, NOT_EXPIRED),
+            asyncio.to_thread(repo.claim, key, BASE, NOT_EXPIRED),
+        )
+        assert sorted(results) == [False, True], (trial, results)

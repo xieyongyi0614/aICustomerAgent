@@ -7,7 +7,7 @@ from app.channels.base import OutboundMessage, RecipientRef
 from app.channels.feishu import client as feishu_client
 from app.channels.feishu import delivery
 from app.channels.feishu.adapter import TurnOutcome
-from app.channels.feishu.delivery import deliver_reply, reset_delivery_state
+from app.channels.feishu.delivery import deliver_reply
 from app.channels.feishu.outbound import split_text
 from app.core import llm_factory
 from app.repositories import conversation_repository
@@ -64,10 +64,8 @@ def _im_calls(transport):
 @pytest.fixture(autouse=True)
 def _reset_state(override_settings):
     override_settings(**APP_SETTINGS)
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
     yield
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
 
 

@@ -1,4 +1,8 @@
-"""出站幂等持久化服务 + 注入 seam：fail-open、TTL 一致性与跨进程生效（FEISHU-011）。"""
+"""出站幂等持久化服务与注入 seam（FEISHU-012）。
+
+生产由 `app/main.py` 在 `FEISHU_ENABLED` 时**无条件安装** hook；本文件既测服务本身，
+也测「hook 未安装」这一配置缺陷的降级语义。
+"""
 
 import asyncio
 import logging
@@ -11,24 +15,29 @@ from app.services import feishu_delivery_ledger_service as service
 
 
 @pytest.fixture(autouse=True)
-def _reset_state():
+def _isolate_hook():
+    """本文件默认在**未安装 hook** 状态下起步（conftest 的 autouse 会先装）。
+
+    需要走持久化路径的用例显式调用 `set_persistent_idempotency`。
+    """
     service.reset_delivery_ledger_state()
-    delivery.reset_delivery_state()
     delivery.clear_persistent_idempotency()
     yield
     service.reset_delivery_ledger_state()
-    delivery.reset_delivery_state()
     delivery.clear_persistent_idempotency()
 
 
-def test_ttl_matches_delivery_module(override_settings):
-    """两处 TTL 表达式必须一致，否则会出现「内存已过期、DB 仍判重」的隐性差异。"""
-    for outbound, dedupe in ((0, 600), (30, 600), (0, 120)):
-        override_settings(
-            feishu_outbound_idempotency_ttl_seconds=outbound,
-            feishu_dedupe_ttl_seconds=dedupe,
-        )
-        assert service.idempotency_ttl_seconds() == delivery._idempotency_ttl_seconds()
+@pytest.mark.parametrize(
+    "outbound,dedupe,expected",
+    [(0, 600, 600), (30, 600, 30), (0, 120, 120)],
+)
+def test_idempotency_ttl_inherits_shared_key(override_settings, outbound, dedupe, expected):
+    """TTL 语义：独立键为 0 时沿用入站去重 TTL，否则用独立值。"""
+    override_settings(
+        feishu_outbound_idempotency_ttl_seconds=outbound,
+        feishu_dedupe_ttl_seconds=dedupe,
+    )
+    assert service.idempotency_ttl_seconds() == expected
 
 
 @pytest.mark.asyncio
@@ -91,33 +100,27 @@ async def test_amortized_purge_runs_once_per_window(override_settings, monkeypat
 
 @pytest.mark.asyncio
 async def test_installed_hook_routes_claim_to_persistent_store(override_settings):
-    """安装 hook 后 `delivery` 的占位走持久化存储（跨进程），而非进程内表。"""
+    """安装 hook 后 `delivery` 的占位落到持久化存储（跨进程共享）。"""
     override_settings(feishu_outbound_idempotency_ttl_seconds=600)
     delivery.set_persistent_idempotency(service.claim, service.release)
 
     assert await delivery._claim_delivery("reply:om_hook:0") is True
-    assert delivery._delivered == {}  # 进程内表未被使用
     assert repo.exists("reply:om_hook:0") is True
 
 
 @pytest.mark.asyncio
-async def test_persistent_hook_survives_process_local_reset(override_settings):
-    """对照组核心：清空进程内表后重投仍被判重（等价于换一个实例）。"""
+async def test_persistent_claim_survives_instance_restart(override_settings):
+    """核心价值：判定不依赖任何进程内状态。
+
+    「重启实例」= 卸载 hook 再重新安装（进程内状态清零）；同一键仍必须被判重。
+    """
     override_settings(feishu_outbound_idempotency_ttl_seconds=600)
     delivery.set_persistent_idempotency(service.claim, service.release)
-
     assert await delivery._claim_delivery("reply:om_xproc:0") is True
-    delivery.reset_delivery_state()  # 模拟另一实例：进程内表为空
+
+    delivery.clear_persistent_idempotency()
+    delivery.set_persistent_idempotency(service.claim, service.release)
     assert await delivery._claim_delivery("reply:om_xproc:0") is False
-
-
-@pytest.mark.asyncio
-async def test_memory_hook_does_not_survive_process_local_reset(override_settings):
-    """对照：未安装 hook 时清空进程内表即失去判重——这正是多实例的缺口。"""
-    override_settings(feishu_outbound_idempotency_ttl_seconds=600)
-    assert await delivery._claim_delivery("reply:om_mem:0") is True
-    delivery.reset_delivery_state()
-    assert await delivery._claim_delivery("reply:om_mem:0") is True
 
 
 @pytest.mark.asyncio
@@ -131,18 +134,36 @@ async def test_hook_release_rolls_back_persistent_claim(override_settings):
 
 
 @pytest.mark.asyncio
-async def test_clear_hook_restores_memory_path(override_settings):
-    override_settings(feishu_outbound_idempotency_ttl_seconds=600)
-    delivery.set_persistent_idempotency(service.claim, service.release)
-    delivery.clear_persistent_idempotency()
+async def test_missing_hook_fails_open_with_error(override_settings, caplog):
+    """hook 未安装属**配置缺陷**（组合根没跑）：记 error 后放行发送。
 
-    assert await delivery._claim_delivery("reply:om_back:0") is True
-    assert list(delivery._delivered) == ["reply:om_back:0"]
+    放行而非跳过——「重复一条消息」远比「用户收不到回复」可接受。
+    """
+    override_settings(feishu_outbound_idempotency_ttl_seconds=600)
+    with caplog.at_level(logging.ERROR, logger="app.channels.feishu.delivery"):
+        assert await delivery._claim_delivery("reply:om_nohook:0") is True
+    assert any("hook 未安装" in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_missing_hook_logs_error_only_once(override_settings, caplog):
+    """缺 hook 的告警只记一次，避免每次发送刷爆日志。"""
+    override_settings(feishu_outbound_idempotency_ttl_seconds=600)
+    with caplog.at_level(logging.ERROR, logger="app.channels.feishu.delivery"):
+        for index in range(5):
+            assert await delivery._claim_delivery(f"reply:om_noise:{index}") is True
+    assert len([r for r in caplog.records if "hook 未安装" in r.getMessage()]) == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_hook_release_is_noop(override_settings):
+    override_settings(feishu_outbound_idempotency_ttl_seconds=600)
+    await delivery._release_delivery("reply:om_nohook:0")
 
 
 @pytest.mark.asyncio
 async def test_hook_ttl_expiry_allows_resend(override_settings):
-    """跨过 TTL 后同一幂等键可重发（DB 路径的 TTL 语义与内存路径一致）。"""
+    """跨过 TTL 后同一幂等键可重发（长时间后的重试不应被永久挡住）。"""
     override_settings(feishu_outbound_idempotency_ttl_seconds=1)
     delivery.set_persistent_idempotency(service.claim, service.release)
 

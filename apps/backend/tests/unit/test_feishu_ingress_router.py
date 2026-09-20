@@ -24,7 +24,6 @@ ROUTER_SETTINGS = {
     "feishu_instance_count": 2,
     "feishu_router_instance_urls": "http://i0.test,http://i1.test",
     "feishu_dedupe_persistent_enabled": True,
-    "feishu_outbound_idempotency_persistent_enabled": True,
 }
 
 # ou_e2e_alice 在 2 片下归属 shard 1（golden 值见 test_feishu_shards.py）

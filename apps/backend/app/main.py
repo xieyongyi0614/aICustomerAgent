@@ -75,18 +75,16 @@ async def lifespan(application: FastAPI):
         logging.getLogger(__name__).info(
             "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
         )
-        if get_settings().feishu_outbound_idempotency_persistent_enabled:
-            # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
-            # 故出站幂等的持久化实现只能在这里注入。
-            from app.services import feishu_delivery_ledger_service
+        # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
+        # 故出站幂等的持久化实现只能在这里注入。**无开关**——跨进程幂等是必需能力，
+        # 缺了它多实例下会重复回复用户。
+        from app.services import feishu_delivery_ledger_service
 
-            delivery.set_persistent_idempotency(
-                feishu_delivery_ledger_service.claim,
-                feishu_delivery_ledger_service.release,
-            )
-            logging.getLogger(__name__).info(
-                "飞书出站幂等已切换到持久化存储（跨进程）"
-            )
+        delivery.set_persistent_idempotency(
+            feishu_delivery_ledger_service.claim,
+            feishu_delivery_ledger_service.release,
+        )
+        logging.getLogger(__name__).info("飞书出站幂等已接入持久化存储（跨进程）")
     report = get_manifest_loader().load(get_settings().tool_ext_manifest_path)
     logging.getLogger(__name__).info(
         "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",

@@ -4,7 +4,6 @@ import pytest
 
 from app.channels.feishu import client as feishu_client
 from app.channels.feishu.delivery import (
-    reset_delivery_state,
     send_proactive,
 )
 from app.repositories import conversation_repository, memory_repository
@@ -52,10 +51,8 @@ def _error_responder(url, body):
 @pytest.fixture(autouse=True)
 def _reset_state(override_settings):
     override_settings(**APP_SETTINGS)
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
     yield
-    reset_delivery_state()
     feishu_client.reset_feishu_client()
 
 
