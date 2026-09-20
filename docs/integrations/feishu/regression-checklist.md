@@ -52,8 +52,11 @@
 - [ ] 新鲜度拒绝日志含 `skew=<偏差秒数>`，可与服务器时钟漂移（NTP）建立联系
 - [ ] 非文本反馈：私聊发一张图片或一个表情 → 收到「我目前只能读文字哦～」；**同样的内容发到群聊 → 无任何回复**（N-08）
 - [ ] 非文本刷屏：快速连发表情超过 `CHAT_RATE_LIMIT_PER_MINUTE`（或 `FEISHU_RATE_LIMIT_PER_MINUTE`）后不再回复——兜底文案同样受限流约束
-- [ ] **多实例硬闸**：临时设 `FEISHU_ENABLED=true` + `FEISHU_INSTANCE_COUNT=2` → **服务启动失败**，错误信息含「不支持多实例」与 `multi-instance-options.md` 路径（FEISHU-011 方案 E）。改回 `1` 后正常启动
-  - ⚠️ 该条是**预期失败**：见到启动报错说明闸门生效。若服务照常启动，说明硬闸被回退了
+- [ ] **多实例就绪契约**：临时设 `FEISHU_ENABLED=true` + `FEISHU_INSTANCE_COUNT=2` → **服务启动失败**，错误信息含「多实例就绪契约未满足」、缺哪一项声明、以及 `multi-instance-options.md` 路径（FEISHU-011）
+  - ⚠️ 该条是**预期失败**：见到启动报错说明契约生效。若服务照常启动，说明契约被回退了
+  - 再补上 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED=true` + `FEISHU_DEDUPE_PERSISTENT_ENABLED=true` → 应能正常启动
+- [ ] **分片归属（仅多实例时）**：`FEISHU_INSTANCE_COUNT=2` + `FEISHU_INSTANCE_INDEX=0`，用归属 shard 1 的账号发消息 → 收到 **503**，且日志出现 `feishu event landed on wrong shard`（抽样）；把该实例设为 `INDEX=1` 后同一账号正常受理
+  - ⚠️ 若上线后持续看到 `wrong shard` error，说明 **ingress 没有按 `crc32(open_id) % FEISHU_INSTANCE_COUNT` 分流**——先修 ingress，不要靠改应用绕过
 - [ ] 消息轰炸（超过 `FEISHU_SESSION_QUEUE_LIMIT`）→ 收到「消息有点多」过载提示，且此前已接受的消息仍按序回复
 - [ ] 临时改错 `FEISHU_APP_SECRET` → 启动或首个事件日志出现明确错误分类（可定位是凭据问题）
 - [ ] 临时改错 `FEISHU_ENCRYPT_KEY`（与平台不一致）→ 加密事件解密失败 → 400 且服务不崩

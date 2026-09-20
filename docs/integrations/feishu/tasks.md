@@ -234,22 +234,28 @@
 - **未实现 Scope（多实例前置的剩余两项）**：跨进程会话串行、出站幂等落库（见 architecture §7.3 第 2/3 项）。
 - **Dependency**：FEISHU-002、FEISHU-007。
 
-### FEISHU-011 跨进程会话串行（多实例硬前置之一，**方案 E 已实现；A/B/C 待选**）
+### FEISHU-011 跨进程会话串行（多实例硬前置之一，**方案 C 应用侧已实现；ingress 待落地**）
 
 - **ID**：FEISHU-011
 - **Priority**：P1（多实例前置；单实例下无影响）
 - **来源**：`review-v1.1.md` §5.1 第 2 项、`review-v1.2.md` §2.1 / §7.10
-- **状态**：**方案 E 已实现**（2026-09-20）——启动期硬闸拦住多实例。**真正的跨进程会话串行（方案 A/B/C）待选**，五个方案的做法、收益、代价、工作量清单见 [`multi-instance-options.md`](./multi-instance-options.md)。
-- **Goal**：让「同一 `session_id` 的轮次在任意实例间串行」，消除多实例下同会话消息交错与状态竞态写。
-- **已实现 Scope（方案 E）**：
-  - `core/settings/feishu.py`：`FEISHU_ENABLED=true` 且 `FEISHU_INSTANCE_COUNT > 1` → 抛 `SettingsError`，错误信息列出三项前置进度并指向 `multi-instance-options.md`；未启用飞书时不拦（与凭据校验同口径）。
-  - `channels/feishu/adapter.py`：`_get_turn_gate` docstring 说明「折算校验当前只是防御性，将来硬闸放开后即恢复为真实保护」。
-- **Acceptance Criteria（方案 E）**：
-  1. `enabled=true` + `instance_count=2` → 启动期 `SettingsError`，信息含「不支持多实例」「FEISHU_INSTANCE_COUNT=2」与文档路径，且**不含任何凭据明文**。
-  2. `enabled=true` + `instance_count=1` → 正常加载。
-  3. `enabled=false` + `instance_count>1` → 正常加载（无 webhook 即无并发风险）。
-- **未实现 Scope（真正的跨进程串行）**：方案 A / B / C。选型取决于「能否控制入口」（能 → C，不能 → A）。
-- **放开硬闸的前置**：三项全齐（去重落库 ✅ / 跨进程会话串行 / 出站幂等落库），且把硬闸替换为所选方案的实现。
+- **状态**：**选定方案 C（入口按 `open_id` 粘性路由）**。应用侧契约已实现（2026-09-20）；**ingress 侧分流待落地**（属部署与运维）。五方案对比见 [`multi-instance-options.md`](./multi-instance-options.md)。
+- **Goal**：让「同一 `session_id` 的轮次在任意实例间串行」，消除多实例下同会话消息交错与状态竞态写。方案 C 的做法是**不做分布式锁**，而是让入口把同会话事件恒定送到同一实例，于是进程内 `asyncio.Lock` 就够用。
+- **已实现 Scope（应用侧契约）**：
+  - `channels/feishu/shards.py`：分片算法 `crc32(open_id) % FEISHU_INSTANCE_COUNT`（标准库 `zlib.crc32`，跨语言可实现）、`owns()`、错分片抽样留痕（每 100 次一条 error，含期望分片与实例下标）。
+  - `core/settings/feishu.py`：`feishu_instance_index`（须 `< count`）；**多实例就绪契约** —— `enabled=true` 且 `count>1` 时必须同时声明 `feishu_ingress_sharded_routing_enabled` 与 `feishu_dedupe_persistent_enabled`，缺一即 `SettingsError`。
+  - `api/v1/feishu.py`：`_owns_shard()` 归属校验，**在去重之前**判定；非本分片 → **503**（可重试）并抽样记 error。非文本兜底路径同样受检；challenge 无 `open_id` 不检。
+  - `tests/unit/test_feishu_shards.py`：**golden 值锁定算法**（算法一改即红，提醒同步改 ingress）、分布均匀性、跨调用稳定、抽样留痕。
+- **Acceptance Criteria（应用侧）**：
+  1. 单实例（`count=1`）时归属校验恒为真，行为与升级前完全一致。
+  2. `count>1` 且 `index` 为错误分片 → **503** 且零派发、零出站。
+  3. 归属校验在去重**之前**：错误分片的拒绝不落去重账，故重投到正确实例时仍能被处理（不被去重表吞掉）。
+  4. `count>1` 且未声明 ingress 分流 / 未开跨进程去重 → 启动期 `SettingsError`（信息点名缺哪一项，且不含凭据明文）。
+  5. `feishu_instance_index >= feishu_instance_count` → `SettingsError`。
+  6. challenge（无 `open_id`）不受归属校验影响，任何实例都能应答。
+  7. 通道边界 AST fail-closed 扫描保持通过（`shards.py` 只依赖标准库）。
+- **未实现 Scope（ingress 侧，属运维）**：① 选形态（C1 LB 粘性 / C2 轻量 router / C3 分区队列）；② 按 `crc32(open_id) % FEISHU_INSTANCE_COUNT` 配置分流；③ 健康探测与实例故障时的会话再归属；④ **翻开关前验证分流真的生效**（否则事件大量落错分片 → 503 → 飞书重投 → 重试风暴）。
+- **相关登记**：出站幂等落库未做 —— 在 C 下风险大幅降低（同会话只由一个实例处理），但 `send_proactive` 不走会话锁，**Autonomy 接入飞书（FEISHU-008）前必须补**。
 - **Dependency**：FEISHU-010（去重落库，已完成）、FEISHU-007。
 
 ## 依赖图

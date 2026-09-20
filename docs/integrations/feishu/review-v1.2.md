@@ -610,3 +610,43 @@ except BaseException:
 - **连带修正**：`test_row13b_concurrency_gate_accounts_for_instance_count`（本报告 §7.8 新增）原用 `feishu_enabled=true` + `instance_count=4` 触发折算校验——被 E 的硬闸封死。已改为 `feishu_enabled=false`（折算校验在当前只走防御性路径），并在 docstring 注明「将来放开硬闸后应改回 `enabled=true` 并额外断言闸门真的生效」。
 
 **放开硬闸的前置**：三项前置全齐，且硬闸已被替换为所选方案（A 或 C）的实现。**只放开硬闸而不落实现，等于把今天封死的故障重新放出来** —— 这一句已写进 `multi-instance-options.md` §4。
+
+### 7.12 FEISHU-011 选定方案 C：入口按 `open_id` 粘性路由（应用侧已实现）
+
+**决策**：从五个方案中选定 **C**。理由：一次解决两个缺口（会话串行 + 跨实例连发合并），且不需要分布式锁的一切复杂度（无租约窗口、无连接占用、无哈希碰撞、无新表新迁移）。方案 E 的闸门**形态保留、语义升级为「多实例就绪契约」**。
+
+#### 交付边界（重要）
+
+方案 C 天然分两半：**应用侧契约**（本仓库）与 **ingress 侧分流**（部署与运维）。本次交付前者。
+
+| 部分 | 状态 |
+|---|---|
+| 分片算法 / 实例身份 / 归属校验 / 就绪契约 | ✅ 本次交付 |
+| ingress 分流（C1 LB / C2 router / C3 分区队列） | ❌ 待运维落地 |
+
+#### 应用侧实现
+
+| 位置 | 内容 |
+|---|---|
+| `channels/feishu/shards.py`（新增） | `shard_of` / `owns` / `note_wrong_shard`。算法 `crc32(open_id.encode("utf-8")) % FEISHU_INSTANCE_COUNT`，用标准库 `zlib.crc32`（取值稳定、各语言都有等价实现，ingress 可复刻） |
+| `core/settings/feishu.py` | 新增 `feishu_instance_index`（须 `< count`）与 `feishu_ingress_sharded_routing_enabled`；`_assert_multi_instance_ready()` 实现就绪契约 |
+| `api/v1/feishu.py` | `_owns_shard()` 归属校验，**在 `accept_event` 之前**；非本分片 → `503`。非文本兜底路径同样受检 |
+| `tests/unit/test_feishu_shards.py`（新增） | **golden 值锁定算法** + 分布均匀性 + 跨调用稳定 + 抽样留痕 |
+
+#### 三处关键设计取舍
+
+1. **非本分片返回 503 而非 200**。503 让飞书重投、有机会落到正确实例；静默丢弃（200）会让消息永久丢失且**无任何可观测信号**。若 ingress 完全没生效，503 会立刻表现为大量错误 + 重投，比「静默丢消息」容易发现得多。
+2. **归属校验必须在去重之前**。否则飞书重投会被去重表静默吞掉——正是 FEISHU-009 修过的坑（N-01）。本次把它排到 `accept_event` 之前，保证重投仍有机会被正确处理。
+3. **把 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 纳入就绪契约**（不是可选项）。它是 ingress 配错时的**兜底**：即使同一 `event_id` 被两个实例收到，也只有一次会真正处理。所以 `count>1` 时必须同时声明「ingress 已分流」+「跨进程去重已开」。
+
+#### 风险登记（写进文档与回归清单）
+
+- **翻开关前必须验证 ingress 真的在分流**：否则事件大量落错分片 → 503 → 飞书重投 → 重试风暴。应用侧已抽样记 error（每 100 次一条，含期望分片与实例下标）供发现。
+- **改 `FEISHU_INSTANCE_COUNT` 会改变分片映射**：`crc32 % count` 的基数变了，几乎所有会话换实例。变更时必须同步改 ingress，并预期一段「会话重新归属」窗口（跨进程去重兜底保证不重复处理）。
+- **出站幂等落库仍未做**：在 C 下风险大幅降低（同会话只由一个实例处理），但 `send_proactive` 不走会话锁 → **Autonomy 接入飞书（FEISHU-008）前必须补**。
+
+#### 验证
+
+- 飞书全量 **368 passed / 2 skipped**（+21 用例：分片 10 + 设置 6 + webhook 路由 5）。
+- **反向验证**：把 `api/v1/feishu.py` 回退到 HEAD、只留新用例 → 3 个分片用例**失败**（`503` 相关；`challenge 不受检` 与 `本分片正常` 是守卫，新旧都绿，符合预期），恢复后 md5 一致。
+- **算法锁定**：`test_shard_values_are_frozen` 记录 `ou_e2e_alice` 在 2/3/4 片下的 golden 分片值（1/0/3）——**算法一改此用例即红**，这正是提醒「必须同步改 ingress」的机制。
