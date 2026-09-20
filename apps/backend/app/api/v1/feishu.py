@@ -78,15 +78,19 @@ async def feishu_events(request: Request) -> JSONResponse:
             return _reject(403, "stale request rejected")
 
     inner_token = _verification_token(payload)
-    if inner_token is not None:
-        try:
-            events.verify_token(inner_token, settings.feishu_verification_token)
-        except FeishuAuthError:
-            logger.warning("feishu webhook rejected: verification token mismatch")
-            return _reject(401, "verification token mismatch")
-    elif not encrypted:
+    if inner_token is None:
         logger.warning("feishu webhook rejected: verification token missing")
         return _reject(401, "verification token missing")
+    try:
+        events.verify_token(inner_token, settings.feishu_verification_token)
+    except FeishuConfigError as exc:
+        logger.error(
+            "feishu webhook rejected: %s（FEISHU_VERIFICATION_TOKEN 未配置？）", exc
+        )
+        return _reject(401, "verification token mismatch")
+    except FeishuAuthError:
+        logger.warning("feishu webhook rejected: verification token mismatch")
+        return _reject(401, "verification token mismatch")
 
     if events.is_challenge(payload):
         challenge = events.challenge_of(payload)

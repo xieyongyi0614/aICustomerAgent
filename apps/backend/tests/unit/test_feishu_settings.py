@@ -39,6 +39,9 @@ EXPECTED_DEFAULTS = {
     "feishu_merge_window_ms": 800,
     "feishu_merge_max_messages": 10,
     "feishu_merge_max_chars": 20000,
+    "feishu_rate_limit_per_minute": 0,
+    "feishu_outbound_idempotency_ttl_seconds": 0,
+    "feishu_instance_count": 1,
     "feishu_http_max_attempts": 3,
     "feishu_http_backoff_seconds": 0.5,
     "feishu_http_backoff_max_seconds": 8.0,
@@ -63,6 +66,9 @@ ENV_OVERRIDES = {
     "FEISHU_MERGE_WINDOW_MS": "0",
     "FEISHU_MERGE_MAX_MESSAGES": "3",
     "FEISHU_MERGE_MAX_CHARS": "500",
+    "FEISHU_RATE_LIMIT_PER_MINUTE": "9",
+    "FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS": "120",
+    "FEISHU_INSTANCE_COUNT": "3",
     "FEISHU_HTTP_MAX_ATTEMPTS": "5",
     "FEISHU_HTTP_BACKOFF_SECONDS": "0.1",
     "FEISHU_HTTP_BACKOFF_MAX_SECONDS": "1.0",
@@ -87,6 +93,9 @@ FIELD_TO_ENV = {
     "feishu_merge_window_ms": "FEISHU_MERGE_WINDOW_MS",
     "feishu_merge_max_messages": "FEISHU_MERGE_MAX_MESSAGES",
     "feishu_merge_max_chars": "FEISHU_MERGE_MAX_CHARS",
+    "feishu_rate_limit_per_minute": "FEISHU_RATE_LIMIT_PER_MINUTE",
+    "feishu_outbound_idempotency_ttl_seconds": "FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS",
+    "feishu_instance_count": "FEISHU_INSTANCE_COUNT",
     "feishu_http_max_attempts": "FEISHU_HTTP_MAX_ATTEMPTS",
     "feishu_http_backoff_seconds": "FEISHU_HTTP_BACKOFF_SECONDS",
     "feishu_http_backoff_max_seconds": "FEISHU_HTTP_BACKOFF_MAX_SECONDS",
@@ -99,7 +108,7 @@ def test_feishu_defaults():
         assert getattr(settings, field_name) == expected, field_name
 
 
-def test_feishu_env_overrides_all_21_keys(monkeypatch):
+def test_feishu_env_overrides_all_keys(monkeypatch):
     for env_name, value in ENV_OVERRIDES.items():
         monkeypatch.setenv(env_name, value)
     settings = FeishuSettings()
@@ -117,6 +126,9 @@ def test_feishu_env_overrides_all_21_keys(monkeypatch):
     assert settings.feishu_merge_window_ms == 0
     assert settings.feishu_merge_max_messages == 3
     assert settings.feishu_merge_max_chars == 500
+    assert settings.feishu_rate_limit_per_minute == 9
+    assert settings.feishu_outbound_idempotency_ttl_seconds == 120
+    assert settings.feishu_instance_count == 3
     assert settings.feishu_http_max_attempts == 5
     assert settings.feishu_http_backoff_seconds == 0.1
     assert settings.feishu_http_backoff_max_seconds == 1.0
@@ -174,6 +186,23 @@ def test_feishu_merge_window_allows_zero_and_rejects_negative():
     assert FeishuSettings(feishu_merge_window_ms=0).feishu_merge_window_ms == 0
     with pytest.raises(SettingsError):
         FeishuSettings(feishu_merge_window_ms=-1)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["feishu_rate_limit_per_minute", "feishu_outbound_idempotency_ttl_seconds"],
+)
+def test_feishu_zero_means_inherit_and_negative_rejected(field_name):
+    """0 是「沿用共用键」的合法取值；负数必须拒绝。"""
+    assert getattr(FeishuSettings(**{field_name: 0}), field_name) == 0
+    with pytest.raises(SettingsError):
+        FeishuSettings(**{field_name: -1})
+
+
+def test_feishu_instance_count_must_be_positive():
+    assert FeishuSettings(feishu_instance_count=3).feishu_instance_count == 3
+    with pytest.raises(SettingsError):
+        FeishuSettings(feishu_instance_count=0)
 
 
 def test_feishu_http_retry_bounds():

@@ -337,19 +337,23 @@ def _get_inbox() -> SessionInbox:
 def _get_turn_gate() -> asyncio.Semaphore:
     """进程内全局并发闸门：让 `feishu_max_concurrent_turns` 真正生效。
 
-    ⚠️ 作用域仅限本进程：多实例部署下实际并发是 `limit × 实例数`，因此下方
-    「≤ DB 连接池容量」的一致性校验也只在单实例成立。开多 worker 前必须改为
-    跨进程闸门（PG advisory lock 计数或 Redis 信号量），否则共享连接池会被压满。
+    ⚠️ 作用域仅限本进程：多实例部署下实际并发是 `limit × 实例数`，而 DB 连接池是
+    **共享**的。故一致性校验按 `feishu_instance_count`（部署侧声明，单实例填 1）折算，
+    开多 worker 前必须先把本闸门换成跨进程实现（PG advisory lock 计数或 Redis 信号量）。
     """
     global _turn_semaphore
     if _turn_semaphore is None:
         settings = get_settings()
         limit = max(1, settings.feishu_max_concurrent_turns)
+        instances = max(1, settings.feishu_instance_count)
         capacity = settings.db_pool_size + settings.db_max_overflow
-        if limit > capacity:
+        if limit * instances > capacity:
             logger.warning(
-                "feishu_max_concurrent_turns=%d 超过 DB 连接池容量=%d，可能出现等待超时",
+                "feishu 并发上限 %d × 实例数 %d = %d 超过 DB 连接池容量 %d，"
+                "可能出现等待超时（进程内闸门无法跨实例收敛）",
                 limit,
+                instances,
+                limit * instances,
                 capacity,
             )
         _turn_semaphore = asyncio.Semaphore(limit)

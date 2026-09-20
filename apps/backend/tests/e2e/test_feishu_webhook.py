@@ -291,12 +291,29 @@ async def test_encrypt_key_empty_with_ciphertext_400(override_settings, dispatch
 
 @pytest.mark.asyncio
 async def test_decryptable_but_malformed_inner_200_no_dispatch(override_settings, dispatch_spy):
-    payload = {"encrypt": encrypt_payload(ENCRYPT_KEY, {"surprise": True})}
+    """错误矩阵 2b：token 合法但明文结构非法 → 200（避免飞书无限重推）+ 零派发。"""
+    payload = {
+        "encrypt": encrypt_payload(
+            ENCRYPT_KEY, {"token": VERIFICATION_TOKEN, "surprise": True}
+        )
+    }
     body = serialize(payload)
     response = await post_event(
         override_settings, raw=body, headers=signature_headers(body), feishu_encrypt_key=ENCRYPT_KEY
     )
     assert response.status_code == 200
+    assert dispatch_spy == []
+
+
+@pytest.mark.asyncio
+async def test_encrypted_without_inner_token_401(override_settings, dispatch_spy):
+    """加密体解密后缺 token：token 校验不得因「已加密」而被整段跳过。"""
+    payload = {"encrypt": encrypt_payload(ENCRYPT_KEY, {"surprise": True})}
+    body = serialize(payload)
+    response = await post_event(
+        override_settings, raw=body, headers=signature_headers(body), feishu_encrypt_key=ENCRYPT_KEY
+    )
+    assert response.status_code == 401
     assert dispatch_spy == []
 
 

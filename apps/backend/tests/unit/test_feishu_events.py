@@ -158,6 +158,14 @@ def test_verify_token():
         events.verify_token(None, VERIFICATION_TOKEN)
 
 
+def test_verify_token_missing_config_is_config_error_not_auth_error():
+    """token 未配置属配置缺失，不得与「鉴权失败」混为一谈（否则运维误判为攻击）。"""
+    with pytest.raises(FeishuConfigError) as exc_info:
+        events.verify_token("anything", "")
+    assert "not configured" in str(exc_info.value)
+    assert not isinstance(exc_info.value, FeishuAuthError)
+
+
 def test_signature_match_passes():
     body = b'{"encrypt":"x"}'
     timestamp = str(int(events._now()))
@@ -558,3 +566,19 @@ def test_dedupe_then_rate_does_not_consume_quota(override_settings):
     assert events.allow_rate("ou_quota") is True
     assert events.accept_event("evt-dup-quota") is False
     assert events.allow_rate("ou_quota") is False
+
+
+def test_rate_limit_threshold_inherits_shared_key_by_default(override_settings):
+    """`feishu_rate_limit_per_minute=0` 时沿用 Web 侧的共用键。"""
+    override_settings(chat_rate_limit_per_minute=7, feishu_rate_limit_per_minute=0)
+    assert events.rate_limit_per_minute() == 7
+
+
+def test_rate_limit_threshold_can_be_decoupled(override_settings):
+    """配了独立键就不再受 Web 侧阈值影响（否则调 Web 限流会误伤飞书）。"""
+    override_settings(chat_rate_limit_per_minute=7, feishu_rate_limit_per_minute=2)
+    assert events.rate_limit_per_minute() == 2
+    events._mono = lambda: 3_000.0
+    assert events.allow_rate("ou_decoupled") is True
+    assert events.allow_rate("ou_decoupled") is True
+    assert events.allow_rate("ou_decoupled") is False

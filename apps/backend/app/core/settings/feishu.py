@@ -51,6 +51,9 @@ class FeishuSettings(BaseSettings):
     feishu_merge_window_ms: int = 800
     feishu_merge_max_messages: int = 10
     feishu_merge_max_chars: int = 20000
+    feishu_rate_limit_per_minute: int = 0
+    feishu_outbound_idempotency_ttl_seconds: int = 0
+    feishu_instance_count: int = 1
     feishu_http_max_attempts: int = 3
     feishu_http_backoff_seconds: float = 0.5
     feishu_http_backoff_max_seconds: float = 8.0
@@ -66,6 +69,17 @@ class FeishuSettings(BaseSettings):
                 raise SettingsError(f"{field_name.upper()} 必须大于 0")
         if self.feishu_merge_window_ms < 0:
             raise SettingsError("FEISHU_MERGE_WINDOW_MS 必须 >= 0（0 表示关闭连发合并）")
+        if self.feishu_rate_limit_per_minute < 0:
+            raise SettingsError(
+                "FEISHU_RATE_LIMIT_PER_MINUTE 必须 >= 0（0 表示沿用 CHAT_RATE_LIMIT_PER_MINUTE）"
+            )
+        if self.feishu_outbound_idempotency_ttl_seconds < 0:
+            raise SettingsError(
+                "FEISHU_OUTBOUND_IDEMPOTENCY_TTL_SECONDS 必须 >= 0"
+                "（0 表示沿用 FEISHU_DEDUPE_TTL_SECONDS）"
+            )
+        if self.feishu_instance_count < 1:
+            raise SettingsError("FEISHU_INSTANCE_COUNT 必须 >= 1（单实例填 1）")
         if self.feishu_http_max_attempts < 1:
             raise SettingsError("FEISHU_HTTP_MAX_ATTEMPTS 必须 >= 1")
         if self.feishu_http_backoff_seconds < 0:

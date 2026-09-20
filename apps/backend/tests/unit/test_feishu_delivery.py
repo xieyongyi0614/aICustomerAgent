@@ -450,6 +450,28 @@ async def test_delivery_idempotency_window_expires_on_monotonic_clock(monkeypatc
     assert len(_im_calls(fake)) == 2
 
 
+def test_delivery_idempotency_ttl_inherits_inbound_ttl_by_default(override_settings):
+    override_settings(feishu_dedupe_ttl_seconds=600, feishu_outbound_idempotency_ttl_seconds=0)
+    assert delivery._idempotency_ttl_seconds() == 600
+
+
+@pytest.mark.asyncio
+async def test_delivery_idempotency_ttl_can_be_decoupled(monkeypatch, override_settings):
+    """主动消息的重试间隔可能远超入站去重窗口，故出站 TTL 可独立配置。"""
+    override_settings(feishu_dedupe_ttl_seconds=600, feishu_outbound_idempotency_ttl_seconds=5)
+    assert delivery._idempotency_ttl_seconds() == 5
+    monkeypatch.setattr(delivery, "_mono", lambda: 2_000.0)
+    fake = _mount(monkeypatch, _ok_responder)
+    adapter = FeishuChannelAdapter()
+    await adapter.send(_proactive_message(key="k-ttl"))
+    await adapter.send(_proactive_message(key="k-ttl"))
+    assert len(_im_calls(fake)) == 1
+
+    monkeypatch.setattr(delivery, "_mono", lambda: 2_000.0 + 6)
+    await adapter.send(_proactive_message(key="k-ttl"))
+    assert len(_im_calls(fake)) == 2
+
+
 @pytest.mark.asyncio
 async def test_multi_segment_stops_after_terminal_failure(monkeypatch, fake_sleep):
     monkeypatch.setenv("FEISHU_MAX_REPLY_CHARS", "5")

@@ -4,6 +4,7 @@
 覆盖，重试维度由 tests/unit/test_feishu_delivery.py 覆盖，此处固化行 → 断言的映射。
 """
 
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -333,6 +334,33 @@ def test_row13_inbound_rate_limit_window(override_settings):
     assert events.allow_rate("ou_rate_mx") is True
     assert events.allow_rate("ou_rate_mx") is False
     assert events.allow_rate("ou_rate_other") is True
+
+
+def test_row13b_concurrency_gate_accounts_for_instance_count(override_settings, caplog):
+    """多实例下进程内闸门无法收敛：容量校验须按「上限 × 实例数」折算（N-05）。"""
+    override_settings(
+        feishu_max_concurrent_turns=4,
+        feishu_instance_count=4,
+        db_pool_size=5,
+        db_max_overflow=10,
+    )
+    adapter.reset_feishu_adapter()
+    with caplog.at_level(logging.WARNING, logger="app.channels.feishu.adapter"):
+        adapter._get_turn_gate()
+    assert any("DB 连接池容量" in record.getMessage() for record in caplog.records)
+
+
+def test_row13c_concurrency_gate_silent_within_capacity(override_settings, caplog):
+    override_settings(
+        feishu_max_concurrent_turns=4,
+        feishu_instance_count=1,
+        db_pool_size=5,
+        db_max_overflow=10,
+    )
+    adapter.reset_feishu_adapter()
+    with caplog.at_level(logging.WARNING, logger="app.channels.feishu.adapter"):
+        adapter._get_turn_gate()
+    assert not [r for r in caplog.records if "DB 连接池容量" in r.getMessage()]
 
 
 @pytest.mark.asyncio

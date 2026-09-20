@@ -78,10 +78,11 @@ def decrypt(encrypt_key: str, ciphertext_b64: str) -> dict:
 
 
 def verify_token(header_token: str | None, expected: str) -> None:
-    if (
-        not expected
-        or not header_token
-        or not hmac.compare_digest(header_token.encode("utf-8"), expected.encode("utf-8"))
+    """校验 verification token；`expected` 为空是**配置缺失**，不得与鉴权失败混为一谈。"""
+    if not expected:
+        raise FeishuConfigError("verify_token", detail="verification token not configured")
+    if not header_token or not hmac.compare_digest(
+        header_token.encode("utf-8"), expected.encode("utf-8")
     ):
         raise FeishuAuthError("verify_token", detail="verification token mismatch")
 
@@ -341,9 +342,15 @@ def _evict_seen(now: float, ttl: float) -> None:
         _seen_events.popitem(last=False)
 
 
+def rate_limit_per_minute() -> int:
+    """入站限流阈值：`feishu_rate_limit_per_minute` 为 0 时沿用 Web 侧共用键。"""
+    settings = get_settings()
+    return settings.feishu_rate_limit_per_minute or settings.chat_rate_limit_per_minute
+
+
 def allow_rate(open_id: str) -> bool:
     global _rate_ops
-    limit = get_settings().chat_rate_limit_per_minute
+    limit = rate_limit_per_minute()
     if limit <= 0:
         return True
     now = _mono()

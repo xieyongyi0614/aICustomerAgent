@@ -172,6 +172,15 @@ async def _send_proactive_parts(
     return SendResult(ok=True)
 
 
+def _idempotency_ttl_seconds() -> int:
+    """出站幂等窗口：`feishu_outbound_idempotency_ttl_seconds` 为 0 时沿用入站去重 TTL。"""
+    settings = get_settings()
+    return (
+        settings.feishu_outbound_idempotency_ttl_seconds
+        or settings.feishu_dedupe_ttl_seconds
+    )
+
+
 def _claim_delivery(key: str) -> bool:
     """原子「查 + 占位」：同一幂等键至多一个并发调用者拿到 True。
 
@@ -182,7 +191,7 @@ def _claim_delivery(key: str) -> bool:
     窗口是「时长」，故用单调钟（`_mono`）而非 wall clock：回拨会让条目永不淘汰，
     使后续重投被自己的幂等表静默跳过（与 `events` 的时钟约定一致）。
     """
-    ttl = get_settings().feishu_dedupe_ttl_seconds
+    ttl = _idempotency_ttl_seconds()
     now = _mono()
     with _delivered_lock:
         _evict_delivered(now, ttl)
