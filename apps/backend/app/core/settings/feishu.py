@@ -38,6 +38,7 @@ class FeishuSettings(BaseSettings):
     feishu_app_secret: str = ""
     feishu_verification_token: str = ""
     feishu_encrypt_key: str = ""
+    feishu_dedupe_persistent_enabled: bool = False
     feishu_api_base: str = "https://open.feishu.cn"
     feishu_llm_profile: str = ""
     feishu_timeout_seconds: float = 10.0

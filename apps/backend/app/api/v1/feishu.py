@@ -1,5 +1,6 @@
 """飞书 Webhook 入口：原始 body → 限长 → 校验 → 解密 → challenge → 解析 → 去重 → 限流 → 快速 ack → 后台派发。"""
 
+import asyncio
 import json
 import logging
 
@@ -10,6 +11,7 @@ from app.application import observability
 from app.channels.feishu import adapter, events
 from app.channels.feishu.errors import FeishuAuthError, FeishuConfigError
 from app.core.settings import get_settings
+from app.services import feishu_dedupe_service
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +105,10 @@ async def feishu_events(request: Request) -> JSONResponse:
 
     parsed = events.parse_message_event(payload)
     if parsed is None:
-        return _reply_unsupported(payload)
+        return await _reply_unsupported(payload)
 
     # 去重先于限流：飞书重投的重复事件不得消耗该用户的限流配额。
-    if not events.accept_event(parsed.event_id):
+    if not await _claim_event(parsed.event_id):
         return JSONResponse(content={})
 
     inbound = events.to_inbound_message(parsed)
@@ -134,7 +136,19 @@ async def feishu_events(request: Request) -> JSONResponse:
     return JSONResponse(content={})
 
 
-def _reply_unsupported(payload: dict) -> JSONResponse:
+async def _claim_event(event_id: str) -> bool:
+    """去重判定的存储分派（组合根职责）。
+
+    默认走通道层的进程内表；`FEISHU_DEDUPE_PERSISTENT_ENABLED=true` 时改走
+    `feishu_dedupe_ledger` 表的唯一约束，使判定在多实例间共享。DB 调用是同步的，必须
+    下放线程，否则会阻塞事件循环（与身份解析同一处理）。
+    """
+    if not get_settings().feishu_dedupe_persistent_enabled:
+        return events.accept_event(event_id)
+    return await asyncio.to_thread(feishu_dedupe_service.claim, event_id)
+
+
+async def _reply_unsupported(payload: dict) -> JSONResponse:
     """非文本 / 空白私聊消息：回一句兜底文案，且与正常消息共用去重与限流闸门。
 
     群聊、非消息事件、缺回复锚点一律不回复（`parse_unhandled_message` 返回 `None`）。
@@ -143,7 +157,7 @@ def _reply_unsupported(payload: dict) -> JSONResponse:
     unhandled = events.parse_unhandled_message(payload)
     if unhandled is None:
         return JSONResponse(content={})
-    if not events.accept_event(unhandled.event_id):
+    if not await _claim_event(unhandled.event_id):
         return JSONResponse(content={})
     if not events.allow_rate(unhandled.open_id):
         logger.warning(

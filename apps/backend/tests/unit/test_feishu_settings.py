@@ -26,6 +26,7 @@ EXPECTED_DEFAULTS = {
     "feishu_app_secret": "",
     "feishu_verification_token": "",
     "feishu_encrypt_key": "",
+    "feishu_dedupe_persistent_enabled": False,
     "feishu_api_base": "https://open.feishu.cn",
     "feishu_llm_profile": "",
     "feishu_timeout_seconds": 10.0,
@@ -53,6 +54,7 @@ ENV_OVERRIDES = {
     "FEISHU_APP_SECRET": "env-secret",
     "FEISHU_VERIFICATION_TOKEN": "env-token",
     "FEISHU_ENCRYPT_KEY": "env-encrypt",
+    "FEISHU_DEDUPE_PERSISTENT_ENABLED": "true",
     "FEISHU_API_BASE": "https://feishu.example.com/",
     "FEISHU_LLM_PROFILE": "longcat",
     "FEISHU_TIMEOUT_SECONDS": "3.5",
@@ -80,6 +82,7 @@ FIELD_TO_ENV = {
     "feishu_app_secret": "FEISHU_APP_SECRET",
     "feishu_verification_token": "FEISHU_VERIFICATION_TOKEN",
     "feishu_encrypt_key": "FEISHU_ENCRYPT_KEY",
+    "feishu_dedupe_persistent_enabled": "FEISHU_DEDUPE_PERSISTENT_ENABLED",
     "feishu_api_base": "FEISHU_API_BASE",
     "feishu_llm_profile": "FEISHU_LLM_PROFILE",
     "feishu_timeout_seconds": "FEISHU_TIMEOUT_SECONDS",
@@ -114,6 +117,7 @@ def test_feishu_env_overrides_all_keys(monkeypatch):
     settings = FeishuSettings()
     assert settings.feishu_enabled is False
     assert settings.feishu_app_id == "cli_env_id"
+    assert settings.feishu_dedupe_persistent_enabled is True
     assert settings.feishu_api_base == "https://feishu.example.com"
     assert settings.feishu_timeout_seconds == 3.5
     assert settings.feishu_token_refresh_ratio == 0.5

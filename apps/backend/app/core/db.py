@@ -1321,6 +1321,15 @@ class ChannelIdentityRow(Base):
     )
 
 
+class FeishuDedupeLedgerRow(Base):
+    __tablename__ = "feishu_dedupe_ledger"
+
+    event_id: Mapped[str] = mapped_column(String, primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("idx_feishu_dedupe_ledger_received_at", "received_at"),)
+
+
 class PersonalityStateRow(Base):
     __tablename__ = "personality_state"
 

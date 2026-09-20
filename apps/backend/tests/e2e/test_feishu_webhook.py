@@ -669,6 +669,84 @@ async def test_duplicate_event_does_not_consume_rate_quota(override_settings, di
 
 
 @pytest.mark.asyncio
+async def test_persistent_dedupe_survives_process_local_reset(override_settings, dispatch_spy):
+    """开启持久化去重后，判定不再依赖进程内表（FEISHU-010）。
+
+    清空 `events._seen_events` 等价于「换一个实例」：重投仍须被拦下。
+    """
+    payload = event_payload(event_id="evt-persist")
+    first = await post_event(
+        override_settings, payload=payload, feishu_dedupe_persistent_enabled=True
+    )
+    assert first.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert events._seen_events == {}
+
+    events.reset_event_state()
+    retry = await post_event(
+        override_settings, payload=payload, feishu_dedupe_persistent_enabled=True
+    )
+    assert retry.status_code == 200
+    await asyncio.sleep(0.05)
+    assert len(dispatch_spy) == 1
+
+
+@pytest.mark.asyncio
+async def test_memory_dedupe_does_not_survive_process_local_reset(override_settings, dispatch_spy):
+    """对照组：默认（内存）去重在进程内表被清空后不再判重——这正是多实例缺口。
+
+    与 `test_persistent_dedupe_survives_process_local_reset` 同场景、相反结果，
+    两者互为证明：开启持久化去重才真正消除「同一 event_id 被多个实例各处理一次」。
+    """
+    payload = event_payload(event_id="evt-memory-reset")
+    await post_event(
+        override_settings, payload=payload, feishu_dedupe_persistent_enabled=False
+    )
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+
+    events.reset_event_state()
+    await post_event(
+        override_settings, payload=payload, feishu_dedupe_persistent_enabled=False
+    )
+    assert await wait_for(lambda: len(dispatch_spy) == 2)
+    assert len(dispatch_spy) == 2
+
+
+@pytest.mark.asyncio
+async def test_persistent_dedupe_disabled_uses_memory_table(override_settings, dispatch_spy):
+    """默认（关闭）仍走进程内表：升级不改变既有行为。"""
+    payload = event_payload(event_id="evt-memory")
+    for _ in range(2):
+        response = await post_event(
+            override_settings, payload=payload, feishu_dedupe_persistent_enabled=False
+        )
+        assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert len(dispatch_spy) == 1
+    assert list(events._seen_events) == ["evt-memory"]
+
+
+@pytest.mark.asyncio
+async def test_persistent_dedupe_fails_open(override_settings, dispatch_spy, monkeypatch, caplog):
+    """去重存储故障时放行：宁可重复处理一次，也不要静默丢掉用户消息。"""
+    from app.repositories import feishu_dedupe_ledger_repository
+
+    def _boom(event_id, received_at, expired_before):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(feishu_dedupe_ledger_repository, "claim", _boom)
+    with caplog.at_level(logging.WARNING):
+        response = await post_event(
+            override_settings,
+            payload=event_payload(event_id="evt-failopen"),
+            feishu_dedupe_persistent_enabled=True,
+        )
+    assert response.status_code == 200
+    assert await wait_for(lambda: len(dispatch_spy) == 1)
+    assert any("fail-open" in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.asyncio
 async def test_dispatch_failure_is_logged_not_silent(override_settings, monkeypatch, caplog):
     """F-06：无可调度 loop 时协程被关闭，必须留痕而不是静默吞掉用户消息。"""
 
