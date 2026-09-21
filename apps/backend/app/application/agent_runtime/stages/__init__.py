@@ -48,10 +48,18 @@ from app.application.agent_runtime.stages.reason import (
     build_stack,
     capabilities_for,
 )
+from app.application.agent_runtime.stages.update import (
+    Feedback,
+    FeedbackItem,
+    PostProcessHandoff,
+    routes_for,
+)
 
 __all__ = [
     "ActOutcome",
     "CharacterStateFact",
+    "Feedback",
+    "FeedbackItem",
     "InsightRef",
     "Intention",
     "MemorySignalFact",
@@ -60,6 +68,7 @@ __all__ = [
     "PlanDegradation",
     "PlanStepRef",
     "PlanValue",
+    "PostProcessHandoff",
     "ReasonDegradation",
     "ReflectDegradation",
     "ReflectOutcome",
@@ -74,5 +83,6 @@ __all__ = [
     "observation_dedupe_key",
     "plan_enabled",
     "reflect_enabled",
+    "routes_for",
     "to_plan_value",
 ]

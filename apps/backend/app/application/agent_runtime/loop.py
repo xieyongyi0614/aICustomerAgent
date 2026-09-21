@@ -37,6 +37,7 @@ from app.application.agent_runtime.stages import act as stages_act
 from app.application.agent_runtime.stages import observe as observe_stage
 from app.application.agent_runtime.stages import plan as stages_plan
 from app.application.agent_runtime.stages import reflect as stages_reflect
+from app.application.agent_runtime.stages import update as stages_update
 from app.application.agent_runtime.stages import reason as stages_reason
 from app.application.agent_runtime.contracts import (
     ErrorKind,
@@ -235,6 +236,7 @@ class AgentLoop:
         self.plan_value: Any = None
         self.act_outcome: Any = None
         self.reflect_outcome: Any = None
+        self.feedback: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -480,9 +482,20 @@ class AgentLoop:
         action_result: object | None = None,
         insights: object | None = None,
     ) -> object | None:
-        return await self._run_phase(
-            PHASE_UPDATE, {"action_result": action_result, "insights": insights}
+        """Update 段：RT-012 显式实现（回写路由；前台只交接、后台走既有合法通道）。"""
+        self.feedback = await stages_update.update(
+            action_outcome=(
+                action_result if action_result is not None else self.act_outcome
+            ),
+            reflect_outcome=insights if insights is not None else self.reflect_outcome,
+            context=self.runtime_context,
+            session_context=self.session_context,
+            spec=self.spec,
+            run=self.run_context,
+            now=self.run_context.started_at or self.now,
+            trace=self.trace,
         )
+        return self.feedback
 
     # ---- 驱动 -----------------------------------------------------------
 

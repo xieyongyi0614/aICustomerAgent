@@ -334,19 +334,25 @@ class TestLoopDriving:
         assert [step["step"] for step in row.steps] == ["perception", "abort"]
         assert row.steps[-1]["error"] == "ValueError"
 
-    async def test_phase_methods_run_only_their_phase(self, db_session_factory):
+    async def test_all_stage_methods_are_delegated(self, db_session_factory):
+        """RT-007 ~ RT-012 完成后，六段方法均为**显式实现**（不再经阶段注册表）。
+
+        RT-006 §5.1 D6 的「各段替换为显式实现」到此收口；`run()` 仍按 `resolve_stages`
+        的声明顺序驱动既有阶段本体，故生产路径未变。
+        """
         spec = _spec(("perception", "record_handoff"))
         calls, registry = _stub_registry(spec.stages)
-        run = _open_run(user_id="u-phase")
+        run = _open_run(user_id="u-delegated")
         loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
 
-        updated = await loop.update()
-        assert set(updated) == {"record_handoff"}
-        assert updated["record_handoff"]["status"] == "ok"
-        assert calls == ["record_handoff"]
+        await loop.observe()
+        await loop.reason()
+        await loop.plan()
+        await loop.act()
+        await loop.reflect()
+        await loop.update()
 
-        assert await loop.plan() is None
-        assert calls == ["record_handoff"]
+        assert calls == []
 
     async def test_observe_method_delegates_to_rt007_stage(self, db_session_factory):
         """RT-007 起 `observe` 段本体由显式实现接管（RT-006 D6「各段替换为显式实现」）。"""
@@ -380,14 +386,19 @@ class TestLoopDriving:
         assert calls == []
         assert loop.intention is intention
 
-    async def test_stage_inputs_reach_the_runner(self, db_session_factory):
+    async def test_run_phase_executes_only_that_phase(self, db_session_factory):
+        """环节成组原语：只跑该环节的段，并把 `inputs` 透传给 runner。
+
+        RT-012 起六段方法均为显式实现，生产路径不再经此入口；它保留为 RT-016 收编时
+        「按环节成组执行既有阶段」的原语，故此处直接覆盖（不留未测代码）。
+        """
         seen: list[dict] = []
 
         async def _capture(context: StageContext):
             seen.append(dict(context.inputs))
             return {"status": "ok"}
 
-        spec = _spec(("record_handoff",))
+        spec = _spec(("perception", "record_handoff"))
         run = _open_run(user_id="u-inputs")
         loop = AgentLoop(
             spec,
@@ -397,8 +408,12 @@ class TestLoopDriving:
             registry={"record_handoff": _capture},
         )
 
-        await loop.update("act-1", ["ins-1"])
+        result = await loop._run_phase(
+            "update", {"action_result": "act-1", "insights": ["ins-1"]}
+        )
 
+        assert set(result) == {"record_handoff"}
+        assert result["record_handoff"]["status"] == "ok"
         assert seen == [{"action_result": "act-1", "insights": ["ins-1"]}]
 
     async def test_stage_events_emitted_per_stage(self, db_session_factory, override_settings):

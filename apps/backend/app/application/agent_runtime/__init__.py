@@ -122,6 +122,13 @@ from app.application.agent_runtime.stages.reason import (
     capabilities_for,
     reason,
 )
+from app.application.agent_runtime.stages.update import (
+    Feedback,
+    FeedbackItem,
+    PostProcessHandoff,
+    routes_for,
+    update,
+)
 from app.application.agent_runtime.state import (
     ReconcileConflict,
     ReconcileReport,
@@ -158,6 +165,8 @@ __all__ = [
     "AgentRuntime",
     "CharacterContext",
     "CharacterStateFact",
+    "Feedback",
+    "FeedbackItem",
     "ContextBudget",
     "ContextDegradation",
     "ErrorKind",
@@ -173,6 +182,7 @@ __all__ = [
     "PlanDegradation",
     "PlanStepRef",
     "PlanValue",
+    "PostProcessHandoff",
     "ReasonDegradation",
     "ReflectDegradation",
     "ReflectOutcome",
@@ -233,6 +243,7 @@ __all__ = [
     "reconcile",
     "reflect",
     "reflect_enabled",
+    "routes_for",
     "register",
     "register_stage_runner",
     "reset",
@@ -249,6 +260,7 @@ __all__ = [
     "subscribers",
     "terminal_status_for",
     "to_plan_value",
+    "update",
     "unsubscribe",
     "version",
 ]
