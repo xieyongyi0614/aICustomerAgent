@@ -44,12 +44,20 @@ EVENT_ACTION_EXECUTED = "ActionExecuted"
 EVENT_ACTION_COMPLETED = "ActionCompleted"
 EVENT_MEMORY_UPDATED = "MemoryUpdated"
 EVENT_RELATIONSHIP_UPDATED = "RelationshipUpdated"
+EVENT_DECISION_MADE = "DecisionMade"
+"""Reason 段产出 `Intention` 的通知锚点（RT-008）。
+
+RT-001 冻结的初始事件集不含本项；RT-008 §5.3 要求 Reason 段发出该事件，而
+`RuntimeEvent.__post_init__` 对未知 `event_type` fail-closed，故同批登记（登记于
+`tests/v30/test_runtime_contracts.py::EXPECTED_EVENT_TYPES`，属**契约追加**而非私改）。
+"""
 
 EVENT_TYPES: tuple[str, ...] = (
     EVENT_USER_MESSAGE_RECEIVED,
     EVENT_OBSERVATION_RECORDED,
     EVENT_RUN_OPENED,
     EVENT_STAGE_COMPLETED,
+    EVENT_DECISION_MADE,
     EVENT_ACTION_EXECUTED,
     EVENT_ACTION_COMPLETED,
     EVENT_MEMORY_UPDATED,

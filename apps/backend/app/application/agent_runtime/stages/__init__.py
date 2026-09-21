@@ -22,13 +22,23 @@ from app.application.agent_runtime.stages.observe import (
     WorldFact,
     observation_dedupe_key,
 )
+from app.application.agent_runtime.stages.reason import (
+    Intention,
+    ReasonDegradation,
+    build_stack,
+    capabilities_for,
+)
 
 __all__ = [
     "CharacterStateFact",
+    "Intention",
     "MemorySignalFact",
     "Observation",
     "ObservationDegradation",
+    "ReasonDegradation",
     "UserInputFact",
     "WorldFact",
+    "build_stack",
+    "capabilities_for",
     "observation_dedupe_key",
 ]

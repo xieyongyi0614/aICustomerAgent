@@ -38,6 +38,7 @@ from app.application.agent_runtime.models import (
 )
 from app.application.agent_runtime.profiles import ProfileSpec, get_profile
 from app.application.agent_runtime.stages.observe import Observation
+from app.application.agent_runtime.stages.reason import Intention
 from app.repositories import loop_run_repository
 
 LOOP_PATH = Path(loop_module.__file__)
@@ -334,18 +335,20 @@ class TestLoopDriving:
         assert row.steps[-1]["error"] == "ValueError"
 
     async def test_phase_methods_run_only_their_phase(self, db_session_factory):
-        spec = _spec(("perception", "turn_decisions", "record_handoff"))
+        spec = _spec(("perception", "record_handoff"))
         calls, registry = _stub_registry(spec.stages)
         run = _open_run(user_id="u-phase")
         loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
 
-        reasoned = await loop.reason()
-        assert set(reasoned) == {"turn_decisions"}
-        assert reasoned["turn_decisions"]["status"] == "ok"
-        assert calls == ["turn_decisions"]
+        updated = await loop.update()
+        assert set(updated) == {"record_handoff"}
+        assert updated["record_handoff"]["status"] == "ok"
+        assert calls == ["record_handoff"]
 
         assert await loop.plan() is None
-        assert calls == ["turn_decisions"]
+        assert await loop.act() is None
+        assert await loop.reflect() is None
+        assert calls == ["record_handoff"]
 
     async def test_observe_method_delegates_to_rt007_stage(self, db_session_factory):
         """RT-007 起 `observe` 段本体由显式实现接管（RT-006 D6「各段替换为显式实现」）。"""
@@ -361,6 +364,24 @@ class TestLoopDriving:
         assert calls == []
         assert loop.observation is observation
 
+    async def test_reason_method_delegates_to_rt008_stage(self, db_session_factory):
+        """RT-008 起 `reason` 段本体由显式实现接管（决策管线唯一入口）。"""
+        spec = _spec(
+            ("turn_decisions",),
+            run_kind=RUN_KIND_FOREGROUND_CHAT,
+            budget_tier="foreground",
+        )
+        calls, registry = _stub_registry(spec.stages)
+        run = _open_run(RUN_KIND_FOREGROUND_CHAT, user_id="u-reason-deleg")
+        loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
+
+        intention = await loop.reason()
+
+        assert isinstance(intention, Intention)
+        assert intention.decided_at == run.started_at
+        assert calls == []
+        assert loop.intention is intention
+
     async def test_stage_inputs_reach_the_runner(self, db_session_factory):
         seen: list[dict] = []
 
@@ -368,19 +389,19 @@ class TestLoopDriving:
             seen.append(dict(context.inputs))
             return {"status": "ok"}
 
-        spec = _spec(("turn_decisions",))
+        spec = _spec(("record_handoff",))
         run = _open_run(user_id="u-inputs")
         loop = AgentLoop(
             spec,
             user_id=run.user_id,
             run=run,
             now=NOW,
-            registry={"turn_decisions": _capture},
+            registry={"record_handoff": _capture},
         )
 
-        await loop.reason("obs-1")
+        await loop.update("act-1", ["ins-1"])
 
-        assert seen == [{"observation": "obs-1"}]
+        assert seen == [{"action_result": "act-1", "insights": ["ins-1"]}]
 
     async def test_stage_events_emitted_per_stage(self, db_session_factory, override_settings):
         spec = _spec(("perception", "record_handoff"))

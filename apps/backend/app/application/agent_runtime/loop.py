@@ -34,6 +34,7 @@ from app.application import agent_state_assembler, logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
 from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.stages import observe as observe_stage
+from app.application.agent_runtime.stages import reason as stages_reason
 from app.application.agent_runtime.contracts import (
     ErrorKind,
     RunResult,
@@ -227,6 +228,7 @@ class AgentLoop:
         self.session_context: SessionContext | None = None
         self.runtime_context: Any = None
         self.observation: Any = None
+        self.intention: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -388,8 +390,35 @@ class AgentLoop:
         )
         return self.observation
 
-    async def reason(self, observation: object | None = None) -> object | None:
-        return await self._run_phase(PHASE_REASON, {"observation": observation})
+    async def reason(
+        self,
+        observation: object | None = None,
+        *,
+        chat_response_intention: str | None = None,
+        chat_response_goal_id: str | None = None,
+        trigger_intention: str | None = None,
+        trigger_goal_id: str | None = None,
+    ) -> object | None:
+        """Reason 段：RT-008 显式实现（情境 → 决策管线 → `Intention`）。
+
+        前后台分叉由 `spec.run_kind` 裁决（前台 `chat_response*`、后台 `trigger_*`），
+        调用方只需给出本轮的触发 / 回复意图；能力面由段内按 Profile 解析。
+        """
+        self.intention = await stages_reason.reason(
+            self.runtime_input,
+            self.session_context,
+            observation if observation is not None else self.observation,
+            spec=self.spec,
+            runtime_state=state_manager.current(self.run_context),
+            chat_response_intention=chat_response_intention,
+            chat_response_goal_id=chat_response_goal_id,
+            trigger_intention=trigger_intention,
+            trigger_goal_id=trigger_goal_id,
+            run=self.run_context,
+            now=self.run_context.started_at or self.now,
+            trace=self.trace,
+        )
+        return self.intention
 
     async def plan(self, intention: object | None = None) -> object | None:
         return await self._run_phase(PHASE_PLAN, {"intention": intention})
