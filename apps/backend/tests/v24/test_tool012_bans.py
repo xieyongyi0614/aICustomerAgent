@@ -99,16 +99,19 @@ def _extended_registry():
 
 
 def test_ban_no_second_agent_profiles_frozen():
-    """Run Profile 表零改动：仍是三种 run_kind（V9 定义）。"""
+    """Run Profile 表零改动：仍是三种 run_kind（V9 定义）且语义签名逐元素不变。
+
+    P2-5：blob 哈希已撤下（V3.0 RT-006 合法扩展 `ProfileSpec.optional_stages`），
+    改由 `V9_PROFILE_SIGNATURES` 语义签名持有——比整文件哈希更精确地命名了不许变的部分。
+    """
     from app.application.agent_runtime import profiles
 
     assert tuple(sorted(profiles._PROFILE_TABLE)) == tuple(
         sorted(support.RUN_KIND_PROFILES)
     )
-    assert (
-        support.git_blob_sha("app/application/agent_runtime/profiles.py")
-        == support.FROZEN_BLOB_SHA_BASELINE["app/application/agent_runtime/profiles.py"]
-    )
+    assert "app/application/agent_runtime/profiles.py" not in support.FROZEN_BLOB_SHA_BASELINE
+    for run_kind, expected in support.V9_PROFILE_SIGNATURES.items():
+        assert support.profile_signature(run_kind) == expected, run_kind
 
 
 def test_ban_no_second_agent_stage_sequence_unchanged():

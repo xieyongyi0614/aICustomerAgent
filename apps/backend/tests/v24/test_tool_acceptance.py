@@ -314,9 +314,15 @@ def test_g_compat_frozen_blobs_zero_diff():
 
     P2-4：`app/application/life_loop.py` 已从 blob 冻结面撤下（P2-1 在 `has_due` 调用侧
     合法新增到期口径排除），改由下面的语义断言持有；冻结整文件哈希会把正常演进判成违规。
+    P2-5：`app/application/agent_runtime/profiles.py` 同样撤下（V3.0 RT-006 按 Task Detail
+    §6.2 合法扩展 `ProfileSpec.optional_stages`，默认空集 = 行为不变），改由
+    `test_g_compat_agent_runtime_profiles_semantics_replacing_blob_freeze` 持有。
+    故当前冻结面为空：下面同时钉住两条撤下决定，避免有人悄悄塞回 blob 条目绕过语义断言。
     """
     for relative_path, expected_sha in support.FROZEN_BLOB_SHA_BASELINE.items():
         assert support.git_blob_sha(relative_path) == expected_sha, relative_path
+    assert "app/application/agent_runtime/profiles.py" not in support.FROZEN_BLOB_SHA_BASELINE
+    assert "app/application/life_loop.py" not in support.FROZEN_BLOB_SHA_BASELINE
 
 
 def test_g_compat_life_loop_semantics_replacing_blob_freeze():
@@ -327,6 +333,22 @@ def test_g_compat_life_loop_semantics_replacing_blob_freeze():
     assert support.live_loop_maintenance_names(source) == support.LIFE_LOOP_MAINTENANCE_SEQUENCE
     assert "ConfirmationService" not in source
     assert "_expire_pending_confirmations" not in source
+
+
+def test_g_compat_agent_runtime_profiles_semantics_replacing_blob_freeze():
+    """profiles.py 的语义面替代 blob 哈希（P2-5）：三 Profile 语义签名逐元素不变。
+
+    V3.0 RT-006 按 Task Detail §6.2 合法扩展 `ProfileSpec.optional_stages`
+    （默认空集 = 行为不变），整文件哈希会把该扩展判成「第二套 Agent」违规。
+    """
+    from app.application.agent_runtime import profiles
+
+    assert "app/application/agent_runtime/profiles.py" not in support.FROZEN_BLOB_SHA_BASELINE
+    assert tuple(sorted(profiles._PROFILE_TABLE)) == tuple(
+        sorted(support.V9_PROFILE_SIGNATURES)
+    )
+    for run_kind, expected in support.V9_PROFILE_SIGNATURES.items():
+        assert support.profile_signature(run_kind) == expected, run_kind
 
 
 def test_g_action_domain_steps_shape_is_v9_plus_tool_fields(

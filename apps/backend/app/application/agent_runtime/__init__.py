@@ -57,6 +57,23 @@ from app.application.agent_runtime.llm_gateway import (
     register,
     resolve_answer_llm,
 )
+from app.application.agent_runtime.loop import (
+    OPTIONAL_PHASES,
+    PHASES,
+    PHASE_ACT,
+    PHASE_OBSERVE,
+    PHASE_PLAN,
+    PHASE_REASON,
+    PHASE_REFLECT,
+    PHASE_UPDATE,
+    STAGE_RUNNERS,
+    STAGE_TO_PHASE,
+    AgentLoop,
+    StageContext,
+    register_stage_runner,
+    resolve_stages,
+    stage_phase,
+)
 from app.application.agent_runtime.models import RunContext
 from app.application.agent_runtime.profiles import get_profile, snapshot_profile
 from app.application.agent_runtime.session import (
@@ -87,6 +104,17 @@ from app.application.agent_runtime.trigger_router import (
 )
 
 __all__ = [
+    "OPTIONAL_PHASES",
+    "PHASES",
+    "PHASE_ACT",
+    "PHASE_OBSERVE",
+    "PHASE_PLAN",
+    "PHASE_REASON",
+    "PHASE_REFLECT",
+    "PHASE_UPDATE",
+    "STAGE_RUNNERS",
+    "STAGE_TO_PHASE",
+    "AgentLoop",
     "AgentRuntime",
     "CharacterContext",
     "ContextBudget",
@@ -108,6 +136,7 @@ __all__ = [
     "RuntimeState",
     "SessionCloseSummary",
     "SessionContext",
+    "StageContext",
     "StateVersion",
     "UserContext",
     "WorldContext",
@@ -139,14 +168,17 @@ __all__ = [
     "open_session",
     "reconcile",
     "register",
+    "register_stage_runner",
     "reset",
     "resolve_answer_llm",
+    "resolve_stages",
     "resume_session",
     "run_autonomous_cycle",
     "run_event_pregate",
     "run_stage_async",
     "snapshot",
     "snapshot_profile",
+    "stage_phase",
     "subscribe",
     "subscribers",
     "terminal_status_for",

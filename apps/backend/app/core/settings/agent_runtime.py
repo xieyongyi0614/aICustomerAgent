@@ -33,3 +33,4 @@ class AgentRuntimeSettings(BaseSettings):
     runtime_state_versioning_enabled: bool = False
     runtime_context_freeze_enabled: bool = False
     runtime_event_bus_enabled: bool = False
+    runtime_loop_optional_stages: str = ""

@@ -15,11 +15,19 @@ from app.application.agent_runtime.models import (
 
 @dataclass(frozen=True)
 class ProfileSpec:
+    """Profile 声明：段序列 / LLM 能力段 / 关键段 / 预算档 / 可选段。
+
+    `optional_stages`（RT-006 裁决 Q4）默认空集 = 全部 `stages` 必执行，
+    与 V2.6.1 行为逐字节一致；只有**同时**出现在 `stages` 与
+    `optional_stages` 中的段，才由 `runtime_loop_optional_stages` 决定是否进入本次循环。
+    """
+
     run_kind: str
     budget_tier: str
     stages: tuple[str, ...]
     llm_capable: frozenset[str]
     critical: frozenset[str]
+    optional_stages: frozenset[str] = frozenset()
 
 
 _PROFILE_TABLE: dict[str, ProfileSpec] = {
@@ -83,4 +91,5 @@ def snapshot_profile(run_kind: str) -> dict:
         "stages": list(spec.stages),
         "llm_capable": sorted(spec.llm_capable),
         "critical": sorted(spec.critical),
+        "optional_stages": sorted(spec.optional_stages),
     }

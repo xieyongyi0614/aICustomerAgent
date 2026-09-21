@@ -132,16 +132,70 @@ SCHEMA_FROZEN_TABLES: tuple[str, ...] = (
     "messages",
 )
 
-FROZEN_BLOB_SHA_BASELINE: dict[str, str] = {
-    "app/application/agent_runtime/profiles.py": "77dade3b10b9e73a0115a12df0fb40072f0bbe16",
-}
-"""冻结面 blob sha1 基线（LF 归一，git 对象口径）。
+FROZEN_BLOB_SHA_BASELINE: dict[str, str] = {}
+"""冻结面 blob sha1 基线（LF 归一，git 对象口径）——**当前为空**。
 
-`app/application/life_loop.py` 已撤下（P2-4）：P2-1 在它的 `has_due` 调用侧合法新增到期
-口径排除，整文件哈希会把正常演进判成违规；其语义面（维护步序列 / 无第二套确认清理路径）
-改由 `test_tool012_bans.test_ban_no_second_agent_stage_sequence_unchanged` 与
-`test_tool_acceptance.test_g_compat_life_loop_semantics_replacing_blob_freeze` 持有。
+- `app/application/life_loop.py` 已撤下（P2-4）：P2-1 在它的 `has_due` 调用侧合法新增到期
+  口径排除，整文件哈希会把正常演进判成违规；其语义面（维护步序列 / 无第二套确认清理路径）
+  改由 `test_tool012_bans.test_ban_no_second_agent_stage_sequence_unchanged` 与
+  `test_tool_acceptance.test_g_compat_life_loop_semantics_replacing_blob_freeze` 持有。
+- `app/application/agent_runtime/profiles.py` 已撤下（P2-5）：V3.0 RT-006 按 Task Detail
+  §6.2 合法扩展 `ProfileSpec`（新增 `optional_stages`，默认空集 = 行为不变）。整文件哈希
+  会把该合法扩展判成「第二套 Agent」违规；其语义面（三 Profile 的 run_kind / stages /
+  critical / llm_capable 逐元素不变）改由 `V9_PROFILE_SIGNATURES` 持有，比 blob 哈希
+  更精确地命名了「什么不许变」。
 """
+
+V9_PROFILE_SIGNATURES: dict[str, dict[str, tuple[str, ...]]] = {
+    "foreground_chat": {
+        "stages": (
+            "perception",
+            "context_assembly",
+            "turn_decisions",
+            "mode_stabilize",
+            "scene_resolve",
+            "behavior_resolve",
+            "reply_generation",
+            "record_handoff",
+        ),
+        "llm_capable": ("reply_generation", "turn_decisions"),
+        "critical": ("reply_generation",),
+    },
+    "autonomous_tick": {
+        "stages": (
+            "perception",
+            "state_update",
+            "state_snapshot",
+            "goal_check",
+            "goal_stack",
+            "goal_supply",
+            "goal_advance",
+            "memory_retrieval",
+            "reflection_check",
+            "decision",
+            "world_experience",
+        ),
+        "llm_capable": ("decision",),
+        "critical": ("decision",),
+    },
+    "event_driven": {
+        "stages": ("event_pregate",),
+        "llm_capable": (),
+        "critical": (),
+    },
+}
+
+
+def profile_signature(run_kind: str) -> dict[str, tuple[str, ...]]:
+    """Profile 的语义签名（stages / llm_capable / critical），替代整文件 blob 冻结。"""
+    from app.application.agent_runtime import profiles
+
+    spec = profiles.get_profile(run_kind)
+    return {
+        "stages": tuple(spec.stages),
+        "llm_capable": tuple(sorted(spec.llm_capable)),
+        "critical": tuple(sorted(spec.critical)),
+    }
 
 LIFE_LOOP_MAINTENANCE_SEQUENCE: tuple[str, ...] = (
     "world_maintenance",
