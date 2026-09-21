@@ -32,6 +32,8 @@ from typing import Any
 
 from app.application import agent_state_assembler, logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
+from app.application.agent_runtime import state as state_manager
+from app.application.agent_runtime.stages import observe as observe_stage
 from app.application.agent_runtime.contracts import (
     ErrorKind,
     RunResult,
@@ -224,6 +226,7 @@ class AgentLoop:
         self.runtime_input: RuntimeInput | None = None
         self.session_context: SessionContext | None = None
         self.runtime_context: Any = None
+        self.observation: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -369,7 +372,21 @@ class AgentLoop:
         return await self._run_stages(names, inputs=inputs)
 
     async def observe(self) -> object | None:
-        return await self._run_phase(PHASE_OBSERVE)
+        """Observe 段：RT-007 显式实现（四类触发增量 → `Observation`）。
+
+        `run()` 仍按 `resolve_stages` 的声明顺序驱动既有阶段本体（AC1 顺序零改动），
+        故本方法的替换不影响生产路径；前台 / 后台收编（RT-015 / RT-016）后由本方法接管。
+        """
+        self.observation = observe_stage.observe(
+            self.runtime_input,
+            self.session_context,
+            runtime_context=self.runtime_context,
+            runtime_state=state_manager.current(self.run_context),
+            now=self.run_context.started_at or self.now,
+            run_id=self.run_context.run_id,
+            trace=self.trace,
+        )
+        return self.observation
 
     async def reason(self, observation: object | None = None) -> object | None:
         return await self._run_phase(PHASE_REASON, {"observation": observation})

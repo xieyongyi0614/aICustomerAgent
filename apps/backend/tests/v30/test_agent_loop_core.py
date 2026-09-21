@@ -37,6 +37,7 @@ from app.application.agent_runtime.models import (
     RunContext,
 )
 from app.application.agent_runtime.profiles import ProfileSpec, get_profile
+from app.application.agent_runtime.stages.observe import Observation
 from app.repositories import loop_run_repository
 
 LOOP_PATH = Path(loop_module.__file__)
@@ -338,17 +339,27 @@ class TestLoopDriving:
         run = _open_run(user_id="u-phase")
         loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
 
-        observed = await loop.observe()
-        assert set(observed) == {"perception"}
-        assert observed["perception"]["status"] == "ok"
-        assert calls == ["perception"]
-
         reasoned = await loop.reason()
         assert set(reasoned) == {"turn_decisions"}
-        assert calls == ["perception", "turn_decisions"]
+        assert reasoned["turn_decisions"]["status"] == "ok"
+        assert calls == ["turn_decisions"]
 
         assert await loop.plan() is None
-        assert calls == ["perception", "turn_decisions"]
+        assert calls == ["turn_decisions"]
+
+    async def test_observe_method_delegates_to_rt007_stage(self, db_session_factory):
+        """RT-007 起 `observe` 段本体由显式实现接管（RT-006 D6「各段替换为显式实现」）。"""
+        spec = _spec(("perception",))
+        calls, registry = _stub_registry(spec.stages)
+        run = _open_run(user_id="u-observe-deleg")
+        loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
+
+        observation = await loop.observe()
+
+        assert isinstance(observation, Observation)
+        assert observation.observed_at == run.started_at
+        assert calls == []
+        assert loop.observation is observation
 
     async def test_stage_inputs_reach_the_runner(self, db_session_factory):
         seen: list[dict] = []
