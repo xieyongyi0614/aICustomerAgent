@@ -36,6 +36,7 @@ from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.stages import act as stages_act
 from app.application.agent_runtime.stages import observe as observe_stage
 from app.application.agent_runtime.stages import plan as stages_plan
+from app.application.agent_runtime.stages import reflect as stages_reflect
 from app.application.agent_runtime.stages import reason as stages_reason
 from app.application.agent_runtime.contracts import (
     ErrorKind,
@@ -233,6 +234,7 @@ class AgentLoop:
         self.intention: Any = None
         self.plan_value: Any = None
         self.act_outcome: Any = None
+        self.reflect_outcome: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -460,7 +462,18 @@ class AgentLoop:
         return self.act_outcome
 
     async def reflect(self, action_result: object | None = None) -> object | None:
-        return await self._run_phase(PHASE_REFLECT, {"action_result": action_result})
+        """Reflect 段：RT-011 显式实现（慢时钟；默认关闭，可选段裁决）。"""
+        self.reflect_outcome = await stages_reflect.reflect(
+            action_outcome=(
+                action_result if action_result is not None else self.act_outcome
+            ),
+            session_context=self.session_context,
+            run=self.run_context,
+            llm=self.llm,
+            now=self.run_context.started_at or self.now,
+            trace=self.trace,
+        )
+        return self.reflect_outcome
 
     async def update(
         self,

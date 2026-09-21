@@ -346,7 +346,6 @@ class TestLoopDriving:
         assert calls == ["record_handoff"]
 
         assert await loop.plan() is None
-        assert await loop.reflect() is None
         assert calls == ["record_handoff"]
 
     async def test_observe_method_delegates_to_rt007_stage(self, db_session_factory):

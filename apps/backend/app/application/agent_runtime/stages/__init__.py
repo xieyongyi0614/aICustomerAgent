@@ -35,6 +35,13 @@ from app.application.agent_runtime.stages.plan import (
     plan_enabled,
     to_plan_value,
 )
+from app.application.agent_runtime.stages.reflect import (
+    InsightRef,
+    ReflectDegradation,
+    ReflectOutcome,
+    evidence_window_key,
+    reflect_enabled,
+)
 from app.application.agent_runtime.stages.reason import (
     Intention,
     ReasonDegradation,
@@ -45,6 +52,7 @@ from app.application.agent_runtime.stages.reason import (
 __all__ = [
     "ActOutcome",
     "CharacterStateFact",
+    "InsightRef",
     "Intention",
     "MemorySignalFact",
     "Observation",
@@ -53,14 +61,18 @@ __all__ = [
     "PlanStepRef",
     "PlanValue",
     "ReasonDegradation",
+    "ReflectDegradation",
+    "ReflectOutcome",
     "UserInputFact",
     "WorldFact",
     "build_stack",
     "capabilities_for",
     "action_source_for",
     "current_plan_value",
+    "evidence_window_key",
     "intent_to_action_intent",
     "observation_dedupe_key",
     "plan_enabled",
+    "reflect_enabled",
     "to_plan_value",
 ]

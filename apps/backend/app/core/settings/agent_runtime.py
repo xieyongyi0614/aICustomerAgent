@@ -34,3 +34,4 @@ class AgentRuntimeSettings(BaseSettings):
     runtime_context_freeze_enabled: bool = False
     runtime_event_bus_enabled: bool = False
     runtime_loop_optional_stages: str = ""
+    runtime_reflect_in_loop_enabled: bool = False

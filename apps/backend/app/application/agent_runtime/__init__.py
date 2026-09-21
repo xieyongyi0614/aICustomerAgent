@@ -107,6 +107,14 @@ from app.application.agent_runtime.stages.plan import (
     plan_enabled,
     to_plan_value,
 )
+from app.application.agent_runtime.stages.reflect import (
+    InsightRef,
+    ReflectDegradation,
+    ReflectOutcome,
+    evidence_window_key,
+    reflect,
+    reflect_enabled,
+)
 from app.application.agent_runtime.stages.reason import (
     Intention,
     ReasonDegradation,
@@ -155,6 +163,7 @@ __all__ = [
     "ErrorKind",
     "GatewayDeniedError",
     "Grant",
+    "InsightRef",
     "Intention",
     "LoopStage",
     "MemoryContext",
@@ -165,6 +174,8 @@ __all__ = [
     "PlanStepRef",
     "PlanValue",
     "ReasonDegradation",
+    "ReflectDegradation",
+    "ReflectOutcome",
     "ReconcileConflict",
     "ReconcileReport",
     "RunContext",
@@ -205,6 +216,7 @@ __all__ = [
     "emit_run_closed",
     "emit_run_opened",
     "emit_stage_completed",
+    "evidence_window_key",
     "evaluate_event_escalation",
     "get_capability",
     "get_profile",
@@ -219,6 +231,8 @@ __all__ = [
     "plan_enabled",
     "reason",
     "reconcile",
+    "reflect",
+    "reflect_enabled",
     "register",
     "register_stage_runner",
     "reset",
