@@ -10,4 +10,5 @@ from __future__ import annotations
 V30_RUNTIME_FIELDS: dict[str, str] = {
     "runtime_session_tracking_enabled": "RT-002",
     "runtime_state_versioning_enabled": "RT-003",
+    "runtime_context_freeze_enabled": "RT-004",
 }

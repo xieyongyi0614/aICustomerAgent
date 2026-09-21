@@ -31,3 +31,4 @@ class AgentRuntimeSettings(BaseSettings):
     state_snapshot_retention_days: int = 90
     runtime_session_tracking_enabled: bool = False
     runtime_state_versioning_enabled: bool = False
+    runtime_context_freeze_enabled: bool = False
