@@ -37,6 +37,13 @@ from app.application.agent_runtime.llm_gateway import (
 )
 from app.application.agent_runtime.models import RunContext
 from app.application.agent_runtime.profiles import get_profile, snapshot_profile
+from app.application.agent_runtime.session import (
+    SessionCloseSummary,
+    build_session_context,
+    close_session,
+    open_session,
+    resume_session,
+)
 from app.application.agent_runtime.trigger_router import (
     classify_background_trigger,
     classify_channel_message,
@@ -55,20 +62,25 @@ __all__ = [
     "RuntimeEvent",
     "RuntimeFailure",
     "RuntimeInput",
+    "SessionCloseSummary",
     "SessionContext",
     "account_turn_decisions",
     "acquire",
     "append_step",
+    "build_session_context",
     "classify_background_trigger",
     "classify_channel_message",
     "close_run",
+    "close_session",
     "evaluate_event_escalation",
     "get_capability",
     "get_profile",
     "open_foreground_run",
     "open_run",
+    "open_session",
     "register",
     "resolve_answer_llm",
+    "resume_session",
     "run_autonomous_cycle",
     "run_event_pregate",
     "run_stage_async",

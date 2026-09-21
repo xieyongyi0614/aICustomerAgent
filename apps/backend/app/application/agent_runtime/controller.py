@@ -38,10 +38,19 @@ def open_run(
     trigger_type: str,
     reason: str,
     now: datetime | None = None,
+    *,
+    session_id: str | None = None,
 ) -> RunContext:
-    """Run Open：台账建行 + Profile 快照落库；kind 沿既有枚举（前台=chat）。"""
+    """Run Open：台账建行 + Profile 快照落库；kind 沿既有枚举（前台=chat）。
+
+    `session_id` 仅在 `runtime_session_tracking_enabled` 开启时写入（裁决 D4）；
+    关闭时列恒为 NULL，读路径始终兼容 NULL。
+    """
     now = now or datetime.now()
     kind = "chat" if run_kind == RUN_KIND_FOREGROUND_CHAT else "autonomy"
+    tracked_session_id = (
+        session_id if get_settings().runtime_session_tracking_enabled else None
+    )
     row = loop_run_repository.create_run(
         user_id=user_id,
         kind=kind,
@@ -50,6 +59,7 @@ def open_run(
         run_kind=run_kind,
         profile=profiles.snapshot_profile(run_kind),
         now=now,
+        session_id=tracked_session_id,
     )
     agent_state_assembler.ensure_personality_baseline(user_id)
     return RunContext(
@@ -62,10 +72,17 @@ def open_run(
     )
 
 
-def open_foreground_run(user_id: str, now: datetime | None = None) -> RunContext:
+def open_foreground_run(
+    user_id: str,
+    now: datetime | None = None,
+    *,
+    session_id: str | None = None,
+) -> RunContext:
     """前台收编入口：每轮对话都是一次 foreground_chat Run。"""
     run_kind, trigger_type = trigger_router.classify_channel_message()
-    return open_run(user_id, run_kind, trigger_type, "user_message", now)
+    return open_run(
+        user_id, run_kind, trigger_type, "user_message", now, session_id=session_id
+    )
 
 
 async def run_stage_async(

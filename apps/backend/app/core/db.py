@@ -870,6 +870,7 @@ class RuntimeTraceRow(Base):
     conversation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     turn_id: Mapped[str | None] = mapped_column(String, nullable=True)
     action_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     duration_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -888,6 +889,7 @@ class RuntimeTraceRow(Base):
         Index("idx_runtime_traces_turn", "turn_id"),
         Index("idx_runtime_traces_user_time", "user_id", "created_at"),
         Index("idx_runtime_traces_conversation", "conversation_id", "created_at"),
+        Index("ix_runtime_traces_correlation_id", "correlation_id"),
     )
 
 
@@ -1208,6 +1210,7 @@ class LoopRunRow(Base):
     trigger_id: Mapped[str | None] = mapped_column(String, nullable=True)
     trigger_type: Mapped[str | None] = mapped_column(String, nullable=True)
     reason: Mapped[str] = mapped_column(String, nullable=False, default="")
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="running", server_default="running"
     )
@@ -1232,6 +1235,7 @@ class LoopRunRow(Base):
         ),
         Index("idx_loop_runs_status_started_at", "status", "started_at"),
         Index("idx_loop_runs_user_started_at", "user_id", "started_at"),
+        Index("ix_loop_runs_session_id", "session_id"),
     )
 
 

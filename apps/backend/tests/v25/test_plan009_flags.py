@@ -22,7 +22,7 @@ from .plan009_support import (  # noqa: F401  （夹具须进本模块命名空�
     planning_memory_on,
 )
 
-MIGRATION_HEAD = "0051"
+MIGRATION_HEAD = "0052"
 
 MEMORIES_COLUMNS = (
     "id",
@@ -119,7 +119,7 @@ class TestImportanceFloorParameter:
 class TestZeroMigration:
     """I8 / §10.3：迁移链头 0046、`memories` 列集与值集未变、零新迁移文件。"""
 
-    def test_migration_chain_head_is_still_0051(self):
+    def test_migration_chain_head_is_still_0052(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))

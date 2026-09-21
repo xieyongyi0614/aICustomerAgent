@@ -60,8 +60,8 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 51
-MIGRATION_BREAKPOINT = "0051_feishu_deliveries.py"
+MIGRATION_FILE_COUNT_CURRENT = 52
+MIGRATION_BREAKPOINT = "0052_runtime_session_trace_links.py"
 MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0046_tool_insight_types.py",
     "0047_action_schedules_priority.py",
@@ -69,9 +69,10 @@ MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0049_loop_runs_kind_maintenance_steps.py",
     "0050_feishu_dedupe_ledger.py",
     "0051_feishu_deliveries.py",
+    "0052_runtime_session_trace_links.py",
 )
-MIGRATION_HEAD = "0051"
-MIGRATION_HEAD_PREVIOUS = "0050"
+MIGRATION_HEAD = "0052"
+MIGRATION_HEAD_PREVIOUS = "0051"
 V23_MIGRATION_TAIL: tuple[str, ...] = (
     "0047_action_schedules_priority.py",
     "0048_action_records_run_id.py",
@@ -79,8 +80,8 @@ V23_MIGRATION_TAIL: tuple[str, ...] = (
 
 SCHEMA_TABLE_COUNT = 45
 SCHEMA_TABLE_SET_DIGEST = "66f03c348e5e31b9"
-SCHEMA_COLUMNS_DIGEST = "6f6bc379c1239b2b"
-SCHEMA_COLUMNS_DIGEST_BASELINE = "506ee5d5cf357bdf"
+SCHEMA_COLUMNS_DIGEST = "15877999c31979d2"
+SCHEMA_COLUMNS_DIGEST_BASELINE = "7d865b081dc179c1"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",

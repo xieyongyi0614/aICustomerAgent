@@ -67,7 +67,7 @@ FROZEN_PLAN_FACE_SIGNATURES = {
     "list_active_plans": ("user_id",),
 }
 
-MIGRATION_HEAD = "0051"
+MIGRATION_HEAD = "0052"
 
 BACKEND_ROOT = Path(goal_repository.__file__).parents[2]
 FRONTEND_ROOT = BACKEND_ROOT.parent / "frontend"
@@ -168,9 +168,9 @@ class TestZeroMigration:
             if (match := re.match(r"(\d+)_", path.name))
         )
 
-    def test_migration_chain_head_is_still_0051(self):
+    def test_migration_chain_head_is_still_0052(self):
         numbered = self._numbered_versions()
-        assert max(numbered) == 51
+        assert max(numbered) == 52
         assert f"{max(numbered):04d}" == MIGRATION_HEAD
 
     def test_goal_plans_status_check_keeps_its_five_values(self):

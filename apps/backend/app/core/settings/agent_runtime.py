@@ -29,3 +29,4 @@ class AgentRuntimeSettings(BaseSettings):
     interest_top_n: int = 3
     state_snapshot_min_interval_minutes: int = 15
     state_snapshot_retention_days: int = 90
+    runtime_session_tracking_enabled: bool = False
