@@ -20,6 +20,8 @@ CHANNELS_ALLOWLIST_PREFIXES = (
     "app.services.agent_service",
     # RT-013：入站归一网关（叶子契约模块，零 IO / 零仓储 / 零 chains）。
     "app.application.agent_runtime.inbound",
+    # RT-014：出站归一出网关（叶子契约模块，零 IO / 零仓储 / 零 chains）。
+    "app.application.agent_runtime.outbound",
 )
 
 CHANNELS_APP_DENY_EXACT = (

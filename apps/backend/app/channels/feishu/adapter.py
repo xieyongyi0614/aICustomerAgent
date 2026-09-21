@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import openai
 
 from app.application.agent_runtime import inbound as inbound_gateway
+from app.application.agent_runtime import outbound as outbound_gateway
 from app.channels.base import InboundMessage
 from app.channels.feishu import delivery
 from app.channels.feishu.events import UnhandledMessage
@@ -181,7 +182,10 @@ async def _deliver_outcome(outcome: TurnOutcome) -> None:
     if not outcome.outbound_text:
         return
     try:
-        await delivery.deliver_reply(outcome)
+        if outbound_gateway.is_routable(FEISHU_CHANNEL):
+            await outbound_gateway.deliver_reply(outcome, channel=FEISHU_CHANNEL)
+        else:
+            await delivery.deliver_reply(outcome)
     except Exception:
         logger.exception(
             "feishu delivery failed (ignored): session_id=%s", outcome.session_id

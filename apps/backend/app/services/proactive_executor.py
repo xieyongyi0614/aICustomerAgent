@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta
 
 from app.application import observability
+from app.application.agent_runtime import outbound as outbound_gateway
 from app.application.post_process import get_user_write_lock
 from app.channels.base import ChannelErrorKind, SendResult
 from app.chains import proactive_chain
@@ -122,6 +123,33 @@ def _generation_artifacts(action: ProactiveAction) -> tuple[str, int] | None:
         return None
 
 
+async def _send_via_outbound(
+    outbound,
+    action: ProactiveAction,
+    text: str,
+    trace: TurnTraceSession | None,
+) -> SendResult:
+    """投递出口选择（RT-014）：纳管渠道走 Outbound Gateway，未纳管走既有端口。
+
+    未纳管（默认）时走 `ProactiveOutbound.send`，行为与接线前逐字节一致；纳管时经
+    `outbound.deliver_proactive` 统一出口。两条路径都**不抛异常**（失败归一为
+    `SendResult`），这里的兜底只覆盖端口实现自身抛出的意外异常。
+    """
+    try:
+        if outbound_gateway.is_routable(outbound.channel):
+            return await outbound_gateway.deliver_proactive(
+                action.user_id,
+                text,
+                action.dedupe_key,
+                channel=outbound.channel,
+                trace=trace,
+            )
+        return await outbound.send(action.user_id, text, action.dedupe_key)
+    except Exception:
+        logger.exception("主动消息通道发送异常：%s", outbound.channel)
+        return SendResult(ok=False, error=ChannelErrorKind.UNKNOWN)
+
+
 async def _send_phase(
     action: ProactiveAction,
     text: str,
@@ -135,11 +163,7 @@ async def _send_phase(
     outbound = proactive_delivery.get_proactive_outbound()
     result: SendResult | None = None
     if outbound is not None:
-        try:
-            result = await outbound.send(action.user_id, text, action.dedupe_key)
-        except Exception:
-            logger.exception("主动消息通道发送异常：%s", outbound.channel)
-            result = SendResult(ok=False, error=ChannelErrorKind.UNKNOWN)
+        result = await _send_via_outbound(outbound, action, text, trace)
         if not result.ok:
             error = result.error.value if result.error else ChannelErrorKind.UNKNOWN.value
             return await _fail_for_retry(

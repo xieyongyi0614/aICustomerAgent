@@ -15,4 +15,5 @@ V30_RUNTIME_FIELDS: dict[str, str] = {
     "runtime_loop_optional_stages": "RT-006",
     "runtime_reflect_in_loop_enabled": "RT-011",
     "runtime_inbound_gateway_channels": "RT-013",
+    "runtime_outbound_gateway_channels": "RT-014",
 }

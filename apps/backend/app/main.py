@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
 from app.application import observability
+from app.application.agent_runtime import outbound as outbound_gateway
 from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
@@ -74,6 +75,13 @@ async def lifespan(application: FastAPI):
         )
         logging.getLogger(__name__).info(
             "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
+        )
+        # RT-014：出站归一网关注册（组合根才允许 import app.channels.feishu）
+        outbound_gateway.register_adapter(
+            FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
+        )
+        logging.getLogger(__name__).info(
+            "出站归一网关适配器已注册：%s", FEISHU_CHANNEL
         )
         # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
         # 故出站幂等的持久化实现只能在这里注入。**无开关**——跨进程幂等是必需能力，

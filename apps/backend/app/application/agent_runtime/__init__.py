@@ -85,6 +85,15 @@ from app.application.agent_runtime.inbound import (
     resolve_session,
 )
 from app.application.agent_runtime.models import RunContext
+from app.application.agent_runtime.outbound import (
+    deliver,
+    deliver_proactive,
+    deliver_reply,
+    is_routable,
+    register_adapter,
+    registered_channels,
+    resolve_adapter,
+)
 from app.application.agent_runtime.profiles import get_profile, snapshot_profile
 from app.application.agent_runtime.session import (
     SessionCloseSummary,
@@ -235,6 +244,9 @@ __all__ = [
     "context_digest",
     "current_plan_value",
     "current",
+    "deliver",
+    "deliver_proactive",
+    "deliver_reply",
     "emit",
     "emit_run_closed",
     "emit_run_opened",
@@ -247,6 +259,7 @@ __all__ = [
     "handler_count",
     "intent_to_action_intent",
     "is_enabled",
+    "is_routable",
     "observation_dedupe_key",
     "normalize",
     "normalize_inbound",
@@ -262,9 +275,12 @@ __all__ = [
     "reflect_enabled",
     "routes_for",
     "register",
+    "register_adapter",
+    "registered_channels",
     "register_stage_runner",
     "reset",
     "resolve_answer_llm",
+    "resolve_adapter",
     "resolve_stages",
     "resolve_session",
     "resume_session",
