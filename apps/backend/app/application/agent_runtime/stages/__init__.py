@@ -13,6 +13,11 @@ Reflect / Update）在此逐任务落位。本包**只读投影**既有域能力
 `'function' object has no attribute 'observe'`（实测踩中）。
 """
 
+from app.application.agent_runtime.stages.act import (
+    ActOutcome,
+    action_source_for,
+    intent_to_action_intent,
+)
 from app.application.agent_runtime.stages.observe import (
     CharacterStateFact,
     MemorySignalFact,
@@ -38,6 +43,7 @@ from app.application.agent_runtime.stages.reason import (
 )
 
 __all__ = [
+    "ActOutcome",
     "CharacterStateFact",
     "Intention",
     "MemorySignalFact",
@@ -51,7 +57,9 @@ __all__ = [
     "WorldFact",
     "build_stack",
     "capabilities_for",
+    "action_source_for",
     "current_plan_value",
+    "intent_to_action_intent",
     "observation_dedupe_key",
     "plan_enabled",
     "to_plan_value",

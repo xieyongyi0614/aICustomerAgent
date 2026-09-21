@@ -346,7 +346,6 @@ class TestLoopDriving:
         assert calls == ["record_handoff"]
 
         assert await loop.plan() is None
-        assert await loop.act() is None
         assert await loop.reflect() is None
         assert calls == ["record_handoff"]
 

@@ -83,6 +83,12 @@ from app.application.agent_runtime.session import (
     open_session,
     resume_session,
 )
+from app.application.agent_runtime.stages.act import (
+    ActOutcome,
+    action_source_for,
+    act,
+    intent_to_action_intent,
+)
 from app.application.agent_runtime.stages.observe import (
     CharacterStateFact,
     MemorySignalFact,
@@ -139,6 +145,7 @@ __all__ = [
     "PHASE_UPDATE",
     "STAGE_RUNNERS",
     "STAGE_TO_PHASE",
+    "ActOutcome",
     "AgentLoop",
     "AgentRuntime",
     "CharacterContext",
@@ -177,9 +184,11 @@ __all__ = [
     "WorldContext",
     "WorldFact",
     "account_turn_decisions",
+    "act",
     "acquire",
     "activate",
     "append_step",
+    "action_source_for",
     "assemble",
     "build_session_context",
     "build_stack",
@@ -200,6 +209,7 @@ __all__ = [
     "get_capability",
     "get_profile",
     "handler_count",
+    "intent_to_action_intent",
     "observation_dedupe_key",
     "observe",
     "observed_version",

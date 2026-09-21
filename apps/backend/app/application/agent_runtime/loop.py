@@ -33,6 +33,7 @@ from typing import Any
 from app.application import agent_state_assembler, logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
 from app.application.agent_runtime import state as state_manager
+from app.application.agent_runtime.stages import act as stages_act
 from app.application.agent_runtime.stages import observe as observe_stage
 from app.application.agent_runtime.stages import plan as stages_plan
 from app.application.agent_runtime.stages import reason as stages_reason
@@ -231,6 +232,7 @@ class AgentLoop:
         self.observation: Any = None
         self.intention: Any = None
         self.plan_value: Any = None
+        self.act_outcome: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -441,9 +443,21 @@ class AgentLoop:
     async def act(
         self, intention: object | None = None, plan: object | None = None
     ) -> object | None:
-        return await self._run_phase(
-            PHASE_ACT, {"intention": intention, "plan": plan}
+        """Act 段：RT-010 显式实现（`Intention` / `PlanValue` → `ActOutcome`）。
+
+        计划步骤存在（`PlanValue.current_step`）时走既有计划步骤执行路径；否则按意图
+        映射创建并执行行动。行动失败只置 Run `degraded`，不中断循环。
+        """
+        self.act_outcome = await stages_act.act(
+            intention if intention is not None else self.intention,
+            plan=plan if plan is not None else self.plan_value,
+            session_context=self.session_context,
+            run=self.run_context,
+            llm=self.llm,
+            now=self.run_context.started_at or self.now,
+            trace=self.trace,
         )
+        return self.act_outcome
 
     async def reflect(self, action_result: object | None = None) -> object | None:
         return await self._run_phase(PHASE_REFLECT, {"action_result": action_result})
