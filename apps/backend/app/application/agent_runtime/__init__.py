@@ -74,6 +74,16 @@ from app.application.agent_runtime.loop import (
     resolve_stages,
     stage_phase,
 )
+from app.application.agent_runtime.inbound import (
+    CHANNEL_FEISHU,
+    CHANNEL_SOURCES,
+    CHANNEL_WEB,
+    enabled_channels,
+    is_enabled,
+    normalize,
+    normalize_inbound,
+    resolve_session,
+)
 from app.application.agent_runtime.models import RunContext
 from app.application.agent_runtime.profiles import get_profile, snapshot_profile
 from app.application.agent_runtime.session import (
@@ -162,6 +172,9 @@ __all__ = [
     "STAGE_TO_PHASE",
     "ActOutcome",
     "AgentLoop",
+    "CHANNEL_FEISHU",
+    "CHANNEL_SOURCES",
+    "CHANNEL_WEB",
     "AgentRuntime",
     "CharacterContext",
     "CharacterStateFact",
@@ -226,13 +239,17 @@ __all__ = [
     "emit_run_closed",
     "emit_run_opened",
     "emit_stage_completed",
+    "enabled_channels",
     "evidence_window_key",
     "evaluate_event_escalation",
     "get_capability",
     "get_profile",
     "handler_count",
     "intent_to_action_intent",
+    "is_enabled",
     "observation_dedupe_key",
+    "normalize",
+    "normalize_inbound",
     "observe",
     "observed_version",
     "open_foreground_run",
@@ -249,6 +266,7 @@ __all__ = [
     "reset",
     "resolve_answer_llm",
     "resolve_stages",
+    "resolve_session",
     "resume_session",
     "run_autonomous_cycle",
     "run_event_pregate",

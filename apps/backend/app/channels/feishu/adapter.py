@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 import openai
 
+from app.application.agent_runtime import inbound as inbound_gateway
 from app.channels.base import InboundMessage
 from app.channels.feishu import delivery
 from app.channels.feishu.events import UnhandledMessage
@@ -49,6 +50,9 @@ class TurnOutcome:
     error_kind: str | None = None
     source_message_ref: str | None = None
     thread_ref: str | None = None
+    # RT-013 入站归一（纳管渠道才有值；未纳管恒为 None，行为逐字节不变）
+    runtime_input: object | None = None
+    session_context: object | None = None
 
 
 _session_locks: dict[str, asyncio.Lock] = {}
@@ -193,6 +197,7 @@ def _outcome(
     error_kind: str | None,
     turn_id: str | None = None,
 ) -> TurnOutcome:
+    runtime_input, session_context = _gateway_projection(inbound)
     return TurnOutcome(
         session_id=session_id,
         user_id=user_id,
@@ -201,7 +206,31 @@ def _outcome(
         error_kind=error_kind,
         source_message_ref=inbound.reply_ref,
         thread_ref=inbound.external_thread_id,
+        runtime_input=runtime_input,
+        session_context=session_context,
     )
+
+
+def _gateway_projection(inbound: InboundMessage):
+    """RT-013 薄适配：纳管渠道经 Inbound Gateway 归一（**仍调既有 `stream_chat`**）。
+
+    未纳管（默认）→ `(None, None)`，行为逐字节不变；归一异常只记日志、不阻断本轮
+    （网关是**附加观测面**，不是执行入口——执行切换属 RT-015）。
+    """
+    try:
+        if not inbound_gateway.is_enabled(FEISHU_CHANNEL):
+            return None, None
+        return (
+            inbound_gateway.normalize_inbound(inbound),
+            inbound_gateway.resolve_session(
+                FEISHU_CHANNEL,
+                inbound.external_user_id,
+                thread_id=inbound.external_thread_id,
+            ),
+        )
+    except Exception:
+        logger.exception("入站网关归一失败，按未纳管处理：%s", inbound.external_user_id)
+        return None, None
 
 
 def _begin_trace():

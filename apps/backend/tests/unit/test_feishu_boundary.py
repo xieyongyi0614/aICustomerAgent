@@ -18,6 +18,8 @@ CHANNELS_ALLOWLIST_PREFIXES = (
     "app.services.channel_identity_service",
     "app.services.trace_collector",
     "app.services.agent_service",
+    # RT-013：入站归一网关（叶子契约模块，零 IO / 零仓储 / 零 chains）。
+    "app.application.agent_runtime.inbound",
 )
 
 CHANNELS_APP_DENY_EXACT = (
