@@ -11,4 +11,5 @@ V30_RUNTIME_FIELDS: dict[str, str] = {
     "runtime_session_tracking_enabled": "RT-002",
     "runtime_state_versioning_enabled": "RT-003",
     "runtime_context_freeze_enabled": "RT-004",
+    "runtime_event_bus_enabled": "RT-005",
 }

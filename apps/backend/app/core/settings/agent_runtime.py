@@ -32,3 +32,4 @@ class AgentRuntimeSettings(BaseSettings):
     runtime_session_tracking_enabled: bool = False
     runtime_state_versioning_enabled: bool = False
     runtime_context_freeze_enabled: bool = False
+    runtime_event_bus_enabled: bool = False
