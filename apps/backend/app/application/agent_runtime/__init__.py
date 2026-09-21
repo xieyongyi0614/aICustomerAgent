@@ -93,6 +93,14 @@ from app.application.agent_runtime.stages.observe import (
     observation_dedupe_key,
     observe,
 )
+from app.application.agent_runtime.stages.plan import (
+    PlanDegradation,
+    PlanStepRef,
+    PlanValue,
+    current_plan_value,
+    plan_enabled,
+    to_plan_value,
+)
 from app.application.agent_runtime.stages.reason import (
     Intention,
     ReasonDegradation,
@@ -146,6 +154,9 @@ __all__ = [
     "MemorySignalFact",
     "Observation",
     "ObservationDegradation",
+    "PlanDegradation",
+    "PlanStepRef",
+    "PlanValue",
     "ReasonDegradation",
     "ReconcileConflict",
     "ReconcileReport",
@@ -179,6 +190,7 @@ __all__ = [
     "close_run",
     "close_session",
     "context_digest",
+    "current_plan_value",
     "current",
     "emit",
     "emit_run_closed",
@@ -194,6 +206,7 @@ __all__ = [
     "open_foreground_run",
     "open_run",
     "open_session",
+    "plan_enabled",
     "reason",
     "reconcile",
     "register",
@@ -211,6 +224,7 @@ __all__ = [
     "subscribe",
     "subscribers",
     "terminal_status_for",
+    "to_plan_value",
     "unsubscribe",
     "version",
 ]

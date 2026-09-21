@@ -22,6 +22,14 @@ from app.application.agent_runtime.stages.observe import (
     WorldFact,
     observation_dedupe_key,
 )
+from app.application.agent_runtime.stages.plan import (
+    PlanDegradation,
+    PlanStepRef,
+    PlanValue,
+    current_plan_value,
+    plan_enabled,
+    to_plan_value,
+)
 from app.application.agent_runtime.stages.reason import (
     Intention,
     ReasonDegradation,
@@ -35,10 +43,16 @@ __all__ = [
     "MemorySignalFact",
     "Observation",
     "ObservationDegradation",
+    "PlanDegradation",
+    "PlanStepRef",
+    "PlanValue",
     "ReasonDegradation",
     "UserInputFact",
     "WorldFact",
     "build_stack",
     "capabilities_for",
+    "current_plan_value",
     "observation_dedupe_key",
+    "plan_enabled",
+    "to_plan_value",
 ]

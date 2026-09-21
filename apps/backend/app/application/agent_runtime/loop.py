@@ -34,6 +34,7 @@ from app.application import agent_state_assembler, logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
 from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.stages import observe as observe_stage
+from app.application.agent_runtime.stages import plan as stages_plan
 from app.application.agent_runtime.stages import reason as stages_reason
 from app.application.agent_runtime.contracts import (
     ErrorKind,
@@ -229,6 +230,7 @@ class AgentLoop:
         self.runtime_context: Any = None
         self.observation: Any = None
         self.intention: Any = None
+        self.plan_value: Any = None
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
@@ -421,7 +423,20 @@ class AgentLoop:
         return self.intention
 
     async def plan(self, intention: object | None = None) -> object | None:
-        return await self._run_phase(PHASE_PLAN, {"intention": intention})
+        """Plan 段：RT-009 显式实现（`Intention` → `PlanValue`，可选段）。
+
+        未启用 / 无目标 / 未通过一律返回 `None`，Act 回落消费 `Intention`（RT-009 D5）。
+        """
+        self.plan_value = await stages_plan.plan(
+            intention if intention is not None else self.intention,
+            spec=self.spec,
+            session_context=self.session_context,
+            run=self.run_context,
+            llm=self.llm,
+            now=self.run_context.started_at or self.now,
+            trace=self.trace,
+        )
+        return self.plan_value
 
     async def act(
         self, intention: object | None = None, plan: object | None = None
