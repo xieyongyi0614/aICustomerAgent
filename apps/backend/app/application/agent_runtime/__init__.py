@@ -5,6 +5,18 @@ Life Loop Controller 的推广而非新 Agent：前台 chat_pipeline 与后台
 Gateway。领域层零感知。
 """
 
+from app.application.agent_runtime.contracts import (
+    AgentRuntime,
+    ErrorKind,
+    LoopStage,
+    RunResult,
+    RunStatus,
+    RuntimeEvent,
+    RuntimeFailure,
+    RuntimeInput,
+    SessionContext,
+    terminal_status_for,
+)
 from app.application.agent_runtime.controller import (
     append_step,
     close_run,
@@ -32,9 +44,18 @@ from app.application.agent_runtime.trigger_router import (
 )
 
 __all__ = [
+    "AgentRuntime",
+    "ErrorKind",
     "GatewayDeniedError",
     "Grant",
+    "LoopStage",
     "RunContext",
+    "RunResult",
+    "RunStatus",
+    "RuntimeEvent",
+    "RuntimeFailure",
+    "RuntimeInput",
+    "SessionContext",
     "account_turn_decisions",
     "acquire",
     "append_step",
@@ -52,4 +73,5 @@ __all__ = [
     "run_event_pregate",
     "run_stage_async",
     "snapshot_profile",
+    "terminal_status_for",
 ]
