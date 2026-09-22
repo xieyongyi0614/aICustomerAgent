@@ -576,3 +576,87 @@ class TestLlmCallAttribution:
 
         row = loop_run_repository.get(run.id)
         assert row.llm_call_count == 1, "并发 Run 的调用不得计入本 Run"
+
+
+class TestDegradedPromotion:
+    """M-9：任一 error step 或 run.degraded → 台账终态 degraded。"""
+
+    pytestmark = pytest.mark.unit
+
+    def test_error_step_promotes_done_to_degraded(self, db_session_factory):
+        from app.application.agent_runtime import controller
+        from app.repositories import loop_run_repository
+
+        now = datetime.now()
+        row = loop_run_repository.create_run(
+            user_id="u-m9", kind="chat", reason="m9", now=now
+        )
+        run = controller.RunContext(
+            run_id=row.id,
+            user_id="u-m9",
+            run_kind="autonomous_tick",
+            trigger_type="schedule",
+            reason="m9",
+            started_at=now,
+        )
+        steps = [{"step": "perception", "status": "error", "error": "RuntimeError"}]
+
+        status = controller._promote_degraded_status("done", run, steps)
+        assert status == "degraded"
+
+        controller.close_run(run, status, steps)
+        assert loop_run_repository.get(row.id).status == "degraded"
+
+    def test_run_degraded_flag_promotes_to_degraded(self):
+        from app.application.agent_runtime import controller
+
+        now = datetime.now()
+        run = controller.RunContext(
+            run_id="r-m9-flag",
+            user_id="u-m9",
+            run_kind="autonomous_tick",
+            trigger_type="schedule",
+            reason="m9",
+            started_at=now,
+            degraded=True,
+        )
+        assert controller._promote_degraded_status("done", run, []) == "degraded"
+
+    def test_clean_done_stays_done(self):
+        from app.application.agent_runtime import controller
+
+        now = datetime.now()
+        run = controller.RunContext(
+            run_id="r-m9-ok",
+            user_id="u-m9",
+            run_kind="autonomous_tick",
+            trigger_type="schedule",
+            reason="m9",
+            started_at=now,
+        )
+        assert (
+            controller._promote_degraded_status(
+                "done", run, [{"step": "perception", "status": "ok"}]
+            )
+            == "done"
+        )
+        assert controller._promote_degraded_status("aborted", run, []) == "aborted"
+
+    def test_loop_close_treats_error_step_as_degraded(self):
+        from app.application.agent_runtime.loop import AgentLoop
+        from app.application.agent_runtime.models import RunContext
+        from app.application.agent_runtime.profiles import get_profile
+
+        run = RunContext(
+            run_id="r-m9-loop",
+            user_id="u-m9",
+            run_kind="autonomous_tick",
+            trigger_type="schedule",
+            reason="m9",
+            started_at=datetime.now(),
+        )
+        loop = AgentLoop(get_profile("autonomous_tick"), user_id="u-m9", run=run)
+        loop._status = "done"
+        loop._steps = [{"step": "goal_check", "status": "error", "error": "ValueError"}]
+        loop._close()
+        assert loop._status == "degraded"

@@ -528,10 +528,12 @@ class AgentLoop:
         关账自身异常不得掩盖上游异常（取消 / 段失败），故内部兜底并只记日志。
         同时释放 Run 内投影缓存（H-5）：`state` / `context` 的内容不再留在 `run.data`。
         """
-        if (
-            self._promote_degraded
-            and self._status == TERMINAL_DONE
-            and self.run_context.degraded
+        if self._status == TERMINAL_DONE and (
+            (self._promote_degraded and self.run_context.degraded)
+            or any(
+                isinstance(step, dict) and step.get("status") == "error"
+                for step in self._steps
+            )
         ):
             self._status = TERMINAL_DEGRADED
         budget_account = self._budget.as_dict() if self._budget is not None else {}

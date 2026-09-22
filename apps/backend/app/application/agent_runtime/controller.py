@@ -165,6 +165,17 @@ def close_run(
     )
 
 
+def _promote_degraded_status(status: str, run: RunContext, steps: list) -> str:
+    """任一 error step 或 run.degraded → 台账终态 degraded（M-9，与观测口径对齐）。"""
+    if status != TERMINAL_DONE:
+        return status
+    if getattr(run, "degraded", False) or any(
+        isinstance(step, dict) and step.get("status") == "error" for step in steps
+    ):
+        return TERMINAL_DEGRADED
+    return status
+
+
 def _reset_run_projections(run: RunContext) -> None:
     """释放 Run 内只读投影缓存（H-5）：State / Context 不把域内容留在 `run.data`。
 
@@ -300,6 +311,7 @@ async def _legacy_run_autonomous_cycle(
             memory_digest_var.reset(digest_token)
         agent_state_assembler.reset_run_state(run)
         _reset_run_projections(run)
+        status = _promote_degraded_status(status, run, steps)
         _safe_close_run(run, status, steps, budget_state=budget.as_dict())
     return status
 
@@ -362,7 +374,6 @@ async def _run_autonomous_cycle_via_loop(
         llm=llm,
         now=now,
         registry=registry,
-        promote_degraded=False,
     )
     loop_box.append(loop)
     result = await loop.run()

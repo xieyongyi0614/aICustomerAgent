@@ -420,6 +420,43 @@ class TestEvents:
 
         assert captured == []
 
+    def test_applied_routes_observe_state_manager(self, monkeypatch, override_settings):
+        from app.application.agent_runtime import state as state_manager
+
+        override_settings(runtime_event_bus_enabled="true")
+        state_manager.reset_observed_cache()
+        _stub_record(monkeypatch)
+        _stub_post_process(monkeypatch)
+        _stub_ingest(monkeypatch)
+
+        outcome = _run_update(action_outcome=_action_outcome(), handoff=_handoff())
+
+        assert state_manager.observed_version("memory", "r-update") is not None
+        observed = state_manager.observed_version("memory", "r-update")
+        assert observed.detail["event_type"] == EVENT_MEMORY_UPDATED
+        assert EVENT_MEMORY_UPDATED in outcome.emitted_events
+
+    def test_unapplied_routes_do_not_observe(self, monkeypatch, override_settings):
+        from app.application.agent_runtime import state as state_manager
+
+        override_settings(runtime_event_bus_enabled="true")
+        state_manager.reset_observed_cache()
+        _stub_record(monkeypatch)
+        _stub_post_process(monkeypatch)
+        _stub_ingest(monkeypatch, raises=RuntimeError("ingest boom"))
+
+        run = RunContext(
+            run_id="r-update-fail",
+            user_id="u-1",
+            run_kind=RUN_KIND_AUTONOMOUS_TICK,
+            trigger_type="schedule",
+            reason="t",
+            started_at=datetime.now(),
+        )
+        _run_update(action_outcome=_action_outcome(), run=run)
+
+        assert state_manager.observed_version("memory", "r-update-fail") is None
+
 
 def _imported_modules(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))

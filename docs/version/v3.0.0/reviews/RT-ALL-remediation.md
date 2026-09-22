@@ -278,22 +278,43 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 
 ## 4. 遗留登记（不阻断本次整改合并，但需排期）
 
+> **P1 裁决（2026-09-22，用户授权「按建议裁决」）** 见 §4.1；下列 R 项状态已同步。
+
 | # | 项 | 来源 | 说明 |
 |---|---|---|---|
 | ~~R-1~~ | ~~H-1 唯一循环裁决~~ | 评审 H-1 | **已处置**：裁决 B（`34cb26a`），A 的前置条件已写入 `architecture.md` D-1 |
-| R-2 | **H-6 双层 Run 语义** | 本次整改 | 已按评审第二方案修好终态传播；若判定改单层 Run，需同步改 RT-016 断言 |
-| R-3 | **C-2 回退路径与 V2.6.1 的残差** | 本次整改 | 回退仍构造内存 `RunContext`；逐字节复刻需剥离段本体签名依赖 |
-| R-4 | **H-5 投影所有权口径** | 评审 H-5 | reset 已补；「持有投影 vs 持有句柄」需 architecture 裁决 |
-| R-5 | **H-3 剩余直读** | 评审 H-3 | `state.py` / `execution_history.py` 的多域审计读仍在 `application` 直连仓储 |
-| R-6 | **H-2 既存反向依赖** | 评审 H-2 | `decision_pipeline` → `llm_gateway`、`planning` → `models`：按评审建议开技术债单 |
-| R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径**；建议抽独立叶子契约模块后再收窄 allowlist |
+| ~~R-2~~ | ~~H-6 双层 Run 语义~~ | 本次整改 | **已裁决：保留双层**（外层记事件升级、内层记 tick）；终态传播已修 |
+| ~~R-3~~ | ~~C-2 回退路径与 V2.6.1 的残差~~ | 本次整改 | **已裁决：接受残差**。回退摘掉台账/事件/冻结/驱动壳；`RunContext` 内存载体保留（剥离并入 H-1-A） |
+| ~~R-4~~ | ~~H-5 投影所有权口径~~ | 评审 H-5 | **已裁决：持有只读投影**。Run 结束必 reset（已修）；不要求改句柄/惰性读 |
+| R-5 | **H-3 剩余直读** | 评审 H-3 | `state.py` / `execution_history.py` 的多域审计读仍在 `application` 直连仓储（Must-Fix「至少」子集已修） |
+| R-6 | **H-2 既存反向依赖** | 评审 H-2 | `decision_pipeline` → `llm_gateway`、`planning` → `models`：开技术债单 |
+| R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径** |
 | R-8 | **M-1 / M-2** | 评审 | 域映射与角色资产（`app.character.asuna`）下沉；多角色就绪 |
-| ~~R-9~~ | ~~M-3 / M-5 / M-10~~ | 评审 | **已完成**：M-5 仅 `running` 可关（`e218889`）、M-10 decision 版本改 count（`3a6ba97`）、M-3 观察缓存加锁 + LRU 有界（`3a6ba97`）。**剩余 M-7（LLM 按时间窗记账 → 按 `run_id` 归因）未做**（需先确认 `llm_calls` 是否有 run 维度列，属跨表口径变更） |
-| R-10 | **M-6 / M-8 / M-9** | 评审 | **未做**：私有 API 公有化（4 处，机械但涉及跨模块导出面）；Update 事件与 State Manager 对齐（需先定事件语义：`MemoryUpdated` 是「已路由」还是「版本已推进」）；`promote_degraded` 口径（改则需同步锁 RT-016 断言） |
-| R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`）：`AGENTS.md` / `apps/backend/AGENTS.md` 迁移链尾 `0050` → `0052`；`current-system-architecture-baseline.md` 0001~0050 → 0001~0052 + §4 顶部 V3.0 形态与 H-1 裁决；`architecture.md` 状态由「仅设计」改为「Implemented」 |
-| R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`）：新增 `tests/e2e/test_foreground_cutover_parity.py` 6 例——全轮次流对照、台账差异、中段 LLM 失败、grounding 缓冲（流式/缓冲两态）、post_process 失败；两态各用独立用户消除跨轮状态干扰。**已注入式验证非空转**（让线性链跳过 `record_handoff` → 4/6 必红） |
+| ~~R-9~~ | ~~M-3 / M-5 / M-7 / M-10~~ | 评审 | **已完成**：M-5（`e218889`）、M-10（`3a6ba97`）、M-3（`3a6ba97`）、**M-7（`60a3a04`）** |
+| R-10 | **M-6 残留** | 评审 | M-6 大部已公有化（`c6261ca`）；**M-8 / M-9 已修**。残留：`trigger_router → life_loop._cycle_reason` |
+| R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`） |
+| R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`） |
 | R-13 | **L-1 / L-2 / L-4** | 评审 | 时区一致性、`state_update` → reason 映射命名、契约事件集版本 bump |
-| R-14 | **`current_goal` 的线格式是值依赖的** | 本次 R-12 发现 | 见 §2.10 |
+| ~~R-14~~ | ~~`current_goal` 线格式值依赖~~ | 本次 R-12 发现 | **已裁决：维持值依赖**（不改 `api/v1/chat.py`）；前端若需恒定键再协同 |
+| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **方向批准、本批不做**。前置 R-12 已就绪；属独立版本重构 |
+| R-16 | **orphan sweep 默认 True** | 评审摘要第 7 点 | **已裁决：保持默认 True**（RT-018 运维例外），见 §4.2 |
+
+### 4.1 P1 裁决记录（2026-09-22）
+
+| 项 | 裁决 | 理由 |
+|---|---|---|
+| R-2 双层 Run | **保留双层** | 外层=事件升级、内层=tick，语义可解释；RT-016 断言依赖两层 `run_kinds` |
+| R-4 投影所有权 | **持有只读投影 + Run 结束 reset** | 与 architecture §3.1 一致；改句柄/惰性读收益不抵热路径成本 |
+| R-14 current_goal | **维持值依赖线格式** | 线上唯一真实流量契约，无前端协同不单方面改键集 |
+| M-8 事件语义 | **`semantics=routed` + applied 时 `state.observe`** | 关系/世界是 acknowledge（`applied=false`），真正写成功才进观察缓存 |
+| M-9 终态 | **任一 error step 或 `run.degraded` → `degraded`** | 与 `trace_query` 观测口径对齐；取消/中断仍为 `aborted` |
+| orphan 默认 True | **保持**，文档豁免 | 扫掠是防孤儿运维安全网；关掉反而放大 C-1 类残留 |
+| H-1-A | **批准方向、本批不做** | 先完成 P2 边界净化，再动前台热路径 |
+
+### 4.2 Flag-off 口径豁免
+
+`runtime_orphan_run_sweep_enabled` 默认 `True`（RT-018）：其余 `runtime_*` 全 off 时仍可能把超时 `running` 收敛为 `aborted`。  
+「Flag 关闭 = V2.6.1 逐字节一致」适用于**对话 / 自治业务行为**；台账运维收敛属有意例外（R-16）。
 
 > R-11 / R-12 已完成；`acceptance-report.md` 的 W-1 / W-2 同步收口。
 

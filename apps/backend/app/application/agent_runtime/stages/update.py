@@ -254,27 +254,30 @@ def _emit_events(
     occurred_at: datetime,
     trace: Any,
 ) -> tuple[str, ...]:
+    from app.application.agent_runtime import state as state_manager
+
     emitted: list[str] = []
     for item in items:
         event_type = TARGET_EVENT.get(item.target)
         if event_type is None:
             continue
-        event_bus.emit(
-            RuntimeEvent(
-                event_type=event_type,
-                run_id=str(getattr(run, "run_id", "") or ""),
-                session_id=session_id,
-                occurred_at=occurred_at,
-                payload={
-                    "target": item.target,
-                    "channel": item.channel,
-                    "applied": item.applied,
-                    "background": item.background,
-                },
-                correlation_id=getattr(run, "run_id", None),
-            ),
-            trace,
+        event = RuntimeEvent(
+            event_type=event_type,
+            run_id=str(getattr(run, "run_id", "") or ""),
+            session_id=session_id,
+            occurred_at=occurred_at,
+            payload={
+                "target": item.target,
+                "channel": item.channel,
+                "applied": item.applied,
+                "background": item.background,
+                "semantics": "routed",
+            },
+            correlation_id=getattr(run, "run_id", None),
         )
+        event_bus.emit(event, trace)
+        if item.applied:
+            state_manager.observe(item.target, event)
         emitted.append(event_type)
     return tuple(emitted)
 
