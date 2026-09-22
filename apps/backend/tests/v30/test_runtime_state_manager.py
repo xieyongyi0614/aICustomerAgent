@@ -70,9 +70,11 @@ def test_version_dispatches_to_registered_source(monkeypatch):
 
 
 def test_version_snapshot_domain_uses_latest_archive_version(monkeypatch):
+    from app.services import domain_ledger
+
     row = SimpleNamespace(version=7, created_at=NOW)
     monkeypatch.setattr(
-        state.agent_state_snapshot_repository, "latest", lambda user_id, character_id: row
+        domain_ledger, "latest_state_snapshot", lambda user_id, character_id: row
     )
 
     result = state.version("character", "u-arc")

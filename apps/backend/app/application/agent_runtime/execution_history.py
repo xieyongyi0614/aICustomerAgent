@@ -14,15 +14,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.application.agent_runtime.contracts import DEFAULT_CHARACTER_ID
-from app.repositories import (
-    action_repository,
-    agent_state_snapshot_repository,
-    decision_repository,
-    development_change_repository,
-    loop_run_repository,
-    relationship_event_repository,
-    trace_repository,
-)
+from app.repositories import loop_run_repository
+from app.services import domain_ledger
 
 
 def _row_mapping(row: Any) -> dict[str, Any]:
@@ -56,7 +49,7 @@ class ExecutionHistory:
 def latest_snapshot_anchor(
     user_id: str, character_id: str = DEFAULT_CHARACTER_ID
 ) -> Mapping[str, Any] | None:
-    row = agent_state_snapshot_repository.latest(user_id, character_id)
+    row = domain_ledger.latest_state_snapshot(user_id, character_id)
     return _row_mapping(row) if row is not None else None
 
 
@@ -76,12 +69,12 @@ def _collect_traces(
     window: tuple[datetime, datetime],
 ) -> list[Mapping[str, Any]]:
     rows: dict[str, Mapping[str, Any]] = {}
-    for row in trace_repository.list_by_correlation_id(run_id):
+    for row in domain_ledger.list_traces_by_correlation_id(run_id):
         rows[row.id] = _row_mapping(row)
-    for row in trace_repository.list_by_action_ids(action_ids):
+    for row in domain_ledger.list_traces_by_action_ids(action_ids):
         rows[row.id] = _row_mapping(row)
     if user_id:
-        for row in trace_repository.list_rows_by_user_window(
+        for row in domain_ledger.list_traces_by_user_window(
             user_id, window[0], window[1]
         ):
             rows[row.id] = _row_mapping(row)
@@ -96,12 +89,12 @@ def _collect_decisions(
 ) -> list[Mapping[str, Any]]:
     rows: dict[str, Mapping[str, Any]] = {}
     for action_id in action_ids:
-        for record in decision_repository.get_by_action(action_id):
+        for record in domain_ledger.list_decisions_by_action(action_id):
             rows[record.id] = _row_mapping(record)
-    for record in decision_repository.search(request_id=run_id, limit=100):
+    for record in domain_ledger.search_decisions(request_id=run_id, limit=100):
         rows[record.id] = _row_mapping(record)
     if user_id:
-        for row in decision_repository.list_rows_by_user_window(
+        for row in domain_ledger.list_decisions_by_user_window(
             user_id, window[0], window[1]
         ):
             rows[row.id] = _row_mapping(row)
@@ -115,13 +108,13 @@ def _collect_state_changes(
 ) -> list[Mapping[str, Any]]:
     changes: list[Mapping[str, Any]] = []
     if user_id:
-        for row in development_change_repository.list_changes(
+        for row in domain_ledger.list_development_changes(
             user_id, since=window[0], until=window[1]
         ):
             item = _row_mapping(row)
             item["source"] = "development_changes"
             changes.append(item)
-        for event in relationship_event_repository.list_events(
+        for event in domain_ledger.list_relationship_events(
             user_id, session_id=session_id, since=window[0], until=window[1], limit=200
         ):
             item = _row_mapping(event)
@@ -136,13 +129,13 @@ def history_for_run(run_id: str) -> ExecutionHistory | None:
         return None
     started_at = run.started_at or datetime.now()
     window = _history_window(started_at, run.finished_at)
-    action_records = action_repository.list_by_run_id(run_id)
+    action_records = domain_ledger.list_actions_by_run_id(run_id)
     action_ids = [record.id for record in action_records]
     user_id = run.user_id
     session_id = run.session_id
-    anchor_row = agent_state_snapshot_repository.get_by_run_id(run_id)
+    anchor_row = domain_ledger.state_snapshot_by_run_id(run_id)
     if anchor_row is None and user_id:
-        anchor_row = agent_state_snapshot_repository.latest(user_id)
+        anchor_row = domain_ledger.latest_state_snapshot(user_id)
     return ExecutionHistory(
         run_id=run_id,
         run=_row_mapping(run),

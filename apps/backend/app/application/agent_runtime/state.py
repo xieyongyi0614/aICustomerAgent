@@ -21,13 +21,7 @@ from app.application.agent_runtime.contracts import (
 )
 from app.core.settings import get_settings
 from app.models.agent_state import AgentStateSnapshot
-from app.repositories import (
-    action_repository,
-    agent_state_snapshot_repository,
-    decision_repository,
-    development_change_repository,
-    relationship_event_repository,
-)
+from app.services import domain_ledger
 
 FAST_DOMAINS: frozenset[str] = frozenset(
     {"mood", "energy", "intensity", "relationship"}
@@ -88,12 +82,6 @@ class ReconcileReport:
     resolved: Mapping[str, Any]
 
 
-def _first_created_at(rows: list) -> datetime | None:
-    if not rows:
-        return None
-    return getattr(rows[0], "created_at", None)
-
-
 def _ledger_source(
     domain: str,
     count_fn: Callable[[str], int],
@@ -117,7 +105,7 @@ def _snapshot_source(
     def _build(user_id: str, character_id: str, now: datetime | None) -> StateVersion:
         observed_at = now or datetime.now()
         try:
-            row = agent_state_snapshot_repository.latest(user_id, character_id)
+            row = domain_ledger.latest_state_snapshot(user_id, character_id)
         except Exception:
             return StateVersion(domain, None, "unavailable", None, observed_at)
         if row is None:
@@ -130,30 +118,23 @@ def _snapshot_source(
 DOMAIN_SOURCES: dict[str, Callable[[str, str, datetime | None], StateVersion]] = {
     "relationship": _ledger_source(
         "relationship",
-        relationship_event_repository.count_events,
-        lambda user_id: _first_created_at(
-            relationship_event_repository.list_events(user_id, limit=1)
-        ),
+        domain_ledger.count_relationship_events,
+        domain_ledger.latest_relationship_event_at,
     ),
     "development": _ledger_source(
         "development",
-        development_change_repository.count_changes,
-        development_change_repository.latest_change,
+        domain_ledger.count_development_changes,
+        domain_ledger.latest_development_change_at,
     ),
     "decision": _ledger_source(
         "decision",
-        # 迟绑定：经 lambda 取模块属性，便于替换 / 打桩，也避免导入期固化引用
-        lambda user_id: decision_repository.count_by_user(user_id),
-        lambda user_id: _first_created_at(
-            decision_repository.search(user_id=user_id, limit=1)
-        ),
+        domain_ledger.count_decisions,
+        domain_ledger.latest_decision_at,
     ),
     "action": _ledger_source(
         "action",
-        action_repository.count_active,
-        lambda user_id: _first_created_at(
-            action_repository.recent_records(user_id, limit=1)
-        ),
+        domain_ledger.count_active_actions,
+        domain_ledger.latest_action_at,
     ),
 }
 for _domain in SNAPSHOT_DOMAINS:

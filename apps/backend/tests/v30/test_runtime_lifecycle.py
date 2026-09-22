@@ -364,11 +364,24 @@ class TestRepositoryAccessLayering:
 
         assert set(self._repository_imports(controller)) <= allowed
 
+    def test_projection_modules_only_use_run_scoped_repositories(self):
+        from app.application.agent_runtime import execution_history, state
+
+        allowed = {"app.repositories.loop_run_repository"}
+        for module in (state, execution_history):
+            assert set(self._repository_imports(module)) <= allowed, module.__name__
+
     def test_domain_reads_go_through_service_facades(self):
-        from app.services import goal_service, outbox_service
+        from app.services import domain_ledger, goal_service, outbox_service
         from app.services.action import manager as action_manager
 
-        for facade in (goal_service.get_goal, goal_service.get_plan, outbox_service.list_pending):
+        for facade in (
+            goal_service.get_goal,
+            goal_service.get_plan,
+            outbox_service.list_pending,
+            domain_ledger.count_decisions,
+            domain_ledger.list_actions_by_run_id,
+        ):
             assert callable(facade)
         assert callable(action_manager.get_record)
 
