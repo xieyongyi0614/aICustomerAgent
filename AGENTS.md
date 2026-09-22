@@ -29,7 +29,12 @@
 
 - `docs/current-system-architecture-baseline.md` — 当前系统唯一可信架构基线（分层/模块/数据/配置/扩展点/技术债/ADR/演进方向）
 
-**当前版本（V2.x）**
+**当前版本（V3.x / V4.x）**
+
+- `docs/version/v4.0.0/` — V4.0.0 Personal Life Agent Foundation（个人生活智能体地基：用户实体 + 账本域）：`architecture.md`（架构依据，含运行时采用裁决）+ `tasks.md`（PLA-001~018）+ `reviews/`（需求评审）+ `audits/`（前置审计）+ `tasks/`（明细，后续生成）
+- `docs/version/v3.0.0/` — V3.0.0 Agent Runtime Core（RT-001~020）：`architecture.md` + `tasks.md` + `acceptance-report.md`（**CONDITIONAL — NOT RELEASED**，G7 既存失败）+ `regression-checklist.md` + `entry-convergence.md` + `reviews/`
+
+**前序版本（V2.x，已实现）**
 
 - `docs/version/v2.6.1/` — V2.6.1 Reflection（REF-001~007）
 - `docs/version/v2.6.0/` — V2.6.0 Action Execution（TASK-001~009）+ architecture / acceptance-report / audit-report
