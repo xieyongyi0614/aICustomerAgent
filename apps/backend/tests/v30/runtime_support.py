@@ -17,6 +17,7 @@ V30_RUNTIME_FIELDS: dict[str, str] = {
     "runtime_inbound_gateway_channels": "RT-013",
     "runtime_outbound_gateway_channels": "RT-014",
     "runtime_autonomous_cycle_enabled": "RT-016",
+    "runtime_foreground_loop_enabled": "RT-020",
     "runtime_orphan_run_timeout_minutes": "RT-018",
     "runtime_orphan_run_sweep_enabled": "RT-018",
 }

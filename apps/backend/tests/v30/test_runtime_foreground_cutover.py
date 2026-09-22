@@ -236,3 +236,74 @@ class TestEntryConvergence:
         assert "stream_chat" in doc
         assert "保留" in doc
         assert "收编本体" in doc or "AgentLoop" in doc
+
+
+class TestForegroundKillSwitch:
+    """C-2：前台收编总闸——关闭时回退线性旧链（零 Run 台账），流式协议不变。"""
+
+    pytestmark = pytest.mark.unit
+
+    async def test_flag_off_creates_no_run_ledger(
+        self, db_session_factory, fake_llm, override_settings
+    ):
+        override_settings(runtime_foreground_loop_enabled="false")
+        before = len(loop_run_repository.list_recent())
+
+        events = await _events("s-kill-off", "在吗", _llm(fake_llm))
+
+        assert events[-1]["kind"] == "done"
+        assert len(loop_run_repository.list_recent()) == before
+
+    async def test_flag_on_records_run_ledger(
+        self, db_session_factory, fake_llm, override_settings
+    ):
+        override_settings(runtime_foreground_loop_enabled="true")
+
+        await _events("s-kill-on", "在吗", _llm(fake_llm))
+
+        rows = [
+            row
+            for row in loop_run_repository.list_recent()
+            if row.run_kind == RUN_KIND_FOREGROUND_CHAT
+        ]
+        assert rows, "开启总闸时应落 foreground_chat 台账"
+        assert rows[0].status in {"done", "degraded"}
+
+    async def test_flag_off_keeps_streaming_contract(
+        self, db_session_factory, fake_llm, override_settings
+    ):
+        override_settings(runtime_foreground_loop_enabled="true")
+        on_events = await _events("s-kill-contract-on", "在吗", _llm(fake_llm))
+
+        override_settings(runtime_foreground_loop_enabled="false")
+        off_events = await _events("s-kill-contract-off", "在吗", _llm(fake_llm))
+
+        on_meta = next(e for e in on_events if e["kind"] == "turn_meta")
+        off_meta = next(e for e in off_events if e["kind"] == "turn_meta")
+        assert _core_keys(off_meta) == _core_keys(on_meta)
+        assert list(off_meta) == list(on_meta)
+
+        on_done = next(e for e in on_events if e["kind"] == "done")
+        off_done = next(e for e in off_events if e["kind"] == "done")
+        assert set(off_done) == set(on_done) == DONE_KEYS
+        assert off_done["session_id"] == "s-kill-contract-off"
+
+    async def test_linear_chain_uses_profile_stage_order(self):
+        from app.application import chat_pipeline
+        from app.application.agent_runtime import profiles
+
+        spec = profiles.get_profile(RUN_KIND_FOREGROUND_CHAT)
+        order: list[str] = []
+
+        async def _recorder(name):
+            async def _run(_ctx):
+                order.append(name)
+
+            return _run
+
+        runners = {name: await _recorder(name) for name in spec.stages}
+        await chat_pipeline._drive_foreground_linear(  # pylint: disable=protected-access
+            spec, runners
+        )
+
+        assert order == list(spec.stages)

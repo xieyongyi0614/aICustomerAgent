@@ -7,6 +7,7 @@
 import asyncio
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import AsyncIterator
 
@@ -37,7 +38,11 @@ from app.application.agent_runtime import profiles as runtime_profiles
 from app.application.agent_runtime import state as runtime_state_manager
 from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
 from app.application.agent_runtime.loop import AgentLoop
-from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
+from app.application.agent_runtime.models import (
+    RUN_KIND_FOREGROUND_CHAT,
+    TRIGGER_CHANNEL_MESSAGE,
+    RunContext,
+)
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.services import (
@@ -344,6 +349,38 @@ def _foreground_registry(runners: dict) -> dict:
     return dict(runners)
 
 
+def _ephemeral_run_context(user_id: str, session_id: str | None) -> RunContext:
+    """线性旧链的 Run 载体：**只存在于内存，不建 `loop_runs` 台账行**（C-2）。
+
+    段本体需要 `RunContext` 承载 `run.data` 与 LLM Gateway 记账，故仍需一个实例；
+    但回退路径零台账写入、零运行时事件，行为等价于收编前的线性链。
+    """
+    return RunContext(
+        run_id=f"ephemeral:{session_id or user_id}:{uuid.uuid4().hex}",
+        user_id=user_id,
+        run_kind=RUN_KIND_FOREGROUND_CHAT,
+        trigger_type=TRIGGER_CHANNEL_MESSAGE,
+        reason="user_message",
+        started_at=datetime.now(),
+    )
+
+
+async def _drive_foreground_linear(spec, runners: dict) -> None:
+    """线性旧链驱动（C-2 kill switch）：按 Profile 顺序直驱段本体。
+
+    与 `AgentLoop` 的差别**仅**在于不产生 Run 台账与运行时事件；段序仍只来自
+    `profiles.py`（无手写阶段序列），关键段失败照旧冒泡，非关键段失败继续
+    （后续段据 `stage_error` 自行跳过）。
+    """
+    for name in spec.stages:
+        try:
+            await runners[name](None)
+        except BaseException:  # noqa: BLE001 — 关键段冒泡，非关键段继续
+            if name in spec.critical:
+                raise
+            logger.exception("前台段失败（线性旧链，非关键段继续）：%s", name)
+
+
 async def run_chat_pipeline(
     session_id: str,
     user_id: str,
@@ -354,21 +391,32 @@ async def run_chat_pipeline(
     runtime_input: RuntimeInput | None = None,
     session_context: SessionContext | None = None,
 ) -> AsyncIterator[dict]:
-    """前台关键路径（RT-015 收编）：流式协议不变，段序列来自 foreground_chat Profile。"""
+    """前台关键路径（RT-015 收编）：流式协议不变，段序列来自 foreground_chat Profile。
+
+    `runtime_foreground_loop_enabled`（C-2 kill switch）关闭时走**线性旧链**：
+    同一段序列、同一段本体，但**不建 Run 台账、不发运行时事件、不冻结上下文**，
+    以便一键回退（无需代码回滚）。默认开启。
+    """
     events: asyncio.Queue = asyncio.Queue()
-    run_ctx = agent_runtime.open_foreground_run(user_id, session_id=session_id)
-    runtime_state_manager.activate(run_ctx, user_id)
+    foreground_loop = get_settings().runtime_foreground_loop_enabled
+    run_ctx = (
+        agent_runtime.open_foreground_run(user_id, session_id=session_id)
+        if foreground_loop
+        else _ephemeral_run_context(user_id, session_id)
+    )
     runtime_context_value = None
-    if (
-        get_settings().runtime_context_freeze_enabled
-        and session_context is not None
-    ):
-        runtime_context_value = await runtime_context_manager.assemble(
-            session_context,
-            runtime_input,
-            run=run_ctx,
-            trace=trace,
-        )
+    if foreground_loop:
+        runtime_state_manager.activate(run_ctx, user_id)
+        if (
+            get_settings().runtime_context_freeze_enabled
+            and session_context is not None
+        ):
+            runtime_context_value = await runtime_context_manager.assemble(
+                session_context,
+                runtime_input,
+                run=run_ctx,
+                trace=trace,
+            )
     spec = runtime_profiles.get_profile(RUN_KIND_FOREGROUND_CHAT)
     stage_error: BaseException | None = None
 
@@ -829,19 +877,22 @@ async def run_chat_pipeline(
             "record_handoff": _record_handoff,
         }
     )
-    loop = AgentLoop(
-        spec,
-        user_id=user_id,
-        run=run_ctx,
-        llm=llm,
-        trace=trace,
-        registry=runners,
-    )
-    task = asyncio.ensure_future(
-        loop.run(
-            runtime_input, session_context, runtime_context=runtime_context_value
+    if foreground_loop:
+        loop = AgentLoop(
+            spec,
+            user_id=user_id,
+            run=run_ctx,
+            llm=llm,
+            trace=trace,
+            registry=runners,
         )
-    )
+        task = asyncio.ensure_future(
+            loop.run(
+                runtime_input, session_context, runtime_context=runtime_context_value
+            )
+        )
+    else:
+        task = asyncio.ensure_future(_drive_foreground_linear(spec, runners))
     try:
         while True:
             getter = asyncio.ensure_future(events.get())
