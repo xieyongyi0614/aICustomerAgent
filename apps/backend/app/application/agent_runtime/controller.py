@@ -118,26 +118,40 @@ def append_step(run: RunContext, steps: list, entry: dict) -> None:
     loop_run_repository.mark_step(run.run_id, entry)
 
 
+def _llm_call_count(
+    run: RunContext, finished: datetime, trace_ref: str | None
+) -> int:
+    """LLM 调用归因（M-7）：有 trace 锚点时**精确**按 `request_id` 计数。
+
+    无 trace（自治 tick 等）时退回时间窗计数——并发 Run 下会互相重复记账，属**近似**。
+    `llm_calls` 无 `run_id` 列，故不新增列（保 V3.0 G5「仅 `0052` 两列」）。
+    """
+    if trace_ref:
+        return llm_call_repository.count_calls_by_request(trace_ref)
+    if finished < run.started_at:
+        return 0
+    return llm_call_repository.count_calls_between(run.started_at, finished)
+
+
 def close_run(
     run: RunContext,
     status: str,
     steps: list | None = None,
     budget_state: dict | None = None,
     now: datetime | None = None,
+    trace_ref: str | None = None,
 ) -> None:
-    """Run Close：终态 + 成本汇总（窗口计数口径与 life_loop 一致）。
+    """Run Close：终态 + 成本汇总。
 
+    `trace_ref` = 本 Run 的 trace `request_id`；给出时 `llm_call_count` 按它**精确归因**
+    （M-7），未给出时沿用时间窗口径（与 `life_loop` 一致，近似）。
     steps=None（前台整链包裹，无逐阶段记账）时保留台账既有 steps。
     """
     finished = now or datetime.now()
     if budget_state is None:
         budget_state = life_loop_budget.check_daily_budget(now=finished).as_dict()
     try:
-        llm_count = (
-            llm_call_repository.count_calls_between(run.started_at, finished)
-            if finished >= run.started_at
-            else 0
-        )
+        llm_count = _llm_call_count(run, finished, trace_ref)
     except Exception:
         logger.exception("run 窗口 LLM 计数失败，按 0 记账")
         llm_count = 0

@@ -542,6 +542,7 @@ class AgentLoop:
                 self._steps,
                 budget_state=budget_account,
                 now=datetime.now(),
+                trace_ref=getattr(self.trace, "request_id", None),
             )
             event_bus.emit_run_closed(
                 self.run_context.run_id, self._session_id, self._status, self.trace

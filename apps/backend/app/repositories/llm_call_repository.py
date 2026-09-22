@@ -175,6 +175,25 @@ def aggregate_usage_since(cutoff: datetime) -> dict:
         return {"calls": int(calls), "tokens": int(tokens)}
 
 
+def count_calls_by_request(request_id: str) -> int:
+    """按 trace `request_id` **精确归因**的 LLM 调用数（RT-ALL-code-review M-7）。
+
+    与 `count_calls_between` 的区别：时间窗计数在**并发 Run** 下会把别的 Run 的调用
+    也算进来（互相重复记账）；`request_id` 由该 Run 自己的 trace 生成，故是精确归因。
+    `llm_calls` 无 `run_id` 列（不新增列 → 不破 V3.0 G5「仅 0052 两列」），
+    故以 trace 为归因锚点；无 trace 的路径（自治 tick）仍用窗口计数，属近似。
+    """
+    if not request_id:
+        return 0
+    with SessionLocal() as session:
+        return int(
+            session.query(func.count(LlmCallRecordRow.id))
+            .filter(LlmCallRecordRow.request_id == request_id)
+            .scalar()
+            or 0
+        )
+
+
 def count_calls_between(start: datetime, end: datetime) -> int:
     """run 窗口内 LLM 调用计数（loop_runs llm_call_count 记账用）。"""
     with SessionLocal() as session:

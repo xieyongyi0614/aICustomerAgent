@@ -504,3 +504,75 @@ class TestNoPrivateServiceApi:
 
         assert life_loop_budget.is_degraded_verdict(_verdict("degraded"))
         assert not life_loop_budget.is_degraded_verdict(_verdict("ok"))
+
+
+class TestLlmCallAttribution:
+    """M-7：LLM 调用按 trace 锚点**精确归因**，不受并发 Run 的窗口计数污染。"""
+
+    pytestmark = pytest.mark.unit
+
+    def _call(self, record_id: str, request_id: str, created_at: datetime):
+        from app.models.observability import CallSite, LlmCallRecord
+        from app.repositories import llm_call_repository
+
+        llm_call_repository.save(
+            LlmCallRecord(
+                id=record_id,
+                request_id=request_id,
+                turn_id=None,
+                call_site=CallSite.ANSWER,
+                status="ok",
+                latency_ms=1.0,
+                created_at=created_at,
+            )
+        )
+
+    def test_count_by_request_is_trace_scoped(self, db_session_factory):
+        from app.repositories import llm_call_repository
+
+        now = datetime.now()
+        self._call("llm-a1", "trace-a", now)
+        self._call("llm-a2", "trace-a", now)
+        self._call("llm-b1", "trace-b", now)
+
+        assert llm_call_repository.count_calls_by_request("trace-a") == 2
+        assert llm_call_repository.count_calls_by_request("trace-b") == 1
+        assert llm_call_repository.count_calls_by_request("") == 0
+        # 同一时间窗内两条 trace 都会被窗口计数算进去 → 正是 M-7 的问题
+        # （`save` 以落库时刻写 created_at，故窗口取宽区间）
+        assert (
+            llm_call_repository.count_calls_between(
+                now - timedelta(minutes=1), datetime.now() + timedelta(minutes=1)
+            )
+            == 3
+        )
+
+    def test_close_run_uses_trace_attribution_when_available(self, db_session_factory):
+        from app.application.agent_runtime import controller
+        from app.repositories import loop_run_repository
+
+        now = datetime.now()
+        run = loop_run_repository.create_run(
+            user_id="u-m7", kind="chat", reason="m7", now=now
+        )
+        # 本 Run 的 1 次调用 + 并发 Run 的 2 次调用（同一窗口）
+        self._call("llm-m7-own", "trace-m7-own", now)
+        self._call("llm-m7-other1", "trace-m7-other", now)
+        self._call("llm-m7-other2", "trace-m7-other", now)
+
+        controller.close_run(
+            controller.RunContext(
+                run_id=run.id,
+                user_id="u-m7",
+                run_kind="foreground_chat",
+                trigger_type="channel_message",
+                reason="m7",
+                started_at=now,
+            ),
+            "done",
+            [],
+            trace_ref="trace-m7-own",
+        )
+
+        row = loop_run_repository.get(run.id)
+        assert row.llm_call_count == 1, "并发 Run 的调用不得计入本 Run"
