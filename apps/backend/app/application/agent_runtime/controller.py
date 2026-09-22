@@ -20,6 +20,7 @@ from app.application.agent_runtime.models import (
     RUN_KIND_EVENT_DRIVEN,
     RUN_KIND_FOREGROUND_CHAT,
     TERMINAL_ABORTED,
+    TERMINAL_DEGRADED,
     TERMINAL_DONE,
     RunContext,
 )
@@ -103,6 +104,7 @@ async def run_stage_async(
         loop_run_repository.mark_step(run.run_id, entry)
         if critical:
             raise
+        return entry
     entry["duration_ms"] = round((time.perf_counter() - started) * 1000, 2)
     steps.append(entry)
     loop_run_repository.mark_step(run.run_id, entry)
@@ -146,6 +148,34 @@ def close_run(
         budget_state=budget_state,
         now=finished,
     )
+
+
+def _reset_run_projections(run: RunContext) -> None:
+    """释放 Run 内只读投影缓存（H-5）：State / Context 不把域内容留在 `run.data`。
+
+    惰性导入：`context` 依赖 `world_engine`，模块级导入会把世界装配链拉进 controller。
+    """
+    from app.application.agent_runtime import context as runtime_context_manager
+    from app.application.agent_runtime import state as state_manager
+
+    for reset in (state_manager.reset, runtime_context_manager.reset):
+        try:
+            reset(run)
+        except Exception:  # noqa: BLE001 — 释放失败不得影响关账
+            logger.exception("Run 投影释放失败：%s", run.run_id)
+
+
+def _safe_close_run(
+    run: RunContext,
+    status: str,
+    steps: list | None = None,
+    budget_state: dict | None = None,
+) -> None:
+    """关账兜底：关账自身异常不得掩盖上游异常（取消 / 段失败）。"""
+    try:
+        close_run(run, status, steps, budget_state=budget_state, now=datetime.now())
+    except Exception:  # noqa: BLE001
+        logger.exception("agent run 关账失败：%s", run.run_id)
 
 
 def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: datetime):
@@ -230,19 +260,32 @@ async def _legacy_run_autonomous_cycle(
                 await run_stage_async(
                     run, steps, name, runner, critical=name in spec.critical
                 )
+    except asyncio.CancelledError:
+        logger.warning("agent run 用户周期被取消，按 aborted 关账：%s", user_id)
+        status = TERMINAL_ABORTED
+        steps.append({"step": "cancel", "status": "error", "error": "CancelledError"})
+        raise
     except Exception as exc:
         logger.exception("agent run 用户周期中止：%s", user_id)
         status = TERMINAL_ABORTED
         steps.append(
             {"step": "abort", "status": "error", "error": exc.__class__.__name__}
         )
+    except BaseException as exc:  # noqa: BLE001 — KeyboardInterrupt / SystemExit 等
+        logger.exception("agent run 用户周期被中断：%s", user_id)
+        status = TERMINAL_ABORTED
+        steps.append(
+            {"step": "abort", "status": "error", "error": exc.__class__.__name__}
+        )
+        raise
     finally:
         logical_clock.unbind(clock_token)
         digest_token = run.data.get("digest_token")
         if digest_token is not None:
             memory_digest_var.reset(digest_token)
         agent_state_assembler.reset_run_state(run)
-    close_run(run, status, steps, budget_state=budget.as_dict(), now=datetime.now())
+        _reset_run_projections(run)
+        _safe_close_run(run, status, steps, budget_state=budget.as_dict())
     return status
 
 
@@ -354,7 +397,11 @@ async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -
 
 
 async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
-    """event_driven Profile（Flow C）：白名单事件升级为完整 Run，其余 0 消耗。"""
+    """event_driven Profile（Flow C）：白名单事件升级为完整 Run，其余 0 消耗。
+
+    两层 Run 的语义：外层记「事件升级」这件事，内层是被升级出来的 tick（见 H-6 裁决）。
+    外层**传播内层终态**（不再恒记 `done`）并在 `finally` 关账，取消 / 异常也不留孤儿。
+    """
     settings = get_settings()
     if not settings.agent_event_escalation_types:
         return 0
@@ -370,19 +417,48 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
             user_id, RUN_KIND_EVENT_DRIVEN, "world_event", f"event:{row.event_type}", now
         )
         steps: list = []
+        status = TERMINAL_ABORTED
         try:
-            await run_autonomous_cycle(
+            inner_status = await run_autonomous_cycle(
                 user_id, llm=llm, now=now,
                 trigger_type="world_event", reason=f"event:{row.event_type}",
             )
-            append_step(run, steps, {"step": "event_pregate", "status": "ok", "escalated": True})
-            close_run(run, TERMINAL_DONE, steps, now=datetime.now())
-            escalated += 1
-        except Exception:
-            logger.exception("事件升级 Run 失败：%s", row.idempotency_key)
+            status = _escalation_status(inner_status)
+            append_step(
+                run, steps,
+                {
+                    "step": "event_pregate",
+                    "status": "ok" if status == TERMINAL_DONE else "error",
+                    "escalated": True,
+                    "inner_status": inner_status,
+                },
+            )
+            if status != TERMINAL_ABORTED:
+                escalated += 1
+        except asyncio.CancelledError:
+            logger.warning("事件升级被取消：%s", row.idempotency_key)
+            status = TERMINAL_ABORTED
             append_step(
                 run, steps,
                 {"step": "event_pregate", "status": "error", "escalated": True},
             )
-            close_run(run, TERMINAL_ABORTED, steps, now=datetime.now())
+            raise
+        except Exception:
+            logger.exception("事件升级 Run 失败：%s", row.idempotency_key)
+            status = TERMINAL_ABORTED
+            append_step(
+                run, steps,
+                {"step": "event_pregate", "status": "error", "escalated": True},
+            )
+        finally:
+            _reset_run_projections(run)
+            _safe_close_run(run, status, steps)
     return escalated
+
+
+def _escalation_status(inner_status: object) -> str:
+    """内层 tick 终态 → 外层升级 Run 终态（未知值保守记 aborted）。"""
+    value = str(inner_status or "")
+    if value in (TERMINAL_DONE, TERMINAL_DEGRADED, TERMINAL_ABORTED):
+        return value
+    return TERMINAL_ABORTED

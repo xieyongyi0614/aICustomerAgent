@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -510,6 +511,34 @@ class AgentLoop:
         async with get_user_write_lock(self.user_id):
             yield
 
+    def _close(self) -> dict:
+        """Run 收口：终态提升 + 关账 + RunClosed 事件（**必须**在 finally 内调用）。
+
+        关账自身异常不得掩盖上游异常（取消 / 段失败），故内部兜底并只记日志。
+        同时释放 Run 内投影缓存（H-5）：`state` / `context` 的内容不再留在 `run.data`。
+        """
+        if (
+            self._promote_degraded
+            and self._status == TERMINAL_DONE
+            and self.run_context.degraded
+        ):
+            self._status = TERMINAL_DEGRADED
+        budget_account = self._budget.as_dict() if self._budget is not None else {}
+        try:
+            controller.close_run(
+                self.run_context,
+                self._status,
+                self._steps,
+                budget_state=budget_account,
+                now=datetime.now(),
+            )
+            event_bus.emit_run_closed(
+                self.run_context.run_id, self._session_id, self._status, self.trace
+            )
+        except Exception:  # noqa: BLE001 — 关账失败不得掩盖上游异常
+            logger.exception("agent loop 关账失败：%s", self.run_context.run_id)
+        return budget_account
+
     async def run(
         self,
         runtime_input: RuntimeInput | None = None,
@@ -517,7 +546,12 @@ class AgentLoop:
         *,
         runtime_context: Any = None,
     ) -> RunResult:
-        """驱动一次认知循环：RunOpened → 段序列 → 收口 → RunClosed。"""
+        """驱动一次认知循环：RunOpened → 段序列 → 收口 → RunClosed。
+
+        **关账在 finally 内**：`CancelledError` 属 `BaseException`，不被 `except Exception`
+        捕获；客户端断流会取消本任务，若关账在 try 之后则台账永久停留 `running`
+        （只等孤儿扫掠收敛）。故取消 / 任意 BaseException 都必须在此收口为 `aborted`。
+        """
         self.runtime_input = runtime_input
         self.session_context = session_context
         self.runtime_context = runtime_context
@@ -530,35 +564,38 @@ class AgentLoop:
         try:
             async with self._lifecycle():
                 await self._run_stages(self.stages)
+        except asyncio.CancelledError:
+            logger.warning(
+                "agent loop run 被取消，按 aborted 关账：%s", self.run_context.run_id
+            )
+            self._status = TERMINAL_ABORTED
+            self._record_step(
+                {"step": "cancel", "status": "error", "error": "CancelledError"}
+            )
+            raise
         except Exception as exc:  # noqa: BLE001 — critical 段失败收口为 aborted
             logger.exception("agent loop run 中止：%s", self.run_context.run_id)
             self._status = TERMINAL_ABORTED
             self._record_step(
                 {"step": "abort", "status": "error", "error": exc.__class__.__name__}
             )
+        except BaseException as exc:  # noqa: BLE001 — KeyboardInterrupt / SystemExit 等
+            logger.exception("agent loop run 被中断：%s", self.run_context.run_id)
+            self._status = TERMINAL_ABORTED
+            self._record_step(
+                {"step": "abort", "status": "error", "error": exc.__class__.__name__}
+            )
+            raise
         finally:
             logical_clock.unbind(clock_token)
             digest_token = self.run_context.data.get("digest_token")
             if digest_token is not None:
                 memory_digest_var.reset(digest_token)
             agent_state_assembler.reset_run_state(self.run_context)
-        if (
-            self._promote_degraded
-            and self._status == TERMINAL_DONE
-            and self.run_context.degraded
-        ):
-            self._status = TERMINAL_DEGRADED
-        budget_account = self._budget.as_dict()
-        controller.close_run(
-            self.run_context,
-            self._status,
-            self._steps,
-            budget_state=budget_account,
-            now=datetime.now(),
-        )
-        event_bus.emit_run_closed(
-            self.run_context.run_id, self._session_id, self._status, self.trace
-        )
+            controller._reset_run_projections(  # pylint: disable=protected-access
+                self.run_context
+            )
+            budget_account = self._close()
         return RunResult(
             run_id=self.run_context.run_id,
             status=self._status,  # type: ignore[arg-type]
