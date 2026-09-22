@@ -36,11 +36,12 @@ EXPECTED_EVENT_TYPES = {
     "MemoryUpdated",
     "RelationshipUpdated",
     "DecisionMade",
+    "ProactiveTriggered",
+    "ProactiveDelivered",
 }
-"""冻结事件集 + RT-008 追加项 `DecisionMade`（Reason 段产出通知锚点）。
+"""冻结事件集 + RT-008 追加项 `DecisionMade` + RT-017 主动链路锚点。
 
-追加理由见 `contracts.EVENT_DECISION_MADE`：RT-008 §5.3 要求 Reason 段发出该事件，
-而 `RuntimeEvent` 对未知类型 fail-closed。属**契约追加**（同批登记），非私改。
+追加属**契约追加**（同批登记），非私改。
 """
 
 

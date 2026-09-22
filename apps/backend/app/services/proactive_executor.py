@@ -12,7 +12,10 @@ import time
 from datetime import datetime, timedelta
 
 from app.application import observability
-from app.application.agent_runtime import outbound as outbound_gateway
+from app.application.autonomy_bridge import (
+    coordinate_delivery,
+    emit_proactive_triggered,
+)
 from app.application.post_process import get_user_write_lock
 from app.channels.base import ChannelErrorKind, SendResult
 from app.chains import proactive_chain
@@ -129,25 +132,15 @@ async def _send_via_outbound(
     text: str,
     trace: TurnTraceSession | None,
 ) -> SendResult:
-    """投递出口选择（RT-014）：纳管渠道走 Outbound Gateway，未纳管走既有端口。
-
-    未纳管（默认）时走 `ProactiveOutbound.send`，行为与接线前逐字节一致；纳管时经
-    `outbound.deliver_proactive` 统一出口。两条路径都**不抛异常**（失败归一为
-    `SendResult`），这里的兜底只覆盖端口实现自身抛出的意外异常。
-    """
-    try:
-        if outbound_gateway.is_routable(outbound.channel):
-            return await outbound_gateway.deliver_proactive(
-                action.user_id,
-                text,
-                action.dedupe_key,
-                channel=outbound.channel,
-                trace=trace,
-            )
-        return await outbound.send(action.user_id, text, action.dedupe_key)
-    except Exception:
-        logger.exception("主动消息通道发送异常：%s", outbound.channel)
-        return SendResult(ok=False, error=ChannelErrorKind.UNKNOWN)
+    """投递出口（RT-017）：统一经 `coordinate_delivery`（网关优先 / 未纳管回落）。"""
+    return await coordinate_delivery(
+        getattr(action, "id", None) or action.dedupe_key,
+        dedupe_key=action.dedupe_key,
+        user_id=action.user_id,
+        text=text,
+        outbound=outbound,
+        trace=trace,
+    )
 
 
 async def _send_phase(
@@ -235,6 +228,13 @@ async def execute(
                 trace.record("proactive_deliver", 0.0, "degraded", error=reason)
             _mark_outcome(action.id, "discarded")
             return discarded
+        emit_proactive_triggered(
+            action.dedupe_key,
+            reason=action.reason,
+            trigger_type=getattr(action, "trigger_type", None),
+            user_id=action.user_id,
+            trace=trace,
+        )
 
         artifacts = _generation_artifacts(approved)
         if artifacts is not None:

@@ -45,6 +45,8 @@ EVENT_ACTION_COMPLETED = "ActionCompleted"
 EVENT_MEMORY_UPDATED = "MemoryUpdated"
 EVENT_RELATIONSHIP_UPDATED = "RelationshipUpdated"
 EVENT_DECISION_MADE = "DecisionMade"
+EVENT_PROACTIVE_TRIGGERED = "ProactiveTriggered"
+EVENT_PROACTIVE_DELIVERED = "ProactiveDelivered"
 """Reason 段产出 `Intention` 的通知锚点（RT-008）。
 
 RT-001 冻结的初始事件集不含本项；RT-008 §5.3 要求 Reason 段发出该事件，而
@@ -63,6 +65,8 @@ EVENT_TYPES: tuple[str, ...] = (
     EVENT_MEMORY_UPDATED,
     EVENT_RELATIONSHIP_UPDATED,
     EVENT_STATE_VERSION_BUMPED,
+    EVENT_PROACTIVE_TRIGGERED,
+    EVENT_PROACTIVE_DELIVERED,
     EVENT_RUN_CLOSED,
 )
 

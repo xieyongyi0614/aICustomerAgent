@@ -23,6 +23,11 @@ def classify_background_trigger(user_id: str, now) -> tuple[str, str]:
     return _BACKGROUND_REASON_TO_TRIGGER.get(reason, "schedule"), reason
 
 
+def classify_proactive_trigger(reason: str) -> str:
+    """主动触发 reason → trigger_type（复用既有映射，零新触发类型）。"""
+    return _BACKGROUND_REASON_TO_TRIGGER.get(reason, "schedule")
+
+
 def escalation_whitelist() -> frozenset[str]:
     settings = get_settings()
     raw = settings.agent_event_escalation_types

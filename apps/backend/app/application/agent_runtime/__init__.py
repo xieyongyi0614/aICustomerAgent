@@ -165,6 +165,7 @@ from app.application.agent_runtime.state import (
 )
 from app.application.agent_runtime.trigger_router import (
     classify_background_trigger,
+    classify_proactive_trigger,
     classify_channel_message,
     evaluate_event_escalation,
 )
@@ -238,6 +239,7 @@ __all__ = [
     "build_stack",
     "capabilities_for",
     "classify_background_trigger",
+    "classify_proactive_trigger",
     "classify_channel_message",
     "clear_subscribers",
     "close_run",
