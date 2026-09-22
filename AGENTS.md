@@ -58,7 +58,7 @@
 **横切与集成**
 
 - `docs/integrations/feishu/` — 飞书通道：`architecture.md`（本域唯一架构依据）+ `tasks.md`（FEISHU-001~007）+ `task-details/` + `acceptance-report-v1.0.md` + `review-v1.1.md`
-- `docs/refactor/` — 横切重构：`flag-removal-audit.md`（vXX_ 开关体系删除成本审查 + 批次台账）、`flag-rename-map.md`（设置字段「旧名 → 新名」对照表）
+- `docs/refactor/` — 横切重构：`flag-removal-audit.md`（vXX_ 开关体系删除成本审查 + 批次台账）、`flag-rename-map.md`（设置字段「旧名 → 新名」对照表）、`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）
 - `docs/TESTING.md` — 测试规范（marker、执行级别、AI Coding 测试规则）
 
 ## 全局约定

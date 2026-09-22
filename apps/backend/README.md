@@ -52,7 +52,7 @@ uv run uvicorn app.main:app --reload --port 8020
 curl http://localhost:8020/health
 ```
 
-`app/main.py` lifespan 启动两个后台循环：记忆回收（memory reclaim）与自主行为 Worker（`AUTONOMY_ENABLED` 门控）。
+`app/main.py` lifespan 启动后台常驻循环：life loop 周期调度（已归并 autonomy / world / action 三循环）与记忆回收（memory reclaim）。
 
 ## 数据库
 
@@ -135,7 +135,6 @@ uv run pylint app tests   # 代码检查
 | `CONTEXT_TOTAL_CHAR_BUDGET`   | 12000       | 单轮注入 Prompt 的上下文总字符预算  |
 | `CONVERSATION_MAX_MESSAGES`   | 20          | 窗口消息数上限                      |
 | `CONVERSATION_MAX_CHARS`      | 8000        | 窗口字符上限                        |
-| `AUTONOMY_ENABLED`            | true        | 自主行为总开关（关闭则 Worker 不启动） |
 | `AUTONOMY_INACTIVITY_MINUTES` | 30          | 会话闲置触发阈值                    |
 | `AUTONOMY_QUIET_HOURS_*`      | 23:00/08:00 | 主动消息静音时段                    |
 

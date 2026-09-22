@@ -14,7 +14,6 @@ os.environ.pop("http_proxy", None)
 os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("https_proxy", None)
 os.environ.setdefault("OPENAI_API_KEY", "test")
-os.environ.setdefault("AUTONOMY_ENABLED", "false")
 os.environ.setdefault("EVALUATION_ENABLED", "false")
 os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
 # 世界/lifespan 循环的 DB 访问已由 autouse _offline_repos 落到内存 SQLite，无需再关闭 world。
@@ -413,7 +412,6 @@ def override_settings(monkeypatch):
             "rel_comfort_drift": "REL_COMFORT_DRIFT",
             "rel_comfort_baseline_json": "REL_COMFORT_BASELINE_JSON",
             "rel_milestone_delta_cap": "REL_MILESTONE_DELTA_CAP",
-            "rel_signal_llm_enabled": "REL_SIGNAL_LLM_ENABLED",
             "rel_signal_evidence_window": "REL_SIGNAL_EVIDENCE_WINDOW",
             "rel_milestone_enabled": "REL_MILESTONE_ENABLED",
             "rel_conflict_enabled": "REL_CONFLICT_ENABLED",

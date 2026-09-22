@@ -29,7 +29,6 @@ class RelationshipSettings(BaseSettings):
         '{"stranger": 0.45, "friend": 0.60, "close_friend": 0.70, "partner": 0.80}'
     )
     rel_milestone_delta_cap: float = 0.10
-    rel_signal_llm_enabled: bool = False
     rel_signal_evidence_window: int = 20
     rel_milestone_enabled: bool = True
     rel_conflict_enabled: bool = True
