@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -408,3 +408,45 @@ class TestSingleLoopDecision:
         import app.application.agent_runtime as runtime
 
         assert self.SHADOW & set(runtime.__all__) == set()
+
+
+class TestLedgerCloseGuard:
+    """M-5：`loop_runs` 仅 `running` 可关，扫掠与真实关账不得互相覆盖。"""
+
+    pytestmark = pytest.mark.unit
+
+    def test_finish_run_only_closes_running(self, db_session_factory):
+        run = loop_run_repository.create_run(user_id="u-guard", kind="chat", reason="m5")
+
+        assert loop_run_repository.finish_run(run.id, status="done") is True
+        # 迟到关账（如扫掠据旧快照写回）不得覆盖已落终态
+        assert loop_run_repository.finish_run(run.id, status="aborted") is False
+        assert loop_run_repository.get(run.id).status == "done"
+
+    def test_finish_run_returns_false_for_missing_run(self, db_session_factory):
+        assert loop_run_repository.finish_run("missing-run", status="done") is False
+
+    def test_sweep_does_not_clobber_completed_run(self, db_session_factory):
+        """扫掠先读到 `running`、真实关账随后完成 → 扫掠的写回必须无效。"""
+        from app.application.agent_runtime import recovery
+
+        run = loop_run_repository.create_run(
+            user_id="u-race",
+            kind="chat",
+            reason="m5-race",
+            now=datetime.now() - timedelta(hours=2),
+        )
+        candidates = loop_run_repository.list_running_started_before(
+            datetime.now() - timedelta(minutes=30)
+        )
+        assert any(row.id == run.id for row in candidates)
+
+        # 真实关账先落终态（扫掠此刻仍持有旧快照）
+        assert loop_run_repository.finish_run(
+            run.id, status="done", steps=[{"step": "record_handoff", "status": "ok"}]
+        )
+
+        assert recovery.sweep_orphan_runs() == []
+        row = loop_run_repository.get(run.id)
+        assert row.status == "done"
+        assert [step["step"] for step in row.steps] == ["record_handoff"]

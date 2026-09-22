@@ -113,12 +113,19 @@ def finish_run(
     token_total: int = 0,
     budget_state: dict | None = None,
     now: datetime | None = None,
-) -> None:
+) -> bool:
+    """Run Close：终态 + 成本汇总（窗口计数口径与 life_loop 一致）。
+
+    **仅 `running` 可关**（RT-ALL-code-review M-5）：已完成 / 已收敛的 Run 不被覆盖。
+    这消除「孤儿扫掠」与「真实关账」互相覆盖的窗口——扫掠先读到 `running`、真实关账随后
+    落终态，若扫掠无条件写回 `aborted` 就会把已完成的 Run 改错（反之亦然）。
+    返回是否真正完成关账（未关账 = 行不存在或已非 `running`）。
+    """
     now = _now(now)
     with SessionLocal() as session:
         row = session.query(LoopRunRow).filter(LoopRunRow.id == run_id).first()
-        if row is None:
-            return
+        if row is None or row.status != "running":
+            return False
         row.status = status
         if steps is not None:
             row.steps = steps
@@ -128,3 +135,4 @@ def finish_run(
             row.budget_state = budget_state
         row.finished_at = now
         session.commit()
+        return True
