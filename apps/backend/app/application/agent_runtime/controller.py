@@ -191,7 +191,12 @@ def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: date
         raise ValueError(f"Profile 声明了未实现的阶段：{name}") from exc
 
 
-async def run_autonomous_cycle(
+def legacy_cycle_runnable():
+    """开关关闭时的既有自治周期执行体（保留，供灰度对照与回退）。"""
+    return _legacy_run_autonomous_cycle
+
+
+async def _legacy_run_autonomous_cycle(
     user_id: str,
     llm=None,
     now: datetime | None = None,
@@ -239,6 +244,86 @@ async def run_autonomous_cycle(
         agent_state_assembler.reset_run_state(run)
     close_run(run, status, steps, budget_state=budget.as_dict(), now=datetime.now())
     return status
+
+
+async def run_autonomous_cycle(
+    user_id: str,
+    llm=None,
+    now: datetime | None = None,
+    trigger_type: str | None = None,
+    reason: str | None = None,
+) -> str:
+    """autonomous_tick 唯一入口：开关关走既有执行体，开关开走 AgentLoop。
+
+    两条路径共享 decision 三道闸语义与 11 段阶段本体（RT-016 D1/D2/D3）。
+    """
+    if get_settings().runtime_autonomous_cycle_enabled:
+        return await _run_autonomous_cycle_via_loop(
+            user_id, llm=llm, now=now, trigger_type=trigger_type, reason=reason
+        )
+    return await legacy_cycle_runnable()(
+        user_id, llm=llm, now=now, trigger_type=trigger_type, reason=reason
+    )
+
+
+async def _run_autonomous_cycle_via_loop(
+    user_id: str,
+    llm=None,
+    now: datetime | None = None,
+    trigger_type: str | None = None,
+    reason: str | None = None,
+) -> str:
+    """AgentLoop 驱动的自治周期：阶段本体仍经既有 runners，只换执行形状。"""
+    from app.application.agent_runtime.loop import STAGE_RUNNERS, AgentLoop
+
+    now = now or datetime.now()
+    settings = get_settings()
+    if trigger_type is None or reason is None:
+        trigger_type, reason = trigger_router.classify_background_trigger(user_id, now)
+    run = open_run(user_id, RUN_KIND_AUTONOMOUS_TICK, trigger_type, reason, now)
+    budget = life_loop_budget.check_daily_budget(now=now)
+    loop_box: list = []
+
+    async def _decision(_context):
+        return await _decision_stage_with_gates(
+            run,
+            loop_box[0]._steps if loop_box else [],
+            user_id,
+            llm,
+            now,
+            budget,
+            settings,
+        )
+
+    registry = dict(STAGE_RUNNERS)
+    registry["decision"] = _decision
+    loop = AgentLoop(
+        profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK),
+        user_id=user_id,
+        run=run,
+        llm=llm,
+        now=now,
+        registry=registry,
+        promote_degraded=False,
+    )
+    loop_box.append(loop)
+    result = await loop.run()
+    return str(result.status)
+
+
+async def _decision_stage_with_gates(
+    run, steps, user_id, llm, now, budget, settings
+) -> dict:
+    """decision 三道闸（与 legacy `_run_decision_stage` 同序同语义）。"""
+    from app.application import life_loop as life_loop_mod
+
+    if budget.status == life_loop_budget._STATUS_DEGRADED:
+        return {"status": "skipped", "skip_reason": "quota_circuit_open"}
+    if life_loop_mod._cycle_llm_budget_exhausted(steps, settings):
+        return {"status": "skipped", "skip_reason": "step_budget"}
+    if not acquire(user_id, "proactive", run, now=now).granted:
+        return {"status": "skipped", "skip_reason": "gateway_denied"}
+    return await life_loop_mod._step_decision(user_id, llm, now)
 
 
 async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -> None:

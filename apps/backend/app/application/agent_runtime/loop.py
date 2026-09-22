@@ -220,6 +220,7 @@ class AgentLoop:
         now: datetime | None = None,
         trace: Any = None,
         registry: Mapping[str, StageRunner] | None = None,
+        promote_degraded: bool = True,
     ) -> None:
         self.spec = spec
         self.user_id = user_id
@@ -240,6 +241,7 @@ class AgentLoop:
         self._registry: Mapping[str, StageRunner] = (
             STAGE_RUNNERS if registry is None else registry
         )
+        self._promote_degraded = promote_degraded
         self._steps: list[dict] = []
         self._status: str = TERMINAL_DONE
         self._session_id: str | None = None
@@ -302,8 +304,6 @@ class AgentLoop:
     def _on_failure(self, failure: RuntimeFailure) -> None:
         if terminal_status_for(failure) == TERMINAL_DEGRADED:
             self.run_context.degraded = True
-            if self._status == TERMINAL_DONE:
-                self._status = TERMINAL_DEGRADED
         if self.trace is not None:
             self.trace.record(
                 TRACE_STAGE,
@@ -542,9 +542,11 @@ class AgentLoop:
             if digest_token is not None:
                 memory_digest_var.reset(digest_token)
             agent_state_assembler.reset_run_state(self.run_context)
-        if self._status == TERMINAL_DONE and self.run_context.degraded:
-            # RT-015：前台 Run 的软降级标记（llm_gateway 预算拒绝等）必须反映到终态，
-            # 与既有 chat_pipeline 收尾语义一致。
+        if (
+            self._promote_degraded
+            and self._status == TERMINAL_DONE
+            and self.run_context.degraded
+        ):
             self._status = TERMINAL_DEGRADED
         budget_account = self._budget.as_dict()
         controller.close_run(

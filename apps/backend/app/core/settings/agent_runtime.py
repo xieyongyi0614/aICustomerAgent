@@ -37,3 +37,4 @@ class AgentRuntimeSettings(BaseSettings):
     runtime_reflect_in_loop_enabled: bool = False
     runtime_inbound_gateway_channels: str = ""
     runtime_outbound_gateway_channels: str = ""
+    runtime_autonomous_cycle_enabled: bool = False
