@@ -314,6 +314,119 @@ def count_entries(user_id: str) -> int:
         )
 
 
+def _period_filter(query, since: datetime | None, until: datetime | None):
+    if since is not None:
+        query = query.filter(LedgerEntryRow.occurred_at >= since)
+    if until is not None:
+        query = query.filter(LedgerEntryRow.occurred_at < until)
+    return query
+
+
+def sum_by_direction(
+    user_id: str, since: datetime | None = None, until: datetime | None = None
+) -> dict[str, int]:
+    from sqlalchemy import func
+
+    with SessionLocal() as session:
+        query = _period_filter(
+            session.query(
+                LedgerEntryRow.direction,
+                func.coalesce(func.sum(LedgerEntryRow.amount_minor), 0),
+            ).filter(LedgerEntryRow.user_id == user_id),
+            since,
+            until,
+        ).group_by(LedgerEntryRow.direction)
+        return {direction: int(total) for direction, total in query.all()}
+
+
+def sum_by_category(
+    user_id: str, since: datetime | None = None, until: datetime | None = None
+) -> list[tuple[str | None, str, int]]:
+    from sqlalchemy import func
+
+    with SessionLocal() as session:
+        query = _period_filter(
+            session.query(
+                LedgerEntryRow.category_id,
+                LedgerEntryRow.direction,
+                func.coalesce(func.sum(LedgerEntryRow.amount_minor), 0),
+            ).filter(LedgerEntryRow.user_id == user_id),
+            since,
+            until,
+        ).group_by(LedgerEntryRow.category_id, LedgerEntryRow.direction)
+        return [
+            (category_id, direction, int(total))
+            for category_id, direction, total in query.all()
+        ]
+
+
+def sum_by_account(
+    user_id: str, since: datetime | None = None, until: datetime | None = None
+) -> list[tuple[str, str, int]]:
+    from sqlalchemy import func
+
+    with SessionLocal() as session:
+        query = _period_filter(
+            session.query(
+                LedgerEntryRow.account_id,
+                LedgerEntryRow.direction,
+                func.coalesce(func.sum(LedgerEntryRow.amount_minor), 0),
+            ).filter(LedgerEntryRow.user_id == user_id),
+            since,
+            until,
+        ).group_by(LedgerEntryRow.account_id, LedgerEntryRow.direction)
+        return [
+            (account_id, direction, int(total))
+            for account_id, direction, total in query.all()
+        ]
+
+
+def count_period_entries(
+    user_id: str, since: datetime | None = None, until: datetime | None = None
+) -> tuple[int, int, int]:
+    """返回 (全部行数, 冲正行数, 被冲正的原条目数)。"""
+    with SessionLocal() as session:
+        base = session.query(LedgerEntryRow).filter(
+            LedgerEntryRow.user_id == user_id
+        )
+        base = _period_filter(base, since, until)
+        total = base.count()
+        reversals = base.filter(LedgerEntryRow.reversal_of.isnot(None)).count()
+        reversed_ids = {
+            row.reversal_of
+            for row in base.filter(LedgerEntryRow.reversal_of.isnot(None)).all()
+            if row.reversal_of
+        }
+        return int(total), int(reversals), len(reversed_ids)
+
+
+def sum_signed_minor(
+    user_id: str, since: datetime | None = None, until: datetime | None = None
+) -> tuple[int, int, int]:
+    """返回 (expense净分, income净分, transfer分)。冲正双向计入。"""
+    rows = list_entries(user_id, since=since, until=until)
+    expense = 0
+    income = 0
+    transfer = 0
+    for row in rows:
+        amount = int(row.amount_minor)
+        if row.reversal_of is not None:
+            if row.direction == "income":
+                expense -= amount
+            elif row.direction == "expense":
+                income -= amount
+            elif row.direction == "transfer":
+                transfer -= amount
+            continue
+        if row.direction == "expense":
+            expense += amount
+        elif row.direction == "income":
+            income += amount
+        elif row.direction == "transfer":
+            transfer += amount
+    return expense, income, transfer
+
+
 def delete_entries_for_user(user_id: str) -> int:
     with SessionLocal() as session:
         count = (
