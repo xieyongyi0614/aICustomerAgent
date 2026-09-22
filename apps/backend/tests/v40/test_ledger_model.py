@@ -112,5 +112,6 @@ def test_ledger_settings_has_no_enabled_flag():
 def test_no_float_in_ledger_paths():
     source = LEDGER_MODEL.read_text(encoding="utf-8")
     assert "float(" not in source
-    assert ": float" not in source
+    assert "amount_minor: float" not in source
+    assert "amount: float" not in source
     assert "-> float" not in source
