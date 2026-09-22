@@ -38,6 +38,8 @@ from app.models.world import (
     part_of_day,
 )
 from app.repositories import world_repository
+from app.services.character_assets import DEFAULT_CHARACTER_ID
+from app.services.life.ownership import assert_access, resolve_owner
 from app.services.world.locations import build_location_context
 from app.services.world.time_provider import TimeProvider
 from app.application.worker_loop import run_worker_loop
@@ -1029,6 +1031,25 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
     try:
         world = ensure_world(user_id)
         if world is None:
+            return None
+        owner_fields = world_repository.get_owner_fields(user_id) or {}
+        owner = resolve_owner(
+            owner_fields,
+            character_id=DEFAULT_CHARACTER_ID,
+            user_id=user_id,
+        )
+        decision = assert_access(
+            owner,
+            user_id=user_id,
+            character_id=DEFAULT_CHARACTER_ID,
+            mode="read",
+        )
+        if not decision.allowed:
+            logger.warning(
+                "世界归属校验未通过，降级为空世界上下文 user=%s reason=%s",
+                user_id,
+                decision.reason,
+            )
             return None
         time_ctx = _default_provider.context(world)
         entities = world_repository.list_objects(world.world_id)

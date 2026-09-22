@@ -13,7 +13,7 @@ from dataclasses import dataclass
 MIGRATION_HEAD = "0053"
 SCHEMA_PREVIOUS_HEAD = "0052"
 SCHEMA_TABLE_COUNT = 46
-SCHEMA_COLUMNS_DIGEST = "b3adb1f1e2afed93"
+SCHEMA_COLUMNS_DIGEST = "ea52ed377c4fac85"
 
 
 @dataclass(frozen=True, slots=True)

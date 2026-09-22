@@ -39,9 +39,21 @@ def upgrade() -> None:
         sqlite_where=sa.text("is_default"),
         postgresql_where=sa.text("is_default"),
     )
+    op.add_column("worlds", sa.Column("owner_type", sa.String(), nullable=True))
+    op.add_column("worlds", sa.Column("owner_id", sa.String(), nullable=True))
+    try:
+        op.create_index("ix_worlds_owner", "worlds", ["owner_type", "owner_id"])
+    except Exception:
+        pass
 
 
 def downgrade() -> None:
+    try:
+        op.drop_index("ix_worlds_owner", table_name="worlds")
+    except Exception:
+        pass
+    op.drop_column("worlds", "owner_id")
+    op.drop_column("worlds", "owner_type")
     try:
         op.drop_index("ux_users_is_default", table_name="users")
     except Exception:

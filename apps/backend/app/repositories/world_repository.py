@@ -123,6 +123,32 @@ def get_world(user_id: str) -> World | None:
         return _to_world(row) if row is not None else None
 
 
+def get_owner_fields(user_id: str) -> dict[str, str | None] | None:
+    with SessionLocal() as session:
+        row = session.get(WorldRow, world_id_for(user_id))
+        if row is None:
+            return None
+        return {"owner_type": row.owner_type, "owner_id": row.owner_id}
+
+
+def list_worlds_by_owner(
+    owner_type: str | None = None,
+    owner_id: str | None = None,
+    *,
+    limit: int | None = None,
+) -> list[World]:
+    with SessionLocal() as session:
+        query = session.query(WorldRow)
+        if owner_type is not None:
+            query = query.filter(WorldRow.owner_type == owner_type)
+        if owner_id is not None:
+            query = query.filter(WorldRow.owner_id == owner_id)
+        query = query.order_by(WorldRow.created_at)
+        if limit is not None:
+            query = query.limit(limit)
+        return [_to_world(row) for row in query.all()]
+
+
 def save_world(world: World) -> None:
     now = datetime.now()
     with SessionLocal() as session:

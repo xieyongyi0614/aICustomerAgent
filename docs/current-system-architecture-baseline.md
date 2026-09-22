@@ -111,7 +111,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 | 子域 | 实现 | 说明 |
 |---|---|---|
-| World State | `worlds` 表 + `application/world_engine.py` | 单一世界（`home`），`time_mode`（real_sync/simulated/story）、`sim_time`、`current_location`、`environment`、`notes` |
+| World State | `worlds` 表 + `application/world_engine.py` | 单一世界（`home`），`time_mode`（real_sync/simulated/story）、`sim_time`、`current_location`、`environment`、`notes`；**归属维度（V4.0 PLA-002）**：`owner_type`/`owner_id`（NULL 归一为 `character`），角色世界对用户只读可见，用户容器跨用户拒绝 |
 | Object | `world_entities` 表 + `models/world.py::WorldObject` + 对象状态机 `OBJECT_STATE_MACHINES` | 物品（category 7 类），状态机迁移、消耗扣减、别名解析、默认家庭库存幂等播种 |
 | Environment | `worlds.environment` JSON（weather/lighting）+ `services/world/weather.py` | 天气演化、光照建议 |
 

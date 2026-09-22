@@ -611,12 +611,15 @@ class WorldRow(Base):
     notes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    owner_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    owner_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
             "time_mode IN ('real_sync', 'simulated', 'story')",
             name="ck_worlds_time_mode",
         ),
+        Index("ix_worlds_owner", "owner_type", "owner_id"),
     )
 
 
