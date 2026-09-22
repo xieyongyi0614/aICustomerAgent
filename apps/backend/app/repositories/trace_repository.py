@@ -94,6 +94,50 @@ def list_by_conversation(conversation_id: str, limit: int = 20) -> list[RuntimeT
         return [_to_model(row) for row in rows]
 
 
+def list_by_correlation_id(correlation_id: str, limit: int = 200) -> list[RuntimeTraceRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(RuntimeTraceRow.correlation_id == correlation_id)
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
+def list_by_action_ids(action_ids: list[str], limit: int = 200) -> list[RuntimeTraceRow]:
+    if not action_ids:
+        return []
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(RuntimeTraceRow.action_id.in_(action_ids))
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
+def list_rows_by_user_window(
+    user_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    limit: int = 200,
+) -> list[RuntimeTraceRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(
+                RuntimeTraceRow.user_id == user_id,
+                RuntimeTraceRow.created_at >= started_at,
+                RuntimeTraceRow.created_at <= ended_at,
+            )
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
 def list_since(cutoff: datetime, limit: int = 5000) -> list[RuntimeTrace]:
     with SessionLocal() as session:
         rows = (

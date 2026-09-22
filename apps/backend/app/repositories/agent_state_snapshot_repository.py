@@ -6,6 +6,16 @@ from datetime import datetime, timedelta
 from app.core.db import AgentStateSnapshotRow, SessionLocal
 
 
+def get_by_run_id(run_id: str) -> AgentStateSnapshotRow | None:
+    with SessionLocal() as session:
+        return (
+            session.query(AgentStateSnapshotRow)
+            .filter(AgentStateSnapshotRow.run_id == run_id)
+            .order_by(AgentStateSnapshotRow.created_at.desc())
+            .first()
+        )
+
+
 def latest(user_id: str, character_id: str = "asuna") -> AgentStateSnapshotRow | None:
     with SessionLocal() as session:
         return (

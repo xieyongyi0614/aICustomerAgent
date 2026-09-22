@@ -100,6 +100,7 @@ def search(
     action_id: str | None = None,
     request_id: str | None = None,
     limit: int = 50,
+    until: datetime | None = None,
 ) -> list[DecisionRecord]:
     with SessionLocal() as session:
         query = session.query(DecisionRecordRow)
@@ -109,6 +110,8 @@ def search(
             query = query.filter(DecisionRecordRow.kind == kind)
         if since is not None:
             query = query.filter(DecisionRecordRow.created_at >= since)
+        if until is not None:
+            query = query.filter(DecisionRecordRow.created_at <= until)
         if action_id is not None:
             query = query.filter(DecisionRecordRow.action_id == action_id)
         if request_id is not None:
@@ -119,6 +122,26 @@ def search(
             .all()
         )
         return [_to_model(row) for row in rows]
+
+
+def list_rows_by_user_window(
+    user_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    limit: int = 200,
+) -> list[DecisionRecordRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(DecisionRecordRow)
+            .filter(
+                DecisionRecordRow.user_id == user_id,
+                DecisionRecordRow.created_at >= started_at,
+                DecisionRecordRow.created_at <= ended_at,
+            )
+            .order_by(DecisionRecordRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
 
 
 def prune_before(cutoff: datetime) -> int:

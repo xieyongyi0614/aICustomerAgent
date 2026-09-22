@@ -9,6 +9,29 @@ from datetime import datetime
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow, SessionLocal
 
 
+def list_changes(
+    user_id: str,
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    limit: int = 200,
+) -> list[DevelopmentChangeRow]:
+    with SessionLocal() as session:
+        query = (
+            session.query(DevelopmentChangeRow)
+            .join(
+                DevelopmentStateRow,
+                DevelopmentChangeRow.development_state_id == DevelopmentStateRow.id,
+            )
+            .filter(DevelopmentStateRow.user_id == user_id)
+        )
+        if since is not None:
+            query = query.filter(DevelopmentChangeRow.created_at >= since)
+        if until is not None:
+            query = query.filter(DevelopmentChangeRow.created_at <= until)
+        return query.order_by(DevelopmentChangeRow.created_at.asc()).limit(limit).all()
+
+
 def count_changes(user_id: str) -> int:
     with SessionLocal() as session:
         return (

@@ -670,6 +670,15 @@ async def _run_maintenance(now: datetime) -> int:
             now,
         )
         executed += 1
+    if get_settings().runtime_orphan_run_sweep_enabled:
+        from app.application.agent_runtime import recovery as runtime_recovery
+
+        try:
+            swept = runtime_recovery.sweep_orphan_runs(now=now)
+            if swept:
+                logger.info("runtime orphan sweep：%d 条", len(swept))
+        except Exception:
+            logger.exception("runtime orphan sweep 失败")
     return executed
 
 

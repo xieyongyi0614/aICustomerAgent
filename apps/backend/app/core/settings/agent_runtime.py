@@ -38,3 +38,5 @@ class AgentRuntimeSettings(BaseSettings):
     runtime_inbound_gateway_channels: str = ""
     runtime_outbound_gateway_channels: str = ""
     runtime_autonomous_cycle_enabled: bool = False
+    runtime_orphan_run_timeout_minutes: int = 30
+    runtime_orphan_run_sweep_enabled: bool = True

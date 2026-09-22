@@ -120,6 +120,18 @@ def save_record(record: ActionRecord) -> ActionRecord:
         return _to_record(row)
 
 
+def list_by_run_id(run_id: str, limit: int = 100) -> list[ActionRecord]:
+    with SessionLocal() as session:
+        rows = (
+            session.query(ActionRecordRow)
+            .filter(ActionRecordRow.run_id == run_id)
+            .order_by(ActionRecordRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+        return [_to_record(row) for row in rows]
+
+
 def get_record(record_id: str) -> ActionRecord | None:
     with SessionLocal() as session:
         row = session.get(ActionRecordRow, record_id)

@@ -22,6 +22,18 @@ def get(run_id: str) -> LoopRunRow | None:
         return session.query(LoopRunRow).filter(LoopRunRow.id == run_id).first()
 
 
+def list_running_started_before(cutoff: datetime, limit: int = 200) -> list[LoopRunRow]:
+    """status=running 且 started_at 早于 cutoff 的 Run（孤儿扫掠候选，只读）。"""
+    with SessionLocal() as session:
+        return (
+            session.query(LoopRunRow)
+            .filter(LoopRunRow.status == "running", LoopRunRow.started_at < cutoff)
+            .order_by(LoopRunRow.started_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
 def list_recent(
     user_id: str | None = None,
     limit: int = 50,
