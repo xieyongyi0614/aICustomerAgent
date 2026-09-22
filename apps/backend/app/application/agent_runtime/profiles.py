@@ -41,6 +41,7 @@ _PROFILE_TABLE: dict[str, ProfileSpec] = {
             "mode_stabilize",
             "scene_resolve",
             "behavior_resolve",
+            "action_planning",
             "reply_generation",
             "record_handoff",
         ),

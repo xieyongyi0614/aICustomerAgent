@@ -1,13 +1,8 @@
-"""RT-015 前置切片：前台流式契约冻结 + 入口收敛登记守卫。
+"""RT-015 前台循环收编：流式契约冻结 + 唯一路径 + 收尾委派 + 入口收敛登记。
 
-本文件只覆盖**收编前即可验证、收编后必须继续成立**的部分：
-`turn_meta` 键集与顺序、`done` 字段、每轮 1 行 `loop_runs`、开关关闭时的等价性、
-`agent_service.stream_chat` 调用点登记完整性。
-
-收编本体（`chat_pipeline` 改由 `AgentLoop` 驱动 / 段序列只来自 `profiles.py` /
-收尾委派循环）尚未落地，因此 RT-015 §7.1 的 `test_single_loop_path` 与
-`test_cleanup_delegated_to_loop` **不在本文件覆盖范围内**；缺口与前置条件登记在
-`docs/version/v3.0.0/entry-convergence.md` §5。
+覆盖 `turn_meta` 键集与顺序、`done` 字段、每轮 1 行 `loop_runs`、开关关闭时的
+等价性、`agent_service.stream_chat` 调用点登记完整性、段序列唯一声明处，以及
+`logical_clock.unbind` / `reset_run_state` / `close_run` 收尾委派循环。
 """
 
 from __future__ import annotations
@@ -123,6 +118,90 @@ class TestStreamingContract:
         assert events[-1]["kind"] == "done"
 
 
+class TestSingleLoopPath:
+    """RT-015 AC2：段序列只来自 `profiles.py`，`chat_pipeline` 不得手写阶段序列。"""
+
+    pytestmark = pytest.mark.unit
+
+    def test_single_loop_path(self):
+        source = (BACKEND / "app" / "application" / "chat_pipeline.py").read_text(
+            encoding="utf-8"
+        )
+        assert "AgentLoop" in source
+        assert "runtime_profiles.get_profile" in source
+        assert "_foreground_registry" in source
+        assert "run_stage_async" not in source
+        for forbidden in (
+            "open_foreground_run(user_id)",
+            'for stage in (',
+            "stages = [",
+        ):
+            assert forbidden not in source
+
+    def test_foreground_stages_come_from_profile(self):
+        from app.application.agent_runtime.profiles import get_profile
+
+        spec = get_profile(RUN_KIND_FOREGROUND_CHAT)
+        assert spec.stages == (
+            "perception",
+            "context_assembly",
+            "turn_decisions",
+            "mode_stabilize",
+            "scene_resolve",
+            "behavior_resolve",
+            "action_planning",
+            "reply_generation",
+            "record_handoff",
+        )
+        source = (BACKEND / "app" / "application" / "chat_pipeline.py").read_text(
+            encoding="utf-8"
+        )
+        for name in spec.stages:
+            assert f'"{name}"' in source
+
+
+class TestCleanupDelegatedToLoop:
+    """RT-015 AC：收尾逻辑由循环统一执行，前台驱动不重复 close。"""
+
+    pytestmark = pytest.mark.integration
+
+    async def test_cleanup_delegated_to_loop(
+        self, db_session_factory, fake_llm, monkeypatch
+    ):
+        from app.application import agent_state_assembler, logical_clock
+        from app.application.agent_runtime import controller as runtime_controller
+
+        unbind_calls: list = []
+        reset_calls: list = []
+        close_calls: list = []
+
+        original_unbind = logical_clock.unbind
+        original_reset = agent_state_assembler.reset_run_state
+        original_close = runtime_controller.close_run
+
+        def _unbind(token):
+            unbind_calls.append(token)
+            return original_unbind(token)
+
+        def _reset(run_ctx):
+            reset_calls.append(run_ctx)
+            return original_reset(run_ctx)
+
+        def _close(run_ctx, status, steps, **kwargs):
+            close_calls.append((run_ctx, status))
+            return original_close(run_ctx, status, steps, **kwargs)
+
+        monkeypatch.setattr(logical_clock, "unbind", _unbind)
+        monkeypatch.setattr(agent_state_assembler, "reset_run_state", _reset)
+        monkeypatch.setattr(runtime_controller, "close_run", _close)
+
+        await _events("s-v30-cleanup", "在吗", _llm(fake_llm))
+
+        assert len(unbind_calls) == 1
+        assert len(reset_calls) == 1
+        assert len(close_calls) == 1
+
+
 class TestEntryConvergence:
     """RT-015 AC6：生产调用点必须登记在案，不得静默保留双入口。"""
 
@@ -149,10 +228,11 @@ class TestEntryConvergence:
                     unregistered.append(f"{rel}:{lineno}")
 
         assert found, "未找到 agent_service.stream_chat 调用点，登记守卫本身失效"
-        assert unregistered == [], f"未登记的生产调用点：{unregistered}"
+        assert not unregistered, f"未登记的生产调用点：{unregistered}"
 
     def test_entry_convergence_doc_is_present(self):
         doc = ENTRY_DOC.read_text(encoding="utf-8")
 
         assert "stream_chat" in doc
         assert "保留" in doc
+        assert "收编本体" in doc or "AgentLoop" in doc

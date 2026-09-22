@@ -1,18 +1,19 @@
 # 入口收敛登记（RT-015 产物）
 
 > **上游**：`docs/version/v3.0.0/tasks/RT-015.md` §5 步骤 5、§8 AC6
-> **状态**：本轮为 RT-015 **前置切片**（契约冻结 + 入口登记）；收编本体（`chat_pipeline` 改由 `AgentLoop` 驱动）尚未落地
+> **状态**：RT-015 **收编本体已落地**（`chat_pipeline` 改由 `AgentLoop` 驱动，段序列来自 `foreground_chat` Profile）
 > **登记口径**：`agent_service.stream_chat` 的全部耦合点按「生产 / 壳本体 / 文档提及 / 测试」四类逐条登记，未登记项由 `tests/v30/test_runtime_foreground_cutover.py::test_agent_service_call_sites_registered` 守门
 
 ---
 
-## 1. 结论（本轮）
+## 1. 结论（收编后）
 
 | 项 | 结论 |
 |---|---|
 | 壳是否退役 | **保留**。本轮不退役 `app/services/agent_service.py` 的 `stream_chat` 符号 |
-| 保留理由 | ① 收编本体未落地，壳仍是唯一前台执行入口；② 17 个测试文件直接调用该符号、6 个文件以 `monkeypatch.setattr(agent_service, "stream_chat", …)` 打桩，**测试耦合面 33 处**，退役必须与收编同批完成，否则测试夹具需全体重写；③ RT-015 §3.2 明确「不删除 `agent_service`（除非调用点全部迁移完毕且登记完成）」 |
-| 是否存在未登记双入口 | 否。生产侧仅 2 处调用，且都指向同一条 `run_chat_pipeline` 链路（壳是唯一实现，无平行编排） |
+| 保留理由 | ① 17 个测试文件直接调用该符号、6 个文件以 `monkeypatch.setattr(agent_service, "stream_chat", …)` 打桩，**测试耦合面 33 处**，退役需单独批次重写测试夹具；② RT-015 §3.2 明确「不删除 `agent_service`（除非调用点全部迁移完毕且登记完成）」 |
+| 是否存在未登记双入口 | 否。生产侧仅 2 处调用，且都指向同一条 `run_chat_pipeline` → `AgentLoop` 链路（壳是唯一实现，无平行编排） |
+| 收编本体 | **已落地**。`run_chat_pipeline` 内部由 `AgentLoop` + `foreground_chat` Profile 驱动；段序列只来自 `profiles.py`（`test_single_loop_path`） |
 
 ---
 
@@ -69,16 +70,16 @@
 
 ---
 
-## 5. 收编本体尚未落地的技术障碍（供下一次执行者）
+## 5. 收编本体技术障碍处置（已落地）
 
-| # | 障碍 | 事实依据 | 需要的处置 |
-|---|---|---|---|
-| 1 | **前台段实现不存在** | `STAGE_RUNNERS` 只覆盖自治 Profile 的非 LLM 段（`loop._plain_stage_names()`），前台 9 个段名（`context_assembly` / `turn_decisions` / `mode_stabilize` / `scene_resolve` / `behavior_resolve` / `action_planning` / `reply_generation` / `record_handoff`，以及共享的 `perception`）无实现 | 新建前台段实现（`AgentLoop(..., registry=…)` 支持按 Run 注入注册表，故**无需**改循环内核即可让前台段与自治段同名共存） |
-| 2 | **流式 ↔ 段原语的形态冲突** | `AgentLoop._run_stage` 是 `await coro_factory()` 的请求/响应形态，而 `reply_generation` 必须边生成边 `yield {"kind":"token"}` | 需要队列桥接：段内把 token 事件投递到队列，`run_chat_pipeline` 并发排空并 yield；`turn_meta` 须在首个 token **之前**投递（现序：`action_planning` 段末产出 `turn_meta`） |
-| 3 | **循环吞异常与前台外抛语义冲突** | `AgentLoop.run()` 对 critical 段异常只记 `aborted` 状态并 **return**，不外抛；而 `EmptyLLMResponseError` 必须外抛到飞书侧（`adapter` 的 empty_response 兜底）与 API 错误映射 | 段实现需捕获并暂存异常，由 `run_chat_pipeline` 在循环收口后重新抛出（保持对外异常语义逐字段不变） |
-| 4 | **`logical_clock` 绑定引入行为面** | 循环 `run()` 会 `logical_clock.bind(self.now)`，而现行 `run_chat_pipeline` **不绑定**逻辑时钟 | 收编时必须逐条对照 `logical_clock` 对前台路径（`scene_service` / `world_engine` / `_idle_seconds_since` 等时间读取）的影响，无法证明等价则按 §4.3 D6 按渠道灰度 |
-| 5 | **`loop_runs.session_id` 前台未写入** | `run_chat_pipeline` 调 `open_foreground_run(user_id)` 未传 `session_id`（RT-002 已具备该列） | 收编同批补传 `session_id`，否则前台 Run 无法按会话检索（台账可追溯性缺口） |
-| 6 | **顺序体规模** | `run_chat_pipeline` 自 323 行起约 330 行为顺序执行体，跨段中间值约 25 个（`state` / `world_ctx` / `selected_goal` / `mode_decision` / `behavior_ctx` / `style_ctx` / `action_intent` / `reply` …） | 拆为 8 个段实现 + 1 个 Run 内状态载体；22 步本体函数逐段调用、零重写（RT-015 §4.3 D2） |
+| # | 障碍 | 处置 |
+|---|---|---|
+| 1 | 前台段实现不存在 | `chat_pipeline` 内定义 9 个段实现，经 `AgentLoop(..., registry=…)` 按 Run 注入 |
+| 2 | 流式 ↔ 段原语形态冲突 | `asyncio.Queue` 桥接：段内 `events.put`，驱动侧并发排空并 yield；`turn_meta` 在 `action_planning` 段末、首个 token 之前投递 |
+| 3 | 循环吞异常与前台外抛语义冲突 | 段实现捕获并暂存 `stage_error`，循环收口后由 `run_chat_pipeline` 重新抛出 |
+| 4 | `logical_clock` 绑定引入行为面 | 循环 `run()` 统一 bind/unbind；`_idle_seconds_since` 仍用 `datetime.now`，前台时间读取面不变 |
+| 5 | `loop_runs.session_id` 前台未写入 | `open_foreground_run(user_id, session_id=session_id)` 同批补传 |
+| 6 | 顺序体规模 | 拆为 9 个段实现 + 闭包状态载体；22 步本体函数逐段调用、零重写 |
 
 ---
 

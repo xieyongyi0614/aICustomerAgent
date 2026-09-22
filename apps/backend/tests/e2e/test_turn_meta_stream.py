@@ -71,8 +71,9 @@ COMFORT_ANALYSIS = {
 
 
 def test_stream_emits_turn_meta_before_first_delta_and_done_carries_turn_id(
-    meta_http_server, db_session_factory, llm_override, fake_llm
+    meta_http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
+    override_settings(inventory_grounding_enabled=False)
     llm_override(
         fake_llm(
             response=["别急", "，有我呢"],

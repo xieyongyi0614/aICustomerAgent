@@ -31,7 +31,13 @@ from app.application import (
     observability,
     world_engine,
 )
+from app.application.agent_runtime import context as runtime_context_manager
 from app.application.agent_runtime import llm_gateway
+from app.application.agent_runtime import profiles as runtime_profiles
+from app.application.agent_runtime import state as runtime_state_manager
+from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
+from app.application.agent_runtime.loop import AgentLoop
+from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.services import (
@@ -320,335 +326,544 @@ def _build_style_context(state: ConversationState, turn: TurnAnalysis, trace):
     return style_ctx
 
 
+# ---------------------------------------------------------------------------
+# RT-015 前台循环收编：段实现 + 薄驱动
+#
+# 段序列**只**来自 `profiles.py` 的 `foreground_chat` Profile（本模块不含任何手写
+# 阶段序列）；段本体经 `AgentLoop(..., registry=...)` 按 Run 注入，故前台段与自治段
+# 可同名共存而无需改循环内核结构。流式协议（turn_meta / token / done）与 22 步业务
+# 实现逐字段保留；等价性硬约束清单见 docs/version/v3.0.0/entry-convergence.md。
+# ---------------------------------------------------------------------------
+
+def _foreground_registry(runners: dict) -> dict:
+    """校验前台段实现完整性；段**序**本身只由 Profile 声明（AC2）。"""
+    spec = runtime_profiles.get_profile(RUN_KIND_FOREGROUND_CHAT)
+    missing = [name for name in spec.stages if name not in runners]
+    if missing:
+        raise ValueError(f"前台段实现缺失：{missing}")
+    return dict(runners)
+
+
 async def run_chat_pipeline(
-    session_id: str, user_id: str, content: str, llm, trace
+    session_id: str,
+    user_id: str,
+    content: str,
+    llm=None,
+    trace=None,
+    *,
+    runtime_input: RuntimeInput | None = None,
+    session_context: SessionContext | None = None,
 ) -> AsyncIterator[dict]:
-    """前台关键路径：整链包裹为 foreground_chat Run（台账记账）。"""
-    run_ctx = agent_runtime.open_foreground_run(user_id)
-    status = "done"
-    try:
-        started = time.perf_counter()
-        trace.user_id = user_id
-        snapshot = await asyncio.to_thread(
-            agent_state_assembler.assemble_snapshot, user_id
+    """前台关键路径（RT-015 收编）：流式协议不变，段序列来自 foreground_chat Profile。"""
+    events: asyncio.Queue = asyncio.Queue()
+    run_ctx = agent_runtime.open_foreground_run(user_id, session_id=session_id)
+    runtime_state_manager.activate(run_ctx, user_id)
+    runtime_context_value = None
+    if (
+        get_settings().runtime_context_freeze_enabled
+        and session_context is not None
+    ):
+        runtime_context_value = await runtime_context_manager.assemble(
+            session_context,
+            runtime_input,
+            run=run_ctx,
+            trace=trace,
         )
-        agent_state_assembler.activate_run_state(snapshot, run_ctx)
-        world_ctx = await asyncio.to_thread(
-            world_engine.build_context, user_id, session_id, trace=trace
-        )
-        state = await context_builder.build(session_id, user_id, content, trace=trace)
-        trace.record("context_builder", (time.perf_counter() - started) * 1000)
+    spec = runtime_profiles.get_profile(RUN_KIND_FOREGROUND_CHAT)
+    stage_error: BaseException | None = None
 
-        scene_state = await asyncio.to_thread(scene_service.load, session_id)
-        current_turn = sum(1 for m in state.messages if m.role == "human") + 1
+    # 段间中间值（闭包共享；只活在本次 Run，不落业务表）
+    snapshot = None
+    world_ctx = None
+    state = None
+    scene_state = None
+    current_turn = 0
+    selected_goal = None
+    role_mode = None
+    analysis = None
+    scene_intent = None
+    intention_candidate = None
+    mode_decision = None
+    effective_mode = None
+    turn = None
+    scene_intent_result = None
+    resolved_state = None
+    directive = None
+    scene_ctx = None
+    validated_intention = None
+    decision_audit = None
+    current_goal = None
+    relationship_ctx = None
+    behavior_ctx = None
+    style_ctx = None
+    behavior_meta: dict = {}
+    mode_meta: dict = {}
+    action_intent = None
+    full_reply: list = []
+    first_token_ms = None
+    reply = ""
+    ai_message_id = None
 
-        goal_started = time.perf_counter()
-        selected_goal = await asyncio.to_thread(_select_goal, state, scene_state, user_id)
-        trace.record("goal_selection", (time.perf_counter() - goal_started) * 1000)
+    async def _perception(_ctx):
+        """Observe 段锚点：入站已由 RT-013 网关归一，本段不引入额外业务。"""
+        if stage_error is not None:
+            return {"status": "skipped"}
+        return {"status": "ok"}
 
-        async def _timed(name: str, coro):
-            step_started = time.perf_counter()
-            try:
-                result = await coro
-            except Exception as exc:
-                trace.record(
-                    name,
-                    (time.perf_counter() - step_started) * 1000,
-                    "error",
-                    error=exc.__class__.__name__,
-                )
-                raise
-            trace.record(name, (time.perf_counter() - step_started) * 1000)
-            return result
+    async def _context_assembly(_ctx):
+        nonlocal snapshot, world_ctx, state, scene_state, current_turn, selected_goal
+        nonlocal stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
+        try:
+            started = time.perf_counter()
+            trace.user_id = user_id
+            snapshot = await asyncio.to_thread(
+                agent_state_assembler.assemble_snapshot, user_id
+            )
+            agent_state_assembler.activate_run_state(snapshot, run_ctx)
+            world_ctx = await asyncio.to_thread(
+                world_engine.build_context, user_id, session_id, trace=trace
+            )
+            state = await context_builder.build(session_id, user_id, content, trace=trace)
+            trace.record("context_builder", (time.perf_counter() - started) * 1000)
+            scene_state = await asyncio.to_thread(scene_service.load, session_id)
+            current_turn = sum(1 for m in state.messages if m.role == "human") + 1
+            goal_started = time.perf_counter()
+            selected_goal = await asyncio.to_thread(
+                _select_goal, state, scene_state, user_id
+            )
+            trace.record("goal_selection", (time.perf_counter() - goal_started) * 1000)
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
 
-        role_mode, analysis, scene_intent, intention_candidate = await asyncio.gather(
-            _timed("role_router", router_chain.route(content, llm=llm)),
-            _timed("turn_analyzer", turn_analysis_chain.analyze(content, state, llm=llm)),
-            _timed("scene_intent", scene_intent_chain.classify(content, llm=llm)),
-            _timed(
-                "intention",
-                intention_chain.decide(content, state, selected_goal, scene_state, llm=llm),
-            ),
-            return_exceptions=True,
-        )
-        llm_gateway.account_turn_decisions(run_ctx)
-        if isinstance(role_mode, RoleMode):
-            if role_mode.confidence < get_settings().router_confidence_threshold:
+    async def _turn_decisions(_ctx):
+        nonlocal role_mode, analysis, scene_intent, intention_candidate
+        nonlocal turn, scene_intent_result, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
+        try:
+
+            async def _timed(name: str, coro):
+                step_started = time.perf_counter()
+                try:
+                    result = await coro
+                except Exception as exc:
+                    trace.record(
+                        name,
+                        (time.perf_counter() - step_started) * 1000,
+                        "error",
+                        error=exc.__class__.__name__,
+                    )
+                    raise
+                trace.record(name, (time.perf_counter() - step_started) * 1000)
+                return result
+
+            role_mode, analysis, scene_intent, intention_candidate = await asyncio.gather(
+                _timed("role_router", router_chain.route(content, llm=llm)),
+                _timed("turn_analyzer", turn_analysis_chain.analyze(content, state, llm=llm)),
+                _timed("scene_intent", scene_intent_chain.classify(content, llm=llm)),
+                _timed(
+                    "intention",
+                    intention_chain.decide(content, state, selected_goal, scene_state, llm=llm),
+                ),
+                return_exceptions=True,
+            )
+            llm_gateway.account_turn_decisions(run_ctx)
+            if isinstance(role_mode, RoleMode):
+                if role_mode.confidence < get_settings().router_confidence_threshold:
+                    trace.mark_status("role_router", "degraded")
+            else:
                 trace.mark_status("role_router", "degraded")
-        else:
-            trace.mark_status("role_router", "degraded")
-        if isinstance(analysis, BaseException) or not isinstance(analysis, TurnAnalysis):
-            trace.mark_status("turn_analyzer", "degraded")
-        if isinstance(intention_candidate, BaseException) or not isinstance(
-            intention_candidate, IntentionDecision
-        ):
-            trace.mark_status("intention", "degraded")
+            if isinstance(analysis, BaseException) or not isinstance(analysis, TurnAnalysis):
+                trace.mark_status("turn_analyzer", "degraded")
+            if isinstance(intention_candidate, BaseException) or not isinstance(
+                intention_candidate, IntentionDecision
+            ):
+                trace.mark_status("intention", "degraded")
+            turn = _resolve_analysis(analysis)
+            scene_intent_result = _resolve_scene_intent(scene_intent)
+            intention_candidate = _resolve_intention(intention_candidate)
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
 
-        stabilize_started = time.perf_counter()
-        mode_decision = _stabilize_mode(role_mode, state, session_id)
-        trace.record(
-            "mode_stabilize",
-            (time.perf_counter() - stabilize_started) * 1000,
-        )
-        if isinstance(role_mode, RoleMode):
-            effective_mode = role_mode.model_copy(update={"mode": mode_decision.effective})
-        else:
-            effective_mode = RoleMode(
-                mode=mode_decision.effective,
-                intent="casual",
-                confidence=0.0,
-                reason="路由失败，保持已确认模式",
-            )
-
-        turn = _resolve_analysis(analysis)
-        scene_intent_result = _resolve_scene_intent(scene_intent)
-        intention_candidate = _resolve_intention(intention_candidate)
-
-        resolver_started = time.perf_counter()
-        resolved_state, directive = scene_service.resolve(
-            scene_intent_result.intent, scene_state, current_turn
-        )
-        trace.record("scene_resolver", (time.perf_counter() - resolver_started) * 1000)
-
-        scene_ctx = SceneContext(
-            state=resolved_state,
-            intent=scene_intent_result.intent,
-            directive=directive,
-        )
-        validated_intention = enforce_intention(
-            intention_candidate,
-            selected_goal,
-            state,
-            turn,
-            datetime.now(),
-            scene_pending=_is_pending(resolved_state),
-        )
-        if validated_intention.degraded:
-            trace.mark_status("intention", "degraded")
-        decision_audit = _run_foreground_decision(
-            run_ctx, user_id, validated_intention, selected_goal, datetime.now()
-        )
-        current_goal = (
-            {
-                "id": selected_goal.goal.id,
-                "type": selected_goal.goal.type,
-                "description": selected_goal.goal.description,
-            }
-            if selected_goal.goal is not None
-            else None
-        )
-
-        behavior_started = time.perf_counter()
-        relationship_ctx = None
+    async def _mode_stabilize(_ctx):
+        nonlocal mode_decision, effective_mode, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
         try:
-            unlocks = await asyncio.to_thread(
-                relationship_milestone_repository.list_unlocks, state.user_id
+            stabilize_started = time.perf_counter()
+            mode_decision = _stabilize_mode(role_mode, state, session_id)
+            trace.record(
+                "mode_stabilize", (time.perf_counter() - stabilize_started) * 1000
             )
-            rel = state.relationship_state
-            relationship_ctx = RelationshipBehaviorContext(
-                stage=rel.stage,
-                comfort=getattr(rel, "comfort", 0.6),
-                respect=getattr(rel, "respect", 0.6),
-                conflict_status=getattr(rel, "conflict_status", "none") or "none",
-                unlocks=unlocks,
-            )
-        except Exception:
-            relationship_ctx = None
-        behavior_ctx = behavior_engine.resolve(
-            validated_intention,
-            state,
-            scene_ctx,
-            mode_decision.effective,
-            turn,
-            relationship_ctx=relationship_ctx,
-            development_overlay=getattr(state, "development_overlay", None),
-        )
-        _record_development_apply(trace, state, behavior_ctx)
-        trace.record(
-            "behavior_engine",
-            (time.perf_counter() - behavior_started) * 1000,
-            "degraded" if behavior_ctx.degraded else "ok",
-            strategy=behavior_ctx.strategy.strategy,
-            base_strategy=behavior_ctx.strategy.base_strategy,
-            budget_max=behavior_ctx.budget.max_action_desc,
-            matched_habits=[h.id for h in behavior_ctx.habits],
-        )
-        trace.set_meta(effective_mode, turn)
+            if isinstance(role_mode, RoleMode):
+                effective_mode = role_mode.model_copy(
+                    update={"mode": mode_decision.effective}
+                )
+            else:
+                effective_mode = RoleMode(
+                    mode=mode_decision.effective,
+                    intent="casual",
+                    confidence=0.0,
+                    reason="路由失败，保持已确认模式",
+                )
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
 
-        style_ctx = _build_style_context(state, turn, trace)
-
-        behavior_meta = {
-            "strategy": behavior_ctx.strategy.strategy,
-            "budget": behavior_ctx.budget.model_dump(),
-            "degraded": behavior_ctx.degraded,
-        }
-        mode_meta = {
-            "confirmed": state.mode or "default",
-            "effective": mode_decision.effective,
-            "switched": mode_decision.switched,
-        }
-        trace.behavior_meta = behavior_meta
-        trace.mode_meta = mode_meta
-
-        detect_started = time.perf_counter()
-        action_intent = detect_action_intent(content, scene_state=resolved_state, world_ctx=world_ctx)
-        trace.record(
-            "action_detect",
-            (time.perf_counter() - detect_started) * 1000,
-            "skipped" if action_intent is None else "ok",
-        )
-
-        turn_meta = {
-            "kind": "turn_meta",
-            "role_mode": effective_mode,
-            "analysis": turn,
-            "scene_intent": scene_intent_result,
-            "scene_state": resolved_state,
-            "intention": validated_intention,
-            "current_goal": current_goal,
-            "behavior": behavior_meta,
-            "mode": mode_meta,
-        }
-        if action_intent is not None:
-            turn_meta["action_intent"] = action_intent.model_dump(mode="json")
-        yield turn_meta
-
-        full_reply = []
-        llm_started = time.perf_counter()
-        first_token_ms = None
-        goal_ctx = GoalContext(selected_goal=selected_goal, intention=validated_intention)
-        active_generations[user_id] = True
-        action_ctx = await asyncio.to_thread(build_action_context, user_id, session_id)
-        settings = get_settings()
-        grounding_mode = (
-            settings.inventory_grounding_mode
-            if settings.inventory_grounding_enabled and world_ctx is not None
-            else "off"
-        )
-        buffer_reply = grounding_mode in ("rewrite", "annotate")
-        answer_llm = llm_gateway.resolve_answer_llm(run_ctx, llm)
+    async def _scene_resolve(_ctx):
+        nonlocal resolved_state, directive, scene_ctx
+        nonlocal validated_intention, decision_audit, current_goal, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
         try:
-            async for token in answer_chain.astream(
-                mode_decision.effective,
+            resolver_started = time.perf_counter()
+            resolved_state, directive = scene_service.resolve(
+                scene_intent_result.intent, scene_state, current_turn
+            )
+            trace.record(
+                "scene_resolver", (time.perf_counter() - resolver_started) * 1000
+            )
+            scene_ctx = SceneContext(
+                state=resolved_state,
+                intent=scene_intent_result.intent,
+                directive=directive,
+            )
+            validated_intention = enforce_intention(
+                intention_candidate,
+                selected_goal,
                 state,
                 turn,
-                llm=answer_llm,
-                trace=trace,
-                scene_ctx=scene_ctx,
-                goal_ctx=goal_ctx,
-                behavior_ctx=behavior_ctx,
-                action_ctx=action_ctx,
-                world_ctx=world_ctx,
-                style_ctx=style_ctx,
-            ):
-                if first_token_ms is None:
-                    first_token_ms = (time.perf_counter() - llm_started) * 1000
-                full_reply.append(token)
-                if not buffer_reply:
-                    yield {"kind": "token", "text": token}
-        except ValueError as exc:
-            if not full_reply:
+                datetime.now(),
+                scene_pending=_is_pending(resolved_state),
+            )
+            if validated_intention.degraded:
+                trace.mark_status("intention", "degraded")
+            decision_audit = _run_foreground_decision(
+                run_ctx, user_id, validated_intention, selected_goal, datetime.now()
+            )
+            current_goal = (
+                {
+                    "id": selected_goal.goal.id,
+                    "type": selected_goal.goal.type,
+                    "description": selected_goal.goal.description,
+                }
+                if selected_goal.goal is not None
+                else None
+            )
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
+
+    async def _behavior_resolve(_ctx):
+        nonlocal relationship_ctx, behavior_ctx, style_ctx, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
+        try:
+            behavior_started = time.perf_counter()
+            relationship_ctx = None
+            try:
+                unlocks = await asyncio.to_thread(
+                    relationship_milestone_repository.list_unlocks, state.user_id
+                )
+                rel = state.relationship_state
+                relationship_ctx = RelationshipBehaviorContext(
+                    stage=rel.stage,
+                    comfort=getattr(rel, "comfort", 0.6),
+                    respect=getattr(rel, "respect", 0.6),
+                    conflict_status=getattr(rel, "conflict_status", "none") or "none",
+                    unlocks=unlocks,
+                )
+            except Exception:
+                relationship_ctx = None
+            behavior_ctx = behavior_engine.resolve(
+                validated_intention,
+                state,
+                scene_ctx,
+                mode_decision.effective,
+                turn,
+                relationship_ctx=relationship_ctx,
+                development_overlay=getattr(state, "development_overlay", None),
+            )
+            _record_development_apply(trace, state, behavior_ctx)
+            trace.record(
+                "behavior_engine",
+                (time.perf_counter() - behavior_started) * 1000,
+                "degraded" if behavior_ctx.degraded else "ok",
+                strategy=behavior_ctx.strategy.strategy,
+                base_strategy=behavior_ctx.strategy.base_strategy,
+                budget_max=behavior_ctx.budget.max_action_desc,
+                matched_habits=[h.id for h in behavior_ctx.habits],
+            )
+            trace.set_meta(effective_mode, turn)
+            style_ctx = _build_style_context(state, turn, trace)
+            behavior_meta.update(
+                {
+                    "strategy": behavior_ctx.strategy.strategy,
+                    "budget": behavior_ctx.budget.model_dump(),
+                    "degraded": behavior_ctx.degraded,
+                }
+            )
+            mode_meta.update(
+                {
+                    "confirmed": state.mode or "default",
+                    "effective": mode_decision.effective,
+                    "switched": mode_decision.switched,
+                }
+            )
+            trace.behavior_meta = behavior_meta
+            trace.mode_meta = mode_meta
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
+
+    async def _action_planning(_ctx):
+        nonlocal action_intent, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
+        try:
+            detect_started = time.perf_counter()
+            action_intent = detect_action_intent(
+                content, scene_state=resolved_state, world_ctx=world_ctx
+            )
+            trace.record(
+                "action_detect",
+                (time.perf_counter() - detect_started) * 1000,
+                "skipped" if action_intent is None else "ok",
+            )
+            turn_meta = {
+                "kind": "turn_meta",
+                "role_mode": effective_mode,
+                "analysis": turn,
+                "scene_intent": scene_intent_result,
+                "scene_state": resolved_state,
+                "intention": validated_intention,
+                "current_goal": current_goal,
+                "behavior": behavior_meta,
+                "mode": mode_meta,
+            }
+            if action_intent is not None:
+                turn_meta["action_intent"] = action_intent.model_dump(mode="json")
+            await events.put(turn_meta)
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
+
+    async def _reply_generation(_ctx):
+        nonlocal full_reply, first_token_ms, reply, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
+        try:
+            llm_started = time.perf_counter()
+            goal_ctx = GoalContext(
+                selected_goal=selected_goal, intention=validated_intention
+            )
+            active_generations[user_id] = True
+            action_ctx = await asyncio.to_thread(
+                build_action_context, user_id, session_id
+            )
+            settings = get_settings()
+            grounding_mode = (
+                settings.inventory_grounding_mode
+                if settings.inventory_grounding_enabled and world_ctx is not None
+                else "off"
+            )
+            buffer_reply = grounding_mode in ("rewrite", "annotate")
+            answer_llm = llm_gateway.resolve_answer_llm(run_ctx, llm)
+            try:
+                async for token in answer_chain.astream(
+                    mode_decision.effective,
+                    state,
+                    turn,
+                    llm=answer_llm,
+                    trace=trace,
+                    scene_ctx=scene_ctx,
+                    goal_ctx=goal_ctx,
+                    behavior_ctx=behavior_ctx,
+                    action_ctx=action_ctx,
+                    world_ctx=world_ctx,
+                    style_ctx=style_ctx,
+                ):
+                    if first_token_ms is None:
+                        first_token_ms = (time.perf_counter() - llm_started) * 1000
+                    full_reply.append(token)
+                    if not buffer_reply:
+                        await events.put({"kind": "token", "text": token})
+            except ValueError as exc:
+                if not full_reply:
+                    trace.record(
+                        "llm",
+                        (time.perf_counter() - llm_started) * 1000,
+                        "error",
+                        first_token_ms=first_token_ms,
+                        error="empty response",
+                    )
+                    raise EmptyLLMResponseError("LLM 未返回任何内容") from exc
+                raise
+            except Exception as exc:
                 trace.record(
                     "llm",
                     (time.perf_counter() - llm_started) * 1000,
                     "error",
                     first_token_ms=first_token_ms,
-                    error="empty response",
+                    error=exc.__class__.__name__,
                 )
-                raise EmptyLLMResponseError("LLM 未返回任何内容") from exc
-            raise
-        except Exception as exc:
+                logger.exception("回答流式输出失败")
+                raise
+            finally:
+                active_generations.pop(user_id, None)
+
             trace.record(
                 "llm",
                 (time.perf_counter() - llm_started) * 1000,
-                "error",
+                "ok",
                 first_token_ms=first_token_ms,
-                error=exc.__class__.__name__,
             )
-            logger.exception("回答流式输出失败")
+
+            reply = "".join(full_reply)
+            if buffer_reply and reply:
+                reply = _apply_inventory_grounding(
+                    reply, content, world_ctx, grounding_mode, trace
+                )
+
+            if reply:
+                logger.info(
+                    "模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply)
+                )
+            else:
+                logger.warning("模型输出为空")
+            if buffer_reply and reply:
+                await events.put({"kind": "token", "text": reply})
+        except BaseException as exc:
+            stage_error = exc
             raise
-        finally:
-            active_generations.pop(user_id, None)
+        return {"status": "ok"}
 
-        trace.record(
-            "llm",
-            (time.perf_counter() - llm_started) * 1000,
-            "ok",
-            first_token_ms=first_token_ms,
-        )
-
-        reply = "".join(full_reply)
-        if buffer_reply and reply:
-            reply = _apply_inventory_grounding(reply, content, world_ctx, grounding_mode, trace)
-
-        if reply:
-            logger.info("模型输出完成，字符数=%d 预览=%s", len(reply), content_preview(reply))
-        else:
-            logger.warning("模型输出为空")
-        if buffer_reply and reply:
-            yield {"kind": "token", "text": reply}
-        ai_message_id = await asyncio.to_thread(
-            conversation_service.save_turn,
-            session_id,
-            content,
-            reply,
-            mode_write_back=(
-                mode_decision.effective if mode_decision.write_back else None
-            ),
-        )
+    async def _record_handoff(_ctx):
+        nonlocal ai_message_id, stage_error
+        if stage_error is not None:
+            return {"status": "skipped"}
         try:
-            await asyncio.to_thread(
-                conversation_service.reset_proactive_on_user_message, user_id
+            ai_message_id = await asyncio.to_thread(
+                conversation_service.save_turn,
+                session_id,
+                content,
+                reply,
+                mode_write_back=(
+                    mode_decision.effective if mode_decision.write_back else None
+                ),
             )
-        except Exception:
-            logger.exception("主动行为复位失败，不影响本轮对话")
-        post_process_task = schedule_post_process(
-            session_id,
-            user_id,
-            content,
-            reply,
-            state,
-            turn,
-            scene_state=resolved_state,
-            scene_intent=scene_intent_result,
-            current_turn=current_turn,
-            llm=llm,
-            trace=trace,
-            selected_goal=selected_goal,
-            intention=validated_intention,
-            behavior=behavior_ctx,
-            action_intent=action_intent,
-        )
-        collector = trace_collector.get_trace_collector()
-        collector.attach(trace, str(ai_message_id))
-        observability.on_turn_finished(
-            trace,
-            turn_id=str(ai_message_id),
-            user_id=user_id,
-            session_id=session_id,
-            post_process_task=post_process_task,
-        )
-        observability.record_turn_decisions(
-            trace,
-            user_id=user_id,
-            session_id=session_id,
-            selected_goal=selected_goal,
-            intention=validated_intention,
-            behavior=behavior_ctx,
-            pipeline_audit=decision_audit,
-        )
-        yield {
-            "kind": "done",
-            "session_id": session_id,
-            "turn_id": str(ai_message_id),
-            "request_id": trace.request_id,
-        }
+            try:
+                await asyncio.to_thread(
+                    conversation_service.reset_proactive_on_user_message, user_id
+                )
+            except Exception:
+                logger.exception("主动行为复位失败，不影响本轮对话")
+            post_process_task = schedule_post_process(
+                session_id,
+                user_id,
+                content,
+                reply,
+                state,
+                turn,
+                scene_state=resolved_state,
+                scene_intent=scene_intent_result,
+                current_turn=current_turn,
+                llm=llm,
+                trace=trace,
+                selected_goal=selected_goal,
+                intention=validated_intention,
+                behavior=behavior_ctx,
+                action_intent=action_intent,
+            )
+            collector = trace_collector.get_trace_collector()
+            collector.attach(trace, str(ai_message_id))
+            observability.on_turn_finished(
+                trace,
+                turn_id=str(ai_message_id),
+                user_id=user_id,
+                session_id=session_id,
+                post_process_task=post_process_task,
+            )
+            observability.record_turn_decisions(
+                trace,
+                user_id=user_id,
+                session_id=session_id,
+                selected_goal=selected_goal,
+                intention=validated_intention,
+                behavior=behavior_ctx,
+                pipeline_audit=decision_audit,
+            )
+            await events.put(
+                {
+                    "kind": "done",
+                    "session_id": session_id,
+                    "turn_id": str(ai_message_id),
+                    "request_id": trace.request_id,
+                }
+            )
+        except BaseException as exc:
+            stage_error = exc
+            raise
+        return {"status": "ok"}
 
-    except Exception:
-        status = "aborted"
-        raise
+    runners = _foreground_registry(
+        {
+            "perception": _perception,
+            "context_assembly": _context_assembly,
+            "turn_decisions": _turn_decisions,
+            "mode_stabilize": _mode_stabilize,
+            "scene_resolve": _scene_resolve,
+            "behavior_resolve": _behavior_resolve,
+            "action_planning": _action_planning,
+            "reply_generation": _reply_generation,
+            "record_handoff": _record_handoff,
+        }
+    )
+    loop = AgentLoop(
+        spec,
+        user_id=user_id,
+        run=run_ctx,
+        llm=llm,
+        trace=trace,
+        registry=runners,
+    )
+    task = asyncio.ensure_future(
+        loop.run(
+            runtime_input, session_context, runtime_context=runtime_context_value
+        )
+    )
+    try:
+        while True:
+            getter = asyncio.ensure_future(events.get())
+            done, _pending = await asyncio.wait(
+                {getter, task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if getter in done:
+                item = getter.result()
+                yield item
+                continue
+            getter.cancel()
+            while not events.empty():
+                yield events.get_nowait()
+            break
+        if stage_error is not None:
+            raise stage_error
+        if task.done() and not task.cancelled() and task.exception() is not None:
+            raise task.exception()
     finally:
-        agent_state_assembler.reset_run_state(run_ctx)
-        if status == "done" and run_ctx.degraded:
-            status = "degraded"
-        agent_runtime.close_run(run_ctx, status)
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except BaseException:  # pylint: disable=broad-except
+                pass

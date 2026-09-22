@@ -542,6 +542,10 @@ class AgentLoop:
             if digest_token is not None:
                 memory_digest_var.reset(digest_token)
             agent_state_assembler.reset_run_state(self.run_context)
+        if self._status == TERMINAL_DONE and self.run_context.degraded:
+            # RT-015：前台 Run 的软降级标记（llm_gateway 预算拒绝等）必须反映到终态，
+            # 与既有 chat_pipeline 收尾语义一致。
+            self._status = TERMINAL_DEGRADED
         budget_account = self._budget.as_dict()
         controller.close_run(
             self.run_context,
