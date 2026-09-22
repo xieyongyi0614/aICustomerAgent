@@ -379,7 +379,7 @@ def run_risk_gates(
     Action 检定在 V9 执行链内进行（本处只声明 delegated，不冒充通过）；
     其余三闸逐候选给出真实判定与理由。
     """
-    from app.application.agent_runtime import llm_gateway
+    from app.services.llm_budget_gate import preview_budget
 
     for candidate in candidates:
         gates = [
@@ -391,12 +391,11 @@ def run_risk_gates(
             gates.append({_GATE_BUDGET: "pass", "reason": "zero_cost"})
             candidate.gates = gates
             continue
-        grant = llm_gateway.acquire(
+        grant = preview_budget(
             run.user_id if run else None,
-            _gate_capability(candidate),
             run,
             now=now,
-            account=False,
+            budget_type=_gate_budget_type(candidate),
         )
         gates.append(
             {
@@ -459,6 +458,10 @@ def _goal_type_of(candidate: Candidate, stack):
 def _gate_capability(candidate: Candidate) -> str:
     """闸门按候选所属预算档取能力：前台候选走前台档，其余走后台档。"""
     return "answer" if candidate.source == "chat_response" else "proactive"
+
+
+def _gate_budget_type(candidate: Candidate) -> str:
+    return "foreground" if candidate.source == "chat_response" else "background"
 
 
 def select(candidates: list[Candidate]) -> Candidate:

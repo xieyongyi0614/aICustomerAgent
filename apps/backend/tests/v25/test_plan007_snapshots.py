@@ -156,6 +156,7 @@ ENGINE_FUNCTION_INVENTORY = (
 PIPELINE_FUNCTION_INVENTORY = (
     "_apply_tool_insight",
     "_cost",
+    "_gate_budget_type",
     "_gate_capability",
     "_goal_type_of",
     "_intention_for",

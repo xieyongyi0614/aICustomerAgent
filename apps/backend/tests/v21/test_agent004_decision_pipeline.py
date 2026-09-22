@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.application.agent_runtime import llm_gateway
 from app.services import decision_pipeline, goal_stack
+from app.services import llm_budget_gate
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "decision-user"
@@ -57,8 +57,8 @@ class TestPipeline:
 
     def test_budget_denied_falls_to_silence(self, db_session_factory, monkeypatch):
         monkeypatch.setattr(
-            llm_gateway,
-            "acquire",
+            llm_budget_gate,
+            "preview_budget",
             lambda *a, **k: SimpleNamespace(granted=False, degraded=False, reason="quota_circuit_open"),
         )
         result = decision_pipeline.run_pipeline(stack=_stack(), run=None, now=NOW)

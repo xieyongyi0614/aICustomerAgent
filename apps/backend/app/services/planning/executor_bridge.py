@@ -60,7 +60,7 @@ import json
 import logging
 from datetime import datetime
 
-from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
+from app.core.agent_run_types import RUN_KIND_AUTONOMOUS_TICK
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
 from app.models.action import ACTION_TYPES, ActionIntent, normalize_core_params

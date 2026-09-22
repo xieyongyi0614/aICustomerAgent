@@ -1,46 +1,21 @@
-"""Run 模型值对象（AGENT-001 §2.2）：RunKind / 触发源枚举 / RunContext。"""
+"""Run 模型值对象（AGENT-001 §2.2）。
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Literal
+实现已下沉 `app.core.agent_run_types`（R-6 无环契约）；本模块保持既有导入面。
+"""
 
-RunKind = Literal["foreground_chat", "autonomous_tick", "event_driven"]
-
-RUN_KIND_FOREGROUND_CHAT = "foreground_chat"
-RUN_KIND_AUTONOMOUS_TICK = "autonomous_tick"
-RUN_KIND_EVENT_DRIVEN = "event_driven"
-RUN_KINDS: tuple[str, ...] = (
-    RUN_KIND_FOREGROUND_CHAT,
+from app.core.agent_run_types import (  # noqa: F401
+    RUN_KINDS,
     RUN_KIND_AUTONOMOUS_TICK,
     RUN_KIND_EVENT_DRIVEN,
-)
-
-TRIGGER_CHANNEL_MESSAGE = "channel_message"
-TRIGGER_WORLD_EVENT = "world_event"
-TRIGGER_SCHEDULE = "schedule"
-TRIGGER_THRESHOLD = "threshold"
-TRIGGER_TYPES: tuple[str, ...] = (
+    RUN_KIND_FOREGROUND_CHAT,
+    TERMINAL_ABORTED,
+    TERMINAL_DEGRADED,
+    TERMINAL_DONE,
     TRIGGER_CHANNEL_MESSAGE,
-    TRIGGER_WORLD_EVENT,
     TRIGGER_SCHEDULE,
     TRIGGER_THRESHOLD,
+    TRIGGER_TYPES,
+    TRIGGER_WORLD_EVENT,
+    RunContext,
+    RunKind,
 )
-
-TERMINAL_DONE = "done"
-TERMINAL_ABORTED = "aborted"
-TERMINAL_DEGRADED = "degraded"
-
-
-@dataclass
-class RunContext:
-    """单次 Run 的内存载体：台账身份 + 阶段间传递（不落业务表）。"""
-
-    run_id: str
-    user_id: str | None
-    run_kind: str
-    trigger_type: str
-    reason: str
-    started_at: datetime
-    llm_calls: int = 0
-    degraded: bool = False
-    data: dict = field(default_factory=dict)

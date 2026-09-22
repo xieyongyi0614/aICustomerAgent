@@ -405,6 +405,31 @@ class TestRepositoryAccessLayering:
             assert callable(facade)
         assert callable(action_manager.get_record)
 
+    def test_services_do_not_import_agent_runtime(self):
+        from app.services import decision_pipeline, domain_ledger, llm_budget_gate
+        from app.services.planning import context as plan_context
+        from app.services.planning import executor_bridge
+
+        modules = (
+            decision_pipeline,
+            domain_ledger,
+            llm_budget_gate,
+            plan_context,
+            executor_bridge,
+        )
+        for module in modules:
+            tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    assert not node.module.startswith(
+                        "app.application.agent_runtime"
+                    ), module.__name__
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        assert not alias.name.startswith(
+                            "app.application.agent_runtime"
+                        ), module.__name__
+
 
 class TestSingleLoopDecision:
     """H-1 裁决 B：唯一循环 = Profile 阶段序列；六段方法是影子实现（未接入 run()）。"""

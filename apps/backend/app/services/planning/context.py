@@ -70,7 +70,7 @@ from datetime import datetime
 from typing import Any
 
 from app.application import world_engine
-from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK, RunContext
+from app.core.agent_run_types import RUN_KIND_AUTONOMOUS_TICK, RunContext
 from app.character.asuna.scene_profiles import scene_profile_for
 from app.core.settings import get_settings
 from app.models.goal import GoalRecord
