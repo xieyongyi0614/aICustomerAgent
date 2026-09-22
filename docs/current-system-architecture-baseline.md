@@ -130,6 +130,8 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 **账本纪律**：`relationship_events` 是关系事件时序权威（全量）；`relationship_state` 是当前状态（upsert 强一致）；`relationship_snapshots` 是版本化快照（`relationship_evolution` 逐字节可重放）。
 
+**数据治理（V4.0 PLA-003）**：财务数据分级由 L2「不保存」重裁为 **L1 受控保存**（本地 + 用户可控 + 可导出删除 + 明细永不进 Prompt）；`services/governance/` 提供领域注册点 / 导出 / 删除 / 溯源 / Prompt 护栏；`GET /life/export` 与 `DELETE /life/data` 为用户权利面出口。记忆域 R1~R8 与 R9 不动。
+
 ### 3.4 Planning System（规划系统）
 
 | 子域 | 实现 | 说明 |

@@ -6,6 +6,7 @@ from app.api.v1 import (
     debug,
     feishu,
     feishu_ingress,
+    governance,
     history,
     llm,
     proactive,
@@ -25,3 +26,4 @@ api_router.include_router(history.history_router)
 api_router.include_router(llm.llm_router)
 api_router.include_router(proactive.proactive_router)
 api_router.include_router(world.world_router)
+api_router.include_router(governance.governance_router)
