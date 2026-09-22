@@ -29,6 +29,7 @@ from typing import Any
 
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime.contracts import (
+    DEFAULT_CHARACTER_ID,
     EVENT_MEMORY_UPDATED,
     EVENT_RELATIONSHIP_UPDATED,
     EVENT_STATE_VERSION_BUMPED,
@@ -64,8 +65,6 @@ TARGET_EVENT: Mapping[str, str] = {
     TARGET_RELATIONSHIP: EVENT_RELATIONSHIP_UPDATED,
     TARGET_STATE: EVENT_STATE_VERSION_BUMPED,
 }
-
-DEFAULT_CHARACTER_ID = "asuna"
 
 
 @dataclass(frozen=True, slots=True)

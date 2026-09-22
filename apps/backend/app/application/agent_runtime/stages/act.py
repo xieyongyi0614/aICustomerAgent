@@ -35,8 +35,8 @@ from app.application.agent_runtime.contracts import (
     RuntimeEvent,
 )
 from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
-from app.character.asuna.action import ACTION_TOOL_MAP, REQUIRED_PARAMS
 from app.models.action import ActionResult, ActionIntent
+from app.services import character_assets
 from app.services.action import result as action_result
 
 logger = logging.getLogger(__name__)
@@ -100,18 +100,25 @@ def _winning_candidate(intention: Any) -> Mapping[str, Any] | None:
     return None
 
 
-def _action_type_for_tool(tool_id: str | None) -> str | None:
-    """tool_id → `ActionType`（反查 `ACTION_TOOL_MAP`，唯一映射来源）。"""
+def _action_type_for_tool(
+    tool_id: str | None, *, character_id: str = character_assets.DEFAULT_CHARACTER_ID
+) -> str | None:
+    """tool_id → `ActionType`（反查人设 `ACTION_TOOL_MAP`，唯一映射来源）。"""
     if not tool_id:
         return None
-    for action_type, tool_ids in ACTION_TOOL_MAP.items():
+    for action_type, tool_ids in character_assets.action_tool_map(character_id).items():
         if tool_id in tool_ids:
             return action_type
     return None
 
 
-def _missing_params(action_type: str, params: Mapping[str, Any]) -> list[str]:
-    required = REQUIRED_PARAMS.get(action_type, ())
+def _missing_params(
+    action_type: str,
+    params: Mapping[str, Any],
+    *,
+    character_id: str = character_assets.DEFAULT_CHARACTER_ID,
+) -> list[str]:
+    required = character_assets.required_params(character_id).get(action_type, ())
     return [name for name in required if not params.get(name)]
 
 
@@ -126,22 +133,28 @@ def _dedupe_key(
 
 
 def intent_to_action_intent(
-    intention: Any, *, session_id: str | None, goal_id: str | None
+    intention: Any,
+    *,
+    session_id: str | None,
+    goal_id: str | None,
+    character_id: str = character_assets.DEFAULT_CHARACTER_ID,
 ) -> ActionIntent | None:
     """`Intention` → `ActionIntent`（**只映射**，D6）。
 
-    映射依据：决策管线胜出候选的 `tool_id`（反查 `ACTION_TOOL_MAP`）。候选未携带
+    映射依据：决策管线胜出候选的 `tool_id`（反查人设 `ACTION_TOOL_MAP`）。候选未携带
     工具身份 → 返回 `None`（无行动可映射，不是失败）。参数取自候选 `params`；
     必填参数缺失时 `confidence="ambiguous"`，由引擎的既有闸门裁决（本段不替它判断）。
     """
     candidate = _winning_candidate(intention)
     if candidate is None:
         return None
-    action_type = _action_type_for_tool(candidate.get("tool_id"))
+    action_type = _action_type_for_tool(
+        candidate.get("tool_id"), character_id=character_id
+    )
     if action_type is None:
         return None
     params = dict(candidate.get("params") or {})
-    missing = _missing_params(action_type, params)
+    missing = _missing_params(action_type, params, character_id=character_id)
     return ActionIntent(
         action_type=action_type,  # type: ignore[arg-type]
         confidence="ambiguous" if missing else "confident",
@@ -378,6 +391,8 @@ async def act(
         intention,
         session_id=session_id,
         goal_id=getattr(intention, "goal_id", None),
+        character_id=getattr(session_context, "character_id", None)
+        or character_assets.DEFAULT_CHARACTER_ID,
     )
     if action_intent is None:
         _record_trace(trace, status="skipped", reason=REASON_NO_MAPPING)

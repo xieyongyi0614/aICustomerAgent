@@ -357,6 +357,26 @@ class TestRepositoryAccessLayering:
         for module in (plan, act, update):
             assert self._repository_imports(module) == [], module.__name__
 
+    def test_runtime_does_not_import_character_package(self):
+        from app.application.agent_runtime import (
+            contracts,
+            controller,
+            execution_history,
+            loop,
+            state,
+        )
+        from app.application.agent_runtime.stages import act, plan, update
+
+        modules = (contracts, controller, execution_history, loop, state, act, plan, update)
+        for module in modules:
+            tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        assert not alias.name.startswith("app.character"), module.__name__
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    assert not node.module.startswith("app.character"), module.__name__
+
     def test_controller_only_uses_run_scoped_repositories(self):
         from app.application.agent_runtime import controller
 

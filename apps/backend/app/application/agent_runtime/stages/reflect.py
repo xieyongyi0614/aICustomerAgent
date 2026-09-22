@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.application.agent_runtime.contracts import DEFAULT_CHARACTER_ID
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,6 @@ REASON_BUDGET = "budget"
 REASON_DUPLICATE = "duplicate_window"
 REASON_NO_EVIDENCE = "no_evidence"
 
-DEFAULT_CHARACTER_ID = "asuna"
 REFLECT_INSIGHT_SCAN_LIMIT = 50
 
 
