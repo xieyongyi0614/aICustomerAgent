@@ -465,6 +465,7 @@ SLOW_TEST_FILES = {
     # 慢测试：本地 SSE server 线程 / 轮询等待。
     "test_chat_http_integration.py",
     "test_turn_meta_stream.py",
+    "test_foreground_cutover_parity.py",
     "test_goal_e2e.py",
     # TestClient(app) 全应用 E2E / strict 需要真实 PostgreSQL 的迁移类。
     # (旧疑 TestClient+lifespan 挂起，实为世界维护循环连真实 PG；已由 autouse _offline_repos 修复，非版本问题。)
