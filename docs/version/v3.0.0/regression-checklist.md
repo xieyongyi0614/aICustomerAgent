@@ -198,13 +198,15 @@ grep -n "env_prefix\|alias" apps/backend/app/core/settings/_shared.py   # 期望
 
 | # | 待办 | 归属 |
 |---|---|---|
-| 1 | G6：配 `TEST_DATABASE_URL`，执行 `0052` 双向空跑 | 运维 / 后端 |
-| 2 | G7：既存 17 项失败清零或显式豁免登记 | 后端（独立缺陷簇） |
+| ~~1~~ | ~~G6：配 `TEST_DATABASE_URL`，执行 `0052` 双向空跑~~ → **已执行并通过**（真实 PG 16.15；过程中修复 `0045` 发布阻断缺陷，见 `acceptance-report.md` §缺陷记录 D-1） | 已完成 |
+| 2 | G7：既存 18 项失败清零或显式豁免登记 | 后端（独立缺陷簇） |
 | 3 | 本清单 §2 A~F 六类场景全部执行并留痕 | 人工回归 |
 | 4 | 运维侧：飞书回调地址指向 `/api/v1/feishu/ingress/events`；配置 `FEISHU_ROUTER_INSTANCE_URLS`；router 与实例 `FEISHU_ENCRYPT_KEY` 一致 | 运维 |
-| 5 | 回写 `docs/current-system-architecture-baseline.md`（需用户确认） | 后端 |
-| 6 | 更新 `AGENTS.md` / `apps/backend/AGENTS.md`：版本入口指向 V3.0.0；迁移链尾 `0050` → `0052`（需用户确认） | 后端 |
-| 7 | C3 分区队列（未修登记，演进选项） | 排期 |
+| 5 | PG 用例债（`acceptance-report.md` D-2 / D-3）：修 `test_channel_identity` 的 0036 快照口径、补 `test_http_lifecycle_on_postgres` 的 memory2 monkeypatch、`test_ws002_migration` fixture 加前置清库 | 后端 |
+| 6 | 环境侧：容器 `template1` 排序规则已刷新（D-4）；**新环境部署时若出现 `collation version mismatch` 需同样处理**，否则整批 PG 用例静默 skip | 运维 |
+| 7 | 回写 `docs/current-system-architecture-baseline.md`（需用户确认） | 后端 |
+| 8 | 更新 `AGENTS.md` / `apps/backend/AGENTS.md`：版本入口指向 V3.0.0；迁移链尾 `0050` → `0052`（需用户确认） | 后端 |
+| 9 | C3 分区队列（未修登记，演进选项） | 排期 |
 
 ---
 
