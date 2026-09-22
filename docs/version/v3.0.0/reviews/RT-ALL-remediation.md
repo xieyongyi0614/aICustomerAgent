@@ -296,7 +296,7 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`） |
 | ~~R-13~~ | ~~L-1 / L-2 / L-4~~ | 评审 | **已修**：时区、`STATE_PREP_STAGES`、`CONTRACT_REVISION` |
 | ~~R-14~~ | ~~`current_goal` 线格式值依赖~~ | 本次 R-12 发现 | **已裁决：维持值依赖** |
-| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **灰度接线**：`runtime_six_stage_loop_enabled`（默认 off）双路径；待 e2e 对照后切默认 |
+| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **灰度 + e2e 安全网**：`runtime_six_stage_loop_enabled`；前台 `_run_phase` 保 22 步；自治走六段；`test_six_stage_loop_parity` 流对照 |
 | R-16 | **orphan sweep 默认 True** | 评审摘要第 7 点 | **已裁决：保持默认 True**，见 §4.2 |
 
 ### 4.1 P1 裁决记录（2026-09-22）

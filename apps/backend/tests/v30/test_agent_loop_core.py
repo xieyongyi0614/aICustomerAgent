@@ -631,9 +631,9 @@ class TestLoopDriving:
         self, db_session_factory, override_settings
     ):
         override_settings(runtime_six_stage_loop_enabled="true")
-        spec = _spec(("perception", "record_handoff"))
+        spec = _spec(("perception", "record_handoff"), run_kind=RUN_KIND_AUTONOMOUS_TICK)
         calls, registry = _stub_registry(spec.stages)
-        run = _open_run(user_id="u-six-on")
+        run = _open_run(RUN_KIND_AUTONOMOUS_TICK, user_id="u-six-on")
         loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
 
         result = await loop.run()
@@ -643,6 +643,24 @@ class TestLoopDriving:
         steps = [step["step"] for step in row.steps]
         assert steps == ["observe", "reason", "plan", "act", "reflect", "update"]
         assert calls == []
+
+    async def test_six_stage_loop_foreground_keeps_profile_stages(
+        self, db_session_factory, override_settings
+    ):
+        override_settings(runtime_six_stage_loop_enabled="true")
+        spec = _spec(
+            ("perception", "record_handoff"),
+            run_kind=RUN_KIND_FOREGROUND_CHAT,
+            budget_tier="foreground",
+        )
+        calls, registry = _stub_registry(spec.stages)
+        run = _open_run(RUN_KIND_FOREGROUND_CHAT, user_id="u-six-fg")
+        loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
+
+        result = await loop.run()
+
+        assert result.status == "done"
+        assert calls == ["perception", "record_handoff"]
 
     async def test_six_stage_loop_default_is_off(self):
         from app.core.settings import get_settings

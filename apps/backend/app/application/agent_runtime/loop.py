@@ -529,7 +529,17 @@ class AgentLoop:
         return bool(getattr(get_settings(), SIX_STAGE_LOOP_SETTING, False))
 
     async def _run_six_stage_loop(self) -> None:
-        """R-15 真收编路径：observe → reason → plan → act → reflect → update。"""
+        """R-15 灰度驱动。
+
+        - 前台 / 事件升级：按六环节分组调用既有 Profile 段本体（`_run_phase`），
+          保持 22 步流式与业务闭包，只改「循环形状」。
+        - 自治 tick：走 RT-007~012 六段显式实现（真收编目标路径）。
+        """
+        if self.spec.run_kind != RUN_KIND_AUTONOMOUS_TICK:
+            for phase in SIX_STAGE_SEQUENCE:
+                await self._run_phase(phase)
+            return
+
         foreground = self.spec.run_kind == RUN_KIND_FOREGROUND_CHAT
 
         def _summary(value: object | None) -> dict[str, Any]:
