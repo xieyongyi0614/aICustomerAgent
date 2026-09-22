@@ -56,6 +56,10 @@ _CARRY_OVER_INDEXES = (
 def _rebuild_source_check(target_check: str, *, with_idempotency_key: bool) -> None:
     """放宽 world_events.source 值域 CHECK。
 
+    `target_check` 是**值清单**（形如 `('a', 'b')`），不是完整布尔表达式：
+    两方言各自包一层 `source IN (...)`——直接当表达式传给 PostgreSQL 会被判为
+    record 而非 boolean（`DatatypeMismatch: argument of CHECK must be type boolean`）。
+
     with_idempotency_key 表示目标表是否包含 idempotency_key 列
     （升级 True / 降级 False），建表与数据搬运按此对齐。
     """
@@ -63,7 +67,7 @@ def _rebuild_source_check(target_check: str, *, with_idempotency_key: bool) -> N
     if bind.dialect.name == "postgresql":
         op.drop_constraint("ck_world_events_source", "world_events", type_="check")
         op.create_check_constraint(
-            "ck_world_events_source", "world_events", target_check
+            "ck_world_events_source", "world_events", f"source IN {target_check}"
         )
         return
     _sqlite_rebuild_world_events(
