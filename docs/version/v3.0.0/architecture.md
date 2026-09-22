@@ -1,6 +1,6 @@
 # V3.0 Agent Runtime Architecture
 
-> **状态**：Architecture Design（仅设计，未排期、未实现）
+> **状态**：Implemented（RT-001 ~ RT-020 已落地并验收；实现期裁决见文末「附：实现期裁决登记」）
 > **前置**：V2.0.0 Memory V2 / Reflection / Life Loop；V2.1.0 Agent Runtime / Goal Stack / Decision Pipeline；V2.2.0 Character Experience；V2.3.0 World Simulation；V2.4.0 Tool System；V2.5.0 Planning System；V2.6.0 Action Execution System（已设计）
 > **定位**：V3.0 = **Agent Runtime Core（运行时内核）**。它把 V2.1.0 建成的「Run Controller（阶段调度器）」升级为**显式的认知闭环运行时**，使 Agent 从「按 Profile 线性执行阶段」升级为「具备 Observe → Reason → Plan → Act → Reflect → Update 完整认知循环的自治运行时」，并补齐 Session 生命周期、Context Manager、State Manager、事件总线、接口契约与 Run/Trace/Execution History 持久化模型。
 > **铁律**：本文档只做架构裁决，不含 Task、不含代码实现（仅接口契约签名）、不改任何既有模块；基于 Current System Architecture Baseline 演进，明确 Runtime 与业务模块边界。
@@ -597,3 +597,40 @@ External Tool（内置 / 通道 / 外部 API / 未来 MCP）
 | Q3 | State Manager 的版本号是「各域审计行投影」还是「独立版本表」 | 倾向投影聚合（零新表），独立版本表待跨域事务写需求出现再评估 |
 | Q4 | `reflect()` 慢时钟段挂接方式（Profile 内显式段 vs 独立周期任务） | 倾向 Profile 显式段 + 预算裁决（复用 V2.1 快慢分离），与 Reflection 既有周期任务并存 |
 | Q5 | Inbound Gateway 归一层的 Web 迁移顺序（先归一、后切 HTTP 语义） | Flag 内逐渠道切，Feishu 先切、Web 后切、Discord 新增 |
+
+---
+
+## 附：实现期裁决登记
+
+### D-1（2026-09-22）唯一认知循环 = Profile 阶段序列（H-1 裁决 B）
+
+**背景**：RT-006 定义六段循环形状（Observe → Reason → Plan → Act → Reflect → Update），
+RT-007 ~ RT-012 交付了六段段本体（`app/application/agent_runtime/stages/*.py`）；
+RT-015 / RT-016 的「收编」则把**既有阶段**（`chat_pipeline` 22 步闭包 / `life_loop._step_*`）
+包进 `AgentLoop` 驱动壳。结果：**两套完整实现并存**，而生产 `run()` 只按 `profiles.py`
+的 Profile 阶段序列驱动（`loop.py::_run_stages`），六段方法从未被 `run()` 调用。
+
+**裁决**：**B — 显式降级为影子实现，禁止长期并存两套完整实现。**
+
+- **当前唯一循环** = `profiles.py` 声明的 **Profile 阶段序列**（段本体为既有阶段实现）。
+- 六段方法（`AgentLoop.observe/reason/plan/act/reflect/update`）与 `stages/*` 段本体
+  **登记为影子 / 测试实现**：标记 `loop.SHADOW_STAGE_METHODS = True`、
+  `stages.SHADOW_STAGE_IMPLEMENTATION = True`；段函数**从生产导出面移除**
+  （`agent_runtime/__init__.py` 不再 re-export `act` / `observe` / `reason` / `reflect` / `update`）。
+- **禁止**在生产代码中调用影子段本体并假定其生效。
+- 护栏：`tests/v30/test_runtime_lifecycle.py::TestSingleLoopDecision`（AST 断言 `run()` 不调用六段方法、
+  标记存在、段函数不在 `__all__`）。
+
+**后续（方案 A：真收编）**：把 `run()` 切到六段方法、删除 / 收缩 Profile 阶段包装，使六段成为
+生产实现。**前置条件（缺一不可）**：
+
+1. C-2 补充 e2e 安全网建成：flags-off 全轮次 golden / 录制流逐字段对照、中段 LLM 失败、
+   grounding 缓冲、post_process 失败（见 `reviews/RT-ALL-remediation.md` R-12）；
+2. `runtime_foreground_loop_enabled` 可一键回退验证通过（已交付，提交 `787e215`）；
+3. 明确 `stages/*.py` 与 Profile 包装的删留边界。
+
+在此之前，不变量 8「前后台共用同一认知循环」与 9「无第二套 Agent / Pipeline」在**代码级**
+按「单一在跑实现 + 显式标注的影子实现」口径成立；**方案 A 完成后按字面口径成立**。
+
+> 相关评审：`docs/version/v3.0.0/reviews/RT-ALL-code-review.md`（H-1）
+> 整改记录：`docs/version/v3.0.0/reviews/RT-ALL-remediation.md`

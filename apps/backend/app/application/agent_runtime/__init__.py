@@ -106,7 +106,6 @@ from app.application.agent_runtime.session import (
 from app.application.agent_runtime.stages.act import (
     ActOutcome,
     action_source_for,
-    act,
     intent_to_action_intent,
 )
 from app.application.agent_runtime.stages.observe import (
@@ -117,7 +116,6 @@ from app.application.agent_runtime.stages.observe import (
     UserInputFact,
     WorldFact,
     observation_dedupe_key,
-    observe,
 )
 from app.application.agent_runtime.stages.plan import (
     PlanDegradation,
@@ -132,7 +130,6 @@ from app.application.agent_runtime.stages.reflect import (
     ReflectDegradation,
     ReflectOutcome,
     evidence_window_key,
-    reflect,
     reflect_enabled,
 )
 from app.application.agent_runtime.stages.reason import (
@@ -140,14 +137,12 @@ from app.application.agent_runtime.stages.reason import (
     ReasonDegradation,
     build_stack,
     capabilities_for,
-    reason,
 )
 from app.application.agent_runtime.stages.update import (
     Feedback,
     FeedbackItem,
     PostProcessHandoff,
     routes_for,
-    update,
 )
 from app.application.agent_runtime.state import (
     ReconcileConflict,
@@ -170,6 +165,8 @@ from app.application.agent_runtime.trigger_router import (
     evaluate_event_escalation,
 )
 
+# 段函数（act / observe / reason / reflect / update）**刻意不导出**：它们是 H-1 裁决 B
+# 下的影子实现，未接入生产 run()；按模块路径显式导入即可（见 stages/__init__.py）。
 __all__ = [
     "OPTIONAL_PHASES",
     "PHASES",
@@ -229,7 +226,6 @@ __all__ = [
     "WorldContext",
     "WorldFact",
     "account_turn_decisions",
-    "act",
     "acquire",
     "activate",
     "append_step",
@@ -266,15 +262,12 @@ __all__ = [
     "observation_dedupe_key",
     "normalize",
     "normalize_inbound",
-    "observe",
     "observed_version",
     "open_foreground_run",
     "open_run",
     "open_session",
     "plan_enabled",
-    "reason",
     "reconcile",
-    "reflect",
     "reflect_enabled",
     "routes_for",
     "register",
@@ -298,7 +291,6 @@ __all__ = [
     "subscribers",
     "terminal_status_for",
     "to_plan_value",
-    "update",
     "unsubscribe",
     "version",
 ]

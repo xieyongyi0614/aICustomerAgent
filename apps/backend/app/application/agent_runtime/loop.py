@@ -115,6 +115,13 @@ ERROR_KIND_BY_PHASE: dict[str, ErrorKind] = {
 
 TRACE_STAGE = "runtime_stage"
 
+SHADOW_STAGE_METHODS = True
+"""`observe` / `reason` / `plan` / `act` / `reflect` / `update` 是否为**影子实现**。
+
+H-1 裁决 B（2026-09-22）：这六个方法**未接入 `run()`**，生产唯一循环是 Profile 阶段
+序列（`_run_stages`）。禁止假定其生效；接线归方案 A（需先建 C-2 补充 e2e 安全网）。
+"""
+
 
 def stage_phase(name: str) -> str:
     """阶段名 → 六段环节；未注册阶段 fail-closed（裁决 D3）。"""
@@ -373,6 +380,10 @@ class AgentLoop:
         return results
 
     # ---- 六段方法（RT-007 ~ RT-012 的挂载点） ---------------------------
+    #
+    # ⚠️ 影子实现（H-1 裁决 B）：以下六个方法**不被 `run()` 调用**——生产唯一循环是
+    # Profile 阶段序列。它们只在 `tests/v30` 与方案 A「真收编」时使用；
+    # 详见模块常量 `SHADOW_STAGE_METHODS` 与 `stages/__init__.py` 的包级说明。
 
     async def _run_phase(
         self, phase: str, inputs: Mapping[str, Any] | None = None

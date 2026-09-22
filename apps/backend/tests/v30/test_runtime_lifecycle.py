@@ -371,3 +371,40 @@ class TestRepositoryAccessLayering:
         for facade in (goal_service.get_goal, goal_service.get_plan, outbox_service.list_pending):
             assert callable(facade)
         assert callable(action_manager.get_record)
+
+
+class TestSingleLoopDecision:
+    """H-1 裁决 B：唯一循环 = Profile 阶段序列；六段方法是影子实现（未接入 run()）。"""
+
+    pytestmark = pytest.mark.unit
+
+    SHADOW = {"observe", "reason", "plan", "act", "reflect", "update"}
+
+    def test_run_never_calls_shadow_stage_methods(self):
+        from app.application.agent_runtime import loop as loop_module
+
+        tree = ast.parse(Path(loop_module.__file__).read_text(encoding="utf-8"))
+        run_fn = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "run"
+        )
+        called = {
+            node.func.attr
+            for node in ast.walk(run_fn)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+
+        assert called & self.SHADOW == set(), sorted(called & self.SHADOW)
+
+    def test_shadow_markers_are_declared(self):
+        from app.application.agent_runtime import loop as loop_module
+        from app.application.agent_runtime import stages
+
+        assert loop_module.SHADOW_STAGE_METHODS is True
+        assert stages.SHADOW_STAGE_IMPLEMENTATION is True
+
+    def test_shadow_stage_functions_are_not_exported(self):
+        import app.application.agent_runtime as runtime
+
+        assert self.SHADOW & set(runtime.__all__) == set()

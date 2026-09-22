@@ -1,7 +1,7 @@
 # Current System Architecture Baseline
 
 > **性质**：本文档是当前系统**唯一可信架构基线**，描述当下真实存在并已实现的系统，非未来规划。
-> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` 0001~0050 + `core/db.py`）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
+> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` 0001~0052 + `core/db.py`）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
 > **纪律**：不设计新功能、不修改架构、不把未实现的模块当作现状描述。后续 Agent Runtime / Memory Evolution / Self Improvement / Multi Channel 开发均以此为基准。
 > **生成时间**：2026-09-20。
 
@@ -88,7 +88,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 - **LLM 唯一来源**：`core/llm_factory.get_llm()`（profile 机制）；结构化输出统一走 `chains/structured.py::build_structured_chain`（主链 + 一层降级）。
 - **DB 唯一写面**：业务层禁止直接操作 ORM，一律经 `repositories/`。
-- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，当前链尾 `0050`），`create_all` 已退役（测试内存 SQLite 属豁免）。
+- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，当前链尾 `0052`），`create_all` 已退役（测试内存 SQLite 属豁免）。
 - **数据流纪律**：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理失败不影响已产出回答。
 
 ---
@@ -175,6 +175,35 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 ---
 
 ## 4. Agent Runtime Flow
+
+> **V3.0.0 Agent Runtime 更新（2026-09-22）**：本节描述的运行路径在 V3.0.0 中已由
+> **Agent Runtime**（`application/agent_runtime/`）承载。落点与形态：
+>
+> | 面 | 落点 |
+> |---|---|
+> | 契约 | `agent_runtime/contracts.py`（`RuntimeInput` / `SessionContext` / `RunResult` / `RuntimeEvent` / `RuntimeFailure`） |
+> | 会话 | `agent_runtime/session.py`（`open/resume/close_session`；无会话表，`loop_runs.session_id` 挂接） |
+> | 循环 | `agent_runtime/loop.py::AgentLoop` + `profiles.py`（**段序列唯一声明处**） |
+> | 状态 / 上下文 | `agent_runtime/state.py`（版本投影）/ `context.py`（四段装配，Run 内可冻结） |
+> | 事件 | `agent_runtime/events.py`（进程内同步总线，零业务表写入；跨域可靠投递仍走 Outbox） |
+> | 通道归一 | `agent_runtime/inbound.py` / `outbound.py`（`ChannelAdapter` 契约零改动） |
+> | 持久化 / 恢复 | `agent_runtime/recovery.py`（孤儿 Run 收敛）/ `execution_history.py`（执行历史只读投影） |
+> | 观测 | `agent_runtime/debug_view.py`（Debug / Replay 组合）+ `services/observability/trace_query.py`（仓储级读面） |
+> | Schema | 唯一扩展 = 迁移 `0052`（`loop_runs.session_id` + `runtime_traces.correlation_id`）；**零新建表** |
+>
+> **⚠️ 唯一认知循环裁决（H-1 裁决 B）**：当前唯一在跑的循环是 `profiles.py` 声明的
+> **Profile 阶段序列**（`loop.py::_run_stages`，段本体为既有阶段实现：`chat_pipeline` 22 步闭包 /
+> `life_loop._step_*`）。`AgentLoop.observe/reason/plan/act/reflect/update` 与
+> `agent_runtime/stages/*` 是**影子 / 测试实现**，**未接入生产 `run()`**，已从生产导出面隔离。
+> 完整裁决、护栏与「方案 A 真收编」的前置条件见
+> `docs/version/v3.0.0/architecture.md` 附「实现期裁决登记 D-1」。
+>
+> **前台回退开关**：`RUNTIME_FOREGROUND_LOOP_ENABLED`（默认 `True`）。关闭时前台走
+> `chat_pipeline._drive_foreground_linear`（线性旧链：同一段序列与段本体，**不建 Run 台账、
+> 不发运行时事件、不冻结上下文**），用于一键回退而不必回滚代码。
+>
+> 验收与评审：`docs/version/v3.0.0/acceptance-report.md`（G1~G12）、
+> `docs/version/v3.0.0/reviews/RT-ALL-code-review.md` + `RT-ALL-remediation.md`。
 
 ### 4.1 前台交互生命周期（一次用户消息）
 
@@ -318,7 +347,7 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0050）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
