@@ -37,6 +37,26 @@ background_tasks: set = set()
 
 current_trace: ContextVar = ContextVar("observability_current_trace", default=None)
 
+current_correlation_id: ContextVar = ContextVar(
+    "observability_correlation_id", default=None
+)
+
+
+def bind_correlation_id(correlation_id: str | None):
+    """绑定当前执行上下文的因果链标识（RT-019）；返回 token 供调用方还原。
+
+    只影响 trace 落库时写入 `runtime_traces.correlation_id`（列由 `0052` 建）；
+    未绑定（默认 `None`）时列恒为 NULL，行为与 V2.6.1 逐字节一致。
+    """
+    return current_correlation_id.set(correlation_id)
+
+
+def reset_correlation_id(token) -> None:
+    try:
+        current_correlation_id.reset(token)
+    except (ValueError, RuntimeError):
+        logger.exception("correlation_id 还原失败，已忽略")
+
 
 def prune_all() -> int:
     """保留策略统一清理（persistence.md §3）：按各自 TTL prune 四张观测表。"""
@@ -164,6 +184,7 @@ def _assemble_trace(
     turn_id: str | None = None,
     action_id: str | None = None,
     events: list[TraceEvent] | None = None,
+    correlation_id: str | None = None,
 ) -> RuntimeTrace:
     snapshot = trace.snapshot()
     return RuntimeTrace(
@@ -173,6 +194,7 @@ def _assemble_trace(
         conversation_id=session_id,
         turn_id=turn_id,
         action_id=action_id,
+        correlation_id=correlation_id,
         status=_derive_status(trace),
         started_at=getattr(trace, "created_at", None),
         duration_ms=snapshot.get("total_ms", 0.0),
@@ -249,6 +271,7 @@ def on_turn_finished(
             action_id=action_id,
             post_process_task=post_process_task,
             drain_background=drain_background,
+            correlation_id=current_correlation_id.get(),
         )
     )
 
@@ -257,7 +280,11 @@ def on_turn_error(trace, user_id: str, session_id: str) -> None:
     """失败运行必存（runtime-trace.md §5）：不采样，直接调度落库。"""
     if not get_settings().observability_persist_enabled:
         return
-    _spawn(_flush_error_trace(trace, user_id, session_id))
+    _spawn(
+        _flush_error_trace(
+            trace, user_id, session_id, correlation_id=current_correlation_id.get()
+        )
+    )
 
 
 async def _await_post_process(post_process_task, drain_background: bool = True) -> None:
@@ -283,6 +310,7 @@ async def _flush_turn_trace(
     action_id: str | None,
     post_process_task,
     drain_background: bool = True,
+    correlation_id: str | None = None,
 ) -> None:
     await _await_post_process(post_process_task, drain_background)
     trace.obs_flushed = True
@@ -306,6 +334,7 @@ async def _flush_turn_trace(
             turn_id=turn_id,
             action_id=action_id,
             events=events,
+            correlation_id=correlation_id,
         )
         trace_repository.save(record)
     except Exception:
@@ -520,10 +549,18 @@ async def _mark_decision_outcome(action_id: str, outcome: str) -> None:
         logger.exception("决策 outcome 补写失败，已忽略")
 
 
-async def _flush_error_trace(trace, user_id: str, session_id: str) -> None:
+async def _flush_error_trace(
+    trace, user_id: str, session_id: str, correlation_id: str | None = None
+) -> None:
     trace.obs_flushed = True
     try:
-        record = _assemble_trace(trace, TraceKind.TURN, user_id, session_id)
+        record = _assemble_trace(
+            trace,
+            TraceKind.TURN,
+            user_id,
+            session_id,
+            correlation_id=correlation_id,
+        )
         trace_repository.save(record)
     except Exception:
         logger.exception("error trace 持久化失败，已忽略")

@@ -117,6 +117,7 @@ class RuntimeTrace(BaseModel):
     conversation_id: str | None = None
     turn_id: str | None = None
     action_id: str | None = None
+    correlation_id: str | None = None
     status: str = "complete"
     started_at: datetime | None = None
     duration_ms: float = 0.0
