@@ -19,7 +19,7 @@ def classify_background_trigger(user_id: str, now) -> tuple[str, str]:
     """后台工作发现 → (trigger_type, reason)；复用既有 _cycle_reason 判据。"""
     from app.application import life_loop
 
-    reason = life_loop._cycle_reason(user_id, now)
+    reason = life_loop.cycle_reason(user_id, now)
     return _BACKGROUND_REASON_TO_TRIGGER.get(reason, "schedule"), reason
 
 

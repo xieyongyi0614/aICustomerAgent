@@ -221,6 +221,10 @@ async def _step_decision(user_id: str, llm, now: datetime) -> dict:
     return {"llm_capable": True}
 
 
+def cycle_reason(user_id: str, now: datetime) -> str:
+    return _cycle_reason(user_id, now)
+
+
 def _cycle_reason(user_id: str, now: datetime) -> str:
     if _due_trigger_present(user_id, now):
         return "due_trigger"

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.application.agent_runtime.contracts import (
     DEFAULT_CHARACTER_ID,
@@ -53,7 +53,7 @@ def build_session_context(
         thread_id=thread_id,
         trigger_type=trigger_type,
         run_id=run_id,
-        started_at=now or datetime.now(),
+        started_at=now or datetime.now(timezone.utc),
     )
 
 
@@ -114,5 +114,5 @@ def close_session(
         status_counts=status_counts,
         first_started_at=min(started) if started else None,
         last_finished_at=max(finished) if finished else None,
-        closed_at=now or datetime.now(),
+        closed_at=now or datetime.now(timezone.utc),
     )

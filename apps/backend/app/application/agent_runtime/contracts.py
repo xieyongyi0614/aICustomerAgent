@@ -4,6 +4,7 @@ Runtime Core 对外唯一契约面：`AgentRuntime.run` + Input / Output / Event
 四类契约，外加事件常量与字段冻结常量。值对象全部 `frozen` 不可变、零 IO、零 LLM、
 零持久化依赖；本模块只依赖标准库、通道契约（`app.channels.base`）与 Run 触发源
 枚举（`models.TRIGGER_*`）。字段冻结由 `tests/v30/test_runtime_contracts.py` 强制。
+契约修订号 `CONTRACT_REVISION` 在事件集/字段表变更时显式 bump（L-4）。
 """
 
 from __future__ import annotations
@@ -11,8 +12,10 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal, Protocol, runtime_checkable
+
+CONTRACT_REVISION = "3.0.1"
 
 from app.application.agent_runtime.models import (
     TRIGGER_CHANNEL_MESSAGE,
@@ -157,7 +160,7 @@ class SessionContext:
     thread_id: str | None = None
     trigger_type: str = TRIGGER_CHANNEL_MESSAGE
     run_id: str | None = None
-    started_at: datetime = field(default_factory=datetime.now)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         if not self.session_id or not self.session_id.strip():
