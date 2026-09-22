@@ -40,13 +40,13 @@ def test_default_index_declared():
     assert indexes["ux_users_is_default"].unique is True
 
 
-def test_migration_chain_head_is_0053():
+def test_migration_chain_head_matches_pin():
     config = Config(str(BACKEND / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD == "0052"
+    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD
 
 
 def test_migration_has_upgrade_and_downgrade():
@@ -59,9 +59,8 @@ def test_migration_has_upgrade_and_downgrade():
     assert "sqlite_where" in source and "postgresql_where" in source
 
 
-def test_schema_table_count_is_46():
-    assert SCHEMA_TABLE_COUNT == 46
-    assert len(Base.metadata.tables) == SCHEMA_TABLE_COUNT
+def test_schema_table_count_is_pinned():
+    assert SCHEMA_TABLE_COUNT == len(Base.metadata.tables)
 
 
 def test_pins_module_is_single_source():

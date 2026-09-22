@@ -67,8 +67,8 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 53
-MIGRATION_BREAKPOINT = "0053_life_user_identity.py"
+MIGRATION_FILE_COUNT_CURRENT = 54
+MIGRATION_BREAKPOINT = "0054_life_ledger_domain.py"
 MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0046_tool_insight_types.py",
     "0047_action_schedules_priority.py",
@@ -78,6 +78,7 @@ MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0051_feishu_deliveries.py",
     "0052_runtime_session_trace_links.py",
     "0053_life_user_identity.py",
+    "0054_life_ledger_domain.py",
 )
 
 V23_MIGRATION_TAIL: tuple[str, ...] = (
@@ -85,12 +86,15 @@ V23_MIGRATION_TAIL: tuple[str, ...] = (
     "0048_action_records_run_id.py",
 )
 
-SCHEMA_TABLE_SET_DIGEST = "2739ee32d55e63b6"
-SCHEMA_COLUMNS_DIGEST_BASELINE = "7d865b081dc179c1"
+SCHEMA_TABLE_SET_DIGEST = "95ea4cc8ff43d997"
+SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",
     "users",
+    "ledger_accounts",
+    "ledger_categories",
+    "ledger_entries",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
@@ -108,7 +112,7 @@ BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "world_entities": ("911237899993c840", "1981fcf3f0fe94f6", "a0a707e89ac86a7a"),
     "world_events": ("3f80b1d6d02fbcad", "6be5466818ae881a", "eb3f5d93af571ed5"),
     "world_snapshots": ("cd3378bda5c2aa2f", "e3b0c44298fc1c14", "7fa2ed5fc8465330"),
-    "worlds": ("1e63bd3f67d7c58b", "8f9151510eb82fd1", "e3b0c44298fc1c14"),
+    "worlds": ("afe8b4993121e952", "8f9151510eb82fd1", "dedd4af9dce523ea"),
 }
 MEMORY_TABLES: tuple[str, ...] = ("memories", "memory_candidates", "memory_links")
 EVENT_TABLES: tuple[str, ...] = ("world_events", "outbox_events", "trigger_registry")
