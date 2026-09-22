@@ -30,11 +30,11 @@
 |---|---|
 | `tests/v30` | **381 passed**（整改前 357，新增 24 例） |
 | `-m "(unit or api) and not slow"` | **1860 passed** |
-| `-m e2e` | 2~3 failed / 155~157 passed（成员在既存 flaky 集内互换：`test_extractor_failure_does_not_break_sse` / `test_state_reflects_turn_and_respects_limit` 等） |
+| `-m e2e` | **1 failed / 163 passed**（仅既存 `test_extractor_failure_does_not_break_sse`） |
 | `tests/v25` | 1327 passed, 1 skipped |
 | `tests/v2 tests/v21 tests/v26` | 2 failed（`aut005` / `agent008`，均**既存**）/ 964 passed |
 | `tests/unit/test_feishu_boundary.py` | 15 passed（通道依赖 allowlist 护栏） |
-| 新增回归用例 | 24 例；其中 **8 例在改动前必红**（见 §2.1） |
+| 新增回归用例 | 30 例（v30 24 + e2e 6）；其中 **8 例在改动前必红**（§2.1），且 R-12 的流对照 harness **经注入式验证非空转** |
 
 ---
 
@@ -291,10 +291,34 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | R-9 | **M-3 / M-5 / M-7 / M-10** | 评审 | `_OBSERVED` 无锁全局态、`loop_runs` RMW 竞态（`finish_run` 条件更新 / JSONB append）、LLM 按时间窗记账、decision 版本号语义 |
 | R-10 | **M-6 / M-8 / M-9** | 评审 | 私有 API（`_GATE_BUDGET` / `_execute_plan_step` / `_day_bucket_key` / `_STATUS_DEGRADED`）公有化；Update 事件与 State Manager 对齐；`promote_degraded` 口径 |
 | R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`）：`AGENTS.md` / `apps/backend/AGENTS.md` 迁移链尾 `0050` → `0052`；`current-system-architecture-baseline.md` 0001~0050 → 0001~0052 + §4 顶部 V3.0 形态与 H-1 裁决；`architecture.md` 状态由「仅设计」改为「Implemented」 |
-| R-12 | **C-2 补充 e2e** | 评审 C-2 | flags-off 全轮次 golden / 录制流对照、中段 LLM 失败、grounding 缓冲、post_process 失败。**本次已补两态 `turn_meta`/`done` 逐字段对照**；其余三项待做（也是方案 A 的前置） |
+| R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`）：新增 `tests/e2e/test_foreground_cutover_parity.py` 6 例——全轮次流对照、台账差异、中段 LLM 失败、grounding 缓冲（流式/缓冲两态）、post_process 失败；两态各用独立用户消除跨轮状态干扰。**已注入式验证非空转**（让线性链跳过 `record_handoff` → 4/6 必红） |
 | R-13 | **L-1 / L-2 / L-4** | 评审 | 时区一致性、`state_update` → reason 映射命名、契约事件集版本 bump |
+| R-14 | **`current_goal` 的线格式是值依赖的** | 本次 R-12 发现 | 见 §2.10 |
 
-> R-11 已完成；`acceptance-report.md` 的 W-1 / W-2 同步收口。
+> R-11 / R-12 已完成；`acceptance-report.md` 的 W-1 / W-2 同步收口。
+
+### 2.10 R-14 `current_goal`：进程内契约 vs HTTP 线格式不一致（本次 R-12 发现）
+
+构建两态流对照时，harness 首轮即报 `turn_meta` 键集差异（on 有 `current_goal`、off 无）。
+根因**不在总闸**，而在两层的口径差：
+
+| 层 | 行为 | 证据 |
+|---|---|---|
+| 进程内事件 | `chat_pipeline` 无条件写入 `"current_goal": current_goal`（值可能为 `None`） | `chat_pipeline.py:690-700` |
+| HTTP 线格式 | **仅当非 None 才下发**该键 | `api/v1/chat.py:72` `if event.get("current_goal") is not None:` |
+
+后果：`turn_meta` 的**线上键集是值依赖的**——本轮若未选中目标则键缺席。
+`tests/v30/test_runtime_foreground_cutover.py:82` 用 `_core_keys(meta) == list(TURN_META_ORDER)`
+**精确**断言含 `current_goal` 的键集，但该用例走**进程内**路径（键恒在），故能稳定通过；
+它并未覆盖 HTTP 线格式的值依赖行为。
+
+**判定**：既存行为，非 V3.0 引入（`api/v1/chat.py` 在 V3.0 全量 diff 中 0 命中）。
+**风险**：前端/客户端若把 `current_goal` 当作恒定键，会在「未选中目标」的轮次读到缺键。
+
+**处置**：本次仅登记（R-14），未改 `api/v1/chat.py`——它是**唯一在跑真实流量的线格式**，
+改它属于兼容性变更，需前端协同确认「恒定下发（值可为 null）还是维持值依赖」。
+本 harness 已在 `test_full_turn_stream_parity` 中以**契约序子序列**断言覆盖该键：
+两态必须一致，且键序不得漂移（允许值依赖键缺席）。
 
 ---
 
