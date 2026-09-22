@@ -4,7 +4,7 @@
 > **上游（需求来源）**：`docs/version/v4.0.0/reviews/personal-life-agent-architecture-review.md`（个人生活智能体架构评审：五缺口 + 六维评分 + Phase A~F 演进路径）。
 > **上游（运行时审计）**：`docs/version/v4.0.0/audits/v3.0.0-runtime-adoption-audit.md`（V3.0.0 Agent Runtime 完成度与采用审计；裁决见 architecture §2）。
 > **上游（现状约束）**：`docs/current-system-architecture-baseline.md`（当前系统唯一可信架构基线）；`docs/version/v3.0.0/architecture.md` + `tasks.md` + `acceptance-report.md`（Agent Runtime 线，§7.3 Backlog 已预留 V3.1~V3.3）。
-> **状态**：Task Registry（任务定义）+ **Task Detail 已就位**（`tasks/PLA-001.md` ~ `tasks/PLA-018.md`）；均**未实现**
+> **状态**：Task Registry（任务定义）+ **Task Detail 已就位**（`tasks/PLA-001.md` ~ `tasks/PLA-018.md`）；**PLA-018 已实现（2026-09-22）**；PLA-001 ~ PLA-017 未实现
 > **主干**：PLA-001 ~ PLA-018（依赖顺序即文档顺序；PLA-018 为审计后**追加登记**，执行位置在 Phase 1，见 §4.1）
 > **说明**：本文档做任务级拆分，冻结 **ID / 名称 / 类型 / 优先级 / 依赖 / 交付面**；各 Task 的可执行明细见 `docs/version/v4.0.0/tasks/PLA-XXX.md`（体例对齐 `docs/version/v3.0.0/tasks/RT-002.md`：Task Overview / Background / Scope / Tech Design / Implementation Plan / File Impact / Testing / Acceptance / Commit）。**本文档不含代码、不含 DDL 与迁移脚本。**
 > **定位复述**：V4.0 = **个人生活智能体地基（Personal Life Agent Foundation）**。把当前「角色生命模拟器」的主体从**角色**翻转为**用户**，交付两块此前完全缺失的地基——**① 用户实体（谁是主人）** 与 **② 账本域（什么算事实）**——并以记账（Ledger）作为第一个纵切，跑通「自然语言 → 结构化事实 → 可查询 / 可对账 / 可纠正 → 主动服务」的完整闭环。**不重造任何既有器官，只补主体与事实底座。**
@@ -840,7 +840,7 @@ Expected Output:
 
 | 序 | 交付物 | 交付即生效的能力 | 观察重点 |
 |---|---|---|---|
-| 1 | **PLA-018** 后台统一到 Agent Runtime | 后台自治走 Runtime 轨道（legacy 降级为非默认） | 一个完整 tick 周期：段序列 / 预算闸 / 节流判定等价。**建议先于账本上线**——先统一调度路径，再往上叠功能 |
+| 1 | **PLA-018** 后台统一到 Agent Runtime ✅ **已实现（2026-09-22）** | 后台自治走 Runtime 轨道（legacy 降级为**代码级**回退位，不可由配置触达） | 一个完整 tick 周期：段序列 / 预算闸 / 节流判定等价。**建议先于账本上线**——先统一调度路径，再往上叠功能 |
 | 2 | **PLA-001** 用户实体 + `0053` | `users` 表 + 默认用户播种 | 既有链路零行为变化（读路径不变） |
 | 3 | **PLA-002 / PLA-003** 归属 + 治理 | 归属校验生效；导出 / 删除端点可用 | 角色世界与用户容器互不可见；导出可对账、删除零残留 |
 | 4 | **PLA-004 / PLA-005 / PLA-006** 账本内核 + `0054` | 账本三表可写可查（**此时只能手动记账**） | 幂等 / 冲正 / 聚合精确性逐分一致 |

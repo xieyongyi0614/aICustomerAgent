@@ -248,7 +248,10 @@ def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: date
 
 
 def legacy_cycle_runnable():
-    """开关关闭时的既有自治周期执行体（保留，供灰度对照与回退）。"""
+    """【回退位·代码级】取回退执行体；**不可由配置触达**（PLA-018）。
+
+    仅回滚期以代码显式调用；删除动作归 flag-removal 批次，不在本任务范围。
+    """
     return _legacy_run_autonomous_cycle
 
 
@@ -259,10 +262,11 @@ async def _legacy_run_autonomous_cycle(
     trigger_type: str | None = None,
     reason: str | None = None,
 ) -> str:
-    """autonomous_tick Profile：按 Profile Registry 声明的阶段序列执行。
+    """【回退位·代码级】按 Profile Registry 声明的阶段序列同步执行。
 
-    唯一的自治周期入口（v2.0.0 的 `life_loop._run_user_cycle` 已随开关体系删除下线）：
-    台账落 run_kind/profile，decision 前置三道闸，触发源支持事件升级。
+    PLA-018 后不再是 `run_autonomous_cycle` 的分支目标（统一经 `AgentLoop`）；
+    保留为回退手段与等价性对照基线，待 flag-removal 批次删除。
+    新增能力不得挂接此处——挂载面唯一为 `profiles.py` 的自治 tick 段序列。
     """
     from app.application.post_process import get_user_write_lock
 
@@ -323,15 +327,13 @@ async def run_autonomous_cycle(
     trigger_type: str | None = None,
     reason: str | None = None,
 ) -> str:
-    """autonomous_tick 唯一入口：开关关走既有执行体，开关开走 AgentLoop。
+    """autonomous_tick 唯一入口：固定经 `AgentLoop`（PLA-018 收敛，无分支）。
 
-    两条路径共享 decision 三道闸语义与 11 段阶段本体（RT-016 D1/D2/D3）。
+    段序列唯一来自 `profiles.py`；decision 三道闸与 11 段阶段本体与回退位
+    `_legacy_run_autonomous_cycle` 逐项等价。曾按 `runtime_autonomous_cycle_enabled`
+    分支到 legacy——该分支已删除，配置位不再改变调度路径（零平行路径）。
     """
-    if get_settings().runtime_autonomous_cycle_enabled:
-        return await _run_autonomous_cycle_via_loop(
-            user_id, llm=llm, now=now, trigger_type=trigger_type, reason=reason
-        )
-    return await legacy_cycle_runnable()(
+    return await _run_autonomous_cycle_via_loop(
         user_id, llm=llm, now=now, trigger_type=trigger_type, reason=reason
     )
 

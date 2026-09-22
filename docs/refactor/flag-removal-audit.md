@@ -1516,3 +1516,18 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | 验证 | 全量 **25 failed / 6165 passed / 2 skipped / 11 errors**，失败 ID 集合 ⊆ 存量豁免（feishu WIP + e2e 家族 15 + @migration 夹具 14 + 计时抖动 2 + aut005/agent008 既存 2——均经 `git stash` 基线逐一确认改动前即挂），**零未归因新增**；`compileall` app+tests 全绿 |
 | 行为变化 | 动作引擎（检出 → 规划 → 执行 → 重试/调度维护 → 事实收集/观测）在生产配置下无条件常开；世界库存联动链路（工具五段 → outbox → world 写）恢复可达。**上线前置：`docs/version/v2.6.0/regression-checklist.md` 人工回归仍待执行** |
 | 在存基础闸 | `world_enabled` / `autonomy_enabled` / `feishu_enabled`（3 个，保留理由同前；如需退役按本批流程另立批次） |
+
+> ⚠️ **上表已过时**（2026-09-22）：`autonomy_enabled` 已作为死开关删除（曾门控独立的 `autonomy_worker`，该 worker 早被 `life_loop` 归并；`main.py` 只起 `run_life_loop_worker`）。删改记录见 `remaining-flag-audit.md` 附录 D。本行**保留不改**以维持历史记录的忠实性。
+
+### H.16 V4.0 常开化登记：runtime 调度两位（PLA-018，2026-09-22）
+
+| 项 | 内容 |
+|---|---|
+| 缘起与裁决 | V4.0.0 PLA-018「后台统一到 Agent Runtime」。V3.0.0 验收报告「边界不变量 8 前后台共用同一认知循环 = PASS」是**开关开启的测试态**口径；默认生产是「前台 Runtime + 后台 legacy + 六段影子」三套路径并存，与架构不变量 12（零平行路径）冲突。裁决 **统一而非切换**：删掉分支而非切换开关值 |
+| 配置层 | `AgentRuntimeSettings.runtime_autonomous_cycle_enabled` 默认值 `False` → **`True`**；字段**保留**（删除动作归后续批次，不混进「路径统一」这件事）。`runtime_foreground_loop_enabled` 早为 `True`，本次零改动 |
+| 代码层 | `controller.run_autonomous_cycle` 删除 `runtime_autonomous_cycle_enabled` 分支，固定调 `_run_autonomous_cycle_via_loop`（-1 分支）；`_legacy_run_autonomous_cycle` / `legacy_cycle_runnable` **降级为代码级回退位**——不再被配置触达，仅回滚期可显式代码调用，docstring 已登记 |
+| 测试面 | `tests/v30/test_runtime_autonomous_loop.py` 三处语义同步：`test_flag_defaults_off` → `test_flag_default_is_on_after_cutover`（断言默认 True）；`test_flag_off_uses_legacy_path` → `test_flag_off_does_not_route_to_legacy`（改为验证同配置下仍走 AgentLoop 且 legacy 零调用）；`test_cycle_equivalence_with_baseline` 基线臂改为**显式调用回退位**（开关不再能切换路径，等价性证据以显式对照保留） |
+| 新增测试 | `tests/v40/test_runtime_background_cutover.py` + `tests/v40/support.py`（`V30_ENABLED_FLAGS` 42 位冻结基线）：单一路径 / 等价性 / 六段影子 / 零新增开关 |
+| 验证（2026-09-22 实测） | v40 **11 passed**；`tests/v30` **406 passed**；`tests/v21 + v22 + v7.8` **2 failed / 231 passed**（`test_agent008_review_fixes::TestLowEnergySuppression` + `test_v7.8/test_performance` 性能预算，均经 `git checkout` 基线对照确认改动前即挂）；Fast 门槛 **2 failed / 1886 passed**（失败集合 = 批次 1 已归因的 `test_feishu_settings` 两例，零未归因新增） |
+| 在存常开位（本次新增登记） | `runtime_autonomous_cycle_enabled`（**已无读取点**，字段待删）、`runtime_foreground_loop_enabled`（前台路径仍读取，待随分支收敛一并退役） |
+| 上位文档 | `docs/version/v4.0.0/tasks/PLA-018.md`；口径澄清与影子矩阵勘误登记在 V4.0 侧，**V3.0 冻结报告不改写** |

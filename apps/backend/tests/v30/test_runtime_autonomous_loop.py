@@ -86,39 +86,45 @@ def _budget_shape(budget_state: dict) -> tuple[str, ...]:
 class TestFlagDispatch:
     pytestmark = pytest.mark.unit
 
-    def test_flag_defaults_off(self):
-        assert get_settings().runtime_autonomous_cycle_enabled is False
+    def test_flag_default_is_on_after_cutover(self):
+        """PLA-018 语义同步：原 `test_flag_defaults_off` 断言默认 False，
+        而收敛的交付面正是「默认值与唯一有效值均为 True」。"""
+        assert get_settings().runtime_autonomous_cycle_enabled is True
 
-    async def test_flag_off_uses_legacy_path(
+    async def test_flag_off_does_not_route_to_legacy(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
+        """PLA-018 语义同步：配置位不再改变调度路径。
+
+        原 `test_flag_off_uses_legacy_path` 断言「开关关闭走 legacy」；收敛后该行为
+        已废止（零平行路径），改为断言同一配置下**仍走 AgentLoop 且 legacy 体零调用**
+        ——即「legacy 不可由配置触达」。
+        """
         override_settings(runtime_autonomous_cycle_enabled="false")
-        calls: list[str] = []
+        _setup_conversation()
+        _fake_tick(monkeypatch)
+        created: list = []
+        legacy_calls: list[str] = []
 
-        class _BoomLoop:
+        class _SpyLoop(loop_module.AgentLoop):
             def __init__(self, *args, **kwargs):
-                calls.append("AgentLoop.__init__")
+                super().__init__(*args, **kwargs)
+                created.append(self)
 
-            async def run(self, *args, **kwargs):
-                calls.append("AgentLoop.run")
-                raise AssertionError("flag off 不得走 AgentLoop")
-
-        monkeypatch.setattr(loop_module, "AgentLoop", _BoomLoop)
-        original = controller.legacy_cycle_runnable()
-        seen: list[str] = []
-
-        def _spy(*args, **kwargs):
-            seen.append("legacy")
-            return original(*args, **kwargs)
-
-        monkeypatch.setattr(controller, "legacy_cycle_runnable", lambda: _spy)
+        monkeypatch.setattr(loop_module, "AgentLoop", _SpyLoop)
+        monkeypatch.setattr(
+            controller,
+            "legacy_cycle_runnable",
+            lambda: (lambda *a, **k: legacy_calls.append("legacy")),
+        )
 
         status = await controller.run_autonomous_cycle(
             USER, now=NOW, trigger_type="schedule", reason="flag-off"
         )
 
-        assert seen == ["legacy"]
-        assert not calls
+        assert len(created) == 1
+        assert created[0].stages == EXPECTED_STAGES
+        assert legacy_calls == []
         assert status in {"done", "degraded", "aborted"}
 
     async def test_flag_on_uses_agent_loop(
@@ -156,6 +162,12 @@ class TestCycleEquivalence:
     async def test_cycle_equivalence_with_baseline(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
+        """PLA-018 语义同步：对照基线改为**显式调用 legacy 执行体**。
+
+        原用例靠 `runtime_autonomous_cycle_enabled` false/true 切换两条路径；收敛后
+        该开关不再改变调度路径，故基线臂改为直接调用回退位，等价性证据得以保留。
+        两次均在同一配置（false）下运行——顺带证明配置位不再影响生产入口。
+        """
         from app.core.db import Message
 
         def _seed(user_id: str, session_id: str):
@@ -174,7 +186,7 @@ class TestCycleEquivalence:
         _seed(user_b, session_b)
 
         override_settings(runtime_autonomous_cycle_enabled="false")
-        legacy_status = await controller.run_autonomous_cycle(
+        legacy_status = await controller.legacy_cycle_runnable()(
             user_a, now=NOW, trigger_type="schedule", reason="equiv"
         )
         legacy_row = loop_run_repository.list_recent(user_id=user_a)[0]
@@ -183,7 +195,6 @@ class TestCycleEquivalence:
         )
         legacy_budget = _budget_shape(legacy_row.budget_state or {})
 
-        override_settings(runtime_autonomous_cycle_enabled="true")
         loop_status = await controller.run_autonomous_cycle(
             user_b,
             now=NOW,

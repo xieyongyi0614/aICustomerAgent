@@ -284,6 +284,8 @@ User Message
 
 `life_loop.py::run_life_loop_worker` 常驻循环，先 sleep 后 tick；`run_life_loop_tick` 先工作发现（0 LLM），再逐用户跑 `agent_runtime.run_autonomous_cycle`（autonomous_tick Profile），最后跑事件预闸与维护步。
 
+**调度路径（V4.0.0 PLA-018 统一）**：`run_autonomous_cycle` **固定经 `AgentLoop`** 驱动自治 tick 的 Profile 段序列，不再按配置分支；`controller._legacy_run_autonomous_cycle` 为**代码级回退位**，仅回滚期可显式调用、**不可由配置触达**。`runtime_autonomous_cycle_enabled` 字段保留但**已无读取点**，待 flag-removal 批次清理（`docs/refactor/flag-removal-audit.md` 附录 H.16）。六段认知循环（`agent_runtime/stages/*`）**仍为影子实现**，未接入生产 `run()`。
+
 **autonomous_tick Profile 阶段序列**（`profiles.py` 唯一声明处，禁止另开阶段序列）：
 
 ```
