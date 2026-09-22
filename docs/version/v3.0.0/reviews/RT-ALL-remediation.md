@@ -15,24 +15,26 @@
 | 2. H-6 `run_event_pregate` 双 Run / 终态吞没 | **已修**（采用评审给出的第二方案：传播内层终态 + `finally` 关账） | `5ca5198` |
 | 3. H-4 `session_id` 冒充 `user_id` | **已修** | `fe3a422` |
 | 4. H-2（V3.0 新引入）`trace_query` → `agent_runtime` 反向依赖 | **已修** | `fe3a422` |
-| 5. H-1 唯一认知循环裁决 | **未处置 — 需架构裁决**（见 §3） | — |
+| 5. H-1 唯一认知循环裁决 | **已处置 — 裁决 B（用户确认「先 B 后 A」）** | `34cb26a` |
 | 6. H-3 域直读仓储（Must-Fix 子集） | **已修** | `ba25d72` |
-| 7. H-5 Run 结束 reset | **已修**（所有权口径见 §4） | `5ca5198` |
+| 7. H-5 Run 结束 reset | **已修**（所有权口径见 §4 R-4） | `5ca5198` |
 | 8. M-4 `run_stage_async` 失败双写 | **已修** | `5ca5198` |
 | — C-2 前台收编 kill switch（Critical） | **已修** | `787e215` |
+| — W-1 / W-2 文档回写（RT-020 §6.3，用户确认后执行） | **已回写** | `34cb26a` |
 
-**8 项 Must-Fix 中 7 项已修并验证；1 项（H-1）属架构裁决，不宜由实现方单方面定夺。**
+**9 项 Must-Fix / Critical 全部处置完毕（8 修 + 1 裁决）。** 遗留 12 项见 §4。
 
 ### 验证结果（整改后）
 
 | 套件 | 结果 |
 |---|---|
-| `tests/v30` | **378 passed**（整改前 357，新增 21 例） |
-| `-m "(unit or api) and not slow"` | **1857 passed** |
-| `-m e2e` | 1 failed / 157 passed（仅 `test_memory_e2e::test_extractor_failure_does_not_break_sse`，**既存**） |
+| `tests/v30` | **381 passed**（整改前 357，新增 24 例） |
+| `-m "(unit or api) and not slow"` | **1860 passed** |
+| `-m e2e` | 2~3 failed / 155~157 passed（成员在既存 flaky 集内互换：`test_extractor_failure_does_not_break_sse` / `test_state_reflects_turn_and_respects_limit` 等） |
 | `tests/v25` | 1327 passed, 1 skipped |
 | `tests/v2 tests/v21 tests/v26` | 2 failed（`aut005` / `agent008`，均**既存**）/ 964 passed |
-| 新增回归用例 | 21 例；其中 **8 例在改动前必红**（见 §2.1） |
+| `tests/unit/test_feishu_boundary.py` | 15 passed（通道依赖 allowlist 护栏） |
+| 新增回归用例 | 24 例；其中 **8 例在改动前必红**（见 §2.1） |
 
 ---
 
@@ -192,7 +194,52 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 
 ---
 
-## 3. 待裁决：H-1 唯一认知循环（**本次唯一未处置的 Must-Fix**）
+### 2.9 H-7 通道层越界 — **评审结论部分不成立（不改代码，登记澄清）**
+
+**评审结论复核：不成立（前提有误）。** 评审称 `channels/feishu/adapter.py` 直 import
+`agent_runtime.inbound/outbound` 与 `agent_service`，「与 AGENTS.md『通道层不得 import Autonomy；
+核心层仅可 import channels.base』的**双向约束不一致**」。实测：
+
+| 核验项 | 实测结果 |
+|---|---|
+| `apps/backend/AGENTS.md` 原文约束 | 「`channels/` 只做『消息归一为 `InboundMessage` + 经 `OutboundMessage` 契约出站』，**不得**包含 Agent / Memory / World 逻辑，也**不得 import 任何 Autonomy 模块**；核心层**不得** import `app.channels.<impl>`，**仅可** import `app.channels.base`」——约束对象是 **Autonomy**，不是「Runtime 内部」 |
+| `adapter.py` 是否 import Autonomy | **否**（`grep autonomy/life_loop/scheduler/proactive_executor/trigger_evaluator` → 0 命中） |
+| 通道依赖 allowlist | `tests/unit/test_feishu_boundary.py::CHANNELS_ALLOWLIST_PREFIXES` **显式列出** `app.application.agent_runtime.inbound` / `.outbound`，并附理由注释：「RT-013 / RT-014：叶子契约模块，零 IO / 零仓储 / 零 chains」 |
+| 护栏测试 | `test_feishu_boundary.py` **15 passed**（含 `test_direction1_channels_imports_within_allowlist`） |
+
+即：`inbound` / `outbound` 是 RT-013 / RT-014 **刻意设计并登记**的**面向通道的叶子契约模块**
+（零 IO / 零仓储 / 零 chains），把它们等同「Runtime 内部」并判定违约，与既存 allowlist 的
+显式登记相矛盾。评审自身也把 H-7 放在 **Future Improvement**（非 Must Fix Before Merge）。
+
+**处置**：**不改代码**。理由——其前提不成立；且改它需要动**唯一在跑真实流量的飞书入站路径**，
+换取的只是「allowlist 从包路径收窄为专用契约模块」的边际收益。风险与收益不成比例。
+
+**保留的有效关切（降级为 Future Improvement）**：通道层依赖的是 `agent_runtime` **包内路径**，
+若该包重构（如方案 A 落地后重组子面）会牵动通道层。建议做法：把 `inbound` / `outbound`
+的**面向通道契约**抽为独立叶子模块（如 `application/channel_gateway.py` 或 `channels/contracts.py`），
+通道只依赖该模块；届时同步更新 allowlist 与 `AGENTS.md` 措辞。**已登记为 R-7'**（§4）。
+
+---
+
+## 3. H-1 唯一认知循环 — 已裁决（方案 B，`34cb26a`）
+
+### 3.0 裁决结果
+
+用户确认「**先 B 后 A**」。已执行 **B（显式降级为影子实现）**：
+
+| 动作 | 落点 |
+|---|---|
+| 声明唯一循环 = Profile 阶段序列 | `docs/version/v3.0.0/architecture.md` 附「实现期裁决登记 D-1」；`docs/current-system-architecture-baseline.md` §4 顶部 |
+| 影子标记 | `loop.SHADOW_STAGE_METHODS = True`；`stages.SHADOW_STAGE_IMPLEMENTATION = True` |
+| 生产导出面隔离 | `agent_runtime/__init__.py` 不再 re-export `act` / `observe` / `reason` / `reflect` / `update`（`__all__` 同步移除并加注释） |
+| 源码级警示 | `loop.py` 六段方法区块注释 + `stages/__init__.py` 包级说明 |
+| 护栏 | `TestSingleLoopDecision` 3 例：AST 断言 `run()` 不调用六段方法、标记存在、段函数不在 `__all__` |
+
+**A（真收编）的前置条件**（已写入 architecture.md，缺一不可）：C-2 补充 e2e 安全网（R-12）、
+`runtime_foreground_loop_enabled` 一键回退验证（已交付）、`stages/*` 与 Profile 包装的删留边界。
+
+> 注：`agent_runtime.observe` 此前已被 `state.observe` 覆盖（同名冲突，后者导入更晚）——故本次移除
+> `stages.observe` 的 re-export **不构成行为变更**，反而消除了同名歧义。
 
 ### 3.1 评审结论复核：**成立**
 
@@ -205,7 +252,7 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 
 `test_all_stage_methods_are_delegated` 亦自述「生产路径未变」。故边界不变量 8/9 在代码级名存实亡。
 
-### 3.2 为什么不由整改方单方面裁决
+### 3.2 为什么由用户裁决而非整改方单方面决定
 
 两条路线代价与风险**极不对称**，且都与版本架构定义相关：
 
@@ -233,22 +280,21 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 
 | # | 项 | 来源 | 说明 |
 |---|---|---|---|
-| R-1 | **H-1 唯一循环裁决** | 评审 H-1 | 见 §3，需架构裁决；建议先 B 后 A |
+| ~~R-1~~ | ~~H-1 唯一循环裁决~~ | 评审 H-1 | **已处置**：裁决 B（`34cb26a`），A 的前置条件已写入 `architecture.md` D-1 |
 | R-2 | **H-6 双层 Run 语义** | 本次整改 | 已按评审第二方案修好终态传播；若判定改单层 Run，需同步改 RT-016 断言 |
 | R-3 | **C-2 回退路径与 V2.6.1 的残差** | 本次整改 | 回退仍构造内存 `RunContext`；逐字节复刻需剥离段本体签名依赖 |
 | R-4 | **H-5 投影所有权口径** | 评审 H-5 | reset 已补；「持有投影 vs 持有句柄」需 architecture 裁决 |
 | R-5 | **H-3 剩余直读** | 评审 H-3 | `state.py` / `execution_history.py` 的多域审计读仍在 `application` 直连仓储 |
 | R-6 | **H-2 既存反向依赖** | 评审 H-2 | `decision_pipeline` → `llm_gateway`、`planning` → `models`：按评审建议开技术债单 |
-| R-7 | **H-7 通道层越界** | 评审 H-7 | `channels/feishu/adapter.py` 直 import `agent_runtime.inbound/outbound` 与 `agent_service` |
+| R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径**；建议抽独立叶子契约模块后再收窄 allowlist |
 | R-8 | **M-1 / M-2** | 评审 | 域映射与角色资产（`app.character.asuna`）下沉；多角色就绪 |
-| R-9 | **M-3 / M-5 / M-7 / M-10** | 评审 | `_OBSERVED` 无锁全局态、`loop_runs` RMW 竞态、LLM 按时间窗记账、decision 版本号语义 |
+| R-9 | **M-3 / M-5 / M-7 / M-10** | 评审 | `_OBSERVED` 无锁全局态、`loop_runs` RMW 竞态（`finish_run` 条件更新 / JSONB append）、LLM 按时间窗记账、decision 版本号语义 |
 | R-10 | **M-6 / M-8 / M-9** | 评审 | 私有 API（`_GATE_BUDGET` / `_execute_plan_step` / `_day_bucket_key` / `_STATUS_DEGRADED`）公有化；Update 事件与 State Manager 对齐；`promote_degraded` 口径 |
-| R-11 | **L-1 ~ L-4** | 评审 | 时区一致性、`state_update` 映射命名、文档滞后、契约事件集版本 bump |
-| R-12 | **C-2 补充 e2e** | 评审 C-2 | flags-off 全轮次 golden / 录制流对照、中段 LLM 失败、grounding 缓冲、post_process 失败 |
+| R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`）：`AGENTS.md` / `apps/backend/AGENTS.md` 迁移链尾 `0050` → `0052`；`current-system-architecture-baseline.md` 0001~0050 → 0001~0052 + §4 顶部 V3.0 形态与 H-1 裁决；`architecture.md` 状态由「仅设计」改为「Implemented」 |
+| R-12 | **C-2 补充 e2e** | 评审 C-2 | flags-off 全轮次 golden / 录制流对照、中段 LLM 失败、grounding 缓冲、post_process 失败。**本次已补两态 `turn_meta`/`done` 逐字段对照**；其余三项待做（也是方案 A 的前置） |
+| R-13 | **L-1 / L-2 / L-4** | 评审 | 时区一致性、`state_update` → reason 映射命名、契约事件集版本 bump |
 
-> R-11 中的文档滞后（`current-system-architecture-baseline.md` 迁移链仍写 `0050`、`AGENTS.md` 同、
-> `architecture.md` 仍写「仅设计」）与 `acceptance-report.md` 的 W-1 / W-2 是同一件事，按 RT-020 §6.3
-> 需用户确认后回写。
+> R-11 已完成；`acceptance-report.md` 的 W-1 / W-2 同步收口。
 
 ---
 
@@ -292,9 +338,13 @@ cd apps/backend
 | `fe3a422` | `refactor: 观测读面分层与主体身份分离`（H-2 / H-4） |
 | `ba25d72` | `refactor: 域读收口 services 门面`（H-3 Must-Fix 子集） |
 | `787e215` | `fix: 前台收编加总闸可回退线性旧链`（C-2） |
+| `34cb26a` | `refactor: 六段降级为影子实现并回写基线`（H-1 裁决 B + W-1 / W-2 文档回写） |
 
 ---
 
-> **结论**：评审 8 项 Must-Fix 中 7 项已整改并配「改动前必红」回归用例，`tests/v30` 378 例、
-> Fast 1857 例全绿，e2e 仅剩既存失败。**唯一未处置项 H-1 属架构裁决**（§3 已给出建议：先 B 后 A），
-> 另 12 项遗留按 §4 登记。建议复审范围：`5ca5198` / `fe3a422` / `ba25d72` / `787e215` 四个提交。
+> **结论**：评审 9 项 Must-Fix / Critical **全部处置完毕**——8 项修复 + 1 项架构裁决（H-1 → 方案 B），
+> 每项配「改动前必红」回归用例；`tests/v30` **381 例**、Fast **1860 例**全绿，e2e 仅剩既存 flaky。
+> **另对评审 H-7 提出反证**（其「违反 AGENTS.md 双向约束」的前提不成立，allowlist 系刻意登记，见 §2.9），
+> 未按其建议改动飞书入站热路径。
+> 遗留 13 项按 §4 登记，其中 **R-12（C-2 补充 e2e）是方案 A 的前置**，建议优先。
+> 建议复审范围：`5ca5198` / `fe3a422` / `ba25d72` / `787e215` / `34cb26a` 五个提交。

@@ -316,14 +316,17 @@ git diff 7461c3c..HEAD --stat -- \
 
 ---
 
-## 待回写项（需用户确认，**不在本任务内**）
+## 待回写项（**已回写**，2026-09-22）
 
-RT-020 §6.3 明确：以下两项属「验收之后」的独立动作，本任务只登记、不执行。
+RT-020 §6.3 明确以下两项属「验收之后」的独立动作，需用户确认后执行。**用户已确认，已于提交 `34cb26a` 完成回写。**
 
-| # | 文件 | 待回写内容 |
-|---|---|---|
-| W-1 | `docs/current-system-architecture-baseline.md` | 回写 V3.0 已实现形态：Agent Runtime 六段循环、四组件（Context / Loop / State / Event）、Session 生命周期、Run/Trace/Execution History 三层、通道归一（Inbound / Outbound Gateway）、孤儿回收与观测查询面；迁移链尾 `0051` → `0052` |
-| W-2 | `AGENTS.md` / `apps/backend/AGENTS.md` | 版本入口指向 `docs/version/v3.0.0/`；**迁移链尾由 `0050` 更新为 `0052`**（`AGENTS.md` 当前仍写 `0050`，已落后两个迁移） |
+| # | 文件 | 回写内容 | 状态 |
+|---|---|---|---|
+| W-1 | `docs/current-system-architecture-baseline.md` | §4 顶部新增 V3.0.0 落点表（契约 / 会话 / 循环 / 状态 / 上下文 / 事件 / 通道归一 / 持久化 / 观测 / Schema）+ **H-1 裁决（唯一循环 = Profile 阶段序列，六段为影子实现）** + `RUNTIME_FOREGROUND_LOOP_ENABLED` 回退开关；迁移链尾 `0050` → `0052`（3 处，历史陈述处保留） | **已完成** |
+| W-2 | `AGENTS.md` / `apps/backend/AGENTS.md` | 迁移链尾由 `0050` 更新为 **`0052`** | **已完成** |
+
+> 附带回写：`docs/version/v3.0.0/architecture.md` 状态由「仅设计，未排期、未实现」改为 **Implemented**，
+> 并新增附「实现期裁决登记 D-1」（H-1 裁决 B + 方案 A 的前置条件）。
 
 ---
 
