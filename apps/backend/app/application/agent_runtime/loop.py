@@ -118,12 +118,21 @@ ERROR_KIND_BY_PHASE: dict[str, ErrorKind] = {
 
 TRACE_STAGE = "runtime_stage"
 
+SIX_STAGE_LOOP_SETTING = "runtime_six_stage_loop_enabled"
 SHADOW_STAGE_METHODS = True
-"""`observe` / `reason` / `plan` / `act` / `reflect` / `update` 是否为**影子实现**。
+"""默认生产循环仍是 Profile 阶段序列；`runtime_six_stage_loop_enabled` 打开后 `run()` 走六段。"""
 
-H-1 裁决 B（2026-09-22）：这六个方法**未接入 `run()`**，生产唯一循环是 Profile 阶段
-序列（`_run_stages`）。禁止假定其生效；接线归方案 A（需先建 C-2 补充 e2e 安全网）。
-"""
+SIX_STAGE_SEQUENCE: tuple[str, ...] = (
+    PHASE_OBSERVE,
+    PHASE_REASON,
+    PHASE_PLAN,
+    PHASE_ACT,
+    PHASE_REFLECT,
+    PHASE_UPDATE,
+)
+SIX_STAGE_CRITICAL: frozenset[str] = frozenset(
+    {PHASE_OBSERVE, PHASE_REASON, PHASE_ACT, PHASE_UPDATE}
+)
 
 
 def stage_phase(name: str) -> str:
@@ -391,9 +400,8 @@ class AgentLoop:
 
     # ---- 六段方法（RT-007 ~ RT-012 的挂载点） ---------------------------
     #
-    # ⚠️ 影子实现（H-1 裁决 B）：以下六个方法**不被 `run()` 调用**——生产唯一循环是
-    # Profile 阶段序列。它们只在 `tests/v30` 与方案 A「真收编」时使用；
-    # 详见模块常量 `SHADOW_STAGE_METHODS` 与 `stages/__init__.py` 的包级说明。
+    # H-1 裁决 B → R-15 灰度：默认 `run()` 仍走 Profile 阶段序列；仅当
+    # `runtime_six_stage_loop_enabled=True` 时由 `_run_six_stage_loop` 调用。
 
     async def _run_phase(
         self, phase: str, inputs: Mapping[str, Any] | None = None
@@ -404,11 +412,7 @@ class AgentLoop:
         return await self._run_stages(names, inputs=inputs)
 
     async def observe(self) -> object | None:
-        """Observe 段：RT-007 显式实现（四类触发增量 → `Observation`）。
-
-        `run()` 仍按 `resolve_stages` 的声明顺序驱动既有阶段本体（AC1 顺序零改动），
-        故本方法的替换不影响生产路径；前台 / 后台收编（RT-015 / RT-016）后由本方法接管。
-        """
+        """Observe 段：RT-007 显式实现（四类触发增量 → `Observation`）。"""
         self.observation = observe_stage.observe(
             self.runtime_input,
             self.session_context,
@@ -521,6 +525,61 @@ class AgentLoop:
 
     # ---- 驱动 -----------------------------------------------------------
 
+    def _six_stage_enabled(self) -> bool:
+        return bool(getattr(get_settings(), SIX_STAGE_LOOP_SETTING, False))
+
+    async def _run_six_stage_loop(self) -> None:
+        """R-15 真收编路径：observe → reason → plan → act → reflect → update。"""
+        foreground = self.spec.run_kind == RUN_KIND_FOREGROUND_CHAT
+
+        def _summary(value: object | None) -> dict[str, Any]:
+            return {"outcome": None if value is None else type(value).__name__}
+
+        async def _do_observe():
+            return _summary(await self.observe())
+
+        async def _do_reason():
+            payload = getattr(self.runtime_input, "payload", None) or {}
+            text = payload.get("text") if isinstance(payload, Mapping) else None
+            return _summary(
+                await self.reason(
+                    chat_response_intention=text if foreground else None,
+                    trigger_intention=(
+                        None
+                        if foreground
+                        else str(getattr(self.runtime_input, "kind", "") or "")
+                    ),
+                )
+            )
+
+        async def _do_plan():
+            return _summary(await self.plan())
+
+        async def _do_act():
+            return _summary(await self.act())
+
+        async def _do_reflect():
+            return _summary(await self.reflect())
+
+        async def _do_update():
+            return _summary(await self.update())
+
+        handlers = {
+            PHASE_OBSERVE: _do_observe,
+            PHASE_REASON: _do_reason,
+            PHASE_PLAN: _do_plan,
+            PHASE_ACT: _do_act,
+            PHASE_REFLECT: _do_reflect,
+            PHASE_UPDATE: _do_update,
+        }
+        for phase in SIX_STAGE_SEQUENCE:
+            await self._run_stage(
+                phase,
+                phase,
+                handlers[phase],
+                critical=phase in SIX_STAGE_CRITICAL,
+            )
+
     @asynccontextmanager
     async def _lifecycle(self):
         """并发语义（裁决 D4）：前台不加 per-user 写锁，后台保留既有写锁。"""
@@ -587,7 +646,10 @@ class AgentLoop:
         event_bus.emit_run_opened(self.run_context.run_id, self._session_id, self.trace)
         try:
             async with self._lifecycle():
-                await self._run_stages(self.stages)
+                if self._six_stage_enabled():
+                    await self._run_six_stage_loop()
+                else:
+                    await self._run_stages(self.stages)
         except asyncio.CancelledError:
             logger.warning(
                 "agent loop run 被取消，按 aborted 关账：%s", self.run_context.run_id

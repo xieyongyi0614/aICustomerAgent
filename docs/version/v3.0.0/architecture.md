@@ -621,7 +621,9 @@ RT-015 / RT-016 的「收编」则把**既有阶段**（`chat_pipeline` 22 步�
 - 护栏：`tests/v30/test_runtime_lifecycle.py::TestSingleLoopDecision`（AST 断言 `run()` 不调用六段方法、
   标记存在、段函数不在 `__all__`）。
 
-**后续（方案 A：真收编）**：把 `run()` 切到六段方法、删除 / 收缩 Profile 阶段包装，使六段成为
+**后续（方案 A：真收编 / R-15 灰度）**：`runtime_six_stage_loop_enabled`（默认 `False`）打开后
+`run()` 经 `_run_six_stage_loop` 驱动六段方法；默认仍走 Profile 阶段序列。待两态 e2e 对照
+稳定后再切默认并收缩 Profile 包装。
 生产实现。**前置条件（缺一不可）**：
 
 1. C-2 补充 e2e 安全网建成：flags-off 全轮次 golden / 录制流逐字段对照、中段 LLM 失败、

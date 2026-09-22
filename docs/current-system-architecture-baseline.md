@@ -191,8 +191,11 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 > | 观测 | `agent_runtime/debug_view.py`（Debug / Replay 组合）+ `services/observability/trace_query.py`（仓储级读面） |
 > | Schema | 唯一扩展 = 迁移 `0052`（`loop_runs.session_id` + `runtime_traces.correlation_id`）；**零新建表** |
 >
-> **⚠️ 唯一认知循环裁决（H-1 裁决 B）**：当前唯一在跑的循环是 `profiles.py` 声明的
+> **⚠️ 唯一认知循环裁决（H-1 裁决 B → R-15 灰度）**：默认在跑的循环是 `profiles.py` 声明的
 > **Profile 阶段序列**（`loop.py::_run_stages`，段本体为既有阶段实现：`chat_pipeline` 22 步闭包 /
+> 自治 Profile 阶段）。`runtime_six_stage_loop_enabled=True` 时 `run()` 改走六段方法
+> （observe/reason/plan/act/reflect/update）。详见
+> `docs/version/v3.0.0/architecture.md` 附「实现期裁决登记 D-1」。
 > `life_loop._step_*`）。`AgentLoop.observe/reason/plan/act/reflect/update` 与
 > `agent_runtime/stages/*` 是**影子 / 测试实现**，**未接入生产 `run()`**，已从生产导出面隔离。
 > 完整裁决、护栏与「方案 A 真收编」的前置条件见

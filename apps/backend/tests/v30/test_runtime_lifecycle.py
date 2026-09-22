@@ -432,13 +432,13 @@ class TestRepositoryAccessLayering:
 
 
 class TestSingleLoopDecision:
-    """H-1 裁决 B：唯一循环 = Profile 阶段序列；六段方法是影子实现（未接入 run()）。"""
+    """H-1 / R-15：默认 Profile 阶段序列；`runtime_six_stage_loop_enabled` 打开后走六段。"""
 
     pytestmark = pytest.mark.unit
 
     SHADOW = {"observe", "reason", "plan", "act", "reflect", "update"}
 
-    def test_run_never_calls_shadow_stage_methods(self):
+    def test_run_default_path_uses_profile_stages(self):
         from app.application.agent_runtime import loop as loop_module
 
         tree = ast.parse(Path(loop_module.__file__).read_text(encoding="utf-8"))
@@ -454,6 +454,24 @@ class TestSingleLoopDecision:
         }
 
         assert called & self.SHADOW == set(), sorted(called & self.SHADOW)
+        assert "_run_six_stage_loop" in called or "_six_stage_enabled" in called
+
+    def test_six_stage_driver_calls_all_six_methods(self):
+        from app.application.agent_runtime import loop as loop_module
+
+        tree = ast.parse(Path(loop_module.__file__).read_text(encoding="utf-8"))
+        driver = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "_run_six_stage_loop"
+        )
+        called = {
+            node.func.attr
+            for node in ast.walk(driver)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        assert self.SHADOW <= called
 
     def test_shadow_markers_are_declared(self):
         from app.application.agent_runtime import loop as loop_module

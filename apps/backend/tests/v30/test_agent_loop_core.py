@@ -612,3 +612,39 @@ class TestLoopDriving:
         assert set(result.budget_account) >= {"status", "used_calls", "token_total"}
         assert result.trace_ref is None
         assert result.intention is None
+
+    async def test_six_stage_loop_flag_off_uses_profile_path(
+        self, db_session_factory, override_settings
+    ):
+        override_settings(runtime_six_stage_loop_enabled="false")
+        spec = _spec(("perception", "record_handoff"))
+        calls, registry = _stub_registry(spec.stages)
+        run = _open_run(user_id="u-six-off")
+        loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
+
+        result = await loop.run()
+
+        assert result.status == "done"
+        assert calls == ["perception", "record_handoff"]
+
+    async def test_six_stage_loop_flag_on_drives_six_methods(
+        self, db_session_factory, override_settings
+    ):
+        override_settings(runtime_six_stage_loop_enabled="true")
+        spec = _spec(("perception", "record_handoff"))
+        calls, registry = _stub_registry(spec.stages)
+        run = _open_run(user_id="u-six-on")
+        loop = AgentLoop(spec, user_id=run.user_id, run=run, now=NOW, registry=registry)
+
+        result = await loop.run()
+
+        assert result.status in {"done", "degraded"}
+        row = loop_run_repository.get(run.run_id)
+        steps = [step["step"] for step in row.steps]
+        assert steps == ["observe", "reason", "plan", "act", "reflect", "update"]
+        assert calls == []
+
+    async def test_six_stage_loop_default_is_off(self):
+        from app.core.settings import get_settings
+
+        assert get_settings().runtime_six_stage_loop_enabled is False
