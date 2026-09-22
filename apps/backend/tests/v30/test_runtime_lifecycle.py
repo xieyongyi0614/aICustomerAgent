@@ -6,8 +6,10 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -327,3 +329,45 @@ def test_autonomous_profile_stage_set_unchanged():
         "decision",
         "world_experience",
     )
+
+
+class TestRepositoryAccessLayering:
+    """H-3：域读必须经 services 门面；Run SoT 自身仓储是唯一豁免。"""
+
+    pytestmark = pytest.mark.unit
+
+    def _repository_imports(self, module) -> list[str]:
+        tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+        names: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names.add(node.module)
+                names.update(f"{node.module}.{alias.name}" for alias in node.names)
+        return sorted(
+            name
+            for name in names
+            if name.startswith("app.repositories") and name != "app.repositories"
+        )
+
+    def test_stages_do_not_read_domain_repositories(self):
+        from app.application.agent_runtime.stages import act, plan, update
+
+        for module in (plan, act, update):
+            assert self._repository_imports(module) == [], module.__name__
+
+    def test_controller_only_uses_run_scoped_repositories(self):
+        from app.application.agent_runtime import controller
+
+        allowed = {"app.repositories.loop_run_repository", "app.repositories.llm_call_repository"}
+
+        assert set(self._repository_imports(controller)) <= allowed
+
+    def test_domain_reads_go_through_service_facades(self):
+        from app.services import goal_service, outbox_service
+        from app.services.action import manager as action_manager
+
+        for facade in (goal_service.get_goal, goal_service.get_plan, outbox_service.list_pending):
+            assert callable(facade)
+        assert callable(action_manager.get_record)

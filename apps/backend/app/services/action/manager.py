@@ -148,6 +148,15 @@ def query(
     return [_record_to_action(r) for r in records]
 
 
+def get_record(action_id: str) -> Any:
+    """按 id 取行动**仓储记录**（只读门面）：上层不得直读 `action_repository`（H-3）。
+
+    与 `query(action_id=...)` 的区别：后者返回领域投影 `Action`，本函数返回原始记录，
+    供记忆摄取等需要完整字段的消费方使用。
+    """
+    return action_repository.get_record(action_id)
+
+
 def cancel(action_id: str, *, reason: str = "cancel_requested") -> bool:
     """仅 created/planned 可取消；经 transition_action；不写世界/记忆/关系。"""
     record = action_repository.get_record(action_id)

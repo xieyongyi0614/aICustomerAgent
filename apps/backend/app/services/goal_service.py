@@ -281,6 +281,24 @@ def list_active_plans(user_id: str) -> list[tuple[GoalRecord, GoalPlanRecord]]:
         return []
 
 
+def get_goal(goal_id: str) -> GoalRecord | None:
+    """按 id 取目标记录（**只读门面**）：上层不得直读 `goal_repository`（H-3）。"""
+    try:
+        return goal_repository.get_goal(goal_id)
+    except Exception:
+        logger.exception("目标记录读取失败，按不可得处理：%s", goal_id)
+        return None
+
+
+def get_plan(plan_id: str) -> GoalPlanRecord | None:
+    """按 id 取计划记录（**只读门面**）：上层不得直读 `goal_repository`（H-3）。"""
+    try:
+        return goal_repository.get_plan(plan_id)
+    except Exception:
+        logger.exception("计划记录读取失败，按不可得处理：%s", plan_id)
+        return None
+
+
 def _effective_tier(goal: GoalRecord, signals: dict) -> float:
     settings = get_settings()
     tier = float(GOAL_TIER[goal.type])

@@ -277,12 +277,12 @@ async def _run_plan_step(
     """
     from app.application import life_loop
     from app.core.settings import get_settings
-    from app.repositories import goal_repository
+    from app.services import goal_service
 
     def _load() -> tuple[Any, Any]:
         return (
-            goal_repository.get_goal(plan_value.goal_id),
-            goal_repository.get_plan(plan_value.plan_id),
+            goal_service.get_goal(plan_value.goal_id),
+            goal_service.get_plan(plan_value.plan_id),
         )
 
     goal, plan_record = await asyncio.to_thread(_load)

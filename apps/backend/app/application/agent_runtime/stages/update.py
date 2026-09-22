@@ -36,7 +36,7 @@ from app.application.agent_runtime.contracts import (
 )
 from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
 from app.application.agent_runtime.profiles import ProfileSpec
-from app.repositories import action_repository
+from app.services.action import manager as action_manager
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ def _load_action_record(action_id: str | None) -> Any:
     if not action_id:
         return None
     try:
-        return action_repository.get_record(action_id)
+        return action_manager.get_record(action_id)
     except Exception:  # noqa: BLE001 — 读取失败按记录不可得处理
         logger.exception("行动记录读取失败：%s", action_id)
         return None

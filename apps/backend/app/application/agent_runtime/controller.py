@@ -27,8 +27,9 @@ from app.application.agent_runtime.models import (
 from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
 from app.application import logical_clock
-from app.repositories import llm_call_repository, loop_run_repository, outbox_repository
+from app.repositories import llm_call_repository, loop_run_repository
 from app.services import life_loop_budget
+from app.services import outbox_service
 
 logger = logging.getLogger(__name__)
 
@@ -407,7 +408,7 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
         return 0
     now = now or datetime.now()
     escalated = 0
-    for row in outbox_repository.list_pending(now=now, limit=20):
+    for row in outbox_service.list_pending(now=now, limit=20):
         if not trigger_router.evaluate_event_escalation(row.event_type):
             continue
         user_id = (row.payload or {}).get("user_id")

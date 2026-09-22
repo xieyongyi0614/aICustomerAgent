@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from app.repositories import goal_repository
+from app.services import goal_service
 from app.services.planning import scheduler as plan_scheduler
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ def current_plan_value(user_id: str, goal_id: str | None = None) -> PlanValue | 
     """最近 active 计划的只读投影（多计划取最新；无 active 计划 → `None`）。"""
     if not user_id:
         return None
-    for goal, plan in reversed(goal_repository.list_active_plans(user_id)):
+    for goal, plan in reversed(goal_service.list_active_plans(user_id)):
         if goal_id is None or goal.id == goal_id:
             return to_plan_value(plan, goal.id)
     return None
@@ -186,7 +186,7 @@ async def plan(
             trace, status="skipped", reason=REASON_GOAL_MISSING, goal_id=None
         )
         return None
-    goal = goal_repository.get_goal(goal_id)
+    goal = goal_service.get_goal(goal_id)
     if goal is None:
         _record_trace(
             trace, status="skipped", reason=REASON_GOAL_MISSING, goal_id=goal_id
