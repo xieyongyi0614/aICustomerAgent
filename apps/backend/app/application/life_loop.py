@@ -402,6 +402,15 @@ def _revision_ctx(settings) -> SimpleNamespace:
     )
 
 
+async def execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -> dict:
+    """公开门面（M-6）：计划步骤执行本体。
+
+    Runtime 的 Act 段经此调用（RT-010「既有 `_execute_plan_step` 本体，非重写」），
+    不触私有名。语义与 `_execute_plan_step` 完全一致。
+    """
+    return await _execute_plan_step(goal, plan, now, facts, settings)
+
+
 async def _execute_plan_step(goal, plan, now: datetime, facts: dict, settings) -> dict:
     """V2.5.0 执行桥接线：一步走 `execute_step`。
 

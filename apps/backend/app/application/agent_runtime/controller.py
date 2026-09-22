@@ -361,7 +361,7 @@ async def _decision_stage_with_gates(
     """decision 三道闸（与 legacy `_run_decision_stage` 同序同语义）。"""
     from app.application import life_loop as life_loop_mod
 
-    if budget.status == life_loop_budget._STATUS_DEGRADED:
+    if life_loop_budget.is_degraded_verdict(budget):
         return {"status": "skipped", "skip_reason": "quota_circuit_open"}
     if life_loop_mod._cycle_llm_budget_exhausted(steps, settings):
         return {"status": "skipped", "skip_reason": "step_budget"}
@@ -374,7 +374,7 @@ async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -
     """decision 阶段：两道既有预算闸 → Gateway 第三道闸 → critical 执行。"""
     from app.application import life_loop as life_loop_mod
 
-    if budget.status == life_loop_budget._STATUS_DEGRADED:
+    if life_loop_budget.is_degraded_verdict(budget):
         append_step(
             run, steps,
             {"step": "decision", "status": "skipped", "skip_reason": "quota_circuit_open"},

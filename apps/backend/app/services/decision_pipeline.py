@@ -50,7 +50,9 @@ _SOURCE_PRIORITY = {
 _GATE_PERSONA = "persona_precheck"
 _GATE_RELATIONSHIP = "relationship_gate"
 _GATE_ACTION = "action_check"
-_GATE_BUDGET = "budget_cooldown"
+GATE_BUDGET = "budget_cooldown"
+"""公开门面（M-6）：预算闸在 `gates` 中的键名。Runtime 段经此读取，不触私有名。"""
+_GATE_BUDGET = GATE_BUDGET
 
 # 六维权重（§5.2③）：和为 1；decision_weight 为全局缩放（默认 1.0）
 _DIMENSION_WEIGHTS = {

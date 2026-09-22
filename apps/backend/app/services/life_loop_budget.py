@@ -15,7 +15,19 @@ from app.repositories import llm_call_repository
 logger = logging.getLogger(__name__)
 
 _STATUS_OK = "ok"
-_STATUS_DEGRADED = "degraded"
+STATUS_DEGRADED = "degraded"
+"""公开门面（M-6）：降级态状态值。Runtime 经 `is_degraded_verdict()` 判定，不触私有名。"""
+_STATUS_DEGRADED = STATUS_DEGRADED
+
+
+def is_degraded_verdict(verdict) -> bool:
+    """公开门面（M-6）：裁决是否为降级态（额度熔断 / 超限）。
+
+    `verdict` 为 `check_daily_budget` 的返回对象。语义与原
+    `verdict.status == _STATUS_DEGRADED` 等价（`BudgetState.status` 恒存在）。
+    """
+    return getattr(verdict, "status", None) == STATUS_DEGRADED
+
 
 _CACHE: dict = {}
 

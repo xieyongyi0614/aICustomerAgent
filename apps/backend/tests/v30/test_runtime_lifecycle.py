@@ -450,3 +450,57 @@ class TestLedgerCloseGuard:
         row = loop_run_repository.get(run.id)
         assert row.status == "done"
         assert [step["step"] for step in row.steps] == ["record_handoff"]
+
+
+class TestNoPrivateServiceApi:
+    """M-6：Runtime 不得依赖 service / application 的**私有**名（易随重构断裂）。"""
+
+    pytestmark = pytest.mark.unit
+
+    # AST 口径（非裸文本）：docstring 里提到私有名不算依赖（`ast.Constant` 天然排除）
+    PRIVATE_ATTRS = {
+        "decision_pipeline": {"_GATE_BUDGET"},
+        "life_loop": {"_execute_plan_step"},
+        "triggers": {"_day_bucket_key"},
+        "life_loop_budget": {"_STATUS_DEGRADED"},
+    }
+
+    def test_runtime_does_not_touch_private_service_names(self):
+        import app.application.agent_runtime as agent_runtime
+
+        root = Path(agent_runtime.__file__).parent
+        offenders: list[str] = []
+        for path in sorted(root.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Attribute):
+                    continue
+                owner = node.value
+                if not isinstance(owner, ast.Name):
+                    continue
+                if node.attr in self.PRIVATE_ATTRS.get(owner.id, set()):
+                    offenders.append(f"{path.name}:{node.lineno} {owner.id}.{node.attr}")
+
+        assert offenders == []
+
+    def test_public_facades_exist_and_delegate(self):
+        from app.application import life_loop
+        from app.services import decision_pipeline, life_loop_budget
+        from app.services.reflection import triggers
+
+        assert decision_pipeline.GATE_BUDGET == "budget_cooldown"
+        assert callable(life_loop.execute_plan_step)
+        assert callable(triggers.day_bucket_key)
+        def _verdict(status: str):
+            return life_loop_budget.BudgetState(
+                status=status,
+                used_calls=0,
+                token_total=0,
+                call_limit=10,
+                token_limit=1000,
+                reason="test",
+                checked_at=datetime.now(),
+            )
+
+        assert life_loop_budget.is_degraded_verdict(_verdict("degraded"))
+        assert not life_loop_budget.is_degraded_verdict(_verdict("ok"))

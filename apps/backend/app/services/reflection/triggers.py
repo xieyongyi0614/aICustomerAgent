@@ -572,6 +572,15 @@ def _users_with_memories() -> list[str]:
         return [row[0] for row in rows]
 
 
+def day_bucket_key(user_id: str, now: datetime) -> str:
+    """公开门面（M-6）：周期反思的「日桶」去重键。
+
+    Runtime 的 Reflect 段经此与既有周期任务共享证据窗去重键（RT-011），
+    不触私有名 `_day_bucket_key`。
+    """
+    return _day_bucket_key(user_id, now)
+
+
 def _day_bucket_key(user_id: str, now: datetime) -> str:
     return f"reflect:{user_id}:{now:%Y-%m-%d}"
 

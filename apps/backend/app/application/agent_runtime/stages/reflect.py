@@ -91,9 +91,7 @@ def evidence_window_key(user_id: str, now: datetime) -> str:
     """证据窗去重键：复用 `triggers` 的日桶构造（不新造算法，§5.1）。"""
     from app.services.reflection import triggers
 
-    return triggers._day_bucket_key(  # pylint: disable=protected-access
-        user_id, now
-    )
+    return triggers.day_bucket_key(user_id, now)
 
 
 def _skipped(reason: str, *, degraded: bool = False) -> ReflectOutcome:

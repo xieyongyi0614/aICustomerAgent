@@ -203,8 +203,8 @@ def _budget_verdicts(audit: Mapping[str, Any]) -> list[tuple[dict, str]]:
     verdicts: list[tuple[dict, str]] = []
     for candidate in audit.get("candidates") or []:
         for gate in candidate.get("gates") or []:
-            if decision_pipeline._GATE_BUDGET in gate:  # pylint: disable=protected-access
-                verdicts.append((candidate, gate[decision_pipeline._GATE_BUDGET]))
+            if decision_pipeline.GATE_BUDGET in gate:
+                verdicts.append((candidate, gate[decision_pipeline.GATE_BUDGET]))
     return verdicts
 
 

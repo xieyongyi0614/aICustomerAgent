@@ -288,7 +288,7 @@ async def _run_plan_step(
     goal, plan_record = await asyncio.to_thread(_load)
     if goal is None or plan_record is None:
         return None, None
-    payload = await life_loop._execute_plan_step(  # pylint: disable=protected-access
+    payload = await life_loop.execute_plan_step(
         goal, plan_record, now, {}, get_settings()
     )
     status = _plan_step_status(payload)
