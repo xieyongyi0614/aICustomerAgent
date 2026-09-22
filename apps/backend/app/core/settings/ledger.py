@@ -8,3 +8,4 @@ class LedgerSettings(BaseSettings):
 
     ledger_default_currency: str = "CNY"
     ledger_extraction_min_confidence: float = 0.70
+    ledger_category_fallback: str = "其他"

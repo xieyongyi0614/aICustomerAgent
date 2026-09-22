@@ -152,6 +152,19 @@ def list_categories(user_id: str, *, kind: str | None = None):
         return rows
 
 
+def append_category_alias(user_id: str, category_id: str, alias: str) -> bool:
+    with SessionLocal() as session:
+        row = session.get(LedgerCategoryRow, category_id)
+        if row is None or row.user_id != user_id:
+            return False
+        aliases = list(row.aliases or [])
+        if alias not in aliases:
+            aliases.append(alias)
+            row.aliases = aliases
+            session.commit()
+        return True
+
+
 def find_by_alias(user_id: str, text: str) -> LedgerCategoryRow | None:
     if not text:
         return None
