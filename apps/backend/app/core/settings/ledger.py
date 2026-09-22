@@ -7,3 +7,4 @@ class LedgerSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
     ledger_default_currency: str = "CNY"
+    ledger_extraction_min_confidence: float = 0.70

@@ -630,12 +630,43 @@ def _persist_tool_decision(ctx: PostProcessContext, surface, audit: dict | None)
     )
 
 
+async def run_ledger_extraction(ctx: PostProcessContext) -> None:
+    """账本抽取候选（PLA-007）：零写库，只产候选并分流标记。失败不影响回答。"""
+    try:
+        from datetime import datetime
+
+        from app.chains.ledger_extraction_chain import classify_extraction, extract_ledger
+        from app.core.settings import get_settings
+
+        extraction = extract_ledger(
+            ctx.user_input,
+            message_id=ctx.session_id,
+            now=datetime.now(),
+            llm=ctx.llm,
+        )
+        decision = classify_extraction(
+            extraction,
+            min_confidence=get_settings().ledger_extraction_min_confidence,
+        )
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "ledger_extraction",
+                0.0,
+                "ok" if decision != "ignore" else "skip",
+                decision=decision,
+                confidence=extraction.confidence,
+            )
+    except Exception:
+        logger.exception("账本抽取失败，忽略本轮候选")
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
     run_goal_review,
     run_summary,
     run_memory_extract,
+    run_ledger_extraction,
     run_budget_observer,
     run_evaluation,
     run_world_update,

@@ -61,5 +61,6 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
 
 V40_SETTINGS_FIELDS: dict[str, str] = {
     "ledger_default_currency": "PLA-004",
+    "ledger_extraction_min_confidence": "PLA-007",
 }
 """V4.0 新增参数类字段（字段名 → 归属 Task）。禁止登记 `*_enabled`。"""

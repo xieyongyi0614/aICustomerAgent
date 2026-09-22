@@ -100,3 +100,18 @@ class LedgerEntryDraft(BaseModel):
     source_ref: str | None = None
     idempotency_key: str
     reversal_of: str | None = None
+
+
+class LedgerExtraction(BaseModel):
+    is_ledger_intent: bool = False
+    amount_value: str | None = None
+    currency_hint: str | None = None
+    direction: LedgerDirection | None = None
+    category_hint: str | None = None
+    merchant_hint: str | None = None
+    occurred_at_hint: str | None = None
+    occurred_at_resolved: datetime | None = None
+    account_hint: str | None = None
+    evidence_span: str | None = None
+    confidence: float = 0.0
+    missing_fields: tuple[str, ...] = ()
