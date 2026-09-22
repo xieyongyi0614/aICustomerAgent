@@ -286,18 +286,18 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | ~~R-2~~ | ~~H-6 双层 Run 语义~~ | 本次整改 | **已裁决：保留双层**（外层记事件升级、内层记 tick）；终态传播已修 |
 | ~~R-3~~ | ~~C-2 回退路径与 V2.6.1 的残差~~ | 本次整改 | **已裁决：接受残差**。回退摘掉台账/事件/冻结/驱动壳；`RunContext` 内存载体保留（剥离并入 H-1-A） |
 | ~~R-4~~ | ~~H-5 投影所有权口径~~ | 评审 H-5 | **已裁决：持有只读投影**。Run 结束必 reset（已修）；不要求改句柄/惰性读 |
-| R-5 | **H-3 剩余直读** | 评审 H-3 | `state.py` / `execution_history.py` 的多域审计读仍在 `application` 直连仓储（Must-Fix「至少」子集已修） |
+| R-5 | ~~H-3 剩余直读~~ | 评审 H-3 | **已修**（`a89ca6d`）：`domain_ledger` 门面；`state` / `execution_history` 零域仓储直读 |
 | R-6 | **H-2 既存反向依赖** | 评审 H-2 | `decision_pipeline` → `llm_gateway`、`planning` → `models`：开技术债单 |
 | R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径** |
-| R-8 | **M-1 / M-2** | 评审 | 域映射与角色资产（`app.character.asuna`）下沉；多角色就绪 |
-| ~~R-9~~ | ~~M-3 / M-5 / M-7 / M-10~~ | 评审 | **已完成**：M-5（`e218889`）、M-10（`3a6ba97`）、M-3（`3a6ba97`）、**M-7（`60a3a04`）** |
-| R-10 | **M-6 残留** | 评审 | M-6 大部已公有化（`c6261ca`）；**M-8 / M-9 已修**。残留：`trigger_router → life_loop._cycle_reason` |
+| R-8 | **M-1 剩余** | 评审 | **M-2 已修**（`d554c70`，`character_assets`）；M-1 的 ActionIntent 映射/合成逻辑仍在 `stages/act.py` |
+| ~~R-9~~ | ~~M-3 / M-5 / M-7 / M-10~~ | 评审 | **已完成**：M-5 仅 `running` 可关（`e218889`）、M-10（`3a6ba97`）、M-3 观察缓存（`3a6ba97`）、**M-7（`60a3a04`）** |
+| R-10 | **M-3 / M-5 残留** | 评审 | **M-6 残留已修**（`cycle_reason` 公有化）；**M-8 / M-9 已修**。残留：`STAGE_RUNNERS` / `_adapters` 全局可变、`mark_step` RMW |
 | R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`） |
 | R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`） |
-| R-13 | **L-1 / L-2 / L-4** | 评审 | 时区一致性、`state_update` → reason 映射命名、契约事件集版本 bump |
-| ~~R-14~~ | ~~`current_goal` 线格式值依赖~~ | 本次 R-12 发现 | **已裁决：维持值依赖**（不改 `api/v1/chat.py`）；前端若需恒定键再协同 |
-| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **方向批准、本批不做**。前置 R-12 已就绪；属独立版本重构 |
-| R-16 | **orphan sweep 默认 True** | 评审摘要第 7 点 | **已裁决：保持默认 True**（RT-018 运维例外），见 §4.2 |
+| R-13 | **L-2 命名** | 评审 | **L-1 / L-4 已修**（时区 + `CONTRACT_REVISION`）；L-2 `state_update`→reason 映射命名待拆 |
+| ~~R-14~~ | ~~`current_goal` 线格式值依赖~~ | 本次 R-12 发现 | **已裁决：维持值依赖** |
+| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **方向批准、本批不做** |
+| R-16 | **orphan sweep 默认 True** | 评审摘要第 7 点 | **已裁决：保持默认 True**，见 §4.2 |
 
 ### 4.1 P1 裁决记录（2026-09-22）
 
@@ -348,14 +348,14 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | # | 不变量 | 整改前 | 整改后 |
 |---|---|---|---|
 | 1 | Runtime 只调度，业务语义归各域 | 部分违例（stages 持有映射 / 合成） | **未变**（M-1 属遗留 R-8） |
-| 2 | Context / Snapshot / Event 只读投影、不落真相源 | 部分违例（域内容冻结进 `run.data` 且不 reset） | **改善**：Run 结束必 reset（H-5）；所有权口径待裁决（R-4） |
+| 2 | Context / Snapshot / Event 只读投影、不落真相源 | 部分违例（域内容冻结进 `run.data` 且不 reset） | **改善**：Run 结束必 reset；**R-4 已裁决**持有只读投影 |
 | 3 | 长期变化可经 Execution History 指认 | 通过 | 通过（`debug_view.replay_bundle` 组合不变） |
 | 4 | LLM 四问只在 Gateway | 通过 | 通过 |
 | 5 | 跨域可靠投递仍走 Outbox | 通过 | 通过（outbox 读面改门面，一致性模型零改动） |
 | 6 | ChannelAdapter 契约零改动 | 通过 | 通过 |
 | 7 | Tool 治理零改动 | 通过 | 通过 |
-| 8 | 前后台共用同一认知循环 | 违例 | **未变**（H-1 / R-1 待裁决） |
-| 9 | 无第二套 Agent / Pipeline | 违例 | **未变**（H-1 / R-1 待裁决） |
+| 8 | 前后台共用同一认知循环 | 违例 | **影子隔离（H-1 裁决 B）**；真收编 = R-15 |
+| 9 | 无第二套 Agent / Pipeline | 违例 | **影子隔离（H-1 裁决 B）**；生产唯一循环 = Profile 阶段序列 |
 
 ---
 

@@ -204,7 +204,7 @@ Session Close
 
 **原则**：
 
-- **只读投影、每 Run 重建**：Context 是 Runtime Context，非真相源，不落表、不写回（沿用 V2.0.0「Working Memory / Context 是 Runtime Context」裁决）。
+- **只读投影、每 Run 重建**：Context 是 Runtime Context，非真相源，不落表、不写回（沿用 V2.0.0「Working Memory / Context 是 Runtime Context」裁决）。**所有权口径（R-4）**：允许持有域内容的只读投影，但不拥有写权；Run 结束必须 `reset`，不得把域 payload 当长期状态。
 - **Run 内不变**：装配完成后冻结，防止决策中途状态漂移（沿用 V2.1 §3.3 一致性约定，升级为 State Manager 强制）。
 - **超预算裁剪**：沿用 context_total_char_budget 与固定优先级裁剪（身份/场景/情绪/关系段不裁）。
 
