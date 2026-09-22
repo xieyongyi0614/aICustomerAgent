@@ -28,13 +28,13 @@
 
 | 套件 | 结果 |
 |---|---|
-| `tests/v30` | **381 passed**（整改前 357，新增 24 例） |
-| `-m "(unit or api) and not slow"` | **1860 passed** |
+| `tests/v30` | **388 passed**（整改前 357，新增 31 例） |
+| `-m "(unit or api) and not slow"` | **1867 passed** |
 | `-m e2e` | **1 failed / 163 passed**（仅既存 `test_extractor_failure_does_not_break_sse`） |
 | `tests/v25` | 1327 passed, 1 skipped |
 | `tests/v2 tests/v21 tests/v26` | 2 failed（`aut005` / `agent008`，均**既存**）/ 964 passed |
 | `tests/unit/test_feishu_boundary.py` | 15 passed（通道依赖 allowlist 护栏） |
-| 新增回归用例 | 30 例（v30 24 + e2e 6）；其中 **8 例在改动前必红**（§2.1），且 R-12 的流对照 harness **经注入式验证非空转** |
+| 新增回归用例 | 36 例（v30 30 + e2e 6）；其中 **14 例在改动前必红**（§2.1 的 8 例 + M-5 3 例 + M-10/M-3 3 例），且 R-12 的流对照 harness **经注入式验证非空转** |
 
 ---
 
@@ -288,8 +288,8 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | R-6 | **H-2 既存反向依赖** | 评审 H-2 | `decision_pipeline` → `llm_gateway`、`planning` → `models`：按评审建议开技术债单 |
 | R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径**；建议抽独立叶子契约模块后再收窄 allowlist |
 | R-8 | **M-1 / M-2** | 评审 | 域映射与角色资产（`app.character.asuna`）下沉；多角色就绪 |
-| R-9 | **M-3 / M-5 / M-7 / M-10** | 评审 | `_OBSERVED` 无锁全局态、`loop_runs` RMW 竞态（`finish_run` 条件更新 / JSONB append）、LLM 按时间窗记账、decision 版本号语义 |
-| R-10 | **M-6 / M-8 / M-9** | 评审 | 私有 API（`_GATE_BUDGET` / `_execute_plan_step` / `_day_bucket_key` / `_STATUS_DEGRADED`）公有化；Update 事件与 State Manager 对齐；`promote_degraded` 口径 |
+| ~~R-9~~ | ~~M-3 / M-5 / M-10~~ | 评审 | **已完成**：M-5 仅 `running` 可关（`e218889`）、M-10 decision 版本改 count（`3a6ba97`）、M-3 观察缓存加锁 + LRU 有界（`3a6ba97`）。**剩余 M-7（LLM 按时间窗记账 → 按 `run_id` 归因）未做**（需先确认 `llm_calls` 是否有 run 维度列，属跨表口径变更） |
+| R-10 | **M-6 / M-8 / M-9** | 评审 | **未做**：私有 API 公有化（4 处，机械但涉及跨模块导出面）；Update 事件与 State Manager 对齐（需先定事件语义：`MemoryUpdated` 是「已路由」还是「版本已推进」）；`promote_degraded` 口径（改则需同步锁 RT-016 断言） |
 | R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`）：`AGENTS.md` / `apps/backend/AGENTS.md` 迁移链尾 `0050` → `0052`；`current-system-architecture-baseline.md` 0001~0050 → 0001~0052 + §4 顶部 V3.0 形态与 H-1 裁决；`architecture.md` 状态由「仅设计」改为「Implemented」 |
 | R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`）：新增 `tests/e2e/test_foreground_cutover_parity.py` 6 例——全轮次流对照、台账差异、中段 LLM 失败、grounding 缓冲（流式/缓冲两态）、post_process 失败；两态各用独立用户消除跨轮状态干扰。**已注入式验证非空转**（让线性链跳过 `record_handoff` → 4/6 必红） |
 | R-13 | **L-1 / L-2 / L-4** | 评审 | 时区一致性、`state_update` → reason 映射命名、契约事件集版本 bump |
@@ -363,6 +363,10 @@ cd apps/backend
 | `ba25d72` | `refactor: 域读收口 services 门面`（H-3 Must-Fix 子集） |
 | `787e215` | `fix: 前台收编加总闸可回退线性旧链`（C-2） |
 | `34cb26a` | `refactor: 六段降级为影子实现并回写基线`（H-1 裁决 B + W-1 / W-2 文档回写） |
+| `c2d5141` | `test: 前台总闸两态流对照与故障注入`（C-2 补充 e2e，R-12） |
+| `ff7bfa3` | `docs: 登记 R-12 完成与 current_goal 发现`（R-14） |
+| `e218889` | `fix: loop_runs 仅 running 可关防扫掠覆盖`（M-5） |
+| `3a6ba97` | `fix: decision 版本改 count 与观察缓存加锁有界`（M-10 / M-3） |
 
 ---
 
