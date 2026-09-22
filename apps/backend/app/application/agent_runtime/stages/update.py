@@ -304,7 +304,11 @@ async def update(
         or datetime.now()
     )
     session_id = getattr(session_context, "session_id", None)
-    user_id = getattr(run, "user_id", None) or session_id
+    user_id = (
+        session_context.effective_user_id(getattr(run, "user_id", None))
+        if session_context is not None
+        else getattr(run, "user_id", None)
+    )
     character_id = (
         getattr(session_context, "character_id", None) or DEFAULT_CHARACTER_ID
     )

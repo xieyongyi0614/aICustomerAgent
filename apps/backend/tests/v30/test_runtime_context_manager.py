@@ -24,7 +24,11 @@ _DEFAULT = object()
 
 def _session():
     return SessionContext(
-        session_id="s-ctx", channel="web", external_user_id="ou-1", thread_id="t-1"
+        session_id="s-ctx",
+        channel="web",
+        external_user_id="ou-1",
+        user_id="u-ctx",
+        thread_id="t-1",
     )
 
 
@@ -219,3 +223,68 @@ def test_context_module_has_no_forbidden_imports():
         )
     ]
     assert offenders == []
+
+
+class TestIdentityResolution:
+    """H-4：装配主体身份解析——Run 优先、其次会话载体，绝不以 session_id 冒充。"""
+
+    pytestmark = pytest.mark.unit
+
+    def _capture(self, monkeypatch) -> list:
+        captured: list = []
+
+        async def _build(session_id, user_id, current_input, **kwargs):
+            captured.append(("build", session_id, user_id))
+            return _conversation()
+
+        def _world(user_id, session_id=None, _trace=None):
+            captured.append(("world", session_id, user_id))
+            return SimpleNamespace(scene="park")
+
+        def _snap(user_id, _character_id="asuna", _now=None):
+            captured.append(("snap", None, user_id))
+            return AgentStateSnapshot(snapshot_version=4)
+
+        def _ver(domain, _user_id, _character_id="asuna", _now=None):
+            return state_manager.StateVersion(domain, 1, "ledger", NOW, NOW)
+
+        monkeypatch.setattr(context_module.context_builder, "build", _build)
+        monkeypatch.setattr(context_module.world_engine, "build_context", _world)
+        monkeypatch.setattr(context_module.state_manager, "snapshot", _snap)
+        monkeypatch.setattr(context_module.state_manager, "version", _ver)
+        return captured
+
+    async def test_run_user_id_wins_over_session_id(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        await context_module.assemble(
+            _session(), _text_input(), run=SimpleNamespace(user_id="u-run")
+        )
+
+        assert captured, "装配未发生"
+        assert all(user_id == "u-run" for _kind, _session_id, user_id in captured)
+        # 会话 id 与主体 id 必须分离传递，不得互相冒充
+        build_calls = [entry for entry in captured if entry[0] == "build"]
+        assert build_calls[0][1] == "s-ctx"
+        assert build_calls[0][2] == "u-run"
+
+    async def test_session_context_user_id_used_without_run(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        await context_module.assemble(_session(), _text_input())
+
+        assert all(user_id == "u-ctx" for _kind, _session_id, user_id in captured)
+
+    async def test_unknown_identity_degrades_instead_of_using_session_id(
+        self, monkeypatch
+    ):
+        self._capture(monkeypatch)
+        anonymous = SessionContext(session_id="s-only")
+
+        result = await context_module.assemble(anonymous, _text_input())
+
+        assert result.user is None
+        assert result.character is None
+        assert result.world is None
+        assert [d.segment for d in result.degradations] == ["user"]
+        assert result.degradations[0].error == "unknown_user"

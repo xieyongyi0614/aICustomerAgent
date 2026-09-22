@@ -83,6 +83,7 @@ SESSION_CONTEXT_FIELDS: tuple[str, ...] = (
     "character_id",
     "channel",
     "external_user_id",
+    "user_id",
     "thread_id",
     "trigger_type",
     "run_id",
@@ -152,6 +153,7 @@ class SessionContext:
     character_id: str = DEFAULT_CHARACTER_ID
     channel: str | None = None
     external_user_id: str | None = None
+    user_id: str | None = None
     thread_id: str | None = None
     trigger_type: str = TRIGGER_CHANNEL_MESSAGE
     run_id: str | None = None
@@ -160,6 +162,14 @@ class SessionContext:
     def __post_init__(self) -> None:
         if not self.session_id or not self.session_id.strip():
             raise ValueError("session_id 不能为空")
+
+    def effective_user_id(self, run_user_id: str | None = None) -> str | None:
+        """本次 Run 的装配主体身份：Run 显式身份优先，其次本载体的 `user_id`。
+
+        **绝不用 `session_id` 兜底**（RT-ALL-code-review H-4）：二者在生产可分离，
+        混用会读到错误主体的记忆 / 世界 / 角色状态。二者皆缺时返回 None，由调用方降级。
+        """
+        return run_user_id or self.user_id
 
 
 @dataclass(frozen=True, slots=True)

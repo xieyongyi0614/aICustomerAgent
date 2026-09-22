@@ -1,17 +1,14 @@
-"""Runtime Observability 查询面（RT-019）：Debug / Replay / Evaluation 只读取材。
+"""Runtime Observability 查询面（RT-019）：Debug / Replay 的**仓储级只读**读面。
 
-三种消费场景（architecture §7.2）共用同一读面，**零写入**（V7.5 Evaluation 铁律）：
+分层纪律（RT-ALL-code-review H-2）：本模块位于 `services`，**只依赖 `app.repositories`**，
+不得 import `app.application.agent_runtime`（允许方向是 application → services）。
+因此这里只做「按 run / session / correlation 取行」，不含任何运行时语义派生；
+段序 / 错误类型映射与回放组合由上层门面 `application/agent_runtime/debug_view.py` 完成。
 
-- **Debug**：`by_run_id` / `by_session` / `by_correlation`——段顺序、耗时、降级原因、
-  `ErrorKind` 与因果链（`correlation_id`）关联集。
-- **Replay**：`replay_bundle`——以 `agent_state_snapshots` 为时点锚点的只读包
-  （锚点 + 决策 + 行动 + 状态变更 + trace），不执行任何副作用。
-- **Evaluation**：`execution_history.history_for_run`（RT-018 投影）+ 既有指标。
+- **Debug**：`by_run_id` / `by_session` / `by_correlation`——段顺序、耗时、降级原因与因果链关联集。
+- **Replay / Evaluation**：见 `application/agent_runtime/debug_view.py`（组合 RT-018 执行历史投影）。
 
-关联策略（D2/D3）：段序以 `loop_runs.steps` 为权威，`runtime_traces` 为补充；
-`ErrorKind` 由 `loop.STAGE_TO_PHASE` / `ERROR_KIND_BY_PHASE`（唯一映射表）派生，
-未知阶段（`abort` / `orphan_sweep` 等伪步骤）标记缺失而非报错；`correlation_id`
-只来自既有链路（Run / 段事件 / RT-017 主动链），本模块不新造键。
+零写入（V7.5 Evaluation 铁律）：全部为只读查询。
 """
 
 from __future__ import annotations
@@ -22,7 +19,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.application.agent_runtime import execution_history
 from app.repositories import (
     action_repository,
     decision_repository,
@@ -42,7 +38,11 @@ DEFAULT_CORRELATION_LIMIT = 200
 
 @dataclass(frozen=True, slots=True)
 class RunDebugView:
-    """一次 Run 的调试视图：段顺序 / 耗时 / 降级 / 预算账户。"""
+    """一次 Run 的台账视图（段顺序 / 耗时 / 降级 / 预算）。
+
+    `stages` 原样承载 `loop_runs.steps` 的条目（含 `phase` / `error_kind`，若产生方已落账）；
+    本层不派生任何运行时语义。
+    """
 
     run_id: str
     session_id: str | None
@@ -74,18 +74,6 @@ class RunDebugView:
         return self.run_id
 
 
-@dataclass(frozen=True, slots=True)
-class ReplayBundle:
-    """只读回放包：调用方自行比对时点，不执行任何副作用（D4）。"""
-
-    run_id: str
-    snapshot_anchor: Mapping[str, Any] | None
-    decisions: tuple[Mapping[str, Any], ...]
-    actions: tuple[Mapping[str, Any], ...]
-    state_changes: tuple[Mapping[str, Any], ...]
-    traces: tuple[Mapping[str, Any], ...]
-
-
 def _row_mapping(row: Any) -> dict[str, Any]:
     if row is None:
         return {}
@@ -99,27 +87,6 @@ def _row_mapping(row: Any) -> dict[str, Any]:
     return {name: getattr(row, name) for name in vars(row) if not name.startswith("_")}
 
 
-def _annotate_stages(steps: Any) -> tuple[Mapping[str, Any], ...]:
-    """`loop_runs.steps` → 调试视图条目，补 `phase` / `error_kind`（映射表派生）。"""
-    raw = [step for step in (steps or []) if isinstance(step, Mapping)]
-    try:
-        from app.application.agent_runtime.loop import (
-            ERROR_KIND_BY_PHASE,
-            STAGE_TO_PHASE,
-        )
-    except Exception:  # noqa: BLE001 — 调试视图不得因映射不可用而失败
-        logger.exception("段映射不可用，调试视图只返回原始步骤")
-        return tuple(dict(step) for step in raw)
-    annotated: list[Mapping[str, Any]] = []
-    for step in raw:
-        item = dict(step)
-        phase = STAGE_TO_PHASE.get(str(item.get("step") or ""))
-        item["phase"] = phase
-        item["error_kind"] = ERROR_KIND_BY_PHASE.get(phase) if phase else None
-        annotated.append(item)
-    return tuple(annotated)
-
-
 def _view_of(row: Any) -> RunDebugView:
     return RunDebugView(
         run_id=row.id,
@@ -129,14 +96,16 @@ def _view_of(row: Any) -> RunDebugView:
         status=row.status,
         started_at=row.started_at,
         finished_at=row.finished_at,
-        stages=_annotate_stages(row.steps),
+        stages=tuple(
+            dict(step) for step in (row.steps or []) if isinstance(step, Mapping)
+        ),
         llm_call_count=int(row.llm_call_count or 0),
         budget_state=dict(row.budget_state or {}),
     )
 
 
 def by_run_id(run_id: str) -> RunDebugView | None:
-    """按 `run_id` 还原一次 Run 的段顺序、耗时、降级与错误（AC1）。"""
+    """按 `run_id` 取一次 Run 的台账视图（段顺序 / 耗时 / 降级 / 错误）。"""
     row = loop_run_repository.get(run_id)
     return _view_of(row) if row is not None else None
 
@@ -198,18 +167,3 @@ def by_correlation(
         _put(entries, LAYER_ACTION, record.id, _row_mapping(record))
 
     return list(entries.values())
-
-
-def replay_bundle(run_id: str) -> ReplayBundle | None:
-    """只读回放包：取材委托 RT-018 执行历史投影（零写入、零副作用）。"""
-    history = execution_history.history_for_run(run_id)
-    if history is None:
-        return None
-    return ReplayBundle(
-        run_id=history.run_id,
-        snapshot_anchor=history.snapshot_anchor,
-        decisions=history.decisions,
-        actions=history.actions,
-        state_changes=history.state_changes,
-        traces=history.traces,
-    )

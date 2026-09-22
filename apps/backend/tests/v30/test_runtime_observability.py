@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from app.application import observability
+from app.application.agent_runtime import debug_view as debug_view_module
 from app.application.agent_runtime import execution_history
 from app.application.agent_runtime.controller import open_run
 from app.application.agent_runtime.loop import AgentLoop, stage_phase
@@ -38,12 +39,14 @@ from app.services.observability import trace_query
 from app.services.trace_collector import TurnTraceSession
 
 QUERY_PATH = Path(trace_query.__file__)
+FACADE_PATH = Path(debug_view_module.__file__)
 FORBIDDEN = (
     "app.chains",
     "app.prompts",
     "app.channels",
     "app.api",
     "app.core.db",
+    "app.application",
     "agent_evaluation",
     "evaluation_rules",
 )
@@ -248,7 +251,7 @@ class TestDebugView:
             budget_state={"status": "ok"},
         )
 
-        view = trace_query.by_run_id(run.id)
+        view = debug_view_module.debug_view(run.id)
 
         assert view is not None
         assert [stage["step"] for stage in view.stages] == [
@@ -266,7 +269,7 @@ class TestDebugView:
         assert view.llm_call_count == 2
         assert view.budget_state == {"status": "ok"}
         assert view.correlation_id == run.id
-        assert trace_query.by_run_id("missing-run") is None
+        assert debug_view_module.debug_view("missing-run") is None
 
     def test_by_session_returns_ordered_runs(self, db_session_factory):
         base = datetime.now() - timedelta(hours=2)
@@ -284,13 +287,13 @@ class TestDebugView:
             )
             created.append(row.id)
 
-        views = trace_query.by_session("S-ordered")
+        views = debug_view_module.debug_views_for_session("S-ordered")
 
         assert [view.run_id for view in views] == [created[1], created[2], created[0]]
         assert [view.started_at for view in views] == sorted(
             view.started_at for view in views
         )
-        assert trace_query.by_session("S-empty") == []
+        assert debug_view_module.debug_views_for_session("S-empty") == []
 
     def test_debug_view_includes_degradation_reason(self, db_session_factory):
         steps = [
@@ -309,7 +312,7 @@ class TestDebugView:
             loop_run_repository.mark_step(run.id, step)
         loop_run_repository.finish_run(run.id, status="degraded", steps=steps)
 
-        view = trace_query.by_run_id(run.id)
+        view = debug_view_module.debug_view(run.id)
 
         assert view is not None
         assert view.degraded is True
@@ -328,7 +331,7 @@ class TestDebugView:
             run.id, {"step": "orphan_sweep", "status": "error", "error": "orphan_timeout"}
         )
 
-        view = trace_query.by_run_id(run.id)
+        view = debug_view_module.debug_view(run.id)
 
         assert view is not None
         assert view.stages[0]["phase"] is None
@@ -455,7 +458,7 @@ class TestReplayBundle:
         loop_run_repository.finish_run(run.id, status="done")
 
         before = _row_counts(db_session_factory)
-        bundle = trace_query.replay_bundle(run.id)
+        bundle = debug_view_module.replay_bundle(run.id)
         after = _row_counts(db_session_factory)
 
         assert bundle is not None
@@ -466,7 +469,7 @@ class TestReplayBundle:
         assert [item["id"] for item in bundle.actions] == [action.id]
         assert [item["id"] for item in bundle.traces] == ["tr-replay"]
         assert before == after
-        assert trace_query.replay_bundle("missing-run") is None
+        assert debug_view_module.replay_bundle("missing-run") is None
 
     def test_retention_and_sampling_unchanged(
         self, db_session_factory, override_settings, monkeypatch
@@ -524,6 +527,24 @@ class TestQueryDiscipline:
         assert offenders == []
         assert "SessionLocal" not in _identifiers(QUERY_PATH)
 
+    def test_services_query_layer_does_not_depend_on_runtime(self):
+        """H-2 分层护栏：services 读面不得 import application.agent_runtime。"""
+        imported = _imported_modules(QUERY_PATH)
+        reverse = [
+            name
+            for name in imported
+            if name == "app.application" or name.startswith("app.application.")
+        ]
+
+        assert reverse == []
+        # 反向依赖必须由上层门面承担，且门面确实在 application 层
+        assert "app.application.agent_runtime.execution_history" in _imported_modules(
+            FACADE_PATH
+        )
+        assert "app.services.observability" in {
+            name.rsplit(".", 1)[0] for name in _imported_modules(FACADE_PATH)
+        }
+
     def test_query_surface_is_read_only(self, db_session_factory, monkeypatch):
         run = loop_run_repository.create_run(
             user_id="u-ro", kind="chat", reason="rt019-ro", session_id="S-ro"
@@ -564,13 +585,13 @@ class TestQueryDiscipline:
             for name in names:
                 monkeypatch.setattr(module, name, _boom)
 
-        assert trace_query.by_run_id(run.id) is not None
-        assert trace_query.by_session("S-ro")
+        assert debug_view_module.debug_view(run.id) is not None
+        assert debug_view_module.debug_views_for_session("S-ro")
         assert trace_query.by_correlation(run.id)
-        assert trace_query.replay_bundle(run.id) is not None
+        assert debug_view_module.replay_bundle(run.id) is not None
 
     def test_replay_bundle_delegates_to_execution_history(self):
-        imported = _imported_modules(QUERY_PATH)
+        imported = _imported_modules(FACADE_PATH)
 
         assert "app.application.agent_runtime.execution_history" in imported
         assert callable(execution_history.history_for_run)
@@ -587,7 +608,7 @@ class TestFullChain:
             _drive_loop(RUN_KIND_FOREGROUND_CHAT, user_id="u-fg", session_id="S-fg")
         )
 
-        view = trace_query.by_run_id(run.run_id)
+        view = debug_view_module.debug_view(run.run_id)
 
         assert view is not None
         assert result.status == "done"
@@ -614,7 +635,7 @@ class TestFullChain:
             )
         )
 
-        view = trace_query.by_run_id(run.run_id)
+        view = debug_view_module.debug_view(run.run_id)
 
         assert view is not None
         assert result.status == "degraded"

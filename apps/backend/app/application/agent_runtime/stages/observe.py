@@ -194,7 +194,11 @@ def _build_world_fact(
         if runtime_context is not None:
             payload = runtime_context.world.payload if runtime_context.world else None
         else:
-            user_id = session_context.session_id if session_context is not None else None
+            user_id = (
+                session_context.effective_user_id()
+                if session_context is not None
+                else None
+            )
             payload = world_engine.collect_facts(user_id) if user_id else None
     except Exception as exc:  # noqa: BLE001 — 感知失败只降级，不中断 Run（D5）
         degradations.append(
@@ -234,7 +238,9 @@ def _build_character_fact(
     if runtime_state is not None:
         agent_state = runtime_state.snapshot
     else:
-        user_id = session_context.session_id if session_context is not None else None
+        user_id = (
+            session_context.effective_user_id() if session_context is not None else None
+        )
         if not user_id:
             return None
         character_id = (

@@ -36,16 +36,20 @@ def build_session_context(
     character_id: str = DEFAULT_CHARACTER_ID,
     channel: str | None = None,
     external_user_id: str | None = None,
+    user_id: str | None = None,
     thread_id: str | None = None,
     trigger_type: str = TRIGGER_CHANNEL_MESSAGE,
     run_id: str | None = None,
     now: datetime | None = None,
 ) -> SessionContext:
+    """`user_id` 是**内部主体身份**，与 `session_id` 语义不同（H-4）：能确定时必须显式传入，
+    禁止以 `session_id` 兜底。渠道侧只知 `external_user_id` 时可留空，由 Run 提供。"""
     return SessionContext(
         session_id=session_id,
         character_id=character_id,
         channel=channel,
         external_user_id=external_user_id,
+        user_id=user_id,
         thread_id=thread_id,
         trigger_type=trigger_type,
         run_id=run_id,

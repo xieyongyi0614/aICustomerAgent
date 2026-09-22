@@ -47,6 +47,7 @@ FORBIDDEN_IMPORTS = (
 FORBIDDEN_WRITE_TOKENS = ("session.add", ".commit(", "INSERT ", "UPDATE ", "DELETE ")
 
 SESSION_ID = "S-observe"
+USER_ID = "u-observe"
 OBSERVED_AT = datetime(2026, 9, 21, 12, 0, 0)
 
 
@@ -88,6 +89,7 @@ def _session(**overrides):
         SESSION_ID,
         channel="web",
         external_user_id="u-ext",
+        user_id=USER_ID,
         thread_id="th-1",
         run_id="r-observe",
         now=OBSERVED_AT,
@@ -240,7 +242,8 @@ class TestFactSetSources:
             _runtime_input(), _session(), runtime_state=frozen
         )
         assert without_context.world == WorldFact(payload={"location": "家"})
-        assert calls == [SESSION_ID]
+        # H-4：世界读面用真实主体身份，不得以 session_id 冒充 user_id
+        assert calls == [USER_ID]
 
     def test_world_fact_without_identity_stays_empty(self, monkeypatch):
         calls: list = []

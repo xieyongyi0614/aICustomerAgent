@@ -99,7 +99,18 @@ def _segment_chars(segment: Any) -> int:
         return len(repr(segment))
 
 
+def _resolve_user_id(session_context: SessionContext, run) -> str | None:
+    """解析本次装配的 `user_id`：Run 显式身份优先，其次会话载体声明。
+
+    **绝不**用 `session_id` 兜底（RT-ALL-code-review H-4）：`session_id` 与 `user_id`
+    在生产可分离，混用会读到错误主体的记忆 / 世界 / 角色状态。二者皆缺时返回 None，
+    由 `assemble` 降级为空段。
+    """
+    return session_context.effective_user_id(getattr(run, "user_id", None))
+
+
 async def _build_user_segment(
+    user_id: str,
     session_context: SessionContext,
     runtime_input: RuntimeInput | None,
     trace,
@@ -108,7 +119,7 @@ async def _build_user_segment(
     try:
         conversation = await context_builder.build(
             session_context.session_id,
-            session_context.session_id,
+            user_id,
             _current_input(runtime_input),
             trace=trace,
         )
@@ -142,6 +153,7 @@ def _build_memory_segment(
 
 
 async def _build_character_segment(
+    user_id: str,
     session_context: SessionContext,
     time_point: datetime,
     degradations: list[ContextDegradation],
@@ -149,7 +161,7 @@ async def _build_character_segment(
     try:
         agent_state = await asyncio.to_thread(
             state_manager.snapshot,
-            session_context.session_id,
+            user_id,
             session_context.character_id,
             time_point,
         )
@@ -158,7 +170,7 @@ async def _build_character_segment(
             versions[domain] = await asyncio.to_thread(
                 state_manager.version,
                 domain,
-                session_context.session_id,
+                user_id,
                 session_context.character_id,
                 time_point,
             )
@@ -173,6 +185,7 @@ async def _build_character_segment(
 
 
 async def _build_world_segment(
+    user_id: str,
     session_context: SessionContext,
     trace,
     degradations: list[ContextDegradation],
@@ -180,7 +193,7 @@ async def _build_world_segment(
     try:
         payload = await asyncio.to_thread(
             world_engine.build_context,
-            session_context.session_id,
+            user_id,
             session_context.session_id,
             trace,
         )
@@ -230,14 +243,23 @@ async def assemble(
     time_point = now or getattr(run, "started_at", None) or datetime.now()
     degradations: list[ContextDegradation] = []
 
-    user_segment = await _build_user_segment(
-        session_context, runtime_input, trace, degradations
-    )
+    user_id = _resolve_user_id(session_context, run)
+    if user_id is None:
+        degradations.append(ContextDegradation("user", "unknown_user"))
+        user_segment = None
+        character_segment = None
+        world_segment = None
+    else:
+        user_segment = await _build_user_segment(
+            user_id, session_context, runtime_input, trace, degradations
+        )
+        character_segment = await _build_character_segment(
+            user_id, session_context, time_point, degradations
+        )
+        world_segment = await _build_world_segment(
+            user_id, session_context, trace, degradations
+        )
     memory_segment = _build_memory_segment(user_segment, degradations)
-    character_segment = await _build_character_segment(
-        session_context, time_point, degradations
-    )
-    world_segment = await _build_world_segment(session_context, trace, degradations)
 
     segments: dict[str, Any] = {
         "user": user_segment,
