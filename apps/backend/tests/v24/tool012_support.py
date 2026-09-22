@@ -18,6 +18,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from tests.support.schema_pins import (
+    MIGRATION_HEAD,
+    SCHEMA_COLUMNS_DIGEST,
+    SCHEMA_TABLE_COUNT,
+)
+from tests.support.schema_pins import SCHEMA_PREVIOUS_HEAD as MIGRATION_HEAD_PREVIOUS
+
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"
 REPO_ROOT = BACKEND_ROOT.parents[1]
@@ -60,8 +67,8 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 52
-MIGRATION_BREAKPOINT = "0052_runtime_session_trace_links.py"
+MIGRATION_FILE_COUNT_CURRENT = 53
+MIGRATION_BREAKPOINT = "0053_life_user_identity.py"
 MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0046_tool_insight_types.py",
     "0047_action_schedules_priority.py",
@@ -70,21 +77,20 @@ MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0050_feishu_dedupe_ledger.py",
     "0051_feishu_deliveries.py",
     "0052_runtime_session_trace_links.py",
+    "0053_life_user_identity.py",
 )
-MIGRATION_HEAD = "0052"
-MIGRATION_HEAD_PREVIOUS = "0051"
+
 V23_MIGRATION_TAIL: tuple[str, ...] = (
     "0047_action_schedules_priority.py",
     "0048_action_records_run_id.py",
 )
 
-SCHEMA_TABLE_COUNT = 45
-SCHEMA_TABLE_SET_DIGEST = "66f03c348e5e31b9"
-SCHEMA_COLUMNS_DIGEST = "15877999c31979d2"
+SCHEMA_TABLE_SET_DIGEST = "2739ee32d55e63b6"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "7d865b081dc179c1"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",
+    "users",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"

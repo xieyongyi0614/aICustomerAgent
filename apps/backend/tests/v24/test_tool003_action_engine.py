@@ -513,10 +513,12 @@ def test_action_record_model_priority_field_present():
 
 
 def test_no_new_migrations_for_tool_system():
+    from tests.support.schema_pins import MIGRATION_HEAD
+
     versions = sorted(
         path.name for path in (BACKEND_ROOT / "migrations" / "versions").glob("*.py")
     )
-    assert versions[-1].startswith("0052_")
+    assert versions[-1].startswith(f"{MIGRATION_HEAD}_")
     assert len(versions) == len({name[:4] for name in versions})
     for name in versions:
         assert "v24_tool" not in name

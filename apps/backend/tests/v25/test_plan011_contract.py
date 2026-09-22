@@ -22,6 +22,7 @@ import io
 import tokenize
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 from app.api.v1 import debug as debug_api
 from app.core.db import Base
 from app.repositories import goal_repository
@@ -680,7 +681,7 @@ class TestDebugSurfaceDiscipline:
             assert table in tables, table
         assert "plan_debug_projection" not in tables
 
-    def test_migration_chain_head_is_still_0052(self):
+    def test_migration_chain_head_matches_pin(self):
         import re
 
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
@@ -689,5 +690,5 @@ class TestDebugSurfaceDiscipline:
             for path in versions.glob("*.py")
             if (match := re.match(r"(\d+)_", path.name))
         )
-        assert max(numbered) == 52
-        assert f"{max(numbered):04d}" == "0052"
+        assert max(numbered) == int(MIGRATION_HEAD)
+        assert f"{max(numbered):04d}" == MIGRATION_HEAD

@@ -35,14 +35,17 @@ def test_indexes_declared():
     assert "ix_runtime_traces_correlation_id" in trace_indexes
 
 
-def test_migration_chain_head_is_0052():
+def test_migration_chain_head_matches_pin():
+    from tests.support.schema_pins import MIGRATION_HEAD, SCHEMA_PREVIOUS_HEAD
+
     config = Config(str(BACKEND_ROOT / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["0052"]
+    assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision("0052")
     assert revision is not None
     assert revision.down_revision == "0051"
+    assert script.get_revision(SCHEMA_PREVIOUS_HEAD) is not None
 
 
 def test_migration_has_upgrade_and_downgrade_for_both_columns():

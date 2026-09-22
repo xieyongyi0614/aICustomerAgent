@@ -9,6 +9,7 @@
 import re
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 from app.models.goal import validate_sub_goals
 from app.repositories import goal_repository
 from app.services.planning import decompose as decompose_mod
@@ -25,7 +26,6 @@ from .plan004_support import (
     tool_criteria,
 )
 
-MIGRATION_HEAD = "0052"
 
 VERSIONS_DIR = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
 
@@ -165,7 +165,7 @@ class TestQ4FreezeIsRecorded:
 class TestZeroMigrationAndZeroWrite:
     """I11：迁移链头 `0046`；本任务零写入（拆解只产内存态结果）。"""
 
-    def test_migration_chain_head_is_still_0052(self):
+    def test_migration_chain_head_matches_pin(self):
         numbered = sorted(
             int(match.group(1))
             for path in VERSIONS_DIR.glob("*.py")
@@ -173,7 +173,7 @@ class TestZeroMigrationAndZeroWrite:
         )
         assert numbered, "未找到迁移文件"
         assert f"{max(numbered):04d}" == MIGRATION_HEAD
-        assert max(numbered) == 52
+        assert max(numbered) == int(MIGRATION_HEAD)
 
     def test_decompose_writes_nothing_to_the_plan_face(
         self, db_session_factory, make_goal

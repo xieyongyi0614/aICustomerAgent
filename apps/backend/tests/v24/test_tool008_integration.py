@@ -68,9 +68,14 @@ MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
     "behavior_pattern",
 )
 
-MIGRATION_COUNT = 52
+from tests.support.schema_pins import (
+    MIGRATION_HEAD,
+    SCHEMA_TABLE_COUNT,
+)
 
-TABLE_COUNT = 45
+MIGRATION_COUNT = int(MIGRATION_HEAD)
+
+TABLE_COUNT = SCHEMA_TABLE_COUNT
 
 MEMORY_BRIDGE_LOGGER = "app.services.action.memory_bridge"
 

@@ -25,6 +25,7 @@
 import re
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 from app.models.observability import DecisionKind
 from app.repositories import goal_repository
 from app.services.planning import context as plan_context
@@ -33,7 +34,6 @@ from app.services.planning import goal_contract
 from . import _plan_scan as scan
 from . import plan008_support as support
 
-MIGRATION_HEAD = "0052"
 
 RELATIONSHIP_WRITE_MODULE_PREFIXES = (
     "app.repositories.relationship",
@@ -224,7 +224,7 @@ class TestIntentSurfaceScan:
 class TestZeroMigration:
     """I10 / §10.3：迁移链头 0046、零新表新列、`world_events.type` 值域未扩。"""
 
-    def test_migration_chain_head_is_still_0052(self):
+    def test_migration_chain_head_matches_pin(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))

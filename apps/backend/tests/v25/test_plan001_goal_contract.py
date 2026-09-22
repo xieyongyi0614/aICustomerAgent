@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from typing import get_args
 
+from tests.support.schema_pins import MIGRATION_HEAD
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import CheckConstraint
@@ -228,7 +229,6 @@ NON_PLANNING_WRITE_FACE = (
     "seed_goals",
 )
 
-MIGRATION_HEAD = "0052"
 
 
 def _check_names(table) -> tuple[str, ...]:
@@ -533,7 +533,7 @@ def test_existing_planning_and_observation_reason_codes_are_frozen():
             assert getattr(module, attribute) == value, (module_name, attribute)
 
 
-def test_migration_chain_head_is_still_0052():
+def test_migration_chain_head_matches_pin():
     versions_dir = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
     numbered = sorted(
         int(match.group(1))

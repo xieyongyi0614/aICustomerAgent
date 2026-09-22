@@ -60,4 +60,4 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
 )
 
 V40_SETTINGS_FIELDS: dict[str, str] = {}
-"""V4.0 新增参数类字段（字段名 → 归属 Task）。PLA-018 新增为零（只改既有默认值）。"""
+"""V4.0 新增参数类字段（字段名 → 归属 Task）。PLA-001 / PLA-018 新增为零。"""

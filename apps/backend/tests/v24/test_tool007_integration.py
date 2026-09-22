@@ -333,8 +333,10 @@ def test_no_new_tables_in_metadata():
 
     计数随版本演进推进（当前 44：FEISHU-010 的 `feishu_dedupe_ledger`）。
     """
+    from tests.support.schema_pins import SCHEMA_TABLE_COUNT
+
     assert set(WORLD_TABLES) <= set(Base.metadata.tables)
-    assert len(Base.metadata.tables) == 45
+    assert len(Base.metadata.tables) == SCHEMA_TABLE_COUNT
 
 
 def test_world_engine_has_no_tool_layer_dependency():

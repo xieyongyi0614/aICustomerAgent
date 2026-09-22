@@ -23,6 +23,7 @@ from app.core.settings.database import DatabaseSettings
 from app.core.settings.evaluation import EvaluationSettings
 from app.core.settings.feishu import FeishuSettings
 from app.core.settings.goal import GoalSettings
+from app.core.settings.life import LifeSettings
 from app.core.settings.life_loop import LifeLoopSettings
 from app.core.settings.llm import LlmProfile, LlmSettings
 from app.core.settings.memory import MemorySettings
@@ -51,6 +52,7 @@ class Settings(
     RelationshipEvolvedSettings,
     RelationshipSettings,
     GoalSettings,
+    LifeSettings,
     AutonomySettings,
     LifeLoopSettings,
     AutonomyAdvancedSettings,

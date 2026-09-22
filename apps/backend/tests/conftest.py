@@ -93,6 +93,7 @@ from app.repositories import (
     summary_repository,
     trace_repository,
     trigger_registry_repository,
+    user_repository,
     world_repository,
     world_simulation_repository,
 )
@@ -132,6 +133,7 @@ _REPO_MODULES = (
     relationship_milestone_repository,
     relationship_conflict_repository,
     relationship_snapshot_repository,
+    user_repository,
 )
 
 _SERVICE_DB_MODULES = (

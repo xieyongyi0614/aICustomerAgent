@@ -14,6 +14,7 @@ import re
 import tokenize
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 from app.core.settings import get_settings
 from app.models.reflection import (
     EVIDENCE_CHANNEL_PLAN,
@@ -28,7 +29,6 @@ from app.services.reflection import evidence as reflection_evidence
 from . import _plan_scan as scan
 from . import plan010_support as support
 
-MIGRATION_HEAD = "0052"
 
 LISTENER_PATH = scan.PLANNING_PACKAGE_DIR / "revision_listener.py"
 EVIDENCE_PATH = support.repo_root() / "app" / "services" / "reflection" / "evidence.py"
@@ -284,7 +284,7 @@ class TestStagePosition:
 class TestZeroMigration:
     """I12 / §10.3：迁移链头 0046；值集与 job_type 未扩。"""
 
-    def test_migration_chain_head_is_still_0052(self):
+    def test_migration_chain_head_matches_pin(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))
@@ -292,7 +292,7 @@ class TestZeroMigration:
             if (match := re.match(r"(\d+)_", path.name))
         )
         assert f"{max(numbered):04d}" == MIGRATION_HEAD
-        assert max(numbered) == 52
+        assert max(numbered) == int(MIGRATION_HEAD)
 
     def test_insight_type_and_scope_value_sets_are_unexpanded(self):
         from typing import get_args

@@ -9,6 +9,7 @@ import ast
 import re
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 from app.models.observability import DecisionKind
 from app.repositories import goal_repository
 from app.services.planning import executor_bridge, observer, scheduler
@@ -49,7 +50,6 @@ FORBIDDEN_IO_PREFIXES = (
     "httpx",
 )
 
-MIGRATION_HEAD = "0052"
 
 PLANNING_PACKAGE_MODULES = (
     "__init__.py",
@@ -233,7 +233,7 @@ class TestRedLines:
 class TestZeroMigration:
     """I14 / §10.3：迁移链头 0046、`ck_decision_records_kind` 五值、零新表新列。"""
 
-    def test_migration_chain_head_is_still_0052(self):
+    def test_migration_chain_head_matches_pin(self):
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         numbered = sorted(
             int(match.group(1))

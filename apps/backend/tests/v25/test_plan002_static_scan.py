@@ -7,6 +7,7 @@
 import re
 from pathlib import Path
 
+from tests.support.schema_pins import MIGRATION_HEAD
 import pytest
 from sqlalchemy import CheckConstraint
 
@@ -71,7 +72,6 @@ PLAN_002_GOAL_PLAN_FIELDS = (
     "evidence_refs",
 )
 
-MIGRATION_HEAD = "0052"
 
 PLAN_TABLES_SNAPSHOT = ("daily_plans", "goal_plans")
 
@@ -138,7 +138,7 @@ def test_i6_plan_context_hard_dependency_is_the_tool_surface_type():
     assert PlanContext.model_fields["budget"].is_required()
 
 
-def test_i7_migration_chain_head_is_still_0052():
+def test_i7_migration_chain_head_matches_pin():
     numbered = sorted(
         int(match.group(1))
         for path in VERSIONS_DIR.glob("*.py")
@@ -146,7 +146,7 @@ def test_i7_migration_chain_head_is_still_0052():
     )
     assert numbered, "未找到迁移文件"
     assert f"{max(numbered):04d}" == MIGRATION_HEAD
-    assert max(numbered) == 52
+    assert max(numbered) == int(MIGRATION_HEAD)
 
 
 def test_i7_goal_plans_table_carries_no_new_column():
