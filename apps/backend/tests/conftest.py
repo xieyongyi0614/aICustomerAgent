@@ -77,6 +77,7 @@ from app.repositories import (
     feishu_dedupe_ledger_repository,
     feishu_delivery_ledger_repository,
     goal_repository,
+    ledger_repository,
     llm_call_repository,
     loop_run_repository,
     memory_repository,
@@ -134,6 +135,7 @@ _REPO_MODULES = (
     relationship_conflict_repository,
     relationship_snapshot_repository,
     user_repository,
+    ledger_repository,
 )
 
 _SERVICE_DB_MODULES = (

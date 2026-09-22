@@ -1,0 +1,16 @@
+SEED_CATEGORY_TREE = (
+    {"name": "餐饮", "kind": "expense", "parent_name": None, "aliases": ["吃饭", "外卖", "快餐"]},
+    {"name": "早餐", "kind": "expense", "parent_name": "餐饮", "aliases": ["早饭"]},
+    {"name": "午餐", "kind": "expense", "parent_name": "餐饮", "aliases": ["午饭", "盖浇饭"]},
+    {"name": "晚餐", "kind": "expense", "parent_name": "餐饮", "aliases": ["晚饭"]},
+    {"name": "交通", "kind": "expense", "parent_name": None, "aliases": ["打车", "地铁", "公交"]},
+    {"name": "购物", "kind": "expense", "parent_name": None, "aliases": ["买东西", "网购"]},
+    {"name": "居住", "kind": "expense", "parent_name": None, "aliases": ["房租", "水电", "物业"]},
+    {"name": "医疗", "kind": "expense", "parent_name": None, "aliases": ["看病", "药"]},
+    {"name": "娱乐", "kind": "expense", "parent_name": None, "aliases": ["电影", "游戏", "聚会"]},
+    {"name": "学习", "kind": "expense", "parent_name": None, "aliases": ["书", "课程"]},
+    {"name": "人情", "kind": "expense", "parent_name": None, "aliases": ["礼物", "红包"]},
+    {"name": "其他", "kind": "expense", "parent_name": None, "aliases": []},
+    {"name": "工资", "kind": "income", "parent_name": None, "aliases": ["薪资"]},
+    {"name": "其他收入", "kind": "income", "parent_name": None, "aliases": ["零花", "退款"]},
+)
