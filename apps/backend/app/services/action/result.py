@@ -1,5 +1,6 @@
 """V2.6.0 ActionResult 统一契约与投影映射（architecture.md §8.4）。"""
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
@@ -10,6 +11,8 @@ from app.models.action import (
     CapabilityResult,
     FailureKind,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -28,6 +31,46 @@ def ensure_result_identity(result: ActionResult, action_id: str) -> ActionResult
     if result.created_at is None:
         result = result.model_copy(update={"created_at": _now()})
     return result
+
+
+def from_record_or_gate(record: Any, *, now: datetime | None = None) -> ActionResult:
+    """记录 → `ActionResult`；未进入执行（闸门拦截 / 装配失败）时合成失败结果。"""
+    now = now or _now()
+    payload = getattr(record, "result", None)
+    if isinstance(payload, dict) and payload:
+        try:
+            return ActionResult.model_validate(payload)
+        except Exception:
+            logger.exception("行动结果反序列化失败，按闸门结果合成：%s", getattr(record, "id", None))
+    gate_reason = getattr(record, "gate_reason", None)
+    return ActionResult(
+        id=make_result_id(),
+        action_id=record.id,
+        status="failed",
+        failure_kind=(
+            "unavailable" if gate_reason == "capability_unavailable" else "permanent"
+        ),
+        error=str(gate_reason or getattr(record, "status", "failed"))[:120],
+        metadata={
+            "gate_reason": gate_reason,
+            "record_status": getattr(record, "status", None),
+            "source": "act_stage",
+        },
+        created_at=now,
+    )
+
+
+def stage_failure(*, action_id: str, error: str, now: datetime | None = None) -> ActionResult:
+    now = now or _now()
+    return ActionResult(
+        id=make_result_id(),
+        action_id=action_id,
+        status="failed",
+        failure_kind="transient",
+        error=error[:120],
+        metadata={"source": "act_stage", "stage_error": error},
+        created_at=now,
+    )
 
 
 def _coerce_effects(raw_effects: Any) -> list[ActionEffect]:

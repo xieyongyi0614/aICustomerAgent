@@ -22,6 +22,7 @@ Runtime 的**唯一出站面**（architecture §8.1）：`Agent Runtime → Outb
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -41,26 +42,31 @@ TRACE_STEP_OUTBOUND = "outbound_deliver"
 """投递结果落 Trace 的 step 名（含 `ok` / `error` / `external_message_id`）。"""
 
 _adapters: dict[str, ChannelAdapter] = {}
+_ADAPTERS_LOCK = threading.Lock()
 
 
 def register_adapter(channel: str, adapter: ChannelAdapter) -> None:
     """注册渠道适配器（**组合根职责**：`app/main.py` 启动期一次）。"""
     if not channel or not channel.strip():
         raise ValueError("channel 不能为空")
-    _adapters[channel] = adapter
+    with _ADAPTERS_LOCK:
+        _adapters[channel] = adapter
 
 
 def resolve_adapter(channel: str) -> ChannelAdapter | None:
-    return _adapters.get(channel)
+    with _ADAPTERS_LOCK:
+        return _adapters.get(channel)
 
 
 def registered_channels() -> frozenset[str]:
-    return frozenset(_adapters)
+    with _ADAPTERS_LOCK:
+        return frozenset(_adapters)
 
 
 def clear_adapters() -> None:
     """卸载全部注册（仅供测试夹具使用；生产不会走到未注册状态）。"""
-    _adapters.clear()
+    with _ADAPTERS_LOCK:
+        _adapters.clear()
 
 
 def enabled_channels() -> frozenset[str]:

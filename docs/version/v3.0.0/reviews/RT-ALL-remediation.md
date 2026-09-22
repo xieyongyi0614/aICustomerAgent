@@ -288,15 +288,15 @@ post_process 失败）：本次已补「两态 `turn_meta` / `done` 逐字段对
 | ~~R-4~~ | ~~H-5 投影所有权口径~~ | 评审 H-5 | **已裁决：持有只读投影**。Run 结束必 reset（已修）；不要求改句柄/惰性读 |
 | R-5 | ~~H-3 剩余直读~~ | 评审 H-3 | **已修**（`a89ca6d`）：`domain_ledger` 门面；`state` / `execution_history` 零域仓储直读 |
 | ~~R-6~~ | ~~H-2 既存反向依赖~~ | 评审 H-2 | **已修**（`0e14b20`）：`core/agent_run_types` + `services/llm_budget_gate`；`services` 零 `agent_runtime` 导入（护栏已锁） |
-| R-7' | **H-7 通道契约模块抽离** | 评审 H-7（**前提已澄清，降级**） | 见 §2.9：allowlist 是刻意登记，非违约。有效关切 = 通道依赖 `agent_runtime` **包内路径** |
-| R-8 | **M-1 剩余** | 评审 | **M-2 已修**（`d554c70`，`character_assets`）；M-1 的 ActionIntent 映射/合成逻辑仍在 `stages/act.py` |
-| ~~R-9~~ | ~~M-3 / M-5 / M-7 / M-10~~ | 评审 | **已完成**：M-5 仅 `running` 可关（`e218889`）、M-10（`3a6ba97`）、M-3 观察缓存（`3a6ba97`）、**M-7（`60a3a04`）** |
-| R-10 | **M-3 / M-5 残留** | 评审 | **M-6 残留已修**（`cycle_reason` 公有化）；**M-8 / M-9 已修**。残留：`STAGE_RUNNERS` / `_adapters` 全局可变、`mark_step` RMW |
+| R-7' | ~~H-7 通道契约模块抽离~~ | 评审 H-7 | **已修**：`application/channel_gateway` 叶子门面；飞书 adapter 不再依赖 `agent_runtime` 包内路径 |
+| ~~R-8~~ | ~~M-1 / M-2~~ | 评审 | **已修**：M-2 `character_assets`；M-1 `services/action/intent_mapping` + `result.from_record_or_gate` |
+| ~~R-9~~ | ~~M-3 / M-5 / M-7 / M-10~~ | 评审 | **已完成** |
+| ~~R-10~~ | ~~M-3 / M-5 残留~~ | 评审 | **已修**：注册表加锁 + `finish_run` 条件 UPDATE + `mark_step` 行锁 |
 | R-11 | ~~L-3 文档滞后~~ | 评审 L-3 | **已回写**（`34cb26a`） |
 | R-12 | **C-2 补充 e2e** | 评审 C-2 | **已完成**（`c2d5141`） |
-| R-13 | **L-2 命名** | 评审 | **L-1 / L-4 已修**（时区 + `CONTRACT_REVISION`）；L-2 `state_update`→reason 映射命名待拆 |
+| ~~R-13~~ | ~~L-1 / L-2 / L-4~~ | 评审 | **已修**：时区、`STATE_PREP_STAGES`、`CONTRACT_REVISION` |
 | ~~R-14~~ | ~~`current_goal` 线格式值依赖~~ | 本次 R-12 发现 | **已裁决：维持值依赖** |
-| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **方向批准、本批不做** |
+| R-15 | **H-1-A 六段真收编** | H-1「先 B 后 A」的 A | **方向批准、待独立版本重构** |
 | R-16 | **orphan sweep 默认 True** | 评审摘要第 7 点 | **已裁决：保持默认 True**，见 §4.2 |
 
 ### 4.1 P1 裁决记录（2026-09-22）

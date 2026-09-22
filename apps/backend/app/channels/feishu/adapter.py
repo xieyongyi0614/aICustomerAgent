@@ -16,8 +16,7 @@ from dataclasses import dataclass
 
 import openai
 
-from app.application.agent_runtime import inbound as inbound_gateway
-from app.application.agent_runtime import outbound as outbound_gateway
+from app.application import channel_gateway as inbound_outbound
 from app.channels.base import InboundMessage
 from app.channels.feishu import delivery
 from app.channels.feishu.events import UnhandledMessage
@@ -182,8 +181,8 @@ async def _deliver_outcome(outcome: TurnOutcome) -> None:
     if not outcome.outbound_text:
         return
     try:
-        if outbound_gateway.is_routable(FEISHU_CHANNEL):
-            await outbound_gateway.deliver_reply(outcome, channel=FEISHU_CHANNEL)
+        if inbound_outbound.is_routable(FEISHU_CHANNEL):
+            await inbound_outbound.deliver_reply(outcome, channel=FEISHU_CHANNEL)
         else:
             await delivery.deliver_reply(outcome)
     except Exception:
@@ -222,11 +221,11 @@ def _gateway_projection(inbound: InboundMessage):
     （网关是**附加观测面**，不是执行入口——执行切换属 RT-015）。
     """
     try:
-        if not inbound_gateway.is_enabled(FEISHU_CHANNEL):
+        if not inbound_outbound.is_enabled(FEISHU_CHANNEL):
             return None, None
         return (
-            inbound_gateway.normalize_inbound(inbound),
-            inbound_gateway.resolve_session(
+            inbound_outbound.normalize_inbound(inbound),
+            inbound_outbound.resolve_session(
                 FEISHU_CHANNEL,
                 inbound.external_user_id,
                 thread_id=inbound.external_thread_id,

@@ -36,8 +36,7 @@ from app.application.agent_runtime.contracts import (
 )
 from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
 from app.models.action import ActionResult, ActionIntent
-from app.services import character_assets
-from app.services.action import result as action_result
+from app.services.action import intent_mapping, result as action_result
 
 logger = logging.getLogger(__name__)
 
@@ -92,121 +91,27 @@ def action_source_for(intention: Any, run: Any = None) -> str:
     return SOURCE_AUTONOMY
 
 
-def _winning_candidate(intention: Any) -> Mapping[str, Any] | None:
-    audit = getattr(intention, "audit", None) or {}
-    for candidate in audit.get("candidates") or []:
-        if candidate.get("won"):
-            return candidate
-    return None
-
-
-def _action_type_for_tool(
-    tool_id: str | None, *, character_id: str = character_assets.DEFAULT_CHARACTER_ID
-) -> str | None:
-    """tool_id → `ActionType`（反查人设 `ACTION_TOOL_MAP`，唯一映射来源）。"""
-    if not tool_id:
-        return None
-    for action_type, tool_ids in character_assets.action_tool_map(character_id).items():
-        if tool_id in tool_ids:
-            return action_type
-    return None
-
-
-def _missing_params(
-    action_type: str,
-    params: Mapping[str, Any],
-    *,
-    character_id: str = character_assets.DEFAULT_CHARACTER_ID,
-) -> list[str]:
-    required = character_assets.required_params(character_id).get(action_type, ())
-    return [name for name in required if not params.get(name)]
-
-
-def _dedupe_key(
-    goal_id: str | None,
-    intention_text: str | None,
-    action_type: str,
-    session_id: str | None,
-) -> str:
-    basis = goal_id or intention_text or session_id or ""
-    return f"act:{action_type}:{basis}"
-
-
 def intent_to_action_intent(
     intention: Any,
     *,
     session_id: str | None,
     goal_id: str | None,
-    character_id: str = character_assets.DEFAULT_CHARACTER_ID,
+    character_id: str | None = None,
 ) -> ActionIntent | None:
-    """`Intention` → `ActionIntent`（**只映射**，D6）。
-
-    映射依据：决策管线胜出候选的 `tool_id`（反查人设 `ACTION_TOOL_MAP`）。候选未携带
-    工具身份 → 返回 `None`（无行动可映射，不是失败）。参数取自候选 `params`；
-    必填参数缺失时 `confidence="ambiguous"`，由引擎的既有闸门裁决（本段不替它判断）。
-    """
-    candidate = _winning_candidate(intention)
-    if candidate is None:
-        return None
-    action_type = _action_type_for_tool(
-        candidate.get("tool_id"), character_id=character_id
-    )
-    if action_type is None:
-        return None
-    params = dict(candidate.get("params") or {})
-    missing = _missing_params(action_type, params, character_id=character_id)
-    return ActionIntent(
-        action_type=action_type,  # type: ignore[arg-type]
-        confidence="ambiguous" if missing else "confident",
-        params=params,
-        missing_params=missing,
-        evidence=str(getattr(intention, "intention", None) or ""),
-        dedupe_key=_dedupe_key(
-            goal_id or getattr(intention, "goal_id", None),
-            getattr(intention, "intention", None),
-            action_type,
-            session_id,
-        ),
-        trigger_source="lexicon",
+    return intent_mapping.intent_to_action_intent(
+        intention,
+        session_id=session_id,
+        goal_id=goal_id,
+        character_id=character_id,
     )
 
 
 def _result_from_record(record: Any, *, now: datetime) -> ActionResult:
-    """记录 → `ActionResult`；未进入执行（闸门拦截 / 计划装配失败）时按 D2 合成。"""
-    payload = getattr(record, "result", None)
-    if isinstance(payload, dict) and payload:
-        try:
-            return ActionResult.model_validate(payload)
-        except Exception:  # noqa: BLE001 — 反序列化失败退化为合成结果，不抛错
-            logger.exception("行动结果反序列化失败，按闸门结果合成：%s", record.id)
-    gate_reason = getattr(record, "gate_reason", None)
-    return ActionResult(
-        id=action_result.make_result_id(),
-        action_id=record.id,
-        status="failed",
-        failure_kind=(
-            "unavailable" if gate_reason == "capability_unavailable" else "permanent"
-        ),
-        error=str(gate_reason or getattr(record, "status", "failed"))[:120],
-        metadata={
-            "gate_reason": gate_reason,
-            "record_status": getattr(record, "status", None),
-            "source": "act_stage",
-        },
-        created_at=now,
-    )
+    return action_result.from_record_or_gate(record, now=now)
 
 
 def _failure_result(*, action_id: str, error: str, now: datetime) -> ActionResult:
-    return ActionResult(
-        id=action_result.make_result_id(),
-        action_id=action_id,
-        status="failed",
-        failure_kind="transient",
-        error=error[:120],
-        metadata={"source": "act_stage", "stage_error": error},
-        created_at=now,
-    )
+    return action_result.stage_failure(action_id=action_id, error=error, now=now)
 
 
 def _gates_summary(record: Any) -> dict[str, Any]:
@@ -391,8 +296,7 @@ async def act(
         intention,
         session_id=session_id,
         goal_id=getattr(intention, "goal_id", None),
-        character_id=getattr(session_context, "character_id", None)
-        or character_assets.DEFAULT_CHARACTER_ID,
+        character_id=getattr(session_context, "character_id", None),
     )
     if action_intent is None:
         _record_trace(trace, status="skipped", reason=REASON_NO_MAPPING)

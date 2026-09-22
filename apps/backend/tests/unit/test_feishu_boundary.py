@@ -18,10 +18,8 @@ CHANNELS_ALLOWLIST_PREFIXES = (
     "app.services.channel_identity_service",
     "app.services.trace_collector",
     "app.services.agent_service",
-    # RT-013：入站归一网关（叶子契约模块，零 IO / 零仓储 / 零 chains）。
-    "app.application.agent_runtime.inbound",
-    # RT-014：出站归一出网关（叶子契约模块，零 IO / 零仓储 / 零 chains）。
-    "app.application.agent_runtime.outbound",
+    # R-7'：通道只依赖独立叶子门面，不绑定 agent_runtime 包内路径。
+    "app.application.channel_gateway",
 )
 
 CHANNELS_APP_DENY_EXACT = (

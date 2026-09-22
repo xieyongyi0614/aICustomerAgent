@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
@@ -79,6 +80,9 @@ PHASES: tuple[str, ...] = (
     PHASE_UPDATE,
 )
 
+STATE_PREP_STAGES: frozenset[str] = frozenset({"state_update", "state_snapshot"})
+"""决策前状态准备实现名（L-2）：归 Reason 环节，**不是** Update 回写段。"""
+
 STAGE_TO_PHASE: dict[str, str] = {
     "perception": PHASE_OBSERVE,
     "context_assembly": PHASE_OBSERVE,
@@ -91,8 +95,6 @@ STAGE_TO_PHASE: dict[str, str] = {
     "goal_supply": PHASE_REASON,
     "goal_advance": PHASE_REASON,
     "memory_retrieval": PHASE_REASON,
-    "state_update": PHASE_REASON,
-    "state_snapshot": PHASE_REASON,
     "decision": PHASE_REASON,
     "action_planning": PHASE_ACT,
     "reply_generation": PHASE_ACT,
@@ -101,6 +103,7 @@ STAGE_TO_PHASE: dict[str, str] = {
     "world_experience": PHASE_UPDATE,
     "event_pregate": PHASE_UPDATE,
 }
+STAGE_TO_PHASE.update({name: PHASE_REASON for name in STATE_PREP_STAGES})
 
 OPTIONAL_PHASES: frozenset[str] = frozenset({PHASE_PLAN, PHASE_REFLECT})
 
@@ -201,14 +204,21 @@ def _plain_stage_names() -> tuple[str, ...]:
 STAGE_RUNNERS: dict[str, StageRunner] = {
     name: _life_loop_runner(name) for name in _plain_stage_names()
 }
+_STAGE_RUNNERS_LOCK = threading.Lock()
 
 
 def register_stage_runner(name: str, runner: StageRunner) -> None:
     """注册段实现（代码静态注册，沿 `ToolRegistry` 模式）；重复注册 fail-closed。"""
     stage_phase(name)
-    if name in STAGE_RUNNERS:
-        raise ValueError(f"阶段实现已注册：{name}")
-    STAGE_RUNNERS[name] = runner
+    with _STAGE_RUNNERS_LOCK:
+        if name in STAGE_RUNNERS:
+            raise ValueError(f"阶段实现已注册：{name}")
+        STAGE_RUNNERS[name] = runner
+
+
+def snapshot_stage_runners() -> dict[str, StageRunner]:
+    with _STAGE_RUNNERS_LOCK:
+        return dict(STAGE_RUNNERS)
 
 
 def _elapsed_ms(started: float) -> float:
@@ -247,7 +257,7 @@ class AgentLoop:
         self.reflect_outcome: Any = None
         self.feedback: Any = None
         self._registry: Mapping[str, StageRunner] = (
-            STAGE_RUNNERS if registry is None else registry
+            snapshot_stage_runners() if registry is None else registry
         )
         self._promote_degraded = promote_degraded
         self._steps: list[dict] = []

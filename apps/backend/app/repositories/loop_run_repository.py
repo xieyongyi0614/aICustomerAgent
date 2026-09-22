@@ -94,10 +94,16 @@ def create_run(
 
 
 def mark_step(run_id: str, step: dict, now: datetime | None = None) -> None:
-    """追加步骤记录（崩溃安全：每步落一次，现场保留已执行步骤）。"""
+    """追加步骤记录（崩溃安全：每步落一次，现场保留已执行步骤）。
+
+    PG 下 `FOR UPDATE` 行锁，消除与孤儿扫掠的 RMW 竞态；SQLite 单写事务内读改写。
+    """
     now = _now(now)
     with SessionLocal() as session:
-        row = session.query(LoopRunRow).filter(LoopRunRow.id == run_id).first()
+        query = session.query(LoopRunRow).filter(LoopRunRow.id == run_id)
+        if session.bind is not None and session.bind.dialect.name == "postgresql":
+            query = query.with_for_update()
+        row = query.first()
         if row is None:
             return
         row.steps = list(row.steps or []) + [step]
@@ -114,25 +120,27 @@ def finish_run(
     budget_state: dict | None = None,
     now: datetime | None = None,
 ) -> bool:
-    """Run Close：终态 + 成本汇总（窗口计数口径与 life_loop 一致）。
+    """Run Close：终态 + 成本汇总。
 
-    **仅 `running` 可关**（RT-ALL-code-review M-5）：已完成 / 已收敛的 Run 不被覆盖。
-    这消除「孤儿扫掠」与「真实关账」互相覆盖的窗口——扫掠先读到 `running`、真实关账随后
-    落终态，若扫掠无条件写回 `aborted` 就会把已完成的 Run 改错（反之亦然）。
+    **仅 `running` 可关**（M-5）：条件 UPDATE 原子落终态，扫掠与真实关账不互相覆盖。
     返回是否真正完成关账（未关账 = 行不存在或已非 `running`）。
     """
     now = _now(now)
+    values: dict = {
+        "status": status,
+        "llm_call_count": llm_call_count,
+        "token_total": token_total,
+        "finished_at": now,
+    }
+    if steps is not None:
+        values["steps"] = steps
+    if budget_state is not None:
+        values["budget_state"] = budget_state
     with SessionLocal() as session:
-        row = session.query(LoopRunRow).filter(LoopRunRow.id == run_id).first()
-        if row is None or row.status != "running":
-            return False
-        row.status = status
-        if steps is not None:
-            row.steps = steps
-        row.llm_call_count = llm_call_count
-        row.token_total = token_total
-        if budget_state is not None:
-            row.budget_state = budget_state
-        row.finished_at = now
+        updated = (
+            session.query(LoopRunRow)
+            .filter(LoopRunRow.id == run_id, LoopRunRow.status == "running")
+            .update(values, synchronize_session=False)
+        )
         session.commit()
-        return True
+        return bool(updated)

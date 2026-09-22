@@ -344,7 +344,7 @@ async def _run_autonomous_cycle_via_loop(
     reason: str | None = None,
 ) -> str:
     """AgentLoop 驱动的自治周期：阶段本体仍经既有 runners，只换执行形状。"""
-    from app.application.agent_runtime.loop import STAGE_RUNNERS, AgentLoop
+    from app.application.agent_runtime.loop import AgentLoop, snapshot_stage_runners
 
     now = now or datetime.now()
     settings = get_settings()
@@ -365,7 +365,7 @@ async def _run_autonomous_cycle_via_loop(
             settings,
         )
 
-    registry = dict(STAGE_RUNNERS)
+    registry = snapshot_stage_runners()
     registry["decision"] = _decision
     loop = AgentLoop(
         profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK),
