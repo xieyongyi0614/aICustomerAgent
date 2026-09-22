@@ -7,6 +7,8 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
+
 from app.core.db import DecisionRecordRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
@@ -142,6 +144,22 @@ def list_rows_by_user_window(
             .limit(limit)
             .all()
         )
+
+
+def count_by_user(user_id: str) -> int:
+    """该用户的决策记录条数（版本投影用）。
+
+    与 `len(search(user_id=..., limit=1000))` 的区别（RT-ALL-code-review M-10）：
+    后者受 `search` 的 `limit` 截断（上限 1000），条数一旦触顶版本号就不再增长——
+    版本语义失真。本函数走 count 聚合，不受截断影响。
+    """
+    with SessionLocal() as session:
+        total = (
+            session.query(func.count(DecisionRecordRow.id))
+            .filter(DecisionRecordRow.user_id == user_id)
+            .scalar()
+        )
+        return int(total or 0)
 
 
 def prune_before(cutoff: datetime) -> int:

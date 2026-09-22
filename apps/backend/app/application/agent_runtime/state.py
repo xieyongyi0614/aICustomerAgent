@@ -7,9 +7,11 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+import threading
 from typing import Any
 
 from app.application import agent_state_assembler
@@ -40,7 +42,15 @@ SNAPSHOT_DOMAINS: tuple[str, ...] = (
     "personality",
 )
 
-_OBSERVED: dict[tuple[str, str], "StateVersion"] = {}
+_OBSERVED: "OrderedDict[tuple[str, str], StateVersion]" = OrderedDict()
+_OBSERVED_LOCK = threading.Lock()
+_OBSERVED_MAX_ENTRIES = 512
+"""进程内观察缓存（不落库）。
+
+RT-ALL-code-review M-3：原先是无锁、无界的模块级 dict——并发写会损坏内部结构，
+且键随 (domain, run_id) 无限增长。现加锁 + LRU 上限（超限逐出最旧），
+语义不变（仍只是「本进程观察到的域写事件」，不是版本真相）。
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,7 +142,8 @@ DOMAIN_SOURCES: dict[str, Callable[[str, str, datetime | None], StateVersion]] =
     ),
     "decision": _ledger_source(
         "decision",
-        lambda user_id: len(decision_repository.search(user_id=user_id, limit=1000)),
+        # 迟绑定：经 lambda 取模块属性，便于替换 / 打桩，也避免导入期固化引用
+        lambda user_id: decision_repository.count_by_user(user_id),
         lambda user_id: _first_created_at(
             decision_repository.search(user_id=user_id, limit=1)
         ),
@@ -170,23 +181,30 @@ def version(
 
 
 def observe(domain: str, event: RuntimeEvent) -> None:
-    """接收域写事件，仅更新进程内观察缓存（不落库）。"""
-    _OBSERVED[(domain, event.run_id)] = StateVersion(
-        domain,
-        None,
-        "event",
-        event.occurred_at,
-        event.occurred_at,
-        {"event_type": event.event_type},
-    )
+    """接收域写事件，仅更新进程内观察缓存（不落库）；加锁 + LRU 上限（M-3）。"""
+    with _OBSERVED_LOCK:
+        key = (domain, event.run_id)
+        _OBSERVED[key] = StateVersion(
+            domain,
+            None,
+            "event",
+            event.occurred_at,
+            event.occurred_at,
+            {"event_type": event.event_type},
+        )
+        _OBSERVED.move_to_end(key)
+        while len(_OBSERVED) > _OBSERVED_MAX_ENTRIES:
+            _OBSERVED.popitem(last=False)
 
 
 def observed_version(domain: str, run_id: str) -> StateVersion | None:
-    return _OBSERVED.get((domain, run_id))
+    with _OBSERVED_LOCK:
+        return _OBSERVED.get((domain, run_id))
 
 
 def reset_observed_cache() -> None:
-    _OBSERVED.clear()
+    with _OBSERVED_LOCK:
+        _OBSERVED.clear()
 
 
 def _snapshot_value(agent_state: AgentStateSnapshot, domain: str) -> Any:

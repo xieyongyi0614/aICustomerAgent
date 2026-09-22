@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+
+import pytest
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -248,3 +250,100 @@ def test_development_version_reads_ledger(db_session_factory):
 
     assert result.basis == "ledger"
     assert result.version == 1
+
+
+class TestVersionSemanticsAndObservedCache:
+    """M-10 版本语义（不截断）+ M-3 观察缓存（加锁 + 有界）。"""
+
+    pytestmark = pytest.mark.unit
+
+    def test_decision_version_is_not_truncated_by_search_limit(self, db_session_factory):
+        from app.models.observability import DecisionKind, DecisionRecord
+        from app.repositories import decision_repository
+
+        total = 5
+        for index in range(total):
+            decision_repository.save(
+                DecisionRecord(
+                    id=f"dec-m10-{index}",
+                    kind=DecisionKind.TURN_INTENTION,
+                    request_id="r-m10",
+                    user_id="u-m10",
+                    conversation_id=None,
+                    action_id=None,
+                    trigger="test",
+                    input_snapshot={},
+                    decision="continue_topic",
+                    reason="test",
+                    confidence=0.9,
+                    outcome=None,
+                    candidates=None,
+                    created_at=datetime.now(),
+                )
+            )
+
+        # count 聚合不受 search 的 limit 截断（旧实现 len(search(limit=1000)) 会触顶停增）
+        assert decision_repository.count_by_user("u-m10") == total
+        assert len(decision_repository.search(user_id="u-m10", limit=1)) == 1
+
+        version = state.version("decision", "u-m10")
+        assert version.basis == "ledger"
+        assert version.version == total
+
+    def test_decision_version_goes_through_count_not_search(self, monkeypatch):
+        """机制断言：版本号必须取 `count_by_user`，而非 `len(search(...))`（M-10）。"""
+        from app.repositories import decision_repository
+
+        monkeypatch.setattr(decision_repository, "count_by_user", lambda user_id: 1234)
+        monkeypatch.setattr(decision_repository, "search", lambda **_kwargs: [])
+
+        version = state.version("decision", "u-m10-mechanism")
+
+        assert version.version == 1234
+        assert version.basis == "ledger"
+
+    def test_observed_cache_is_bounded(self):
+        state.reset_observed_cache()
+        overflow = state._OBSERVED_MAX_ENTRIES + 20  # pylint: disable=protected-access
+        for index in range(overflow):
+            state.observe("relationship", _opened(f"r-obs-{index}"))
+
+        assert len(state._OBSERVED) <= state._OBSERVED_MAX_ENTRIES  # pylint: disable=protected-access
+        # LRU：最旧的键被逐出，最新的仍在
+        assert state.observed_version("relationship", "r-obs-0") is None
+        assert state.observed_version("relationship", f"r-obs-{overflow - 1}") is not None
+        state.reset_observed_cache()
+
+    def test_observed_cache_is_thread_safe(self):
+        import threading
+
+        state.reset_observed_cache()
+        errors: list = []
+
+        def _worker(offset: int) -> None:
+            try:
+                for index in range(50):
+                    state.observe("memory", _opened(f"r-thr-{offset}-{index}"))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=_worker, args=(i,)) for i in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        assert len(state._OBSERVED) <= state._OBSERVED_MAX_ENTRIES  # pylint: disable=protected-access
+        state.reset_observed_cache()
+
+
+def _opened(run_id: str):
+    from app.application.agent_runtime.contracts import RuntimeEvent
+
+    return RuntimeEvent(
+        event_type="RunOpened",
+        run_id=run_id,
+        session_id=None,
+        occurred_at=datetime.now(),
+    )
