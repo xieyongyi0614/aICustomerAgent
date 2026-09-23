@@ -55,14 +55,14 @@ VALUE_SET_SNAPSHOT = {
     "GoalSource": ("definition", "policy", "scene"),
     "GoalHorizon": ("persistent", "current"),
     "GoalLayer": ("short_term", "medium", "long_term"),
-    "GoalDomain": ("personal", "relationship", "world"),
+    "GoalDomain": ("personal", "relationship", "world", "budget"),
     "GoalPlanStatus": ("draft", "validated", "active", "rejected", "superseded"),
     "SubGoalStatus": ("pending", "in_progress", "done", "failed"),
 }
 
 TUPLE_SNAPSHOT = {
     "LAYER_VALUES": ("short_term", "medium", "long_term"),
-    "DOMAIN_VALUES": ("personal", "relationship", "world"),
+    "DOMAIN_VALUES": ("personal", "relationship", "world", "budget"),
     "PLAN_STATUS_VALUES": ("draft", "validated", "active", "rejected", "superseded"),
     "SUB_GOAL_STATUS_VALUES": ("pending", "in_progress", "done", "failed"),
     "V1_STATUS_TARGETS": ("completed", "expired", "cancelled"),
@@ -358,6 +358,8 @@ def test_u6_planning_failure_reason_vocabulary_has_exactly_two_terms():
     assert goal_contract.PLANNING_FAILURE_REASONS == (
         "plan_exhausted",
         "criteria_undecidable",
+        "over_budget",
+        "budget_exhausted",
     )
     assert goal_contract.PLANNING_FAILURE_REASON_PLAN_EXHAUSTED == "plan_exhausted"
     assert (

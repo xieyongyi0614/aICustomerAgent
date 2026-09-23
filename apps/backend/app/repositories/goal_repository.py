@@ -70,6 +70,7 @@ def _to_row(record: GoalRecord) -> GoalRow:
         parent_goal_id=record.parent_goal_id,
         layer=record.layer,
         domain=record.domain,
+        origin=record.origin,
         failure_reason=record.failure_reason,
         arbitration_state=record.arbitration_state,
     )

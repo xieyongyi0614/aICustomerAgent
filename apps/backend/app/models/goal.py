@@ -24,7 +24,7 @@ GoalHorizon = Literal["persistent", "current"]
 
 GoalLayer = Literal["short_term", "medium", "long_term"]
 
-GoalDomain = Literal["personal", "relationship", "world"]
+GoalDomain = Literal["personal", "relationship", "world", "budget"]
 
 GoalPlanStatus = Literal["draft", "validated", "active", "rejected", "superseded"]
 
@@ -96,7 +96,7 @@ def validate_origin(origin: str | None) -> bool:
     if origin is None:
         return True
     return origin.split(":", 1)[0] in GOAL_ORIGINS
-DOMAIN_VALUES: tuple[str, ...] = ("personal", "relationship", "world")
+DOMAIN_VALUES: tuple[str, ...] = ("personal", "relationship", "world", "budget")
 PLAN_STATUS_VALUES: tuple[str, ...] = (
     "draft",
     "validated",
@@ -133,6 +133,7 @@ HIERARCHICAL_TYPE_MAP: dict[str, GoalType] = {
     "personal": "user_care",
     "relationship": "relationship",
     "world": "conversation",
+    "budget": "user_care",
 }
 
 GOAL_TIER: dict[str, int] = {

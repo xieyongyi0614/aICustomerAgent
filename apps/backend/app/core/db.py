@@ -387,7 +387,7 @@ class GoalRow(Base):
             name="ck_character_goals_layer",
         ),
         CheckConstraint(
-            "domain IN ('personal', 'relationship', 'world') OR domain IS NULL",
+            "domain IN ('personal', 'relationship', 'world', 'budget') OR domain IS NULL",
             name="ck_character_goals_domain",
         ),
         CheckConstraint("priority BETWEEN 1 AND 5", name="ck_character_goals_priority"),
