@@ -229,9 +229,9 @@ main{flex:1; padding:16px 16px calc(var(--nav-h) + 28px); }
 
       <div class="sec-label">五条结论</div>
       <div class="card tight">
-        <div class="check"><div class="check-dot ok">1</div><div><b>小米手环 9 Pro ≠ Zepp OS</b><span>走 Mi Fitness（小米后端）；Zepp 开发体系不覆盖本机型，不能混用。</span></div></div>
-        <div class="check"><div class="check-dot ok">2</div><div><b>没有面向个人的云健康 API</b><span>Zepp Console 是伙伴向 Mini Program 平台；未发现自助 OAuth 健康接口。</span></div></div>
-        <div class="check"><div class="check-dot ok">3</div><div><b>主路径 = Health Connect / HealthKit</b><span>细粒度 READ_*，数据默认本机；合规与上架风险最低。</span></div></div>
+        <div class="check"><div class="check-dot ok">1</div><div><b>小米手环 9 Pro ≠ Zepp OS</b><span>走 Mi Fitness / HyperOS HealthKit；Zepp 开发体系不覆盖本机型，不能混用。</span></div></div>
+        <div class="check"><div class="check-dot warn">2</div><div><b>小米运动健康 SDK 真实存在，但不是个人自助</b><span>HyperOS 端侧 MiHealthKit / 云对云；开通要开发者认证 + 已上架应用 + 服务审核。应用商店暂不收个人开发者账号。</span></div></div>
+        <div class="check"><div class="check-dot ok">3</div><div><b>无企认时主路径 = Health Connect / HealthKit</b><span>细粒度 READ_*，数据默认本机；有企认后可双轨并上小米运动健康 SDK。</span></div></div>
         <div class="check"><div class="check-dot warn">4</div><div><b>逆向 auth_key 不宜作产品路径</b><span>密钥云端签发、解绑即失效；社区有 DMCA / 工具归档断裂史。</span></div></div>
         <div class="check"><div class="check-dot ok">5</div><div><b>差异点在「有记忆的管家」</b><span>不拼指标算法，拼角色化长期记忆 + 目标 + 主动行动。</span></div></div>
       </div>
@@ -307,11 +307,11 @@ main{flex:1; padding:16px 16px calc(var(--nav-h) + 28px); }
           </div>
         </div>
         <div class="path" data-k="A">
-          <div class="path-rank x">A</div>
+          <div class="path-rank b">A</div>
           <div class="path-body">
-            <div class="path-title">小米云 API（个人） <span class="badge coral">不可用</span></div>
-            <div class="path-desc">未发现面向个人开发者的自助健康数据 API / OAuth。</div>
-            <div class="path-meta"><span class="badge coral">无公开通道</span></div>
+            <div class="path-title">小米运动健康 SDK（HyperOS） <span class="badge amber">有企认可用</span></div>
+            <div class="path-desc">官方端侧 MiHealthKit + 云对云。字段全（睡眠分期/心率/血氧/压力/运动）。须账号认证、已上架应用、服务审核；商店暂不收个人开发者。</div>
+            <div class="path-meta"><span class="badge teal">数据面最强</span><span class="badge coral">无企认不可用</span><span class="badge mute">HyperOS 4.0+ · 仅大陆</span></div>
           </div>
         </div>
         <div class="path" data-k="B">
@@ -522,7 +522,7 @@ const pathNotes = {
   D: "已选：CSV / GDPR 导出 —— 适合历史回填与无网冷启动，不适合实时。",
   E: "已选：Gadgetbridge —— 仅极客/实验模式；ToS 与互斥风险高，不进主产品。",
   F: "已选：逆向 auth_key —— 否决。密钥云端签发，法律与稳定性不可接受。",
-  A: "已选：小米云 API —— 不存在面向个人开发者的公开自助通道。",
+  A: "已选：小米运动健康 SDK —— 官方能力真实存在；无企业认证/未上架应用时无法开通，有资质则为数据面最强主路径。",
   B: "已选：Zepp OS 外送 —— 只覆盖 Amazfit，与小米手环 9 Pro 无关。"
 };
 

@@ -5,7 +5,7 @@
 ## Executive summary
 
 - **小米手环 9 Pro 不在 Zepp OS 开放体系内**，配套 App 是 Mi Fitness（`com.xiaomi.wearable`，小米后端）；Zepp OS 官方健康外送（Device App → Side Service → Fetch）只覆盖 Amazfit，**不能**把 Zepp Console / Zepp OS API 当作本机型的接入方案 [1][5][10]。
-- **未发现小米向个人开发者开放的自助云健康数据 API / OAuth**；Zepp Console 是合作伙伴向开放平台 + Mini Program 分发（需隐私政策、1–5 日审核），不是个人云健康 REST 接口 [9][14]。
+- **小米运动健康开放能力真实存在**（HyperOS 端侧 `MiHealthKit` SDK + 云对云），但**不是个人自助开通**：须开发者账号身份认证、创建并上架至少一款应用、服务申请审核（约 2 天）+ 协议签署 + 签名指纹；且**小米应用商店暂不接受个人开发者账号申请** [37][38][39]。Zepp Console 仍是 Amazfit 伙伴向，不能与小米运动健康 SDK 混用 [9][14]。
 - **个人开发者最现实的合规接入枢纽是 Android Health Connect**（或 iOS HealthKit）：官方 App / Gadgetbridge 把指标写入系统健康中枢，你的 App 只申请细粒度 `android.permission.health.READ_*` 读权限，数据默认留在本机 [7][8][13]。
 - **逆向 auth_key / 抓私有云 API 不宜作主路径**：Mi Band 4+ 密钥由厂商服务端签发、解绑即失效；社区工具链存在 DMCA 下架（2017）与归档（huafetcher 2026-02）等断裂史 [12][6][14]。
 - **产品差异化机会不在指标算法**，而在「角色化长期记忆 + 情绪/目标/行动」叠到中端手环时序数据上——对应 Whoop Coach / Oura Advisor 形态，但用你的 Agent Runtime + Memory + Goal/Action 能力做更深的个人生活管家 [12 in F3][2 in F3]。
@@ -51,7 +51,7 @@
 
 | 路径 | 可得性 | 合规 | 稳定性 | 结论 |
 |---|---|---|---|---|
-| A. 小米/Zepp 云 API（个人 OAuth） | **未发现公开自助通道** [14][9] | 未知 | — | **不可作主路径** |
+| A. 小米运动健康 SDK（HyperOS 端侧 / 云对云） | 官方文档齐全，数据面强 [37][38][39] | 高（用户授权） | 中 | **有企认+已上架应用时主路径**；纯个人无账号则不可用 |
 | B. Zepp OS Device→Side→Fetch | 仅 Amazfit，**不含本机** [4][5] | 高 | 高 | 机型不匹配 |
 | C. **Health Connect / HealthKit** | 官方或桥接写入后可读 [7][13][8] | **高** | 高 | **主路径** |
 | D. Mi Fitness CSV / GDPR 导出 | Huami GDPR 可得 HEARTRATE/SLEEP 等 CSV [10 in F5] | 中高 | 低频 | 兜底/冷启动 |
@@ -249,6 +249,9 @@ Mi Fitness 国内版是否原生写入系统「健康互联/Health Connect」、
 [34] 微信支付商户开户 — https://pay.weixin.qq.com/static/help_guide/business_registration.shtml (accessed 2026-09-23)  
 [35] mHealth 2023;9:21 健康 App 支付意愿 — https://pmc.ncbi.nlm.nih.gov/articles/PMC10364011/ (2023-07-03)  
 [36] JMIR Form Res 2021;5(10):e26125 mHealth WTP — https://pmc.ncbi.nlm.nih.gov/articles/PMC8527382/ (2021-10-05)  
+[37] 小米运动健康客户端接入指南 — https://dev.mi.com/xiaomihyperos/documentation/detail?pId=2332 (2026-08-27, accessed 2026-09-23)  
+[38] 小米运动健康端侧数据开放定义 / 接口定义 — https://dev.mi.com/xiaomihyperos/documentation/detail?pId=2331 / pId=2330 (2026-08-26/27, accessed 2026-09-23)  
+[39] 开放服务接入操作指南 + 开发者账号注册标准 — https://dev.mi.com/xiaomihyperos/documentation/detail?pId=1963 / pId=1731 (accessed 2026-09-23)  
 
 ---
 
