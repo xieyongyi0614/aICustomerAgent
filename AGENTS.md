@@ -29,6 +29,11 @@
 
 - `docs/current-system-architecture-baseline.md` — 当前系统唯一可信架构基线（分层/模块/数据/配置/扩展点/技术债/ADR/演进方向）
 
+**设计系统（UI 唯一真源）**
+
+- `.agents/skills/zhaoxi-design-system/` — 朝夕设计系统 Skill（`SKILL.md` + `references/` + `assets/app_tokens.dart`）。**任何 UI / 样式 / 设计稿 / Flutter 主题工作先读它**；其优先级**高于** `design/` 下的设计稿与原型（已裁决 4 处歧义，见 `SKILL.md`）。客户端版本规划见 `docs/version/v5.0.0/`。
+- 项目级 Skill 统一放 **`.agents/skills/`**（跨 Agent 互操作目录，Codex / Cursor / GitHub Copilot / VS Code 原生读取）。新增 Skill 也放这里。
+
 **当前版本（V3.x / V4.x）**
 
 - `docs/version/v4.0.0/` — V4.0.0 Personal Life Agent Foundation（个人生活智能体地基：用户实体 + 账本域）：`architecture.md`（架构依据，含运行时采用裁决）+ `tasks.md`（PLA-001~018）+ `reviews/`（需求评审）+ `audits/`（前置审计）+ `tasks/`（明细，后续生成）
