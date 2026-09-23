@@ -4,7 +4,7 @@
 > **上游（需求来源）**：`docs/version/v4.0.0/reviews/personal-life-agent-architecture-review.md`（个人生活智能体架构评审：五缺口 + 六维评分 + Phase A~F 演进路径）。
 > **上游（运行时审计）**：`docs/version/v4.0.0/audits/v3.0.0-runtime-adoption-audit.md`（V3.0.0 Agent Runtime 完成度与采用审计；裁决见 architecture §2）。
 > **上游（现状约束）**：`docs/current-system-architecture-baseline.md`（当前系统唯一可信架构基线）；`docs/version/v3.0.0/architecture.md` + `tasks.md` + `acceptance-report.md`（Agent Runtime 线，§7.3 Backlog 已预留 V3.1~V3.3）。
-> **状态**：Task Registry（任务定义）+ **Task Detail 已就位**（`tasks/PLA-001.md` ~ `tasks/PLA-018.md`）；**PLA-001 ~ PLA-013 / PLA-018 已实现（2026-09-22）**；PLA-014 ~ PLA-017 未实现
+> **状态**：Task Registry（任务定义）+ **Task Detail 已就位**（`tasks/PLA-001.md` ~ `tasks/PLA-018.md`）；**PLA-001 ~ PLA-014 / PLA-018 已实现（2026-09-22）**；PLA-015 ~ PLA-017 未实现
 > **主干**：PLA-001 ~ PLA-018（依赖顺序即文档顺序；PLA-018 为审计后**追加登记**，执行位置在 Phase 1，见 §4.1）
 > **说明**：本文档做任务级拆分，冻结 **ID / 名称 / 类型 / 优先级 / 依赖 / 交付面**；各 Task 的可执行明细见 `docs/version/v4.0.0/tasks/PLA-XXX.md`（体例对齐 `docs/version/v3.0.0/tasks/RT-002.md`：Task Overview / Background / Scope / Tech Design / Implementation Plan / File Impact / Testing / Acceptance / Commit）。**本文档不含代码、不含 DDL 与迁移脚本。**
 > **定位复述**：V4.0 = **个人生活智能体地基（Personal Life Agent Foundation）**。把当前「角色生命模拟器」的主体从**角色**翻转为**用户**，交付两块此前完全缺失的地基——**① 用户实体（谁是主人）** 与 **② 账本域（什么算事实）**——并以记账（Ledger）作为第一个纵切，跑通「自然语言 → 结构化事实 → 可查询 / 可对账 / 可纠正 → 主动服务」的完整闭环。**不重造任何既有器官，只补主体与事实底座。**
