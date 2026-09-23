@@ -299,7 +299,7 @@ decision → world_experience
 - `decision` 是唯一 LLM capable 且 critical 阶段：两道既有预算闸 → `llm_gateway.acquire` 第三道闸 → `autonomy_engine.tick`（V7 决策管线）。
 - `event_driven` Profile（Flow C）：白名单世界事件（`escalation_whitelist`）升级为完整 Run，其余 0 消耗。
 
-**维护步**（`_run_maintenance`，按间隔调度）：world_maintenance、world_simulation、action_retry、action_schedule、outbox_consume（`action_outbox_enabled` 门控）、trigger_reconcile。
+**维护步**（`_run_maintenance`，按间隔调度）：world_maintenance、world_simulation、action_retry、action_schedule、outbox_consume（`action_outbox_enabled` 门控）、trigger_reconcile、**ledger_digest**（PLA-011 日结/周报，数字只来自聚合）。
 
 **其它常驻后台循环**（`main.py` lifespan）：memory reclaim、job worker（`memory2.job_worker`）、agent evolution worker（指标快照 + 人格编译 + goal rebalance）、observability retention（`observability_persist_enabled` 门控）、世界维护循环。
 

@@ -83,6 +83,7 @@ LIFE_LOOP_MAINTENANCE_SEQUENCE = (
     "action_schedule",
     "outbox_consume",
     "trigger_reconcile",
+    "ledger_digest",
 )
 
 PERMISSION_ON_SETTINGS: tuple[str, ...] = ()

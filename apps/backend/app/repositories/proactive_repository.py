@@ -246,6 +246,16 @@ def reset_on_user_message(user_id: str, now: datetime | None = None) -> None:
             session.commit()
 
 
+def find_by_dedupe_key(dedupe_key: str) -> ProactiveAction | None:
+    with SessionLocal() as session:
+        row = (
+            session.query(ProactiveActionRow)
+            .filter(ProactiveActionRow.dedupe_key == dedupe_key)
+            .first()
+        )
+        return _to_model(row) if row is not None else None
+
+
 def list_users_with_history() -> list[str]:
     with SessionLocal() as session:
         rows = session.query(ProactiveActionRow.user_id).distinct().all()
