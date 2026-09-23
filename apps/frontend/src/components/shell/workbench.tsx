@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
 import { ChatInputBar } from "@/components/chat/chat-input-bar"
 import { ChatScrollRegion } from "@/components/chat/chat-scroll-region"
@@ -14,8 +14,10 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
+import { LedgerView } from "@/features/ledger/LedgerView"
 
 const DEBUG_COLLAPSED_KEY = "asuna-debug.debugPaneCollapsed"
+const VIEW_MODE_KEY = "asuna-debug.viewMode"
 
 function Workbench() {
   const [collapsed, setCollapsed] = usePersistedState<boolean>(
@@ -27,6 +29,10 @@ function Workbench() {
     true,
   )
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [viewMode, setViewMode] = usePersistedState<"debug" | "ledger">(
+    VIEW_MODE_KEY,
+    "debug",
+  )
   const selectedTurnId = useUiStore((s) => s.selectedTurnId)
 
   useEffect(() => {
@@ -40,80 +46,106 @@ function Workbench() {
         className="flex h-12 shrink-0 items-center border-b border-border px-4"
       >
         <TopBar />
+        <div className="ml-4 flex gap-1">
+          <Button
+            size="xs"
+            variant={viewMode === "debug" ? "default" : "ghost"}
+            data-testid="mode-debug"
+            onClick={() => setViewMode("debug")}
+          >
+            Debug
+          </Button>
+          <Button
+            size="xs"
+            variant={viewMode === "ledger" ? "default" : "ghost"}
+            data-testid="mode-ledger"
+            onClick={() => setViewMode("ledger")}
+          >
+            账本
+          </Button>
+        </div>
       </header>
 
-      <p
-        data-testid="mobile-banner"
-        className="hidden max-md:block px-4 py-1.5 text-center font-mono text-xs text-status-warn"
-      >
-        请使用桌面端获得完整调试体验
-      </p>
-
-      <div className="flex min-h-0 flex-1">
-        <section
-          data-testid="chat-pane"
-          className="flex min-h-0 min-w-0 flex-col lg:flex-1 lg:basis-0 min-[1200px]:basis-[42%] min-[1200px]:grow-0"
-        >
-          <ChatScrollRegion enabled={autoScroll} />
-          <ChatInputBar
-            autoScrollEnabled={autoScroll}
-            onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
-          />
-        </section>
-
-        {!collapsed ? (
-          <section
-            data-testid="debug-pane-inline"
-            className="hidden min-h-0 min-w-0 flex-col border-l border-border lg:flex lg:w-[480px] lg:shrink-0 min-[1200px]:w-auto min-[1200px]:flex-1"
+      {viewMode === "ledger" ? (
+        <div className="min-h-0 flex-1">
+          <LedgerView />
+        </div>
+      ) : (
+        <>
+          <p
+            data-testid="mobile-banner"
+            className="hidden max-md:block px-4 py-1.5 text-center font-mono text-xs text-status-warn"
           >
-            <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
-              <span className="font-mono text-xs text-fg-tertiary">Agent Debug</span>
+            请使用桌面端获得完整调试体验
+          </p>
+
+          <div className="flex min-h-0 flex-1">
+            <section
+              data-testid="chat-pane"
+              className="flex min-h-0 min-w-0 flex-col lg:flex-1 lg:basis-0 min-[1200px]:basis-[42%] min-[1200px]:grow-0"
+            >
+              <ChatScrollRegion enabled={autoScroll} />
+              <ChatInputBar
+                autoScrollEnabled={autoScroll}
+                onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
+              />
+            </section>
+
+            {!collapsed ? (
+              <section
+                data-testid="debug-pane-inline"
+                className="hidden min-h-0 min-w-0 flex-col border-l border-border lg:flex lg:w-[480px] lg:shrink-0 min-[1200px]:w-auto min-[1200px]:flex-1"
+              >
+                <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
+                  <span className="font-mono text-xs text-fg-tertiary">Agent Debug</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="debug-collapse"
+                    onClick={() => setCollapsed(true)}
+                  >
+                    禄
+                  </Button>
+                </div>
+                <DebugPane />
+              </section>
+            ) : (
               <Button
                 variant="ghost"
                 size="sm"
-                data-testid="debug-collapse"
-                onClick={() => setCollapsed(true)}
+                data-testid="debug-restore"
+                className="self-start"
+                onClick={() => setCollapsed(false)}
               >
-                禄
+                芦
               </Button>
-            </div>
-            <DebugPane />
-          </section>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="debug-restore"
-            className="self-start"
-            onClick={() => setCollapsed(false)}
-          >
-            芦
-          </Button>
-        )}
-      </div>
-
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerTrigger
-          render={
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="debug-drawer-trigger"
-              className="fixed right-4 bottom-4 z-40 lg:hidden"
-            />
-          }
-        >
-          Debug
-        </DrawerTrigger>
-        <DrawerContent className="h-[70vh]">
-          <DrawerHeader>
-            <DrawerTitle className="font-mono text-sm">Agent Debug</DrawerTitle>
-          </DrawerHeader>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <DebugPane />
+            )}
           </div>
-        </DrawerContent>
-      </Drawer>
+
+          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DrawerTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="debug-drawer-trigger"
+                  className="fixed right-4 bottom-4 z-40 lg:hidden"
+                />
+              }
+            >
+              Debug
+            </DrawerTrigger>
+            <DrawerContent className="h-[70vh]">
+              <DrawerHeader>
+                <DrawerTitle className="font-mono text-sm">Agent Debug</DrawerTitle>
+              </DrawerHeader>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <DebugPane />
+              </div>
+            </DrawerContent>
+          </Drawer>
+        </>
+      )}
     </div>
   )
 }
