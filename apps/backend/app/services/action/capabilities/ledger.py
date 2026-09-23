@@ -121,6 +121,16 @@ class LedgerCapability:
         ),
         "revise": ActionSchema(
             required=["entry_id", "reason", "idempotency_key"],
+            optional={
+                "amount_minor": "新金额（整数分）",
+                "direction": "新方向",
+                "category_id": "新类目",
+                "occurred_at": "新时间",
+                "merchant": "商户",
+                "note": "备注",
+                "account_id": "账户",
+                "currency": "币种",
+            },
             validators={"idempotency_key": _validate_idempotency_key},
         ),
     }
@@ -208,24 +218,46 @@ class LedgerCapability:
         )
 
     def _revise(self, params: dict, ctx: ExecutionContext) -> CapabilityResult:
-        from app.services.ledger import reverse_entry
+        from app.services.ledger.correction import cancel_entry, revise_entry
 
         errors = self.validate("revise", params)
         if errors:
             return _failed("; ".join(errors)[:80])
-        outcome = reverse_entry(
-            str(params["entry_id"]),
-            reason=str(params["reason"]),
-            idempotency_key=str(params["idempotency_key"]),
-            now=ctx.now,
+        change_keys = (
+            "amount_minor",
+            "currency",
+            "direction",
+            "occurred_at",
+            "merchant",
+            "note",
+            "category_id",
+            "account_id",
         )
+        changes = {key: params[key] for key in change_keys if params.get(key) is not None}
+        if changes:
+            outcome = revise_entry(
+                str(params["entry_id"]),
+                changes,
+                reason=str(params["reason"]),
+                idempotency_key=str(params["idempotency_key"]),
+                now=ctx.now,
+            )
+        else:
+            outcome = cancel_entry(
+                str(params["entry_id"]),
+                reason=str(params["reason"]),
+                idempotency_key=str(params["idempotency_key"]),
+                now=ctx.now,
+            )
         return CapabilityResult(
             status="succeeded",
             payload={
-                "entry_id": outcome.entry.id,
-                "reversal_of": outcome.entry.reversal_of,
-                "created": outcome.created,
-                "reason": outcome.reason,
+                "entry_id": outcome.reversal_entry_id,
+                "reversal_of": outcome.original_entry_id,
+                "new_entry_id": outcome.new_entry_id,
+                "net_effect_minor": outcome.net_effect_minor,
+                "created": True,
+                "reason": "revised" if outcome.new_entry_id else "reversed",
                 "failure_kind": None,
             },
         )

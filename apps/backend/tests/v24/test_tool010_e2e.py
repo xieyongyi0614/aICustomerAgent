@@ -84,7 +84,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     "app/services/decision_pipeline.py": "0c6713304f4b80ddab4f3b132be82ac49429a6d8ef8eaec4866f1a1461b9d612",
     "app/application/chat_pipeline.py": "f4320415d8337b6ef5d1908beae1163e8881600923316616bf7d6afbb47d7423",
-    "app/application/post_process.py": "c739fd1ee77a8c1fa5a34ec9280b3c5bad6e92c16186a23167022fc2ca93db88",
+    "app/application/post_process.py": "3f154e7616c90053df8747358d142544a4b2ad78f9a9001ddb5be4280f72e127",
     "app/application/action_engine.py": "8dec1c865a9e58546e6096e1f61ff13be5e6a168859e6ab8181cd85c68dc4df8",
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }

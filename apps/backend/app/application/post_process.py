@@ -660,6 +660,51 @@ async def run_ledger_extraction(ctx: PostProcessContext) -> None:
         logger.exception("账本抽取失败，忽略本轮候选")
 
 
+async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
+    """PLA-010 确认挂接：需澄清则登记待确认；超时清理。失败不影响回答。"""
+    try:
+        from datetime import datetime
+
+        from app.services.ledger.confirmation import should_confirm
+        from app.services.ledger.pending import expire_if_due, register_pending
+
+        now = datetime.now()
+        expire_if_due(ctx.session_id, now=now)
+        from app.chains.ledger_extraction_chain import extract_ledger
+
+        extraction = extract_ledger(
+            ctx.user_input,
+            message_id=ctx.session_id,
+            now=now,
+            llm=ctx.llm,
+        )
+        request = should_confirm(
+            extraction,
+            now=now,
+            source_ref=ctx.session_id,
+        )
+        if request is None:
+            return
+        record = register_pending(
+            user_id=ctx.user_id,
+            session_id=ctx.session_id,
+            request=request,
+            extraction=extraction,
+            now=now,
+        )
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "ledger_confirmation",
+                0.0,
+                "asked" if record is not None else "deduped",
+                reason=request.reason,
+                pending_key=request.pending_key,
+                question=request.question,
+            )
+    except Exception:
+        logger.exception("账本确认挂接失败，忽略本轮")
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
@@ -667,6 +712,7 @@ STEP_HANDLERS = (
     run_summary,
     run_memory_extract,
     run_ledger_extraction,
+    run_ledger_confirmation,
     run_budget_observer,
     run_evaluation,
     run_world_update,
