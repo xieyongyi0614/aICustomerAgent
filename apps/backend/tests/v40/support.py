@@ -65,5 +65,10 @@ V40_SETTINGS_FIELDS: dict[str, str] = {
     "ledger_category_fallback": "PLA-008",
     "ledger_confirm_threshold_amount": "PLA-010",
     "ledger_digest_send_time": "PLA-011",
+    "ledger_alert_near_ratio": "PLA-013",
+    "ledger_alert_daily_spike_ratio": "PLA-013",
+    "ledger_alert_daily_spike_floor_minor": "PLA-013",
+    "ledger_alert_monthly_surge_ratio": "PLA-013",
+    "ledger_alert_monthly_surge_floor_minor": "PLA-013",
 }
 """V4.0 新增参数类字段（字段名 → 归属 Task）。禁止登记 `*_enabled`。"""

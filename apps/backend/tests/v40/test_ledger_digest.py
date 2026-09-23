@@ -154,6 +154,7 @@ def test_maintenance_step_appended_only():
     source = (BACKEND / "app/application/life_loop.py").read_text(encoding="utf-8")
     assert '_mark_maintenance("ledger_digest")' in source
     assert '_maintenance_due("ledger_digest"' in source
+    assert '_mark_maintenance("ledger_alert")' in source
     # 既有六步 kind 不变（loop_runs.kind 零迁移）
     for kind in (
         "world_maintenance",

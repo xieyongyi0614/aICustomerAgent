@@ -685,6 +685,7 @@ async def _run_maintenance(now: datetime) -> int:
         executed += 1
     if _maintenance_due("ledger_digest", 60):
         _mark_maintenance("ledger_digest")
+        from app.services.ledger import alert as ledger_alert
         from app.services.ledger import digest as ledger_digest
 
         try:
@@ -698,6 +699,22 @@ async def _run_maintenance(now: datetime) -> int:
                 "error": exc.__class__.__name__,
             }
         _record_maintenance_run("ledger_digest", [entry], now)
+        executed += 1
+    if _maintenance_due("ledger_alert", 60):
+        _mark_maintenance("ledger_alert")
+        from app.services.ledger import alert as ledger_alert
+
+        try:
+            result = await asyncio.to_thread(ledger_alert.run_maintenance, now) or {}
+            entry = {"step": "ledger_alert", "status": "ok", **result}
+        except Exception as exc:
+            logger.exception("ledger alert 维护失败")
+            entry = {
+                "step": "ledger_alert",
+                "status": "error",
+                "error": exc.__class__.__name__,
+            }
+        _record_maintenance_run("ledger_alert", [entry], now)
         executed += 1
     if get_settings().runtime_orphan_run_sweep_enabled:
         from app.application.agent_runtime import recovery as runtime_recovery
@@ -738,6 +755,8 @@ def _maintenance_pending(settings) -> bool:
         if outbox_repository.list_pending(limit=1):
             return True
     if _maintenance_due("ledger_digest", 60):
+        return True
+    if _maintenance_due("ledger_alert", 60):
         return True
     return _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS)
 

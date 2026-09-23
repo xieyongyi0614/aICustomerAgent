@@ -1230,7 +1230,7 @@ class LoopRunRow(Base):
         CheckConstraint(
             "kind IN ('autonomy', 'chat', 'world_maintenance', 'world_simulation', "
             "'action_retry', 'action_schedule', 'outbox_consume', 'trigger_reconcile', "
-            "'ledger_digest')",
+            "'ledger_digest', 'ledger_alert')",
             name="ck_loop_runs_kind",
         ),
         CheckConstraint(

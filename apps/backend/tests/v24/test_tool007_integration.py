@@ -50,6 +50,7 @@ EXPECTED_MAINTENANCE_STEPS: tuple[str, ...] = (
     "outbox_consume",
     "trigger_reconcile",
     "ledger_digest",
+    "ledger_alert",
 )
 """维护步序列（`_run_maintenance` 内按源码顺序的调度 kind）。
 `action_expire`（TOOL-005 过期确认清理挂接点所在函数）是 `action_retry` 条目的子步，

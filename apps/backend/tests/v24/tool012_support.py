@@ -219,6 +219,7 @@ LIFE_LOOP_MAINTENANCE_SEQUENCE: tuple[str, ...] = (
     "outbox_consume",
     "trigger_reconcile",
     "ledger_digest",
+    "ledger_alert",
 )
 
 POST_PROCESS_STEP_SEQUENCE: tuple[str, ...] = (

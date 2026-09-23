@@ -242,6 +242,6 @@ class TestCutoverEquivalence:
 
         stats = await life_loop.run_life_loop_tick(now=NOW)
 
-        assert stats["maintenance"] == 4
+        assert stats["maintenance"] == 5
         kinds = {r.kind for r in loop_run_repository.list_recent()}
-        assert {"trigger_reconcile", "ledger_digest"} <= kinds
+        assert {"trigger_reconcile", "ledger_digest", "ledger_alert"} <= kinds
