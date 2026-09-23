@@ -6,6 +6,8 @@
   禁止新增任何功能开关（v4.0.0 `architecture.md` 铁律 5 / 不变量 11），故 `core/settings/`
   的 `*_enabled` 字段集合必须与它**完全一致**——本版只允许改既有字段的默认值。
   基线是**静态快照**而非运行时计算：动态计算会让「防新增」的断言退化为同义反复。
+  例外（设计缺口补齐，非新增功能开关）：`evaluation_development_enabled` 为 development
+  维闸补配（动态 getattr 命名约定早已存在，字段在 V2.0 Phase3 扩维时漏加）。
 - `V40_SETTINGS_FIELDS`（字段名 → 归属 Task）：V4.0 新增的**参数类**字段登记处。
   新增 `*_enabled` 字段一律违规，不在此登记。
 """
@@ -23,6 +25,7 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "evaluation_action_enabled",
         "evaluation_autonomy_enabled",
         "evaluation_behavior_enabled",
+        "evaluation_development_enabled",
         "evaluation_emotion_enabled",
         "evaluation_enabled",
         "evaluation_goal_enabled",

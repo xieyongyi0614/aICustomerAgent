@@ -99,6 +99,27 @@ def test_run_rules_honors_dimension_toggle(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_run_rules_honors_development_dimension_toggle(monkeypatch):
+    monkeypatch.setenv("EVALUATION_DEVELOPMENT_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().evaluation_development_enabled is False
+        rule = DummyRule(
+            IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED,
+            EvaluationDimension.DEVELOPMENT,
+            issue=Issue(
+                code=IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED,
+                severity="critical",
+                dimension=EvaluationDimension.DEVELOPMENT,
+            ),
+        )
+        RULES[:] = [rule]
+        assert run_rules(make_ctx()) == []
+        assert eligible_dimensions("turn", get_settings()) == []
+    finally:
+        get_settings.cache_clear()
+
+
 def test_compute_rule_scores_penalty_and_absence():
     settings = get_settings()
     eligible = [

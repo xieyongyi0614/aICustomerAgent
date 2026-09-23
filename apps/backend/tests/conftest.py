@@ -450,6 +450,7 @@ def override_settings(monkeypatch):
             "autonomy_action_enabled": "AUTONOMY_ACTION_ENABLED",
             "autonomy_action_daily_limit": "AUTONOMY_ACTION_DAILY_LIMIT",
             "evaluation_action_enabled": "EVALUATION_ACTION_ENABLED",
+            "evaluation_development_enabled": "EVALUATION_DEVELOPMENT_ENABLED",
         }
         for key, env in env_map.items():
             if key in kwargs:
