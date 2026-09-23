@@ -4,7 +4,7 @@
 > **上游（覆盖核对）**：`docs/version/v5.0.0/traceability.md`（设计稿 119 条要求 → REQ → 任务的**全量覆盖矩阵**，含反向核对：41 个任务全部可追溯到设计稿或调研报告）。**每个 Task Detail 生成前先在该矩阵里找到它的来源条目。**
 > **上游（技术方案）**：`docs/version/v5.0.0/flutter-architecture.md`（Flutter 分层、选型、Orb 与设计 token 落地路径）。
 > **上游（现状约束）**：`docs/current-system-architecture-baseline.md`；`docs/version/v4.0.0/tasks.md`（九条前提裁决）；`docs/version/v3.0.0/acceptance-report.md`（`CONDITIONAL — NOT RELEASED`）。
-> **状态**：Task Registry（任务定义）。**Task Detail 待生成**（体例对齐 `docs/version/v4.0.0/tasks/PLA-XXX.md`）。
+> **状态**：Task Registry（任务定义）+ **Task Detail 已生成（41/41）**（2026-09-23，位于 `docs/version/v5.0.0/tasks/`，体例对齐 `docs/version/v4.0.0/tasks/PLA-XXX.md`，撰写规范见 `tasks/README.md`）。索引与生成记录见 **§11**。
 > **主干**：41 个任务 / 5 个里程碑 / 3 条任务线（`APP-` 客户端、`API-` 后端补齐、`PLT-` 平台横切）。
 > **本文档不含代码、不含 DDL、不含 UI 稿。**
 
@@ -287,3 +287,58 @@ API-001 → API-002 ──┘
 - [ ] 零回归是否用**基线对照法**验证（而非期待全绿）？
 - [ ] 新建 `app/` / `tests/` 文件是否转了 CRLF？
 - [ ] 是否误用 `git rm`？（**禁止**）提交后是否复核了 `git rev-parse HEAD`？
+
+---
+
+## 11. Task Detail 索引与生成记录（2026-09-23）
+
+> **状态**：41 个 Task Detail **已全部生成**，位于 `docs/version/v5.0.0/tasks/`；统一体例见 `tasks/README.md`（10 章体例 + 三条任务线差异化要求 + 全局约束速查）。
+> **总量**：41 个明细 / 约 17.5 千行 / 单文件 378–450 行。
+
+### 11.1 索引
+
+| 里程碑 | 任务线 | 明细文件 |
+|---|---|---|
+| **M0** 地基 | `APP-001`~`APP-008` | `tasks/APP-001.md` ~ `tasks/APP-008.md` |
+| **M1** 对话闭环 | `API-001`~`API-003` | `tasks/API-001.md` ~ `tasks/API-003.md` |
+| **M1** 对话闭环 | `APP-009`~`APP-012` | `tasks/APP-009.md` ~ `tasks/APP-012.md` |
+| **M2** 生活域与首页 | `API-004`~`API-007` | `tasks/API-004.md` ~ `tasks/API-007.md` |
+| **M2** 生活域与首页 | `APP-013`~`APP-017` | `tasks/APP-013.md` ~ `tasks/APP-017.md` |
+| **M3** 主动与我的 | `API-008` | `tasks/API-008.md` |
+| **M3** 主动与我的 | `APP-018`~`APP-022` | `tasks/APP-018.md` ~ `tasks/APP-022.md` |
+| **M4** 健康（门控） | `API-009`~`API-010` | `tasks/API-009.md` ~ `tasks/API-010.md` |
+| **M4** 健康（门控） | `APP-023`~`APP-025` | `tasks/APP-023.md` ~ `tasks/APP-025.md` |
+| **PLT** 平台横切 | `PLT-001`~`PLT-006` | `tasks/PLT-001.md` ~ `tasks/PLT-006.md` |
+
+**每个明细文件的结构**：`1. Task Overview`（含 `完成判据` 与 `新增设置`）/ `2. Background`（现状证据带 `文件:行号`）/ `3. Scope`（In / Out，Out 是反范围护栏）/ `4. Technical Design Requirements`（4.1 契约 · 4.2 关键裁决 · 4.3 数据流 · 4.4 依赖与边界）/ `5. Implementation Plan` / `6. File Impact`（含 6.3 禁止修改红线）/ `7. Testing Requirements`（用例名 + 断言）/ `8. Acceptance Criteria`（AC# + 判据 + 验证方式）/ `9. Commit Requirement` / `10. 需求溯源`（设计稿条目 → REQ → 覆盖状态，带 `traceability.md` 行号）。
+
+### 11.2 生成过程中发现的 5 个跨任务缺口（**需回写，不是本次撰写能自行了结的**）
+
+| # | 缺口 | 证据 | 影响 | 建议处置 |
+|---|---|---|---|---|
+| **N1** | **`API-008` 的「按设定时刻预生成」需要第 3 个迁移**（新增表 + 放宽 `ck_loop_runs_kind`），与 §0.3「本版本只加 1 个迁移」冲突 | `tasks/API-008.md` §4.2 | 简报内容无法离线预取 → `APP-019` 本地通知落地页可能拿到过期内容 | **优先验证「复用 Life Loop 既有 trigger 做预生成」能否零迁移**（「既有 trigger」是允许的五种接入姿势之一）；若不可行，则须承认本版本加 3 个迁移并同批改 §0.3 与钉测清单 |
+| **N2** | **关系等级（相识天数 · Lv.N）无产品级接口**，但 §5 要求「来自产品级接口（非 debug）」 | 现仅 `GET /debug/relationship/state`、`/debug/relationship/timeline` | `APP-020` 用户卡阻塞 | 补一个 `API-*`（关系状态读接口），或在 §5 显式标阻塞并下调 `APP-020` 交付面 |
+| **N3** | **Role Mode 切档无写路径** → M1 验收口径「切到 professional 模式后 `turn_meta.role_mode` 变化」端上无法保证 | `ChatRequest` 无 mode 参数（`apps/backend/app/api/v1/schemas.py:6-9`）；无 mode 端点；唯一写回在管线内部（`chat_pipeline.py:809-810`） | M1 验收项不可达 | 补一个 `API-*`（模式读写），或扩展 `API-001`；否则须下调 M1 验收口径 |
+| **N4** | **`APP-013` 的 `failed` 步骤态视觉规格是本次补齐的**（设计稿与设计系统 `A14` 只定义 `done/running/todo` 三态，而 `flutter-architecture.md` §3.3 的状态模型有四值） | `tasks/APP-013.md` §4.1 / §4.2 D1·D3·D4 | 视觉回归基线未获设计侧确认 | 交设计侧 sign-off；确认后**回写** `.agents/skills/zhaoxi-design-system/references/components.md` 的 `A14` |
+| **N5** | **记忆页 H1 口径张力**：决策 D5 要求标题写「我记住了你 N 件事」，而设计系统锁定 H1 为「亚丝娜记住的你」 | `requirements-analysis.md` §6 D5 vs `components.md` B7 / `principles.md` §5.3 | 两套真源冲突 | Detail 暂**保留设计系统 H1**，把 D5 措辞移入计数胶囊；若 D5 为准须先改设计系统 skill 再改页面 |
+
+### 11.3 待确认项（不阻塞撰写，但影响开工）
+
+| # | 事项 | 相关任务 | 当前处置 |
+|---|---|---|---|
+| Q1 | **字重方案**：`FontVariation('wght', 550)`（精确，需可变字体）vs 降级映射 `550→w500 / 650→w600 / 750→w700`（零成本） | `APP-002` | 暂定**降级映射**（可变字体资产受 `PLT-002` 字体授权阻塞）；字体授权先落地则可改前者 |
+| Q2 | `EXPECTED_EVENT_TYPES` 实为运行时事件总线类型集，与 NDJSON 事件**并非同一集合** | `API-002` | 暂按「同批登记」处理，需确认登记口径 |
+| Q3 | 令牌签名密钥来源：复用既有 secret vs 新增参数类 `auth_token_secret` | `API-001` | 标为待定 + 阻塞条件（未定不开工） |
+| Q4 | **健康域命名避歧方案**：表保持 `health_*`，服务包改 `app/services/vitals/`、设置 `core/settings/vitals.py`、工具 id 仍 `builtin.health.sync` | `API-009` | 暂定；若采纳须同步 §0.3 与 V4.0.0 的 `ledger_*` 避歧纪律 |
+| Q5 | 晚间简报第 4 张卡（设计系统 `B9` 只给了 3 张） | `API-008` / `APP-018` | 暂定 `remembered`「今天记住的你」，待设计确认 |
+| Q6 | **golden 在 CI 与本地渲染不一致**：固定容器镜像 vs CI 标记「非阻塞告警」 | `PLT-004` / `PLT-005` | 二选一未拍板 |
+| Q7 | PLT 产出落点：`docs/version/v5.0.0/phase0-miband-validation.md`（PLT-001）、`docs/version/v5.0.0/compliance/`（PLT-002） | `PLT-001` / `PLT-002` | 暂定，可改 |
+| Q8 | CI 载体：暂定 GitHub Actions（仓库**现无 CI**，`docs/TESTING.md:36`） | `PLT-005` | 暂定 |
+| Q9 | 授权范围态持久化：V1 无服务端同意记录端点 | `APP-021` | 暂用端侧偏好，标待定 |
+| Q10 | `PLT-006` 的 Orb 功耗阈值：设计稿无依据（缺口 13 已声明四项指标为**本方案补齐**） | `PLT-006` | 先建基线再定目标 |
+
+### 11.4 明细对注册表的**零偏离声明**
+
+41 个明细的 `In Scope` 全部落在本注册表 §2~§7 的「交付面」范围内，`Out of Scope` 逐条对应 §7.3 反范围清单与 §0 七条前提。**唯一需要注册表回写的是 §11.2 的 5 个缺口**（N1~N5）——它们不是明细擅自扩张，而是撰写时按证据发现的上游遗漏，处置权在注册表与需求文档。
+
+> **变更顺序纪律不变**（见 `traceability.md` §12）：需求变更先改覆盖矩阵 → 再改 `requirements-analysis.md` → 最后改本注册表与明细。**顺序不可颠倒。**
