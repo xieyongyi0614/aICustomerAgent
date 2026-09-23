@@ -79,6 +79,10 @@ def normalize(
     return _fallback("fallback", 6)
 
 
+def list_user_categories(user_id: str, *, kind: str | None = None):
+    return ledger_repository.list_categories(user_id, kind=kind)
+
+
 def add_category(
     user_id: str,
     name: str,

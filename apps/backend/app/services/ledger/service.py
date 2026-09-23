@@ -119,6 +119,14 @@ def reverse_entry(
     )
 
 
+def resolve_account_id(user_id: str, account_id: str | None = None) -> str:
+    ensure_user_bootstrap(user_id)
+    if account_id:
+        return account_id
+    account, _created = ledger_repository.ensure_default_account(user_id)
+    return account.id
+
+
 def ensure_user_bootstrap(
     user_id: str, *, now: datetime | None = None
 ) -> BootstrapReport:

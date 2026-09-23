@@ -16,6 +16,7 @@ from app.services.ledger.service import (
     RecordOutcome,
     ensure_user_bootstrap,
     record_entry,
+    resolve_account_id,
     reverse_entry,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     "ensure_user_bootstrap",
     "format_minor",
     "record_entry",
+    "resolve_account_id",
     "revise_entry",
     "reverse_entry",
     "summary",
