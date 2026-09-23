@@ -98,6 +98,9 @@ TOOL_SEMANTIC_TEXT: dict[str, str] = {
     "builtin.search.query": "向外面的世界打听一件事（我还没有可用的消息来源）。",
     "builtin.notification.send": "在手边留一张字条，等你回来时亲口对你说。",
     "channel.feishu.send": "经飞书给你递一句话，这条会真的送到你手上。",
+    "builtin.ledger.record": "把你说的那笔收支记进账本，数字写进结构化账目里。",
+    "builtin.ledger.query": "把账本里的数字加总给你看，只算结构化字段，不靠我回忆。",
+    "builtin.ledger.revise": "把记错的那笔冲正掉，原账不动，另记一条反向。",
 }
 
 TOOL_OBSERVATION_KEYS: dict[str, dict[str, str]] = {
@@ -131,6 +134,19 @@ TOOL_OBSERVATION_KEYS: dict[str, dict[str, str]] = {
     },
     "builtin.notification.send": {"note_created": "note.created"},
     "channel.feishu.send": {"external_message_id": "external.message_id"},
+    "builtin.ledger.record": {
+        "entry_id": "ledger.entry_id",
+        "created": "ledger.created",
+    },
+    "builtin.ledger.query": {
+        "expense_minor": "ledger.expense_minor",
+        "income_minor": "ledger.income_minor",
+        "entry_count": "ledger.entry_count",
+    },
+    "builtin.ledger.revise": {
+        "entry_id": "ledger.entry_id",
+        "reversal_of": "ledger.reversal_of",
+    },
 }
 
 TOOL_UNAVAILABLE_TOOL_IDS: tuple[str, ...] = ("builtin.search.query",)

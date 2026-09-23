@@ -57,7 +57,7 @@ def test_runtime_fingerprint_matches_always_on_config(monkeypatch):
 
 
 def test_registry_ids_are_stable(monkeypatch):
-    """注册表恒为固定 10 条内置声明。"""
+    """注册表恒为固定 13 条内置声明。"""
     support.apply_flag_env(monkeypatch, support.group_env())
     from app.services.tool.registry import get_tool_registry
 
@@ -445,7 +445,7 @@ def test_g_govern_namespace_index_reports_registration_source(monkeypatch):
     registry = builtin_registry()
 
     index = registry.namespaces()
-    assert index["builtin"].enabled_count == 5
+    assert index["builtin"].enabled_count == 8
     assert index["world"].enabled_count == 4
     assert index["channel"].enabled_count == 0
     assert index["channel"].tool_ids == [CHANNEL_TOOL_ID]

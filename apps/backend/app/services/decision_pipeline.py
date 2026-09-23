@@ -73,6 +73,7 @@ _CARE_GOAL_TYPES = frozenset({"user_care", "relationship"})
 
 _CAPABILITY_TYPE_HINTS = {
     "environment_query": "scene",
+    "ledger": "user_care",
     "memory": "conversation",
     "notification": "user_care",
     "reminder": "user_care",
@@ -93,6 +94,9 @@ ACTION_TOOL_TYPE_HINTS = {
     "world.object.move": "scene",
     "world.object.use": "scene",
     "world.env.query": "scene",
+    "builtin.ledger.record": "user_care",
+    "builtin.ledger.revise": "user_care",
+    "builtin.ledger.query": "conversation",
 }
 
 _TOOL_CAPABILITY_HINTS = {

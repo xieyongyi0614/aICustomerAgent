@@ -136,6 +136,11 @@ def test_builtin_declarations_do_not_touch_capability_implementations():
         "environment_query": {"query": []},
         "search": {"query": ["query"]},
         "notification": {"send": ["content"]},
+        "ledger": {
+            "record": ["amount_minor", "direction", "source", "idempotency_key"],
+            "query": ["period"],
+            "revise": ["entry_id", "reason", "idempotency_key"],
+        },
         "external_api": {"call": ["host"]},
     }
 
@@ -232,6 +237,7 @@ def test_default_capability_registry_is_v9_six_plus_external():
         "environment_query",
         "search",
         "notification",
+        "ledger",
         "external_api",
     }
     assert registry.has("reminder", "create") is True

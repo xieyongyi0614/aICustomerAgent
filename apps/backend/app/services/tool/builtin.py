@@ -59,10 +59,17 @@ OBJECT_CATEGORIES: tuple[str, ...] = (
 )
 SEARCH_QUERY_MAX_CHARS = 60
 NOTIFICATION_CONTENT_MAX_CHARS = 200
+LEDGER_NOTE_MAX_CHARS = 80
+LEDGER_MERCHANT_MAX_CHARS = 40
+LEDGER_REASON_MAX_CHARS = 80
+LEDGER_IDEMPOTENCY_MIN_LENGTH = 8
 
 IMPORTANCE_VALUES: tuple[str, ...] = ("low", "normal", "high")
 MEMORY_TYPES: tuple[str, ...] = ("user_fact", "preference", "event")
 ENVIRONMENT_DIMENSIONS: tuple[str, ...] = ("weather", "temperature", "time", "lighting")
+LEDGER_DIRECTIONS: tuple[str, ...] = ("expense", "income", "transfer")
+LEDGER_SOURCES: tuple[str, ...] = ("conversation", "action", "manual", "import")
+LEDGER_PERIODS: tuple[str, ...] = ("month", "week")
 
 def _parameter(
     name: str,
@@ -76,6 +83,7 @@ def _parameter(
     min_value: float | int | None = None,
     max_value: float | int | None = None,
     max_length: int | None = None,
+    min_length: int | None = None,
     source_hint: str = "",
 ) -> ToolParameter:
     return ToolParameter(
@@ -88,6 +96,7 @@ def _parameter(
         min=min_value,
         max=max_value,
         max_length=max_length,
+        min_length=min_length,
         format=format_,
         source_hint=source_hint,
     )
@@ -473,6 +482,150 @@ def _definitions(settings: Any = None) -> tuple[ToolDefinition, ...]:
             tags=("channel", "feishu"),
             memory_policy_key="channel.feishu.send",
             observability_fields=("content", "recipient"),
+        ),
+        ToolDefinition(
+            id="builtin.ledger.record",
+            name="记一笔账",
+            description="把一笔结构化收支写入账本（整数分、append-only、幂等），拒绝自由文本入参。",
+            when_to_use="用户给出明确金额与方向、需要落账时使用",
+            when_not_to_use="金额缺失或只是闲聊消费话题时不要使用",
+            namespace="builtin",
+            capability="ledger",
+            action="record",
+            input_schema=ToolSchema(
+                parameters=[
+                    _parameter(
+                        "amount_minor",
+                        "integer",
+                        required=True,
+                        description="金额（整数分，必须为正）",
+                        min_value=1,
+                    ),
+                    _parameter(
+                        "direction",
+                        "enum",
+                        required=True,
+                        description="收支方向",
+                        enum=LEDGER_DIRECTIONS,
+                    ),
+                    _parameter(
+                        "source",
+                        "enum",
+                        required=True,
+                        description="账目来源",
+                        enum=LEDGER_SOURCES,
+                    ),
+                    _parameter(
+                        "idempotency_key",
+                        "string",
+                        required=True,
+                        description="幂等键（至少 8 位）",
+                        min_length=LEDGER_IDEMPOTENCY_MIN_LENGTH,
+                    ),
+                    _parameter("currency", "string", description="币种", default="CNY"),
+                    _parameter("category_id", "string", description="类目 id"),
+                    _parameter("account_id", "string", description="账户 id"),
+                    _parameter(
+                        "occurred_at",
+                        "datetime",
+                        description="发生时间",
+                        format_="iso8601",
+                    ),
+                    _parameter(
+                        "merchant",
+                        "string",
+                        description="商户",
+                        max_length=LEDGER_MERCHANT_MAX_CHARS,
+                    ),
+                    _parameter(
+                        "note",
+                        "string",
+                        description="备注",
+                        max_length=LEDGER_NOTE_MAX_CHARS,
+                    ),
+                    _parameter("source_ref", "string", description="来源引用"),
+                ]
+            ),
+            permission=PermissionProfile(level="normal", scope=("ledger",)),
+            side_effects=("irreversible",),
+            idempotency="keyed",
+            priority=35,
+            tags=("ledger", "write"),
+            observability_fields=("amount_minor", "direction", "source"),
+        ),
+        ToolDefinition(
+            id="builtin.ledger.query",
+            name="查询账本",
+            description="按期间聚合查询账本（只读，数字只来自结构化字段，零 LLM）。",
+            when_to_use="用户询问花了多少、收入多少等账目汇总时使用",
+            when_not_to_use="需要修改或撤销账目时不要使用",
+            namespace="builtin",
+            capability="ledger",
+            action="query",
+            input_schema=ToolSchema(
+                parameters=[
+                    _parameter(
+                        "period",
+                        "enum",
+                        required=True,
+                        description="统计期间",
+                        enum=LEDGER_PERIODS,
+                    ),
+                    _parameter("category_id", "string", description="类目 id"),
+                    _parameter("account_id", "string", description="账户 id"),
+                    _parameter("limit", "integer", description="条目上限", min_value=1),
+                ]
+            ),
+            permission=PermissionProfile(
+                level="safe",
+                scope=("ledger",),
+                override_reason="只读账本聚合无副作用，按只读工具降级到命名空间下限之下",
+            ),
+            side_effects=("read",),
+            idempotency="natural",
+            priority=37,
+            tags=("ledger", "read"),
+            observability_fields=("period",),
+        ),
+        ToolDefinition(
+            id="builtin.ledger.revise",
+            name="冲正账目",
+            description="对已入账条目做冲正（append-only 反向条目），原行永不改写。",
+            when_to_use="用户指出某笔记错、要求撤销或订正时使用",
+            when_not_to_use="只是查询账目时不要使用",
+            namespace="builtin",
+            capability="ledger",
+            action="revise",
+            input_schema=ToolSchema(
+                parameters=[
+                    _parameter(
+                        "entry_id",
+                        "string",
+                        required=True,
+                        description="被冲正条目 id",
+                    ),
+                    _parameter(
+                        "reason",
+                        "string",
+                        required=True,
+                        description="冲正原因",
+                        max_length=LEDGER_REASON_MAX_CHARS,
+                    ),
+                    _parameter(
+                        "idempotency_key",
+                        "string",
+                        required=True,
+                        description="幂等键（至少 8 位）",
+                        min_length=LEDGER_IDEMPOTENCY_MIN_LENGTH,
+                    ),
+                ]
+            ),
+            permission=PermissionProfile(level="normal", scope=("ledger",)),
+            side_effects=("irreversible",),
+            idempotency="keyed",
+            priority=36,
+            tags=("ledger", "write"),
+            observability_fields=("entry_id", "reason"),
         ),
     )
 

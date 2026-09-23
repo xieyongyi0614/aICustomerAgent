@@ -22,6 +22,9 @@ ActionType = Literal[
     "query_environment",
     "query_search",
     "send_notification",
+    "record_ledger_entry",
+    "revise_ledger_entry",
+    "query_ledger",
 ]
 
 ACTION_TYPES: tuple[str, ...] = (
@@ -34,6 +37,9 @@ ACTION_TYPES: tuple[str, ...] = (
     "query_environment",
     "query_search",
     "send_notification",
+    "record_ledger_entry",
+    "revise_ledger_entry",
+    "query_ledger",
 )
 
 ActionSource = Literal["conversation", "autonomy", "cancel", "plan", "event_driven"]
@@ -58,6 +64,9 @@ ACTION_EXECUTION_MAP: dict[str, ExecutionKind] = {
     "query_environment": "tool",
     "query_search": "tool",
     "send_notification": "external",
+    "record_ledger_entry": "internal",
+    "revise_ledger_entry": "internal",
+    "query_ledger": "internal",
 }
 
 ACTION_STATUS_SEMANTICS: dict[str, str] = {

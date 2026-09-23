@@ -54,6 +54,9 @@ def test_mapping_table_covers_documented_tools():
         "builtin.search.query",
         "builtin.notification.send",
         "channel.feishu.send",
+        "builtin.ledger.record",
+        "builtin.ledger.query",
+        "builtin.ledger.revise",
     }
     assert GENERIC_OBSERVATION_MAP == {"world_event_id": "world.event_id", "memory_id": "memory.id"}
 
@@ -316,6 +319,14 @@ KNOWN_CAPABILITY_PAYLOAD_KEYS = frozenset(
         "content",
         "external_sent",
         "external_message_id",
+        "entry_id",
+        "created",
+        "amount_minor",
+        "direction",
+        "expense_minor",
+        "income_minor",
+        "entry_count",
+        "reversal_of",
     }
 )
 

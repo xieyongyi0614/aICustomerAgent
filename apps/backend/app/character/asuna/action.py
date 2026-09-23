@@ -87,16 +87,39 @@ ACTION_TRIGGER_LEXICON: dict[str, tuple[str, ...]] = {
         "通知我",
         "发消息提醒我",
     ),
+    "record_ledger_entry": (
+        "记账",
+        "记一笔",
+        "记下",
+        "花了",
+        "付了",
+        "买了",
+    ),
+    "revise_ledger_entry": (
+        "记错了",
+        "撤掉",
+        "撤销这笔",
+        "冲正",
+        "订正",
+    ),
+    "query_ledger": (
+        "查一下账",
+        "这个月花了多少",
+        "本月消费",
+    ),
 }
 
 # 词表优先级：一轮至多一个 intent，多条命中取优先级最高者（planner.md §1.1 纪律 3）。
 ACTION_LEXICON_PRIORITY: tuple[str, ...] = (
     "cancel_reminder",
+    "revise_ledger_entry",
+    "record_ledger_entry",
     "create_reminder",
     "remember_fact",
     "create_object",
     "move_object",
     "use_object",
+    "query_ledger",
     "query_environment",
     "query_search",
     "send_notification",
@@ -127,6 +150,9 @@ REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
     "query_environment": (),
     "query_search": ("query",),
     "send_notification": ("content",),
+    "record_ledger_entry": ("amount_minor", "direction", "source", "idempotency_key"),
+    "revise_ledger_entry": ("entry_id", "reason", "idempotency_key"),
+    "query_ledger": ("period",),
 }
 
 # 能力映射（planner.md §3）：ActionType → (capability, action)。
@@ -140,6 +166,9 @@ ACTION_CAPABILITY_MAP: dict[str, tuple[str, str]] = {
     "query_environment": ("environment_query", "query"),
     "query_search": ("search", "query"),
     "send_notification": ("notification", "send"),
+    "record_ledger_entry": ("ledger", "record"),
+    "revise_ledger_entry": ("ledger", "revise"),
+    "query_ledger": ("ledger", "query"),
 }
 
 # 工具身份映射（V2.4.0 TOOL-004 §2.3）：ActionType → 工具 id 候选元组（一词多工具）。
@@ -154,7 +183,64 @@ ACTION_TOOL_MAP: dict[str, tuple[str, ...]] = {
     "query_environment": ("world.env.query",),
     "query_search": ("builtin.search.query",),
     "send_notification": ("builtin.notification.send", "channel.feishu.send"),
+    "record_ledger_entry": ("builtin.ledger.record",),
+    "revise_ledger_entry": ("builtin.ledger.revise",),
+    "query_ledger": ("builtin.ledger.query",),
 }
+
+# 记账意图词表（PLA-009）：动词/短语 + 金额结构组合判定；反例见 detector。
+LEDGER_RECORD_TRIGGERS: tuple[str, ...] = (
+    "记账",
+    "记一笔",
+    "记下",
+    "花了",
+    "花掉",
+    "付了",
+    "支付了",
+    "买了",
+    "消费",
+    "入账",
+    "收到",
+    "报销",
+    "充了",
+    "吃了",
+    "喝了",
+    "打了车",
+)
+LEDGER_REVISE_TRIGGERS: tuple[str, ...] = (
+    "记错",
+    "记错了",
+    "撤掉",
+    "撤销",
+    "冲正",
+    "订正",
+    "那笔不对",
+    "这笔不对",
+    "改一下账",
+)
+LEDGER_QUERY_TRIGGERS: tuple[str, ...] = (
+    "查一下账",
+    "查账",
+    "这个月花了多少",
+    "本月消费",
+    "本月花了",
+)
+LEDGER_INCOME_MARKERS: tuple[str, ...] = (
+    "收到",
+    "报销",
+    "工资",
+    "奖金",
+    "转入",
+    "收入",
+    "进账",
+)
+LEDGER_FALSE_POSITIVE_MARKERS: tuple[str, ...] = (
+    "我记得",
+    "记住我",
+    "记忆里",
+    "回忆",
+    "记账本",
+)
 
 # 物品类目推断（world-integration.md §1 create_object 行）。
 OBJECT_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {

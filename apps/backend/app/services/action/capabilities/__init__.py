@@ -24,6 +24,7 @@ from app.services.tool.ext_api import get_external_api_capability
 
 def register_builtin(registry: CapabilityRegistry) -> None:
     from app.services.action.capabilities.environment_query import EnvironmentQueryCapability
+    from app.services.action.capabilities.ledger import LedgerCapability
     from app.services.action.capabilities.memory import MemoryCapability
     from app.services.action.capabilities.notification import NotificationCapability
     from app.services.action.capabilities.reminder import ReminderCapability
@@ -36,6 +37,7 @@ def register_builtin(registry: CapabilityRegistry) -> None:
     registry.register(EnvironmentQueryCapability())
     registry.register(SearchCapability())
     registry.register(NotificationCapability())
+    registry.register(LedgerCapability())
     if channel_tools_enabled():
         registry.register(get_channel_capability())
     registry.register(get_external_api_capability())

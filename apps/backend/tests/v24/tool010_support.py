@@ -25,6 +25,9 @@ SEARCH_TOOL_ID = "builtin.search.query"
 NOTIFICATION_TOOL_ID = "builtin.notification.send"
 
 BUILTIN_TOOL_IDS: tuple[str, ...] = (
+    "builtin.ledger.query",
+    "builtin.ledger.record",
+    "builtin.ledger.revise",
     "builtin.memory.save",
     "builtin.notification.send",
     "builtin.reminder.cancel",
@@ -169,6 +172,29 @@ SUCCESS_PAYLOADS: dict[str, dict] = {
         "content": "在吗",
         "failure_kind": None,
     },
+    "ledger.record": {
+        "entry_id": "ent-1",
+        "created": True,
+        "amount_minor": 2000,
+        "direction": "expense",
+        "failure_kind": None,
+    },
+    "ledger.query": {
+        "period": "month",
+        "expense_minor": 2000,
+        "income_minor": 0,
+        "net_minor": -2000,
+        "entry_count": 1,
+        "reversal_count": 0,
+        "failure_kind": None,
+    },
+    "ledger.revise": {
+        "entry_id": "ent-rev-1",
+        "reversal_of": "ent-1",
+        "created": True,
+        "reason": "reversed",
+        "failure_kind": None,
+    },
 }
 
 CAPABILITY_ACTIONS: dict[str, dict[str, list[str]]] = {
@@ -183,6 +209,11 @@ CAPABILITY_ACTIONS: dict[str, dict[str, list[str]]] = {
     "search": {"query": ["query"]},
     "notification": {"send": ["content"]},
     "channel_feishu": {"send": ["content", "recipient"]},
+    "ledger": {
+        "record": ["amount_minor", "direction", "source", "idempotency_key"],
+        "query": ["period"],
+        "revise": ["entry_id", "reason", "idempotency_key"],
+    },
 }
 
 EXPECTED_OBSERVATIONS: dict[str, dict[str, object]] = {
@@ -207,6 +238,19 @@ EXPECTED_OBSERVATIONS: dict[str, dict[str, object]] = {
         "search.untrusted": True,
         "search.results": [],
     },
+    "builtin.ledger.record": {
+        "ledger.entry_id": "ent-1",
+        "ledger.created": True,
+    },
+    "builtin.ledger.query": {
+        "ledger.expense_minor": 2000,
+        "ledger.income_minor": 0,
+        "ledger.entry_count": 1,
+    },
+    "builtin.ledger.revise": {
+        "ledger.entry_id": "ent-rev-1",
+        "ledger.reversal_of": "ent-1",
+    },
 }
 
 VALID_PARAMS: dict[str, dict] = {
@@ -220,6 +264,18 @@ VALID_PARAMS: dict[str, dict] = {
     "builtin.search.query": {"query": "明天天气"},
     "builtin.notification.send": {"content": "记得喝水"},
     CHANNEL_TOOL_ID: {"content": "在吗", "recipient": EXTERNAL_ID},
+    "builtin.ledger.record": {
+        "amount_minor": 2000,
+        "direction": "expense",
+        "source": "conversation",
+        "idempotency_key": "key-record-01",
+    },
+    "builtin.ledger.query": {"period": "month"},
+    "builtin.ledger.revise": {
+        "entry_id": "ent-1",
+        "reason": "记错了",
+        "idempotency_key": "key-revise-01",
+    },
 }
 
 INVALID_PARAMS: dict[str, tuple[dict, str]] = {
@@ -239,6 +295,12 @@ INVALID_PARAMS: dict[str, tuple[dict, str]] = {
         {"content": "在吗", "recipient": "ou_unauthorized"},
         "recipient_not_authorized",
     ),
+    "builtin.ledger.record": (
+        {"direction": "expense", "source": "conversation", "idempotency_key": "key-record-01"},
+        "missing_required",
+    ),
+    "builtin.ledger.query": ({"period": "year"}, "enum_invalid"),
+    "builtin.ledger.revise": ({}, "missing_required"),
 }
 
 

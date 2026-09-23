@@ -44,7 +44,7 @@ READ_ONLY_IDS = ("world.env.query", "builtin.search.query")
 # TOOL-010：`builtin.search.query` 走路线 B（无可用检索来源、保持 unavailable），
 # 工具面按 §6.3 E1 默认裁剪（reason=`unavailable:source_not_configured`），
 # 因此实际进面的只读工具只剩环境查询。
-SURFACED_READ_ONLY_IDS = ("world.env.query",)
+SURFACED_READ_ONLY_IDS = ("builtin.ledger.query", "world.env.query")
 
 
 def resolve(registry, ctx, *, settings=None) -> ToolSurface:
@@ -509,7 +509,7 @@ def test_surface_limit_defaults_to_ctx_settings():
     surface = resolver.resolve(ctx.run_kind, ctx)
     assert len(surface.tool_ids) == 1
     # TOOL-010：`builtin.search.query` 被可用性降级维度先裁掉，不计入上限截断。
-    assert [item["reason"] for item in surface.excluded].count(SURFACE_LIMIT_REASON) == 7
+    assert [item["reason"] for item in surface.excluded].count(SURFACE_LIMIT_REASON) == 10
 
 
 @pytest.mark.parametrize("run_kind", list(SURFACE_RULES))

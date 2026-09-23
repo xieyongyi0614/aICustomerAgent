@@ -170,7 +170,10 @@ def _declared_params(definition) -> dict:
         elif parameter.type == "datetime":
             params[parameter.name] = FAR_FUTURE
         else:
-            params[parameter.name] = TYPE_DEFAULTS.get(parameter.type, "x")
+            value = TYPE_DEFAULTS.get(parameter.type, "x")
+            if parameter.min_length and isinstance(value, str) and len(value) < parameter.min_length:
+                value = (value * parameter.min_length)[: parameter.min_length]
+            params[parameter.name] = value
     return params
 
 

@@ -10,6 +10,9 @@ from app.models.tool import (
 )
 
 BUILTIN_TOOL_IDS: tuple[str, ...] = (
+    "builtin.ledger.query",
+    "builtin.ledger.record",
+    "builtin.ledger.revise",
     "builtin.memory.save",
     "builtin.notification.send",
     "builtin.reminder.cancel",
@@ -126,6 +129,36 @@ MAPPING_TABLE: tuple[dict[str, Any], ...] = (
         "side_effects": ("send_external",),
         "idempotency": "keyed",
         "priority": 100,
+    },
+    {
+        "tool_id": "builtin.ledger.record",
+        "capability": "ledger",
+        "action": "record",
+        "namespace": "builtin",
+        "level": "normal",
+        "side_effects": ("irreversible",),
+        "idempotency": "keyed",
+        "priority": 35,
+    },
+    {
+        "tool_id": "builtin.ledger.revise",
+        "capability": "ledger",
+        "action": "revise",
+        "namespace": "builtin",
+        "level": "normal",
+        "side_effects": ("irreversible",),
+        "idempotency": "keyed",
+        "priority": 36,
+    },
+    {
+        "tool_id": "builtin.ledger.query",
+        "capability": "ledger",
+        "action": "query",
+        "namespace": "builtin",
+        "level": "safe",
+        "side_effects": ("read",),
+        "idempotency": "natural",
+        "priority": 37,
     },
 )
 

@@ -92,7 +92,7 @@ def test_namespaces_returns_five_indexes_sorted():
     indexes = registry.namespaces()
     assert list(indexes) == ["builtin", "channel", "world", "ext.api", "user"]
     assert indexes["builtin"].tool_ids == sorted(indexes["builtin"].tool_ids)
-    assert indexes["builtin"].enabled_count == 5
+    assert indexes["builtin"].enabled_count == 8
     assert indexes["world"].tool_ids == [
         "world.env.query",
         "world.object.create",
@@ -279,7 +279,7 @@ def test_disabled_id_absent_from_describe_and_list(v24_tool_env):
     ]
     assert registry.has("builtin.reminder.create") is False
     assert registry.has("builtin.reminder.create", enabled_only=False) is True
-    assert registry.namespaces()["builtin"].enabled_count == 4
+    assert registry.namespaces()["builtin"].enabled_count == 7
 
 
 def test_disabled_overlay_does_not_write_back_to_definition(v24_tool_env):

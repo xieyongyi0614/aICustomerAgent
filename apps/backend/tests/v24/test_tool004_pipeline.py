@@ -254,13 +254,14 @@ def test_post_process_step_sequence_shape_is_frozen():
         "run_goal_review",
         "run_summary",
         "run_memory_extract",
+        "run_ledger_extraction",
         "run_budget_observer",
         "run_evaluation",
         "run_world_update",
         "run_character_action_sync",
         "run_action_planning",
     ]
-    assert len(names) == 10
+    assert len(names) == 11
 
 
 def _post_process_ctx(trace, *, action_intent=None):

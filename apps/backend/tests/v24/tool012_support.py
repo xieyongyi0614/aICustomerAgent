@@ -52,8 +52,11 @@ FEISHU_PLACEHOLDER_ENVS: dict[str, str] = {
     "FEISHU_VERIFICATION_TOKEN": "tool012_test_token",
 }
 
-BUILTIN_TOOL_COUNT = 10
+BUILTIN_TOOL_COUNT = 13
 BUILTIN_TOOL_IDS: tuple[str, ...] = (
+    "builtin.ledger.query",
+    "builtin.ledger.record",
+    "builtin.ledger.revise",
     "builtin.memory.save",
     "builtin.notification.send",
     "builtin.reminder.cancel",
@@ -165,6 +168,7 @@ V9_PROFILE_SIGNATURES: dict[str, dict[str, tuple[str, ...]]] = {
             "mode_stabilize",
             "scene_resolve",
             "behavior_resolve",
+            "action_planning",
             "reply_generation",
             "record_handoff",
         ),
@@ -222,6 +226,7 @@ POST_PROCESS_STEP_SEQUENCE: tuple[str, ...] = (
     "run_goal_review",
     "run_summary",
     "run_memory_extract",
+    "run_ledger_extraction",
     "run_budget_observer",
     "run_evaluation",
     "run_world_update",

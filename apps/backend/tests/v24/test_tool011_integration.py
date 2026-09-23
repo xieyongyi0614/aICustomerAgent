@@ -75,6 +75,7 @@ def test_default_registry_is_v9_six_plus_external_capability():
         "environment_query",
         "search",
         "notification",
+        "ledger",
         ext_api.EXT_API_CAPABILITY_NAME,
     }
 

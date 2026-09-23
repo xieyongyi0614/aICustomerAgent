@@ -122,7 +122,7 @@ async def test_tool_list_exposes_declaration_status_and_health(tools_on):
     payload = (await _get("/debug/tools")).json()
     assert payload["enabled"] is True
     rows = {row["tool_id"]: row for row in payload["tools"]}
-    assert len(rows) == 10
+    assert len(rows) == 13
     assert rows[TOOL_ID]["namespace"] == "builtin"
     assert rows[TOOL_ID]["side_effects"] == ["write_world"]
     assert rows[TOOL_ID]["status"] == "enabled"
@@ -149,6 +149,7 @@ async def test_tool_list_exposes_capability_registry_build_flags(tools_on):
     assert payload["capability_names"] == [
         "environment_query",
         "external_api",
+        "ledger",
         "memory",
         "notification",
         "reminder",
@@ -216,8 +217,8 @@ async def test_surface_endpoint_defaults_run_kind_and_lists_reasons(tools_on):
     assert payload["run_kind"] == RUN_KIND_FOREGROUND_CHAT
     assert payload["run_kind_defaulted"] is True
     assert CHANNEL_ID not in payload["tool_ids"]
-    # TOOL-010｜通道工具声明态 disabled + 检索工具可用性降级裁剪 → 实际进面 8 个。
-    assert len(payload["tool_ids"]) == 8
+    # TOOL-010｜通道工具声明态 disabled + 检索工具可用性降级裁剪 → 实际进面 11 个。
+    assert len(payload["tool_ids"]) == 11
     assert {item["tool_id"] for item in payload["excluded"]} == {
         CHANNEL_ID,
         "builtin.search.query",

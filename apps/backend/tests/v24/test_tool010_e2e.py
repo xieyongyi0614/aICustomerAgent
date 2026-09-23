@@ -54,6 +54,7 @@ SCRIPTED_CAPABILITIES: tuple[str, ...] = (
     "memory",
     "world_action",
     "environment_query",
+    "ledger",
 )
 
 MATRIX_OBSERVATIONS: dict[str, dict] = {
@@ -74,16 +75,16 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/base.py": "f992542b7585468c09f169a16d1f6d4aab36639eb35ae840936b201402359617",
     "app/channels/feishu/outbound.py": "50aa5f198d1793195ba32634e6d25e67fd21f160821957f96c4e5d78b1b800ac",
     "app/channels/feishu/client.py": "5f9fe0dadc8a5fa49a945f611d68600f3dc15d07e65d3d2463384a6f036bff7e",
-    "app/channels/feishu/delivery.py": "4b16ad9e5e57694b4f2d8ff57029981a36cfa48efd9475870dfc2766110b493c",
+    "app/channels/feishu/delivery.py": "b82457b2f04ac0a6cbad31ca3121bfd48fa1f5607a7dfe7473c4c9679140b390",
     "app/services/action/capabilities/reminder.py": "d6cd1bc27a698b107a02e534c7bb3e1afe48d1cb1f887f8e21e39d4b84ebd954",
     "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
     "app/services/action/capabilities/world_action.py": "345912ee8452d4d03c572e5e734f3b5900223be15a80524c1a6386bbffd40048",
     "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
-    "app/character/asuna/action.py": "6915eabd0e13bfb2caf57f81f9e9cf17bcd813a095557cc2e954d8fbaa2281d1",
+    "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
-    "app/services/decision_pipeline.py": "0afb670900820ffe3af959516e3e8741c32e5c7c8c502fa4edfe987241411aac",
-    "app/application/chat_pipeline.py": "90dd510fcdff0ddc7c2560cf3882b245e377c20a549afe15f57e63fccfc88e68",
-    "app/application/post_process.py": "d83914a52f53541ad862d00e8ef3e224cecbde0f1edfbde4ecb2be5eea20fced",
+    "app/services/decision_pipeline.py": "0c6713304f4b80ddab4f3b132be82ac49429a6d8ef8eaec4866f1a1461b9d612",
+    "app/application/chat_pipeline.py": "f4320415d8337b6ef5d1908beae1163e8881600923316616bf7d6afbb47d7423",
+    "app/application/post_process.py": "c739fd1ee77a8c1fa5a34ec9280b3c5bad6e92c16186a23167022fc2ca93db88",
     "app/application/action_engine.py": "8dec1c865a9e58546e6096e1f61ff13be5e6a168859e6ab8181cd85c68dc4df8",
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }
@@ -374,8 +375,11 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
     assert declaration.id in [item.tool_id for item in registry.describe()]
     assert registry.resolve("world.obj.tidy").action == "move"
 
-    surface = ToolSurfaceResolver(registry, _settings()).resolve(
-        "foreground_chat", surface_context(settings=_settings())
+    surface = ToolSurfaceResolver(
+        registry, _settings(tool_surface_max_tools=20)
+    ).resolve(
+        "foreground_chat",
+        surface_context(settings=_settings(tool_surface_max_tools=20)),
     )
     assert "world.obj.tidy" in surface.tool_ids
     assert (

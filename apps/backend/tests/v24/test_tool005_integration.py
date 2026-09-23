@@ -67,6 +67,7 @@ POST_PROCESS_STEP_SEQUENCE = (
     "run_goal_review",
     "run_summary",
     "run_memory_extract",
+    "run_ledger_extraction",
     "run_budget_observer",
     "run_evaluation",
     "run_world_update",

@@ -25,8 +25,8 @@ from app.models.action import (
 
 
 class TestValueSetFreeze:
-    def test_action_types_nine_values(self):
-        assert len(ACTION_TYPES) == 9
+    def test_action_types_twelve_values(self):
+        assert len(ACTION_TYPES) == 12
         assert set(ACTION_TYPES) == {
             "create_reminder",
             "cancel_reminder",
@@ -37,6 +37,9 @@ class TestValueSetFreeze:
             "query_environment",
             "query_search",
             "send_notification",
+            "record_ledger_entry",
+            "revise_ledger_entry",
+            "query_ledger",
         }
 
     def test_action_statuses_six_values(self):

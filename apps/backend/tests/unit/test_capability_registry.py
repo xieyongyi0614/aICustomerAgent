@@ -70,5 +70,6 @@ def test_builtin_registry_complete():
         "environment_query",
         "search",
         "notification",
+        "ledger",
         "external_api",
     }

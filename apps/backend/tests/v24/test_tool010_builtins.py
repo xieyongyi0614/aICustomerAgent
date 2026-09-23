@@ -190,7 +190,7 @@ def test_channel_declaration_matches_section_2_2():
 
 def test_read_only_tools_keep_override_reason():
     by_id = definitions_by_id()
-    for tool_id in ("world.env.query", SEARCH_TOOL_ID):
+    for tool_id in ("world.env.query", SEARCH_TOOL_ID, "builtin.ledger.query"):
         assert by_id[tool_id].permission.level == "safe"
         assert by_id[tool_id].permission.override_reason
         assert by_id[tool_id].is_read_only()
@@ -216,6 +216,7 @@ def test_declarations_touch_no_capability_implementation():
         "environment_query": ["query"],
         "search": ["query"],
         "notification": ["send"],
+        "ledger": ["query", "record", "revise"],
         "external_api": ["call"],
     }
 

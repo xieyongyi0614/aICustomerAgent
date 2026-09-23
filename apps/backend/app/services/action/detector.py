@@ -12,6 +12,11 @@ from datetime import datetime
 from app.character.asuna.action import (
     ACTION_LEXICON_PRIORITY,
     ACTION_TRIGGER_LEXICON,
+    LEDGER_FALSE_POSITIVE_MARKERS,
+    LEDGER_INCOME_MARKERS,
+    LEDGER_QUERY_TRIGGERS,
+    LEDGER_RECORD_TRIGGERS,
+    LEDGER_REVISE_TRIGGERS,
     REQUIRED_PARAMS,
     SELF_IMPERATIVE_TRIGGERS,
 )
@@ -23,6 +28,12 @@ logger = logging.getLogger(__name__)
 
 _QUESTION_GUARDS = ("能不能", "可不可以", "可以吗", "能吗", "会提醒我吗", "你会", "能不能帮我")
 _IMPERATIVE_SUBJECTS = ("帮我", "替我", "给我", "记得", "麻烦")
+
+# 记账金额结构：带单位金额，或收入动词后的裸数字（PLA-009 组合判定）。
+_AMOUNT_WITH_UNIT = re.compile(r"(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱|角|毛|¥|￥)")
+_AMOUNT_AFTER_INCOME = re.compile(
+    r"(?:收到|报销|入账|工资|奖金|转入|收入|进账)\D{0,6}(\d+(?:\.\d{1,2})?)"
+)
 
 # 数量清单抽取：数词/数字 + 量词 + 名词（"俩个鸡蛋" → 鸡蛋×2），供 use_object 批量消耗。
 _ITEM_PATTERN = re.compile(
@@ -57,18 +68,53 @@ def _extract_items(content: str) -> list[dict]:
         items.append({"object": noun, "quantity": value})
     return items
 
-# 祈使主语豁免：把X放到Y 是天然指令；查询/取消是天然请求。
-_IMPERATIVE_EXEMPT_TYPES = ("move_object", "query_environment", "cancel_reminder")
+# 祈使主语豁免：把X放到Y 是天然指令；查询/取消/记账陈述是天然请求。
+_IMPERATIVE_EXEMPT_TYPES = (
+    "move_object",
+    "query_environment",
+    "cancel_reminder",
+    "record_ledger_entry",
+    "revise_ledger_entry",
+    "query_ledger",
+)
 
 # 触发词 → 前置主语要求：词表已含"我"的模式天然祈使，其余要求命令式主语。
 _MOVE_PATTERN = re.compile(r"(?:帮我)?把(.{1,12}?)(?:放到|放进|收到)(.{1,16}?)(?:里|里面|中)?(?:[，。！？!?.]|$)")
 
 
+def _ledger_false_positive(content: str) -> bool:
+    if any(marker in content for marker in LEDGER_FALSE_POSITIVE_MARKERS):
+        return not _AMOUNT_WITH_UNIT.search(content) and not _AMOUNT_AFTER_INCOME.search(content)
+    return False
+
+
+def _detect_ledger(content: str) -> tuple[str, str] | None:
+    """记账意图组合判定：动词/短语 + 金额结构；反例（「我记得」）不命中。"""
+    if _ledger_false_positive(content):
+        return None
+    for trigger in LEDGER_REVISE_TRIGGERS:
+        if trigger in content:
+            return "revise_ledger_entry", trigger
+    for trigger in LEDGER_QUERY_TRIGGERS:
+        if trigger in content:
+            return "query_ledger", trigger
+    amount_hit = _AMOUNT_WITH_UNIT.search(content) or _AMOUNT_AFTER_INCOME.search(content)
+    if amount_hit is None:
+        return None
+    for trigger in LEDGER_RECORD_TRIGGERS:
+        if trigger in content:
+            return "record_ledger_entry", trigger
+    return None
+
+
 def _triggered_type(content: str) -> tuple[str, str] | None:
     """一轮至多一个 intent：按词表优先级取最高命中的 (action_type, trigger)。"""
+    ledger_hit = _detect_ledger(content)
+    if ledger_hit is not None:
+        return ledger_hit
     for action_type in ACTION_LEXICON_PRIORITY:
         for trigger in ACTION_TRIGGER_LEXICON.get(action_type, ()):
-            if trigger in content and action_type != "move_object":
+            if trigger in content and action_type not in ("move_object", "record_ledger_entry", "revise_ledger_entry", "query_ledger"):
                 return action_type, trigger
     if _MOVE_PATTERN.search(content):
         return "move_object", "放到"
@@ -134,6 +180,28 @@ def _extract_params(action_type: str, content: str, trigger: str, now: datetime)
         "query_search": "query",
         "send_notification": "content",
     }
+    if action_type == "record_ledger_entry":
+        amount = _AMOUNT_WITH_UNIT.search(content) or _AMOUNT_AFTER_INCOME.search(content)
+        if amount:
+            params["amount_value"] = amount.group(1)
+        direction = "income" if any(m in content for m in LEDGER_INCOME_MARKERS) else "expense"
+        params["direction"] = direction
+        for name in REQUIRED_PARAMS[action_type]:
+            if name not in params:
+                missing.append(name)
+        return params, missing
+    if action_type == "revise_ledger_entry":
+        params["reason"] = content.strip()[:80]
+        for name in REQUIRED_PARAMS[action_type]:
+            if name not in params:
+                missing.append(name)
+        return params, missing
+    if action_type == "query_ledger":
+        params["period"] = "month"
+        for name in REQUIRED_PARAMS[action_type]:
+            if name not in params:
+                missing.append(name)
+        return params, missing
     field = field_by_type.get(action_type)
     if field is not None:
         value = _text_after(content, trigger)
@@ -161,6 +229,9 @@ def _core_params(action_type: str, params: dict) -> dict:
         "query_environment": (),
         "query_search": ("query",),
         "send_notification": ("content",),
+        "record_ledger_entry": ("amount_value", "direction"),
+        "revise_ledger_entry": ("reason",),
+        "query_ledger": ("period",),
     }
     return {key: params[key] for key in core_fields.get(action_type, ()) if key in params}
 

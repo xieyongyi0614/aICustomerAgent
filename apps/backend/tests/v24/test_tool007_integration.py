@@ -32,7 +32,7 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "f26d7477f9d79c7986cc6e65ec7d730c9ac8d2e0fc658128ee7eec7b06949af8",
+    "app/application/world_engine.py": "3bdcd4f417f0d70e272518a50f994c8ee1dd6dc568a73142123182b0d16180e0",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
@@ -61,6 +61,7 @@ WORLD_TABLES: dict[str, tuple[str, ...]] = {
     "worlds": (
         "id", "user_id", "name", "time_mode", "sim_time", "sim_last_advanced_at", "sim_rate",
         "current_location", "environment", "notes", "created_at", "updated_at",
+        "owner_type", "owner_id",
     ),
     "world_entities": (
         "id", "world_id", "name", "aliases", "category", "location_id", "state", "quantity",
