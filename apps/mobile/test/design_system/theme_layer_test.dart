@@ -39,8 +39,12 @@ void main() {
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'));
     for (final f in files) {
-      expect(f.readAsStringSync().contains('NavigationBar'), isFalse,
-          reason: f.path);
+      // 只禁 M3 NavigationBar 构件，不禁 bottomNavigationBar 属性名
+      expect(
+        RegExp(r'\bNavigationBar\s*[<(\.]').hasMatch(f.readAsStringSync()),
+        isFalse,
+        reason: f.path,
+      );
     }
   });
 
