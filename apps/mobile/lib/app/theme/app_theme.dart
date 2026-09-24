@@ -67,6 +67,7 @@ ThemeData _build({required Brightness brightness}) {
       AppTypography.values,
       AppSpacing.values,
       AppMotion.values,
+      AppOrbPalette.values,
       elevation,
     ],
   );
