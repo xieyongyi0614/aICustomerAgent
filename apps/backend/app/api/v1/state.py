@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from app.api.v1.schemas import (
     BehaviorBudgetOut,
@@ -110,3 +111,23 @@ def get_state_snapshot(
         mode=_latest_mode(user_id),
         last_behavior=_last_behavior_out(user_id),
     )
+
+
+class ModeSetRequest(BaseModel):
+    mode: str
+
+
+@state_router.post("/state/mode")
+def set_mode(body: ModeSetRequest):
+    if body.mode not in {"professional", "default", "immersive"}:
+        raise HTTPException(status_code=422, detail="invalid mode")
+    user_id = get_settings().default_user
+    session_id = history_service.find_latest_conversation(user_id)
+    session_id = getattr(session_id, "id", None)
+    if session_id is None:
+        # 无会话时仅回传期望模式，待首轮对话落库
+        return {"ok": True, "mode": body.mode, "session_id": None}
+    from app.services import conversation_service
+
+    conversation_service.set_preferred_mode(user_id, body.mode)
+    return {"ok": True, "mode": body.mode, "session_id": session_id}

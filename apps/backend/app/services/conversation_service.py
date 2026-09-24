@@ -46,6 +46,17 @@ def save_proactive_turn(session_id: str, text: str) -> int:
     return message.id
 
 
+def set_preferred_mode(user_id: str, mode: str) -> str | None:
+    """N3 Role Mode 写路径：写最近会话的 confirmed mode。"""
+    from app.services import history_service
+
+    conversation = history_service.find_latest_conversation(user_id)
+    if conversation is None:
+        return None
+    repo.update_mode(conversation.id, mode)
+    return conversation.id
+
+
 def reset_proactive_on_user_message(user_id: str) -> None:
     """用户发言复位（cooldown.md §5）：delivered 未 acked → acked；candidate → discarded。"""
     proactive_repository.reset_on_user_message(user_id)
