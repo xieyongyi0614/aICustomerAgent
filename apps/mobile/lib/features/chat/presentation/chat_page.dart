@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/analytics/analytics.dart';
 import '../../../core/network/events/chat_event.dart';
 import '../../../design_system/components/components.dart';
 import '../data/chat_stream_repository.dart';
@@ -141,7 +142,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       children: [
         for (final m in state.messages)
-          MessageBubble(text: m.content, isUser: m.role == 'human'),
+          MessageBubble(
+            text: m.content,
+            isUser: m.role == 'human',
+            enableMarkdown: m.role != 'human',
+          ),
         if (state.toolSteps.isNotEmpty)
           ProcCard(
             title: '正在为你记账',
@@ -156,13 +161,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ],
           ),
         if (state.streamingText.isNotEmpty)
-          MessageBubble(text: state.streamingText, isUser: false),
+          MessageBubble.streaming(
+            text: state.streamingText,
+          ),
         if (state.streaming)
           const Padding(
             padding: EdgeInsets.only(left: 30, top: 4),
             child: Align(
               alignment: Alignment.centerLeft,
               child: TypingIndicator(),
+            ),
+          ),
+        if (state.error != null && state.messages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 30, top: 8, right: 18),
+            child: _InlineStreamError(
+              message: state.error is String
+                  ? state.error! as String
+                  : StateCopy.streamInterrupted,
+              onRetry: state.lastUserText == null
+                  ? null
+                  : () => ref
+                      .read(chatPageStateProvider.notifier)
+                      .send(state.lastUserText!),
             ),
           ),
         const SizedBox(height: 12),
@@ -202,6 +223,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
   }
 
   Future<void> send(String text) async {
+    Analytics.track('chat_send');
     final repo = _repo ??= ChatStreamRepository();
     final userMsg = ChatMessageItem(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
@@ -216,6 +238,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
       memoryRefs: const [],
       loading: false,
       error: null,
+      lastUserText: text,
     );
     _controller?.dispose();
     final controller = ChatStreamController(
@@ -247,11 +270,47 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
       }
       if (controller.state.incomplete) {
         state = state.copyWith(
-          error: controller.state.error?.userMessage ?? '刚才没说完，要我接着说吗',
+          error: controller.state.error?.userMessage ?? StateCopy.streamInterrupted,
         );
       }
     } catch (e) {
       state = state.copyWith(error: e, streamingText: '');
     }
+  }
+}
+
+class _InlineStreamError extends StatelessWidget {
+  const _InlineStreamError({required this.message, this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.line),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: type.body.copyWith(fontSize: 13.5, color: colors.ink2),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: const Text(StateCopy.retryAction),
+            ),
+        ],
+      ),
+    );
   }
 }

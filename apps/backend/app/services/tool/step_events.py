@@ -163,16 +163,12 @@ def complete_plan(tool_id: str, *, ok: bool, details: dict | None = None) -> Non
     plan = plan_for(tool_id)
     if not plan:
         return
-    final = STATUS_DONE if ok else STATUS_FAILED
     for i, step in enumerate(plan):
         last = i == len(plan) - 1
-        step_status = final if last or ok else STATUS_DONE
-        if not ok and last:
-            step_status = STATUS_FAILED
-        elif not ok and i < len(plan) - 1:
+        if ok:
             step_status = STATUS_DONE
         else:
-            step_status = STATUS_DONE
+            step_status = STATUS_FAILED if last else STATUS_DONE
         emit_tool_step(
             step_id=step["step_id"],
             tool_id=tool_id,

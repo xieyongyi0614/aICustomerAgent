@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.settings import get_settings
+from app.api.v1.auth import require_user
 from app.repositories import memory_repository
 
 memory_router = APIRouter(prefix="/memory", tags=["memory"])
@@ -40,14 +40,18 @@ def _out(row) -> MemoryItemOut:
 
 
 @memory_router.get("/items", response_model=list[MemoryItemOut])
-def list_items(limit: int = 50):
-    user_id = get_settings().default_user
+def list_items(limit: int = 50, user_id: str = Depends(require_user)):
     rows = memory_repository.list_by_user(user_id, limit=limit)
     return [_out(r) for r in rows if getattr(r, "status", "active") == "active"]
 
 
 @memory_router.patch("/items/{memory_id}", response_model=MemoryItemOut)
-def update_item(memory_id: str, body: MemoryUpdateRequest):
+def update_item(
+    memory_id: str,
+    body: MemoryUpdateRequest,
+    user_id: str = Depends(require_user),
+):
+    _ = user_id
     if body.content is None:
         row = memory_repository.get_memory(memory_id)
     else:
@@ -58,7 +62,8 @@ def update_item(memory_id: str, body: MemoryUpdateRequest):
 
 
 @memory_router.post("/items/{memory_id}/forget")
-def forget_item(memory_id: str):
+def forget_item(memory_id: str, user_id: str = Depends(require_user)):
+    _ = user_id
     row = memory_repository.get_memory(memory_id)
     if row is None:
         raise HTTPException(status_code=404, detail="memory not found")

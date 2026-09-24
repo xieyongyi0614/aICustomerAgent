@@ -28,4 +28,4 @@ jobs:
         run: |
           pip install uv
           uv sync
-          uv run pytest tests/v50 -q
+          uv run pytest tests -q -m "not slow"

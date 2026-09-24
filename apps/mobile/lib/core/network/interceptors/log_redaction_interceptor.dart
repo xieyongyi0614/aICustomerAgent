@@ -65,24 +65,37 @@ class LogRedactionInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // 只记录白名单安全字段
+    final safe = redactMap({
+      'method': options.method,
+      'path': options.uri.path,
+    });
     // ignore: avoid_print
-    print('[net] req ${options.method} ${options.uri.path}');
+    print('[net] req $safe');
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final safe = redactMap({
+      'method': response.requestOptions.method,
+      'path': response.requestOptions.uri.path,
+      'status': response.statusCode,
+      'duration_ms': response.requestOptions.extra['duration_ms'],
+    });
     // ignore: avoid_print
-    print('[net] res ${response.statusCode} ${response.requestOptions.uri.path}');
+    print('[net] res $safe');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     final kind = err.error is Object ? err.error.runtimeType.toString() : 'unknown';
+    final safe = redactMap({
+      'path': err.requestOptions.uri.path,
+      'error_kind': '${err.type.name}/$kind',
+    });
     // ignore: avoid_print
-    print('[net] err ${err.type.name} $kind');
+    print('[net] err $safe');
     handler.next(err);
   }
 }

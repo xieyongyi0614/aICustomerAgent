@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from app.api.v1.auth import require_user
 
 health_router = APIRouter(prefix="/health", tags=["health"])
 
@@ -16,7 +18,8 @@ class HealthScoreOut(BaseModel):
 
 
 @health_router.get("/score", response_model=HealthScoreOut)
-def health_score():
+def health_score(user_id: str = Depends(require_user)):
+    _ = user_id
     return HealthScoreOut(narrative="连接手环后这里会显示状态解读")
 
 
@@ -26,6 +29,7 @@ class HealthSyncRequest(BaseModel):
 
 
 @health_router.post("/sync")
-def health_sync(body: HealthSyncRequest):
+def health_sync(body: HealthSyncRequest, user_id: str = Depends(require_user)):
+    _ = user_id
     # 幂等 ingest 骨架；M4 门控后实现
     return {"ok": True, "accepted": 0}

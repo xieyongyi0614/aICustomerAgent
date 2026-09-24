@@ -10,6 +10,7 @@ from app.api.v1.deps import get_chat_llm
 from app.core.settings import get_settings
 from app.api.v1.schemas import ChatRequest
 from app.services import agent_service, trace_collector
+from app.services.analytics.events import track_event
 from app.services.agent_service import EmptyLLMResponseError
 from app.services.tool.step_events import (
     CHAT_EVENT_TOOL_STEP,
@@ -48,6 +49,7 @@ async def chat_message(
         raise HTTPException(status_code=422, detail="content 不能为空")
     session_id = body.session_id or str(uuid.uuid4())
     new_session = body.session_id is None
+    track_event("chat_message", session_new=new_session)
     profile_id = body.profile_id or request.headers.get("x-llm-profile")
 
     async def generate():

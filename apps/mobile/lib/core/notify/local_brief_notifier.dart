@@ -20,8 +20,12 @@ class LocalBriefNotifier {
     );
   }
 
+  static void Function(String payload)? onOpenBriefing;
+
   static void _onTap(NotificationResponse response) {
-    // 落地简报页由路由层处理（payload: briefing:morning|evening）
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    onOpenBriefing?.call(payload);
   }
 
   Future<void> scheduleDaily({

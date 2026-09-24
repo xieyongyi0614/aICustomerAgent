@@ -63,12 +63,15 @@ async def _events(session_id: str, content: str, llm) -> list[dict]:
     return events
 
 
+OPTIONAL_TRAILING_KEYS: tuple[str, ...] = ("action_intent", "memory_refs")
+
+
 def _core_keys(meta: dict) -> list[str]:
-    return [
-        name
-        for name in meta
-        if name not in ("action_intent", "memory_refs")
-    ]
+    return [name for name in meta if name not in OPTIONAL_TRAILING_KEYS]
+
+
+def _trailing_keys(meta: dict) -> list[str]:
+    return [name for name in meta if name in OPTIONAL_TRAILING_KEYS]
 
 
 class TestStreamingContract:
@@ -84,9 +87,9 @@ class TestStreamingContract:
         meta = events[0]
         assert meta["kind"] == "turn_meta"
         assert _core_keys(meta) == list(TURN_META_ORDER)
-        keys = list(meta)
-        if "action_intent" in keys:
-            assert keys[-1] == "action_intent"
+        assert _trailing_keys(meta) == [
+            name for name in OPTIONAL_TRAILING_KEYS if name in meta
+        ]
 
     async def test_done_event_unchanged(self, db_session_factory, fake_llm):
         events = await _events("s-v30-done", "在吗", _llm(fake_llm))
@@ -285,7 +288,9 @@ class TestForegroundKillSwitch:
         on_meta = next(e for e in on_events if e["kind"] == "turn_meta")
         off_meta = next(e for e in off_events if e["kind"] == "turn_meta")
         assert _core_keys(off_meta) == _core_keys(on_meta)
-        assert list(off_meta) == list(on_meta)
+        assert _core_keys(off_meta) == list(TURN_META_ORDER)
+        assert _trailing_keys(off_meta) == [name for name in OPTIONAL_TRAILING_KEYS if name in off_meta]
+        assert _trailing_keys(on_meta) == [name for name in OPTIONAL_TRAILING_KEYS if name in on_meta]
 
         on_done = next(e for e in on_events if e["kind"] == "done")
         off_done = next(e for e in off_events if e["kind"] == "done")

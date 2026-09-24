@@ -2,119 +2,182 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/cards.dart';
-import '../../../design_system/components/chips.dart';
+import '../../../design_system/components/components.dart';
 import '../../../design_system/components/rows.dart';
+import '../data/ledger_repository.dart';
 
-/// B5 #ledger 账本：深色总览 + AI 观察 + 分类 + 账单。Tab 隐藏由路由元数据控制。
-class LedgerPage extends StatelessWidget {
-  const LedgerPage({super.key});
+/// B5 #ledger 账本：深色总览 + AI 观察 + 分类 + 账单。
+class LedgerPage extends StatefulWidget {
+  const LedgerPage({super.key, this.debugSummary, this.debugEntries});
+
+  final LedgerSummaryData? debugSummary;
+  final List<LedgerEntryData>? debugEntries;
+
+  @override
+  State<LedgerPage> createState() => _LedgerPageState();
+}
+
+class _LedgerPageState extends State<LedgerPage> {
+  final _repo = LedgerRepository();
+  LedgerSummaryData? _summary;
+  List<LedgerEntryData> _entries = [];
+  bool _loading = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.debugSummary != null) {
+      _summary = widget.debugSummary;
+      _entries = widget.debugEntries ?? const [];
+      _loading = false;
+      return;
+    }
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final summary = await _repo.fetchSummary();
+      final entries = await _repo.fetchEntries();
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+        _entries = entries;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    if (_loading && _summary == null) {
+      return Scaffold(
+        backgroundColor: colors.canvas,
+        body: const SafeArea(
+          child: ListView(
+            padding: EdgeInsets.all(18),
+            children: [SkeletonCard(), SkeletonCard()],
+          ),
+        ),
+      );
+    }
+    if (_error != null && _summary == null) {
+      return Scaffold(
+        backgroundColor: colors.canvas,
+        body: SafeArea(child: ErrorState(onRetry: _load)),
+      );
+    }
+    final s = _summary!;
     final type = context.typography;
     final gradients = context.gradients;
+    final maxExpense = s.byCategory
+        .map((e) => e.expenseMinor)
+        .fold<int>(0, (a, b) => b > a ? b : a);
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
-        child: ListView(
-          padding: context.spacing.screenPadding.copyWith(bottom: 40),
-          children: [
-            BackLink(label: '‹ 生活', onTap: () => Navigator.of(context).maybePop()),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: gradients.deepSummary,
-                borderRadius: context.radii.rLg,
-                boxShadow: context.elevation.deep,
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: context.spacing.screenPadding.copyWith(bottom: 40),
+            children: [
+              BackLink(
+                label: '‹ 生活',
+                onTap: () => Navigator.of(context).maybePop(),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('9 月总支出',
-                      style: type.caption.copyWith(color: colors.onDeepSecondary)),
-                  const SizedBox(height: 6),
-                  Text('¥3,420',
-                      style: type.numeric(type.display)
-                          .copyWith(color: colors.onDeepPrimary)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: colors.health.withValues(alpha: 0.18),
-                      borderRadius: context.radii.rFull,
-                    ),
-                    child: Text('比上月同期少 8%',
-                        style: type.caption.copyWith(color: colors.health)),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: gradients.deepSummary,
+                  borderRadius: context.radii.rLg,
+                  boxShadow: context.elevation.deep,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.periodLabel,
+                        style: type.caption
+                            .copyWith(color: colors.onDeepSecondary)),
+                    const SizedBox(height: 6),
+                    Text('¥${s.expenseText}',
+                        style: type.numeric(type.display)
+                            .copyWith(color: colors.onDeepPrimary)),
+                    const SizedBox(height: 6),
+                    if (s.comparisonLabel != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 3, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: colors.health.withValues(alpha: 0.18),
+                          borderRadius: context.radii.rFull,
+                        ),
+                        child: Text(s.comparisonLabel!,
+                            style:
+                                type.caption.copyWith(color: colors.health)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              AiCard(
+                title: '亚丝娜的观察',
+                child: Text(
+                  s.entryCount == 0
+                      ? '这段时间还没有记账，说一句「午饭 35 元」就能记上。'
+                      : '本期共 ${s.entryCount} 笔。收入 ${s.incomeText}，结余 ${s.netText}。',
+                  style: type.body
+                      .copyWith(color: colors.bodyOnCard, height: 1.65),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _SectionTitle(title: '分类支出', hint: s.periodLabel),
+              const SizedBox(height: 10),
+              if (s.byCategory.isEmpty)
+                Text('还没有分类数据', style: type.body.copyWith(color: colors.ink2))
+              else
+                for (final c in s.byCategory.take(6))
+                  CategoryBar(
+                    label: c.categoryId ?? '未分类',
+                    amountLabel: '¥${(c.expenseMinor / 100).toStringAsFixed(0)}',
+                    ratio: maxExpense == 0
+                        ? 0
+                        : c.expenseMinor / maxExpense,
+                    gradient: gradients.barMoney,
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            AiCard(
-              title: '亚丝娜的观察',
-              child: Text(
-                '旅行预算有点紧，可以把旅行基金上调至 ¥650/月，我帮你自动划转。',
-                style: type.body.copyWith(color: colors.bodyOnCard, height: 1.65),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _SectionTitle(title: '分类支出', hint: '9 月'),
-            const SizedBox(height: 10),
-            CategoryBar(
-              label: '餐饮',
-              amountLabel: '¥1,240（78%）',
-              ratio: 0.78,
-              gradient: gradients.barMoney,
-            ),
-            CategoryBar(
-              label: '交通',
-              amountLabel: '¥860（54%）',
-              ratio: 0.54,
-              gradient: gradients.barBlue,
-            ),
-            CategoryBar(
-              label: '购物',
-              amountLabel: '¥720（45%）',
-              ratio: 0.45,
-              gradient: gradients.barPurple,
-            ),
-            CategoryBar(
-              label: '娱乐',
-              amountLabel: '¥600（38%）',
-              ratio: 0.38,
-              gradient: gradients.barGreen,
-            ),
-            const SizedBox(height: 14),
-            _SectionTitle(title: '最近账单', hint: 'AI 自动分类'),
-            const SizedBox(height: 6),
-            TxRow(
-              title: '午餐 · 一碗拉面',
-              amountLabel: '-35',
-              tileColor: colors.tileMoney,
-              iconColor: colors.money,
-              icon: Icons.restaurant,
-              subtitle: '今天 12:32 · 语音记账',
-            ),
-            TxRow(
-              title: '地铁出行',
-              amountLabel: '-6',
-              tileColor: colors.tileInfo,
-              iconColor: colors.aiBlue,
-              icon: Icons.train,
-              subtitle: '今天 08:47 · 自动同步',
-            ),
-            TxRow(
-              title: '咖啡豆 · 手冲拼配',
-              amountLabel: '-87',
-              tileColor: colors.tileWarm,
-              iconColor: colors.warm,
-              icon: Icons.coffee,
-              subtitle: '昨天 · 「咖啡不加糖」已记忆',
-              showDivider: false,
-            ),
-          ],
+              const SizedBox(height: 14),
+              _SectionTitle(title: '最近账单', hint: 'AI 自动分类'),
+              const SizedBox(height: 6),
+              if (_entries.isEmpty)
+                Text('还没有账单', style: type.body.copyWith(color: colors.ink2))
+              else
+                for (var i = 0; i < _entries.length; i++)
+                  TxRow(
+                    title: _entries[i].merchant ??
+                        _entries[i].note ??
+                        '一笔账',
+                    amountLabel: _entries[i].direction == 'income'
+                        ? '+${_entries[i].amountText}'
+                        : '-${_entries[i].amountText}',
+                    tileColor: colors.tileMoney,
+                    iconColor: colors.money,
+                    icon: Icons.receipt_long,
+                    subtitle: _entries[i].occurredAt,
+                    showDivider: i < _entries.length - 1,
+                  ),
+            ],
+          ),
         ),
       ),
     );

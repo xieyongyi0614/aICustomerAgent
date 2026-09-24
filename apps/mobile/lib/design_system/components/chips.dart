@@ -172,9 +172,11 @@ class CaptureBar extends StatelessWidget {
   const CaptureBar({
     super.key,
     this.hint = '「记一下，下个月准备去旅行」…',
+    this.onTap,
   });
 
   final String hint;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -182,20 +184,23 @@ class CaptureBar extends StatelessWidget {
     final type = _t(context);
     final radii = _r(context);
     final elevation = _e(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 22),
-      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 15),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: radii.rMd,
-        boxShadow: elevation.card,
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome, size: 17, color: colors.aiPrimary),
-          const SizedBox(width: 10),
-          Expanded(child: Text(hint, style: type.body.copyWith(color: colors.ink3))),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 22),
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 15),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: radii.rMd,
+          boxShadow: elevation.card,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, size: 17, color: colors.aiPrimary),
+            const SizedBox(width: 10),
+            Expanded(child: Text(hint, style: type.body.copyWith(color: colors.ink3))),
+          ],
+        ),
       ),
     );
   }

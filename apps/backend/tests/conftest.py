@@ -53,6 +53,7 @@ from app.services.development import attribution as development_attribution
 from app.services.development import evaluation as development_evaluation
 from app.services.development import policy as development_policy
 from app.services.reflection import attribution as reflection_attribution
+from app.services.insights import query as insights_query
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import evaluation as reflection_evaluation
 from app.services.reflection import lifecycle as reflection_lifecycle
@@ -165,6 +166,7 @@ _SERVICE_DB_MODULES = (
     development_attribution,
     development_evaluation,
     evolution_service,
+    insights_query,
 )
 
 

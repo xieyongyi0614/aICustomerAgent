@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../design_system/components/cards.dart';
 import '../../../design_system/components/rows.dart';
 
@@ -24,13 +27,16 @@ class ProfilePrivacyPage extends StatelessWidget {
                 title: '健康数据',
                 subtitle: '单独同意 · 用于趋势参考，非医疗建议',
                 icon: Icons.favorite,
-                trailing: AppToggle(value: false, onChanged: (_) {}),
+                onTap: () => context.go('/health/consent'),
               ),
               SettingRow(
                 title: '导出我的数据',
                 subtitle: '生成一份完整备份',
                 icon: Icons.download,
-                onTap: () {},
+                onTap: () async {
+                  final dio = createDio();
+                  await dio.get('/life/export');
+                },
                 showDivider: false,
               ),
             ],
@@ -70,7 +76,13 @@ class ProfilePrivacyPage extends StatelessWidget {
               child: const Text('再想想'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                final dio = createDio();
+                try {
+                  await dio.delete('/life/data');
+                } catch (_) {}
+              },
               child: const Text('确认清空'),
             ),
           ],

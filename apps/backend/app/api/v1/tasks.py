@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.settings import get_settings
+from app.api.v1.auth import require_user
 from app.services.tasks import task_service
 
 tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -43,19 +43,15 @@ class TaskOut(BaseModel):
     due_date: str | None = None
 
 
-def _user_id() -> str:
-    return get_settings().default_user
-
-
 @tasks_router.get("", response_model=list[TaskOut])
-def list_tasks():
-    return task_service.list_open(_user_id())
+def list_tasks(user_id: str = Depends(require_user)):
+    return task_service.list_open(user_id)
 
 
 @tasks_router.post("", response_model=TaskOut)
-def create_task(body: TaskCreateRequest):
+def create_task(body: TaskCreateRequest, user_id: str = Depends(require_user)):
     row = task_service.create(
-        _user_id(),
+        user_id,
         body.title,
         kind=body.kind,
         tag=body.tag,
@@ -77,7 +73,12 @@ def create_task(body: TaskCreateRequest):
 
 
 @tasks_router.patch("/{task_id}", response_model=TaskOut)
-def patch_task(task_id: str, body: TaskPatchRequest):
+def patch_task(
+    task_id: str,
+    body: TaskPatchRequest,
+    user_id: str = Depends(require_user),
+):
+    _ = user_id
     row = task_service.update(
         task_id,
         title=body.title,
@@ -102,7 +103,8 @@ def patch_task(task_id: str, body: TaskPatchRequest):
 
 
 @tasks_router.post("/{task_id}/complete", response_model=TaskOut)
-def complete_task(task_id: str):
+def complete_task(task_id: str, user_id: str = Depends(require_user)):
+    _ = user_id
     row = task_service.complete(task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")
@@ -120,7 +122,8 @@ def complete_task(task_id: str):
 
 
 @tasks_router.post("/{task_id}/reopen", response_model=TaskOut)
-def reopen_task(task_id: str):
+def reopen_task(task_id: str, user_id: str = Depends(require_user)):
+    _ = user_id
     row = task_service.reopen(task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")
@@ -138,7 +141,8 @@ def reopen_task(task_id: str):
 
 
 @tasks_router.delete("/{task_id}")
-def delete_task(task_id: str):
+def delete_task(task_id: str, user_id: str = Depends(require_user)):
+    _ = user_id
     row = task_service.delete(task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")

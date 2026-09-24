@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/cards.dart';
@@ -93,13 +94,20 @@ class ProfilePage extends StatelessWidget {
                   title: '健康数据授权',
                   subtitle: '单独同意 · 可随时关闭',
                   icon: Icons.favorite,
-                  onTap: () {},
+                  onTap: () => context.go('/health/consent'),
                 ),
                 SettingRow(
                   title: '记忆与隐私',
                   subtitle: '可导出、可清空',
                   icon: Icons.lock,
-                  onTap: () {},
+                  onTap: () => context.go('/profile/privacy'),
+                  showDivider: false,
+                ),
+                SettingRow(
+                  title: '设备配对',
+                  subtitle: '绑定这台设备',
+                  icon: Icons.link,
+                  onTap: () => context.go('/profile/pairing'),
                   showDivider: false,
                 ),
               ],

@@ -70,8 +70,8 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 )
 
 MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 54
-MIGRATION_BREAKPOINT = "0054_life_ledger_domain.py"
+MIGRATION_FILE_COUNT_CURRENT = 55
+MIGRATION_BREAKPOINT = "0055_life_tasks.py"
 MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0046_tool_insight_types.py",
     "0047_action_schedules_priority.py",
@@ -82,6 +82,7 @@ MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
     "0052_runtime_session_trace_links.py",
     "0053_life_user_identity.py",
     "0054_life_ledger_domain.py",
+    "0055_life_tasks.py",
 )
 
 V23_MIGRATION_TAIL: tuple[str, ...] = (
@@ -89,7 +90,7 @@ V23_MIGRATION_TAIL: tuple[str, ...] = (
     "0048_action_records_run_id.py",
 )
 
-SCHEMA_TABLE_SET_DIGEST = "95ea4cc8ff43d997"
+SCHEMA_TABLE_SET_DIGEST = "05a4460a97174d48"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
@@ -98,6 +99,7 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "ledger_accounts",
     "ledger_categories",
     "ledger_entries",
+    "life_tasks",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"

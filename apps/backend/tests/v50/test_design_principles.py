@@ -13,7 +13,11 @@ def test_ai_narrative_first_home():
     src = Path("../mobile/lib/features/home/presentation/home_page.dart").read_text(
         encoding="utf-8"
     )
-    ai = src.index("今日 AI 总结")
+    repo = Path("../mobile/lib/features/home/data/home_repository.dart").read_text(
+        encoding="utf-8"
+    )
+    assert "今日 AI 总结" in repo
+    ai = src.index("AiCard(")
     data = src.index("今日状态")
     assert ai < data
 

@@ -433,10 +433,13 @@ async def _save_prompt_snapshot(snapshot) -> None:
 
 
 def on_decision(record: DecisionRecord) -> None:
-    """决策记录入口（decision-history.md §3）：自治 tick 无 trace 上下文，直接后台写。"""
+    """决策记录入口：单行落库同步写，避免 write-behind 在短生命周期 loop 上丢失。"""
     if not get_settings().observability_persist_enabled:
         return
-    _spawn(_save_decision(record))
+    try:
+        decision_repository.save(record)
+    except Exception:
+        logger.exception("决策记录落库失败，已忽略")
 
 
 def record_turn_decisions(

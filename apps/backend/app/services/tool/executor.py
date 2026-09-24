@@ -69,6 +69,7 @@ from app.services.tool.step_events import (
     STATUS_DONE,
     STATUS_FAILED,
     STATUS_RUNNING,
+    advance_plan,
     complete_plan,
     emit_todo_plan,
     emit_tool_step,
@@ -160,55 +161,62 @@ class ToolExecutor:
         started_at = _now(ctx)
         params = dict(invocation.params)
 
+        has_plan = bool(plan_for(defn.id))
         if self._is_unavailable(defn.id, started_at):
-            emit_tool_step(
-                step_id=f"{defn.id}.resolve",
-                tool_id=defn.id,
-                label="解析工具",
-                status=STATUS_FAILED,
-                detail="unavailable",
-            )
+            if has_plan:
+                complete_plan(defn.id, ok=False, details={"unavailable": "unavailable"})
+            else:
+                emit_tool_step(
+                    step_id=f"{defn.id}.run",
+                    tool_id=defn.id,
+                    label="执行工具",
+                    status=STATUS_FAILED,
+                    detail="unavailable",
+                )
             return self._terminal(index, defn, params, started_at, "unavailable")
 
         emit_todo_plan(defn.id)
         decision = self._evaluate_permission(defn, invocation, ctx, permission_snapshot)
         if decision.decision == PERMISSION_DENY:
-            emit_tool_step(
-                step_id=f"{defn.id}.permission",
-                tool_id=defn.id,
-                label="权限校验",
-                status=STATUS_FAILED,
-                detail="denied",
-            )
+            if has_plan:
+                complete_plan(defn.id, ok=False, details={"denied": "denied"})
+            else:
+                emit_tool_step(
+                    step_id=f"{defn.id}.run",
+                    tool_id=defn.id,
+                    label="执行工具",
+                    status=STATUS_FAILED,
+                    detail="denied",
+                )
             return self._terminal(index, defn, params, started_at, "denied", decision=decision)
         if decision.decision == PERMISSION_CONFIRM_REQUIRED:
-            emit_tool_step(
-                step_id=f"{defn.id}.permission",
-                tool_id=defn.id,
-                label="权限校验",
-                status=STATUS_RUNNING,
-                detail="pending_confirmation",
-            )
+            if has_plan:
+                advance_plan(defn.id, up_to=0, status=STATUS_RUNNING, details={"pending_confirmation": "待确认"})
+            else:
+                emit_tool_step(
+                    step_id=f"{defn.id}.run",
+                    tool_id=defn.id,
+                    label="执行工具",
+                    status=STATUS_RUNNING,
+                    detail="pending_confirmation",
+                )
             return self._terminal(
                 index, defn, params, started_at, "pending_confirmation", decision=decision
             )
 
-        emit_tool_step(
-            step_id=f"{defn.id}.run",
-            tool_id=defn.id,
-            label="执行工具",
-            status=STATUS_RUNNING,
-        )
         validation = None
         report = self.validator.validate(defn, params, _tool_ctx(ctx))
         if not report.passed:
-            emit_tool_step(
-                step_id=f"{defn.id}.validate",
-                tool_id=defn.id,
-                label="参数校验",
-                status=STATUS_FAILED,
-                detail="invalid",
-            )
+            if has_plan:
+                complete_plan(defn.id, ok=False, details={"invalid": "invalid"})
+            else:
+                emit_tool_step(
+                    step_id=f"{defn.id}.run",
+                    tool_id=defn.id,
+                    label="执行工具",
+                    status=STATUS_FAILED,
+                    detail="invalid",
+                )
             return self._terminal(
                 index,
                 defn,
@@ -219,12 +227,6 @@ class ToolExecutor:
                 validation=report.model_dump(mode="json"),
             )
         params = dict(report.normalized)
-        emit_tool_step(
-            step_id=f"{defn.id}.validate",
-            tool_id=defn.id,
-            label="参数校验",
-            status=STATUS_DONE,
-        )
 
         return await self._invoke(
             index, defn, params, ctx, started_at, decision, validation, invocation.dedupe_key
@@ -301,7 +303,6 @@ class ToolExecutor:
         )
         plan = plan_for(defn.id)
         if plan:
-            # ⑤ normalize 后一次性收口 4 步（validate 段已完成 0，invoke 段完成 1~2）
             complete_plan(
                 defn.id,
                 ok=tool_result.status == "succeeded",

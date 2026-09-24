@@ -6,11 +6,14 @@ import '../../design_system/components/app_tab_bar.dart';
 import '../../features/briefing/presentation/briefing_page.dart';
 import '../../features/chat/presentation/chat_ledger_page.dart';
 import '../../features/chat/presentation/chat_page.dart';
+import '../../features/health/presentation/health_consent_page.dart';
 import '../../features/health/presentation/health_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/life_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
+import '../../features/profile/presentation/pairing_page.dart';
+import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 
 /// 路由元数据：Tab 隐藏与状态栏样式由壳层统一消费，禁止页面内局部 if。
@@ -38,6 +41,9 @@ const chromeByPath = <String, RouteChrome>{
   '/ledger': chromeLedger,
   '/chat/ledger': chromeLedger,
   '/briefing': chromeBriefing,
+  '/profile/privacy': chromeLedger,
+  '/health/consent': chromeLedger,
+  '/profile/pairing': chromeLedger,
 };
 
 RouteChrome chromeForLocation(String location) {
@@ -66,7 +72,19 @@ final appRouter = GoRouter(
         ),
         GoRoute(path: '/memory', builder: (_, _) => const MemoryPage()),
         GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
+        GoRoute(
+          path: '/profile/privacy',
+          builder: (_, _) => const ProfilePrivacyPage(),
+        ),
+        GoRoute(
+          path: '/profile/pairing',
+          builder: (_, _) => const PairingPage(),
+        ),
         GoRoute(path: '/health', builder: (_, _) => const HealthPage()),
+        GoRoute(
+          path: '/health/consent',
+          builder: (_, _) => const HealthConsentPage(),
+        ),
         GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
         GoRoute(
           path: '/briefing',

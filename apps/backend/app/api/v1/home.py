@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.settings import get_settings
+from app.api.v1.auth import require_user
+from app.services.analytics.events import track_event
 from app.services.ledger import query as ledger_query
 from app.services.tasks import task_service
 
@@ -80,8 +81,8 @@ def _day_end() -> datetime:
 
 
 @home_router.get("/summary", response_model=HomeSummary)
-def home_summary():
-    user_id = get_settings().default_user
+def home_summary(user_id: str = Depends(require_user)):
+    track_event("home_summary")
     try:
         task_rows = task_service.list_open(user_id)
     except Exception:

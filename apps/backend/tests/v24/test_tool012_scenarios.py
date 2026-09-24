@@ -573,7 +573,16 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
         "u-tool006", NOW - timedelta(minutes=1), "下午面试"
     )
 
-    stats = asyncio.run(life_loop.run_life_loop_tick(now=NOW))
+    async def _tick_and_drain():
+        result = await life_loop.run_life_loop_tick(now=NOW)
+        from app.application import observability
+
+        pending = list(observability.background_tasks)
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        return result
+
+    stats = asyncio.run(_tick_and_drain())
 
     assert stats["user_cycles"] == 1 and stats["aborted"] == 0
     records = [

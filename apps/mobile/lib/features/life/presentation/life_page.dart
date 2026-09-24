@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/chips.dart';
+import 'capture_route.dart';
 
 /// B4 #life：捕获条 → 模块 3×2 → soon 占位。
 class LifePage extends StatelessWidget {
@@ -22,7 +23,15 @@ class LifePage extends StatelessWidget {
             Text('说一句话，亚丝娜帮你归位',
                 style: type.sub.copyWith(color: colors.ink2)),
             const SizedBox(height: 16),
-            const CaptureBar(),
+            CaptureBar(
+              onTap: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const CaptureRouteSheet(),
+                );
+              },
+            ),
             const _SectionTitle(title: '生活模块', hint: 'Skill 化 · 可持续扩展'),
             const SizedBox(height: 10),
             const _ModuleGrid(),
@@ -72,7 +81,7 @@ class _ModuleGrid extends StatelessWidget {
             Expanded(
               child: ModuleCard(
                 title: '记账',
-                summary: '本月节奏稳，餐饮略高',
+                summary: '还没有月度总结',
                 icon: Icons.wallet,
                 tileBg: colors.tileMoney,
                 tileFg: colors.money,

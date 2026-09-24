@@ -1,87 +1,171 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
+import '../data/home_repository.dart';
 
 /// B1 #home 十一段：先结论 → 后数据 → 再行动。
-/// 三宫格双分支：真实数据 / 空态引导授权（不得假数据）。
-class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.healthAuthorized = false});
+class HomePage extends ConsumerStatefulWidget {
+  const HomePage({super.key, this.healthAuthorized = false, this.debugSummary});
 
-  /// PLT-001 未通过前默认走空态分支
   final bool healthAuthorized;
+
+  /// 测试注入；生产路径为 null，走 /home/summary。
+  final HomeSummaryData? debugSummary;
+
+  @override
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  final _repo = HomeRepository();
+  HomeSummaryData? _data;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.debugSummary != null) {
+      _data = widget.debugSummary;
+      _loading = false;
+      return;
+    }
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await _repo.fetchSummary();
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    if (_loading && _data == null) {
+      return Scaffold(
+        backgroundColor: colors.canvas,
+        body: const SafeArea(
+          child: ListView(
+            padding: EdgeInsets.all(18),
+            children: [SkeletonCard(), SkeletonCard(), SkeletonCard()],
+          ),
+        ),
+      );
+    }
+    if (_error != null && _data == null) {
+      return Scaffold(
+        backgroundColor: colors.canvas,
+        body: SafeArea(
+          child: ErrorState(
+            message: StateCopy.serverError,
+            onRetry: _load,
+          ),
+        ),
+      );
+    }
+    final d = _data!;
+    final healthAuthorized = d.healthAuthorized || widget.healthAuthorized;
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: context.spacing.screenPadding,
-          children: [
-            const _GreetingRow(),
-            const SizedBox(height: 18),
-            const _HeroBlock(),
-            const SizedBox(height: 20),
-            // 3 AI 结论卡（视觉焦点，先于数据）
-            AiCard(
-              title: '今日 AI 总结',
-              actionLabel: '查看完整早间简报 →',
-              onAction: () {},
-              child: Text(
-                '昨晚睡得不错，上午适合处理需要专注的事。午餐后记得留 20 分钟散步。',
-                style: context.typography.body.copyWith(
-                  color: colors.bodyOnCard,
-                  height: 1.65,
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: context.spacing.screenPadding,
+            children: [
+              _GreetingRow(dateLabel: d.dateLabel, greeting: d.greeting),
+              const SizedBox(height: 18),
+              _HeroBlock(headline: d.headline, sub: d.sub, modeChip: d.modeChip),
+              const SizedBox(height: 20),
+              AiCard(
+                title: d.insightTitle,
+                actionLabel: d.insightAction,
+                onAction: d.insightAction == null
+                    ? null
+                    : () => context.go('/briefing?form=morning'),
+                child: Text(
+                  d.insightNarrative.isEmpty ? '今天还没有新的总结' : d.insightNarrative,
+                  style: context.typography.body.copyWith(
+                    color: colors.bodyOnCard,
+                    height: 1.65,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _SectionTitle(title: '今日状态', hint: healthAuthorized ? '来自小米手环 9 Pro' : null),
-            const SizedBox(height: 10),
-            if (healthAuthorized)
-              const _HealthGrid()
-            else
-              const _HealthAuthEmpty(),
-            const SizedBox(height: 24),
-            const _SectionTitle(title: '今日任务', hint: '3 项 · AI 已排序'),
-            const SizedBox(height: 6),
-            const AppCard(
-              listPadding: true,
-              child: Column(
-                children: [
-                  TaskRow(title: '回复导师邮件', tag: '工作', done: true, showDivider: true),
-                  TaskRow(
-                    title: '15:00 产品方案对齐',
-                    subtitle: '14:30 提醒',
-                    tag: '工作',
-                    showDivider: true,
-                  ),
-                  TaskRow(title: '给妈妈回电话', tag: '晚间', showDivider: false),
-                ],
+              const SizedBox(height: 24),
+              _SectionTitle(
+                title: '今日状态',
+                hint: healthAuthorized ? '来自已连接设备' : null,
               ),
-            ),
-            const SizedBox(height: 24),
-            _SectionTitle(
-              title: '今日消费',
-              trailingAction: '查看账本 ›',
-              onTrailing: () {},
-            ),
-            const SizedBox(height: 10),
-            SpendSummary(
-              amountLabel: '¥128',
-              budgetLabel: '/ 今日预算 ¥200',
-              progress: 0.64,
-              weekBars: [80, 120, 90, 140, 100, 70, 128],
-              conclusion: '本周日均 ¥96，节奏健康 —— 亚丝娜',
-            ),
-            const SizedBox(height: 20),
-            AskPill(onSend: () {}),
-            const SizedBox(height: 40),
-          ],
+              const SizedBox(height: 10),
+              if (healthAuthorized)
+                const _HealthGrid()
+              else
+                _HealthAuthEmpty(hint: d.healthEmptyHint),
+              const SizedBox(height: 24),
+              _SectionTitle(title: '今日任务', hint: d.tasksHint),
+              const SizedBox(height: 6),
+              AppCard(
+                listPadding: true,
+                child: Column(
+                  children: [
+                    if (d.tasks.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text('今天还没有任务'),
+                      )
+                    else
+                      for (var i = 0; i < d.tasks.length; i++)
+                        TaskRow(
+                          title: d.tasks[i].title,
+                          subtitle: d.tasks[i].subtitle,
+                          tag: d.tasks[i].tag,
+                          done: d.tasks[i].done,
+                          showDivider: i < d.tasks.length - 1,
+                        ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              _SectionTitle(
+                title: '今日消费',
+                trailingAction: '查看账本 ›',
+                onTrailing: () => context.go('/ledger'),
+              ),
+              const SizedBox(height: 10),
+              if (d.spend != null)
+                SpendSummary(
+                  amountLabel: d.spend!.amountLabel,
+                  budgetLabel: d.spend!.budgetLabel,
+                  progress: d.spend!.progress,
+                  weekBars: const <double>[],
+                  conclusion: d.spend!.conclusion,
+                ),
+              const SizedBox(height: 20),
+              AskPill(onSend: () => context.go('/chat')),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -89,7 +173,10 @@ class HomePage extends StatelessWidget {
 }
 
 class _GreetingRow extends StatelessWidget {
-  const _GreetingRow();
+  const _GreetingRow({required this.dateLabel, required this.greeting});
+
+  final String dateLabel;
+  final String greeting;
 
   @override
   Widget build(BuildContext context) {
@@ -101,9 +188,8 @@ class _GreetingRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('今天 · 周二',
-                  style: type.caption.copyWith(color: colors.ink2)),
-              Text('早上好', style: type.heroTitle.copyWith(fontSize: 17)),
+              Text(dateLabel, style: type.caption.copyWith(color: colors.ink2)),
+              Text(greeting, style: type.heroTitle.copyWith(fontSize: 17)),
             ],
           ),
         ),
@@ -122,7 +208,15 @@ class _GreetingRow extends StatelessWidget {
 }
 
 class _HeroBlock extends StatelessWidget {
-  const _HeroBlock();
+  const _HeroBlock({
+    required this.headline,
+    required this.sub,
+    required this.modeChip,
+  });
+
+  final String headline;
+  final String sub;
+  final String modeChip;
 
   @override
   Widget build(BuildContext context) {
@@ -132,15 +226,14 @@ class _HeroBlock extends StatelessWidget {
       children: [
         const Center(child: Orb(size: OrbSize.lg)),
         const SizedBox(height: 12),
-        Text('今天也交给我吧',
-            textAlign: TextAlign.center, style: type.heroTitle),
+        Text(headline, textAlign: TextAlign.center, style: type.heroTitle),
         const SizedBox(height: 6),
-        Text('亚丝娜已为你整理好今天的一切',
+        Text(sub,
             textAlign: TextAlign.center,
             style: type.body.copyWith(color: colors.ink2, fontSize: 13.5)),
         const SizedBox(height: 10),
-        const Center(
-          child: ModeChip(label: 'Default 模式 · 长期记忆运行中'),
+        Center(
+          child: ModeChip(label: modeChip),
         ),
       ],
     );
@@ -206,7 +299,9 @@ class _HealthGrid extends StatelessWidget {
 
 /// 空态 + 引导授权：零数值、零留白（决策 D1）。
 class _HealthAuthEmpty extends StatelessWidget {
-  const _HealthAuthEmpty();
+  const _HealthAuthEmpty({this.hint});
+
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -219,12 +314,15 @@ class _HealthAuthEmpty extends StatelessWidget {
               style: type.rowTitle.copyWith(color: colors.ink)),
           const SizedBox(height: 8),
           Text(
-            '连接手环后，这里会显示睡眠、心率和步数',
+            hint ?? '连接手环后，这里会显示睡眠、心率和步数',
             textAlign: TextAlign.center,
             style: type.body.copyWith(color: colors.ink2),
           ),
           const SizedBox(height: 14),
-          ChipButton(label: '去授权健康数据', onTap: () {}),
+          ChipButton(
+            label: '去授权健康数据',
+            onTap: () => Navigator.of(context).pushNamed('/health/consent'),
+          ),
         ],
       ),
     );

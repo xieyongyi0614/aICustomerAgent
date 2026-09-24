@@ -1,24 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../tokens/tokens.dart';
 import '../orb/orb.dart';
+import 'incremental_markdown.dart';
+
+MarkdownStyleSheet _markdownSheet(
+  TextStyle textStyle,
+  AppColors colors,
+  AppRadii radii,
+) {
+  return MarkdownStyleSheet(
+    p: textStyle,
+    h1: textStyle.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
+    h2: textStyle.copyWith(fontSize: 16.5, fontWeight: FontWeight.w700),
+    h3: textStyle.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
+    list: textStyle,
+    code: textStyle.copyWith(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      backgroundColor: colors.fillSubtle,
+    ),
+    codeblockDecoration: BoxDecoration(
+      color: colors.fillSubtle,
+      borderRadius: radii.rMd,
+    ),
+    blockquote: textStyle.copyWith(color: colors.ink2),
+  );
+}
 
 /// A13 消息气泡：用户右深色泡 / AI 左白卡 + 迷你 Orb sm。
+/// AI 侧走增量 Markdown（已闭合块完整渲染，尾部未闭合按纯文本）。
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
     super.key,
     required this.text,
     required this.isUser,
+    this.enableMarkdown = false,
+    this.streaming = false,
   });
 
   final String text;
   final bool isUser;
+  final bool enableMarkdown;
+  final bool streaming;
+
+  const MessageBubble.streaming({
+    super.key,
+    required this.text,
+  })  : isUser = false,
+        enableMarkdown = true,
+        streaming = true;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<AppColors>()!;
     final type = Theme.of(context).extension<AppTypography>()!;
     final radii = Theme.of(context).extension<AppRadii>()!;
+    final textStyle = type.body.copyWith(
+      fontSize: 14.5,
+      height: 1.65,
+      color: isUser ? colors.userBubbleText : colors.bodyOnBubble,
+    );
+    final Widget body;
+    if (!isUser && enableMarkdown) {
+      final (closed, openTail) = streaming
+          ? const IncrementalMarkdown().split(text)
+          : (text, '');
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (closed.isNotEmpty)
+            MarkdownBody(
+              data: closed,
+              selectable: true,
+              styleSheet: _markdownSheet(textStyle, colors, radii),
+            ),
+          if (openTail.isNotEmpty)
+            Text(openTail, style: textStyle),
+        ],
+      );
+    } else {
+      body = Text(text, style: textStyle);
+    }
     final bubble = Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
       constraints: const BoxConstraints(maxWidth: 280),
@@ -31,14 +95,7 @@ class MessageBubble extends StatelessWidget {
           bottomRight: Radius.circular(isUser ? radii.bubbleTail : 20),
         ),
       ),
-      child: Text(
-        text,
-        style: type.body.copyWith(
-          fontSize: 14.5,
-          height: 1.65,
-          color: isUser ? colors.userBubbleText : colors.bodyOnBubble,
-        ),
-      ),
+      child: body,
     );
 
     if (isUser) {

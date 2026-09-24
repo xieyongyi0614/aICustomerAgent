@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.v1.auth import require_user
 from app.core.settings import get_settings
 from app.services.tasks import task_service
 
@@ -36,9 +37,19 @@ class BriefPrefs(BaseModel):
 _PREFS: dict[str, BriefPrefs] = {}
 
 
+def _default_prefs() -> BriefPrefs:
+    settings = get_settings()
+    return BriefPrefs(
+        morning_at=getattr(settings, "briefing_morning_time", "") or None,
+        evening_at=getattr(settings, "briefing_evening_time", "") or None,
+    )
+
+
 @brief_router.get("/{form}", response_model=BriefContent)
-def get_brief(form: Literal["morning", "evening"]):
-    user_id = get_settings().default_user
+def get_brief(
+    form: Literal["morning", "evening"],
+    user_id: str = Depends(require_user),
+):
     try:
         tasks = task_service.list_open(user_id)
     except Exception:
@@ -81,11 +92,11 @@ def get_brief(form: Literal["morning", "evening"]):
 
 
 @brief_router.get("/prefs/me", response_model=BriefPrefs)
-def get_prefs():
-    return _PREFS.get(get_settings().default_user, BriefPrefs())
+def get_prefs(user_id: str = Depends(require_user)):
+    return _PREFS.get(user_id, _default_prefs())
 
 
 @brief_router.put("/prefs/me", response_model=BriefPrefs)
-def put_prefs(body: BriefPrefs):
-    _PREFS[get_settings().default_user] = body
+def put_prefs(body: BriefPrefs, user_id: str = Depends(require_user)):
+    _PREFS[user_id] = body
     return body

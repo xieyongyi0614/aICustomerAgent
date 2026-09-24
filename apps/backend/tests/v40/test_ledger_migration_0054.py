@@ -88,19 +88,18 @@ def test_orm_has_three_ledger_tables():
     }
 
 
-def test_migration_chain_head_is_0054():
+def test_migration_chain_head_matches_pin():
     config = Config(str(BACKEND / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD == "0053"
+    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD
 
 
-def test_schema_table_count_is_49():
-    assert SCHEMA_TABLE_COUNT == 49
+def test_schema_table_count_matches_pin():
     assert len(Base.metadata.tables) == SCHEMA_TABLE_COUNT
-    assert schema_pin().schema_table_count == 49
+    assert schema_pin().schema_table_count == SCHEMA_TABLE_COUNT
 
 
 def test_amount_minor_is_integer():

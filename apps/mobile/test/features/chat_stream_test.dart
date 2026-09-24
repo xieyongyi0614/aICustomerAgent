@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/chat/domain/chat_turn_state.dart';
 import 'package:mobile/core/network/events/chat_event.dart';
-import 'package:mobile/features/chat/presentation/streaming/incremental_markdown.dart';
+import 'package:mobile/design_system/components/incremental_markdown.dart';
 import 'package:mobile/features/chat/presentation/streaming/text_flush_buffer.dart';
 
 void main() {

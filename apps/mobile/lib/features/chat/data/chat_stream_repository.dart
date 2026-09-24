@@ -6,13 +6,14 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/events/chat_event.dart';
 import '../../../core/network/interceptors/token_reader.dart';
 import '../../../core/network/ndjson/ndjson_parser.dart';
+import '../../../core/storage/secure_token_store.dart';
 
 /// 对话流仓储：dio + NDJSON（L3：presentation 不直接碰 dio）。
 class ChatStreamRepository {
   ChatStreamRepository({Dio? dio, TokenReader? tokenReader})
       : _dio = dio ??
             createDio(
-              tokenReader: tokenReader ?? const NoopTokenReader(),
+              tokenReader: tokenReader ?? SecureTokenStore(),
             );
 
   final Dio _dio;
