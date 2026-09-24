@@ -269,16 +269,27 @@ class $$ScaffoldDriftSamplesTableTableManager
                 $db: db,
                 $table: table,
               ),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => ScaffoldDriftSamplesCompanion(id: id, rowid: rowid),
-          createCompanionCallback:
-              ({required String id, Value<int> rowid = const Value.absent()}) =>
-                  ScaffoldDriftSamplesCompanion.insert(id: id, rowid: rowid),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => ScaffoldDriftSamplesCompanion(id: id, rowid: rowid),
+          createCompanionCallback: ({
+            required String id,
+            Value<int> rowid = const Value.absent(),
+          }) => ScaffoldDriftSamplesCompanion.insert(id: id, rowid: rowid),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$ScaffoldDriftSamplesTable, ScaffoldDriftSample>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$ScaffoldSampleDb,
+                    $ScaffoldDriftSamplesTable,
+                    ScaffoldDriftSample
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
