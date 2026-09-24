@@ -28,3 +28,4 @@ class PipelineSettings(BaseSettings):
     conversation_max_chars: int = 8000
 
     default_user: str = "default-user"
+    auth_token_secret: str = ""

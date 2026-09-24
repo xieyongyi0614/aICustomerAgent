@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     action,
     action_execution,
+    auth,
     brief,
     chat,
     debug,
@@ -39,3 +40,4 @@ api_router.include_router(insights.insights_router)
 api_router.include_router(memory.memory_router)
 api_router.include_router(home.home_router)
 api_router.include_router(brief.brief_router)
+api_router.include_router(auth.auth_router)
