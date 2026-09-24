@@ -314,28 +314,28 @@ API-001 → API-002 ──┘
 
 ### 11.2 生成过程中发现的 5 个跨任务缺口（**需回写，不是本次撰写能自行了结的**）
 
-| # | 缺口 | 证据 | 影响 | 建议处置 |
+| # | 缺口 | 证据 | 影响 | **处置（2026-09-24 回写）** |
 |---|---|---|---|---|
-| **N1** | **`API-008` 的「按设定时刻预生成」需要第 3 个迁移**（新增表 + 放宽 `ck_loop_runs_kind`），与 §0.3「本版本只加 1 个迁移」冲突 | `tasks/API-008.md` §4.2 | 简报内容无法离线预取 → `APP-019` 本地通知落地页可能拿到过期内容 | **优先验证「复用 Life Loop 既有 trigger 做预生成」能否零迁移**（「既有 trigger」是允许的五种接入姿势之一）；若不可行，则须承认本版本加 3 个迁移并同批改 §0.3 与钉测清单 |
-| **N2** | **关系等级（相识天数 · Lv.N）无产品级接口**，但 §5 要求「来自产品级接口（非 debug）」 | 现仅 `GET /debug/relationship/state`、`/debug/relationship/timeline` | `APP-020` 用户卡阻塞 | 补一个 `API-*`（关系状态读接口），或在 §5 显式标阻塞并下调 `APP-020` 交付面 |
-| **N3** | **Role Mode 切档无写路径** → M1 验收口径「切到 professional 模式后 `turn_meta.role_mode` 变化」端上无法保证 | `ChatRequest` 无 mode 参数（`apps/backend/app/api/v1/schemas.py:6-9`）；无 mode 端点；唯一写回在管线内部（`chat_pipeline.py:809-810`） | M1 验收项不可达 | 补一个 `API-*`（模式读写），或扩展 `API-001`；否则须下调 M1 验收口径 |
-| **N4** | **`APP-013` 的 `failed` 步骤态视觉规格是本次补齐的**（设计稿与设计系统 `A14` 只定义 `done/running/todo` 三态，而 `flutter-architecture.md` §3.3 的状态模型有四值） | `tasks/APP-013.md` §4.1 / §4.2 D1·D3·D4 | 视觉回归基线未获设计侧确认 | 交设计侧 sign-off；确认后**回写** `.agents/skills/zhaoxi-design-system/references/components.md` 的 `A14` |
-| **N5** | **记忆页 H1 口径张力**：决策 D5 要求标题写「我记住了你 N 件事」，而设计系统锁定 H1 为「亚丝娜记住的你」 | `requirements-analysis.md` §6 D5 vs `components.md` B7 / `principles.md` §5.3 | 两套真源冲突 | Detail 暂**保留设计系统 H1**，把 D5 措辞移入计数胶囊；若 D5 为准须先改设计系统 skill 再改页面 |
+| **N1** | **`API-008` 的「按设定时刻预生成」需要第 3 个迁移** | `tasks/API-008.md` §4.2 | 简报离线预取 | **已按零迁移处置**：`GET /brief/{form}` 按设定时刻即时生成（复用 `task_service` 读面），未建第三迁移；本地通知落地页可拉最新简报。若后续必须离线预生成，再开迁移并改 §0.3 |
+| **N2** | **关系等级无产品级接口** | 仅 `/debug/relationship/*` | `APP-020` 用户卡 | **已降级处置**：`APP-020` 用户卡展示「相识天数 · 关系 Lv.」占位文案，不调 debug 接口；关系读接口列 **V5.1** |
+| **N3** | **Role Mode 切档无写路径** | 无 mode 端点 | M1 验收不可达 | **已闭合**：新增 `POST /state/mode`（`conversation_service.set_preferred_mode` → `update_mode`），写最近会话 confirmed mode |
+| **N4** | **`APP-013` failed 态视觉未设计 sign-off** | `components.md` A14 仅三态 | 视觉基线 | **实现已带 failed 态**（暖橙叉 + 文案）；**待设计 sign-off** 后回写 `components.md` A14 |
+| **N5** | **记忆页 H1 口径张力** | D5 vs 设计系统 B7 | 两套真源 | **已按设计系统执行**：H1=「亚丝娜记住的你」，D5 措辞不进 H1；若 D5 为准须先改 skill |
 
 ### 11.3 待确认项（不阻塞撰写，但影响开工）
 
-| # | 事项 | 相关任务 | 当前处置 |
+| # | 事项 | 相关任务 | **处置（2026-09-24 回写）** |
 |---|---|---|---|
-| Q1 | **字重方案**：`FontVariation('wght', 550)`（精确，需可变字体）vs 降级映射 `550→w500 / 650→w600 / 750→w700`（零成本） | `APP-002` | 暂定**降级映射**（可变字体资产受 `PLT-002` 字体授权阻塞）；字体授权先落地则可改前者 |
-| Q2 | `EXPECTED_EVENT_TYPES` 实为运行时事件总线类型集，与 NDJSON 事件**并非同一集合** | `API-002` | 暂按「同批登记」处理，需确认登记口径 |
-| Q3 | 令牌签名密钥来源：复用既有 secret vs 新增参数类 `auth_token_secret` | `API-001` | 标为待定 + 阻塞条件（未定不开工） |
-| Q4 | **健康域命名避歧方案**：表保持 `health_*`，服务包改 `app/services/vitals/`、设置 `core/settings/vitals.py`、工具 id 仍 `builtin.health.sync` | `API-009` | 暂定；若采纳须同步 §0.3 与 V4.0.0 的 `ledger_*` 避歧纪律 |
-| Q5 | 晚间简报第 4 张卡（设计系统 `B9` 只给了 3 张） | `API-008` / `APP-018` | 暂定 `remembered`「今天记住的你」，待设计确认 |
-| Q6 | **golden 在 CI 与本地渲染不一致**：固定容器镜像 vs CI 标记「非阻塞告警」 | `PLT-004` / `PLT-005` | 二选一未拍板 |
-| Q7 | PLT 产出落点：`docs/version/v5.0.0/phase0-miband-validation.md`（PLT-001）、`docs/version/v5.0.0/compliance/`（PLT-002） | `PLT-001` / `PLT-002` | 暂定，可改 |
-| Q8 | CI 载体：暂定 GitHub Actions（仓库**现无 CI**，`docs/TESTING.md:36`） | `PLT-005` | 暂定 |
-| Q9 | 授权范围态持久化：V1 无服务端同意记录端点 | `APP-021` | 暂用端侧偏好，标待定 |
-| Q10 | `PLT-006` 的 Orb 功耗阈值：设计稿无依据（缺口 13 已声明四项指标为**本方案补齐**） | `PLT-006` | 先建基线再定目标 |
+| Q1 | 字重方案 | `APP-002` | **已定：降级映射** `550→w500 / 650→w600 / 750→w700` |
+| Q2 | `EXPECTED_EVENT_TYPES` 与 NDJSON 集合 | `API-002` | **已定：同批登记** `ToolStepRecorded`；wire 形态 `tool_step` |
+| Q3 | 令牌签名密钥来源 | `API-001` | **已定：新增参数类 `auth_token_secret`**（env=`AUTH_TOKEN_SECRET`，见 `.env.example`） |
+| Q4 | 健康域命名避歧 | `API-009` | 暂定 vitals；M4 开工时再定 |
+| Q5 | 晚间简报第 4 张卡 | `API-008` | **已定：`remembered`「记住的你」** |
+| Q6 | golden CI 一致性 | `PLT-004/005` | 暂定本地生成入库；CI 只校验 diff |
+| Q7 | PLT 落点 | `PLT-001/002` | **已定**：`compliance/plt002-notes.md`、`perf/plt006-baseline.md` |
+| Q8 | CI 载体 | `PLT-005` | **已定：GitHub Actions**（`.github/workflows/ci.yml`） |
+| Q9 | 授权范围持久化 | `APP-021` | 暂用端侧偏好 |
+| Q10 | Orb 功耗阈值 | `PLT-006` | 先基线后定目标（`perf/plt006-baseline.md`） |
 
 ### 11.4 明细对注册表的**零偏离声明**
 
