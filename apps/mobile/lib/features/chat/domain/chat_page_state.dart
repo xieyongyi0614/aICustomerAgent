@@ -48,6 +48,7 @@ class ChatPageState {
     this.streamingText = '',
     this.mode = RoleMode.defaultMode,
     this.toolSteps = const [],
+    this.lastUserText,
   });
 
   final bool loading;
@@ -61,6 +62,7 @@ class ChatPageState {
   final String streamingText;
   final RoleMode mode;
   final List<ChatToolStep> toolSteps;
+  final String? lastUserText;
 
   bool get streaming => streamingText.isNotEmpty;
 
@@ -81,6 +83,7 @@ class ChatPageState {
     String? streamingText,
     RoleMode? mode,
     List<ChatToolStep>? toolSteps,
+    String? lastUserText,
   }) {
     return ChatPageState(
       loading: loading ?? this.loading,
@@ -92,6 +95,7 @@ class ChatPageState {
       streamingText: streamingText ?? this.streamingText,
       mode: mode ?? this.mode,
       toolSteps: toolSteps ?? this.toolSteps,
+      lastUserText: lastUserText ?? this.lastUserText,
     );
   }
 }

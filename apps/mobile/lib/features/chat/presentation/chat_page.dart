@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/network/events/chat_event.dart';
 import '../../../design_system/components/components.dart';
+import '../data/chat_stream_repository.dart';
 import '../domain/chat_page_state.dart';
+import 'streaming/chat_stream_controller.dart';
 import 'widgets/persona_status_bar.dart';
 
 /// B2 #chat 八段装配（顺序固定）。
@@ -17,6 +19,7 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   final _scroll = ScrollController();
+  final _input = TextEditingController();
   bool _stickToBottom = true;
 
   @override
@@ -35,6 +38,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void dispose() {
     _scroll.dispose();
+    _input.dispose();
     super.dispose();
   }
 
@@ -54,7 +58,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         return Container(
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 32),
           decoration: BoxDecoration(
-            gradient: Theme.of(sheetContext).extension<AppGradients>()!.deepPersona,
+            gradient:
+                Theme.of(sheetContext).extension<AppGradients>()!.deepPersona,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: ModeSelector(
@@ -94,7 +99,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             Expanded(child: _body(state)),
             Padding(
               padding: const EdgeInsets.only(bottom: 88),
-              child: ChatInputBar(onSend: () {}),
+              child: ChatInputBar(
+                controller: _input,
+                onSend: () {
+                  final text = _input.text.trim();
+                  if (text.isEmpty) return;
+                  _input.clear();
+                  ref.read(chatPageStateProvider.notifier).send(text);
+                },
+              ),
             ),
           ],
         ),
@@ -112,9 +125,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ],
       );
     }
-    if (state.error != null) {
+    if (state.error != null && state.messages.isEmpty) {
       return ErrorState(
-        message: StateCopy.serverError,
+        message: state.error is String
+            ? state.error! as String
+            : StateCopy.serverError,
         onRetry: () => ref.read(chatPageStateProvider.notifier).reload(),
       );
     }
@@ -160,8 +175,17 @@ final chatPageStateProvider =
     NotifierProvider<ChatPageNotifier, ChatPageState>(ChatPageNotifier.new);
 
 class ChatPageNotifier extends Notifier<ChatPageState> {
+  ChatStreamRepository? _repo;
+  ChatStreamController? _controller;
+
   @override
-  ChatPageState build() => const ChatPageState(loading: true);
+  ChatPageState build() {
+    ref.onDispose(() {
+      _controller?.dispose();
+      _repo?.dispose();
+    });
+    return const ChatPageState(loading: false);
+  }
 
   Future<void> reload() async {
     state = state.copyWith(loading: true, error: null);
@@ -173,8 +197,61 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
     state = state.copyWith(memoryRefs: refs);
   }
 
-  /// 仅记录端上期望模式；写路径缺口见 APP-012 D4，不得伪造 role_mode。
   void setPreferredMode(RoleMode mode) {
     state = state.copyWith(mode: mode);
+  }
+
+  Future<void> send(String text) async {
+    final repo = _repo ??= ChatStreamRepository();
+    final userMsg = ChatMessageItem(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      role: 'human',
+      content: text,
+      createdAt: DateTime.now(),
+    );
+    state = state.copyWith(
+      messages: [...state.messages, userMsg],
+      streamingText: '',
+      toolSteps: const [],
+      memoryRefs: const [],
+      loading: false,
+      error: null,
+    );
+    _controller?.dispose();
+    final controller = ChatStreamController(
+      onState: (turnState) {
+        state = state.copyWith(
+          streamingText: turnState.text,
+          toolSteps: turnState.toolSteps,
+          memoryRefs: turnState.memoryRefs,
+        );
+      },
+    )..attachCancel(repo.cancel);
+    _controller = controller;
+    try {
+      await controller.consume(repo.send(content: text));
+      final doneText = controller.state.text;
+      if (doneText.isNotEmpty) {
+        state = state.copyWith(
+          streamingText: '',
+          messages: [
+            ...state.messages,
+            ChatMessageItem(
+              id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
+              role: 'ai',
+              content: doneText,
+              createdAt: DateTime.now(),
+            ),
+          ],
+        );
+      }
+      if (controller.state.incomplete) {
+        state = state.copyWith(
+          error: controller.state.error?.userMessage ?? '刚才没说完，要我接着说吗',
+        );
+      }
+    } catch (e) {
+      state = state.copyWith(error: e, streamingText: '');
+    }
   }
 }
