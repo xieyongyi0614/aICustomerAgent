@@ -8,6 +8,7 @@ from app.api.v1 import (
     feishu_ingress,
     governance,
     history,
+    home,
     insights,
     ledger,
     llm,
@@ -35,3 +36,4 @@ api_router.include_router(ledger.ledger_router)
 api_router.include_router(tasks.tasks_router)
 api_router.include_router(insights.insights_router)
 api_router.include_router(memory.memory_router)
+api_router.include_router(home.home_router)
