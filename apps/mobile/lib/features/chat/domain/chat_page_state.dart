@@ -56,6 +56,8 @@ class ChatPageState {
   final String? currentSessionId;
   final String streamingText;
 
+  bool get streaming => streamingText.isNotEmpty;
+
   bool get showMemoryHint => memoryRefs.isNotEmpty;
 
   String get memoryHintText {

@@ -67,10 +67,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 child: MemHint(text: state.memoryHintText),
               ),
             Expanded(child: _body(state)),
-            // 8 输入栏（槽位 → APP-011），bottom 88 在布局层让出
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 8, 18, 88),
-              child: AskPill(),
+            // 8 输入栏（A16），bottom 88 在布局层让出
+            Padding(
+              padding: const EdgeInsets.only(bottom: 88),
+              child: ChatInputBar(
+                onSend: () {},
+              ),
             ),
           ],
         ),
@@ -102,10 +104,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       children: [
         for (final m in state.messages)
-          _MessageRow(role: m.role, text: m.content),
+          MessageBubble(text: m.content, isUser: m.role == 'human'),
         // 工具过程卡穿插位（APP-013）
         if (state.streamingText.isNotEmpty)
-          _MessageRow(role: 'ai', text: state.streamingText),
+          MessageBubble(text: state.streamingText, isUser: false),
+        if (state.streaming)
+          const Padding(
+            padding: EdgeInsets.only(left: 30, top: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TypingIndicator(),
+            ),
+          ),
         const SizedBox(height: 12),
         // 建议 chips 穿插位（APP-013）
       ],
@@ -130,38 +140,6 @@ class _HeaderSlot extends StatelessWidget {
           const SizedBox(width: 8),
           ModeChip(label: 'Default 模式 · 长期记忆运行中'),
         ],
-      ),
-    );
-  }
-}
-
-class _MessageRow extends StatelessWidget {
-  const _MessageRow({required this.role, required this.text});
-
-  final String role;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final type = context.typography;
-    final isUser = role == 'human';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
-        constraints: const BoxConstraints(maxWidth: 280),
-        decoration: BoxDecoration(
-          color: isUser ? colors.userBubbleBg : colors.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          text,
-          style: type.body.copyWith(
-            color: isUser ? colors.userBubbleText : colors.bodyOnBubble,
-          ),
-        ),
       ),
     );
   }
