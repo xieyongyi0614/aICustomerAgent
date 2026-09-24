@@ -131,13 +131,47 @@ def emit_todo_plan(tool_id: str) -> None:
         )
 
 
-def advance_plan(tool_id: str, *, up_to: int, status: str, details: dict | None = None) -> None:
+def advance_plan(
+    tool_id: str,
+    *,
+    up_to: int,
+    status: str,
+    details: dict | None = None,
+) -> None:
+    """按段边界推进计划：≤up_to-1 done，==up_to 为 status，其余 todo。"""
     plan = plan_for(tool_id)
+    if not plan:
+        return
     for i, step in enumerate(plan):
-        if i > up_to:
-            break
-        step_status = status if i == up_to or status in (STATUS_FAILED, STATUS_DONE) else STATUS_RUNNING
-        if status == STATUS_DONE:
+        if i < up_to:
+            step_status = STATUS_DONE
+        elif i == up_to:
+            step_status = status
+        else:
+            step_status = STATUS_TODO
+        emit_tool_step(
+            step_id=step["step_id"],
+            tool_id=tool_id,
+            label=step["label"],
+            status=step_status,
+            detail=(details or {}).get(step["step_id"], step.get("detail")),
+            target=step.get("target") if step_status == STATUS_DONE else None,
+        )
+
+
+def complete_plan(tool_id: str, *, ok: bool, details: dict | None = None) -> None:
+    plan = plan_for(tool_id)
+    if not plan:
+        return
+    final = STATUS_DONE if ok else STATUS_FAILED
+    for i, step in enumerate(plan):
+        last = i == len(plan) - 1
+        step_status = final if last or ok else STATUS_DONE
+        if not ok and last:
+            step_status = STATUS_FAILED
+        elif not ok and i < len(plan) - 1:
+            step_status = STATUS_DONE
+        else:
             step_status = STATUS_DONE
         emit_tool_step(
             step_id=step["step_id"],

@@ -69,7 +69,7 @@ from app.services.tool.step_events import (
     STATUS_DONE,
     STATUS_FAILED,
     STATUS_RUNNING,
-    advance_plan,
+    complete_plan,
     emit_todo_plan,
     emit_tool_step,
     plan_for,
@@ -301,10 +301,11 @@ class ToolExecutor:
         )
         plan = plan_for(defn.id)
         if plan:
-            advance_plan(
+            # ⑤ normalize 后一次性收口 4 步（validate 段已完成 0，invoke 段完成 1~2）
+            complete_plan(
                 defn.id,
-                up_to=len(plan) - 1,
-                status=STATUS_DONE if tool_result.status == "succeeded" else STATUS_FAILED,
+                ok=tool_result.status == "succeeded",
+                details={},
             )
         else:
             emit_tool_step(
