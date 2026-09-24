@@ -136,6 +136,7 @@ TURN_META_ORDER: tuple[str, ...] = (
     "current_goal",
     "behavior",
     "mode",
+    "memory_refs",
 )
 
 

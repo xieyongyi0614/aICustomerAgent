@@ -64,7 +64,11 @@ async def _events(session_id: str, content: str, llm) -> list[dict]:
 
 
 def _core_keys(meta: dict) -> list[str]:
-    return [name for name in meta if name != "action_intent"]
+    return [
+        name
+        for name in meta
+        if name not in ("action_intent", "memory_refs")
+    ]
 
 
 class TestStreamingContract:

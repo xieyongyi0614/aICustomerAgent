@@ -75,6 +75,8 @@ async def chat_message(
                         payload["mode"] = event["mode"]
                     if "action_intent" in event:
                         payload["action_intent"] = event["action_intent"]
+                    if event.get("memory_refs"):
+                        payload["memory_refs"] = event["memory_refs"]
                     yield _stream_json(payload)
                 elif kind == "token":
                     yield _stream_json({"delta": event["text"]})

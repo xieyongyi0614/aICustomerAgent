@@ -63,6 +63,7 @@ from app.chains.answer_chain import answer_max_tokens
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import build_action_context
 from app.services.behavior_engine import RelationshipBehaviorContext
+from app.services.memory_refs import build_memory_refs
 
 logger = logging.getLogger(__name__)
 
@@ -700,6 +701,9 @@ async def run_chat_pipeline(
             }
             if action_intent is not None:
                 turn_meta["action_intent"] = action_intent.model_dump(mode="json")
+            memory_refs = build_memory_refs(state.memories if state else None)
+            if memory_refs:
+                turn_meta["memory_refs"] = memory_refs
             await events.put(turn_meta)
         except BaseException as exc:
             stage_error = exc
