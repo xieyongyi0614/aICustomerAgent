@@ -38,6 +38,7 @@ EXPECTED_EVENT_TYPES = {
     "DecisionMade",
     "ProactiveTriggered",
     "ProactiveDelivered",
+    "ToolStepRecorded",
 }
 """冻结事件集 + RT-008 追加项 `DecisionMade` + RT-017 主动链路锚点。
 

@@ -11,6 +11,12 @@ from app.core.settings import get_settings
 from app.api.v1.schemas import ChatRequest
 from app.services import agent_service, trace_collector
 from app.services.agent_service import EmptyLLMResponseError
+from app.services.tool.step_events import (
+    CHAT_EVENT_TOOL_STEP,
+    CollectingToolStepSink,
+    bind_tool_step_sink,
+    reset_tool_step_sink,
+)
 
 chat_router = APIRouter()
 
@@ -46,10 +52,14 @@ async def chat_message(
 
     async def generate():
         turn_id = None
+        step_sink = CollectingToolStepSink()
+        sink_token = bind_tool_step_sink(step_sink)
         try:
             async for event in agent_service.stream_chat(
                 session_id, get_settings().default_user, body.content, llm=llm, trace=trace
             ):
+                for step in step_sink.drain():
+                    yield _stream_json(step.to_ndjson_dict())
                 kind = event.get("kind")
                 if kind == "turn_meta":
                     payload = {
@@ -94,6 +104,10 @@ async def chat_message(
             logger.exception("LLM 流式回答失败")
             yield _stream_json({"detail": "LLM 调用失败"})
             return
+        finally:
+            for step in step_sink.drain():
+                yield _stream_json(step.to_ndjson_dict())
+            reset_tool_step_sink(sink_token)
         final = {"done": True, "session_id": session_id}
         if turn_id is not None:
             final["turn_id"] = turn_id

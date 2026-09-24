@@ -57,6 +57,13 @@ RT-001 冻结的初始事件集不含本项；RT-008 §5.3 要求 Reason 段发�
 `tests/v30/test_runtime_contracts.py::EXPECTED_EVENT_TYPES`，属**契约追加**而非私改）。
 """
 
+EVENT_TOOL_STEP = "ToolStepRecorded"
+"""工具步骤流式观测锚点（API-002 契约追加）。
+
+NDJSON wire 形态为 `tool_step`（`services/tool/step_events.CHAT_EVENT_TOOL_STEP`），
+与本常量同源登记；事件走独立通道，**不得**写入 `loop_runs.steps`。
+"""
+
 EVENT_TYPES: tuple[str, ...] = (
     EVENT_USER_MESSAGE_RECEIVED,
     EVENT_OBSERVATION_RECORDED,
@@ -70,6 +77,7 @@ EVENT_TYPES: tuple[str, ...] = (
     EVENT_STATE_VERSION_BUMPED,
     EVENT_PROACTIVE_TRIGGERED,
     EVENT_PROACTIVE_DELIVERED,
+    EVENT_TOOL_STEP,
     EVENT_RUN_CLOSED,
 )
 
