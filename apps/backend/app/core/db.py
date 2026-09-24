@@ -1517,6 +1517,38 @@ class LedgerEntryRow(Base):
     )
 
 
+class LifeTaskRow(Base):
+    __tablename__ = "life_tasks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String, nullable=False, default="task", server_default="task"
+    )
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="open", server_default="open"
+    )
+    tag: Mapped[str | None] = mapped_column(String, nullable=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    order_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    remind_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    due_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('task', 'memo')", name="ck_life_tasks_kind"),
+        CheckConstraint(
+            "status IN ('open', 'done', 'cancelled')",
+            name="ck_life_tasks_status",
+        ),
+        Index("ix_life_tasks_user_status", "user_id", "status"),
+        Index("ix_life_tasks_user_remind", "user_id", "remind_at"),
+    )
+
+
 class UserRow(Base):
     __tablename__ = "users"
 

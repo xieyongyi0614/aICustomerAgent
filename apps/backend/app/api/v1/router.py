@@ -12,6 +12,7 @@ from app.api.v1 import (
     llm,
     proactive,
     state,
+    tasks,
     world,
 )
 
@@ -29,3 +30,4 @@ api_router.include_router(proactive.proactive_router)
 api_router.include_router(world.world_router)
 api_router.include_router(governance.governance_router)
 api_router.include_router(ledger.ledger_router)
+api_router.include_router(tasks.tasks_router)
