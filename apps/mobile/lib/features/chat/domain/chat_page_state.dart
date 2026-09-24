@@ -1,5 +1,6 @@
 import '../../../core/network/events/chat_event.dart';
 import '../../../design_system/components/mode_selector.dart';
+import 'chat_turn_state.dart';
 
 class ChatMessageItem {
   const ChatMessageItem({
@@ -46,6 +47,7 @@ class ChatPageState {
     this.currentSessionId,
     this.streamingText = '',
     this.mode = RoleMode.defaultMode,
+    this.toolSteps = const [],
   });
 
   final bool loading;
@@ -58,6 +60,7 @@ class ChatPageState {
   final String? currentSessionId;
   final String streamingText;
   final RoleMode mode;
+  final List<ChatToolStep> toolSteps;
 
   bool get streaming => streamingText.isNotEmpty;
 
@@ -77,6 +80,7 @@ class ChatPageState {
     String? currentSessionId,
     String? streamingText,
     RoleMode? mode,
+    List<ChatToolStep>? toolSteps,
   }) {
     return ChatPageState(
       loading: loading ?? this.loading,
@@ -87,6 +91,7 @@ class ChatPageState {
       currentSessionId: currentSessionId ?? this.currentSessionId,
       streamingText: streamingText ?? this.streamingText,
       mode: mode ?? this.mode,
+      toolSteps: toolSteps ?? this.toolSteps,
     );
   }
 }

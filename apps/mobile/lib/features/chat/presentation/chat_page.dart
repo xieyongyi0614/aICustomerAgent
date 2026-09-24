@@ -127,6 +127,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       children: [
         for (final m in state.messages)
           MessageBubble(text: m.content, isUser: m.role == 'human'),
+        if (state.toolSteps.isNotEmpty)
+          ProcCard(
+            title: '正在为你记账',
+            steps: [
+              for (final s in state.toolSteps)
+                ProcStep(
+                  label: s.label,
+                  status: s.status,
+                  detail: s.detail,
+                  target: s.target,
+                ),
+            ],
+          ),
         if (state.streamingText.isNotEmpty)
           MessageBubble(text: state.streamingText, isUser: false),
         if (state.streaming)

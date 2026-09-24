@@ -4,5 +4,6 @@ export 'chat_widgets.dart';
 export 'chips.dart';
 export 'gradient_border_card.dart';
 export 'mode_selector.dart';
+export 'proc_card.dart';
 export 'rows.dart';
 export 'states/states.dart';
