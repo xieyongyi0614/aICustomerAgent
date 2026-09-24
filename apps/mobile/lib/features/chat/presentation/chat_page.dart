@@ -4,11 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/network/events/chat_event.dart';
 import '../../../design_system/components/components.dart';
-import '../../../design_system/orb/orb.dart';
 import '../domain/chat_page_state.dart';
+import 'widgets/persona_status_bar.dart';
 
 /// B2 #chat 八段装配（顺序固定）。
-/// 头部/气泡/输入栏/过程卡为槽位，细节归 APP-011/012/013。
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
 
@@ -47,6 +46,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  void _openModeSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 32),
+          decoration: BoxDecoration(
+            gradient: Theme.of(sheetContext).extension<AppGradients>()!.deepPersona,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ModeSelector(
+            value: ref.read(chatPageStateProvider).mode,
+            onChanged: (m) {
+              ref.read(chatPageStateProvider.notifier).setPreferredMode(m);
+              Navigator.of(sheetContext).pop();
+            },
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -59,20 +81,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         bottom: false,
         child: Column(
           children: [
-            // 1 头部人格状态栏（槽位 → APP-012）
-            const _HeaderSlot(),
+            PersonaStatusBar(
+              mode: state.mode,
+              online: true,
+              onOpenModeSheet: _openModeSheet,
+            ),
             if (state.showMemoryHint)
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
                 child: MemHint(text: state.memoryHintText),
               ),
             Expanded(child: _body(state)),
-            // 8 输入栏（A16），bottom 88 在布局层让出
             Padding(
               padding: const EdgeInsets.only(bottom: 88),
-              child: ChatInputBar(
-                onSend: () {},
-              ),
+              child: ChatInputBar(onSend: () {}),
             ),
           ],
         ),
@@ -105,7 +127,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       children: [
         for (final m in state.messages)
           MessageBubble(text: m.content, isUser: m.role == 'human'),
-        // 工具过程卡穿插位（APP-013）
         if (state.streamingText.isNotEmpty)
           MessageBubble(text: state.streamingText, isUser: false),
         if (state.streaming)
@@ -117,30 +138,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
           ),
         const SizedBox(height: 12),
-        // 建议 chips 穿插位（APP-013）
       ],
-    );
-  }
-}
-
-class _HeaderSlot extends StatelessWidget {
-  const _HeaderSlot();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final type = context.typography;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-      child: Row(
-        children: [
-          const Orb(size: OrbSize.md),
-          const SizedBox(width: 10),
-          Text('亚丝娜', style: type.sectionTitle.copyWith(color: colors.ink)),
-          const SizedBox(width: 8),
-          ModeChip(label: 'Default 模式 · 长期记忆运行中'),
-        ],
-      ),
     );
   }
 }
@@ -160,5 +158,10 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
 
   void applyMemoryRefs(List<MemoryRef> refs) {
     state = state.copyWith(memoryRefs: refs);
+  }
+
+  /// 仅记录端上期望模式；写路径缺口见 APP-012 D4，不得伪造 role_mode。
+  void setPreferredMode(RoleMode mode) {
+    state = state.copyWith(mode: mode);
   }
 }

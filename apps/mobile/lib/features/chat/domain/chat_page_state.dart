@@ -1,4 +1,5 @@
 import '../../../core/network/events/chat_event.dart';
+import '../../../design_system/components/mode_selector.dart';
 
 class ChatMessageItem {
   const ChatMessageItem({
@@ -44,6 +45,7 @@ class ChatPageState {
     this.memoryRefs = const [],
     this.currentSessionId,
     this.streamingText = '',
+    this.mode = RoleMode.defaultMode,
   });
 
   final bool loading;
@@ -55,6 +57,7 @@ class ChatPageState {
   final List<MemoryRef> memoryRefs;
   final String? currentSessionId;
   final String streamingText;
+  final RoleMode mode;
 
   bool get streaming => streamingText.isNotEmpty;
 
@@ -73,6 +76,7 @@ class ChatPageState {
     List<MemoryRef>? memoryRefs,
     String? currentSessionId,
     String? streamingText,
+    RoleMode? mode,
   }) {
     return ChatPageState(
       loading: loading ?? this.loading,
@@ -82,6 +86,7 @@ class ChatPageState {
       memoryRefs: memoryRefs ?? this.memoryRefs,
       currentSessionId: currentSessionId ?? this.currentSessionId,
       streamingText: streamingText ?? this.streamingText,
+      mode: mode ?? this.mode,
     );
   }
 }
