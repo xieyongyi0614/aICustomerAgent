@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.core.settings import get_settings
+from app.services.ledger import query as ledger_query
 from app.services.tasks import task_service
 
 home_router = APIRouter(prefix="/home", tags=["home"])
@@ -68,6 +71,14 @@ class HomeSummary(BaseModel):
     proactive_todo: list[str] = []
 
 
+def _day_start() -> datetime:
+    return datetime.combine(datetime.now().date(), time.min)
+
+
+def _day_end() -> datetime:
+    return _day_start() + timedelta(days=1)
+
+
 @home_router.get("/summary", response_model=HomeSummary)
 def home_summary():
     user_id = get_settings().default_user
@@ -84,6 +95,27 @@ def home_summary():
         )
         for t in task_rows[:5]
     ]
+    try:
+        today = ledger_query.summary(
+            user_id,
+            period=ledger_query.Period.custom(_day_start(), _day_end()),
+            compare_previous=False,
+        )
+        spent_major = abs(getattr(today, "expense", 0) or 0) / 100
+        budget = 200.0
+        spend = SpendBlock(
+            amount_label=f"¥{spent_major:.0f}",
+            budget_label=f"/ 今日预算 ¥{budget:.0f}",
+            progress=min(1.0, spent_major / budget) if budget else 0.0,
+            conclusion="节奏健康 —— 亚丝娜" if spent_major > 0 else "今天还没有记账 —— 亚丝娜",
+        )
+    except Exception:
+        spend = SpendBlock(
+            amount_label="¥0",
+            budget_label="/ 今日预算 ¥200",
+            progress=0.0,
+            conclusion="今天还没有记账 —— 亚丝娜",
+        )
     return HomeSummary(
         greeting=GreetingBlock(date_label="今天", greeting="早上好"),
         hero=HeroBlock(
@@ -102,10 +134,5 @@ def home_summary():
         ),
         tasks=tasks,
         tasks_hint=f"{len(tasks)} 项 · AI 已排序",
-        spend=SpendBlock(
-            amount_label="¥0",
-            budget_label="/ 今日预算 ¥200",
-            progress=0.0,
-            conclusion="今天还没有记账 —— 亚丝娜",
-        ),
+        spend=spend,
     )
