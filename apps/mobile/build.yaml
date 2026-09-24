@@ -1,0 +1,35 @@
+# APP-001 三生成器输出隔离
+# 约定：一个源文件只被一个生成器处理（Freezed / drift / Riverpod 不得混写）
+# freezed + json_serializable → *.freezed.dart + *.g.dart
+# drift                         → *.drift.dart（drift_dev|not_shared PartBuilder）
+# riverpod_generator            → *.g.dart
+targets:
+  $default:
+    builders:
+      freezed:
+        enabled: true
+        generate_for:
+          - lib/**/*_model.dart
+          - lib/**/*_event.dart
+          - lib/core/scaffold_samples/freezed_sample.dart
+      json_serializable:
+        enabled: true
+        generate_for:
+          - lib/**/*_model.dart
+          - lib/**/*_event.dart
+          - lib/core/scaffold_samples/freezed_sample.dart
+      # 默认 SharedPartBuilder 会走 source_gen 合成 .g.dart，与 freezed/riverpod 撞名
+      drift_dev:
+        enabled: false
+      # PartBuilder：直接写 *.drift.dart 到源码树，与 .g.dart 物理分离
+      drift_dev|not_shared:
+        enabled: true
+        generate_for:
+          - lib/**/*_db.dart
+          - lib/**/*_table.dart
+          - lib/core/scaffold_samples/drift_sample.dart
+      riverpod_generator:
+        enabled: true
+        generate_for:
+          - lib/**/*_provider.dart
+          - lib/core/scaffold_samples/riverpod_sample.dart
