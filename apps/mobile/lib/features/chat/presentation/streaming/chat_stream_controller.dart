@@ -50,6 +50,12 @@ class ChatStreamController {
       _buffer.add(event.delta);
       return;
     }
+    if (event is ReplyReplace) {
+      _buffer.replaceWith(event.text);
+      _state = reduceChatEvent(_state.copyWith(text: event.text), event);
+      _emit();
+      return;
+    }
     if (event is Done) {
       _buffer.flushNow();
       _state = reduceChatEvent(_state.copyWith(text: _buffer.flushedText), event);

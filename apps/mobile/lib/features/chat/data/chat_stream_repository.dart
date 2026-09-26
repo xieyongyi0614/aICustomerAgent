@@ -20,9 +20,12 @@ class ChatStreamRepository {
   final _parser = const NdjsonParser();
   CancelToken? _cancelToken;
 
+  /// [onSessionId]：后端为每次请求返回会话归属（新会话经 X-Session-Id 下发），
+  /// 调用方负责持久化，用于下一次进入时拉取历史。
   Stream<ChatEvent> send({
     required String content,
     String? sessionId,
+    void Function(String sessionId)? onSessionId,
   }) async* {
     _cancelToken?.cancel('new_turn');
     final cancel = CancelToken();
@@ -39,6 +42,10 @@ class ChatStreamRepository {
       ),
       cancelToken: cancel,
     );
+    final remoteSessionId = response.headers.value('x-session-id');
+    if (remoteSessionId != null && remoteSessionId.isNotEmpty) {
+      onSessionId?.call(remoteSessionId);
+    }
     final stream = response.data!.stream;
     yield* _parser.parse(stream);
   }

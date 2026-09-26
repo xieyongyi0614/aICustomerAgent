@@ -94,6 +94,17 @@ void main() {
     expect((events[1] as ToolStep).status, 'done');
   });
 
+  test('reply_replace parses with replacement text', () async {
+    final raw = '{"delta":"别急"}\n'
+        '{"type":"reply_replace","text":"别急，有我呢（已校准）"}\n'
+        '{"done":true}\n';
+    final events = await parser.parse(bytesOf(raw)).toList();
+    expect(events.length, 3);
+    final replace = events[1] as ReplyReplace;
+    expect(replace.text, '别急，有我呢（已校准）');
+    expect(events[2], isA<Done>());
+  });
+
   test('memory_refs omitted vs empty', () async {
     final withRefs = await parser
         .parse(bytesOf(

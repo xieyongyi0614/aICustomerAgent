@@ -56,12 +56,13 @@ extension ChatEventPatterns on ChatEvent {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( TurnMeta value)?  turnMeta,TResult Function( TokenDelta value)?  token,TResult Function( ToolStep value)?  toolStep,TResult Function( Done value)?  done,TResult Function( Failure value)?  failure,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( TurnMeta value)?  turnMeta,TResult Function( TokenDelta value)?  token,TResult Function( ReplyReplace value)?  replyReplace,TResult Function( ToolStep value)?  toolStep,TResult Function( Done value)?  done,TResult Function( Failure value)?  failure,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case TurnMeta() when turnMeta != null:
 return turnMeta(_that);case TokenDelta() when token != null:
-return token(_that);case ToolStep() when toolStep != null:
+return token(_that);case ReplyReplace() when replyReplace != null:
+return replyReplace(_that);case ToolStep() when toolStep != null:
 return toolStep(_that);case Done() when done != null:
 return done(_that);case Failure() when failure != null:
 return failure(_that);case _:
@@ -82,12 +83,13 @@ return failure(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( TurnMeta value)  turnMeta,required TResult Function( TokenDelta value)  token,required TResult Function( ToolStep value)  toolStep,required TResult Function( Done value)  done,required TResult Function( Failure value)  failure,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( TurnMeta value)  turnMeta,required TResult Function( TokenDelta value)  token,required TResult Function( ReplyReplace value)  replyReplace,required TResult Function( ToolStep value)  toolStep,required TResult Function( Done value)  done,required TResult Function( Failure value)  failure,}){
 final _that = this;
 switch (_that) {
 case TurnMeta():
 return turnMeta(_that);case TokenDelta():
-return token(_that);case ToolStep():
+return token(_that);case ReplyReplace():
+return replyReplace(_that);case ToolStep():
 return toolStep(_that);case Done():
 return done(_that);case Failure():
 return failure(_that);}
@@ -104,12 +106,13 @@ return failure(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( TurnMeta value)?  turnMeta,TResult? Function( TokenDelta value)?  token,TResult? Function( ToolStep value)?  toolStep,TResult? Function( Done value)?  done,TResult? Function( Failure value)?  failure,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( TurnMeta value)?  turnMeta,TResult? Function( TokenDelta value)?  token,TResult? Function( ReplyReplace value)?  replyReplace,TResult? Function( ToolStep value)?  toolStep,TResult? Function( Done value)?  done,TResult? Function( Failure value)?  failure,}){
 final _that = this;
 switch (_that) {
 case TurnMeta() when turnMeta != null:
 return turnMeta(_that);case TokenDelta() when token != null:
-return token(_that);case ToolStep() when toolStep != null:
+return token(_that);case ReplyReplace() when replyReplace != null:
+return replyReplace(_that);case ToolStep() when toolStep != null:
 return toolStep(_that);case Done() when done != null:
 return done(_that);case Failure() when failure != null:
 return failure(_that);case _:
@@ -129,11 +132,12 @@ return failure(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)?  turnMeta,TResult Function( String delta)?  token,TResult Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)?  toolStep,TResult Function()?  done,TResult Function( String? detail,  String? error)?  failure,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)?  turnMeta,TResult Function( String delta)?  token,TResult Function( String text)?  replyReplace,TResult Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)?  toolStep,TResult Function()?  done,TResult Function( String? detail,  String? error)?  failure,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case TurnMeta() when turnMeta != null:
 return turnMeta(_that.roleMode,_that.analysis,_that.sceneId,_that.sceneLabel,_that.intention,_that.currentGoal,_that.behavior,_that.mode,_that.actionIntent,_that.memoryRefs);case TokenDelta() when token != null:
-return token(_that.delta);case ToolStep() when toolStep != null:
+return token(_that.delta);case ReplyReplace() when replyReplace != null:
+return replyReplace(_that.text);case ToolStep() when toolStep != null:
 return toolStep(_that.stepId,_that.toolId,_that.label,_that.status,_that.detail,_that.target);case Done() when done != null:
 return done();case Failure() when failure != null:
 return failure(_that.detail,_that.error);case _:
@@ -154,11 +158,12 @@ return failure(_that.detail,_that.error);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)  turnMeta,required TResult Function( String delta)  token,required TResult Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)  toolStep,required TResult Function()  done,required TResult Function( String? detail,  String? error)  failure,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)  turnMeta,required TResult Function( String delta)  token,required TResult Function( String text)  replyReplace,required TResult Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)  toolStep,required TResult Function()  done,required TResult Function( String? detail,  String? error)  failure,}) {final _that = this;
 switch (_that) {
 case TurnMeta():
 return turnMeta(_that.roleMode,_that.analysis,_that.sceneId,_that.sceneLabel,_that.intention,_that.currentGoal,_that.behavior,_that.mode,_that.actionIntent,_that.memoryRefs);case TokenDelta():
-return token(_that.delta);case ToolStep():
+return token(_that.delta);case ReplyReplace():
+return replyReplace(_that.text);case ToolStep():
 return toolStep(_that.stepId,_that.toolId,_that.label,_that.status,_that.detail,_that.target);case Done():
 return done();case Failure():
 return failure(_that.detail,_that.error);}
@@ -175,11 +180,12 @@ return failure(_that.detail,_that.error);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)?  turnMeta,TResult? Function( String delta)?  token,TResult? Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)?  toolStep,TResult? Function()?  done,TResult? Function( String? detail,  String? error)?  failure,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( String? roleMode,  String? analysis,  String? sceneId,  String? sceneLabel,  String? intention,  String? currentGoal,  String? behavior,  String? mode,  String? actionIntent,  MemoryRefs? memoryRefs)?  turnMeta,TResult? Function( String delta)?  token,TResult? Function( String text)?  replyReplace,TResult? Function( String stepId,  String toolId,  String label,  String status,  String? detail,  String? target)?  toolStep,TResult? Function()?  done,TResult? Function( String? detail,  String? error)?  failure,}) {final _that = this;
 switch (_that) {
 case TurnMeta() when turnMeta != null:
 return turnMeta(_that.roleMode,_that.analysis,_that.sceneId,_that.sceneLabel,_that.intention,_that.currentGoal,_that.behavior,_that.mode,_that.actionIntent,_that.memoryRefs);case TokenDelta() when token != null:
-return token(_that.delta);case ToolStep() when toolStep != null:
+return token(_that.delta);case ReplyReplace() when replyReplace != null:
+return replyReplace(_that.text);case ToolStep() when toolStep != null:
 return toolStep(_that.stepId,_that.toolId,_that.label,_that.status,_that.detail,_that.target);case Done() when done != null:
 return done();case Failure() when failure != null:
 return failure(_that.detail,_that.error);case _:
@@ -333,6 +339,72 @@ class _$TokenDeltaCopyWithImpl<$Res>
 @pragma('vm:prefer-inline') $Res call({Object? delta = null,}) {
   return _then(TokenDelta(
 delta: null == delta ? _self.delta : delta // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+/// @nodoc
+
+
+class ReplyReplace implements ChatEvent {
+  const ReplyReplace({required this.text});
+  
+
+ final  String text;
+
+/// Create a copy of ChatEvent
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ReplyReplaceCopyWith<ReplyReplace> get copyWith => _$ReplyReplaceCopyWithImpl<ReplyReplace>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReplyReplace&&(identical(other.text, text) || other.text == text));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,text);
+
+@override
+String toString() {
+  return 'ChatEvent.replyReplace(text: $text)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ReplyReplaceCopyWith<$Res> implements $ChatEventCopyWith<$Res> {
+  factory $ReplyReplaceCopyWith(ReplyReplace value, $Res Function(ReplyReplace) _then) = _$ReplyReplaceCopyWithImpl;
+@useResult
+$Res call({
+ String text
+});
+
+
+
+
+}
+/// @nodoc
+class _$ReplyReplaceCopyWithImpl<$Res>
+    implements $ReplyReplaceCopyWith<$Res> {
+  _$ReplyReplaceCopyWithImpl(this._self, this._then);
+
+  final ReplyReplace _self;
+  final $Res Function(ReplyReplace) _then;
+
+/// Create a copy of ChatEvent
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? text = null,}) {
+  return _then(ReplyReplace(
+text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

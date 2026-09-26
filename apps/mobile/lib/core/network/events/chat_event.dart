@@ -22,6 +22,9 @@ sealed class ChatEvent with _$ChatEvent {
 
   const factory ChatEvent.token({required String delta}) = TokenDelta;
 
+  /// grounding 重写后的整段替换文本；到达后覆盖已渲染的流式文本。
+  const factory ChatEvent.replyReplace({required String text}) = ReplyReplace;
+
   const factory ChatEvent.toolStep({
     required String stepId,
     required String toolId,

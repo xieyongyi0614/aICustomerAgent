@@ -25,6 +25,8 @@ ChatEvent parseChatEvent(Map<String, dynamic> json) {
           detail: json['detail'] as String?,
           target: json['target'] as String?,
         );
+      case 'reply_replace':
+        return ChatEvent.replyReplace(text: json['text'] as String? ?? '');
       default:
         throw FormatException('unregistered event type: $type');
     }

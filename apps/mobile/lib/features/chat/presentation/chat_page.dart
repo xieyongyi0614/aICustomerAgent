@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +8,9 @@ import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/network/events/chat_event.dart';
+import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/components.dart';
+import '../data/chat_history_repository.dart';
 import '../data/chat_stream_repository.dart';
 import '../domain/chat_page_state.dart';
 import 'streaming/chat_stream_controller.dart';
@@ -201,14 +205,49 @@ final chatPageStateProvider =
 class ChatPageNotifier extends Notifier<ChatPageState> {
   ChatStreamRepository? _repo;
   ChatStreamController? _controller;
+  ChatHistoryRemoteRepository? _historyRepo;
+  bool _disposed = false;
 
   @override
   ChatPageState build() {
     ref.onDispose(() {
+      _disposed = true;
       _controller?.dispose();
       _repo?.dispose();
     });
-    return const ChatPageState(loading: false);
+    unawaited(_loadHistory());
+    return const ChatPageState(loading: true);
+  }
+
+  /// 进入页面恢复上次会话：优先用持久化的会话 id 拉取，
+  /// 缺失（首次使用 / 清过数据）时回退到服务端最新会话。
+  Future<void> _loadHistory() async {
+    try {
+      final prefs = await PrefsStore.load();
+      if (_disposed) return;
+      final historyRepo = _historyRepo ??= ChatHistoryRemoteRepository();
+      final cachedId = prefs.lastConversationId();
+      var page = cachedId == null ? null : await historyRepo.messages(cachedId);
+      if (_disposed) return;
+      page ??= await historyRepo.latest();
+      if (_disposed) return;
+      if (page != null) {
+        await prefs.setLastConversationId(page.conversationId);
+        if (_disposed) return;
+        state = state.copyWith(
+          loading: false,
+          currentSessionId: page.conversationId,
+          messages: page.messages,
+        );
+        return;
+      }
+    } catch (_) {
+      // 历史不可达时不阻塞新对话：保持空态可正常发送，发送链路自会暴露错误。
+    } finally {
+      if (!_disposed && state.loading) {
+        state = state.copyWith(loading: false);
+      }
+    }
   }
 
   Future<void> reload() async {
@@ -224,6 +263,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
   Future<void> send(String text) async {
     Analytics.track('chat_send');
     final repo = _repo ??= ChatStreamRepository();
+    final prefs = await PrefsStore.load();
     final userMsg = ChatMessageItem(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
       role: 'human',
@@ -251,7 +291,14 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
     )..attachCancel(repo.cancel);
     _controller = controller;
     try {
-      await controller.consume(repo.send(content: text));
+      await controller.consume(repo.send(
+        content: text,
+        sessionId: state.currentSessionId,
+        onSessionId: (sessionId) {
+          if (!_disposed) state = state.copyWith(currentSessionId: sessionId);
+          unawaited(prefs.setLastConversationId(sessionId));
+        },
+      ));
       final doneText = controller.state.text;
       if (doneText.isNotEmpty) {
         state = state.copyWith(

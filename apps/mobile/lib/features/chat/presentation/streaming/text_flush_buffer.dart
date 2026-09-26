@@ -39,6 +39,15 @@ class TextFlushBuffer {
     return _flushed;
   }
 
+  /// 整段替换：丢弃未 flush 的增量，以替换文本为唯一真相。
+  void replaceWith(String text) {
+    _timer?.cancel();
+    _timer = null;
+    _pending.clear();
+    _flushed = text;
+    generation += 1;
+  }
+
   void dispose() {
     _timer?.cancel();
     _timer = null;

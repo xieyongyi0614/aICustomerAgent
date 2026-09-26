@@ -85,6 +85,10 @@ ChatTurnState reduceChatEvent(ChatTurnState state, ChatEvent event) {
         status: ChatTurnStatus.streaming,
         text: state.text + delta,
       ),
+    ReplyReplace(:final text) => state.copyWith(
+        status: ChatTurnStatus.streaming,
+        text: text,
+      ),
     ToolStep(
       :final stepId,
       :final toolId,

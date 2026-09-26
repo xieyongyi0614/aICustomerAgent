@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/chat/domain/chat_turn_state.dart';
 import 'package:mobile/core/network/events/chat_event.dart';
 import 'package:mobile/design_system/components/incremental_markdown.dart';
+import 'package:mobile/features/chat/presentation/streaming/chat_stream_controller.dart';
 import 'package:mobile/features/chat/presentation/streaming/text_flush_buffer.dart';
 
 void main() {
@@ -46,6 +47,23 @@ void main() {
     state = markIncomplete(state);
     expect(state.incomplete, isFalse);
     expect(state.status, ChatTurnStatus.done);
+  });
+
+  test('reply_replace overrides accumulated text and pending buffer', () async {
+    final controller = ChatStreamController(
+      onState: (_) {},
+      flushWindow: const Duration(milliseconds: 30),
+    );
+    final events = [
+      const ChatEvent.token(delta: '别急'),
+      const ChatEvent.token(delta: '，有我'),
+      const ChatEvent.replyReplace(text: '别急，有我呢（已校准）'),
+      const ChatEvent.done(),
+    ];
+    await controller.consume(Stream.fromIterable(events));
+    expect(controller.state.text, '别急，有我呢（已校准）');
+    expect(controller.state.status, ChatTurnStatus.done);
+    controller.dispose();
   });
 
   test('tool steps upsert by step_id', () {
