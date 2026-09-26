@@ -36,4 +36,12 @@ class AppIcons {
   static const swap = IconData(0xf4e7, fontFamily: 'lucide');
   static const alert = IconData(0xf083, fontFamily: 'lucide');
   static const activity = IconData(0xf076, fontFamily: 'lucide');
+  static const smartphone = IconData(0xf4dd, fontFamily: 'lucide');
+  static const chevronLeft = IconData(0xf1f9, fontFamily: 'lucide');
+  static const chevronRight = IconData(0xf1fb, fontFamily: 'lucide');
+  static const slidersHorizontal = IconData(0xf4dc, fontFamily: 'lucide');
+  static const brain = IconData(0xf1c6, fontFamily: 'lucide');
+  static const shield = IconData(0xf4bf, fontFamily: 'lucide');
+  static const link = IconData(0xf397, fontFamily: 'lucide');
+  static const logOut = IconData(0xf3b0, fontFamily: 'lucide');
 }

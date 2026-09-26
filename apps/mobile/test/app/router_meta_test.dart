@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/router/app_router.dart';
 
 void main() {
-  test('test_all_nine_anchors_mapped', () {
+  test('test_all_route_anchors_mapped', () {
     for (final p in const [
       '/home',
       '/chat',
@@ -13,16 +13,31 @@ void main() {
       '/memory',
       '/profile',
       '/briefing',
+      '/profile/privacy',
+      '/health/consent',
+      '/profile/pairing',
+      '/login',
+      '/verify',
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 9);
+    expect(chromeByPath.length, 14);
   });
 
-  test('test_tab_hidden_on_ledger_chatledger_briefing', () {
-    expect(chromeForLocation('/ledger').hideTabBar, isTrue);
-    expect(chromeForLocation('/chat/ledger').hideTabBar, isTrue);
-    expect(chromeForLocation('/briefing').hideTabBar, isTrue);
+  test('test_tab_hidden_on_immersive_routes', () {
+    for (final p in const [
+      '/ledger',
+      '/chat/ledger',
+      '/briefing',
+      '/profile/privacy',
+      '/health/consent',
+      '/profile/pairing',
+      '/chat',
+      '/login',
+      '/verify',
+    ]) {
+      expect(chromeForLocation(p).hideTabBar, isTrue, reason: p);
+    }
     expect(chromeForLocation('/home').hideTabBar, isFalse);
     expect(chromeForLocation('/health').hideTabBar, isFalse);
   });
@@ -30,5 +45,6 @@ void main() {
   test('test_briefing_status_bar_light', () {
     expect(chromeForLocation('/briefing').lightStatusBar, isTrue);
     expect(chromeForLocation('/home').lightStatusBar, isFalse);
+    expect(chromeForLocation('/login').lightStatusBar, isFalse);
   });
 }

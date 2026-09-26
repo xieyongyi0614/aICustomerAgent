@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/storage/prefs_store.dart';
+import '../../core/storage/secure_token_store.dart';
 import '../../design_system/components/app_tab_bar.dart';
 import '../../features/briefing/presentation/briefing_page.dart';
 import '../../features/chat/presentation/chat_ledger_page.dart';
@@ -12,9 +15,11 @@ import '../../features/home/presentation/home_page.dart';
 import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/life_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
+import '../../features/profile/presentation/login_page.dart';
 import '../../features/profile/presentation/pairing_page.dart';
 import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
+import '../../features/profile/presentation/verify_code_page.dart';
 
 /// 路由元数据：Tab 隐藏与状态栏样式由壳层统一消费，禁止页面内局部 if。
 class RouteChrome {
@@ -28,22 +33,24 @@ class RouteChrome {
 }
 
 const chromeHome = RouteChrome();
-const chromeLedger = RouteChrome(hideTabBar: true);
+const chromeImmersive = RouteChrome(hideTabBar: true);
 const chromeBriefing = RouteChrome(hideTabBar: true, lightStatusBar: true);
 
 const chromeByPath = <String, RouteChrome>{
   '/home': chromeHome,
   '/life': chromeHome,
-  '/chat': chromeHome,
+  '/chat': chromeImmersive,
   '/memory': chromeHome,
   '/profile': chromeHome,
   '/health': chromeHome,
-  '/ledger': chromeLedger,
-  '/chat/ledger': chromeLedger,
+  '/login': chromeImmersive,
+  '/verify': chromeImmersive,
+  '/ledger': chromeImmersive,
+  '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
-  '/profile/privacy': chromeLedger,
-  '/health/consent': chromeLedger,
-  '/profile/pairing': chromeLedger,
+  '/profile/privacy': chromeImmersive,
+  '/health/consent': chromeImmersive,
+  '/profile/pairing': chromeImmersive,
 };
 
 RouteChrome chromeForLocation(String location) {
@@ -51,9 +58,31 @@ RouteChrome chromeForLocation(String location) {
   return chromeByPath[path] ?? chromeHome;
 }
 
+bool _entryGateChecked = false;
+
+/// 设计稿 ⓪：无令牌且未看过登录页 → 首启落「初见登录页」；先逛逛 / 已配对直进。
+Future<String?> _entryGateRedirect() async {
+  try {
+    final token = await SecureTokenStore().readAccessToken();
+    if (token != null && token.isNotEmpty) return null;
+  } catch (_) {
+    return null;
+  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(PrefsStore.keyLoginSeen) ?? false) return null;
+  } catch (_) {}
+  return '/login';
+}
+
 final appRouter = GoRouter(
   initialLocation: '/home',
   errorBuilder: (context, state) => const HomePage(),
+  redirect: (context, state) async {
+    if (_entryGateChecked) return null;
+    _entryGateChecked = true;
+    return _entryGateRedirect();
+  },
   routes: [
     ShellRoute(
       builder: (context, state, child) => _AppShell(
@@ -71,6 +100,8 @@ final appRouter = GoRouter(
           ),
         ),
         GoRoute(path: '/memory', builder: (_, _) => const MemoryPage()),
+        GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+        GoRoute(path: '/verify', builder: (_, _) => const VerifyCodePage()),
         GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
         GoRoute(
           path: '/profile/privacy',

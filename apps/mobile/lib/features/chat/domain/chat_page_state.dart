@@ -1,5 +1,4 @@
 import '../../../core/network/events/chat_event.dart';
-import '../../../design_system/components/mode_selector.dart';
 import 'chat_turn_state.dart';
 
 class ChatMessageItem {
@@ -46,7 +45,6 @@ class ChatPageState {
     this.memoryRefs = const [],
     this.currentSessionId,
     this.streamingText = '',
-    this.mode = RoleMode.defaultMode,
     this.toolSteps = const [],
     this.lastUserText,
   });
@@ -60,7 +58,6 @@ class ChatPageState {
   final List<MemoryRef> memoryRefs;
   final String? currentSessionId;
   final String streamingText;
-  final RoleMode mode;
   final List<ChatToolStep> toolSteps;
   final String? lastUserText;
 
@@ -81,7 +78,6 @@ class ChatPageState {
     List<MemoryRef>? memoryRefs,
     String? currentSessionId,
     String? streamingText,
-    RoleMode? mode,
     List<ChatToolStep>? toolSteps,
     String? lastUserText,
   }) {
@@ -93,7 +89,6 @@ class ChatPageState {
       memoryRefs: memoryRefs ?? this.memoryRefs,
       currentSessionId: currentSessionId ?? this.currentSessionId,
       streamingText: streamingText ?? this.streamingText,
-      mode: mode ?? this.mode,
       toolSteps: toolSteps ?? this.toolSteps,
       lastUserText: lastUserText ?? this.lastUserText,
     );

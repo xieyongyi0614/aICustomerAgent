@@ -4,17 +4,19 @@ import '../../../../app/theme/theme_context.dart';
 import '../../../../design_system/components/mode_selector.dart';
 import '../../../../design_system/orb/orb.dart';
 
-/// 对话页头部人格状态栏（B2 头部）。
+/// 对话页头部人格状态栏（B2 头部；沉浸式下左侧带返回键）。
 class PersonaStatusBar extends StatelessWidget {
   const PersonaStatusBar({
     super.key,
     required this.mode,
     this.online = true,
+    this.onBack,
     this.onOpenModeSheet,
   });
 
   final RoleMode mode;
   final bool online;
+  final VoidCallback? onBack;
   final VoidCallback? onOpenModeSheet;
 
   @override
@@ -25,6 +27,24 @@ class PersonaStatusBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
       child: Row(
         children: [
+          if (onBack != null) ...[
+            GestureDetector(
+              onTap: onBack,
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 30,
+                height: 30,
+                child: Center(
+                  child: Icon(
+                    AppIcons.chevronLeft,
+                    size: 18,
+                    color: colors.ink2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           const Orb(size: OrbSize.md),
           const SizedBox(width: 10),
           Expanded(
@@ -33,12 +53,27 @@ class PersonaStatusBar extends StatelessWidget {
               children: [
                 Text('亚丝娜',
                     style: type.sectionTitle.copyWith(color: colors.ink)),
-                Text(
-                  online ? '● 在线 · ${mode.label} 模式' : '○ 离线 · ${mode.label} 模式',
-                  style: type.label.copyWith(
-                    fontSize: 11.5,
-                    color: online ? colors.health : colors.ink3,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: online ? colors.health : colors.ink3,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${online ? '在线' : '离线'} · ${mode.label} 模式',
+                      style: type.label.copyWith(
+                        fontSize: 11.5,
+                        letterSpacing: 0,
+                        color: online ? colors.health : colors.ink3,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

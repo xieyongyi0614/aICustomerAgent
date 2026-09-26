@@ -189,6 +189,7 @@ class SettingRow extends StatelessWidget {
     this.trailing,
     this.icon,
     this.iconBg,
+    this.iconColor,
     this.onTap,
     this.showDivider = true,
   });
@@ -198,6 +199,9 @@ class SettingRow extends StatelessWidget {
   final Widget? trailing;
   final IconData? icon;
   final Color? iconBg;
+
+  /// 设计稿 .s-ic 彩色图标（默认 ink2）
+  final Color? iconColor;
   final VoidCallback? onTap;
   final bool showDivider;
 
@@ -224,7 +228,7 @@ class SettingRow extends StatelessWidget {
                   color: iconBg ?? colors.fillSubtle,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 16, color: colors.ink2),
+                child: Icon(icon, size: 16, color: iconColor ?? colors.ink2),
               ),
               const SizedBox(width: 12),
             ],

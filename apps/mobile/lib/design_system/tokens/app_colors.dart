@@ -48,6 +48,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.tagRelationBg,
     required this.tagRelationFg,
     required this.transparent,
+    required this.wechat,
+    required this.danger,
   });
 
   final Color canvas;
@@ -96,6 +98,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color tagRelationBg;
   final Color tagRelationFg;
   final Color transparent;
+  final Color wechat;
+
+  /// 破坏性操作文字（退出登录等）
+  final Color danger;
 
   static const light = AppColors(
     canvas: Color(0xFFF5F4F0),
@@ -144,6 +150,8 @@ class AppColors extends ThemeExtension<AppColors> {
     tagRelationBg: Color(0x1F3E8BFF),
     tagRelationFg: Color(0xFF3E8BFF),
     transparent: Color(0x00000000),
+    wechat: Color(0xFF07C160),
+    danger: Color(0xFFE5484D),
   );
 
   static const dark = AppColors(
@@ -193,6 +201,8 @@ class AppColors extends ThemeExtension<AppColors> {
     tagRelationBg: Color(0x336BA6FF),
     tagRelationFg: Color(0xFF6BA6FF),
     transparent: Color(0x00000000),
+    wechat: Color(0xFF07C160),
+    danger: Color(0xFFFF8588),
   );
 
   @override
@@ -243,6 +253,8 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? tagRelationBg,
     Color? tagRelationFg,
     Color? transparent,
+    Color? wechat,
+    Color? danger,
   }) {
     return AppColors(
       canvas: canvas ?? this.canvas,
@@ -291,6 +303,8 @@ class AppColors extends ThemeExtension<AppColors> {
       tagRelationBg: tagRelationBg ?? this.tagRelationBg,
       tagRelationFg: tagRelationFg ?? this.tagRelationFg,
       transparent: transparent ?? this.transparent,
+      wechat: wechat ?? this.wechat,
+      danger: danger ?? this.danger,
     );
   }
 
@@ -345,6 +359,8 @@ class AppColors extends ThemeExtension<AppColors> {
       tagRelationBg: m(tagRelationBg, other.tagRelationBg),
       tagRelationFg: m(tagRelationFg, other.tagRelationFg),
       transparent: m(transparent, other.transparent),
+      wechat: m(wechat, other.wechat),
+      danger: m(danger, other.danger),
     );
   }
 }

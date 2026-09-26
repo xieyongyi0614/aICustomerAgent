@@ -23,11 +23,12 @@ class AppTabBar extends StatelessWidget {
     final colors = Theme.of(context).extension<AppColors>()!;
     final elevation = Theme.of(context).extension<AppElevation>()!;
     final gradients = Theme.of(context).extension<AppGradients>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
     final tabs = const [
       _TabSpec(label: '首页', icon: AppIcons.home),
       _TabSpec(label: '生活', icon: AppIcons.layoutGrid),
       _TabSpec(label: '对话', icon: AppIcons.messageCircle),
-      _TabSpec(label: '记忆', icon: AppIcons.heart),
+      _TabSpec(label: '记忆', icon: AppIcons.brain),
       _TabSpec(label: '我的', icon: AppIcons.user),
     ];
 
@@ -44,15 +45,32 @@ class AppTabBar extends StatelessWidget {
             Row(
               children: [
                 for (var i = 0; i < tabCount; i++)
-                  Expanded(
-                    child: i == 2
-                        ? const SizedBox(width: 76)
-                        : _TabItem(
-                            spec: tabs[i],
-                            selected: currentIndex == i,
-                            onTap: () => onTap(i),
+                  if (i == 2)
+                    GestureDetector(
+                      onTap: () => onTap(2),
+                      behavior: HitTestBehavior.opaque,
+                      child: SizedBox(
+                        width: 76,
+                        height: AppTabBar.barHeight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 36),
+                          child: Text(
+                            '对话',
+                            textAlign: TextAlign.center,
+                            style:
+                                type.tabLabel.copyWith(color: colors.ink3),
                           ),
-                  ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: _TabItem(
+                        spec: tabs[i],
+                        selected: currentIndex == i,
+                        onTap: () => onTap(i),
+                      ),
+                    ),
               ],
             ),
             Positioned(

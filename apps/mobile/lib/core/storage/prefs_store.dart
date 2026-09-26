@@ -8,12 +8,17 @@ class PrefsStore {
   static const keyEveningBriefAt = 'care.evening_brief_at';
   static const keyLastConversationId = 'chat.last_conversation_id';
   static const keyLastSyncAt = 'sync.last_at';
+  static const keyNickname = 'profile.nickname';
+  static const keyLoginSeen = 'profile.login_seen';
+  static const keyFirstUsedAt = 'profile.first_used_at';
 
   static const allKeys = [
     keyMorningBriefAt,
     keyEveningBriefAt,
     keyLastConversationId,
     keyLastSyncAt,
+    keyNickname,
+    keyLoginSeen,
   ];
 
   final SharedPreferences _prefs;
@@ -36,6 +41,31 @@ class PrefsStore {
   int? lastSyncAtMillis() => _prefs.getInt(keyLastSyncAt);
   Future<void> setLastSyncAtMillis(int millis) =>
       _prefs.setInt(keyLastSyncAt, millis);
+
+  String? nickname() => _prefs.getString(keyNickname);
+  Future<void> setNickname(String value) =>
+      _prefs.setString(keyNickname, value);
+
+  bool loginSeen() => _prefs.getBool(keyLoginSeen) ?? false;
+  Future<void> markLoginSeen() async {
+    await _prefs.setBool(keyLoginSeen, true);
+    await _ensureFirstUsedAt();
+  }
+
+  String? firstUsedAt() => _prefs.getString(keyFirstUsedAt);
+
+  Future<void> _ensureFirstUsedAt() async {
+    if (_prefs.getString(keyFirstUsedAt) == null) {
+      await _prefs.setString(
+          keyFirstUsedAt, DateTime.now().toIso8601String());
+    }
+  }
+
+  /// 退出登录：清称呼与登录标记；first_used_at 保留（相识天数不因登出重置）。
+  Future<void> clearIdentity() async {
+    await _prefs.remove(keyNickname);
+    await _prefs.remove(keyLoginSeen);
+  }
 
   Future<void> clearNonCredential() async {
     for (final k in allKeys) {

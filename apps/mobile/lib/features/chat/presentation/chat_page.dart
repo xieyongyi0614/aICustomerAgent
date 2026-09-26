@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/network/events/chat_event.dart';
@@ -64,9 +66,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: ModeSelector(
-            value: ref.read(chatPageStateProvider).mode,
+            value: ref.read(personaModeProvider),
             onChanged: (m) {
-              ref.read(chatPageStateProvider.notifier).setPreferredMode(m);
+              ref.read(personaModeProvider.notifier).set(m);
               Navigator.of(sheetContext).pop();
             },
           ),
@@ -88,8 +90,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         child: Column(
           children: [
             PersonaStatusBar(
-              mode: state.mode,
+              mode: ref.watch(personaModeProvider),
               online: true,
+              onBack: () => context.go('/home'),
               onOpenModeSheet: _openModeSheet,
             ),
             if (state.showMemoryHint)
@@ -98,8 +101,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 child: MemHint(text: state.memoryHintText),
               ),
             Expanded(child: _body(state)),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 88),
+            SafeArea(
+              top: false,
               child: ChatInputBar(
                 controller: _input,
                 onSend: () {
@@ -216,10 +219,6 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
 
   void applyMemoryRefs(List<MemoryRef> refs) {
     state = state.copyWith(memoryRefs: refs);
-  }
-
-  void setPreferredMode(RoleMode mode) {
-    state = state.copyWith(mode: mode);
   }
 
   Future<void> send(String text) async {

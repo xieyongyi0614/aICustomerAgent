@@ -5,11 +5,15 @@ class AppElevation extends ThemeExtension<AppElevation> {
     required this.card,
     required this.deep,
     required this.orbGlow,
+    required this.btnWechat,
+    required this.btnPrimary,
   });
 
   final List<BoxShadow> card;
   final List<BoxShadow> deep;
   final List<BoxShadow> orbGlow;
+  final List<BoxShadow> btnWechat;
+  final List<BoxShadow> btnPrimary;
 
   static const light = AppElevation(
     card: [
@@ -35,6 +39,20 @@ class AppElevation extends ThemeExtension<AppElevation> {
       BoxShadow(
         color: Color(0x593F96FF),
         blurRadius: 60,
+      ),
+    ],
+    btnWechat: [
+      BoxShadow(
+        color: Color(0x4707C160),
+        offset: Offset(0, 10),
+        blurRadius: 24,
+      ),
+    ],
+    btnPrimary: [
+      BoxShadow(
+        color: Color(0x66665AFF),
+        offset: Offset(0, 12),
+        blurRadius: 28,
       ),
     ],
   );
@@ -65,6 +83,20 @@ class AppElevation extends ThemeExtension<AppElevation> {
         blurRadius: 60,
       ),
     ],
+    btnWechat: [
+      BoxShadow(
+        color: Color(0x4707C160),
+        offset: Offset(0, 10),
+        blurRadius: 24,
+      ),
+    ],
+    btnPrimary: [
+      BoxShadow(
+        color: Color(0x66665AFF),
+        offset: Offset(0, 12),
+        blurRadius: 28,
+      ),
+    ],
   );
 
   /// 悬浮对话球：外圈 6px 与页面底色同色，形成挖空感
@@ -82,11 +114,15 @@ class AppElevation extends ThemeExtension<AppElevation> {
     List<BoxShadow>? card,
     List<BoxShadow>? deep,
     List<BoxShadow>? orbGlow,
+    List<BoxShadow>? btnWechat,
+    List<BoxShadow>? btnPrimary,
   }) {
     return AppElevation(
       card: card ?? this.card,
       deep: deep ?? this.deep,
       orbGlow: orbGlow ?? this.orbGlow,
+      btnWechat: btnWechat ?? this.btnWechat,
+      btnPrimary: btnPrimary ?? this.btnPrimary,
     );
   }
 
