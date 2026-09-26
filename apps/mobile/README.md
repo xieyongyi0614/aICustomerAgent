@@ -126,6 +126,7 @@ flutter test integration_test   # 冒烟（app_smoke_test）
 ## 设计系统与开发约定
 
 - **UI 唯一真源**：`.agents/skills/zhaoxi-design-system/`（优先级高于 `design/` 下设计稿）。任何 UI / 样式工作前先读其 `SKILL.md`。
+- **图标系统**：Lucide 本地 TTF + 生成器 + cmap 守卫测试，码点不手抄、不加图标包——详见 [`docs/icons.md`](docs/icons.md)。
 - **Material 3 五禁令**：不用 `ColorScheme.fromSeed`（手工构造 `ColorScheme`）、不用 M3 默认 `TextTheme`、显式关闭 `surfaceTintColor`、图标用 Lucide 不用 Material Icons、Tab 栏自绘（中位悬浮 Orb）。视觉不得出现 M3 默认特征（色渗 / pill indicator / 默认字号阶）。
 - **状态与 Hooks 边界**：业务状态一律 Riverpod provider（`*_provider.dart` 走生成器）；Flutter Hooks 仅限 widget 级临时资源（Orb 动画控制器 / 输入控制器 / 节流），不承载业务逻辑、不与 `StatefulWidget` 混用。
 - **客户端缓存**：Drift 只存服务端 DTO 投影，不做本地业务逻辑；令牌只进 `flutter_secure_storage`，`shared_preferences` 只存非敏感偏好。
