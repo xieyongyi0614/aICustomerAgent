@@ -107,7 +107,7 @@ class _ModeSwitchChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.swap_horiz, size: 11, color: colors.aiPrimary),
+            Icon(AppIcons.slidersHorizontal, size: 11, color: colors.aiPrimary),
             const SizedBox(width: 5),
             Text('切换模式',
                 style: type.label

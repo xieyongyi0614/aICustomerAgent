@@ -261,7 +261,7 @@ class _FieldCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: radii.rMd,
-        boxShadow: context.elevation.card,
+        boxShadow: context.elevation.pill,
       ),
       child: Row(
         children: [

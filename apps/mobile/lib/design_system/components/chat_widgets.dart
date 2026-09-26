@@ -214,11 +214,11 @@ class ChatInputBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: radii.rFull,
-          boxShadow: elevation.card,
+          boxShadow: elevation.pill,
         ),
         child: Row(
           children: [
-            _IconCircle(icon: Icons.add, color: colors.ink2, onTap: null),
+            _IconCircle(icon: AppIcons.plus, color: colors.ink2, onTap: null),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -232,7 +232,7 @@ class ChatInputBar extends StatelessWidget {
               ),
             ),
             // 语音 P2：只留位置，零实现
-            _IconCircle(icon: Icons.mic_none, color: colors.ink3, onTap: null),
+            _IconCircle(icon: AppIcons.mic, color: colors.ink3, onTap: null),
             const SizedBox(width: 6),
             GestureDetector(
               onTap: onSend,
@@ -243,7 +243,7 @@ class ChatInputBar extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: gradients.ai,
                 ),
-                child: Icon(Icons.arrow_upward,
+                child: Icon(AppIcons.arrowUp,
                     size: 17, color: colors.onDeepPrimary),
               ),
             ),
