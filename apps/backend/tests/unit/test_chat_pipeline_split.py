@@ -27,6 +27,8 @@ def test_post_process_registry_contains_v5_v6_v65_steps():
         "run_goal_review",
         "run_summary",
         "run_memory_extract",
+        "run_ledger_extraction",
+        "run_ledger_confirmation",
         "run_budget_observer",
         "run_evaluation",
         "run_world_update",
