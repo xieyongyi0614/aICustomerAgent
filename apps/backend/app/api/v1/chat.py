@@ -92,6 +92,8 @@ async def chat_message(
                     yield _stream_json(payload)
                 elif kind == "token":
                     yield _stream_json({"delta": event["text"]})
+                elif kind == "reply_replace":
+                    yield _stream_json({"type": "reply_replace", "text": event["text"]})
                 elif kind == "done":
                     turn_id = event["turn_id"]
         except openai.APIStatusError as exc:

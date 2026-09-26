@@ -748,8 +748,7 @@ async def run_chat_pipeline(
                     if first_token_ms is None:
                         first_token_ms = (time.perf_counter() - llm_started) * 1000
                     full_reply.append(token)
-                    if not buffer_reply:
-                        await events.put({"kind": "token", "text": token})
+                    await events.put({"kind": "token", "text": token})
             except ValueError as exc:
                 if not full_reply:
                     trace.record(
@@ -793,8 +792,10 @@ async def run_chat_pipeline(
                 )
             else:
                 logger.warning("模型输出为空")
-            if buffer_reply and reply:
-                await events.put({"kind": "token", "text": reply})
+            # wire 契约：回复恒逐 token 流式；grounding 重写有变更时补发整段替换，
+            # 客户端收到后以替换文本为最终回复。
+            if buffer_reply and reply and reply != "".join(full_reply):
+                await events.put({"kind": "reply_replace", "text": reply})
         except BaseException as exc:
             stage_error = exc
             raise

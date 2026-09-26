@@ -373,6 +373,10 @@ async def _consume_turn(resolved, inbound: InboundMessage, llm, trace):
             text = event.get("text")
             if isinstance(text, str):
                 chunks.append(text)
+        elif kind == "reply_replace":
+            text = event.get("text")
+            if isinstance(text, str):
+                chunks = [text]
         elif kind == "done":
             turn_id = event.get("turn_id")
             saw_done = True

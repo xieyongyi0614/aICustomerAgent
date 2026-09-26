@@ -17,6 +17,32 @@ MAX_MESSAGES_LIMIT = 500
 
 
 @history_router.get(
+    "/conversations/latest",
+    response_model=ConversationMessagesOut,
+)
+def latest_conversation_messages(
+    user_id: str = Query(default=get_settings().default_user),
+    limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
+):
+    conversation = history_service.find_latest_conversation(user_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="暂无历史会话")
+    rows = history_service.list_recent_messages(conversation.id, limit)
+    return ConversationMessagesOut(
+        conversation_id=conversation.id,
+        messages=[
+            MessageItemOut(
+                id=row.id,
+                role=row.role,
+                content=row.content,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ],
+    )
+
+
+@history_router.get(
     "/conversations/{conversation_id}/messages",
     response_model=ConversationMessagesOut,
 )

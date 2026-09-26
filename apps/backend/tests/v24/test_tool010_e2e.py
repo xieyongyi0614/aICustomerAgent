@@ -84,7 +84,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     "app/services/decision_pipeline.py": "0c6713304f4b80ddab4f3b132be82ac49429a6d8ef8eaec4866f1a1461b9d612",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "c578e77949b2c369b2a444863cb7c84c451b2bd96ea92d5feaba1ad145caf059",
+    "app/application/chat_pipeline.py": "25f71edc2d48bd84ea15c8da74b4aeff4b3403d199ba364ac1660a863cfee084",  # 再冻结：流式契约演进（恒逐 token + reply_replace），e2e 对齐测试覆盖
     "app/application/post_process.py": "3f154e7616c90053df8747358d142544a4b2ad78f9a9001ddb5be4280f72e127",
     "app/application/action_engine.py": "8dec1c865a9e58546e6096e1f61ff13be5e6a168859e6ab8181cd85c68dc4df8",
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",

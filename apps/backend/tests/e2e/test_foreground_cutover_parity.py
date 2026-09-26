@@ -300,10 +300,10 @@ def test_grounding_streamed_parity(
     assert _deltas(on) == ["别急", "，有我呢"]
 
 
-def test_grounding_buffered_parity(
+def test_grounding_rewrite_streams_tokens(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
-    """grounding=rewrite 且世界上下文可用 → 缓冲（聚合为单个 delta）；两态一致。"""
+    """grounding=rewrite 不再缓冲：恒逐 token 流；无库存冲突时不发替换。"""
     on, off = _both_modes(
         http_server,
         override_settings,
@@ -317,9 +317,41 @@ def test_grounding_buffered_parity(
         inventory_grounding_mode="rewrite",
     )
 
-    # 缓冲态下 token 不逐条下发：delta 条数 ≤ 1（聚合或空）
-    assert len(_deltas(on)) <= 1
-    assert len(_deltas(off)) <= 1
+    assert _deltas(on) == ["别急", "，有我呢"]
+    assert all(line.get("type") != "reply_replace" for line in on)
+    assert all(line.get("type") != "reply_replace" for line in off)
+
+
+def test_grounding_rewrite_replaces_changed_reply(
+    http_server, db_session_factory, llm_override, fake_llm, override_settings, monkeypatch
+):
+    """重写有变更：逐 token 流后补发整段 reply_replace，客户端以其为最终回复。"""
+
+    def _rewrite(reply, content, world_ctx, mode, trace):
+        return reply + "（已校准）"
+
+    monkeypatch.setattr(
+        "app.application.chat_pipeline._apply_inventory_grounding", _rewrite
+    )
+    on, off = _both_modes(
+        http_server,
+        override_settings,
+        llm_override,
+        lambda: fake_llm(
+            response=["别急", "，有我呢"], structured_responses=_structured()
+        ),
+        content="我今天压力很大",
+        tag="gbr",
+        inventory_grounding_enabled="true",
+        inventory_grounding_mode="rewrite",
+    )
+
+    assert _deltas(on) == ["别急", "，有我呢"]
+    replaces = [
+        line["text"] for line in on if line.get("type") == "reply_replace"
+    ]
+    assert replaces == ["别急，有我呢（已校准）"]
+    assert on[-1].get("done") is True
 
 
 # ---------------------------------------------------------------------------
