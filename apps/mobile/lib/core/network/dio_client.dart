@@ -1,13 +1,14 @@
 import 'package:dio/dio.dart';
 
 import '../env/app_env.dart';
+import '../storage/secure_token_store.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_mapping_interceptor.dart';
 import 'interceptors/log_redaction_interceptor.dart';
 import 'interceptors/token_reader.dart';
 
 Dio createDio({
-  TokenReader tokenReader = const NoopTokenReader(),
+  TokenReader? tokenReader,
   String? baseUrl,
 }) {
   final dio = Dio(
@@ -19,7 +20,7 @@ Dio createDio({
     ),
   );
   dio.interceptors.addAll([
-    AuthInterceptor(tokenReader),
+    AuthInterceptor(tokenReader ?? SecureTokenStore()),
     const ErrorMappingInterceptor(),
     const LogRedactionInterceptor(),
   ]);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
@@ -47,7 +48,7 @@ class _PairingPageState extends State<PairingPage> {
             : _deviceName.text.trim(),
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      context.go('/profile');
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -321,7 +321,7 @@ class _HealthAuthEmpty extends StatelessWidget {
           const SizedBox(height: 14),
           ChipButton(
             label: '去授权健康数据',
-            onTap: () => Navigator.of(context).pushNamed('/health/consent'),
+            onTap: () => context.go('/health/consent'),
           ),
         ],
       ),

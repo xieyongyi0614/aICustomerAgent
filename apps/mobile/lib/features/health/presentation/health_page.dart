@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
@@ -57,8 +58,7 @@ class HealthPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   FilledButton.tonal(
-                    onPressed: () =>
-                        Navigator.of(context).pushNamed('/health/consent'),
+                    onPressed: () => context.go('/health/consent'),
                     child: const Text('健康数据授权'),
                   ),
                 ],
