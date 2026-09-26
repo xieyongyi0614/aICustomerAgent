@@ -33,6 +33,27 @@
         "PYTHONPATH": "${workspaceFolder}/apps/backend"
       },
       "justMyCode": true
+    },
+    {
+      "name": "朝夕 App · Android 模拟器 (dev)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/mobile/lib/main.dart",
+      "args": [
+        "--flavor",
+        "dev",
+        "--dart-define-from-file=${workspaceFolder}/apps/mobile/dart_defines/dev.json"
+      ]
+    },
+    {
+      "name": "朝夕 App · iOS 模拟器 (dev)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/mobile/lib/main.dart",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/apps/mobile/dart_defines/dev.json",
+        "--dart-define=API_BASE_URL=http://localhost:8020"
+      ]
     }
   ]
 }

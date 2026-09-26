@@ -81,7 +81,7 @@ class _MemoryPageState extends State<MemoryPage> {
       body: SafeArea(
         bottom: false,
         child: _loading && _items.isEmpty
-            ? const ListView(
+            ? ListView(
                 padding: EdgeInsets.all(18),
                 children: [SkeletonCard(), SkeletonCard()],
               )

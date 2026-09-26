@@ -44,5 +44,18 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Gradle 构建产物（problems-report 等；android/ 下的 build 目录不被上方 /build/ 覆盖）
+/android/build/
+
 # Widget Preview related
 .widget_preview/
+
+# Plugin registrant 生成物：flutter pub get 按 pubspec 插件清单确定性再生成，不入库
+# （对齐官方模板约定：android/ios 模板默认忽略同类文件，windows/linux 模板不携带）
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+/macos/Flutter/GeneratedPluginRegistrant.swift

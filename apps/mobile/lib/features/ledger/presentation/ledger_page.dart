@@ -65,7 +65,7 @@ class _LedgerPageState extends State<LedgerPage> {
     if (_loading && _summary == null) {
       return Scaffold(
         backgroundColor: colors.canvas,
-        body: const SafeArea(
+        body: SafeArea(
           child: ListView(
             padding: EdgeInsets.all(18),
             children: [SkeletonCard(), SkeletonCard()],

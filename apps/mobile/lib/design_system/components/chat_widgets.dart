@@ -15,7 +15,6 @@ MarkdownStyleSheet _markdownSheet(
     h1: textStyle.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
     h2: textStyle.copyWith(fontSize: 16.5, fontWeight: FontWeight.w700),
     h3: textStyle.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
-    list: textStyle,
     code: textStyle.copyWith(
       fontFamily: 'monospace',
       fontSize: 12.5,

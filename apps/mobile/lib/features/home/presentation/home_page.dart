@@ -64,7 +64,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (_loading && _data == null) {
       return Scaffold(
         backgroundColor: colors.canvas,
-        body: const SafeArea(
+        body: SafeArea(
           child: ListView(
             padding: EdgeInsets.all(18),
             children: [SkeletonCard(), SkeletonCard(), SkeletonCard()],

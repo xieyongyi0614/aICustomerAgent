@@ -10,6 +10,7 @@
 |---|---|
 | 后端（`apps/backend/`） | Python 3.13 + FastAPI + LangChain + PostgreSQL 16（SQLAlchemy + Alembic），uv 管理依赖 |
 | 前端（`apps/frontend/`） | React 19 + TypeScript + Vite + TanStack Query + Zustand + Tailwind 4，vitest 测试 |
+| 移动端（`apps/mobile/`） | Flutter ≥ 3.44 + Riverpod 3 + GoRouter + Dio + Freezed + Drift(SQLite)，朝夕 App（V5.0.0，产品级客户端） |
 | 部署 | Docker 多阶段构建（根目录 `Dockerfile`）+ docker compose（根目录唯一入口） |
 
 ## 目录结构
@@ -20,8 +21,10 @@
 │   │   ├── app/           #   api / application / services / repositories / chains / core / prompts / character
 │   │   ├── migrations/    #   Alembic 迁移链（0001 ~ 0011）
 │   │   └── tests/         #   pytest 分层（unit / integration / e2e / golden；FakeLLM 注入）
-│   └── frontend/          # React 调试控制台（详见 apps/frontend/README.md）
-│       └── src/           #   api / app / components / features / hooks / stores / mocks
+│   ├── frontend/          # React 调试控制台（详见 apps/frontend/README.md）
+│   │   └── src/           #   api / app / components / features / hooks / stores / mocks
+│   └── mobile/            # 朝夕 App Flutter 客户端（详见 apps/mobile/README.md）
+│       └── lib/           #   app / core / design_system / features（按域垂直切分）
 ├── docs/                  # 文档（按版本归档，当前 V1.0.0 封版）
 │   └── version/
 │       └── v1.0.0/        # V1.0.0 全部文档
@@ -65,7 +68,14 @@ uv run uvicorn app.main:app --reload --port 8020
 cd apps/frontend
 npm install
 npm run dev                 # http://localhost:2000，/api 代理到 :8020（VITE_PROXY_TARGET 可配置）
+
+# 4. 移动端（apps/mobile/ 下）：朝夕 App，完整启动与配对流程见 apps/mobile/README.md
+cd apps/mobile
+flutter pub get
+flutter run --dart-define-from-file=dart_defines/dev.json   # 或 VS Code 打开仓库根，F5 选「朝夕 App」启动配置
 ```
+
+> 移动端要求 Flutter ≥ 3.44.0（Dart ≥ 3.13.4）；`API_BASE_URL` 未注入时启动即 fail-fast，模拟器/真机地址改 `apps/mobile/dart_defines/dev.json` 一处即可。首次使用需在 App「我的 → 设备配对」输入后端 `.env` 里的 `AUTH_PAIRING_CODE`（后端还需配置 `AUTH_TOKEN_SECRET` 用于令牌签名）。
 
 > 环境变量说明见 `apps/backend/README.md` 的配置项表。LLM profile 两种配置方式（`LLM_PROFILES_JSON` 优先级更高，同时配置时忽略文件）：本地开发用 `LLM_PROFILES_FILE` 指向外置 JSON 文件（如 `llm_profiles.json`，可排版）；容器 / 内联场景把 `LLM_PROFILES_JSON` 写成单行数组。
 
@@ -80,6 +90,10 @@ uv run pylint app tests
 npm run test        # vitest
 npm run typecheck   # tsc -b
 npm run lint        # eslint
+
+# 移动端（apps/mobile/ 下；单元 + widget + golden 视觉回归）
+flutter test
+flutter test integration_test   # 冒烟
 ```
 
 ## 核心能力
