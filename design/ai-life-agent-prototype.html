@@ -48,9 +48,10 @@ body{
 .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding:60px 18px 118px;scrollbar-width:none}
 .screen::-webkit-scrollbar{display:none}
 .screen:target{display:block;animation:fadeUp .38s cubic-bezier(.22,.9,.3,1)}
-#home{display:block}
-.screen-wrap:has(.screen:target) #home:not(:target){display:none}
-.screen-wrap:has(#ledger:target) #tabbar,.screen-wrap:has(#chatLedger:target) #tabbar,.screen-wrap:has(#briefing:target) #tabbar{display:none}
+#login{display:flex}
+.screen#login:target{display:flex}
+.screen-wrap:has(.screen:target) #login:not(:target){display:none}
+.screen-wrap:has(#ledger:target) #tabbar,.screen-wrap:has(#chatLedger:target) #tabbar,.screen-wrap:has(#briefing:target) #tabbar,.screen-wrap:has(#chat:target) #tabbar,.screen-wrap:has(#login:target) #tabbar,.screen-wrap:has(#verify:target) #tabbar,.screen-wrap:not(:has(.screen:target)) #tabbar{display:none}
 .screen-wrap:has(#briefing:target) #statusbar{color:#fff}
 a{color:inherit;text-decoration:none}
 .card,.b-start{display:block}
@@ -171,7 +172,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .inputbar{position:absolute;left:0;right:0;bottom:0;z-index:52;padding:12px 16px 26px;background:linear-gradient(180deg,rgba(245,244,240,0),var(--bg) 34%)}
 .inputbar .ib-in{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:99px;box-shadow:var(--shadow-card);padding:7px 7px 7px 16px}
 .inputbar .ib-in .ph{flex:1;font-size:14px;color:var(--ink3)}
-#chat .inputbar{bottom:88px}
+#chat .inputbar{bottom:0}
 .ib-ic{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none}
 .ib-ic.go{background:var(--grad-ai);color:#fff}
 .ib-ic svg{width:17px;height:17px}
@@ -284,6 +285,31 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .brief .b-start{margin-top:22px;width:100%;text-align:center;background:#fff;color:#2B2A3D;font-weight:700;font-size:15px;border-radius:99px;padding:15px;cursor:pointer}
 .brief .back{color:rgba(255,255,255,.75)}
 
+/* ============ Login & Verify ============ */
+#login{flex-direction:column;align-items:center;text-align:center;padding:96px 30px 42px}
+.lg-orb-wrap{position:relative;margin:24px 0 30px}
+.lg-orb-wrap::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(122,92,255,.2),transparent 68%);pointer-events:none}
+.lg-brand{font-size:34px;font-weight:800;letter-spacing:.3em;margin-left:.3em}
+.lg-slogan{font-size:13.5px;color:var(--ink2);margin-top:10px;letter-spacing:.05em}
+.lg-hi{margin:36px 0 0;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%}
+.lg-hi .orb{margin-top:2px}
+.lg-hi-b{font-size:13.5px;line-height:1.8;color:#33343D}
+.lg-btns{width:100%;margin-top:auto;padding-top:30px}
+.lg-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border-radius:99px;padding:15px;font-size:15px;font-weight:700;margin-bottom:12px;cursor:pointer}
+.lg-btn svg{width:20px;height:20px}
+.lg-btn.wx{background:#07C160;color:#fff;box-shadow:0 10px 24px rgba(7,193,96,.28)}
+.lg-btn.phone-b{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
+.lg-btn.primary{background:var(--grad-ai);color:#fff;box-shadow:0 12px 28px rgba(102,90,255,.4)}
+.lg-agree{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11.5px;color:var(--ink3);margin-top:4px;line-height:1.6}
+.lg-agree .box{width:14px;height:14px;border-radius:50%;border:1.5px solid #CBC9C0;position:relative;flex:none}
+.lg-agree .box::after{content:"";position:absolute;left:4px;top:2px;width:4px;height:7px;border:solid var(--health);border-width:0 1.8px 1.8px 0;transform:rotate(42deg)}
+.lg-agree b{color:var(--ink2);font-weight:600}
+.lg-guest{margin-top:15px;font-size:12.5px;color:var(--ink3)}
+.vf-field{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:17px 16px;margin-top:12px;font-size:15px}
+.vf-field .ph{color:var(--ink3)}
+.vf-field .act{margin-left:auto;font-size:13px;font-weight:600;color:var(--ai1);flex:none}
+.vf-field svg{width:16px;height:16px;color:var(--ai1);flex:none}
+
 /* ============ 演示导航 ============ */
 .demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:150px}
 .demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
@@ -302,6 +328,46 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
       <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
       <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
     </span></div>
+
+    <!-- ================= Login · 初见 ================= -->
+    <div class="screen" id="login">
+      <div class="lg-orb-wrap"><div class="orb lg"></div></div>
+      <div class="lg-brand">朝夕</div>
+      <div class="lg-slogan">一个有长期记忆的 AI 生命管家</div>
+      <div class="lg-hi">
+        <div class="orb sm"></div>
+        <div class="lg-hi-b">你好，我是亚丝娜。<br>登录之后，我会记住你、理解你，<br>陪你把每一天过好。</div>
+      </div>
+      <div class="lg-btns">
+        <a class="lg-btn wx" href="#home">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.7 4C4.9 4 2 6.6 2 9.8c0 1.8 1 3.4 2.5 4.5l-.6 2 2.2-1.2c.8.2 1.5.4 2.4.4h.4A6.6 6.6 0 0 1 8.6 14c0-3.3 3.1-6 7-6 .3 0 .7 0 1 .1C16 5.4 12.7 4 8.7 4zM6.4 8.2a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zm4.6 0a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zM15.6 9c-3.3 0-6 2.2-6 5s2.7 5 6 5c.7 0 1.4-.1 2-.3l1.9 1-.5-1.7A4.7 4.7 0 0 0 21.6 14c0-2.8-2.7-5-6-5zm-2 4.4a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4zm4 0a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4z"/></svg>
+          微信一键登录
+        </a>
+        <a class="lg-btn phone-b" href="#verify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 5h3"/></svg>
+          手机号登录 / 注册
+        </a>
+        <div class="lg-agree"><span class="box"></span><span>已阅读并同意 <b>《用户协议》</b> 和 <b>《隐私政策》</b></span></div>
+        <a class="lg-guest" href="#home">先逛逛，稍后再登录 →</a>
+      </div>
+    </div>
+
+    <!-- ================= Verify · 手机号验证 ================= -->
+    <div class="screen" id="verify" style="padding-bottom:40px">
+      <a class="back" href="#login"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>返回</a>
+      <div class="row" style="gap:10px;margin:18px 0 6px"><div class="orb md"></div><div class="sub">亚丝娜 · 初次见面</div></div>
+      <h1 class="pt" style="font-size:26px">手机号登录 / 注册</h1>
+      <div class="sub" style="margin-top:6px;margin-bottom:18px">未注册的手机号将自动创建账号</div>
+      <div class="vf-field"><span style="font-weight:700">+86</span><span class="ph">输入手机号</span></div>
+      <div class="vf-field"><span class="ph">输入 6 位验证码</span><span class="act">获取验证码</span></div>
+      <div class="vf-field">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+        <span class="ph">想让我怎么称呼你？（选填）</span>
+      </div>
+      <a class="lg-btn primary" href="#home" style="margin-top:24px">开始我们的第一天</a>
+      <div class="lg-agree" style="margin-top:14px"><span class="box"></span><span>已阅读并同意 <b>《用户协议》</b> 和 <b>《隐私政策》</b></span></div>
+      <div class="privacy-note" style="margin-top:26px">你的数据只属于你：记忆与对话本地优先存储，可随时导出或一键清空。</div>
+    </div>
 
     <!-- ================= Home ================= -->
     <div class="screen active" id="home">
@@ -384,8 +450,9 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
     </div>
 
     <!-- ================= Chat ================= -->
-    <div class="screen" id="chat" style="padding-bottom:180px">
+    <div class="screen" id="chat" style="padding-bottom:120px">
       <div class="chat-head">
+        <a class="back" href="#home" style="margin-bottom:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></a>
         <div class="orb md"></div>
         <div>
           <div class="nm">亚丝娜</div>
@@ -709,10 +776,10 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · AI Personal Life Agent</b> — 高保真交互原型<br>点击底部导航与页面卡片，可跳转全部 9 个页面 · 支持 #hash 深链</div>
+<div class="page-tip"><b>朝夕 · AI Personal Life Agent</b> — 高保真交互原型<br>点击底部导航与页面卡片，可跳转全部 11 个页面 · 支持 #hash 深链</div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="#home">首页</a><a href="#chat">对话</a><a href="#chatLedger">AI记账</a><a href="#life">生活</a><a href="#ledger">账本</a><a href="#health">健康</a><a href="#memory">记忆</a><a href="#profile">我的</a><a href="#briefing">简报</a>
+  <a href="#login">登录</a><a href="#verify">验证</a><a href="#home">首页</a><a href="#chat">对话</a><a href="#chatLedger">AI记账</a><a href="#life">生活</a><a href="#ledger">账本</a><a href="#health">健康</a><a href="#memory">记忆</a><a href="#profile">我的</a><a href="#briefing">简报</a>
 </div>
 
 </body>
