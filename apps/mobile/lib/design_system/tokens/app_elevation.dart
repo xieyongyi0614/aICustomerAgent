@@ -7,7 +7,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
     required this.orbGlow,
     required this.btnWechat,
     required this.btnPrimary,
-    required this.pill,
   });
 
   final List<BoxShadow> card;
@@ -15,11 +14,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
   final List<BoxShadow> orbGlow;
   final List<BoxShadow> btnWechat;
   final List<BoxShadow> btnPrimary;
-
-  /// 矮宽元素（输入栏 pill / 输入卡）的阴影：
-  /// blur 过大（如 card 的 30）在这类几何上会被 Skia 九宫格路径渲染成实色带，
-  /// 必须保持小模糊（模拟器 Skia 实测；真机 Impeller 不受影响）。
-  final List<BoxShadow> pill;
 
   static const light = AppElevation(
     card: [
@@ -58,13 +52,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
       BoxShadow(
         color: Color(0x66665AFF),
         offset: Offset(0, 4),
-        blurRadius: 12,
-      ),
-    ],
-    pill: [
-      BoxShadow(
-        color: Color(0x141B1C23),
-        offset: Offset(0, 3),
         blurRadius: 12,
       ),
     ],
@@ -110,13 +97,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
         blurRadius: 12,
       ),
     ],
-    pill: [
-      BoxShadow(
-        color: Color(0x33000000),
-        offset: Offset(0, 3),
-        blurRadius: 12,
-      ),
-    ],
   );
 
   /// 悬浮对话球：外圈 6px 与页面底色同色，形成挖空感
@@ -136,7 +116,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
     List<BoxShadow>? orbGlow,
     List<BoxShadow>? btnWechat,
     List<BoxShadow>? btnPrimary,
-    List<BoxShadow>? pill,
   }) {
     return AppElevation(
       card: card ?? this.card,
@@ -144,7 +123,6 @@ class AppElevation extends ThemeExtension<AppElevation> {
       orbGlow: orbGlow ?? this.orbGlow,
       btnWechat: btnWechat ?? this.btnWechat,
       btnPrimary: btnPrimary ?? this.btnPrimary,
-      pill: pill ?? this.pill,
     );
   }
 

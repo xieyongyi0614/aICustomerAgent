@@ -221,7 +221,7 @@ class _EmailField extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: context.radii.rFull,
-        boxShadow: context.elevation.pill,
+        boxShadow: context.elevation.card,
       ),
       child: Row(
         children: [

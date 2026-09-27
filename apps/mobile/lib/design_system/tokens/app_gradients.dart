@@ -111,7 +111,7 @@ class AppGradients extends ThemeExtension<AppGradients> {
       colors: [Color(0xFFFFFFFF), Color(0xFFF4F1FF)],
     ),
     orbHalo: RadialGradient(
-      colors: [Color(0x337A5CFF), Color(0x00000000)],
+      colors: [Color(0x337A5CFF), Color(0x007A5CFF)],
       stops: [0.0, 0.95],
     ),
   );

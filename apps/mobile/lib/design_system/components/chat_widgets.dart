@@ -206,7 +206,8 @@ class ChatInputBar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [colors.transparent, colors.canvas],
+          colors: [colors.canvas.withValues(alpha: 0), colors.canvas],
+          stops: const [0, 0.34],
         ),
       ),
       child: Container(
@@ -214,26 +215,29 @@ class ChatInputBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: radii.rFull,
-          boxShadow: elevation.pill,
+          boxShadow: elevation.card,
         ),
         child: Row(
           children: [
-            _IconCircle(icon: AppIcons.plus, color: colors.ink2, onTap: null),
-            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: controller,
+                style: type.body.copyWith(fontSize: 14, color: colors.ink),
                 decoration: InputDecoration(
                   hintText: hint,
-                  hintStyle: type.body.copyWith(color: colors.ink3),
+                  hintStyle:
+                      type.body.copyWith(fontSize: 14, color: colors.ink3),
                   border: InputBorder.none,
                   isDense: true,
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            _IconCircle(icon: AppIcons.plus, color: colors.ink2, onTap: null),
+            const SizedBox(width: 8),
             // 语音 P2：只留位置，零实现
-            _IconCircle(icon: AppIcons.mic, color: colors.ink3, onTap: null),
-            const SizedBox(width: 6),
+            _IconCircle(icon: AppIcons.mic, color: colors.ink2, onTap: null),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: onSend,
               child: Container(
@@ -272,7 +276,7 @@ class _IconCircle extends StatelessWidget {
       child: SizedBox(
         width: 34,
         height: 34,
-        child: Icon(icon, size: 20, color: color),
+        child: Icon(icon, size: 17, color: color),
       ),
     );
   }
