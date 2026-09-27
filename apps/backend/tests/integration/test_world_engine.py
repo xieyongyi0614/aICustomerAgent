@@ -1,5 +1,7 @@
 """V8-002 WorldEngine：生命周期、手动通道、降级契约。"""
 
+import logging
+
 from app.application import world_engine
 from app.character.asuna.world import OBJECT_STATE_MACHINES
 from app.models.world import object_initial_state
@@ -41,6 +43,25 @@ def test_set_location_rejects_unknown(db_session_factory):
     assert world_engine.set_location("default-user", "home.kitchen").current_location == "home.kitchen"
     assert world_engine.set_location("default-user", "mars") is None
     assert world_engine.get_world("default-user").current_location == "home.kitchen"
+
+
+def test_create_event_duplicate_idempotency_key_dedupes_without_error(
+    db_session_factory, caplog
+):
+    user = "event-dedupe-user"
+    world_engine.ensure_world(user)
+    key = "location:2026-09-27:evening:home.living_room"
+    first = world_engine.create_event(
+        user, event_type="life_event", title="移动到客厅", idempotency_key=key
+    )
+    assert first is not None
+    with caplog.at_level(logging.INFO):
+        duplicate = world_engine.create_event(
+            user, event_type="life_event", title="移动到客厅", idempotency_key=key
+        )
+    assert duplicate is None
+    assert any("幂等去重" in record.message for record in caplog.records)
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
 
 
 def test_snapshot_captures_full_state(db_session_factory):

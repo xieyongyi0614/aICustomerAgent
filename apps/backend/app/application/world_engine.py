@@ -10,6 +10,8 @@ import logging
 import time
 from datetime import datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
+
 from app.character.asuna.world import (
     DEFAULT_HOUSEHOLD,
     HOME_LOCATIONS,
@@ -37,7 +39,7 @@ from app.models.world import (
     object_initial_state,
     part_of_day,
 )
-from app.repositories import world_repository
+from app.repositories import world_repository, world_simulation_repository
 from app.services.character_assets import DEFAULT_CHARACTER_ID
 from app.services.life.ownership import assert_access, resolve_owner
 from app.services.world.locations import build_location_context
@@ -777,6 +779,13 @@ def create_event(
         world = ensure_world(user_id)
         if world is None:
             return None
+        if idempotency_key and idempotency_key in (
+            world_simulation_repository.get_latest_idempotency_keys(
+                world.world_id, [idempotency_key]
+            )
+        ):
+            logger.info("世界事件幂等去重，同键已落库：key=%s", idempotency_key)
+            return None
         settings = get_settings()
         if (
             event_type not in _QUOTA_EXEMPT_EVENT_TYPES
@@ -800,7 +809,13 @@ def create_event(
             created_at=now,
             updated_at=now,
         )
-        world_repository.save_event(event)
+        try:
+            world_repository.save_event(event)
+        except IntegrityError:
+            logger.info(
+                "世界事件并发写入撞幂等唯一索引，按去重处理：key=%s", idempotency_key
+            )
+            return None
         return event
     except Exception:
         logger.exception("世界事件创建失败")
