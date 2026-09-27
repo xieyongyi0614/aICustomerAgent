@@ -241,9 +241,10 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
         );
         return;
       }
-    } catch (_) {
-      // 历史不可达时不阻塞新对话：保持空态可正常发送，发送链路自会暴露错误。
-    } finally {
+  } catch (e) {
+    // 历史不可达时不阻塞新对话：保持空态可正常发送，发送链路自会暴露错误。
+    debugPrint('[chat] history load failed: $e');
+  } finally {
       if (!_disposed && state.loading) {
         state = state.copyWith(loading: false);
       }

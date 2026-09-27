@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/features/chat/domain/chat_page_state.dart' show ChatMessageItem;
 import 'package:mobile/features/chat/domain/chat_turn_state.dart';
 import 'package:mobile/core/network/events/chat_event.dart';
 import 'package:mobile/design_system/components/incremental_markdown.dart';
@@ -91,5 +92,19 @@ void main() {
     expect(state.toolSteps.length, 1);
     expect(state.toolSteps.single.status, 'done');
     expect(state.toolSteps.single.detail, '¥35');
+  });
+
+  test('history payload with int row id parses (regression: 200 but no回显)', () {
+    final item = ChatMessageItem.fromJson(const {
+      'id': 11,
+      'role': 'human',
+      'content': 'hello',
+      'created_at': '2026-09-27T23:07:41.437351',
+    });
+    expect(item.id, '11');
+    expect(item.role, 'human');
+    expect(item.content, 'hello');
+    expect(item.createdAt, isNotNull);
+    expect(ChatMessageItem.fromJson(const {}).id, '');
   });
 }

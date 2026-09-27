@@ -15,12 +15,12 @@ class ChatMessageItem {
   final DateTime? createdAt;
 
   factory ChatMessageItem.fromJson(Map<String, dynamic> json) => ChatMessageItem(
-        id: json['id'] as String? ?? '',
-        role: json['role'] as String? ?? 'ai',
-        content: json['content'] as String? ?? '',
+        id: json['id']?.toString() ?? '',
+        role: json['role']?.toString() ?? 'ai',
+        content: json['content']?.toString() ?? '',
         createdAt: json['created_at'] == null
             ? null
-            : DateTime.tryParse(json['created_at'] as String),
+            : DateTime.tryParse(json['created_at'].toString()),
       );
 }
 
