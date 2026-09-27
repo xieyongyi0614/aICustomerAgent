@@ -407,11 +407,13 @@ API-001 → API-002 ──┘
 
 留白：IDENT-009（`default_user` 设置与 `is_default` 退役评估，测试身份保留前不动）、IDENT-010（调试面鉴权）、IDENT-011（feishu 身份与 email 身份并集）均 P2，另行登记。
 
+**IDENT-009 评估结论（2026-09-28，裁决：暂不退役）**：`settings.default_user` 现承担三重角色——①测试身份（conftest override 与数百用例以 default-user 直连服务层，全量替换成本远超收益）；②部署启动播种锚点（`main.py` lifespan `ensure_default_user`，owner 邮箱绑定后它就是 owner 行本身，不再有"幽灵用户"语义）；③调试面回落值（D3 语义）。`users.is_default` 是 owner 行的标记列，随行存在无害。退役前提是"调试面鉴权（IDENT-010）落地 + 测试身份迁移到显式 fixture 值"，两者都属 P2；结论：保留现状，本轮仅删除语义歧义（default-user = owner 内部 id，非匿名兜底身份）。
+
 **测试门槛（已过，2026-09-27）**：后端全量 7153 绿（28 失败经 HEAD 干净 worktree 基线对照逐项归因：22 既有红 + 4 本地 `.env` SMTP/Redis 环境敏感 + 1 tool007 冻结源钉测因前序会话未提交的 world_engine 改动 + 1 既有时序 flake，**本变更零确定性回归**）；`tests/v50` 鉴权专项 + 归并脚本 + 登录/令牌共 34 绿；前端 typecheck + 154 绿；移动端零改动。
 
 **回归清单（真机 / 真实部署人工项）**：
 
-1. 部署侧执行一次归并：`uv run python -m scripts.adopt_owner_identity --email <owner邮箱>`（dry-run 核对报告）→ `--apply`；确认 `users` 表 default-user 行 email 已绑定、`email-*` 行已删（或按 warning 保留）。
-2. App 登录（owner 邮箱）→ 发消息 → 杀 App 重开 → 会话历史恢复；`conversations` / `memories` / `character_state` 均在 default-user 名下。
+1. 部署侧执行一次归并：`uv run python -m scripts.adopt_owner_identity --email <owner邮箱>`（dry-run 核对报告）→ `--apply`；确认 `users` 表 default-user 行 email 已绑定、`email-*` 行已删（或按 warning 保留）。—— **已执行（2026-09-28）**：email-* 散用户名下零数据，绑定 + 删行完成，登录解析验证 `find_or_create_by_email → default-user`，13 条记忆与会话数据完好。
+2. App 登录（owner 邮箱）→ 发消息 → 杀 App 重开 → 会话历史恢复；`conversations` / `memories` / `character_state` 均在 default-user 名下。**注意：归并前拿到的旧 token 指向已删的 email-* 行（令牌无状态不校验库），须退出登录重登一次换新令牌**。
 3. 首页任务 / 今日消费非空（聊天链路创建的任务与账目对 token 用户可见）——归并前创建的历史数据需第 1 步完成后新产生的对话验证口径。
 4. 无 token 直接请求 `/api/v1/chat/message`、`/life/export`、`/ledger/summary`、`/conversations/latest` → 401；隐私页「导出数据」只含本人数据。
