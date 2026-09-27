@@ -1,8 +1,8 @@
-"""设备配对 / 邮箱验证码登录换长期令牌 + 鉴权依赖。
+"""邮箱验证码登录换长期令牌 + 鉴权依赖。
 
-契约：`POST /auth/pair` 需 `pairing_secret`；`POST /auth/email/code|verify` 需
-SMTP + Redis + 令牌密钥齐备（缺一 503）；令牌无状态签名；401/403/429 语义分离。
-既有端点不挂载（V1 纯新增）；新产品端点经 `require_user` 显式注入。
+契约：`POST /auth/email/code|verify` 需 SMTP + Redis + 令牌密钥齐备（缺一 503）；
+令牌无状态签名（设备配对链路已退役）；401/403/429 语义分离。
+新产品端点经 `require_user` 显式注入。
 """
 
 from __future__ import annotations
@@ -33,14 +33,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 TOKEN_TTL_SECONDS = 30 * 24 * 3600
 
 
-class PairRequest(BaseModel):
-    pairing_secret: str = Field(min_length=1)
-    device_id: str = Field(min_length=1)
-    device_name: str | None = None
-    platform: str = Field(min_length=1)
-
-
-class PairResponse(BaseModel):
+class TokenResponse(BaseModel):
     token: str
     token_type: str = "Bearer"
     user_id: str
@@ -73,10 +66,6 @@ class EmailVerifyRequest(BaseModel):
 
 def _secret() -> str:
     return getattr(get_settings(), "auth_token_secret", "") or ""
-
-
-def _pairing_secret() -> str:
-    return getattr(get_settings(), "auth_pairing_code", "") or ""
 
 
 def _sign(payload: str) -> str:
@@ -125,27 +114,6 @@ def require_user(authorization: str = Header(default="")) -> str:
     return parse_token(authorization.removeprefix("Bearer ").strip())
 
 
-@auth_router.post("/pair", response_model=PairResponse)
-def pair_device(body: PairRequest):
-    secret = _secret()
-    if not secret:
-        raise HTTPException(status_code=503, detail="auth_token_secret not configured")
-    expected = _pairing_secret()
-    if not expected:
-        raise HTTPException(status_code=503, detail="auth_pairing_code not configured")
-    if not hmac.compare_digest(body.pairing_secret, expected):
-        raise HTTPException(status_code=401, detail="配对凭据无效")
-    user_id = get_settings().default_user
-    token = issue_token(user_id, body.device_id)
-    _, _, exp = parse_token_parts(token)
-    return PairResponse(
-        token=token,
-        user_id=user_id,
-        expires_at=_iso(exp),
-        device_id=body.device_id,
-    )
-
-
 @auth_router.get("/me", response_model=MeResponse)
 def me(authorization: str = Header(default="")):
     if not authorization.startswith("Bearer "):
@@ -175,7 +143,7 @@ async def send_email_code(body: EmailCodeRequest):
     return EmailCodeResponse(cooldown_seconds=cooldown)
 
 
-@auth_router.post("/email/verify", response_model=PairResponse)
+@auth_router.post("/email/verify", response_model=TokenResponse)
 async def verify_email_code(body: EmailVerifyRequest):
     _email_login_ready()
     try:
@@ -191,7 +159,7 @@ async def verify_email_code(body: EmailVerifyRequest):
     context = await asyncio.to_thread(user_service.find_or_create_by_email, normalized)
     token = issue_token(context.user_id, body.device_id)
     _, _, exp = parse_token_parts(token)
-    return PairResponse(
+    return TokenResponse(
         token=token,
         user_id=context.user_id,
         expires_at=_iso(exp),

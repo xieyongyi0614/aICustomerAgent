@@ -31,10 +31,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Future<void> _loadIdentity() async {
     try {
       final prefs = await PrefsStore.load();
-      final paired = await _auth.hasToken();
+      final loggedIn = await _auth.hasToken();
       final raw = prefs.firstUsedAt();
       var firstUsedAt = raw == null ? null : DateTime.tryParse(raw);
-      if (paired && firstUsedAt == null) {
+      if (loggedIn && firstUsedAt == null) {
         await prefs.markLoginSeen();
         firstUsedAt = DateTime.now();
       }
@@ -67,7 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('退出登录'),
-        content: const Text('退出后需要重新登录或配对才能继续同步，本机数据不会丢失。'),
+        content: const Text('退出后需要重新登录才能继续同步，本机数据不会丢失。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -265,17 +265,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     color: colors.ink3,
                   ),
                   onTap: () => context.go('/profile/privacy'),
-                ),
-                SettingRow(
-                  title: '设备配对',
-                  subtitle: '绑定这台设备',
-                  icon: AppIcons.link,
-                  trailing: Icon(
-                    AppIcons.chevronRight,
-                    size: 16,
-                    color: colors.ink3,
-                  ),
-                  onTap: () => context.go('/profile/pairing'),
                   showDivider: false,
                 ),
               ],

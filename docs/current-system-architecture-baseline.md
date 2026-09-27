@@ -445,7 +445,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 | 发件端口 | `services/email/sender.py` 的 `EmailSender` 协议 | 验证码服务只依赖协议；换 Resend / 阿里云 / 腾讯云 = 新增实现类 + `build_email_sender` 的 provider 分支，业务零改动 |
 | SMTP 实现 | `SmtpEmailSender`（aiosmtplib，按次建连） | MVP 163 个人邮箱：465 SSL + 授权码；`EMAIL_*` 配置域（`core/settings/email.py`） |
 | 验证码存储 | `services/identity/code_store.py` 的 `VerificationCodeStore` 协议 + `RedisCodeStore` | 短 TTL 一次性状态入 Redis：SETNX 冷却 / INCR+EXPIRE 小时·日频控 / GETDEL 单次消费 / 尝试超限作废；多实例前必须保证 Redis 可用 |
-| 登录端点 | `POST /auth/email/code` + `POST /auth/email/verify`（`api/v1/auth.py`） | 校验通过 find-or-create `users`（email 唯一），复用 `/auth/pair` 的无状态 HMAC 令牌契约；SMTP / Redis / 令牌密钥缺一 503 |
+| 登录端点 | `POST /auth/email/code` + `POST /auth/email/verify`（`api/v1/auth.py`） | 校验通过 find-or-create `users`（email 唯一），签发无状态 HMAC 令牌；SMTP / Redis / 令牌密钥缺一 503 |
 
 ---
 
@@ -481,7 +481,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 9. **单一写面纪律**：计划落库只经 `goal_repository` 计划面；行动写世界只走 `deferred_world_op → outbox → world_engine` 唯一路径；Run 唯一写面 = `loop_runs`。
 10. **能力是手脚不是逻辑**：`Capability` 只执行不做决策，调度权/重试/回复生成在引擎（ActionEngine/AutonomyEngine）；`ToolRegistry`/`CapabilityRegistry` 代码注册非热插拔。
 11. **前台/后台同一决策代码路径**：统一 `decision_pipeline`，前台目标栈只读（长期化写入只发生在后台）。
-12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌复用 `/auth/pair` 的无状态 HMAC 体系。
+12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
 
 ---
 

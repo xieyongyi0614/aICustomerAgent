@@ -367,3 +367,18 @@ API-001 → API-002 ──┘
 3. 60s 内重发 → 429 提示剩余秒数；连错 5 次 → 提示作废需重取；过期码（>5min）→ 提示过期。
 4. 登录成功后杀 App 重开 → 免登录直达；`/profile` 登出 → 回登录页。
 5. 配对码链路回归：`POST /auth/pair` 行为不变（两套认证并存）。
+
+---
+
+## 13. 增量注册：设备配对链路退役（2026-09-27，已实现）
+
+> **背景**：邮箱验证码登录（§12）落地后，配对码（API-001）失去独立价值：签发面只有 `default-user` 无身份语义、静态共享密钥不可撤销，且 owner 侧无历史数据继承诉求。裁决整体退役，邮箱验证码登录成为唯一登录入口。
+> **契约不变量**：令牌格式（`user_id.device_id.exp.hmac`）、`/auth/me`、`require_user` 依赖、端侧 SecureTokenStore 存储链路均不变，仅令牌签发入口由配对码换为邮箱验证码。
+
+| 变更 | 内容 |
+|---|---|
+| 后端 | 删 `POST /auth/pair`、`auth_pairing_code` 设置、`PairRequest`；`PairResponse` → `TokenResponse`；`tests/v50/test_auth_token.py` 移除配对用例（`AUTH_TOKEN_SECRET` 保留，令牌签名仍需） |
+| 移动端 | 删 `pairing_page.dart`、`/profile/pairing` 路由与 chrome 元、个人页「设备配对」入口；`AuthRepository.pair()` 删除、`PairResult` → `TokenResult`；登出文案去「或配对」 |
+| 配置 | `.env.example` 删 `AUTH_PAIRING_CODE`；部署侧 `.env` 同步删除该键（env 同步纪律） |
+| 测试门槛 | 后端 Fast 1950 绿（仅 §12 已登记的 2 处遗留红，非本次）+ pylint 8.97；移动端全量 117 绿 |
+| 影响 | SMTP / Redis 不可用期间无备用登录路径（可接受：自部署场景 owner 可直接改库签发/绑邮箱救急） |

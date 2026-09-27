@@ -8,8 +8,8 @@
 
 - **Flutter ≥ 3.44.0（含 Dart ≥ 3.13.4）** —— 由 `pubspec.yaml` 与 `pubspec.lock` 的 SDK 约束决定。先 `flutter --version` 核对；版本过低会在 `pub get` 时直接报 `version solving failed`。
 - 目标平台：**Android / iOS**。仓库带 web / windows / macos / linux 脚手架目录，但产品验收以移动端为准。
-- 后端就绪：见根 README「快速开始」起后端，并在 `apps/backend/.env` 配置：
-  - `AUTH_PAIRING_CODE` —— 设备配对码（客户端配对页输入的就是它）
+- 后端就绪：见根 README「快速开始」起后端，并在 `apps/backend/.env` 配置（清单见 `apps/backend/.env.example`）：
+  - `REDIS_URL` + `EMAIL_SMTP_*` —— 邮箱验证码登录依赖（缺一登录端点 503）
   - `AUTH_TOKEN_SECRET` —— 设备令牌 HMAC 签名密钥
 
 ## 快速启动
@@ -35,7 +35,25 @@ dart run build_runner build --delete-conflicting-outputs
 | `*_db.dart` / `*_table.dart` | drift_dev（PartBuilder） | `*.drift.dart` |
 | `*_provider.dart` | riverpod_generator | `*.g.dart` |
 
-### 3. 运行
+### 3. 启动 Android 模拟器（Android 开发必读）
+
+模拟器**不会随 `flutter run` 自动拉起**：手动关闭模拟器后再跑 `flutter run`，设备列表里没有 Android（或直接回落 web）。每次开发前先拉起：
+
+```bash
+flutter emulators --launch Medium_Phone_API_36    # 列表用 flutter emulators 查看
+```
+
+等开机完成后（首次较慢）`adb devices` 出现 `emulator-5554` 即就绪，然后**重建端口隧道**：
+
+```bash
+adb reverse tcp:8020 tcp:8020
+```
+
+模拟器是带独立网络栈的虚拟机，它的 `127.0.0.1` 是它自己——reverse 之后模拟器里的 `127.0.0.1:8020` 才指向宿主机后端（`dart_defines/dev.json` 即按此地址约定）。**reverse 在模拟器重启后丢失**，App 报「网络好像断了」时先重跑这条。
+
+关闭模拟器用 `adb emu kill` 或直接关窗口。已知坑：`adb emu kill` 可能残留 AVD 锁（`~/.android/avd/Medium_Phone_API_36.avd/` 下的 `*.lock`，锁可能是**目录**，用 `rm -rf` 删）——残留后下次启动崩溃、`flutter run` 回落 web，删锁再拉起即可。
+
+### 4. 运行
 
 API 地址经 `--dart-define` 注入，**未注入时启动即崩**（`lib/core/env/app_env.dart` fail-fast，无静默回退硬编码地址）。三种方式任选：
 
@@ -44,26 +62,29 @@ API 地址经 `--dart-define` 注入，**未注入时启动即崩**（`lib/core/
 **CLI（推荐）**：地址收敛在 `dart_defines/dev.json`，改地址只动这一处：
 
 ```bash
-flutter run --dart-define-from-file=dart_defines/dev.json                  # Android 模拟器（10.0.2.2 = 宿主机回环）
+flutter run --dart-define-from-file=dart_defines/dev.json \
+  --flavor dev -d emulator-5554                    # Android 模拟器（--flavor dev 必带，Gradle productFlavors）
 
 flutter run --dart-define-from-file=dart_defines/dev.json \
-  --dart-define=API_BASE_URL=http://localhost:8020                         # iOS 模拟器（后项覆盖文件值）
+  --dart-define=API_BASE_URL=http://localhost:8020 \
+  --flavor dev                                     # iOS 模拟器（共享宿主网络，后项覆盖文件值）
 
 flutter run --dart-define-from-file=dart_defines/dev.json \
-  --dart-define=API_BASE_URL=http://192.168.x.x:8020                       # 真机（同一局域网，替换为电脑 IP）
+  --dart-define=API_BASE_URL=http://192.168.x.x:8020 \
+  --flavor dev -d <device-id>                      # 真机（同一局域网，替换为电脑 IP）
 ```
 
 **原始方式（兜底）**：
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8020 --dart-define=APP_FLAVOR=dev
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8020/api/v1 --flavor dev
 ```
 
 `APP_FLAVOR` 默认 `dev`；正式部署时在 `dart_defines/` 下新增 `prod.json` 即可（该目录入库，勿放密钥）。
 
-### 4. 设备配对（首次使用）
+### 5. 首次登录（邮箱验证码）
 
-鉴权走「配对码换长期令牌」（API-001）：进入 `我的 → 设备配对`，输入部署侧 `AUTH_PAIRING_CODE` 对应的配对码，客户端 `POST /auth/pair` 换取 30 天期令牌并写入 Keychain / Keystore（`flutter_secure_storage`）；后续请求由 `AuthInterceptor` 注入 `Authorization: Bearer`。令牌过期后 401，重新配对即可。
+鉴权走邮箱验证码登录：登录页输入邮箱 → 后端经 SMTP 发 6 位验证码（Redis 存码 + 单次消费）→ 输码调 `POST /auth/email/verify` 换取 30 天期令牌写入 Keychain / Keystore（`flutter_secure_storage`），未注册邮箱自动建号；后续请求由 `AuthInterceptor` 注入 `Authorization: Bearer`，令牌过期 401 重新登录。原「设备配对」链路已退役。
 
 ## 目录结构
 
@@ -84,7 +105,7 @@ lib/
     ├── memory/        #   长期记忆
     ├── health/        #   健康（含授权同意流）
     ├── briefing/      #   早/晚简报
-    └── profile/       #   我的（设备配对 / 隐私与数据导出删除）
+    └── profile/       #   我的（登录 / 隐私与数据导出删除）
 ```
 
 ## 路由与页面
@@ -98,13 +119,13 @@ GoRouter 全量路由（壳层 Tab 5 位、各页 chrome 由 `lib/app/router/app
 | `/ledger` | 账本页 |
 | `/briefing?form=morning\|evening` | 早/晚简报（通知点开直达） |
 | `/health` · `/health/consent` | 健康页 / 健康授权同意 |
-| `/profile/pairing` · `/profile/privacy` | 设备配对 / 隐私（数据导出与删除） |
+| `/profile/privacy` | 隐私（数据导出与删除） |
 
 ## 依赖的后端 API（前缀 `/api/v1`）
 
 | 端点 | 用途 |
 |---|---|
-| `POST /auth/pair` | 设备配对换长期令牌 |
+| `POST /auth/email/code` · `POST /auth/email/verify` | 邮箱验证码登录（发码 / 验码换长期令牌） |
 | `GET /home/summary` | 首页聚合（今日事项 / 花销 / 健康） |
 | `POST /chat/message` | 流式对话（NDJSON 事件流，Freezed union 建模 + 增量 Markdown 渲染） |
 | `GET /ledger/summary` · `GET/POST /ledger/entries` | 账本汇总与条目（记账四步） |

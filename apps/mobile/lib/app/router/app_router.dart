@@ -16,7 +16,6 @@ import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/life_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
 import '../../features/profile/presentation/login_page.dart';
-import '../../features/profile/presentation/pairing_page.dart';
 import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/profile/presentation/verify_code_page.dart';
@@ -50,7 +49,6 @@ const chromeByPath = <String, RouteChrome>{
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
   '/health/consent': chromeImmersive,
-  '/profile/pairing': chromeImmersive,
 };
 
 RouteChrome chromeForLocation(String location) {
@@ -110,10 +108,6 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/profile/privacy',
           builder: (_, _) => const ProfilePrivacyPage(),
-        ),
-        GoRoute(
-          path: '/profile/pairing',
-          builder: (_, _) => const PairingPage(),
         ),
         GoRoute(path: '/health', builder: (_, _) => const HealthPage()),
         GoRoute(

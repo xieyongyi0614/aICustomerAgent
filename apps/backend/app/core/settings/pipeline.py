@@ -29,6 +29,5 @@ class PipelineSettings(BaseSettings):
 
     default_user: str = "default-user"
     auth_token_secret: str = ""
-    auth_pairing_code: str = ""
     briefing_morning_time: str = "08:00"
     briefing_evening_time: str = "21:30"

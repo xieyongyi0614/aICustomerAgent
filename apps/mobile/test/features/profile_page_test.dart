@@ -62,7 +62,7 @@ void main() {
     expect(find.text('健康数据授权'), findsOneWidget);
     expect(find.text('记忆管理'), findsOneWidget);
     expect(find.text('隐私设置'), findsOneWidget);
-    expect(find.text('设备配对'), findsOneWidget);
+    expect(find.text('设备配对'), findsNothing);
     expect(find.text('主动关怀'), findsOneWidget);
     expect(find.text('状态异常提醒'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
@@ -98,7 +98,7 @@ void main() {
     await tester.tap(find.text('退出登录'));
     await tester.pump();
     expect(
-      find.text('退出后需要重新登录或配对才能继续同步，本机数据不会丢失。'),
+      find.text('退出后需要重新登录才能继续同步，本机数据不会丢失。'),
       findsOneWidget,
     );
     await tester.tap(find.text('取消'));

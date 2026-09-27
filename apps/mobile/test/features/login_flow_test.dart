@@ -40,7 +40,7 @@ class _FakeAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<PairResult> verifyEmailCode({
+  Future<TokenResult> verifyEmailCode({
     required String email,
     required String code,
     required String deviceId,
@@ -49,7 +49,7 @@ class _FakeAuthRepository extends AuthRepository {
   }) async {
     if (verifyError != null) throw verifyError!;
     verifiedCodes.add(code);
-    return PairResult(
+    return TokenResult(
       token: 'test-token',
       userId: 'u1',
       deviceId: deviceId,

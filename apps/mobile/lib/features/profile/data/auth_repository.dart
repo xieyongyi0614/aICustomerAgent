@@ -4,8 +4,8 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/errors/app_error.dart';
 import '../../../core/storage/secure_token_store.dart';
 
-class PairResult {
-  const PairResult({
+class TokenResult {
+  const TokenResult({
     required this.token,
     required this.userId,
     required this.deviceId,
@@ -49,7 +49,7 @@ class AuthCodeException implements Exception {
   }
 }
 
-/// 设备配对（API-001）与邮箱验证码登录（API-0xx）共用：换取长期令牌进 Keychain。
+/// 邮箱验证码登录（API-014）：换取长期令牌进 Keychain。
 class AuthRepository {
   AuthRepository({Dio? dio, SecureTokenStore? tokenStore})
       : _dio = dio ?? createDio(),
@@ -65,24 +65,6 @@ class AuthRepository {
     return t != null && t.isNotEmpty;
   }
 
-  Future<PairResult> pair({
-    required String pairingSecret,
-    required String deviceId,
-    required String platform,
-    String? deviceName,
-  }) async {
-    final resp = await _dio.post<Map<String, dynamic>>(
-      '/auth/pair',
-      data: {
-        'pairing_secret': pairingSecret,
-        'device_id': deviceId,
-        'platform': platform,
-        if (deviceName != null) 'device_name': deviceName,
-      },
-    );
-    return _persistPairResponse(resp, deviceId);
-  }
-
   Future<void> requestEmailCode(String email) async {
     try {
       await _dio.post<void>('/auth/email/code', data: {'email': email});
@@ -91,7 +73,7 @@ class AuthRepository {
     }
   }
 
-  Future<PairResult> verifyEmailCode({
+  Future<TokenResult> verifyEmailCode({
     required String email,
     required String code,
     required String deviceId,
@@ -108,10 +90,10 @@ class AuthRepository {
         if (deviceName != null) 'device_name': deviceName,
       },
     );
-    return _persistPairResponse(resp, deviceId);
+    return _persistTokenResponse(resp, deviceId);
   }
 
-  Future<PairResult> _persistPairResponse(
+  Future<TokenResult> _persistTokenResponse(
     Response<Map<String, dynamic>?> resp,
     String fallbackDeviceId,
   ) async {
@@ -125,7 +107,7 @@ class AuthRepository {
     }
     await _store.writeAccessToken(token);
     await _store.writeDeviceId(boundDevice);
-    return PairResult(
+    return TokenResult(
       token: token,
       userId: userId,
       deviceId: boundDevice,
