@@ -1,7 +1,7 @@
 # 朝夕 · 设计 Token（定稿）
 
 > 全部值已按 SKILL.md「已裁决的 4 处歧义」定稿。**禁止在代码里写死色值**，一律经 token 取用。
-> 真源：`design/ai-life-agent-prototype.html` 的 CSS 变量 + `design/ai-life-agent-design.html` §06。
+> 真源：`design/pages/*.html`（按页拆分原型，现役）的 CSS 变量 + `design/ai-life-agent-design.html` §06。单文件 `ai-life-agent-prototype.html` 已冻结不再维护，色值以拆分原型为准。
 
 ---
 

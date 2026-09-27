@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 00 登录欢迎页 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 118px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.row{display:flex;align-items:center}
+.grow{flex:1}
+h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--ink2)}
+.card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px}
+.card,.b-start{display:block}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ AI 核心球 ============ */
+.orb{position:relative;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#D9CCFF 0%,#8B6DFF 34%,#4D6BFF 66%,#1FB9D8 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.5) inset,0 10px 30px rgba(102,90,255,.45),0 0 60px rgba(63,150,255,.35);
+  animation:breathe 4.2s ease-in-out infinite;
+}
+.orb::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 68% 72%,rgba(43,210,232,.85),transparent 46%),radial-gradient(circle at 30% 26%,rgba(255,255,255,.9),transparent 30%);
+  mix-blend-mode:screen;animation:swirl 7s linear infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+@keyframes swirl{to{transform:rotate(360deg)}}
+.orb.lg{width:76px;height:76px}.orb.md{width:34px;height:34px}.orb.sm{width:22px;height:22px}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:150px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Login ============ */
+#login{display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 30px 42px}
+.lg-orb-wrap{position:relative;margin:24px 0 30px}
+.lg-orb-wrap::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(122,92,255,.2),transparent 68%);pointer-events:none}
+.lg-brand{font-size:34px;font-weight:800;letter-spacing:.3em;margin-left:.3em}
+.lg-slogan{font-size:13.5px;color:var(--ink2);margin-top:10px;letter-spacing:.05em}
+.lg-hi{margin:36px 0 0;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%}
+.lg-hi .orb{margin-top:2px}
+.lg-hi-b{font-size:13.5px;line-height:1.8;color:#33343D}
+.lg-btns{width:100%;margin-top:auto;padding-top:30px}
+.lg-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border-radius:99px;padding:15px;font-size:15px;font-weight:700;margin-bottom:12px;cursor:pointer}
+.lg-btn svg{width:20px;height:20px}
+.lg-btn.wx{background:#07C160;color:#fff;box-shadow:0 10px 24px rgba(7,193,96,.28)}
+.lg-btn.phone-b{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
+.lg-btn.primary{background:var(--grad-ai);color:#fff;box-shadow:0 12px 28px rgba(102,90,255,.4)}
+.lg-agree{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11.5px;color:var(--ink3);margin-top:4px;line-height:1.6}
+.lg-agree .box{width:14px;height:14px;border-radius:50%;border:1.5px solid #CBC9C0;position:relative;flex:none}
+.lg-agree .box::after{content:"";position:absolute;left:4px;top:2px;width:4px;height:7px;border:solid var(--health);border-width:0 1.8px 1.8px 0;transform:rotate(42deg)}
+.lg-agree b{color:var(--ink2);font-weight:600}
+.lg-guest{margin-top:15px;font-size:12.5px;color:var(--ink3)}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Login · 初见 ================= -->
+    <div class="screen" id="login">
+      <div class="lg-orb-wrap"><div class="orb lg"></div></div>
+      <div class="lg-brand">朝夕</div>
+      <div class="lg-slogan">一个有长期记忆的 AI 生命管家</div>
+      <div class="lg-hi">
+        <div class="orb sm"></div>
+        <div class="lg-hi-b">你好，我是亚丝娜。<br>登录之后，我会记住你、理解你，<br>陪你把每一天过好。</div>
+      </div>
+      <div class="lg-btns">
+        <a class="lg-btn wx" href="10-home.html">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.7 4C4.9 4 2 6.6 2 9.8c0 1.8 1 3.4 2.5 4.5l-.6 2 2.2-1.2c.8.2 1.5.4 2.4.4h.4A6.6 6.6 0 0 1 8.6 14c0-3.3 3.1-6 7-6 .3 0 .7 0 1 .1C16 5.4 12.7 4 8.7 4zM6.4 8.2a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zm4.6 0a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zM15.6 9c-3.3 0-6 2.2-6 5s2.7 5 6 5c.7 0 1.4-.1 2-.3l1.9 1-.5-1.7A4.7 4.7 0 0 0 21.6 14c0-2.8-2.7-5-6-5zm-2 4.4a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4zm4 0a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4z"/></svg>
+          微信一键登录
+        </a>
+        <a class="lg-btn phone-b" href="01-verify.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 5h3"/></svg>
+          手机号登录 / 注册
+        </a>
+        <div class="lg-agree"><span class="box"></span><span>已阅读并同意 <b>《用户协议》</b> 和 <b>《隐私政策》</b></span></div>
+        <a class="lg-guest" href="10-home.html">先逛逛，稍后再登录 →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · 登录欢迎页</b> — 高保真原型 · 按页拆分<br><a href="index.html">11 页总览</a> · <a href="../ai-life-agent-prototype.html#login">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

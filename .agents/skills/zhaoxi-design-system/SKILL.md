@@ -4,7 +4,7 @@ description: 朝夕（Zhaoxi）AI Personal Life Agent 的设计系统唯一真�
 metadata:
   author: zhaoxi-project
   version: "1.0"
-  source: design/ai-life-agent-design.html + design/ai-life-agent-prototype.html
+  source: design/pages/（按页拆分原型，现役）+ design/ai-life-agent-design.html（产品设计稿；ai-life-agent-prototype.html 已冻结存档）
 agent_created: true
 ---
 
@@ -27,12 +27,14 @@ agent_created: true
 | 层级 | 文件 | 说明 |
 |---|---|---|
 | 1（最高） | 本 skill | 已裁决的定稿规范；**与下游冲突时以本 skill 为准** |
-| 2 | `design/ai-life-agent-prototype.html` | 唯一可交互原型；组件结构与真实文案的真源 |
+| 2 | `design/pages/`（总览 `pages/index.html`） | **现役维护**的按页拆分原型（11 页，每页一个零依赖 HTML）；组件结构与真实文案的真源。新增 / 修改页面只改这里 |
 | 3 | `design/ai-life-agent-design.html` | 产品设计稿；§06 视觉规范是色值真源 |
+
+> `design/ai-life-agent-prototype.html`（拆分前的单文件原型）**已冻结，不再维护**：仅为历史对照存档，不随页面演进同步更新；内容是 pages/ 拆分时的同源快照，与现役页面冲突时以 pages/ 为准。
 
 **已裁决的 4 处歧义（不要再翻旧稿重新判断）**：
 
-1. **色值**以设计稿 §06 色卡 + 原型为准。设计稿 `:root` 的 `#FAF9F6` / `#62646E` / `#9C9DA7` / `#EAE8E1` 视为笔误，正确值为 `#F5F4F0` / `#6E7079` / `#A7A8B1` / `#ECEAE3`。
+1. **色值**以设计稿 §06 色卡 + 拆分原型（`design/pages/`）为准。设计稿 `:root` 的 `#FAF9F6` / `#62646E` / `#9C9DA7` / `#EAE8E1` 视为笔误，正确值为 `#F5F4F0` / `#6E7079` / `#A7A8B1` / `#ECEAE3`。
 2. **Orb 呼吸时长取 4.2s**（设计稿 §04+ 写的 4s 不采用）。
 3. **深夜紫有 3 个不同渐变**（月度总览卡 / 人格卡 / 简报页背景），不要合并成一个。
 4. **图标底色方块圆角 = 边长 ÷ 3**（取整）—— 这是原型的隐含规律，设计稿未写明。
