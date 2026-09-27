@@ -69,6 +69,7 @@ agent_created: true
 | `references/principles.md` | 5 条设计原则的可判定验收规则 + 反范围清单 + 文案语气与占位文案 |
 | `references/flutter-mapping.md` | M3 五条禁令 + `ThemeExtension` 结构 + 4 处平移替代方案 + 深色模式 |
 | `assets/app_tokens.dart` | 可直接拷入工程的 token 模板（首次使用需过一遍 `flutter analyze`） |
+| `design/flutter/zhaoxi_orb.dart` | Orb 的 Flutter 完整实现（四态、零依赖、含集成指南注释），可直接拷入工程或交给其他 AI 复用 |
 
 ## 常见错误
 
