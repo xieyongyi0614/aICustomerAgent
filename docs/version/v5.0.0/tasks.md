@@ -382,3 +382,36 @@ API-001 → API-002 ──┘
 | 配置 | `.env.example` 删 `AUTH_PAIRING_CODE`；部署侧 `.env` 同步删除该键（env 同步纪律） |
 | 测试门槛 | 后端 Fast 1950 绿（仅 §12 已登记的 2 处遗留红，非本次）+ pylint 8.97；移动端全量 117 绿 |
 | 影响 | SMTP / Redis 不可用期间无备用登录路径（可接受：自部署场景 owner 可直接改库签发/绑邮箱救急） |
+
+---
+
+## 14. 增量注册：用户身份收口（IDENT-001~008，2026-09-27）
+
+> **背景**：邮箱验证码登录（§12）与配对退役（§13）落地后，token 身份只覆盖生活域 7 个产品端点（tasks/memory/insights/home/brief/health）；核心对话面 `/chat/message` 硬编码 `default-user`，`history` / `governance` / `ledger` / `proactive` 仍按请求参数回落 `default-user`。三套身份空间并存（`default-user` / `email-*` / `feishu:{open_id}`），登录用户与对话数据主体脱节：聊天落 default-user，生活域读 token 用户，首页任务/消费恒为空。
+> **裁决**：
+> - **D1 数据归属（归并而非搬迁）**：单人自部署，owner 真实数据全在 `default-user` 名下 → 一次性归并脚本 `scripts/adopt_owner_identity.py`：`email-*` 散数据并入 default-user → owner 邮箱绑定 default-user 行（`users.email` 唯一约束，0057）→ 删 email-* 行；登录命中 default-user 行，token `user_id` 即 `default-user`（不透明 id，后续零数据搬迁）。
+> - **D2 测试策略**：`default-user` 保留为**测试身份**（settings 驱动）；conftest autouse `dependency_overrides[require_user]` 注入 default-user，存量 HTTP 测试零逐文件改动；鉴权语义（401 / 越权 403 / 冷启动）另立专项测试 `tests/v50/test_identity_cutover.py`。
+> - **D3 调试面划界**：`/debug/*`（world / action / action_execution / debug）与 `/state` 保持「`user_id` 客户端直传 + default-user 回落」的调试台语义（IDENT-010 留白 P2）；**产品面 = 移动端实际调用集合**。
+> - **兼容红线变化**：V4.0.0「user_id 缺失回落 default_user 与现状逐字节一致」裁决自本变更废止——产品端点无 token 一律 401；调试面不变。基线 ADR 13 已同步。
+
+| ID | 变更 | 内容 | 状态 |
+|---|---|---|---|
+| IDENT-001 | 对话收口 | `/chat/message` 接 `require_user`，`chat.py` 删 `get_settings().default_user` 硬编码，token user_id 贯穿 `stream_chat` | 已实现 |
+| IDENT-002 | 治理端点收口 | `/life/export`、`DELETE /life/data` 接 `require_user`，删 default-user 锁定与 `user_id` Query（原无鉴权可导出全量生活数据，安全修复） | 已实现 |
+| IDENT-003 | 账本收口 | ledger 全端点接 `require_user`，删 `_current_user` 的 default-user 特判（原显式非 default 用户反被 403）；请求体「禁止客户端指定」`user_id` 字段删除，服务端注入 | 已实现 |
+| IDENT-004 | 历史/主动收口 | `/conversations/latest`、`/conversations/{id}/messages`（补属主比对 404）、`/proactive/pending`、`/proactive/{id}/ack` 接 `require_user`（移动端在用面） | 已实现 |
+| IDENT-005 | owner 归并脚本 | `scripts/adopt_owner_identity.py --email`：information_schema 动态发现含 `user_id` 列的表 → email-* 数据并入 default-user（单行冲突保 default-user 并告警）→ 绑定邮箱 → 删 email-* 行；幂等，`--dry-run` | 已实现 |
+| IDENT-006 | 调试台适配 | Debug Console `http.ts`/`chat-stream.ts` 注入 `Authorization`（localStorage token）+ 顶栏「身份」对话框（贴 token → `/auth/me` 校验显示）；`use-active-user-id` 语义不变（调试台仍可显式指定 user_id） | 已实现 |
+| IDENT-007 | 后台用户集合 | `digest.py` / `alert.py` `run_maintenance` 已按 `user_repository.list_all` 迭代（本次核实，仅保留空表回落 default-user）；无代码变更 | 已实现 |
+| IDENT-008 | 冷启动回归 | 专项测试 `tests/v50/test_identity_cutover.py`：无 token 401；token 身份贯穿（聊天落库/历史隔离/账本 scope/导出 scope）；全新用户首轮对话不崩（世界/角色状态空态口径） | 已实现 |
+
+留白：IDENT-009（`default_user` 设置与 `is_default` 退役评估，测试身份保留前不动）、IDENT-010（调试面鉴权）、IDENT-011（feishu 身份与 email 身份并集）均 P2，另行登记。
+
+**测试门槛（已过，2026-09-27）**：后端全量 7153 绿（28 失败经 HEAD 干净 worktree 基线对照逐项归因：22 既有红 + 4 本地 `.env` SMTP/Redis 环境敏感 + 1 tool007 冻结源钉测因前序会话未提交的 world_engine 改动 + 1 既有时序 flake，**本变更零确定性回归**）；`tests/v50` 鉴权专项 + 归并脚本 + 登录/令牌共 34 绿；前端 typecheck + 154 绿；移动端零改动。
+
+**回归清单（真机 / 真实部署人工项）**：
+
+1. 部署侧执行一次归并：`uv run python -m scripts.adopt_owner_identity --email <owner邮箱>`（dry-run 核对报告）→ `--apply`；确认 `users` 表 default-user 行 email 已绑定、`email-*` 行已删（或按 warning 保留）。
+2. App 登录（owner 邮箱）→ 发消息 → 杀 App 重开 → 会话历史恢复；`conversations` / `memories` / `character_state` 均在 default-user 名下。
+3. 首页任务 / 今日消费非空（聊天链路创建的任务与账目对 token 用户可见）——归并前创建的历史数据需第 1 步完成后新产生的对话验证口径。
+4. 无 token 直接请求 `/api/v1/chat/message`、`/life/export`、`/ledger/summary`、`/conversations/latest` → 401；隐私页「导出数据」只含本人数据。

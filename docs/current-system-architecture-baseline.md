@@ -323,7 +323,7 @@ decision → world_experience
 
 | 通道 | 入站 | 出站 | 说明 |
 |---|---|---|---|
-| Web | `POST /api/v1/chat/message`（StreamingResponse NDJSON：turn_meta → delta* → done） | 同一流式响应 | 调试控制台通道 |
+| Web | `POST /api/v1/chat/message`（StreamingResponse NDJSON：turn_meta → delta* → done；Bearer token 鉴权，user_id 由 token 解析） | 同一流式响应 | 移动 App 产品通道 + 调试控制台通道 |
 | Feishu（飞书） | `POST /api/v1/feishu/events`（Webhook：验签/解密/challenge/去重/限流 → `feishu.adapter.ingest_inbound_message`） | `feishu.delivery`（Reply 有锚点 / Proactive 无锚点共用切分/幂等/收口） | 已通过真实链路验证 |
 
 飞书适配器（`channels/feishu/`）细分：`adapter.py`（入站编排：收件箱合并/排队 → 身份 → 会话串行 → LLM → 既有管线 → TurnOutcome）、`delivery.py`（出站）、`client.py`（API）、`events.py`（验签/解密）、`identity.py`（身份组装）、`inbox.py`（SessionInbox 每会话 FIFO）、`outbound.py`、`errors.py`。
@@ -457,7 +457,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 | ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
 | **迁移链头钉测散落在 v24/v25/v26 共 15 个测试文件**（`MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`max(numbered) == NN`、`SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`）。每加一个迁移都要机械升级一遍（FEISHU-010 加 `0050` 时实测 **22 个用例由绿转红**，见 `review-v1.2.md` §7.10） | 加迁移的隐性成本高、易漏改；`v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名会随升级逐渐名不副实 | P1 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
-| 旧调试/会话端点 `user_id` 仍由请求直传（隐式 default-user）；邮箱验证码登录已引入多用户（email → `users` 行），两套身份面并存 | 旧端点无多用户隔离，新邮箱用户的数据仅在 `require_user` 产品端点可见 | P2 |
+| 调试台面端点（`/debug/*`、`/state`、action）`user_id` 仍由请求直传（隐式 default-user），属开发工具定位（IDENT-010 留白）；产品面已全部经 `require_user` 收口（ADR 13），调试控制台经顶栏身份对话框注入 token | 调试面无多用户隔离；产品面已隔离 | P2 |
 | `docs/` 169 文件、1589 处 `vXX_` 引用未改写（历史文档不改写是约定，靠 `flag-rename-map.md` 桥接） | 读历史文档需查对照表，存在导航断层 | P2 |
 | 测试侧版本标记残留 188 处（fixture 名/函数名如 `v24_tool_env`、`v21_on`） | 测试命名仍带历史版本号，语义混淆 | P3 |
 | settings 命名一致性建议未采纳（`flag-rename-map.md` §七：部分字段去前缀后丧失域归属，如 `decision_weight`、`planning_enabled`） | 扁平命名空间局部可读性下降 | P3 |
@@ -482,6 +482,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 10. **能力是手脚不是逻辑**：`Capability` 只执行不做决策，调度权/重试/回复生成在引擎（ActionEngine/AutonomyEngine）；`ToolRegistry`/`CapabilityRegistry` 代码注册非热插拔。
 11. **前台/后台同一决策代码路径**：统一 `decision_pipeline`，前台目标栈只读（长期化写入只发生在后台）。
 12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
+13. **用户身份收口（token 唯一身份源，2026-09-27）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）；`/debug/*` 与 `/state` 保持调试台语义（客户端直传 + default-user 回落）。owner 归并：`email-*` 散数据并入 default-user 并绑定 owner 邮箱（`scripts/adopt_owner_identity.py`，幂等一次性），default-user 即 owner 的稳定内部 id；V4.0.0 任务册 §14 为本次登记。
 
 ---
 
