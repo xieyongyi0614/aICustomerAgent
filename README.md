@@ -53,8 +53,8 @@ docker compose up -d --build
 ### 方式二：本地开发
 
 ```bash
-# 1. 只启动 PostgreSQL 16 数据库（统一入口为根目录 compose）
-docker compose up -d postgres
+# 1. 启动 PostgreSQL 16 + Redis（统一入口为根目录 compose；Redis 供邮箱验证码登录）
+docker compose up -d postgres redis
 
 # 2. 后端（apps/backend/ 下）：配置 LLM profiles + 安装依赖 + 迁移 + 启动
 cd apps/backend
@@ -69,20 +69,21 @@ cd apps/frontend
 npm install
 npm run dev                 # http://localhost:2000，/api 代理到 :8020（VITE_PROXY_TARGET 可配置）
 
-# 4. 移动端（apps/mobile/ 下）：朝夕 App，完整启动与配对流程见 apps/mobile/README.md
+# 4. 移动端（apps/mobile/ 下）：朝夕 App，模拟器/登录流程见 apps/mobile/README.md
 cd apps/mobile
 flutter pub get
-flutter run --dart-define-from-file=dart_defines/dev.json   # 或 VS Code 打开仓库根，F5 选「朝夕 App」启动配置
+adb reverse tcp:8020 tcp:8020                               # 模拟器端口隧道（重启模拟器后重跑）
+flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d emulator-5554   # 或 VS Code 打开仓库根，F5 选「朝夕 App」启动配置
 ```
 
-> 移动端要求 Flutter ≥ 3.44.0（Dart ≥ 3.13.4）；`API_BASE_URL` 未注入时启动即 fail-fast，模拟器/真机地址改 `apps/mobile/dart_defines/dev.json` 一处即可。首次使用需在 App「我的 → 设备配对」输入后端 `.env` 里的 `AUTH_PAIRING_CODE`（后端还需配置 `AUTH_TOKEN_SECRET` 用于令牌签名）。
+> 移动端要求 Flutter ≥ 3.44.0（Dart ≥ 3.13.4）；`API_BASE_URL` 未注入时启动即 fail-fast，地址改 `apps/mobile/dart_defines/dev.json` 一处即可。登录走**邮箱验证码**（未注册邮箱自动建号）：后端 `.env` 需配置 `REDIS_URL` + `EMAIL_SMTP_*`（163 用授权码）+ `AUTH_TOKEN_SECRET`，缺一登录端点 503；配对码链路已退役。
 
 > 环境变量说明见 `apps/backend/README.md` 的配置项表。LLM profile 两种配置方式（`LLM_PROFILES_JSON` 优先级更高，同时配置时忽略文件）：本地开发用 `LLM_PROFILES_FILE` 指向外置 JSON 文件（如 `llm_profiles.json`，可排版）；容器 / 内联场景把 `LLM_PROFILES_JSON` 写成单行数组。
 
 ## 测试
 
 ```bash
-# 后端（apps/backend/ 下；全量 2195 项 / 16 skipped，无本地 PG 实例时迁移一致性用例自动 skip）
+# 后端（apps/backend/ 下；全量 7165 项，无本地 PG 实例时迁移一致性用例自动 skip）
 uv run pytest
 uv run pylint app tests
 

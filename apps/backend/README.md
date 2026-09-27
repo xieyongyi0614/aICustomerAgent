@@ -7,6 +7,7 @@
 - Python 3.13 + FastAPI + Uvicorn
 - LangChain（Chain 编排：路由 / 轮次分析 / 意图 / 场景 / 回答 / 状态更新 / 摘要 / 记忆提取 / 主动消息，统一结构化输出 + 一层降级）
 - PostgreSQL 16（SQLAlchemy ORM + Alembic 版本化迁移）+ pydantic-settings
+- Redis（邮箱验证码等短命一次性状态，redis.asyncio）
 - pytest + pytest-asyncio（FakeLLM 注入，无真实 LLM 调用）
 
 ## 目录结构
@@ -38,8 +39,8 @@ api → application（编排） → services → repositories → core
 cp .env.example .env
 cp llm_profiles.example.json llm_profiles.json
 
-# 2. 启动本地 PostgreSQL 16（在仓库根目录执行，统一入口为根目录 docker-compose.yml，asuna/asuna/asuna）
-docker compose up -d postgres
+# 2. 启动本地 PostgreSQL 16 + Redis（在仓库根目录执行，统一入口为根目录 docker-compose.yml，asuna/asuna/asuna）
+docker compose up -d postgres redis
 
 # 3. 安装依赖并执行数据库迁移
 uv sync
@@ -57,7 +58,7 @@ curl http://localhost:8020/health
 ## 数据库
 
 - 运行库为 PostgreSQL 16，连接串由 `DATABASE_URL` 配置（默认 `postgresql+psycopg://asuna:asuna@localhost:5432/asuna`）。
-- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，当前链尾 `0050`）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
+- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，当前链尾 `0057`）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
 - 存量 SQLite 数据可用 `uv run python -m scripts.migrate_sqlite_to_postgres --source sqlite:///./asuna.db` 一次性搬运（幂等，目标表先清后写）。
 - 连接池参数（`DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` / `DB_POOL_PRE_PING`）见配置项表。
 
@@ -72,6 +73,7 @@ curl http://localhost:8020/health
 - **行为精修（V6.5）**：策略 / 预算 / 习惯 / 活动四层，动作描写按 ActionBudget 约束并只读观测
 - **自主行为（V7）**：闲置触发 → AutonomyPolicy 八步裁决（静音 / 冷却退避 / 集期上限 / 关系门槛等）→ Outbox 状态机 → 主动消息生成发送
 - **多模型切换**：消息级 LLM profile 切换（body / header / query 三通道）
+- **邮箱验证码登录**：`POST /auth/email/code|verify`——Redis 存码（GETDEL 单次消费 / SETNX 冷却 / INCR 频控 / 尝试超限作废）+ `EmailSender` 协议（MVP SMTP 163，换 Resend/阿里云只加实现类），签发无状态 HMAC 设备令牌
 
 ## API
 
@@ -102,19 +104,21 @@ curl http://localhost:8020/health
 | `GET /api/v1/proactive/pending` | 待 ack 的主动消息 |
 | `POST /api/v1/proactive/{action_id}/ack` | 确认收到主动消息 |
 | `GET /api/v1/debug/turns/{turn_id}/trace` | 单轮编排 trace（内存 LRU，过期 404） |
+| `POST /api/v1/auth/email/code` · `POST /api/v1/auth/email/verify` | 邮箱验证码登录：发码（429 + Retry-After）/ 验码换长期令牌 |
+| `GET /api/v1/auth/me` | 回显令牌对应的 user / device / 过期时间 |
 
 ## 测试
 
 ```bash
-uv run pytest             # 全量 2195 项（16 skipped）
+uv run pytest             # 全量 7165 项（无本地 PG 实例时迁移一致性用例自动 skip）
 uv run pylint app tests   # 代码检查
 ```
 
 测试分层于 `tests/unit / integration / e2e / golden`，通过 `tests/conftest.py` 的 FakeLLM（结构化输出按 schema 类名分发）与内存 SQLite（每用例独立建表）运行，不发起真实 LLM 调用；golden prompt 快照用 `UPDATE_GOLDEN=1` 重新生成；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL（无实例时自动 skip）。
 
-## 配置项（app/core/settings.py）
+## 配置项（app/core/settings/ 包）
 
-完整清单见 `app/core/settings.py`（含 memory_* / emotion_* / rel_* / goal_* / mode_* / autonomy_* / energy_* / stage_* 等分组），常用项：
+完整清单见 `app/core/settings/`（23 个领域模块，平铺字段名；env 名 = 字段名大写）（含 memory_* / emotion_* / rel_* / goal_* / mode_* / autonomy_* / energy_* / stage_* 等分组），常用项：
 
 | 配置                          | 默认值      | 说明                                |
 | ----------------------------- | ----------- | ----------------------------------- |
@@ -137,6 +141,11 @@ uv run pylint app tests   # 代码检查
 | `CONVERSATION_MAX_CHARS`      | 8000        | 窗口字符上限                        |
 | `AUTONOMY_INACTIVITY_MINUTES` | 30          | 会话闲置触发阈值                    |
 | `AUTONOMY_QUIET_HOURS_*`      | 23:00/08:00 | 主动消息静音时段                    |
+| `REDIS_URL`                   | 空          | Redis 连接串（空 = 邮箱验证码登录 503） |
+| `EMAIL_SMTP_HOST/PORT/SSL`    | 空/465/true | SMTP 发件（MVP 163：smtp.163.com:465） |
+| `EMAIL_SMTP_USER/PASSWORD`    | -           | SMTP 认证（163 填授权码，非登录密码） |
+| `EMAIL_FROM_ADDRESS/NAME`     | -/朝夕      | 发件人（163 要求与认证账号一致）     |
+| `EMAIL_CODE_TTL_SECONDS` 等   | 300/60/6/20/5 | 验证码有效期 / 冷却 / 小时·日上限 / 尝试上限 |
 
 ## 开发约定
 
