@@ -283,6 +283,22 @@ def _default_channel_gate_off(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _default_auth_user():
+    """产品端点 user_id 收口自 require_user（v5.0.0 §14 / ADR 13）。
+
+    HTTP 测试统一以 default-user 身份直连，免除逐用例造令牌；鉴权语义专项
+    用例（tests/v50/test_identity_cutover.py）在用例内 pop 掉本 override 走真实解析。
+    """
+    from app.api.v1 import auth as auth_api
+
+    app.dependency_overrides[auth_api.require_user] = (
+        lambda: get_settings().default_user
+    )
+    yield
+    app.dependency_overrides.pop(auth_api.require_user, None)
+
+
+@pytest.fixture(autouse=True)
 def _offline_repos(monkeypatch):
     """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory2 服务的 SessionLocal 指向内存 SQLite。
 

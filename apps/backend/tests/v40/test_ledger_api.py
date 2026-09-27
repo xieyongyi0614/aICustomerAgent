@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.v1 import auth as auth_api
+from app.core.settings import get_settings
 from app.main import create_app
 from app.models.ledger import LedgerEntryDraft
 from app.repositories import ledger_repository
@@ -24,7 +26,11 @@ USER = "api-user"
 @pytest.fixture()
 def client(override_settings):
     override_settings()
-    return TestClient(create_app())
+    test_app = create_app()
+    test_app.dependency_overrides[auth_api.require_user] = (
+        lambda: get_settings().default_user
+    )
+    return TestClient(test_app)
 
 
 @pytest.fixture()
@@ -110,12 +116,12 @@ def test_create_entry_manual_source(client):
     assert body["amount_text"] == format_minor(1234)
 
 
-def test_create_entry_rejects_client_user_id(client):
+def test_create_entry_ignores_client_user_id(client):
     response = client.post(
         "/api/v1/ledger/entries",
         json={"amount_minor": 100, "direction": "expense", "user_id": "other"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
 def test_create_entry_amount_not_integer_rejected(client):
@@ -149,14 +155,14 @@ def test_reverse_missing_entry_returns_404(client):
     assert response.status_code == 404
 
 
-def test_cross_user_read_denied(client, setup):
+def test_user_id_query_param_retired(client, setup):
     response = client.get(
         "/api/v1/ledger/entries", params={"user_id": "someone-else"}
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
-def test_cross_user_reverse_denied(client, setup):
+def test_user_id_body_param_retired_on_reverse(client, setup):
     created = client.post(
         "/api/v1/ledger/entries",
         json={"amount_minor": 100, "direction": "expense", "idempotency_key": "api-x-1"},
@@ -165,7 +171,7 @@ def test_cross_user_reverse_denied(client, setup):
         f"/api/v1/ledger/entries/{created['id']}/reverse",
         json={"reason": "x", "user_id": "someone-else"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
 def test_categories_lists_user_tree(client, setup):

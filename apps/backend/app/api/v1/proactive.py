@@ -3,8 +3,9 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.v1.auth import require_user
 from app.api.v1.schemas import ProactiveActionOut, ProactivePendingOut
 from app.core.settings import get_settings
 from app.repositories import decision_repository, proactive_repository
@@ -15,7 +16,7 @@ proactive_router = APIRouter()
 
 
 @proactive_router.get("/proactive/pending", response_model=ProactivePendingOut)
-def pending(user_id: str = Query(default=get_settings().default_user)):
+def pending(user_id: str = Depends(require_user)):
     expired_ids: list[str] = []
     actions = proactive_repository.list_pending(user_id, expired_out=expired_ids)
     for action_id in expired_ids:
@@ -40,7 +41,7 @@ def pending(user_id: str = Query(default=get_settings().default_user)):
 
 
 @proactive_router.post("/proactive/{action_id}/ack")
-def ack(action_id: str):
+def ack(action_id: str, _user_id: str = Depends(require_user)):
     action = proactive_repository.get_by_id(action_id)
     if action is None:
         raise HTTPException(status_code=404, detail="action not found")

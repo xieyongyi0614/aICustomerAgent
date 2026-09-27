@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.v1 import auth as auth_api
+from app.core.settings import get_settings
 from app.main import create_app
 from app.services.governance import DomainHandlers, register_domain
 from app.services.governance import provenance as provenance_mod
@@ -16,7 +18,11 @@ BACKEND = Path(__file__).resolve().parents[2]
 
 @pytest.fixture()
 def client():
-    return TestClient(create_app())
+    test_app = create_app()
+    test_app.dependency_overrides[auth_api.require_user] = (
+        lambda: get_settings().default_user
+    )
+    return TestClient(test_app)
 
 
 @pytest.fixture(autouse=True)
@@ -80,14 +86,14 @@ def test_delete_endpoint_returns_report(client):
     assert store["rows"] == []
 
 
-def test_cannot_delete_other_user(client):
+def test_user_id_param_retired_on_delete(client):
     store = _register_sample()
     response = client.delete(
         "/api/v1/life/data",
         params={"confirm": "true", "user_id": "someone-else"},
     )
-    assert response.status_code == 403
-    assert store["rows"] == ["a", "b"]
+    assert response.status_code == 200
+    assert store["rows"] == []
 
 
 def test_api_layer_has_no_repositories_import():

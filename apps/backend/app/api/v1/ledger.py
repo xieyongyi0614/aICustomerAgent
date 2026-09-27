@@ -5,11 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.core.settings import get_settings
-from app.services.identity.user_service import resolve_user
+from app.api.v1.auth import require_user
 from app.services.ledger import budget as budget_service
 from app.services.ledger import category as category_service
 from app.services.ledger import correction as correction_service
@@ -90,13 +89,11 @@ class LedgerEntryCreateRequest(BaseModel):
     merchant: str | None = None
     note: str | None = None
     idempotency_key: str | None = None
-    user_id: str | None = Field(default=None, description="禁止由客户端指定")
 
 
 class LedgerReverseRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=80)
     idempotency_key: str | None = None
-    user_id: str | None = Field(default=None, description="禁止由客户端指定")
 
 
 class CorrectionResponse(BaseModel):
@@ -120,7 +117,6 @@ class BudgetUpsertRequest(BaseModel):
     period: Literal["month", "week"] = "month"
     limit_minor: int = Field(gt=0)
     currency: str = "CNY"
-    user_id: str | None = Field(default=None, description="禁止由客户端指定")
 
 
 class BudgetResponse(BaseModel):
@@ -136,17 +132,6 @@ class BudgetResponse(BaseModel):
     remaining_minor: int = 0
     breached: bool = False
     reason: str = "ok"
-
-
-def _current_user(requested: str | None) -> str:
-    if requested is not None and requested != "":
-        resolved = resolve_user(requested)
-        if resolved.user_id != requested and requested != get_settings().default_user:
-            raise HTTPException(status_code=403, detail="不得读写他人数据")
-        if requested != get_settings().default_user:
-            raise HTTPException(status_code=403, detail="不得读写他人数据")
-        return requested
-    return resolve_user(None).user_id
 
 
 def _money(minor: int) -> tuple[int, str]:
@@ -178,9 +163,9 @@ def get_summary(
     period: str = Query(default="month", pattern="^(month|week|custom)$"),
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
-    user_id: str | None = Query(default=None),
+    user_id: str = Depends(require_user),
 ):
-    current = _current_user(user_id)
+    current = user_id
     now = datetime.now()
     if period == "custom":
         if since is None or until is None:
@@ -239,11 +224,11 @@ def list_entries_endpoint(
     direction: str | None = Query(default=None, pattern="^(expense|income|transfer)$"),
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
-    user_id: str | None = Query(default=None),
+    user_id: str = Depends(require_user),
 ):
     if limit > LIMIT_MAX:
         raise HTTPException(status_code=400, detail=f"limit 不能超过 {LIMIT_MAX}")
-    current = _current_user(user_id)
+    current = user_id
     window = None
     if since is not None or until is not None:
         window = query_service.Period.custom(
@@ -268,10 +253,11 @@ def list_entries_endpoint(
 
 
 @ledger_router.post("/entries", response_model=LedgerEntryResponse)
-def create_entry(body: LedgerEntryCreateRequest):
-    if body.user_id is not None:
-        raise HTTPException(status_code=403, detail="不得由客户端指定 user_id")
-    current = _current_user(None)
+def create_entry(
+    body: LedgerEntryCreateRequest,
+    user_id: str = Depends(require_user),
+):
+    current = user_id
     from app.models.ledger import LedgerEntryDraft
 
     idempotency_key = body.idempotency_key or _auto_key(current, body)
@@ -307,11 +293,8 @@ def _auto_key(user_id: str, body: LedgerEntryCreateRequest) -> str:
 def reverse_entry(
     entry_id: str,
     body: LedgerReverseRequest = Body(default_factory=lambda: LedgerReverseRequest(reason="订正")),
-    user_id: str | None = Query(default=None),
+    _user_id: str = Depends(require_user),
 ):
-    if body.user_id is not None:
-        raise HTTPException(status_code=403, detail="不得由客户端指定 user_id")
-    current = _current_user(user_id)
     key = body.idempotency_key or f"rev-{entry_id}"
     try:
         outcome = correction_service.cancel_entry(
@@ -331,9 +314,8 @@ def reverse_entry(
 
 
 @ledger_router.get("/categories", response_model=list[LedgerCategoryResponse])
-def list_categories(user_id: str | None = Query(default=None)):
-    current = _current_user(user_id)
-    rows = category_service.list_user_categories(current)
+def list_categories(user_id: str = Depends(require_user)):
+    rows = category_service.list_user_categories(user_id)
     return [
         LedgerCategoryResponse(
             id=row.id,
@@ -347,9 +329,8 @@ def list_categories(user_id: str | None = Query(default=None)):
 
 
 @ledger_router.get("/budgets", response_model=list[BudgetResponse])
-def list_budgets(user_id: str | None = Query(default=None)):
-    current = _current_user(user_id)
-    checks = budget_service.check_all_budgets(current, now=datetime.now())
+def list_budgets(user_id: str = Depends(require_user)):
+    checks = budget_service.check_all_budgets(user_id, now=datetime.now())
     out = []
     for check in checks:
         limit_minor, limit_text = _money(check.budget.limit_minor)
@@ -374,12 +355,12 @@ def list_budgets(user_id: str | None = Query(default=None)):
 
 
 @ledger_router.put("/budgets", response_model=BudgetResponse)
-def upsert_budget(body: BudgetUpsertRequest):
-    if body.user_id is not None:
-        raise HTTPException(status_code=403, detail="不得由客户端指定 user_id")
-    current = _current_user(None)
+def upsert_budget(
+    body: BudgetUpsertRequest,
+    user_id: str = Depends(require_user),
+):
     spec = budget_service.BudgetSpec(
-        user_id=current,
+        user_id=user_id,
         scope=body.scope,
         category_id=body.category_id,
         period=body.period,
@@ -388,7 +369,7 @@ def upsert_budget(body: BudgetUpsertRequest):
         currency=body.currency,
     )
     saved = budget_service.upsert_budget(spec, now=datetime.now())
-    check = budget_service.check_budget(current, saved, now=datetime.now())
+    check = budget_service.check_budget(user_id, saved, now=datetime.now())
     limit_minor, limit_text = _money(saved.limit_minor)
     consumed_minor, consumed_text = _money(check.consumed_minor)
     return BudgetResponse(

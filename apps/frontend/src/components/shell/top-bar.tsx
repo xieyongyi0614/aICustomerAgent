@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useLlmProfiles } from "@/hooks/use-llm-profiles"
 import { LlmProfileSelect } from "@/components/shell/llm-profile-select"
+import { IdentityDialog } from "@/components/shell/identity-dialog"
 
 const STATUS_DOT_CLASS: Record<ConnectionStatus, string> = {
   idle: "bg-neutral-500",
@@ -189,6 +190,7 @@ function TopBar() {
           )}
 
           <ModeSwitchDialog currentMode={getActiveApiMode()} />
+          <IdentityDialog />
         </div>
       </div>
     </TooltipProvider>

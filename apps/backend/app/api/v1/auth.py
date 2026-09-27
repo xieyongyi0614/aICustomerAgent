@@ -101,12 +101,6 @@ def _iso(ts: int) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
-def current_user_id(authorization: str = Header(default="")) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="未提供设备令牌")
-    return parse_token(authorization.removeprefix("Bearer ").strip())
-
-
 def require_user(authorization: str = Header(default="")) -> str:
     """产品端点鉴权依赖：user_id 仅从 token 解析，不回落 default_user。"""
     if not authorization.startswith("Bearer "):

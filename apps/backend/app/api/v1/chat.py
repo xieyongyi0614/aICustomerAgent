@@ -6,8 +6,8 @@ import openai
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.api.v1.auth import require_user
 from app.api.v1.deps import get_chat_llm
-from app.core.settings import get_settings
 from app.api.v1.schemas import ChatRequest
 from app.services import agent_service, trace_collector
 from app.services.analytics.events import track_event
@@ -44,6 +44,7 @@ async def chat_message(
     request: Request,
     body: ChatRequest,
     llm=Depends(get_chat_llm),
+    user_id: str = Depends(require_user),
 ):
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content 不能为空")
@@ -58,7 +59,7 @@ async def chat_message(
         sink_token = bind_tool_step_sink(step_sink)
         try:
             async for event in agent_service.stream_chat(
-                session_id, get_settings().default_user, body.content, llm=llm, trace=trace
+                session_id, user_id, body.content, llm=llm, trace=trace
             ):
                 for step in step_sink.drain():
                     yield _stream_json(step.to_ndjson_dict())

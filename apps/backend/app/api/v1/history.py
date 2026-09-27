@@ -1,7 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.settings import get_settings
-
+from app.api.v1.auth import require_user
 from app.api.v1.schemas import (
     ConversationMessagesOut,
     MemoriesOut,
@@ -21,7 +20,7 @@ MAX_MESSAGES_LIMIT = 500
     response_model=ConversationMessagesOut,
 )
 def latest_conversation_messages(
-    user_id: str = Query(default=get_settings().default_user),
+    user_id: str = Depends(require_user),
     limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
 ):
     conversation = history_service.find_latest_conversation(user_id)
@@ -50,9 +49,10 @@ def list_conversation_messages(
     conversation_id: str,
     limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
     before_id: int | None = Query(default=None),
+    user_id: str = Depends(require_user),
 ):
     conversation = history_service.find_conversation_or_none(conversation_id)
-    if conversation is None:
+    if conversation is None or getattr(conversation, "user_id", None) != user_id:
         raise HTTPException(status_code=404, detail="会话不存在")
     rows = history_service.list_recent_messages(
         conversation_id, limit, before_id=before_id
@@ -73,7 +73,7 @@ def list_conversation_messages(
 
 @history_router.get("/memories", response_model=MemoriesOut)
 def list_memories(
-    user_id: str = Query(default=get_settings().default_user),
+    user_id: str = Depends(require_user),
     limit: int = Query(default=50, ge=1, le=200),
 ):
     items = history_service.list_memories(user_id, limit=limit)
