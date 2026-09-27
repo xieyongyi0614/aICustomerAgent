@@ -1,4 +1,4 @@
-"""数据库连接域设置。"""
+"""数据库与缓存连接域设置。"""
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
@@ -7,6 +7,7 @@ class DatabaseSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
     database_url: str = "postgresql+psycopg://asuna:asuna@localhost:5432/asuna"
+    redis_url: str = ""
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_recycle: int = 1800

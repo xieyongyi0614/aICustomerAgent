@@ -8,15 +8,18 @@ import '../../../app/theme/theme_context.dart';
 import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
+import '../data/auth_repository.dart';
 import 'widgets/agreement_check.dart';
 
 /// 设计稿 ⓪ 邮箱验证码：自动注册 + 称呼设置（称呼是亚丝娜的第一条记忆）。
-/// 验证码通道尚未接入：任意 6 位数字本地校验通过即可进入，页面常驻诚实提示。
+/// 进入页面即请求发送验证码；验证通过换取长期令牌后进入首页。
 class VerifyCodePage extends StatefulWidget {
-  const VerifyCodePage({super.key, this.email});
+  const VerifyCodePage({super.key, this.email, this.authRepository});
 
   /// 登录页带入的邮箱地址，用于「已发送至」展示（脱敏）。
   final String? email;
+
+  final AuthRepository? authRepository;
 
   @override
   State<VerifyCodePage> createState() => _VerifyCodePageState();
@@ -25,15 +28,17 @@ class VerifyCodePage extends StatefulWidget {
 class _VerifyCodePageState extends State<VerifyCodePage> {
   static const _resendSeconds = 60;
   static final _codePattern = RegExp(r'^\d{6}$');
-  static const _channelNotice =
-      '验证码通道还没接入，任意填 6 位数字，直接点「开始我们的第一天」';
 
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
   final _nickname = TextEditingController();
+  late final AuthRepository _repo =
+      widget.authRepository ?? AuthRepository();
   Timer? _resendTimer;
   int _countdown = _resendSeconds;
   bool _agreed = true;
+  bool _sending = false;
+  bool _verifying = false;
   String? _error;
 
   @override
@@ -42,7 +47,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     _startCountdown();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _notice(_channelNotice);
+      _sendCode(initial: true);
     });
   }
 
@@ -74,9 +79,9 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     );
   }
 
-  void _startCountdown() {
+  void _startCountdown({int seconds = _resendSeconds}) {
     _resendTimer?.cancel();
-    setState(() => _countdown = _resendSeconds);
+    setState(() => _countdown = seconds);
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown <= 1) {
         timer.cancel();
@@ -87,15 +92,41 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     });
   }
 
+  Future<void> _sendCode({required bool initial}) async {
+    final email = widget.email?.trim() ?? '';
+    if (email.isEmpty) {
+      setState(() => _error = '缺少邮箱地址，请返回重新输入');
+      return;
+    }
+    if (_sending) return;
+    setState(() => _sending = true);
+    try {
+      await _repo.requestEmailCode(email);
+      if (!mounted) return;
+      _notice(initial ? '验证码已发送，请查收邮箱' : '验证码已重新发送');
+      _startCountdown();
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      _notice(e.message);
+      final retry = e.retryAfterSeconds ?? 0;
+      if (retry > 0) _startCountdown(seconds: retry);
+    } catch (_) {
+      if (!mounted) return;
+      _notice('验证码发送失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   void _onResend() {
     FocusScope.of(context).unfocus();
-    if (_countdown > 0) return;
-    _notice(_channelNotice);
+    if (_countdown > 0 || _sending) return;
+    _sendCode(initial: false);
   }
 
   void _onHelp() {
     FocusScope.of(context).unfocus();
-    _notice('收不到验证码？通道还没接入，任意 6 位数字即可进入');
+    _notice('收不到验证码？看看垃圾箱，或稍后点「重新发送」');
   }
 
   void _editEmail() =>
@@ -111,15 +142,45 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
       setState(() => _error = '请先阅读并同意《用户协议》和《隐私政策》');
       return;
     }
-    setState(() => _error = null);
-    final prefs = await PrefsStore.load();
-    final nickname = _nickname.text.trim();
-    if (nickname.isNotEmpty) {
-      await prefs.setNickname(nickname);
+    final email = widget.email?.trim() ?? '';
+    if (email.isEmpty) {
+      setState(() => _error = '缺少邮箱地址，请返回重新输入');
+      return;
     }
-    await prefs.markLoginSeen();
-    if (!mounted) return;
-    context.go('/home');
+    if (_verifying) return;
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
+    try {
+      final deviceId = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+      await _repo.verifyEmailCode(
+        email: email,
+        code: _code.text.trim(),
+        deviceId: deviceId,
+        platform: Theme.of(context).platform.name,
+      );
+      final prefs = await PrefsStore.load();
+      final nickname = _nickname.text.trim();
+      if (nickname.isNotEmpty) {
+        await prefs.setNickname(nickname);
+      }
+      await prefs.markLoginSeen();
+      if (!mounted) return;
+      context.go('/home');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _verifying = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _verifying = false;
+        _error = '登录失败，请检查网络后重试';
+      });
+    }
   }
 
   @override
@@ -272,7 +333,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
             ],
             const SizedBox(height: 24),
             GestureDetector(
-              onTap: _startFirstDay,
+              onTap: _verifying ? null : _startFirstDay,
               behavior: HitTestBehavior.opaque,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 15),
@@ -283,7 +344,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
                 ),
                 child: Center(
                   child: Text(
-                    '开始我们的第一天',
+                    _verifying ? '验证中…' : '开始我们的第一天',
                     style: type.rowTitle.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,

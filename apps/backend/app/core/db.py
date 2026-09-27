@@ -1553,6 +1553,7 @@ class UserRow(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active", server_default="active"
@@ -1574,5 +1575,12 @@ class UserRow(Base):
             unique=True,
             sqlite_where=text("is_default"),
             postgresql_where=text("is_default"),
+        ),
+        Index(
+            "ux_users_email",
+            "email",
+            unique=True,
+            sqlite_where=text("email IS NOT NULL"),
+            postgresql_where=text("email IS NOT NULL"),
         ),
     )

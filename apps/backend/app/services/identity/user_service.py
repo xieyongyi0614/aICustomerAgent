@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 
 from app.core.settings import get_settings
 from app.repositories import user_repository
@@ -46,4 +47,24 @@ def get_user(user_id: str) -> UserContext | None:
     row = user_repository.get(user_id)
     if row is None:
         return None
+    return _to_context(row)
+
+
+def _email_user_id(normalized_email: str) -> str:
+    digest = hashlib.sha256(normalized_email.encode("utf-8")).hexdigest()
+    return f"email-{digest[:16]}"
+
+
+def find_or_create_by_email(email: str, *, now: datetime | None = None) -> UserContext:
+    normalized = email.strip().lower()
+    row = user_repository.get_by_email(normalized)
+    if row is not None:
+        return _to_context(row)
+    display_name = normalized.split("@", 1)[0]
+    row = user_repository.create_with_email(
+        _email_user_id(normalized),
+        normalized,
+        display_name=display_name,
+        now=now,
+    )
     return _to_context(row)

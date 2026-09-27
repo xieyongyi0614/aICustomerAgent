@@ -354,11 +354,12 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
 | 会话 | `conversations`、`messages`、`conversation_summaries` | messages.conversation_id → conversations.id；summary 1:1 conversation |
+| 身份 | `users` | email 唯一**部分索引**（0057，邮箱验证码登录绑定；可空保留 default-user 无邮箱态）；is_default 全局唯一部分索引 |
 | 角色状态 | `character_state`、`emotion_history`、`personality_state` | character_state.user_id 主键；emotion_history 按 user 时序；personality_state 唯一 (user,character,axis) |
 | 关系 | `relationship_state`、`relationship_events`、`relationship_milestones`、`relationship_conflicts`、`relationship_snapshots` | state 为当前态（version 乐观锁）；events 为账本（时序权威）；snapshots 版本化快照 |
 | 目标/计划 | `character_goals`、`goal_plans` | goals.parent_goal_id 自引用分层；goal_plans.goal_id → goals，版本号 version |
@@ -401,7 +402,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；
 | 维度 | 机制 | 说明 |
 |---|---|---|
 | Environment | pydantic-settings（`.env`，`extra="ignore"`） | 环境变量名 = 字段名全大写，无 alias 层、无 env_prefix |
-| Runtime Config | `Settings` = 21 个领域模块多继承组合的**扁平命名空间** | `core/settings/`：llm/database/pipeline/character/memory/reflection_development/relationship/goal/autonomy/life_loop/autonomy_advanced/agent_runtime/action/action_execution/evaluation/feishu/observability/world/world_simulation/tool/plan |
+| Runtime Config | `Settings` = 23 个领域模块多继承组合的**扁平命名空间** | `core/settings/`：llm/database/pipeline/character/memory/reflection_development/relationship/goal/autonomy/life_loop/autonomy_advanced/agent_runtime/action/action_execution/evaluation/feishu/email/ledger/observability/world/world_simulation/tool/plan |
 | Feature Config | 按领域命名的布尔开关 + 调参字段 | 开关语义已从"版本门控"收敛为"策略位/裁决位/调试位" |
 | LLM Profiles | `llm_profiles.json`（`LLM_PROFILES_FILE`）或 `LLM_PROFILES_JSON`（内联优先） | 多模型 profile，消息级切换（body `profile_id` > header `X-LLM-Profile` > query） |
 
@@ -437,6 +438,15 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；
 
 支持 **Discord / Telegram**（未来含微信）的落点：`channels/base.py` 的 `ChannelAdapter` 协议 + `channel_identity_service` 身份派生 + `delivery` 出站端口 + `channel_tools` 通道工具注册，均已为多通道预留；新增通道只需实现 adapter + delivery 并注册，无需改动 Agent 核心。
 
+### 8.4 Email 发件（邮箱验证码登录，2026-09-27）
+
+| 能力 | 现状 | 说明 |
+|---|---|---|
+| 发件端口 | `services/email/sender.py` 的 `EmailSender` 协议 | 验证码服务只依赖协议；换 Resend / 阿里云 / 腾讯云 = 新增实现类 + `build_email_sender` 的 provider 分支，业务零改动 |
+| SMTP 实现 | `SmtpEmailSender`（aiosmtplib，按次建连） | MVP 163 个人邮箱：465 SSL + 授权码；`EMAIL_*` 配置域（`core/settings/email.py`） |
+| 验证码存储 | `services/identity/code_store.py` 的 `VerificationCodeStore` 协议 + `RedisCodeStore` | 短 TTL 一次性状态入 Redis：SETNX 冷却 / INCR+EXPIRE 小时·日频控 / GETDEL 单次消费 / 尝试超限作废；多实例前必须保证 Redis 可用 |
+| 登录端点 | `POST /auth/email/code` + `POST /auth/email/verify`（`api/v1/auth.py`） | 校验通过 find-or-create `users`（email 唯一），复用 `/auth/pair` 的无状态 HMAC 令牌契约；SMTP / Redis / 令牌密钥缺一 503 |
+
 ---
 
 ## 9. Current Technical Debt
@@ -447,6 +457,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；
 | ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
 | **迁移链头钉测散落在 v24/v25/v26 共 15 个测试文件**（`MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`max(numbered) == NN`、`SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`）。每加一个迁移都要机械升级一遍（FEISHU-010 加 `0050` 时实测 **22 个用例由绿转红**，见 `review-v1.2.md` §7.10） | 加迁移的隐性成本高、易漏改；`v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名会随升级逐渐名不副实 | P1 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
+| 旧调试/会话端点 `user_id` 仍由请求直传（隐式 default-user）；邮箱验证码登录已引入多用户（email → `users` 行），两套身份面并存 | 旧端点无多用户隔离，新邮箱用户的数据仅在 `require_user` 产品端点可见 | P2 |
 | `docs/` 169 文件、1589 处 `vXX_` 引用未改写（历史文档不改写是约定，靠 `flag-rename-map.md` 桥接） | 读历史文档需查对照表，存在导航断层 | P2 |
 | 测试侧版本标记残留 188 处（fixture 名/函数名如 `v24_tool_env`、`v21_on`） | 测试命名仍带历史版本号，语义混淆 | P3 |
 | settings 命名一致性建议未采纳（`flag-rename-map.md` §七：部分字段去前缀后丧失域归属，如 `decision_weight`、`planning_enabled`） | 扁平命名空间局部可读性下降 | P3 |
@@ -470,6 +481,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0052）；
 9. **单一写面纪律**：计划落库只经 `goal_repository` 计划面；行动写世界只走 `deferred_world_op → outbox → world_engine` 唯一路径；Run 唯一写面 = `loop_runs`。
 10. **能力是手脚不是逻辑**：`Capability` 只执行不做决策，调度权/重试/回复生成在引擎（ActionEngine/AutonomyEngine）；`ToolRegistry`/`CapabilityRegistry` 代码注册非热插拔。
 11. **前台/后台同一决策代码路径**：统一 `decision_pipeline`，前台目标栈只读（长期化写入只发生在后台）。
+12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌复用 `/auth/pair` 的无状态 HMAC 体系。
 
 ---
 

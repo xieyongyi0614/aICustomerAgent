@@ -342,3 +342,28 @@ API-001 → API-002 ──┘
 41 个明细的 `In Scope` 全部落在本注册表 §2~§7 的「交付面」范围内，`Out of Scope` 逐条对应 §7.3 反范围清单与 §0 七条前提。**唯一需要注册表回写的是 §11.2 的 5 个缺口**（N1~N5）——它们不是明细擅自扩张，而是撰写时按证据发现的上游遗漏，处置权在注册表与需求文档。
 
 > **变更顺序纪律不变**（见 `traceability.md` §12）：需求变更先改覆盖矩阵 → 再改 `requirements-analysis.md` → 最后改本注册表与明细。**顺序不可颠倒。**
+
+---
+
+## 12. 增量注册：邮箱验证码登录（2026-09-27，已实现）
+
+> **背景**：真机验收留下的「邮箱登录无令牌」深层缺口（原验证码页为本地假登录，任意 6 位放行、不调后端）。本节为**实现后补记**的增量注册（体例从简，不另立 41 任务式 Detail），设计裁决见 `docs/current-system-architecture-baseline.md` §8.4 / §10 ADR-12。
+> **范围**：5 个任务（延续 API- / APP- 编号），迁移 `0057_users_email.py`（users.email 唯一部分索引；0056 为并行会话已入链的 life_tasks kind 白名单，非本节范围）。验证码状态**存 Redis 不建表**（GETDEL 单次消费），发件走 `EmailSender` 协议（MVP = SMTP 163 个人邮箱，换 Resend/阿里云/腾讯云只加实现类）。
+
+| Task ID | 名称 | 交付面 | 状态 |
+|---|---|---|---|
+| `API-011` | Redis 基座接入 | `docker-compose.yml`（redis 服务 + healthcheck）· `pyproject` redis 依赖 · `redis_url` 设置 · `core/redis_client.py`（懒建单例 + lifespan ping/close） | 已实现 |
+| `API-012` | 验证码存储协议 + Redis 实现 | `services/identity/code_store.py`（`VerificationCodeStore` 协议 + `RedisCodeStore`：SETNX 冷却 / INCR+EXPIRE 频控 / GETDEL 消费 / 尝试超限作废）+ `tests/unit/test_code_store.py`（fakeredis） | 已实现 |
+| `API-013` | 邮件发件端口 | `core/settings/email.py`（`EMAIL_*` 域）· `services/email/sender.py`（`EmailSender` 协议 + `SmtpEmailSender` 163：465 SSL + 授权码）+ `tests/unit/test_email_sender.py` | 已实现 |
+| `API-014` | 验证码服务 + 登录端点 + 迁移 | `services/identity/verification.py`（签发/校验/策略）· `services/identity/user_service.py`（find-or-create by email，display_name=邮箱前缀）· `api/v1/auth.py`（`POST /auth/email/code` 429+Retry-After、`POST /auth/email/verify` 契约同 `/auth/pair`，缺 SMTP/Redis/密钥 503）· 迁移 0057 + `tests/v50/test_email_login.py` | 已实现 |
+| `APP-026` | 客户端接线 | `auth_repository.dart`（`requestEmailCode` / `verifyEmailCode` / `AuthCodeException` 状态码+Retry-After 透传）· `verify_code_page.dart`（进页即发码、重发接冷却、验证通过换令牌写 SecureTokenStore 后进首页，假登录语义移除）+ `login_flow_test.dart`（12 用例） | 已实现 |
+
+**测试门槛（已过）**：后端 `tests/v50` + 三个新 unit 文件 64 绿；迁移 0057 up/down 往返在真实 PG 验证；钉测中心 `tests/support/schema_pins.py` 已修至 `0057`（并修正 0056 遗漏的钉测失修）；移动端全量 117 绿。
+
+**回归清单（真实模型 / 真机人工项）**：
+
+1. `docker compose up` 后 `redis-cli ping` 通、后端启动日志出现「Redis 连接正常」。
+2. 配置 `EMAIL_SMTP_*`（163 授权码）后：App 登录页输入邮箱 → 收到验证码邮件（查垃圾箱）→ 输码 → 进首页；`users` 表出现 `email-*` 用户行。
+3. 60s 内重发 → 429 提示剩余秒数；连错 5 次 → 提示作废需重取；过期码（>5min）→ 提示过期。
+4. 登录成功后杀 App 重开 → 免登录直达；`/profile` 登出 → 回登录页。
+5. 配对码链路回归：`POST /auth/pair` 行为不变（两套认证并存）。

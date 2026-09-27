@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/network/errors/app_error.dart';
 import '../../../core/storage/secure_token_store.dart';
 
 class PairResult {
@@ -17,7 +18,38 @@ class PairResult {
   final String expiresAt;
 }
 
-/// API-001 设备配对：pairing_secret + device_id → 长期令牌（进 Keychain）。
+/// 邮箱验证码登录的域异常：携带状态码 / Retry-After 与可展示消息。
+class AuthCodeException implements Exception {
+  AuthCodeException({
+    this.statusCode,
+    this.retryAfterSeconds,
+    required this.message,
+  });
+
+  final int? statusCode;
+  final int? retryAfterSeconds;
+  final String message;
+
+  factory AuthCodeException.fromDio(DioException e) {
+    final status = e.response?.statusCode;
+    final data = e.response?.data;
+    final detail =
+        data is Map && data['detail'] != null ? data['detail'].toString() : null;
+    final retryAfter = int.tryParse(
+      e.response?.headers.value('retry-after') ?? '',
+    );
+    final fallback = e.error is AppError
+        ? (e.error as AppError).userMessage
+        : '请求失败，请稍后再试';
+    return AuthCodeException(
+      statusCode: status,
+      retryAfterSeconds: retryAfter,
+      message: detail ?? fallback,
+    );
+  }
+}
+
+/// 设备配对（API-001）与邮箱验证码登录（API-0xx）共用：换取长期令牌进 Keychain。
 class AuthRepository {
   AuthRepository({Dio? dio, SecureTokenStore? tokenStore})
       : _dio = dio ?? createDio(),
@@ -48,13 +80,48 @@ class AuthRepository {
         if (deviceName != null) 'device_name': deviceName,
       },
     );
+    return _persistPairResponse(resp, deviceId);
+  }
+
+  Future<void> requestEmailCode(String email) async {
+    try {
+      await _dio.post<void>('/auth/email/code', data: {'email': email});
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  Future<PairResult> verifyEmailCode({
+    required String email,
+    required String code,
+    required String deviceId,
+    required String platform,
+    String? deviceName,
+  }) async {
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '/auth/email/verify',
+      data: {
+        'email': email,
+        'code': code,
+        'device_id': deviceId,
+        'platform': platform,
+        if (deviceName != null) 'device_name': deviceName,
+      },
+    );
+    return _persistPairResponse(resp, deviceId);
+  }
+
+  Future<PairResult> _persistPairResponse(
+    Response<Map<String, dynamic>?> resp,
+    String fallbackDeviceId,
+  ) async {
     final data = resp.data ?? const {};
     final token = data['token'] as String? ?? '';
     final userId = data['user_id'] as String? ?? '';
-    final boundDevice = data['device_id'] as String? ?? deviceId;
+    final boundDevice = data['device_id'] as String? ?? fallbackDeviceId;
     final expiresAt = data['expires_at'] as String? ?? '';
     if (token.isEmpty) {
-      throw StateError('pair failed: empty token');
+      throw StateError('auth failed: empty token');
     }
     await _store.writeAccessToken(token);
     await _store.writeDeviceId(boundDevice);

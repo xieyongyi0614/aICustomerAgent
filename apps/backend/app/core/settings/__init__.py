@@ -21,6 +21,7 @@ from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
 from app.core.settings.character import CharacterSettings
 from app.core.settings.database import DatabaseSettings
 from app.core.settings.evaluation import EvaluationSettings
+from app.core.settings.email import EmailSettings
 from app.core.settings.feishu import FeishuSettings
 from app.core.settings.goal import GoalSettings
 from app.core.settings.ledger import LedgerSettings
@@ -63,6 +64,7 @@ class Settings(
     ActionExecutionSettings,
     EvaluationSettings,
     FeishuSettings,
+    EmailSettings,
     ObservabilitySettings,
     WorldSettings,
     WorldSimulationSettings,

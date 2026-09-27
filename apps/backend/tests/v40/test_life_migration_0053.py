@@ -25,6 +25,7 @@ def test_orm_has_users_columns():
     columns = UserRow.__table__.columns
     assert set(columns.keys()) == {
         "id",
+        "email",
         "display_name",
         "status",
         "is_default",

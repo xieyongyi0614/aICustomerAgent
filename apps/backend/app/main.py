@@ -11,6 +11,7 @@ from app.application.agent_runtime import outbound as outbound_gateway
 from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
+from app.core import redis_client
 from app.core.settings import get_settings, unknown_versioned_env_keys
 from app.services import memory_service, proactive_delivery
 from app.services.tool import channel_tools
@@ -55,6 +56,11 @@ async def lifespan(application: FastAPI):
         logging.getLogger(__name__).info("默认用户播种完成")
     except Exception:
         logging.getLogger(__name__).exception("默认用户播种失败，启动继续")
+    if redis_client.is_configured():
+        if await redis_client.ping_redis():
+            logging.getLogger(__name__).info("Redis 连接正常")
+        else:
+            logging.getLogger(__name__).warning("Redis 连接失败，邮箱验证码登录将不可用")
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
     _job_worker_task = asyncio.create_task(run_job_worker_loop())
@@ -135,6 +141,7 @@ async def lifespan(application: FastAPI):
     _observability_cleanup_task = None
     _job_worker_task = None
     _life_loop_task = None
+    await redis_client.close_redis()
 
 
 def create_app() -> FastAPI:

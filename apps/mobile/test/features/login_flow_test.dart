@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/core/storage/prefs_store.dart';
 import 'package:mobile/design_system/tokens/app_icons.dart';
+import 'package:mobile/features/profile/data/auth_repository.dart';
 import 'package:mobile/features/profile/presentation/login_page.dart';
 import 'package:mobile/features/profile/presentation/verify_code_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,39 @@ Future<void> _drainResendCountdown(WidgetTester tester) async {
     await tester.pump(const Duration(seconds: 1));
   }
   await tester.pump();
+}
+
+class _FakeAuthRepository extends AuthRepository {
+  _FakeAuthRepository({this.sendError, this.verifyError});
+
+  Object? sendError;
+  Object? verifyError;
+  final List<String> codeRequests = [];
+  final List<String> verifiedCodes = [];
+
+  @override
+  Future<void> requestEmailCode(String email) async {
+    if (sendError != null) throw sendError!;
+    codeRequests.add(email);
+  }
+
+  @override
+  Future<PairResult> verifyEmailCode({
+    required String email,
+    required String code,
+    required String deviceId,
+    required String platform,
+    String? deviceName,
+  }) async {
+    if (verifyError != null) throw verifyError!;
+    verifiedCodes.add(code);
+    return PairResult(
+      token: 'test-token',
+      userId: 'u1',
+      deviceId: deviceId,
+      expiresAt: '2030-01-01T00:00:00',
+    );
+  }
 }
 
 void main() {
@@ -137,10 +171,13 @@ void main() {
   });
 
   testWidgets('verify_page_renders_email_code_state', (tester) async {
-    await tester.pumpWidget(_app(const VerifyCodePage(
+    final repo = _FakeAuthRepository();
+    await tester.pumpWidget(_app(VerifyCodePage(
       email: 'asuna@example.com',
+      authRepository: repo,
     )));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('亚丝娜 · 初次见面'), findsOneWidget);
     expect(find.text('输入邮箱验证码'), findsOneWidget);
     expect(find.text('asu***@example.com'), findsOneWidget);
@@ -149,15 +186,18 @@ void main() {
     expect(find.text('后可重新发送'), findsOneWidget);
     expect(find.text('开始我们的第一天'), findsOneWidget);
     expect(find.textContaining('你的数据只属于你'), findsOneWidget);
-    expect(find.textContaining('验证码通道还没接入'), findsOneWidget);
+    expect(find.textContaining('验证码通道还没接入'), findsNothing);
+    expect(repo.codeRequests, ['asuna@example.com']);
     await _dismissSnackBar(tester);
     await _drainResendCountdown(tester);
     expect(find.text('重新发送'), findsOneWidget);
   });
 
   testWidgets('verify_page_start_requires_six_digits', (tester) async {
-    await tester.pumpWidget(_app(const VerifyCodePage(
+    final repo = _FakeAuthRepository();
+    await tester.pumpWidget(_app(VerifyCodePage(
       email: 'asuna@example.com',
+      authRepository: repo,
     )));
     await tester.pump();
     await _dismissSnackBar(tester);
@@ -168,17 +208,40 @@ void main() {
     await tester.tap(find.text('开始我们的第一天'));
     await tester.pump();
     expect(find.text('请输入 6 位验证码'), findsOneWidget);
+    expect(repo.verifiedCodes, isEmpty);
+    await _drainResendCountdown(tester);
+  });
+
+  testWidgets('verify_page_start_requires_agreement', (tester) async {
+    final repo = _FakeAuthRepository();
+    await tester.pumpWidget(_app(VerifyCodePage(
+      email: 'asuna@example.com',
+      authRepository: repo,
+    )));
+    await tester.pump();
+    await _dismissSnackBar(tester);
+    await tester.enterText(find.byKey(const Key('verify_code_field')), '123456');
+    await tester.pump();
+    await tester.tap(find.textContaining('《用户协议》'));
+    await tester.pump();
+    await tester.tap(find.text('开始我们的第一天'));
+    await tester.pump();
+    expect(find.text('请先阅读并同意《用户协议》和《隐私政策》'), findsOneWidget);
+    expect(repo.verifiedCodes, isEmpty);
     await _drainResendCountdown(tester);
   });
 
   testWidgets('verify_page_start_saves_nickname_and_enters', (tester) async {
+    final repo = _FakeAuthRepository();
     final router = GoRouter(
       initialLocation: '/verify',
       routes: [
         GoRoute(
           path: '/verify',
-          builder: (_, _) =>
-              const VerifyCodePage(email: 'asuna@example.com'),
+          builder: (_, _) => VerifyCodePage(
+            email: 'asuna@example.com',
+            authRepository: repo,
+          ),
         ),
         GoRoute(
           path: '/home',
@@ -201,21 +264,82 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('FIRST_DAY_HOME'), findsOneWidget);
+    expect(repo.verifiedCodes, ['123456']);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString(PrefsStore.keyNickname), '小夕');
     expect(prefs.getBool(PrefsStore.keyLoginSeen), isTrue);
     await _drainResendCountdown(tester);
   });
 
-  testWidgets('verify_page_help_link_is_honest', (tester) async {
-    await tester.pumpWidget(_app(const VerifyCodePage(
+  testWidgets('verify_page_wrong_code_shows_server_message', (tester) async {
+    final repo = _FakeAuthRepository(
+      verifyError: AuthCodeException(statusCode: 401, message: '验证码错误'),
+    );
+    await tester.pumpWidget(_app(VerifyCodePage(
       email: 'asuna@example.com',
+      authRepository: repo,
+    )));
+    await tester.pump();
+    await _dismissSnackBar(tester);
+    await tester.enterText(find.byKey(const Key('verify_code_field')), '999999');
+    await tester.pump();
+    await tester.tap(find.text('开始我们的第一天'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('验证码错误'), findsOneWidget);
+    expect(find.text('开始我们的第一天'), findsOneWidget);
+    await _drainResendCountdown(tester);
+  });
+
+  testWidgets('verify_page_resend_after_countdown', (tester) async {
+    final repo = _FakeAuthRepository();
+    await tester.pumpWidget(_app(VerifyCodePage(
+      email: 'asuna@example.com',
+      authRepository: repo,
+    )));
+    await tester.pump();
+    await _dismissSnackBar(tester);
+    await _drainResendCountdown(tester);
+    await tester.tap(find.text('重新发送'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('验证码已重新发送'), findsOneWidget);
+    expect(repo.codeRequests.length, 2);
+    await _dismissSnackBar(tester);
+    await _drainResendCountdown(tester);
+  });
+
+  testWidgets('verify_page_resend_rate_limited_shows_retry', (tester) async {
+    final repo = _FakeAuthRepository(
+      sendError: AuthCodeException(
+        statusCode: 429,
+        retryAfterSeconds: 37,
+        message: '发送过于频繁，请 37 秒后重试',
+      ),
+    );
+    await tester.pumpWidget(_app(VerifyCodePage(
+      email: 'asuna@example.com',
+      authRepository: repo,
+    )));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('发送过于频繁'), findsOneWidget);
+    expect(find.textContaining('37 s'), findsOneWidget);
+    await _dismissSnackBar(tester);
+    await _drainResendCountdown(tester);
+  });
+
+  testWidgets('verify_page_help_link_copy', (tester) async {
+    final repo = _FakeAuthRepository();
+    await tester.pumpWidget(_app(VerifyCodePage(
+      email: 'asuna@example.com',
+      authRepository: repo,
     )));
     await tester.pump();
     await _dismissSnackBar(tester);
     await tester.tap(find.text('收不到验证码？'));
     await tester.pump();
-    expect(find.textContaining('通道还没接入'), findsOneWidget);
+    expect(find.textContaining('垃圾箱'), findsOneWidget);
     await _dismissSnackBar(tester);
     await _drainResendCountdown(tester);
   });
