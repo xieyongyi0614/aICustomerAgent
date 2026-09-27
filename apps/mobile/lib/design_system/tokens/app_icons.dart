@@ -44,4 +44,6 @@ class AppIcons {
   static const shield = IconData(0xf4bf, fontFamily: 'lucide');
   static const link = IconData(0xf397, fontFamily: 'lucide');
   static const logOut = IconData(0xf3b0, fontFamily: 'lucide');
+  static const mail = IconData(0xf3b4, fontFamily: 'lucide');
+  static const arrowRight = IconData(0xf155, fontFamily: 'lucide');
 }

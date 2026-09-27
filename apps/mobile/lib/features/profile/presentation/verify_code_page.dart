@@ -10,9 +10,13 @@ import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import 'widgets/agreement_check.dart';
 
-/// 设计稿 ⓪ 手机号验证码：自动注册 + 称呼设置（称呼是亚丝娜的第一条记忆）。
+/// 设计稿 ⓪ 邮箱验证码：自动注册 + 称呼设置（称呼是亚丝娜的第一条记忆）。
+/// 验证码通道尚未接入：任意 6 位数字本地校验通过即可进入，页面常驻诚实提示。
 class VerifyCodePage extends StatefulWidget {
-  const VerifyCodePage({super.key});
+  const VerifyCodePage({super.key, this.email});
+
+  /// 登录页带入的邮箱地址，用于「已发送至」展示（脱敏）。
+  final String? email;
 
   @override
   State<VerifyCodePage> createState() => _VerifyCodePageState();
@@ -20,38 +24,59 @@ class VerifyCodePage extends StatefulWidget {
 
 class _VerifyCodePageState extends State<VerifyCodePage> {
   static const _resendSeconds = 60;
-  static final _phonePattern = RegExp(r'^1\d{10}$');
+  static final _codePattern = RegExp(r'^\d{6}$');
+  static const _channelNotice =
+      '验证码通道还没接入，任意填 6 位数字，直接点「开始我们的第一天」';
 
-  final _phone = TextEditingController();
   final _code = TextEditingController();
+  final _codeFocus = FocusNode();
   final _nickname = TextEditingController();
   Timer? _resendTimer;
-  int _countdown = 0;
+  int _countdown = _resendSeconds;
   bool _agreed = true;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _notice(_channelNotice);
+    });
+  }
+
+  @override
   void dispose() {
-    _phone.dispose();
     _code.dispose();
+    _codeFocus.dispose();
     _nickname.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
 
-  bool get _phoneValid => _phonePattern.hasMatch(_phone.text.trim());
+  String get _maskedEmail {
+    final email = widget.email?.trim() ?? '';
+    if (email.isEmpty) return '你的邮箱';
+    final at = email.indexOf('@');
+    if (at <= 0) return email;
+    final localHead =
+        email.substring(0, at < 3 ? at : 3);
+    return '$localHead***${email.substring(at)}';
+  }
 
-  void _sendCode() {
-    FocusScope.of(context).unfocus();
-    if (!_phoneValid) {
-      setState(() => _error = '请输入正确的手机号');
-      return;
-    }
-    setState(() {
-      _error = null;
-      _countdown = _resendSeconds;
-    });
+  void _notice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+      ),
+    );
+  }
+
+  void _startCountdown() {
     _resendTimer?.cancel();
+    setState(() => _countdown = _resendSeconds);
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown <= 1) {
         timer.cancel();
@@ -60,21 +85,25 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
       }
       if (mounted) setState(() => _countdown -= 1);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('验证码通道还没接入，填好信息后直接点「开始我们的第一天」'),
-      ),
-    );
   }
+
+  void _onResend() {
+    FocusScope.of(context).unfocus();
+    if (_countdown > 0) return;
+    _notice(_channelNotice);
+  }
+
+  void _onHelp() {
+    FocusScope.of(context).unfocus();
+    _notice('收不到验证码？通道还没接入，任意 6 位数字即可进入');
+  }
+
+  void _editEmail() =>
+      context.canPop() ? context.pop() : context.go('/login');
 
   Future<void> _startFirstDay() async {
     FocusScope.of(context).unfocus();
-    if (!_phoneValid) {
-      setState(() => _error = '请输入正确的手机号');
-      return;
-    }
-    if (_code.text.trim().length != 6) {
+    if (!_codePattern.hasMatch(_code.text.trim())) {
       setState(() => _error = '请输入 6 位验证码');
       return;
     }
@@ -82,6 +111,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
       setState(() => _error = '请先阅读并同意《用户协议》和《隐私政策》');
       return;
     }
+    setState(() => _error = null);
     final prefs = await PrefsStore.load();
     final nickname = _nickname.text.trim();
     if (nickname.isNotEmpty) {
@@ -96,8 +126,6 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
-    final radii = context.radii;
-    final elevation = context.elevation;
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
@@ -122,49 +150,110 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
             ),
             const SizedBox(height: 6),
             Text(
-              '手机号登录 / 注册',
+              '输入邮箱验证码',
               style: type.pageTitle.copyWith(fontSize: 26, color: colors.ink),
             ),
-            const SizedBox(height: 6),
-            Text(
-              '未注册的手机号将自动创建账号',
-              style: type.sub.copyWith(color: colors.ink2),
-            ),
-            const SizedBox(height: 18),
-            _FieldCard(
-              prefix: Text(
-                '+86',
-                style: type.rowTitle.copyWith(
-                  fontSize: 15,
-                  color: colors.ink,
-                ),
-              ),
-              hint: '输入手机号',
-              controller: _phone,
-              maxLength: 11,
-              digitsOnly: true,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            _FieldCard(
-              hint: '输入 6 位验证码',
-              controller: _code,
-              maxLength: 6,
-              digitsOnly: true,
-              action: GestureDetector(
-                onTap: _countdown > 0 ? null : _sendCode,
-                behavior: HitTestBehavior.opaque,
-                child: Text(
-                  _countdown > 0 ? '重发（$_countdown s）' : '获取验证码',
-                  style: type.rowTitle.copyWith(
-                    fontSize: 13,
-                    color:
-                        _countdown > 0 ? colors.ink3 : colors.aiPrimary,
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '6 位验证码已发送至 ',
+                  style: type.body.copyWith(
+                    fontSize: 13.5,
+                    color: colors.ink2,
                   ),
                 ),
-              ),
+                Flexible(
+                  child: Text(
+                    _maskedEmail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: type.body.copyWith(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.ink,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _editEmail,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      '修改',
+                      style: type.body.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.aiBlue,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 22),
+            _CodeRow(
+              controller: _code,
+              focusNode: _codeFocus,
+              hasError: _error != null,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _countdown > 0
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$_countdown s',
+                            style: type.rowTitle.copyWith(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.aiPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '后可重新发送',
+                            style: type.sub.copyWith(
+                              fontSize: 12.5,
+                              color: colors.ink3,
+                            ),
+                          ),
+                        ],
+                      )
+                    : GestureDetector(
+                        onTap: _onResend,
+                        behavior: HitTestBehavior.opaque,
+                        child: Text(
+                          '重新发送',
+                          style: type.rowTitle.copyWith(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: colors.aiPrimary,
+                          ),
+                        ),
+                      ),
+                GestureDetector(
+                  onTap: _onHelp,
+                  behavior: HitTestBehavior.opaque,
+                  child: Text(
+                    '收不到验证码？',
+                    style: type.rowTitle.copyWith(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.aiBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 26),
             _FieldCard(
               prefix: Icon(AppIcons.sparkles,
                   size: 16, color: colors.aiPrimary),
@@ -175,7 +264,10 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: type.caption.copyWith(color: colors.warm),
+                style: type.rowTitle.copyWith(
+                  fontSize: 12.5,
+                  color: colors.danger,
+                ),
               ),
             ],
             const SizedBox(height: 24),
@@ -186,8 +278,8 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 decoration: BoxDecoration(
                   gradient: context.gradients.ai,
-                  borderRadius: radii.rFull,
-                  boxShadow: elevation.btnPrimary,
+                  borderRadius: context.radii.rFull,
+                  boxShadow: context.elevation.btnPrimary,
                 ),
                 child: Center(
                   child: Text(
@@ -211,7 +303,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
               padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
               decoration: BoxDecoration(
                 color: colors.health.withValues(alpha: 0.07),
-                borderRadius: radii.rMd,
+                borderRadius: context.radii.rMd,
                 border: Border.all(
                   color: colors.health.withValues(alpha: 0.18),
                 ),
@@ -232,24 +324,210 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
   }
 }
 
+/// 6 格分段验证码：隐形 TextField 承载输入与键盘，格子只做视觉。
+class _CodeRow extends StatelessWidget {
+  const _CodeRow({
+    required this.controller,
+    required this.focusNode,
+    required this.hasError,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => focusNode.requestFocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AnimatedBuilder(
+            animation: Listenable.merge([controller, focusNode]),
+            builder: (context, _) {
+              final children = <Widget>[];
+              for (var i = 0; i < 6; i++) {
+                if (i > 0) children.add(const SizedBox(width: 8));
+                children.add(
+                  Expanded(
+                    child: _CodeCell(
+                      character: i < controller.text.length
+                          ? controller.text[i]
+                          : null,
+                      filled: i < controller.text.length,
+                      focused:
+                          focusNode.hasFocus && i == controller.text.length,
+                      hasError: hasError,
+                    ),
+                  ),
+                );
+              }
+              return Row(children: children);
+            },
+          ),
+          SizedBox(
+            height: 58,
+            width: double.infinity,
+            child: Opacity(
+              opacity: 0,
+              child: TextField(
+                key: const Key('verify_code_field'),
+                controller: controller,
+                focusNode: focusNode,
+                autofocus: true,
+                maxLength: 6,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  counterText: '',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CodeCell extends StatelessWidget {
+  const _CodeCell({
+    required this.character,
+    required this.filled,
+    required this.focused,
+    required this.hasError,
+  });
+
+  final String? character;
+  final bool filled;
+  final bool focused;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    final radii = BorderRadius.circular(14);
+    final cell = Container(
+      alignment: Alignment.center,
+      height: 58,
+      decoration: BoxDecoration(
+        color:
+            hasError ? colors.danger.withValues(alpha: 0.05) : colors.surface,
+        borderRadius: radii,
+        border: hasError
+            ? Border.all(color: colors.danger.withValues(alpha: 0.55), width: 1.5)
+            : null,
+        boxShadow:
+            hasError || focused ? null : context.elevation.card,
+      ),
+      child: character != null
+          ? Text(
+              character!,
+              style: type.pageTitle.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: hasError ? colors.danger : colors.ink,
+              ),
+            )
+          : (focused ? const _BlinkingCaret() : null),
+    );
+    if (focused && !hasError) {
+      return AnimatedScale(
+        scale: filled ? 1.04 : 1,
+        duration: const Duration(milliseconds: 150),
+        child: Container(
+          padding: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            gradient: context.gradients.ai,
+            borderRadius: radii,
+            boxShadow: context.elevation.btnPrimary,
+          ),
+          child: Container(
+            alignment: Alignment.center,
+            height: 55,
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: radii,
+            ),
+            child: character != null
+                ? Text(
+                    character!,
+                    style: type.pageTitle.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: colors.ink,
+                    ),
+                  )
+                : const _BlinkingCaret(),
+          ),
+        ),
+      );
+    }
+    return AnimatedScale(
+      scale: filled ? 1.04 : 1,
+      duration: const Duration(milliseconds: 150),
+      child: cell,
+    );
+  }
+}
+
+class _BlinkingCaret extends StatefulWidget {
+  const _BlinkingCaret();
+
+  @override
+  State<_BlinkingCaret> createState() => _BlinkingCaretState();
+}
+
+class _BlinkingCaretState extends State<_BlinkingCaret>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        // steps(1)：无渐变，前半显示后半隐藏
+        return Opacity(
+          opacity: _controller.value < 0.5 ? 1 : 0,
+          child: Container(
+            width: 2.5,
+            height: 24,
+            decoration: BoxDecoration(
+              color: colors.aiPrimary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _FieldCard extends StatelessWidget {
   const _FieldCard({
     required this.hint,
     required this.controller,
     this.prefix,
-    this.action,
-    this.maxLength,
-    this.digitsOnly = false,
-    this.onChanged,
   });
 
   final String hint;
   final TextEditingController controller;
   final Widget? prefix;
-  final Widget? action;
-  final int? maxLength;
-  final bool digitsOnly;
-  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +535,8 @@ class _FieldCard extends StatelessWidget {
     final type = context.typography;
     final radii = context.radii;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: radii.rMd,
@@ -272,29 +551,16 @@ class _FieldCard extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              onChanged: onChanged,
-              maxLength: maxLength,
-              keyboardType:
-                  digitsOnly ? TextInputType.number : TextInputType.text,
-              inputFormatters: digitsOnly
-                  ? [FilteringTextInputFormatter.digitsOnly]
-                  : null,
               style: type.body.copyWith(fontSize: 15, color: colors.ink),
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle:
                     type.body.copyWith(fontSize: 15, color: colors.ink3),
                 border: InputBorder.none,
-                counterText: '',
                 isCollapsed: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
-          if (action != null) ...[
-            const SizedBox(width: 10),
-            action!,
-          ],
         ],
       ),
     );

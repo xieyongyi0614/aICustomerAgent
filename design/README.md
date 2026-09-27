@@ -12,8 +12,8 @@
 
 | 文件 | 页面 | 冻结原型锚点（仅历史对照） |
 |---|---|---|
-| `00-login.html` | 登录欢迎页 | `#login` |
-| `01-verify.html` | 手机验证码页 | `#verify` |
+| `00-login.html` | 登录欢迎页（邮箱优先） | `#login` |
+| `01-verify.html` | 邮箱验证码页 | `#verify` |
 | `10-home.html` | 首页 · AI Life Center | `#home` |
 | `11-briefing.html` | 早间简报（主动式） | `#briefing` |
 | `20-chat.html` | 对话 · 旅行规划 Tool Call | `#chat` |

@@ -101,7 +101,11 @@ final appRouter = GoRouter(
         ),
         GoRoute(path: '/memory', builder: (_, _) => const MemoryPage()),
         GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
-        GoRoute(path: '/verify', builder: (_, _) => const VerifyCodePage()),
+        GoRoute(
+          path: '/verify',
+          builder: (_, state) =>
+              VerifyCodePage(email: state.extra as String?),
+        ),
         GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
         GoRoute(
           path: '/profile/privacy',

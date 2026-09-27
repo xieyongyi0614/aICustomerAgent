@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
-import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/orb/orb.dart';
 import 'widgets/agreement_check.dart';
 
-/// 设计稿 ⓪ 登录 / 初见 Onboarding：登录即「与亚丝娜的第一天」。
+/// 设计稿 ⓪ 登录 / 初见 Onboarding（邮箱优先）：登录即「与亚丝娜的第一天」。
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -15,45 +14,61 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  final _email = TextEditingController();
   bool _agreed = true;
 
-  void _noticeWeChatUnavailable() {
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  void _notice(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         behavior: SnackBarBehavior.floating,
-        content: Text('微信登录还没接入，先用手机号见亚丝娜吧'),
+        content: Text(message),
       ),
     );
   }
 
-  Future<void> _enterAsGuest() async {
-    final prefs = await PrefsStore.load();
-    await prefs.markLoginSeen();
-    if (!mounted) return;
-    context.go('/home');
+  bool get _agreementAccepted {
+    if (_agreed) return true;
+    _notice('请先阅读并同意《用户协议》和《隐私政策》');
+    return false;
+  }
+
+  void _onEmailLogin() {
+    FocusScope.of(context).unfocus();
+    if (!_agreementAccepted) return;
+    final email = _email.text.trim();
+    if (!_emailPattern.hasMatch(email)) {
+      _notice('请输入正确的邮箱地址');
+      return;
+    }
+    context.push('/verify', extra: email);
   }
 
   void _onWeChatLogin() {
-    if (!_agreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('请先阅读并同意《用户协议》和《隐私政策》'),
-        ),
-      );
-      return;
-    }
-    _noticeWeChatUnavailable();
+    if (!_agreementAccepted) return;
+    _notice('微信登录还没接入，先用邮箱见亚丝娜吧');
+  }
+
+  void _onPhoneLogin() {
+    if (!_agreementAccepted) return;
+    _notice('手机号登录还没接入，先用邮箱吧');
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
-    final radii = context.radii;
-    final elevation = context.elevation;
     return Scaffold(
       backgroundColor: colors.canvas,
+      // 键盘弹出不重排布局：Spacer 底部锚定 + 视口逐帧收缩会叠加出上挪与抖动
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
@@ -73,6 +88,8 @@ class _LoginPageState extends State<LoginPage> {
                   height: 160,
                   child: Stack(
                     alignment: Alignment.center,
+                    // 辉光半径到球心约 98px，超出 160 盘面，不可裁剪
+                    clipBehavior: Clip.none,
                     children: [
                       DecoratedBox(
                         decoration: BoxDecoration(
@@ -115,8 +132,8 @@ class _LoginPageState extends State<LoginPage> {
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                 decoration: BoxDecoration(
                   color: colors.surface,
-                  borderRadius: radii.rLg,
-                  boxShadow: elevation.card,
+                  borderRadius: context.radii.rLg,
+                  boxShadow: context.elevation.card,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,46 +153,44 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
               const Spacer(),
-              _PrimaryAction(
-                label: '微信一键登录',
-                onTap: _onWeChatLogin,
-                background: colors.wechat,
-                foreground: colors.onDeepPrimary,
-                boxShadow: elevation.btnWechat,
-                icon: const _WeChatGlyph(size: 20),
-              ),
+              _EmailField(controller: _email, onSubmit: _onEmailLogin),
               const SizedBox(height: 12),
-              _PrimaryAction(
-                label: '手机号登录 / 注册',
-                onTap: () => context.push('/verify'),
-                background: colors.surface,
-                foreground: colors.ink,
-                boxShadow: elevation.card,
-                border: Border.all(color: colors.line, width: 1.5),
-                icon: Icon(AppIcons.smartphone,
-                    size: 20, color: colors.onWhitePill),
+              _EmailLoginButton(onTap: _onEmailLogin),
+              const SizedBox(height: 10),
+              Text(
+                '未注册的邮箱将自动创建账号',
+                textAlign: TextAlign.center,
+                style: type.sub.copyWith(
+                  fontSize: 11.5,
+                  color: colors.ink3,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 10),
+              const _AltDivider(),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _AltLogin(
+                    label: '微信',
+                    icon: _WeChatGlyph(size: 23, inverted: true),
+                    onTap: _onWeChatLogin,
+                  ),
+                  const SizedBox(width: 46),
+                  _AltLogin(
+                    label: '手机号',
+                    icon: Icon(AppIcons.smartphone,
+                        size: 23, color: colors.ink2),
+                    onTap: _onPhoneLogin,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               AgreementCheck(
                 checked: _agreed,
                 onToggle: () => setState(() => _agreed = !_agreed),
-              ),
-              const SizedBox(height: 15),
-              GestureDetector(
-                onTap: _enterAsGuest,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(
-                    '先逛逛，稍后再登录 →',
-                    textAlign: TextAlign.center,
-                    style: type.sub.copyWith(
-                      fontSize: 12.5,
-                      color: colors.ink3,
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 20),
                     ],
@@ -190,27 +205,59 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction({
-    required this.label,
-    required this.onTap,
-    required this.background,
-    required this.foreground,
-    required this.boxShadow,
-    required this.icon,
-    this.border,
-  });
+class _EmailField extends StatelessWidget {
+  const _EmailField({required this.controller, required this.onSubmit});
 
-  final String label;
-  final VoidCallback onTap;
-  final Color background;
-  final Color foreground;
-  final List<BoxShadow> boxShadow;
-  final Widget icon;
-  final Border? border;
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: context.radii.rFull,
+        boxShadow: context.elevation.pill,
+      ),
+      child: Row(
+        children: [
+          Icon(AppIcons.mail, size: 18, color: colors.aiPrimary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => onSubmit(),
+              autofillHints: const [AutofillHints.email],
+              style: type.body.copyWith(fontSize: 15, color: colors.ink),
+              decoration: InputDecoration(
+                hintText: '输入邮箱地址',
+                hintStyle:
+                    type.body.copyWith(fontSize: 15, color: colors.ink3),
+                border: InputBorder.none,
+                isCollapsed: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmailLoginButton extends StatelessWidget {
+  const _EmailLoginButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
     final type = context.typography;
     final radii = context.radii;
     return GestureDetector(
@@ -219,24 +266,24 @@ class _PrimaryAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: background,
+          gradient: context.gradients.ai,
           borderRadius: radii.rFull,
-          boxShadow: boxShadow,
-          border: border,
+          boxShadow: context.elevation.btnPrimary,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            icon,
-            const SizedBox(width: 9),
             Text(
-              label,
+              '邮箱登录 / 注册',
               style: type.rowTitle.copyWith(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: foreground,
+                color: colors.onDeepPrimary,
               ),
             ),
+            const SizedBox(width: 9),
+            Icon(AppIcons.arrowRight,
+                size: 19, color: colors.onDeepPrimary),
           ],
         ),
       ),
@@ -244,10 +291,82 @@ class _PrimaryAction extends StatelessWidget {
   }
 }
 
+class _AltDivider extends StatelessWidget {
+  const _AltDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return Row(
+      children: [
+        Expanded(child: Container(height: 1, color: colors.line)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            '其他登录方式',
+            style: type.sub.copyWith(
+              fontSize: 11.5,
+              letterSpacing: 1,
+              color: colors.ink3,
+            ),
+          ),
+        ),
+        Expanded(child: Container(height: 1, color: colors.line)),
+      ],
+    );
+  }
+}
+
+class _AltLogin extends StatelessWidget {
+  const _AltLogin({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final Widget icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.surface,
+              border: Border.all(color: colors.line, width: 1.5),
+              boxShadow: context.elevation.card,
+            ),
+            child: Center(child: icon),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            style: type.sub.copyWith(fontSize: 11.5, color: colors.ink2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WeChatGlyph extends StatelessWidget {
-  const _WeChatGlyph({required this.size});
+  const _WeChatGlyph({required this.size, this.inverted = false});
 
   final double size;
+
+  /// true = 绿色图形（用于白底圆形按钮）；false = 白色图形（用于绿色大按钮）。
+  final bool inverted;
 
   @override
   Widget build(BuildContext context) {
@@ -255,8 +374,8 @@ class _WeChatGlyph extends StatelessWidget {
     return CustomPaint(
       size: Size.square(size),
       painter: _WeChatGlyphPainter(
-        body: colors.onDeepPrimary,
-        detail: colors.wechat,
+        body: inverted ? colors.wechat : colors.onDeepPrimary,
+        detail: inverted ? colors.surface : colors.wechat,
       ),
     );
   }

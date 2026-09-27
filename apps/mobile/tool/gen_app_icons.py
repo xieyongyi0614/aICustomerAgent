@@ -51,6 +51,8 @@ ICONS = [
     ("shield", "shield"),
     ("link", "link"),
     ("logOut", "log-out"),
+    ("mail", "mail"),
+    ("arrowRight", "arrow-right"),
 ]
 
 
