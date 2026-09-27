@@ -56,6 +56,18 @@ scale 1 → 1.055 → 1
 
 > 定稿值 **4.2s**。设计稿 §04+ 写的 4s 不采用。
 
+### 2.4 登录欢迎页 Hero 晕盘（`lg-orb-wrap::after`）
+
+登录页大球外圈的**静态**紫色辉光盘，属于页面组合（只有登录欢迎页用），不是 Orb 的状态：
+
+```
+直径 = 160px（lg 76 球的 2.105 倍），以球心为中心，溢出绘制不占布局
+径向渐变：rgba(122,92,255,.20) → transparent（68% farthest-corner ≈ 球半径 2.02 倍处消失）
+无动效（不呼吸、不旋转）；晕盘在球体之下层
+```
+
+Flutter 实现：`ZhaoxiOrb(size: lg, halo: true)`（`design/flutter/zhaoxi_orb.dart`）。外层容器**不要裁剪**（不要用 ClipRect 包裹，晕盘靠溢出绘制）。
+
 ---
 
 ## 3. 四个尺寸档
@@ -109,10 +121,13 @@ Orb(size, state)
 | 点 | 做法 |
 |---|---|
 | 底层径向渐变 | `RadialGradient(center: Alignment(-0.36, -0.44))` 对应 CSS 的 `32% 28%` |
+| **CSS farthest-corner 换算** | CSS `radial-gradient` 默认半径 = 圆心到**最远角**，Flutter `radius` 是**短边分数**（无 farthest-corner 语义，默认 0.5）。76px 球换算：底层 1.0、青光 **0.99**（0.46 × 75.2px）、白光 **1.02**（0.30 × 77.4px）；照抄 CSS 百分比当 radius 会让高光缩小 30–50% |
 | 内层高光叠加 | `Canvas.saveLayer(bounds, Paint())` → 画底层 → 第二层起用 `Paint()..blendMode = BlendMode.screen` → `restore()` |
 | 旋转 | 对整个内层做 `canvas.rotate(angle)`，**不要逐帧重算渐变坐标** |
 | 呼吸 | 用 `Transform.scale` 包外层，**不要重绘 painter**（painter 只依赖状态，不依赖呼吸进度） |
-| 内描边 | `Paint()..style = PaintingStyle.stroke..strokeWidth = 1` 画 1px 白圈 |
+| 内描边 | `Paint()..style = PaintingStyle.stroke..strokeWidth = 1` 画 1px 白圈，**α 0.5**（高光用的 innerWhite 本体 α0.9，描边需 withValues 降回） |
+| **外发光（box-shadow 换算）** | CSS `0 10px 30px rgba(102,90,255,.45)` + `0 0 60px rgba(63,150,255,.35)` → 球后两层 `MaskFilter.blur(BlurStyle.normal, σ)` 圆：紫层 center+(0,10) σ15、蓝层 center σ30（**blur-radius ≈ 2σ**），先画蓝层、紫层（首列）盖上。**必须画在 saveLayer 之外**——辉光溢出球体方框，进 saveLayer 会被边界裁掉；外层容器也不可裁剪（Stack 需 `clipBehavior: Clip.none`） |
+| flutter_hooks 订阅 | `useAnimationController` 不触发重建，必须 `useListenable(controller)` 订阅 tick，否则动画静止 |
 
 > ⚠️ `saveLayer` 开销大。**必须**包 `RepaintBoundary`，且只在 Orb 可见时开动画。
 

@@ -63,6 +63,9 @@ class Orb extends HookWidget {
     final swirl = useAnimationController(
       duration: Duration(milliseconds: swirlMs),
     );
+    // hook 不会随 AnimationController 的 tick 自动重建，缺订阅则画面静止
+    useListenable(breathe);
+    useListenable(swirl);
 
     final ticking = TickerMode.valuesOf(context).enabled;
 

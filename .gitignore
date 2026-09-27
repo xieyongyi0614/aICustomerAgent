@@ -3,7 +3,8 @@
 .pytest_tmp
 .workbuddy
 .workbuddy-ai
-
+.idea
+.playwright-mcp
 # Local databases
 *.db
 

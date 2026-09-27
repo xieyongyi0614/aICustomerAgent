@@ -62,3 +62,6 @@ app.*.map.json
 
 # DevTools 本地偏好（打开 DevTools 自动生成）
 /devtools_options.yaml
+
+# golden 测试失败时的诊断输出（isolatedDiff/maskedDiff/masterImage/testImage），仅本地临时产物
+**/failures/

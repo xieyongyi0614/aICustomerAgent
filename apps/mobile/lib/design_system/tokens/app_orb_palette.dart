@@ -8,6 +8,8 @@ class AppOrbPalette extends ThemeExtension<AppOrbPalette> {
     required this.done,
     required this.innerCyan,
     required this.innerWhite,
+    required this.glowPrimary,
+    required this.glowSecondary,
   });
 
   /// 待机/思考：#D9CCFF → #8B6DFF → #4D6BFF → #1FB9D8
@@ -21,6 +23,12 @@ class AppOrbPalette extends ThemeExtension<AppOrbPalette> {
 
   final Color innerCyan;
   final Color innerWhite;
+
+  /// 外发光主层 rgba(102,90,255,.45)：CSS 0 10px 30px
+  final Color glowPrimary;
+
+  /// 外发光外层 rgba(63,150,255,.35)：CSS 0 0 60px
+  final Color glowSecondary;
 
   static const values = AppOrbPalette(
     idle: [
@@ -43,6 +51,8 @@ class AppOrbPalette extends ThemeExtension<AppOrbPalette> {
     ],
     innerCyan: Color(0xD92BD2E8),
     innerWhite: Color(0xE6FFFFFF),
+    glowPrimary: Color(0x73665AFF),
+    glowSecondary: Color(0x593F96FF),
   );
 
   List<Color> forState(OrbVisualState state) => switch (state) {
@@ -58,6 +68,8 @@ class AppOrbPalette extends ThemeExtension<AppOrbPalette> {
     List<Color>? done,
     Color? innerCyan,
     Color? innerWhite,
+    Color? glowPrimary,
+    Color? glowSecondary,
   }) {
     return AppOrbPalette(
       idle: idle ?? this.idle,
@@ -65,6 +77,8 @@ class AppOrbPalette extends ThemeExtension<AppOrbPalette> {
       done: done ?? this.done,
       innerCyan: innerCyan ?? this.innerCyan,
       innerWhite: innerWhite ?? this.innerWhite,
+      glowPrimary: glowPrimary ?? this.glowPrimary,
+      glowSecondary: glowSecondary ?? this.glowSecondary,
     );
   }
 

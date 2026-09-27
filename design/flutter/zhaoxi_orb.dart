@@ -29,13 +29,22 @@
 // 3. 参数一览：
 //      size            ZhaoxiOrbSize.lg(76) / md(34) / sm(22)，默认 md
 //      state           ZhaoxiOrbState.idle / thinking / caring / bloom，默认 idle
+//      halo            登录欢迎页 Hero 的紫色辉光晕盘（静态、溢出绘制），默认 false
 //      onBloomComplete bloom 一次性动画播完后的回调（见「状态纪律」）
 //      semanticLabel   无障碍标签，默认「亚丝娜，AI 助手」
 //
+// 4. 登录欢迎页 Hero 的画法（对应 design/pages/00-login.html）：
+//
+//      ZhaoxiOrb(size: ZhaoxiOrbSize.lg, halo: true)
+//
+//      晕盘直径 = 球径 × 160/76 ≈ 2.105 倍，溢出绘制不占布局空间，
+//      外层容器不要裁剪（不要用 ClipRect / overflow 剪裁包住它）。
+//
 // 【状态语义与设计纪律（来自朝夕设计系统，务必遵守）】
 //   - idle     待机/陪伴：蓝紫，呼吸 4.2s + 高光旋转 7s
-//   - thinking 思考/执行：蓝紫，呼吸幅度加大(1.08)，高光旋转加速至 2.4s
-//   - caring   主动关怀：暖橙，非对称脉冲 1.8s（快起慢落）
+//   - thinking 思考/执行：蓝紫，呼吸幅度加大(1.08)，高光旋转加速至 2.4s，
+//              并叠加随 swirl 同速旋转的 conic 色相流动
+//   - caring   主动关怀：暖橙，非对称脉冲 1.8s（快起慢落），高光冻结不旋转
 //   - bloom    完成/成长：青绿，一次性绽放 1 → 1.18 → 1（600ms，只播一次）
 //   - 纪律 1：bloom 播完必须切回 idle（通过 onBloomComplete），不能让球停在青绿。
 //   - 纪律 2：同一时刻只有一态；冲突优先级 bloom > caring > thinking > idle。
@@ -44,9 +53,11 @@
 // 【性能说明（已在内部处理，接入方无需操心）】
 //   - 内置 RepaintBoundary 隔离重绘（内层高光用 saveLayer + BlendMode.screen，
 //     开销大，必须隔离）。
-//   - 感知 TickerMode：页面不可见 / App 退后台时自动停表，恢复时继续。
+//   - 感知 TickerMode：TickerProviderStateMixin 自动静音（页面不可见 / App
+//     退后台时停表，恢复时继续），无需接入方包任何 widget。
 //   - Painter 只依赖「状态 + 旋转角」，呼吸缩放走 Transform.scale，不触发重绘。
 //   - Shader / Paint 按帧缓存，不逐帧重建对象。
+//   - 晕盘（halo）是静态溢出绘制，无动画开销。
 //
 // 【token 色值（朝夕设计系统定稿，禁止随意改）】
 //   待机径向渐变（圆心 32% 28%）：
@@ -54,12 +65,17 @@
 //   内层高光（screen 叠加，7s 旋转）：
 //     A: 圆心 68% 72%，rgba(43,210,232,.85) → transparent 46%
 //     B: 圆心 30% 26%，rgba(255,255,255,.90) → transparent 30%
+//   思考态 conic 色相流动（screen 叠加，随 swirl 同速旋转）：
+//     #8B6DFF → #3E8BFF → #2BD2E8 → #8B6DFF（首尾相接，α0.45）
 //   主动关怀：#FFE6D2 0% → #FFB48F 36% → #FF9D76 68% → #FF7A4D 100%
 //   完成成长：#C8F7E4 0% → #6FD9B4 36% → #33BC8C 68% → #1F9A70 100%
+//   登录晕盘（halo，仅登录欢迎页 Hero，静态）：
+//     直径 = 球径 × 160/76；径向 #7A5CFF α0.20 → 透明（68% farthest-corner）
 //   外发光：0 10px 30px rgba(102,90,255,.45) + 0 0 60px rgba(63,150,255,.35)
 //   内描边：1px rgba(255,255,255,.5)
 //
-// 【真源】.agents/skills/zhaoxi-design-system/references/orb.md
+// 【真源】.agents/skills/zhaoxi-design-system/references/orb.md（晕盘见其 §2.4）
+//          登录晕盘原型：design/pages/00-login.html 的 .lg-orb-wrap::after
 // ============================================================================
 
 import 'dart:math' as math;
@@ -85,12 +101,16 @@ class ZhaoxiOrb extends StatefulWidget {
     super.key,
     this.size = ZhaoxiOrbSize.md,
     this.state = ZhaoxiOrbState.idle,
+    this.halo = false,
     this.onBloomComplete,
     this.semanticLabel = '亚丝娜，AI 助手',
   });
 
   final ZhaoxiOrbSize size;
   final ZhaoxiOrbState state;
+
+  /// 登录欢迎页 Hero 的紫色辉光晕盘（静态、溢出绘制，不占布局空间）。
+  final bool halo;
 
   /// bloom 一次性绽放播完后的回调。业务方必须在这里把 state 切回 idle。
   final VoidCallback? onBloomComplete;
@@ -128,12 +148,6 @@ class _ZhaoxiOrbState extends State<ZhaoxiOrb> with TickerProviderStateMixin {
     if (oldWidget.state != widget.state) _syncWithState();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _syncWithTickerMode();
-  }
-
   void _onBloomStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
       _bloom.reset();
@@ -160,18 +174,9 @@ class _ZhaoxiOrbState extends State<ZhaoxiOrb> with TickerProviderStateMixin {
       case ZhaoxiOrbState.caring:
         _breathe.duration = _caringPulsePeriod;
         _breathe.repeat();
-        _swirl.duration = _swirlPeriodIdle;
-        _swirl.repeat();
+        _swirl.stop();
       case ZhaoxiOrbState.bloom:
         _bloom.forward();
-    }
-    _syncWithTickerMode();
-  }
-
-  void _syncWithTickerMode() {
-    final enabled = TickerMode.of(context);
-    for (final c in [_breathe, _swirl, _bloom]) {
-      c.muted = !enabled;
     }
   }
 
@@ -243,6 +248,8 @@ class _ZhaoxiOrbState extends State<ZhaoxiOrb> with TickerProviderStateMixin {
                   swirlAngle: _swirl.value * 2 * math.pi,
                   showHighlights: widget.state != ZhaoxiOrbState.bloom ||
                       _bloom.value < 0.9,
+                  showConic: widget.state == ZhaoxiOrbState.thinking,
+                  halo: widget.halo,
                 ),
               ),
             );
@@ -258,11 +265,15 @@ class _OrbPainter extends CustomPainter {
     required this.colors,
     required this.swirlAngle,
     required this.showHighlights,
+    required this.showConic,
+    required this.halo,
   });
 
   final List<Color> colors;
   final double swirlAngle;
   final bool showHighlights;
+  final bool showConic;
+  final bool halo;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -270,16 +281,37 @@ class _OrbPainter extends CustomPainter {
     final center = rect.center;
     final radius = size.width / 2;
 
-    // ---------- 外发光（两层柔和投影） ----------
+    // ---------- 登录晕盘（静态，对应 .lg-orb-wrap::after，溢出绘制） ----------
+    if (halo) {
+      const haloSideRatio = 160 / 76;
+      final haloSide = size.width * haloSideRatio;
+      final haloRect =
+          Rect.fromCenter(center: center, width: haloSide, height: haloSide);
+      final haloPaint = Paint()
+        ..shader = RadialGradient(
+          radius: haloSide * math.sqrt2 / 2,
+          colors: [
+            const Color(0xFF7A5CFF).withValues(alpha: 0.20),
+            const Color(0xFF7A5CFF).withValues(alpha: 0),
+          ],
+          stops: const [0, 0.68],
+        ).createShader(haloRect);
+      canvas.drawCircle(center, haloSide / 2, haloPaint);
+    }
+
+    // ---------- 外发光（CSS box-shadow → MaskFilter，blur-radius ≈ 2σ） ----------
+    // 先画列表靠后的蓝层（0 0 60px rgba(63,150,255,.35)），紫层（0 10px 30px
+    // rgba(102,90,255,.45)）盖在上面；发光画在球后，球体自然遮住内圈。
+    // ⚠️ 必须画在 saveLayer 之外：辉光溢出球体方框，进 saveLayer 会被边界裁掉。
     final glowPaint = Paint()
       ..color = const Color(0xFF665AFF).withValues(alpha: 0.45)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-    canvas.drawCircle(center + const Offset(0, 5), radius * 0.92, glowPaint);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
+    canvas.drawCircle(center + const Offset(0, 10), radius, glowPaint);
 
     final haloPaint = Paint()
-      ..color = const Color(0xFF3F96FF).withValues(alpha: 0.30)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26);
-    canvas.drawCircle(center, radius * 1.05, haloPaint);
+      ..color = const Color(0xFF3F96FF).withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30);
+    canvas.drawCircle(center, radius, haloPaint);
 
     // ---------- 底层径向渐变（圆心 32% 28% ≈ Alignment(-0.36, -0.44)） ----------
     canvas.saveLayer(rect, Paint());
@@ -299,11 +331,12 @@ class _OrbPainter extends CustomPainter {
       canvas.rotate(swirlAngle);
       canvas.translate(-center.dx, -center.dy);
 
+      // CSS farthest-corner → Flutter shortestSide 换算：青光 0.99、白光 1.02
       final highlightA = Paint()
         ..blendMode = BlendMode.screen
         ..shader = RadialGradient(
           center: const Alignment(0.36, 0.44), // 68% 72%
-          radius: 0.7,
+          radius: 0.99,
           colors: [
             const Color(0xFF2BD2E8).withValues(alpha: 0.85),
             const Color(0xFF2BD2E8).withValues(alpha: 0),
@@ -316,7 +349,7 @@ class _OrbPainter extends CustomPainter {
         ..blendMode = BlendMode.screen
         ..shader = RadialGradient(
           center: const Alignment(-0.4, -0.48), // 30% 26%
-          radius: 0.55,
+          radius: 1.02,
           colors: [
             Colors.white.withValues(alpha: 0.9),
             Colors.white.withValues(alpha: 0),
@@ -324,6 +357,23 @@ class _OrbPainter extends CustomPainter {
           stops: const [0, 0.3],
         ).createShader(rect);
       canvas.drawCircle(center, radius, highlightB);
+
+      // 思考态 conic 色相流动：随 swirl 同速旋转，首尾相接无缝
+      if (showConic) {
+        final conicPaint = Paint()
+          ..blendMode = BlendMode.screen
+          ..shader = SweepGradient(
+            colors: [
+              const Color(0xFF8B6DFF).withValues(alpha: 0.45),
+              const Color(0xFF3E8BFF).withValues(alpha: 0.45),
+              const Color(0xFF2BD2E8).withValues(alpha: 0.45),
+              const Color(0xFF8B6DFF).withValues(alpha: 0.45),
+            ],
+            stops: const [0, 0.33, 0.66, 1],
+            transform: GradientRotation(swirlAngle),
+          ).createShader(rect);
+        canvas.drawCircle(center, radius, conicPaint);
+      }
       canvas.restore();
     }
     canvas.restore();
@@ -340,6 +390,8 @@ class _OrbPainter extends CustomPainter {
   bool shouldRepaint(_OrbPainter oldDelegate) =>
       oldDelegate.swirlAngle != swirlAngle ||
       oldDelegate.showHighlights != showHighlights ||
+      oldDelegate.showConic != showConic ||
+      oldDelegate.halo != halo ||
       !_listEquals(oldDelegate.colors, colors);
 
   bool _listEquals(List<Color> a, List<Color> b) {
@@ -368,7 +420,7 @@ class ZhaoxiOrbPreviewApp extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              ZhaoxiOrb(size: ZhaoxiOrbSize.lg),
+              ZhaoxiOrb(size: ZhaoxiOrbSize.lg, halo: true),
               SizedBox(height: 32),
               ZhaoxiOrb(size: ZhaoxiOrbSize.md, state: ZhaoxiOrbState.thinking),
               SizedBox(height: 32),
