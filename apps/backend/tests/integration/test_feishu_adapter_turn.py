@@ -9,10 +9,10 @@ from app.channels.feishu import adapter
 from app.channels.feishu.adapter import FALLBACK_TEXTS
 from app.core import llm_factory
 from app.core.db import Conversation
-from app.core.settings import get_settings
 from app.repositories import conversation_repository
 from app.services import agent_service, channel_identity_service, trace_collector
 from app.services.agent_service import EmptyLLMResponseError
+from tests.conftest import TEST_USER_ID
 
 
 def _structured_responses():
@@ -54,7 +54,7 @@ async def test_full_turn_writes_exactly_two_messages(db_session_factory, fake_ll
     assert outcome.outbound_text == "你好呀"
     assert outcome.user_id == "feishu:ou_full"
     assert outcome.session_id == "feishu:ou_full"
-    assert outcome.user_id != get_settings().default_user
+    assert outcome.user_id != TEST_USER_ID
     assert conversation_repository.count_messages("feishu:ou_full") == 2
     conversation = conversation_repository.find_conversation("feishu:ou_full")
     assert conversation is not None

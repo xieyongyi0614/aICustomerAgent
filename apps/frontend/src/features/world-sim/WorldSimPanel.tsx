@@ -319,7 +319,7 @@ function WorldSimPanelInner({ userId }: { userId: string }) {
 }
 
 function WorldSimPanel({ userId }: { userId?: string }) {
-  const resolved = userId ?? "default-user"
+  const resolved = userId ?? ""
   return <WorldSimPanelInner key={resolved} userId={resolved} />
 }
 

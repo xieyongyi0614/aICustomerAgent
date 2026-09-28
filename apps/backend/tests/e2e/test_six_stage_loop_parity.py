@@ -19,6 +19,7 @@ import pytest
 import uvicorn
 
 from app.main import app
+from tests.conftest import use_auth_user
 
 
 def _free_port():
@@ -127,18 +128,18 @@ def _both_six_modes(
 ):
     on_user, off_user = f"u-{tag}-on", f"u-{tag}-off"
 
+    use_auth_user(on_user)
     override_settings(
         **settings,
-        default_user=on_user,
         runtime_foreground_loop_enabled="true",
         runtime_six_stage_loop_enabled="true",
     )
     llm_override(build_llm())
     on = _turn(server, content, f"s-{tag}-on")
 
+    use_auth_user(off_user)
     override_settings(
         **settings,
-        default_user=off_user,
         runtime_foreground_loop_enabled="true",
         runtime_six_stage_loop_enabled="false",
     )

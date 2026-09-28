@@ -76,6 +76,20 @@ def test_product_endpoints_require_token(real_auth, method, path, kwargs):
     assert response.status_code == 401
 
 
+_DEBUG_ENDPOINTS = [
+    ("get", "/api/v1/state", None),
+    ("get", "/api/v1/debug/world", None),
+]
+
+
+@pytest.mark.parametrize("method,path,kwargs", _DEBUG_ENDPOINTS)
+def test_debug_surface_requires_token(real_auth, method, path, kwargs):
+    """默认用户概念退役后，调试面身份同样来自 token（不再回落魔法默认值）。"""
+    client = TestClient(app)
+    response = getattr(client, method)(path, **(kwargs or {}))
+    assert response.status_code == 401
+
+
 def test_chat_uses_token_identity(real_auth, llm_override):
     llm_override(FakeLLM(response="嗯，我在。", structured_responses=_structured()))
     client = TestClient(app)

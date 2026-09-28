@@ -117,7 +117,8 @@ function StatePanelInner({ userId }: { userId: string }) {
 }
 
 function StatePanel(props: StatePanelProps) {
-  return <StatePanelInner key={props.userId ?? "default-user"} userId={props.userId ?? "default-user"} />
+  const userId = props.userId ?? ""
+  return <StatePanelInner key={userId} userId={userId} />
 }
 
 export { StatePanel }

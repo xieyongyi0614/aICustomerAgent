@@ -227,8 +227,6 @@ def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
     timestamp = now or datetime.now()
     cfg = _get_settings()
     users = [row.id for row in user_repository.list_all(limit=50)]
-    if not users:
-        users = [getattr(cfg, "default_user", "default-user")]
     sent = 0
     skipped = 0
     for user_id in users:

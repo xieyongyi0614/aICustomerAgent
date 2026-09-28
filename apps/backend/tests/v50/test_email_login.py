@@ -90,7 +90,6 @@ def test_find_or_create_by_email_is_idempotent():
     assert first.user_id == second.user_id
     assert first.display_name == "newuser"
     assert first.status == "active"
-    assert first.is_default is False
 
 
 async def test_send_email_code_endpoint_returns_cooldown(monkeypatch):
@@ -124,7 +123,7 @@ async def test_verify_email_code_endpoint_issues_bound_token(monkeypatch):
 
     def fake_find(email):
         return user_service.UserContext(
-            user_id="email-abc123", display_name="u", status="active", is_default=False
+            user_id="email-abc123", display_name="u", status="active"
         )
 
     monkeypatch.setattr(verification_service, "verify_login_code", ok)

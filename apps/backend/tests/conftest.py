@@ -282,20 +282,38 @@ def _default_channel_gate_off(monkeypatch):
     get_settings.cache_clear()
 
 
+TEST_USER_ID = "default-user"
+"""测试身份：产品端点经 `require_user` 注入的 user_id（生产无默认用户概念）。
+
+取值沿用历史字面量，以免 ~300 处世界域 / 后台域夹具连锁改写（`home:default-user`
+这类派生 world_id 亦随之变动）——那是纯改名 churn，与本次「退役默认用户概念」无关。
+"""
+
+
 @pytest.fixture(autouse=True)
 def _default_auth_user():
     """产品端点 user_id 收口自 require_user（v5.0.0 §14 / ADR 13）。
 
-    HTTP 测试统一以 default-user 身份直连，免除逐用例造令牌；鉴权语义专项
-    用例（tests/v50/test_identity_cutover.py）在用例内 pop 掉本 override 走真实解析。
+    HTTP 测试统一以 `TEST_USER_ID` 直连，免除逐用例造令牌；需切换身份的用例用
+    `use_auth_user`；鉴权语义专项用例（tests/v50/test_identity_cutover.py）在用例内
+    pop 掉本 override 走真实解析。
     """
     from app.api.v1 import auth as auth_api
 
-    app.dependency_overrides[auth_api.require_user] = (
-        lambda: get_settings().default_user
-    )
+    app.dependency_overrides[auth_api.require_user] = lambda: TEST_USER_ID
     yield
     app.dependency_overrides.pop(auth_api.require_user, None)
+
+
+def use_auth_user(user_id: str) -> None:
+    """把 require_user override 切到指定 user_id（测试辅助，fixture / helper 均可调）。
+
+    每个用例开始时由 autouse `_default_auth_user` 重置为 `TEST_USER_ID`，故用例内
+    切换无需自行还原。
+    """
+    from app.api.v1 import auth as auth_api
+
+    app.dependency_overrides[auth_api.require_user] = lambda: user_id
 
 
 @pytest.fixture(autouse=True)

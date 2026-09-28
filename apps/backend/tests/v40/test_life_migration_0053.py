@@ -28,17 +28,17 @@ def test_orm_has_users_columns():
         "email",
         "display_name",
         "status",
-        "is_default",
         "created_at",
         "updated_at",
     }
     assert columns["id"].primary_key is True
 
 
-def test_default_index_declared():
-    indexes = {index.name: index for index in UserRow.__table__.indexes}
-    assert "ux_users_is_default" in indexes
-    assert indexes["ux_users_is_default"].unique is True
+def test_default_index_removed_from_orm():
+    """默认用户概念退役（0058）：ORM 不再声明 is_default 及其唯一索引。"""
+    indexes = {index.name for index in UserRow.__table__.indexes}
+    assert "ux_users_is_default" not in indexes
+    assert "is_default" not in UserRow.__table__.columns
 
 
 def test_migration_chain_head_matches_pin():

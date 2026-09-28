@@ -49,13 +49,6 @@ async def lifespan(application: FastAPI):
             "环境变量 %s 不对应任何 settings 字段，已被静默忽略（字段是否已改名？）",
             unknown_key,
         )
-    try:
-        from app.services.identity.user_service import ensure_default_user
-
-        ensure_default_user()
-        logging.getLogger(__name__).info("默认用户播种完成")
-    except Exception:
-        logging.getLogger(__name__).exception("默认用户播种失败，启动继续")
     if redis_client.is_configured():
         if await redis_client.ping_redis():
             logging.getLogger(__name__).info("Redis 连接正常")

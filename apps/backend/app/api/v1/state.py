@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.v1.auth import require_user
 from app.api.v1.schemas import (
     BehaviorBudgetOut,
     CharacterStateOut,
@@ -53,9 +54,11 @@ def _last_behavior_out(user_id: str) -> LastBehaviorOut | None:
 
 @state_router.get("/state", response_model=StateSnapshotOut)
 def get_state_snapshot(
-    user_id: str = Query(default=get_settings().default_user),
+    user_id: str | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=100),
+    caller: str = Depends(require_user),
 ):
+    user_id = user_id or caller
     settings = get_settings()
     history_limit = limit if limit is not None else settings.state_history_limit
     snapshot = state_service.load_snapshot(user_id, history_limit)
@@ -115,13 +118,14 @@ def get_state_snapshot(
 
 class ModeSetRequest(BaseModel):
     mode: str
+    user_id: str | None = None
 
 
 @state_router.post("/state/mode")
-def set_mode(body: ModeSetRequest):
+def set_mode(body: ModeSetRequest, caller: str = Depends(require_user)):
     if body.mode not in {"professional", "default", "immersive"}:
         raise HTTPException(status_code=422, detail="invalid mode")
-    user_id = get_settings().default_user
+    user_id = body.user_id or caller
     session_id = history_service.find_latest_conversation(user_id)
     session_id = getattr(session_id, "id", None)
     if session_id is None:

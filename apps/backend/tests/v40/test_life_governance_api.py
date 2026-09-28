@@ -7,11 +7,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import auth as auth_api
-from app.core.settings import get_settings
 from app.main import create_app
 from app.services.governance import DomainHandlers, register_domain
 from app.services.governance import provenance as provenance_mod
 from app.services.governance import registry as registry_mod
+from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
 
@@ -19,9 +19,7 @@ BACKEND = Path(__file__).resolve().parents[2]
 @pytest.fixture()
 def client():
     test_app = create_app()
-    test_app.dependency_overrides[auth_api.require_user] = (
-        lambda: get_settings().default_user
-    )
+    test_app.dependency_overrides[auth_api.require_user] = lambda: TEST_USER_ID
     return TestClient(test_app)
 
 

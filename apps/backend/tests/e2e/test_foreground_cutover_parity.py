@@ -29,6 +29,7 @@ import uvicorn
 
 from app.application import post_process
 from app.main import app
+from tests.conftest import use_auth_user
 
 
 def _free_port():
@@ -170,21 +171,19 @@ def _both_modes(
 ):
     """同一输入在总闸 on / off 两态各跑一轮，返回 (on_lines, off_lines)。
 
-    两态用**各自独立的用户**（`default_user`），否则同一用户的跨轮状态（如本轮是否选中目标）
+    两态用**各自独立的用户**（`use_auth_user`），否则同一用户的跨轮状态（如本轮是否选中目标）
     会让 `current_goal` 这类「按值决定是否下发」的字段产生与开关无关的差异——
     那是数据依赖，不是收编差异。
     """
     on_user, off_user = f"u-{tag}-on", f"u-{tag}-off"
 
-    override_settings(
-        **settings, default_user=on_user, runtime_foreground_loop_enabled="true"
-    )
+    use_auth_user(on_user)
+    override_settings(**settings, runtime_foreground_loop_enabled="true")
     llm_override(build_llm())
     on = _turn(server, content, f"s-{tag}-on")
 
-    override_settings(
-        **settings, default_user=off_user, runtime_foreground_loop_enabled="false"
-    )
+    use_auth_user(off_user)
+    override_settings(**settings, runtime_foreground_loop_enabled="false")
     llm_override(build_llm())
     off = _turn(server, content, f"s-{tag}-off")
 

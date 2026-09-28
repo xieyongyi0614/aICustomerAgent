@@ -10,7 +10,7 @@ import {
 } from "./fixtures"
 
 function persona(requestUrl: URL) {
-  const userId = requestUrl.searchParams.get("user_id") ?? "default-user"
+  const userId = requestUrl.searchParams.get("user_id") ?? ""
   if (userId === "rich-user") return RICH_USER
   if (userId === "near-upgrade-user") return NEAR_UPGRADE_USER
   return EMPTY_USER

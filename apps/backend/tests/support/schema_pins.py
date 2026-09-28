@@ -10,10 +10,10 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-MIGRATION_HEAD = "0057"
-SCHEMA_PREVIOUS_HEAD = "0056"
+MIGRATION_HEAD = "0058"
+SCHEMA_PREVIOUS_HEAD = "0057"
 SCHEMA_TABLE_COUNT = 50
-SCHEMA_COLUMNS_DIGEST = "e280e2cc52dd3232"
+SCHEMA_COLUMNS_DIGEST = "95861a517691ceaa"
 
 
 @dataclass(frozen=True, slots=True)

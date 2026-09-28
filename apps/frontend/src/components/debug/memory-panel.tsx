@@ -229,7 +229,7 @@ function MemoryPanelInner({
 }
 
 function MemoryPanel(props: MemoryPanelProps) {
-  const userId = props.userId ?? "default-user"
+  const userId = props.userId ?? ""
   return (
     <MemoryPanelInner key={userId} userId={userId} turnTrace={props.turnTrace ?? null} />
   )

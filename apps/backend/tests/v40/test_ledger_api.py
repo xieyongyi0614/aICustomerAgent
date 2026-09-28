@@ -10,13 +10,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import auth as auth_api
-from app.core.settings import get_settings
 from app.main import create_app
 from app.models.ledger import LedgerEntryDraft
 from app.repositories import ledger_repository
 from app.services.ledger import query as query_service
 from app.services.ledger.format import format_minor
 from app.services.ledger.service import ensure_user_bootstrap, record_entry
+from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 9, 22, 12, 0, 0)
@@ -27,18 +27,15 @@ USER = "api-user"
 def client(override_settings):
     override_settings()
     test_app = create_app()
-    test_app.dependency_overrides[auth_api.require_user] = (
-        lambda: get_settings().default_user
-    )
+    test_app.dependency_overrides[auth_api.require_user] = lambda: TEST_USER_ID
     return TestClient(test_app)
 
 
 @pytest.fixture()
 def setup(override_settings):
     override_settings()
-    from app.core.settings import get_settings
 
-    user = get_settings().default_user
+    user = TEST_USER_ID
     ensure_user_bootstrap(user, now=NOW)
     account = ledger_repository.list_accounts(user)[0]
     for i, amount in enumerate((5000, 3000)):
@@ -71,7 +68,7 @@ def test_summary_matches_aggregation_service(client, setup):
     data = query_service.summary(
         USER, period=query_service.Period.month(datetime.now()), now=datetime.now()
     )
-    # TestClient uses current default_user which may differ; compare shape and types
+    # TestClient 以 owner 身份请求，与 USER 常量可能不同；只比对形状与类型
     assert isinstance(body["expense_minor"], int)
     assert isinstance(data.expense_minor, int)
 

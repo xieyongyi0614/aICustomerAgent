@@ -36,7 +36,6 @@ def create_with_email(
             email=normalized,
             display_name=display_name,
             status="active",
-            is_default=False,
             created_at=timestamp,
             updated_at=timestamp,
         )
@@ -73,38 +72,3 @@ def list_all(limit: int | None = None) -> list[UserRow]:
 def exists(user_id: str) -> bool:
     with SessionLocal() as session:
         return session.get(UserRow, user_id) is not None
-
-
-def upsert_default(
-    user_id: str,
-    *,
-    display_name: str | None = None,
-    now: datetime | None = None,
-) -> UserRow:
-    timestamp = now or datetime.now()
-    with SessionLocal() as session:
-        row = session.get(UserRow, user_id)
-        if row is not None:
-            session.expunge(row)
-            return row
-        row = UserRow(
-            id=user_id,
-            display_name=display_name,
-            status="active",
-            is_default=True,
-            created_at=timestamp,
-            updated_at=timestamp,
-        )
-        session.add(row)
-        try:
-            session.commit()
-        except Exception:
-            session.rollback()
-            existing = session.get(UserRow, user_id)
-            if existing is not None:
-                session.expunge(existing)
-                return existing
-            raise
-        session.refresh(row)
-        session.expunge(row)
-        return row

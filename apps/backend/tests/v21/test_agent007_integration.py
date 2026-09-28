@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from app.application import life_loop
 from app.core import llm_factory
-from app.core.settings import get_settings
 from app.main import app
 from app.repositories import (
     agent_metric_repository,
@@ -23,6 +22,7 @@ from app.repositories import (
 )
 from app.character.asuna import evolution as persona_evolution
 from app.services import evolution, trigger_evaluator
+from tests.conftest import TEST_USER_ID
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "integration-user"
@@ -74,7 +74,7 @@ class TestEvolutionLoopE2E:
         assert run.status == "done"
         assert run.profile["budget_tier"] == "foreground"
 
-        chat_user = get_settings().default_user
+        chat_user = TEST_USER_ID
         anchors = {
             "personality_seeded": len(personality_state_repository.get_all(chat_user)) > 0,
             "snapshot_archived": agent_state_snapshot_repository.latest(chat_user) is not None,

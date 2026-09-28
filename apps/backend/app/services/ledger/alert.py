@@ -208,9 +208,7 @@ def should_alert(draft: AlertDraft, *, now: datetime, settings=None) -> bool:
     return proactive_repository.find_by_dedupe_key(draft.dedupe_key) is None
 
 
-def deliver_alert(
-    draft: AlertDraft, *, now: datetime, user_id: str = "default-user"
-) -> SendResult:
+def deliver_alert(draft: AlertDraft, *, now: datetime, user_id: str) -> SendResult:
     from app.models.autonomy import ProactiveAction
     from app.repositories import proactive_repository
     from app.services import proactive_delivery
@@ -256,8 +254,6 @@ def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
 
     timestamp = now or datetime.now()
     users = [row.id for row in user_repository.list_all(limit=50)]
-    if not users:
-        users = ["default-user"]
     sent = 0
     skipped = 0
     for user_id in users:
