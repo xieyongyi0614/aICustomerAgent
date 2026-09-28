@@ -18,7 +18,7 @@
 | 后端 | Python 3.13 + FastAPI + LangChain + PostgreSQL 16（SQLAlchemy + Alembic），uv 管理依赖 |
 | 前端 | React 19 + TypeScript + Vite + TanStack Query + Zustand + Tailwind 4（调试控制台 Debug Console） |
 | 部署 | Docker 多阶段构建 + docker compose（`postgres` + `console` 完整栈） |
-| 角色 | 单一角色 `character/asuna/`，单人用户模型（`default_user`） |
+| 角色 | 单一角色 `character/asuna/`，单人用户模型（用户行由登录链路派生，无固定 owner id） |
 
 ### 1.2 当前系统能力
 
@@ -359,7 +359,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
 | 会话 | `conversations`、`messages`、`conversation_summaries` | messages.conversation_id → conversations.id；summary 1:1 conversation |
-| 身份 | `users` | email 唯一**部分索引**（0057，邮箱验证码登录绑定；可空保留 default-user 无邮箱态）；is_default 全局唯一部分索引 |
+| 身份 | `users` | email 唯一**部分索引**（0057，邮箱验证码登录绑定）；`is_default` 列与唯一索引已于 0058 删除（默认用户概念退役） |
 | 角色状态 | `character_state`、`emotion_history`、`personality_state` | character_state.user_id 主键；emotion_history 按 user 时序；personality_state 唯一 (user,character,axis) |
 | 关系 | `relationship_state`、`relationship_events`、`relationship_milestones`、`relationship_conflicts`、`relationship_snapshots` | state 为当前态（version 乐观锁）；events 为账本（时序权威）；snapshots 版本化快照 |
 | 目标/计划 | `character_goals`、`goal_plans` | goals.parent_goal_id 自引用分层；goal_plans.goal_id → goals，版本号 version |
@@ -457,7 +457,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 | ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
 | **迁移链头钉测散落在 v24/v25/v26 共 15 个测试文件**（`MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`max(numbered) == NN`、`SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`）。每加一个迁移都要机械升级一遍（FEISHU-010 加 `0050` 时实测 **22 个用例由绿转红**，见 `review-v1.2.md` §7.10） | 加迁移的隐性成本高、易漏改；`v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名会随升级逐渐名不副实 | P1 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
-| 调试台面端点（`/debug/*`、`/state`、action）`user_id` 仍由请求直传（隐式 default-user），属开发工具定位（IDENT-010 留白）；产品面已全部经 `require_user` 收口（ADR 13），调试控制台经顶栏身份对话框注入 token | 调试面无多用户隔离；产品面已隔离 | P2 |
+| 调试台面端点（`/debug/*`、`/state`、action）`user_id` 省略时取 token 身份（`require_user`），可显式传入覆盖——**已无魔法默认值**（2026-09-28 IDENT-009）；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离 | 调试面无多用户隔离；产品面已隔离 | P2 |
 | `docs/` 169 文件、1589 处 `vXX_` 引用未改写（历史文档不改写是约定，靠 `flag-rename-map.md` 桥接） | 读历史文档需查对照表，存在导航断层 | P2 |
 | 测试侧版本标记残留 188 处（fixture 名/函数名如 `v24_tool_env`、`v21_on`） | 测试命名仍带历史版本号，语义混淆 | P3 |
 | settings 命名一致性建议未采纳（`flag-rename-map.md` §七：部分字段去前缀后丧失域归属，如 `decision_weight`、`planning_enabled`） | 扁平命名空间局部可读性下降 | P3 |
@@ -482,7 +482,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 10. **能力是手脚不是逻辑**：`Capability` 只执行不做决策，调度权/重试/回复生成在引擎（ActionEngine/AutonomyEngine）；`ToolRegistry`/`CapabilityRegistry` 代码注册非热插拔。
 11. **前台/后台同一决策代码路径**：统一 `decision_pipeline`，前台目标栈只读（长期化写入只发生在后台）。
 12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
-13. **用户身份收口（token 唯一身份源，2026-09-27）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）；`/debug/*` 与 `/state` 保持调试台语义（客户端直传 + default-user 回落）。owner 归并：`email-*` 散数据并入 default-user 并绑定 owner 邮箱（`scripts/adopt_owner_identity.py`，幂等一次性），default-user 即 owner 的稳定内部 id；V4.0.0 任务册 §14 为本次登记。
+13. **用户身份收口（token 唯一身份源，2026-09-27；默认用户概念整体退役 2026-09-28）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）。**IDENT-009（2026-09-28）：默认用户概念不再存在**——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。具体：①删 `settings.default_user` 字段与 `DEFAULT_USER` env 键；②删启动播种 `ensure_default_user()` / `upsert_default()`（空库冷启动不再造幽灵行）；③`/debug/*` 与 `/state`（共 20 个端点）的回落值由魔法 id 改为 **token 身份**（`user_id` 省略即取 `require_user`，显式传入可覆盖）；④删 `users.is_default` 列与唯一索引（迁移 `0058`；该列此前是纯装饰，全仓无查询用它）与 `UserContext.is_default`；⑤删一次性归并脚本 `adopt_owner_identity.py` 与 `resolve_user` 死代码。历史 owner 行的 id 迁移由 `scripts/migrate_owner_id_to_email.py` 承担（幂等 / 默认 dry-run，级联 `user_id` + `worlds.id` + `world_id`；**执行后所有已签发 token 失效**）。V4.0.0 任务册 §14 为本次登记。
 
 ---
 

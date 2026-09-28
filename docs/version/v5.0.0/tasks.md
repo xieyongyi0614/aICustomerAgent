@@ -400,14 +400,37 @@ API-001 → API-002 ──┘
 | IDENT-002 | 治理端点收口 | `/life/export`、`DELETE /life/data` 接 `require_user`，删 default-user 锁定与 `user_id` Query（原无鉴权可导出全量生活数据，安全修复） | 已实现 |
 | IDENT-003 | 账本收口 | ledger 全端点接 `require_user`，删 `_current_user` 的 default-user 特判（原显式非 default 用户反被 403）；请求体「禁止客户端指定」`user_id` 字段删除，服务端注入 | 已实现 |
 | IDENT-004 | 历史/主动收口 | `/conversations/latest`、`/conversations/{id}/messages`（补属主比对 404）、`/proactive/pending`、`/proactive/{id}/ack` 接 `require_user`（移动端在用面） | 已实现 |
-| IDENT-005 | owner 归并脚本 | `scripts/adopt_owner_identity.py --email`：information_schema 动态发现含 `user_id` 列的表 → email-* 数据并入 default-user（单行冲突保 default-user 并告警）→ 绑定邮箱 → 删 email-* 行；幂等，`--dry-run` | 已实现 |
+| IDENT-005 | owner 归并脚本 | `scripts/adopt_owner_identity.py --email`：动态发现含 `user_id` 列的表 → email-* 数据并入 default-user → 绑定邮箱 → 删 email-* 行；幂等，`--dry-run`。**2026-09-28 已执行完毕，脚本随默认用户概念退役删除**（其目标 id 概念已不存在；接替者见 IDENT-009 的 `migrate_owner_id_to_email.py`） | 已实现（已退役） |
 | IDENT-006 | 调试台适配 | Debug Console `http.ts`/`chat-stream.ts` 注入 `Authorization`（localStorage token）+ 顶栏「身份」对话框（贴 token → `/auth/me` 校验显示）；`use-active-user-id` 语义不变（调试台仍可显式指定 user_id） | 已实现 |
-| IDENT-007 | 后台用户集合 | `digest.py` / `alert.py` `run_maintenance` 已按 `user_repository.list_all` 迭代（本次核实，仅保留空表回落 default-user）；无代码变更 | 已实现 |
+| IDENT-007 | 后台用户集合 | `digest.py` / `alert.py` `run_maintenance` 按 `user_repository.list_all` 迭代；空表回落 default-user 分支已于 IDENT-009 摘除（启动播种保证非空，分支不可达） | 已实现 |
 | IDENT-008 | 冷启动回归 | 专项测试 `tests/v50/test_identity_cutover.py`：无 token 401；token 身份贯穿（聊天落库/历史隔离/账本 scope/导出 scope）；全新用户首轮对话不崩（世界/角色状态空态口径） | 已实现 |
 
-留白：IDENT-009（`default_user` 设置与 `is_default` 退役评估，测试身份保留前不动）、IDENT-010（调试面鉴权）、IDENT-011（feishu 身份与 email 身份并集）均 P2，另行登记。
+留白：IDENT-010（调试面鉴权）、IDENT-011（feishu 身份与 email 身份并集）均 P2，另行登记。IDENT-009 已执行（见下）。
 
-**IDENT-009 评估结论（2026-09-28，裁决：暂不退役）**：`settings.default_user` 现承担三重角色——①测试身份（conftest override 与数百用例以 default-user 直连服务层，全量替换成本远超收益）；②部署启动播种锚点（`main.py` lifespan `ensure_default_user`，owner 邮箱绑定后它就是 owner 行本身，不再有"幽灵用户"语义）；③调试面回落值（D3 语义）。`users.is_default` 是 owner 行的标记列，随行存在无害。退役前提是"调试面鉴权（IDENT-010）落地 + 测试身份迁移到显式 fixture 值"，两者都属 P2；结论：保留现状，本轮仅删除语义歧义（default-user = owner 内部 id，非匿名兜底身份）。
+**IDENT-009 执行结论（2026-09-28，默认用户概念整体退役）**：不再存在"默认用户"这一身份概念——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。
+
+| # | 退役项 | 落地 |
+|---|---|---|
+| 1 | `settings.default_user` 字段 + `DEFAULT_USER` env | 已删。保留可配置面本身是地雷：改它会让播种撞 `ux_users_is_default` 唯一索引而静默失败 |
+| 2 | 启动播种 `ensure_default_user()` + `user_repository.upsert_default()` | 已删（`main.py` lifespan 不再播种）。空库冷启动不再造幽灵行，等首次登录自然建行 |
+| 3 | 调试面回落值（`state.py` / `world.py`，共 20 个端点） | 改为**token 身份**：`user_id` 省略即取 `require_user`，显式传入可覆盖。`/state`、`/debug/*` 由无鉴权变为需 token（提前兑现 IDENT-010 的语义） |
+| 4 | `users.is_default` 列 + `ux_users_is_default` 唯一索引 + `UserContext.is_default` | 已删（迁移 `0058`）。该列此前是**纯装饰**——全仓无任何查询用它，只有写入端 |
+| 5 | 一次性归并脚本 `scripts/adopt_owner_identity.py` + 测试 | 已删（目标概念消失；`adc57e4` 记录其已执行完毕） |
+| 6 | `user_service.resolve_user()` 死代码 | 已删（生产零调用点） |
+
+**接替工具**：`scripts/migrate_owner_id_to_email.py` —— 把历史 owner 行 id 由 `default-user` 改成邮箱派生 id，级联改写所有 `user_id` 列 + `worlds.id` + 所有 `world_id` 列（全部动态发现，幂等，默认 dry-run，`--apply` 单事务）。**待跑**：需部署侧 `alembic upgrade head`（0058）后执行；副作用是**所有已签发 token 失效**（无状态签名里带 user_id），需重新登录一次。
+
+**测试身份**：`tests/conftest.py::TEST_USER_ID`（值取 `default-user`）。取值沿用历史字面量是刻意的——全仓约 300 处世界域夹具会派生 `home:default-user` 这类 world_id，整体改名属纯 churn，未纳入本次；语义上它只是夹具的任意 id，生产已无此概念。
+
+**测试门槛（IDENT-009，2026-09-28）**：后端全量在**同条件**下双树对照（PG 已起、每次运行前 `DROP SCHEMA public CASCADE` 重置 `asuna_test`）——HEAD 干净 worktree 基线（`adc57e4`）**27 failed / 7154 passed / 2 skipped**，本变更 **27 failed / 7153 passed / 2 skipped**；25 条为两树共有（既有失败），差异仅 1 条/侧（`test_tool009_evidence::test_projection_failure_is_isolated_per_window` vs `test_debug_trace_persist::test_lru_evicted_turn_falls_back_to_db`），两者在各自树隔离重复 3 次均通过 → **零确定性回归**。
+
+**PG 迁移已实测**：`tests/integration/test_db_migration.py::test_alembic_upgrade_matches_orm_metadata` 在 PG 上通过 → `alembic upgrade head`（含新 `0058`）产出的 schema 与 ORM metadata 逐列一致。
+
+**数据迁移脚本已实测**：`tests/v50/test_migrate_owner_id.py` 6/6（内存 SQLite，覆盖 `user_id` / `worlds.id` / `world_id` 三条级联路径、dry-run 零写入、重复执行、无邮箱拒绝、目标已存在拒绝）。
+
+**前端**：`tsc -b` 通过 + vitest 154/154。
+
+注：本机 `.venv` 与 `uv.lock` 不同步（缺 `redis` / `fakeredis` / `aiosmtplib` / `sortedcontainers`），已 `uv sync --all-groups` 补齐；另本机 `asuna` 库停在 revision `0035`（无 `users` 表），直接跑 `migrate_owner_id_to_email` dry-run 会因缺表报错——属既有环境问题，非本变更。
 
 **测试门槛（已过，2026-09-27）**：后端全量 7153 绿（28 失败经 HEAD 干净 worktree 基线对照逐项归因：22 既有红 + 4 本地 `.env` SMTP/Redis 环境敏感 + 1 tool007 冻结源钉测因前序会话未提交的 world_engine 改动 + 1 既有时序 flake，**本变更零确定性回归**）；`tests/v50` 鉴权专项 + 归并脚本 + 登录/令牌共 34 绿；前端 typecheck + 154 绿；移动端零改动。
 
