@@ -133,11 +133,9 @@ def test_world_facts_defaults():
     assert facts.salient_events == []
 
 
-def test_world_settings_defaults(monkeypatch):
-    monkeypatch.delenv("WORLD_ENABLED", raising=False)
+def test_world_settings_defaults():
     get_settings.cache_clear()
     settings = get_settings()
-    assert settings.world_enabled is True
     assert settings.world_time_mode == "real_sync"
     assert settings.world_context_char_budget == 600
     assert "world_llm_assist_enabled" not in type(settings).model_fields

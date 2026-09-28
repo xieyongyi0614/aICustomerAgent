@@ -128,7 +128,7 @@ class TestCancellationClosesLedger:
     def test_legacy_cycle_closes_ledger_on_cancellation(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(world_enabled="false")
+        override_settings()
 
         async def _scenario() -> str:
             started = asyncio.Event()
@@ -165,7 +165,7 @@ class TestCancellationClosesLedger:
     def test_legacy_cycle_closes_ledger_on_base_exception(
         self, db_session_factory, override_settings, monkeypatch
     ):
-        override_settings(world_enabled="false")
+        override_settings()
 
         async def _scenario() -> str:
             async def _boom_step(*_args, **_kwargs):
@@ -251,7 +251,6 @@ class TestEventPregateStatusPropagation:
         override_settings(
             runtime_autonomous_cycle_enabled="true",
             AGENT_EVENT_ESCALATION_TYPES="action_result",
-            world_enabled="false",
         )
         monkeypatch.setattr(
             controller,
@@ -280,7 +279,6 @@ class TestEventPregateStatusPropagation:
         override_settings(
             runtime_autonomous_cycle_enabled="true",
             AGENT_EVENT_ESCALATION_TYPES="action_result",
-            world_enabled="false",
         )
         monkeypatch.setattr(controller, "run_autonomous_cycle", _stub_cycle("done"))
         outbox_repository.insert({"user_id": "u-pregate-ok", "world_ops": []}, "evt-rev-ok", now=NOW)

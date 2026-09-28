@@ -1097,7 +1097,7 @@ grep -rn 'v2[1-6]_' apps/backend/app/api apps/frontend/src --include=*.py --incl
 | `action_outbox_enabled` | 附录 E 方案③：LIFE-004 灰度评审未通过；固化 ON 须先把 v26 的 world 反馈投影从 `integrate_result` 迁到 outbox 消费之后 |
 | `character_action_sync_enabled` / `inventory_grounding_enabled` | 批次 1 改名保留（附录 E.6） |
 
-**4 个不带版本段的基闸**（`world_enabled` / `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled`）**不在删除范围**——vXX_ 的 ON 路径运行时仍依赖它们（`world_enabled` 一个就有 31 处门控）。
+**4 个不带版本段的基闸**（`world_enabled` / `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled`）**不在删除范围**——vXX_ 的 ON 路径运行时仍依赖它们（`world_enabled` 一个就有 31 处门控）。**（后记 2026-09-28：四者已固化常开并删除，见 `remaining-flag-audit.md` 附录 E.7 / E.8）**
 
 ### H.2 批次 5 · v24 工具系统（11 个 / 70 门控点 / 测试 278 处 42 文件）
 
@@ -1518,6 +1518,8 @@ kind IN ('autonomy', 'chat', 'world_maintenance', 'action_retry', 'outbox_consum
 | 在存基础闸 | `world_enabled` / `autonomy_enabled` / `feishu_enabled`（3 个，保留理由同前；如需退役按本批流程另立批次） |
 
 > ⚠️ **上表已过时**（2026-09-22）：`autonomy_enabled` 已作为死开关删除（曾门控独立的 `autonomy_worker`，该 worker 早被 `life_loop` 归并；`main.py` 只起 `run_life_loop_worker`）。删改记录见 `remaining-flag-audit.md` 附录 D。本行**保留不改**以维持历史记录的忠实性。
+>
+> ⚠️ **再更新**（2026-09-28）：`world_enabled` 已固化常开并删除，在存基础闸为 **2 个**（`feishu_enabled` 为环境耦合位保留；`action_enabled` 等策略位见 `remaining-flag-audit.md`）。见 `remaining-flag-audit.md` 附录 E.8。
 
 ### H.16 V4.0 常开化登记：runtime 调度两位（PLA-018，2026-09-22）
 

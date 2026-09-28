@@ -69,7 +69,6 @@ GOAL_WRITE_FACE = (
 def planning_on(override_settings):
     """PLAN-003 装配面：编排常开（总闸与上下文子闸已删），四源恒装配；世界/观测面钉死。"""
     override_settings(
-        world_enabled="false",
         observability_persist_enabled="false")
 
 
@@ -220,7 +219,7 @@ class TestSixSources:
         self, db_session_factory, planning_on, assembler, make_goal, override_settings
     ):
         goal = make_goal(description="不建档目标")
-        override_settings(world_enabled="true")
+        override_settings()
         assert world_repository.get_world(V25_USER) is None
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
@@ -234,8 +233,7 @@ class TestSixSources:
     ):
         goal = make_goal(description="场景处境目标")
         world_repository.ensure_world(V25_USER)
-        override_settings(
-            world_enabled="true")
+        override_settings()
         world_simulation_repository.save_situation(_situation())
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
@@ -252,12 +250,12 @@ class TestSixSources:
             raise RuntimeError("处境读取失败")
 
         monkeypatch.setattr(world_simulation_repository, "get_active_situation", _boom)
-        override_settings(world_enabled="false")
+        override_settings()
         degraded = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(degraded, PlanContext)
-        assert degraded.scene is None
+        assert degraded.scene is not None
         assert degraded.situations == []
-        assert plan_context.DEGRADED_SCENE_UNAVAILABLE in degraded.degraded
+        assert plan_context.DEGRADED_SCENE_UNAVAILABLE not in degraded.degraded
         assert plan_context.DEGRADED_SITUATION_UNAVAILABLE in degraded.degraded
 
 
@@ -429,7 +427,7 @@ class TestAssemblyDiscipline:
         self, db_session_factory, planning_on, assembler, make_goal, monkeypatch, override_settings
     ):
         goal = make_goal(description="探测目标")
-        override_settings(world_enabled="false")
+        override_settings()
         result = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(result, PlanContext)
 
@@ -474,8 +472,7 @@ class TestAssemblyDiscipline:
         )
         world_repository.ensure_world(V25_USER)
         world_simulation_repository.save_situation(_situation())
-        override_settings(
-            world_enabled="true")
+        override_settings()
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
         seen: list[str] = []
@@ -518,8 +515,7 @@ class TestAssemblyDiscipline:
         world_repository.ensure_world(V25_USER)
         world_engine.seed_default_household(V25_USER)
         world_simulation_repository.save_situation(_situation())
-        override_settings(
-            world_enabled="true")
+        override_settings()
         _stub_memories(monkeypatch)
         _stub_insights(monkeypatch, 1)
         called: list[str] = []
@@ -563,7 +559,7 @@ class TestDegradedRegistry:
 
     PLAN-008 契约演进（本模块的必要改动，留痕）：World 源由「三段一体」细化为 §4.2.1 的
     **九段逐段可降级**，故 `PLAN_DEGRADED_REASONS` 在原六值之后（`world_disabled` 之后）
-    插入七条世界段标记。整体不可用（`world_enabled=False` / 无世界记录）仍只登记
+    插入七条世界段标记。整体不可用（无世界记录）仍只登记
     `world_disabled` 一条，其余断言不变。
     """
 

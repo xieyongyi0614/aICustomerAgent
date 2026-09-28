@@ -52,7 +52,7 @@ def _reset_budget():
 def background_ready(override_settings):
     """后台 tick 可跑的最小环境（世界旁路关闭）。"""
     trigger_evaluator._followup_registry.clear()
-    override_settings(world_enabled="false")
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -242,6 +242,6 @@ class TestCutoverEquivalence:
 
         stats = await life_loop.run_life_loop_tick(now=NOW)
 
-        assert stats["maintenance"] == 5
+        assert stats["maintenance"] == 7
         kinds = {r.kind for r in loop_run_repository.list_recent()}
         assert {"trigger_reconcile", "ledger_digest", "ledger_alert"} <= kinds

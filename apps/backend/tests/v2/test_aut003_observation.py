@@ -64,7 +64,6 @@ def _facts(**overrides):
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        world_enabled="false",
         observability_persist_enabled="false")
     yield
 

@@ -11,9 +11,6 @@ from app.services.action.registry import ExecutionContext
 from app.services.world.locations import resolve_location_alias
 
 
-from app.services.action.capabilities.reminder import world_gate
-
-
 def _failure(error: str) -> CapabilityResult:
     return CapabilityResult(status="failed", error=error, payload={"failure_kind": "permanent"})
 
@@ -49,9 +46,6 @@ class WorldActionCapability:
         return schema.validate(params) if schema else [f"未知动作: {action}"]
 
     async def execute(self, action: str, params: dict, ctx: ExecutionContext) -> CapabilityResult:
-        gate = world_gate(ctx)
-        if gate is not None:
-            return gate
         if action == "create":
             return await self._create(params, ctx)
         if action == "move":

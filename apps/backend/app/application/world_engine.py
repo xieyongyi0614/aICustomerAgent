@@ -424,11 +424,8 @@ def ensure_world(user_id: str) -> World | None:
     try:
         existing = world_repository.get_world(user_id)
         world = world_repository.ensure_world(user_id)
-        settings = get_settings()
         if (
             world is not None
-            and settings.world_enabled
-            and settings.world_household_autoseed_enabled
             and (existing is None or _household_missing_defaults(world))
         ):
             seed_default_household(user_id)
@@ -874,9 +871,8 @@ def _transition_events_by_type(
 
 def complete_events_by_type(user_id: str, event_type: str) -> int:
     changed = _transition_events_by_type(user_id, event_type, EventStatus.COMPLETED)
-    if get_settings().world_memory_bridge_enabled:
-        for event in changed:
-            materialize_event_memory(event, user_id)
+    for event in changed:
+        materialize_event_memory(event, user_id)
     return len(changed)
 
 
@@ -922,8 +918,7 @@ def expire_stale_events(user_id: str, now: datetime | None = None) -> int:
             event.updated_at = now
             world_repository.save_event(event)
             expired += 1
-            if settings.world_memory_bridge_enabled:
-                materialize_event_memory(event, user_id)
+            materialize_event_memory(event, user_id)
         return expired
     except Exception:
         logger.exception("世界事件过期清理失败")
@@ -933,8 +928,6 @@ def expire_stale_events(user_id: str, now: datetime | None = None) -> int:
 def run_turn_update(user_id: str, message: str, trace=None) -> int:
     """post_process 第 8 步（H4）：解释用户消息 → 世界状态迁移 + 到期处理。"""
     settings = get_settings()
-    if not settings.world_enabled or not settings.world_interpreter_enabled:
-        return 0
     started = time.perf_counter()
     try:
         world = ensure_world(user_id)
@@ -1040,8 +1033,6 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
 
 def build_context(user_id: str, session_id: str | None = None, trace=None):
     """每 turn 一次的世界切片装配（H1）：只读、有界、失败降级 None。"""
-    if not get_settings().world_enabled:
-        return None
     started = time.perf_counter()
     try:
         world = ensure_world(user_id)
@@ -1072,19 +1063,17 @@ def build_context(user_id: str, session_id: str | None = None, trace=None):
             world.world_id, statuses=["scheduled", "active", "completed"], limit=20
         )
         settings = get_settings()
-        change_events = None
-        if settings.character_action_sync_enabled:
-            try:
-                change_events = world_repository.list_events(
-                    world.world_id,
-                    statuses=["completed"],
-                    limit=50,
-                    types=["character_action"],
-                    order="created_at_desc",
-                )
-            except Exception:
-                logger.exception("角色动作事件查询失败，最近世界变化置空")
-                change_events = []
+        try:
+            change_events = world_repository.list_events(
+                world.world_id,
+                statuses=["completed"],
+                limit=50,
+                types=["character_action"],
+                order="created_at_desc",
+            )
+        except Exception:
+            logger.exception("角色动作事件查询失败，最近世界变化置空")
+            change_events = []
         context = build_world_context(
             world,
             entities,
@@ -1188,8 +1177,6 @@ def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
 
 def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
     """自治只读事实包（autonomy-integration.md §1）：装配失败 → 空包。"""
-    if not get_settings().world_enabled:
-        return {}
     try:
         world = get_world(user_id)
         if world is None:
@@ -1220,8 +1207,6 @@ def collect_facts(user_id: str, provider: TimeProvider | None = None) -> dict:
 def run_maintenance(user_id: str | None = None) -> int:
     """世界维护单轮：到期触发 / 物品过期 / 宽限过期 / 保留清理。"""
     settings = get_settings()
-    if not settings.world_enabled:
-        return 0
     handled = 0
     worlds = (
         [get_world(user_id)]
@@ -1349,9 +1334,6 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
 
     全程 0 LLM；异常按世界旁路纪律降级，不中断其它维护步。
     """
-    settings = get_settings()
-    if not settings.world_enabled:
-        return None
     worlds = (
         [ensure_world(user_id)]
         if user_id is not None

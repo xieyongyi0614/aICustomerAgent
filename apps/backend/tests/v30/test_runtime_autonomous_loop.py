@@ -50,7 +50,7 @@ def _reset_budget():
 @pytest.fixture()
 def cycle_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(world_enabled="false")
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -130,7 +130,7 @@ class TestFlagDispatch:
     async def test_flag_on_uses_agent_loop(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true", world_enabled="false")
+        override_settings(runtime_autonomous_cycle_enabled="true")
         _setup_conversation()
         _fake_tick(monkeypatch)
         created: list = []
@@ -254,7 +254,7 @@ class TestDecisionGates:
         _setup_conversation()
         _fake_tick(monkeypatch)
         override_settings(
-            runtime_autonomous_cycle_enabled="true", world_enabled="false"
+            runtime_autonomous_cycle_enabled="true"
         )
 
         if gate == "quota_circuit_open":
@@ -327,7 +327,7 @@ class TestSchedulerUnchanged:
     async def test_idle_short_circuit_zero_llm_zero_runs(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true", world_enabled="false")
+        override_settings(runtime_autonomous_cycle_enabled="true")
         _fake_tick(monkeypatch)
 
         await life_loop.run_life_loop_tick(now=NOW)
@@ -346,7 +346,7 @@ class TestSchedulerUnchanged:
     async def test_maintenance_steps_unchanged(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true", world_enabled="false")
+        override_settings(runtime_autonomous_cycle_enabled="true")
         _fake_tick(monkeypatch)
 
         stats = await life_loop.run_life_loop_tick(now=NOW)
@@ -358,7 +358,7 @@ class TestSchedulerUnchanged:
     async def test_event_pregate_unchanged(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true", world_enabled="false")
+        override_settings(runtime_autonomous_cycle_enabled="true")
         _fake_tick(monkeypatch)
         assert await agent_runtime.run_event_pregate(now=NOW) == 0
 
@@ -375,7 +375,7 @@ class TestSchedulerUnchanged:
     async def test_run_writes_loop_runs_only(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true", world_enabled="false")
+        override_settings(runtime_autonomous_cycle_enabled="true")
         _setup_conversation()
         _fake_tick(monkeypatch)
         before = len(loop_run_repository.list_recent())

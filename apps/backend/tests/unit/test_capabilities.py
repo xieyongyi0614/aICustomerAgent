@@ -27,7 +27,7 @@ def ctx(registry):
 
 @pytest.mark.asyncio
 async def test_reminder_create_world_event(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     reminder = world_engine  # noqa: F841
     from app.services.action.capabilities.reminder import ReminderCapability
 
@@ -47,7 +47,7 @@ async def test_reminder_create_world_event(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_reminder_cancel(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.reminder import ReminderCapability
 
     cap = ReminderCapability()
@@ -59,7 +59,7 @@ async def test_reminder_cancel(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_reminder_cancel_no_target_fails(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.reminder import ReminderCapability
 
     result = await ReminderCapability().execute("cancel", {"target": "不存在"}, ctx)
@@ -69,7 +69,7 @@ async def test_reminder_cancel_no_target_fails(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_memory_save_user_stated(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.memory import MemoryCapability
 
     result = await MemoryCapability().execute("save", {"fact": "我生日是7月30日"}, ctx)
@@ -82,7 +82,7 @@ async def test_memory_save_user_stated(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_world_action_create_and_use(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     cap = WorldActionCapability()
@@ -99,7 +99,7 @@ async def test_world_action_create_and_use(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_world_action_move(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     cap = WorldActionCapability()
@@ -111,7 +111,7 @@ async def test_world_action_move(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_world_action_move_unknown_location(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     await WorldActionCapability().execute("create", {"object": "牛奶"}, ctx)
@@ -121,7 +121,7 @@ async def test_world_action_move_unknown_location(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_environment_query_readonly(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.environment_query import EnvironmentQueryCapability
 
     world_engine.set_environment(USER, weather="晴", temperature_c=26.0)
@@ -146,13 +146,3 @@ async def test_search_unavailable_and_notification_wired(ctx):
     assert (await NotificationCapability().execute("send", {"content": "x"}, ctx)).status == (
         "succeeded"
     )
-
-@pytest.mark.asyncio
-async def test_world_unavailable_when_disabled(override_settings):
-    override_settings(world_enabled=False)
-    from app.core.settings import get_settings
-    from app.services.action.capabilities.reminder import ReminderCapability
-
-    ctx = ExecutionContext(user_id=USER, record_id="act_test", now=NOW, settings=get_settings())
-    result = await ReminderCapability().execute("create", {"content": "开会", "due_at": "2026-09-04T08:00:00"}, ctx)
-    assert result.status == "unavailable"

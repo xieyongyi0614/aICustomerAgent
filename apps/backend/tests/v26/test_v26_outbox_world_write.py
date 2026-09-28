@@ -18,7 +18,6 @@ class TestOutboxWorldWrite:
     def test_create_reminder_outbox_world_ops_and_consume(self, override_settings):
         override_settings(
             action_outbox_enabled=True,
-            world_enabled=True,
         )
         world_engine.ensure_world("u_t2_outbox")
         action = manager.create(
@@ -59,7 +58,6 @@ class TestOutboxWorldWrite:
     def test_outbox_off_direct_world_event(self, override_settings):
         override_settings(
             action_outbox_enabled=False,
-            world_enabled=True,
         )
         world_engine.ensure_world("u_t2_direct")
         action = manager.create(

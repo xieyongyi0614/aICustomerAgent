@@ -80,7 +80,6 @@ RUN_PROFILE_REASON_PREFIX = "run_profile"
 PART_OF_DAY_REASON_PREFIX = "part_of_day"
 SCENE_REASON_PREFIX = "scene"
 RELATIONSHIP_REASON_PREFIX = "relationship_stage"
-WORLD_REASON = "world_unavailable"
 WORLD_FACTS_REASON = "world_disabled"
 
 STATUS_LABELS: tuple[str, ...] = ("disabled", "deprecated", "removed", "tripped")
@@ -128,7 +127,6 @@ class ToolSurfacePolicy:
             or self._scene_reason(defn, ctx)
             or self._relationship_reason(defn, ctx)
             or self._world_facts_reason(defn, ctx)
-            or self._world_reason(defn, ctx)
         )
 
     def _unavailable_reason(self, defn: ToolDefinition) -> str | None:
@@ -213,14 +211,6 @@ class ToolSurfacePolicy:
             return None
         if defn.namespace == WORLD_NAMESPACE:
             return WORLD_FACTS_REASON
-        return None
-
-    def _world_reason(self, defn: ToolDefinition, ctx: ToolContext) -> str | None:
-        """世界可用性维度（配置态）：world_enabled=False 剔除 world 命名空间（V9 world_gate 同款）。"""
-        if ctx.world_enabled():
-            return None
-        if defn.namespace == WORLD_NAMESPACE:
-            return WORLD_REASON
         return None
 
     @staticmethod
@@ -417,7 +407,6 @@ def surface_hash(
         "world": _pick(ctx.world, _HASH_WORLD_KEYS),
         "scene": _pick(ctx.scene, _HASH_SCENE_KEYS),
         "relationship": _pick(ctx.relationship, _HASH_RELATIONSHIP_KEYS),
-        "world_enabled": ctx.world_enabled(),
         "rule": (
             None
             if rule is None

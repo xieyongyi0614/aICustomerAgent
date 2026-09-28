@@ -274,11 +274,9 @@ def surface_context(*tool_ids: str, now: datetime | None = NOW):
 
 @pytest.fixture
 def planning_world_on(override_settings):
-    """PLAN-008 装配面：编排常开（子闸已删）+ 世界（V2.3.0 事件链）+ 工具总闸；自动播种关闭（夹具确定）。"""
+    """PLAN-008 装配面：编排常开（子闸已删）+ 世界（V2.3.0 事件链）+ 工具总闸。"""
     override_settings(
         plan_tool_required="true",
-        world_enabled="true",
-        world_household_autoseed_enabled="false",
         action_relationship_enabled="false",
         action_outbox_enabled="false",
         observability_persist_enabled="false")

@@ -290,30 +290,14 @@ class TestNineWorldFacts:
 
 
 class TestWorldDisabled:
-    """U2 / D4：`world_enabled=False` → World 源全空 + `degraded` 含 `world_disabled`（仅此一条）。
+    """U2 / D4：无世界记录 → World 源全空 + `degraded` 含 `world_disabled`（仅此一条）。
 
     D4 的「九项全空」在 World 源内逐项成立（①~⑤、⑧、⑨）；⑥ 处境取自
     `world_simulation_repository`、⑦ 场景取自角色资产，属 Context 源：⑦ 因缺地点
-    `scene_unavailable`，⑥ 的可用性只取决于该表的数据面——**世界总闸与处境表无门控关系**
-    （PLAN-003 既有语义，本任务零改动），故本用例不断言 ⑥ 为空（人造的「世界关闭 + 处境表非空」
-    组合下它仍有值；这正是「逐段可降级」与「同开同关」的区别）。
+    `scene_unavailable`，⑥ 的可用性只取决于该表的数据面——**世界记录缺失与处境表
+    无门控关系**（PLAN-003 既有语义，本任务零改动），故本用例不断言 ⑥ 为空（人造的
+    「无世界记录 + 处境表非空」组合下它仍有值；这正是「逐段可降级」与「同开同关」的区别）。
     """
-
-    @pytest.mark.asyncio
-    async def test_world_off_empties_the_nine_facts_without_segment_codes(
-        self, db_session_factory, planning_world_on, assembler, make_goal, override_settings
-    ):
-        seed_all(USER, location=LOCATION)
-        goal = make_goal(user_id=USER, description="世界关闭目标")
-        override_settings(world_enabled="false")
-        result = await assembler.assemble(goal, now=V25_NOW)
-        assert isinstance(result, PlanContext)
-        assert result.world == {}
-        assert result.world_context is None
-        assert result.world_brief is None
-        assert result.scene is None
-        assert plan_context.DEGRADED_WORLD_DISABLED in result.degraded
-        assert _world_codes(result) == []
 
     @pytest.mark.asyncio
     async def test_world_record_missing_degrades_without_creating_one(

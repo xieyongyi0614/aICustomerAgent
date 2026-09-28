@@ -29,6 +29,8 @@ EVENT_STATUS_CN = {
 
 
 def recent_world_changes_from_events(events: list[WorldEvent], limit: int = 3) -> list[str]:
+    if limit <= 0:
+        return []
     seen: set[str] = set()
     rows: list[str] = []
     ordered = sorted(

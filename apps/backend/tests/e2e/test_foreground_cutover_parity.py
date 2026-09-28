@@ -208,8 +208,7 @@ def test_full_turn_stream_parity(
         ),
         content="我今天压力很大",
         tag="parity",
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
     )
 
     assert [_kind(line) for line in on] == ["turn_meta", "delta", "delta", "done"]
@@ -228,8 +227,7 @@ def test_flag_off_skips_run_ledger_but_on_records_it(
     from app.repositories import loop_run_repository
 
     override_settings(
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
         runtime_foreground_loop_enabled="true",
     )
     llm_override(fake_llm(response=["好"], structured_responses=_structured()))
@@ -262,8 +260,7 @@ def test_mid_turn_llm_failure_parity(
         content="在吗",
         tag="llmfail",
         expect_done=False,
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
     )
 
     # 失败面：先 turn_meta，后错误块；无 token 下发；两态一致
@@ -290,8 +287,7 @@ def test_grounding_streamed_parity(
         ),
         content="在吗",
         tag="gs",
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
     )
 
     # 逐 token 流（非聚合）
@@ -312,7 +308,6 @@ def test_grounding_rewrite_streams_tokens(
         ),
         content="我今天压力很大",
         tag="gb",
-        inventory_grounding_enabled="true",
         inventory_grounding_mode="rewrite",
     )
 
@@ -341,7 +336,6 @@ def test_grounding_rewrite_replaces_changed_reply(
         ),
         content="我今天压力很大",
         tag="gbr",
-        inventory_grounding_enabled="true",
         inventory_grounding_mode="rewrite",
     )
 
@@ -378,8 +372,7 @@ def test_post_process_failure_parity(
         lambda: fake_llm(response=["别急"], structured_responses=_structured()),
         content="在吗",
         tag="ppf",
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
     )
 
     # 后台步骤失败不影响已产出的回复与流终态

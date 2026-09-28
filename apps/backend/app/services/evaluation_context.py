@@ -548,8 +548,6 @@ def _delta_dims(delta) -> dict | None:
 def _collect_world(user_id: str) -> dict | None:
     """V8 世界事实切片（只读）：评估 World Consistency 规则用；缺席为 None。"""
     try:
-        if not get_settings().world_enabled:
-            return None
         world = world_repository.get_world(user_id)
         if world is None:
             return None

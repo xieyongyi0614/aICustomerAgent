@@ -30,7 +30,8 @@
 
 `world["locations"]` 是 TOOL-004 `ToolContext.world_locations()` 定义、TOOL-003 `location_exists`
 消费的**已知地点词表**（注册表 id ∪ 中文名），本任务供数据（§5 Step 3）。
-`world_enabled` 恒存在 = **已装配标记**：`False` 时其余世界键缺省（E1），消费方据此保守降级。
+`world_enabled` 恒存在 = **已装配标记**：本装配器恒产出装配态；「未装配」表现为
+`world` 段整体缺席，消费方据此保守降级。
 """
 
 from __future__ import annotations
@@ -140,7 +141,7 @@ def _event_order_key(event: Any) -> tuple[int, float, str]:
 class WorldContextBuilder:
     """世界事实预读装配器（TOOL-007 §4.1）：无共享可变状态，并发安全（E15）。
 
-    `settings` 可在构造或 `build()` 传入（后者优先）；只读 `world_enabled`。
+    `settings` 可在构造或 `build()` 传入（后者优先），经 `build_scene` 透传。
     """
 
     def __init__(self, settings: Any = None) -> None:
@@ -151,14 +152,6 @@ class WorldContextBuilder:
     ) -> dict[str, Any]:
         """八段预读；返回 `ToolContext` 世界域字段集合（§2.2 键集，失败逐段降级）。"""
         resolved = settings if settings is not None else self._settings
-        if not _world_enabled(resolved):
-            return {
-                "world": {WORLD_ENABLED_KEY: False},
-                "inventory": [],
-                "situations": [],
-                "scene": {},
-                "relationship": {},
-            }
         world = self._read_world(user_id)
         return {
             "world": self._world_segment(user_id, world, now),
@@ -294,10 +287,6 @@ class WorldContextBuilder:
         except Exception as exc:
             logger.warning("世界事实预读段降级（locations）：%s", exc, exc_info=True)
             return ()
-
-
-def _world_enabled(settings: Any) -> bool:
-    return bool(getattr(settings, "world_enabled", True))
 
 
 def apply_world_facts(ctx: ToolContext, facts: dict[str, Any]) -> ToolContext:

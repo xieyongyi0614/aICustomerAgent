@@ -10,13 +10,6 @@ from app.models.action import ActionSchema, CapabilityResult
 from app.services.action.registry import ExecutionContext
 
 
-def world_gate(ctx: ExecutionContext) -> CapabilityResult | None:
-    """依赖世界的行动：世界未启用 → unavailable（world-integration.md §1.3）。"""
-    if ctx.settings is not None and not getattr(ctx.settings, "world_enabled", True):
-        return CapabilityResult(status="unavailable", error="世界未启用", payload={"failure_kind": "unavailable"})
-    return None
-
-
 def _parse_due(value) -> object | None:
     from datetime import datetime
 
@@ -44,9 +37,6 @@ class ReminderCapability:
         return schema.validate(params) if schema else [f"未知动作: {action}"]
 
     async def execute(self, action: str, params: dict, ctx: ExecutionContext) -> CapabilityResult:
-        gate = world_gate(ctx)
-        if gate is not None:
-            return gate
         if action == "create":
             return await self._create(params, ctx)
         if action == "cancel":

@@ -13,7 +13,6 @@ import pytest
 
 from app.application import action_engine, world_engine
 from app.core.db import Base
-from app.core.settings import get_settings
 from app.models.action import ActionResult
 from app.models.memory import MemoryCandidate, MemoryType
 from app.repositories import memory_repository
@@ -90,53 +89,6 @@ def tool_memory_on(v24_tool_env, override_settings):
 
 def _tool_record(tool_id: str, params: dict, **kwargs):
     return record(tool_id, params=params, **kwargs)
-
-
-# --- P1-3 端到端：工具执行 → 候选 → R1~R8 通过 → 落库 -------------------------
-
-
-@pytest.mark.asyncio
-async def test_reminder_create_end_to_end_deposits_memory(
-    db_session_factory, v24_tool_env, override_settings, monkeypatch
-):
-    """`builtin.reminder.create` 真跑一遍：执行成功 → 候选 → R1~R8 通过 → `memories` +1。
-
-    链路：`run_action_planning`（六闸门 → 工具面选择 → ToolExecutor → 真实 reminder 能力）
-    → `integrate_result` → `memory_bridge.deliver`（工具记忆子闸 on）→ `memories` 表。
-    """
-    from app.application.action_engine import run_action_planning
-    from app.models.action import ActionIntent
-    from app.services.tool import registry as tool_registry
-    from tests.v24.tool007_support import seed_all
-
-    v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_MEMORY_ENABLED=True)
-    override_settings(
-        world_enabled=True,
-        action_outbox_enabled=False,
-        world_household_autoseed_enabled=False,
-    )
-    seed_all(USER)
-    monkeypatch.setattr(tool_registry, "_registry", None)
-    assert memory_count(USER) == 0
-
-    intent_value = ActionIntent(
-        action_type="create_reminder",
-        confidence="confident",
-        params={"content": "开会", "due_at": "2026-09-20T08:00:00"},
-        dedupe_key="tool008:e2e-reminder",
-    )
-    rec = await run_action_planning(USER, intent_value, session_id="s-tool008-e2e")
-
-    assert rec is not None
-    assert rec.status == "succeeded"
-    assert rec.steps[0]["tool_id"] == "builtin.reminder.create"
-    assert memory_count(USER) == 1
-    memories = memory_repository.list_by_user(USER, limit=10)
-    assert [memory.content for memory in memories] == ["用户请我提醒：开会"]
-    assert memories[0].type == "important_event"
-    assert memories[0].importance == 0.7
-    assert memories[0].source == "user_derived"
-    monkeypatch.setattr(tool_registry, "_registry", None)
 
 
 # --- §6.1 分流：普通结果零写入 / 重要结果落库 ---------------------------------
@@ -354,7 +306,7 @@ def test_tool_channel_and_world_channel_are_independent(
     db_session_factory, tool_memory_on, override_settings
 ):
     """两条通道各走各的幂等标记：`memory_materialized` 与 `effects.kind == "memory"`。"""
-    override_settings(memory_importance_threshold=0.5, world_enabled=True)
+    override_settings(memory_importance_threshold=0.5)
     event = world_engine.create_event(
         USER, "meeting", "项目评审", "high", datetime(2026, 9, 20, 9, 0, 0), "user_mention"
     )

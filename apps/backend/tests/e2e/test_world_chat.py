@@ -105,11 +105,10 @@ async def test_world_section_reaches_prompt_and_persists(
 
 
 @pytest.mark.asyncio
-async def test_world_disabled_keeps_prompt_clean(
+async def test_world_prompt_carries_world_section(
     db_session_factory, fake_llm, llm_override, override_settings
 ):
     override_settings(
-        world_enabled=False,
         observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
@@ -123,4 +122,4 @@ async def test_world_disabled_keeps_prompt_clean(
         )
         prompts = prompt_snapshot_repository.get_by_turn(turn_id)
         answer = next(p for p in prompts if p.call_site.value == "answer")
-        assert not any("【当前世界】" in m.get("content", "") for m in answer.messages)
+        assert any("【当前世界】" in m.get("content", "") for m in answer.messages)

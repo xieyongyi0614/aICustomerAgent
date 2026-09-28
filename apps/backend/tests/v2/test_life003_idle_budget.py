@@ -35,7 +35,7 @@ def _reset_budget_cache():
 @pytest.fixture()
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings( world_enabled="false")
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()

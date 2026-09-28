@@ -38,10 +38,10 @@ BRIDGE = PlanExecutorBridge()
 ACTIVE_STATUSES = ("created", "planned", "executing")
 
 WORLD_FREE_ACTION = support.OTHER_ACTION
-"""`send_notification` 不在 `WORLD_DEPENDENT_ACTIONS` 内：世界关闭时 G3 仍通过。
+"""`send_notification` 不在 `WORLD_DEPENDENT_ACTIONS` 内：不引出世界依赖闸与提醒域副作用。
 
-额度负例必须让**额度闸门成为第一个拒绝点**——若用 `create_reminder`，`world_enabled=false`
-会让 G3 抢先返回 `capability_unavailable`，断言就退化成「路径不通」而非「额度生效」。
+额度负例必须让**额度闸门成为第一个拒绝点**——若用 `create_reminder`，会先走进世界
+依赖路径，断言就退化成「路径不通」而非「额度生效」。
 """
 
 
@@ -82,7 +82,7 @@ def _world_free_plan():
 
 @pytest.fixture
 def action_on(override_settings):
-    override_settings(world_enabled="false")
+    override_settings()
     return True
 
 
@@ -325,7 +325,7 @@ class TestIntervalAndCooldownAreNotRelaxed:
     def test_the_packet_reports_the_block_without_relaxing_it(
         self, override_settings, db_session_factory
     ):
-        override_settings(world_enabled="false")
+        override_settings()
         goal = support.seed_layered_goal(USER)
         support.seed_plan(
             goal.id, [support.spec(1, last_attempt_at=NOW - timedelta(minutes=5))]

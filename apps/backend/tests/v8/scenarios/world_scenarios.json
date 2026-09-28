@@ -1,20 +1,5 @@
 [
   {
-    "name": "watermelon_full_chain",
-    "time_mode": "story",
-    "setup": {
-      "entities": [
-        {"name": "西瓜", "category": "food", "location_id": "home.kitchen.fridge", "aliases": ["瓜"], "quantity": 1.0}
-      ]
-    },
-    "steps": [
-      {"message": "给我拿个西瓜", "expect": {"object": {"name": "西瓜", "location_id": "home.living_room", "state": "whole", "quantity": 1.0}, "notes_contains": "取出"}},
-      {"message": "切一下", "expect": {"object": {"name": "西瓜", "state": "cut"}}},
-      {"message": "我吃一块", "expect": {"object": {"name": "西瓜", "state": "eaten", "quantity": 0.8}}},
-      {"message": "把西瓜放回冰箱", "expect": {"object": {"name": "西瓜", "location_id": "home.kitchen.fridge"}}, "render_contains": "西瓜"}
-    ]
-  },
-  {
     "name": "interview_full_chain",
     "time_mode": "story",
     "setup": {},

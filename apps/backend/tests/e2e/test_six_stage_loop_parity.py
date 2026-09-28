@@ -166,8 +166,7 @@ def test_six_stage_flag_off_matches_on_full_turn_stream(
         ),
         content="我今天压力很大",
         tag="six-parity",
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
     )
 
     assert [_kind(line) for line in on] == ["turn_meta", "delta", "delta", "done"]
@@ -190,8 +189,7 @@ def test_six_stage_flag_off_matches_on_mid_turn_llm_failure(
         build,
         content="随便聊聊",
         tag="six-fail",
-        inventory_grounding_enabled="false",
-        world_enabled="false",
+        inventory_grounding_mode="off",
         expect_done=False,
     )
 

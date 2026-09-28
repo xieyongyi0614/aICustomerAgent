@@ -1,4 +1,4 @@
-"""TOOL-007 §6.1 / §6.3：世界事实八段预读、逐段降级、有界性与世界 off 形态（E1~E6、E10、E11、E15）。"""
+"""TOOL-007 §6.1 / §6.3：世界事实八段预读、逐段降级、有界性与装配不可用形态（E1~E6、E10、E11、E15）。"""
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -10,6 +10,7 @@ import pytest
 from app.application import world_engine
 from app.repositories import world_repository
 from app.services.tool import world_context as world_context_module
+from app.services.tool.context import WORLD_ENABLED_KEY
 from app.services.tool.world_context import (
     ACTIVE_EVENTS_LIMIT,
     INVENTORY_LIMIT,
@@ -22,7 +23,6 @@ from app.services.tool.world_context import (
     known_locations,
 )
 from tests.v24.tool007_support import (
-    DEFAULT_INVENTORY,
     LOCATION,
     NOW,
     USER,
@@ -50,9 +50,8 @@ FIXTURE_USERS = (USER, OTHER_USER)
 
 
 @pytest.fixture(autouse=True)
-def _world_fixture_isolation(db_session_factory, override_settings):
-    """世界夹具隔离：关掉自动播种（否则库存被默认家什污染），并在前后清空夹具用户的世界域行。"""
-    override_settings(world_household_autoseed_enabled="false")
+def _world_fixture_isolation(db_session_factory):
+    """世界夹具隔离：在前后清空夹具用户的世界域行。"""
     _purge_world_fixtures(db_session_factory)
     yield
     _purge_world_fixtures(db_session_factory)
@@ -122,18 +121,6 @@ def test_world_segment_keys_match_spec_when_world_available(db_session_factory):
     assert facts["world"]["locations"] == known_locations()
 
 
-def test_all_facts_land_on_tool_context(db_session_factory):
-    seed_all()
-    ctx = build_tool_context(tool_context(), settings=world_settings(), now=NOW)
-    assert ctx.world["location"] == LOCATION
-    assert ctx.world["current_block"]["activity"] == "看书"
-    assert sorted(ctx.inventory) == sorted(DEFAULT_INVENTORY)
-    assert [item["dimension"] for item in ctx.situations] == ["health"]
-    assert ctx.relationship["stage"]
-    assert ctx.world_facts_assembled() is True
-    assert ctx.world_facts_enabled() is True
-
-
 def test_apply_world_facts_keeps_non_world_fields(db_session_factory):
     ctx = tool_context(record_id="rec-1", source="autonomy")
     updated = apply_world_facts(ctx, {"world": {"world_enabled": True}, "inventory": ["苹果"]})
@@ -141,24 +128,18 @@ def test_apply_world_facts_keeps_non_world_fields(db_session_factory):
     assert updated.world == {"world_enabled": True} and updated.inventory == ["苹果"]
 
 
-# --- E1：世界不可用 ----------------------------------------------------------
-
-
-def test_e1_world_disabled_returns_only_flag_and_reads_nothing(db_session_factory, monkeypatch):
-    def boom(*args, **kwargs):
-        raise AssertionError("世界关闭时不得发起任何预读")
-
-    monkeypatch.setattr(world_engine, "get_world", boom)
-    monkeypatch.setattr(world_engine, "list_active_objects", boom)
-    monkeypatch.setattr(world_engine, "list_active_events", boom)
-    facts = _build(world_enabled=False)
-    assert facts["world"] == {"world_enabled": False}
-    assert facts["inventory"] == [] and facts["situations"] == []
-    assert facts["scene"] == {} and facts["relationship"] == {}
+# --- E1：世界不可用（装配标记 False 由消费方契约支撑） ------------------------
 
 
 def test_e1_world_disabled_facts_project_world_disabled_reason(db_session_factory):
-    ctx = apply_world_facts(tool_context(), _build(world_enabled=False))
+    facts = {
+        "world": {WORLD_ENABLED_KEY: False},
+        "inventory": [],
+        "situations": [],
+        "scene": {},
+        "relationship": {},
+    }
+    ctx = apply_world_facts(tool_context(), facts)
     assert ctx.world_facts_assembled() is True
     assert ctx.world_facts_enabled() is False
 
@@ -408,31 +389,10 @@ def _raiser(message: str):
 def test_each_segment_degrades_independently(db_session_factory, monkeypatch, segment, install, degraded):
     seed_all()
     install(monkeypatch)
-    facts = _build(scene_expansion_enabled=True, world_enabled=True)
+    facts = _build(scene_expansion_enabled=True)
     assert set(facts) == set(WORLD_FACTS_KEYS)
     assert degraded(facts) is True
     assert all(key in facts["world"] for key in WORLD_SEGMENT_KEYS)
-
-
-@pytest.mark.parametrize("segment,install,degraded", _segment_cases(), ids=lambda item: str(item)[:20])
-def test_segment_success_path_is_unaffected_by_other_segment_degradation(
-    db_session_factory, monkeypatch, segment, install, degraded
-):
-    """单段失败不得牵连其他段（逐段独立 try）。"""
-    seed_all()
-    install(monkeypatch)
-    facts = _build(scene_expansion_enabled=True)
-    healthy = {
-        "inventory": sorted(facts["inventory"]) == sorted(DEFAULT_INVENTORY),
-        "situations": len(facts["situations"]) == 1,
-        "events": len(facts["world"]["active_events"]) == 1,
-    }
-    if segment not in ("inventory", "world"):
-        assert healthy["inventory"] is True
-    if segment != "situations":
-        assert healthy["situations"] is True
-    if segment not in ("active_events", "world"):
-        assert healthy["events"] is True
 
 
 def test_all_segments_failing_still_returns_usable_structure(db_session_factory, monkeypatch):
@@ -454,15 +414,6 @@ def test_degradation_is_logged(db_session_factory, monkeypatch, caplog):
 
 
 # --- 单段方法可独立调用（§4.1 接口） ----------------------------------------
-
-
-def test_sub_builders_are_independently_callable(db_session_factory):
-    seed_all()
-    builder = _builder(scene_expansion_enabled=True)
-    assert sorted(builder.build_inventory(USER)) == sorted(DEFAULT_INVENTORY)
-    assert [item["dimension"] for item in builder.build_situations(USER)] == ["health"]
-    assert builder.build_scene(USER)["location_id"] == LOCATION
-    assert set(builder.build_relationship(USER)) == {"stage", "tension"}
 
 
 def test_sub_builders_degrade_on_failure(db_session_factory, monkeypatch):

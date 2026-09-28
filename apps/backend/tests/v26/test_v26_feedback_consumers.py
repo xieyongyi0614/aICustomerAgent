@@ -17,9 +17,7 @@ def _due_at(hours: int = 2) -> str:
 
 
 def _enabled(monkeypatch, **flags):
-    settings_flags = {
-        "world_enabled": True,
-    }
+    settings_flags = {}
     settings_flags.update(flags)
     from app.core.settings import get_settings
 

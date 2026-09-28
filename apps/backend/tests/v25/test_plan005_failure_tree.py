@@ -228,7 +228,6 @@ def planning_on(override_settings):
     """编排常开（总闸已删），只钉重规划预算与世界/观测面。"""
     override_settings(
         plan_revision_budget="3",
-        world_enabled="false",
         observability_persist_enabled="false")
 
 

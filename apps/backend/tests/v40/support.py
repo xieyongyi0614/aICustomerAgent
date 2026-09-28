@@ -8,6 +8,10 @@
   基线是**静态快照**而非运行时计算：动态计算会让「防新增」的断言退化为同义反复。
   例外（设计缺口补齐，非新增功能开关）：`evaluation_development_enabled` 为 development
   维闸补配（动态 getattr 命名约定早已存在，字段在 V2.0 Phase3 扩维时漏加）。
+  **首次删除记录（2026-09-28）**：`inventory_grounding_enabled` / `character_action_sync_enabled` /
+  `world_interpreter_enabled` / `world_memory_bridge_enabled` / `world_household_autoseed_enabled` /
+  `world_enabled` 六个开关删除并固化常开，本基线随之收缩 6 项——这是自冻结以来**唯一一次**集合
+  变更（同日单批），见 `docs/refactor/remaining-flag-audit.md` 附录 E。删除同样需显式登记。
 - `V40_SETTINGS_FIELDS`（字段名 → 归属 Task）：V4.0 新增的**参数类**字段登记处。
   新增 `*_enabled` 字段一律违规，不在此登记。
 """
@@ -21,7 +25,6 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "action_outbox_enabled",
         "action_relationship_enabled",
         "autonomy_action_enabled",
-        "character_action_sync_enabled",
         "evaluation_action_enabled",
         "evaluation_autonomy_enabled",
         "evaluation_behavior_enabled",
@@ -39,7 +42,6 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "feishu_enabled",
         "feishu_ingress_sharded_routing_enabled",
         "feishu_router_enabled",
-        "inventory_grounding_enabled",
         "observability_persist_enabled",
         "plan_context_digest_enabled",
         "rel_conflict_enabled",
@@ -55,10 +57,6 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "runtime_six_stage_loop_enabled",
         "runtime_state_versioning_enabled",
         "scene_idle_reset_enabled",
-        "world_enabled",
-        "world_household_autoseed_enabled",
-        "world_interpreter_enabled",
-        "world_memory_bridge_enabled",
     }
 )
 

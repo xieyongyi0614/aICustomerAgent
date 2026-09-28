@@ -12,7 +12,7 @@ from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core import redis_client
-from app.core.settings import get_settings, unknown_versioned_env_keys
+from app.core.settings import get_settings
 from app.services import memory_service, proactive_delivery
 from app.services.tool import channel_tools
 from app.services.tool.ext_api import get_manifest_loader
@@ -44,16 +44,13 @@ async def lifespan(application: FastAPI):
     global _reclaim_task, _observability_cleanup_task
     global _job_worker_task
     global _life_loop_task, _agent_evolution_task
-    for unknown_key in unknown_versioned_env_keys():
-        logging.getLogger(__name__).warning(
-            "环境变量 %s 不对应任何 settings 字段，已被静默忽略（字段是否已改名？）",
-            unknown_key,
-        )
     if redis_client.is_configured():
         if await redis_client.ping_redis():
             logging.getLogger(__name__).info("Redis 连接正常")
         else:
-            logging.getLogger(__name__).warning("Redis 连接失败，邮箱验证码登录将不可用")
+            logging.getLogger(__name__).warning(
+                "Redis 连接失败，邮箱验证码登录将不可用"
+            )
     _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
     _job_worker_task = asyncio.create_task(run_job_worker_loop())
@@ -68,7 +65,9 @@ async def lifespan(application: FastAPI):
 
     register_character_event_listeners()
     _life_loop_task = asyncio.create_task(run_life_loop_worker())
-    logging.getLogger(__name__).info("life loop 已接管周期调度（归并 autonomy/world/action 三循环）")
+    logging.getLogger(__name__).info(
+        "life loop 已接管周期调度（归并 autonomy/world/action 三循环）"
+    )
     if get_settings().feishu_enabled:
         proactive_delivery.register_proactive_outbound(
             proactive_delivery.ProactiveOutbound(
@@ -86,9 +85,7 @@ async def lifespan(application: FastAPI):
         outbound_gateway.register_adapter(
             FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
         )
-        logging.getLogger(__name__).info(
-            "出站归一网关适配器已注册：%s", FEISHU_CHANNEL
-        )
+        logging.getLogger(__name__).info("出站归一网关适配器已注册：%s", FEISHU_CHANNEL)
         # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
         # 故出站幂等的持久化实现只能在这里注入。**无开关**——跨进程幂等是必需能力，
         # 缺了它多实例下会重复回复用户。

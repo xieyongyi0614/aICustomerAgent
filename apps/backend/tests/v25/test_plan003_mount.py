@@ -72,7 +72,6 @@ def planning_on(override_settings):
     """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     life_loop_budget.reset_cache()
     override_settings(
-        world_enabled="false",
         observability_persist_enabled="false")
 
 
@@ -104,8 +103,7 @@ class TestMountWiring:
         ]
         life_loop_budget.reset_cache()
         override_settings(
-            autonomy_supply_interval_minutes="0",
-            world_enabled="false")
+            autonomy_supply_interval_minutes="0")
         monkeypatch.setattr(
             goal_planning,
             "materialize",
@@ -145,8 +143,7 @@ class TestMountWiring:
         """
         life_loop_budget.reset_cache()
         override_settings(
-            autonomy_supply_interval_minutes="0",
-            world_enabled="false")
+            autonomy_supply_interval_minutes="0")
         goal = make_goal(description="供给步处理目标")
         _claim_planning_job(goal.id)
         stub_planning_llm(
@@ -185,8 +182,7 @@ class TestMountWiring:
         """编排常开（原 flag 分派反转为无条件路由）：无新建目标时也只做 `run_jobs`。"""
         life_loop_budget.reset_cache()
         override_settings(
-            autonomy_supply_interval_minutes="0",
-            world_enabled="false")
+            autonomy_supply_interval_minutes="0")
         monkeypatch.setattr(
             goal_planning,
             "materialize",

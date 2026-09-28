@@ -4,7 +4,7 @@ import pytest
 
 from app.models.action import ActionIntent
 from app.services.tool.context import ToolContext
-from app.services.tool.surface import ToolSurfaceResolver, WORLD_FACTS_REASON, WORLD_REASON
+from app.services.tool.surface import ToolSurfaceResolver, WORLD_FACTS_REASON
 from app.services.tool.validator import ParamValidator
 from app.services.tool.world_context import WorldContextBuilder, apply_world_facts
 from tests.v24.tool003_support import StubCapability, build_executor
@@ -26,15 +26,19 @@ USE_TOOL = "world.object.use"
 VALIDATOR = ParamValidator()
 
 
-@pytest.fixture(autouse=True)
-def _world_fixture_isolation(db_session_factory, override_settings):
-    override_settings(world_household_autoseed_enabled="false")
-    yield
-
-
 def _facts(**settings_overrides) -> dict:
     settings = world_settings(**settings_overrides)
     return WorldContextBuilder(settings).build(USER, now=NOW, settings=settings)
+
+
+FACTS_DISABLED: dict = {
+    "world": {"world_enabled": False},
+    "inventory": [],
+    "situations": [],
+    "scene": {},
+    "relationship": {},
+}
+"""装配标记 False 的世界事实包：装配器恒产出装配态，False 态由消费方契约 defensively 支撑。"""
 
 
 def _resolved(facts: dict | None, **settings_overrides):
@@ -69,7 +73,7 @@ def _world_reasons(surface) -> dict:
 
 
 def test_e1_world_disabled_facts_cut_world_namespace_with_reason():
-    surface = _resolved(_facts(world_enabled=False), world_enabled=False)
+    surface = _resolved(FACTS_DISABLED)
     world_ids = _world_tool_ids()
     assert set(_world_reasons(surface)) == world_ids
     assert all(_world_reasons(surface)[tool_id] == WORLD_FACTS_REASON for tool_id in world_ids)
@@ -83,28 +87,20 @@ def test_world_facts_enabled_keeps_world_namespace(db_session_factory):
 
 
 def test_world_disabled_facts_only_affect_world_namespace():
-    facts_off = _resolved(_facts(world_enabled=False), world_enabled=False)
-    facts_on = _resolved(_facts(), world_enabled=True)
+    facts_off = _resolved(FACTS_DISABLED)
+    facts_on = _resolved(_facts())
     assert set(_reasons(facts_off)) - set(_reasons(facts_on)) == _world_tool_ids()
     assert _reasons(facts_off)[CODE_DISABLED_TOOL] == "tool_status:disabled"
 
 
-def test_unassembled_facts_fall_back_to_settings_reason():
-    """未装配（TOOL-007 未跑）时保留 TOOL-004 配置态理由，不误用新理由。"""
-    surface = _resolved(None, world_enabled=False)
-    reasons = _world_reasons(surface)
-    assert set(reasons) == _world_tool_ids()
-    assert all(reason == WORLD_REASON for reason in reasons.values())
-
-
-def test_unassembled_facts_with_world_enabled_do_not_trim():
+def test_unassembled_facts_do_not_trim():
     surface = _resolved(None)
     assert _world_reasons(surface) == {}
 
 
-def test_world_facts_disabled_but_settings_enabled_still_trims():
-    """事实态优先于配置态：装配说世界不可用即裁掉 world.*。"""
-    surface = _resolved(_facts(world_enabled=False))
+def test_world_facts_disabled_still_trims():
+    """装配标记 False：事实说世界不可用即裁掉 world.*。"""
+    surface = _resolved(FACTS_DISABLED)
     assert all(
         _world_reasons(surface)[tool_id] == WORLD_FACTS_REASON for tool_id in _world_tool_ids()
     )
@@ -112,7 +108,7 @@ def test_world_facts_disabled_but_settings_enabled_still_trims():
 
 def test_surface_hash_reacts_to_world_facts():
     on = _resolved(_facts())
-    off = _resolved(_facts(world_enabled=False), world_enabled=False)
+    off = _resolved(FACTS_DISABLED)
     unassembled = _resolved(None)
     assert len({on.surface_hash, off.surface_hash, unassembled.surface_hash}) == 3
 
@@ -212,8 +208,8 @@ def test_object_in_inventory_degrades_when_facts_unassembled():
     assert report.passed is True
 
 
-def test_object_in_inventory_degrades_when_world_disabled():
-    ctx = _ctx_with_facts(world_enabled=False)
+def test_object_in_inventory_degrades_when_world_facts_disabled():
+    ctx = apply_world_facts(tool_context(), FACTS_DISABLED)
     assert ctx.inventory == []
     assert _validate(USE_TOOL, _use_params("梨"), ctx).passed is True
 

@@ -359,17 +359,6 @@ class TestSurfaceExplainability:
         surface = support.resolve_surface()
         assert support.excluded_reason(surface, support.MEMORY_SAVE) == "tool_status:disabled"
         assert support.excluded_reason(surface, support.SEARCH_QUERY) == TOOL_UNAVAILABLE_REASON
-        world_reason = support.excluded_reason(surface, "world.object.create")
-        assert world_reason is not None and world_reason.startswith("world_")
-
-    def test_i13_world_tools_are_clipped_when_the_world_is_disabled(self, planning_gates_on):
-        surface = support.resolve_surface()
-        for tool_id in ("world.object.create", "world.object.move", "world.env.query"):
-            assert tool_id not in surface.tool_ids
-            assert support.excluded_reason(surface, tool_id) in (
-                "world_unavailable",
-                "world_disabled",
-            )
 
     def test_u10_surface_hash_is_stable_for_the_same_input(self, planning_gates_on):
         first = support.resolve_surface()

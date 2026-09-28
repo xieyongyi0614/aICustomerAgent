@@ -86,7 +86,6 @@ INTERVIEW_STEPS: tuple[dict, ...] = (
 
 FULL_CHAIN_ENVS = {
     "PLAN_TOOL_REQUIRED": "true",
-    "WORLD_ENABLED": "false",
     "OBSERVABILITY_PERSIST_ENABLED": "false",
 }
 

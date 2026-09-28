@@ -207,21 +207,6 @@ def test_relationship_stage_below_friend_cuts_intimate_tag():
     assert relationship_stage_rank("stranger") < relationship_stage_rank("friend")
 
 
-# --- 维度五｜世界可用性 -----------------------------------------------------
-
-
-def test_world_disabled_cuts_world_namespace():
-    registry = builtin_registry()
-    on = resolve(registry, surface_context(settings=tool_settings(world_enabled=True)))
-    off = resolve(registry, surface_context(settings=tool_settings(world_enabled=False)))
-    world_ids = {item.id for item in registry.list(namespace="world")}
-    assert world_ids & set(on.tool_ids)
-    assert not (world_ids & set(off.tool_ids))
-    assert all(
-        reasons_for(off)[tool_id] == "world_unavailable" for tool_id in world_ids
-    )
-
-
 # --- 维度六｜工具状态 -------------------------------------------------------
 
 

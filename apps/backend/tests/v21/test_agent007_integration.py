@@ -85,7 +85,7 @@ class TestEvolutionLoopE2E:
     async def test_goal_stack_and_snapshot_stages_present(
         self, db_session_factory, override_settings, fake_llm, monkeypatch
     ):
-        override_settings(world_enabled="false")
+        override_settings()
         trigger_evaluator._followup_registry.clear()
         conversation_repository.get_or_create_conversation(SESSION, USER)
         trigger_evaluator.register_followup(USER, NOW - timedelta(minutes=1), "下午面试")

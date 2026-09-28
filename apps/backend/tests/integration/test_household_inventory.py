@@ -194,12 +194,6 @@ def test_ensure_world_autoseed_respects_existing_state(db_session_factory, overr
     assert names_after == names_before == {"鸡蛋", "牛奶", "可乐", "面条", "大米", "面包"}
 
 
-def test_ensure_world_no_autoseed_when_disabled(db_session_factory, override_settings):
-    override_settings(world_household_autoseed_enabled=False)
-    world_engine.ensure_world("dave")
-    assert world_engine.get_objects_by_location("dave", "home") == []
-
-
 def test_ensure_world_backfills_existing_empty_world(db_session_factory):
     world_repository.ensure_world("erin")
     assert world_engine.get_objects_by_location("erin", "home") == []

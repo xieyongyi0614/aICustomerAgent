@@ -140,10 +140,10 @@ def resolve_autonomy_surface(
 
 
 def _autonomy_binding(action_type: str, now: datetime) -> ToolBinding | None:
-    """`action_type` 在自治工具面内的工具绑定；总闸 off / 不在面内 → None。
+    """`action_type` 在自治工具面内的工具绑定；不在面内 → None。
 
-    工具面投影不读 `user_id`（TOOL-004 六维规则只读 source / world / scene /
-    relationship / world_enabled），故以无用户自治上下文解析；
+    工具面投影不读 `user_id`（TOOL-004 规则只读 source / world / scene /
+    relationship 维度），故以无用户自治上下文解析；
     TOOL-007 装配用户维度世界事实后，此处须改为按用户解析（风险已登记）。
     """
     registry = get_tool_registry()

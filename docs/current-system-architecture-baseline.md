@@ -409,8 +409,9 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 ### 7.2 已移除项（确认）
 
 - **Version Gate 体系**：`core/settings/enablement.py` 已删除（版本桶常量 `V25_SUB_FLAGS` 等随文件移除）。
-- **`vXX_` 版本变量**：settings 字段总数 405，带 `vXX_` 前缀 **0**（200 字段去前缀 + 死开关/未接线字段删除 + 各批 ON 转常开）。
-- **静默失效防护**：`unknown_versioned_env_keys()` 在启动边界捕获形如 `V2_*`/`V21_*` 但不对应任何字段的遗留 env 键，把 `extra="ignore"` 的静默回落变成显式告警。
+- **`vXX_` 版本变量**：带 `vXX_` 前缀 **0**（settings 字段总数 2026-09-28 实测 **423**；200 字段去前缀 + 死开关/未接线字段删除 + 各批 ON 转常开）。
+- **启动期未知 env 键告警**：`unknown_versioned_env_keys()` 已删除（2026-09-28，连带 `app/main.py` lifespan 的告警循环与 3 条自测）。删除时全仓 `V<数字>_` 键为 0、函数返回 `[]`，故**零行为变化**；代价是**生产启动边界不再有「env 键 ↔ settings 字段」一致性检查**（`tests/conftest.py::set_known_env` 只在测试进程生效），部署侧死键将完全静默。
+- **世界域四闸**：`world_enabled`（总闸，曾 11 处读取）与 `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled` 已删除（2026-09-28，固化常开，世界域不可再配置旁路）。TOOL-007 的 `world["world_enabled"]` 键保留为**装配标记**（「已装配 vs 未装配」数据契约，非配置开关）。记录见 `docs/refactor/remaining-flag-audit.md` 附录 E.7 / E.8。
 - **剩余策略位**：仍有少数按领域命名的布尔开关作为策略/裁决保留（如 `action_outbox_enabled`、`foreground_gateway_enforced`，以及 tool/plan/action 域的调试与策略子闸），语义非版本门控。
 
 ---

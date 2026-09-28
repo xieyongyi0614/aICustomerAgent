@@ -1,7 +1,7 @@
-"""TOOL-007 §6.2：`_build_snapshot` 世界事实注入、总闸 off 零装配与零 diff 断言。
+"""TOOL-007 §6.2：`_build_snapshot` 世界事实注入与零 diff 断言。
 
-覆盖：装配接入（WorldContextBuilder → ToolContext）、总闸 off 时行为与 V2.3.0 一致（零 IO）、
-工具面投影消费预读事实、`world_engine` / `outbox_consumer` 源码零 diff、维护步序列零改动、
+覆盖：装配接入（WorldContextBuilder → ToolContext）、工具面投影消费预读事实、
+`world_engine` / `outbox_consumer` 源码零 diff、维护步序列零改动、
 世界域与角色域表结构零改动。
 """
 
@@ -17,11 +17,10 @@ from app.models.action import ActionIntent
 from app.services.action.planner import GateSnapshot, assemble_plan, resolve_surface
 from app.services.tool import registry as tool_registry
 from app.services.tool import world_context as world_context_module
-from app.services.tool.context import ToolContext
+from app.services.tool.context import WORLD_ENABLED_KEY, ToolContext
 from app.services.tool.surface import WORLD_FACTS_REASON
 from app.services.tool.world_context import WorldContextBuilder, apply_world_facts
 from tests.v24.tool007_support import (
-    LOCATION,
     NOW,
     USER,
     seed_all,
@@ -32,7 +31,10 @@ from tests.v24.tool007_support import (
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/application/world_engine.py": "3bdcd4f417f0d70e272518a50f994c8ee1dd6dc568a73142123182b0d16180e0",
+    # 再冻结（2026-09-28）：CAS 门控去掉（固化常开）+ 删除 world_interpreter_enabled /
+    # world_memory_bridge_enabled / world_household_autoseed_enabled / world_enabled
+    # （四者固化常开，门控点展开）。原 3bdcd4f4 在首次改动前已 stale。
+    "app/application/world_engine.py": "c57307c7b4b9ff7189f8d2b79b701101ece2c816813c722f219c88452732298d",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
@@ -103,12 +105,6 @@ CHARACTER_TABLES: dict[str, tuple[str, ...]] = {
 
 
 @pytest.fixture(autouse=True)
-def _world_fixture_isolation(db_session_factory, override_settings):
-    override_settings(world_household_autoseed_enabled="false")
-    yield
-
-
-@pytest.fixture(autouse=True)
 def _pin_action_engine_clock(monkeypatch):
     """`_build_snapshot` 无 `now` 形参，内部经 `action_engine._now()` 读真实墙钟。
 
@@ -119,22 +115,6 @@ def _pin_action_engine_clock(monkeypatch):
 
 
 # --- `_build_snapshot` 装配接入 ---------------------------------------------
-
-
-def test_build_snapshot_assembles_world_facts_when_master_flag_on(db_session_factory, override_settings):
-    override_settings(world_enabled="true")
-    seed_all()
-    snapshot = action_engine._build_snapshot(USER, world_settings())
-
-    tool_ctx = snapshot.tool_context
-    assert isinstance(tool_ctx, ToolContext)
-    assert tool_ctx.user_id == USER
-    assert tool_ctx.world["world_enabled"] is True
-    assert tool_ctx.world["location"] == LOCATION
-    assert tool_ctx.world["current_block"] is not None
-    assert sorted(tool_ctx.inventory) == ["牛奶", "苹果"]
-    assert tool_ctx.world_locations()
-    assert tool_ctx.relationship_stage() == "friend"
 
 
 def test_build_snapshot_degrades_when_preread_crashes(db_session_factory, monkeypatch, override_settings):
@@ -149,7 +129,7 @@ def test_build_snapshot_degrades_when_preread_crashes(db_session_factory, monkey
 
 
 def test_build_snapshot_survives_missing_world(db_session_factory, override_settings):
-    override_settings(world_enabled="true")
+    override_settings()
     snapshot = action_engine._build_snapshot(USER, world_settings())
     assert snapshot.tool_context is not None
     assert snapshot.tool_context.world["world_enabled"] is True
@@ -214,9 +194,15 @@ def test_resolve_surface_uses_preloaded_world_facts(db_session_factory, monkeypa
 
 
 def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_settings):
-    override_settings(world_enabled="false")
-    settings = world_settings(world_enabled=False)
-    facts = WorldContextBuilder(settings).build(USER, now=NOW, settings=settings)
+    override_settings()
+    settings = world_settings()
+    facts = {
+        "world": {WORLD_ENABLED_KEY: False},
+        "inventory": [],
+        "situations": [],
+        "scene": {},
+        "relationship": {},
+    }
     ctx = apply_world_facts(ToolContext(user_id=USER, now=NOW, settings=settings), facts)
     surface = resolve_surface(_snapshot_with_tool_context(ctx, settings))
     reasons = {item["tool_id"]: item["reason"] for item in surface.excluded}
@@ -228,7 +214,7 @@ def test_resolve_surface_trims_world_when_facts_disabled(monkeypatch, override_s
 
 def test_assemble_plan_uses_preloaded_facts_for_tool_choice(db_session_factory, monkeypatch, override_settings):
     override_settings(
-        world_enabled="true",     )
+        )
     seed_all()
     settings = world_settings()
     snapshot = action_engine._build_snapshot(USER, settings)

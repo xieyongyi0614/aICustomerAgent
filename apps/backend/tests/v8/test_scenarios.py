@@ -60,10 +60,7 @@ def _expect_environment(user_id, spec):
 
 @pytest.mark.parametrize("scenario", load_scenarios(), ids=lambda s: s["name"])
 def test_world_scenario(db_session_factory, override_settings, scenario):
-    override_settings(
-        world_time_mode=scenario.get("time_mode", "story"),
-        world_household_autoseed_enabled=False,
-    )
+    override_settings(world_time_mode=scenario.get("time_mode", "story"))
     user_id = f"scenario-{scenario['name']}"
 
     setup = scenario.get("setup", {})

@@ -98,7 +98,7 @@ def test_http_health(http_server):
 def test_http_chat_streams_chunks_incrementally(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
-    override_settings(inventory_grounding_enabled=False)
+    override_settings(inventory_grounding_mode="off")
     llm_override(fake_llm(
         response=["你好", "呀"],
         structured_responses=_structured_responses(),

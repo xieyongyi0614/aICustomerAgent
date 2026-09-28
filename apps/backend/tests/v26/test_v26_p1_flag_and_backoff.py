@@ -62,7 +62,6 @@ class TestExecuteBackoffGuard:
 
     def test_execute_proceeds_when_backoff_elapsed(self, monkeypatch):
         settings = get_settings()
-        monkeypatch.setattr(settings, "world_enabled", True)
         from app.application import world_engine
 
         world_engine.ensure_world("u_backoff_ok")

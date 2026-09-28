@@ -435,7 +435,6 @@ def planning_memory_on(override_settings):
         plan_tool_required="true",
         action_memory_policy_enabled="true",
         action_relationship_enabled="false",
-        world_enabled="false",
         action_outbox_enabled="false",
         observability_persist_enabled="false")
     return True

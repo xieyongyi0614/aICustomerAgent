@@ -53,7 +53,6 @@ def _step(index: int = 1, **overrides) -> dict:
 def planning_on(override_settings):
     """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     override_settings(
-        world_enabled="false",
         observability_persist_enabled="false")
 
 

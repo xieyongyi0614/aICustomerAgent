@@ -138,7 +138,6 @@ def _memory_capability() -> StubCapability:
 
 def _enable(override_settings, **extra):
     override_settings(
-        world_enabled=False,
         **extra,
     )
 

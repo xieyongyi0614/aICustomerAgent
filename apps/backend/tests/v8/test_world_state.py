@@ -15,14 +15,6 @@ def test_world_state_persists_across_sessions(db_session_factory):
     assert "西瓜" in {obj["name"] for obj in fresh_view["entities"]}
 
 
-def test_world_enabled_false_short_circuits(db_session_factory, override_settings):
-    override_settings(world_enabled=False)
-    assert world_engine.ensure_world("default-user") is not None
-    assert world_engine.build_context("default-user") is None
-    assert world_engine.collect_facts("default-user") == {}
-    assert world_engine.run_turn_update("default-user", "给我拿个西瓜") == 0
-
-
 def test_world_degrades_on_repository_failure(db_session_factory, monkeypatch):
     world_engine.ensure_world("default-user")
 

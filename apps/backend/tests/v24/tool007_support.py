@@ -32,10 +32,8 @@ DEFAULT_SITUATIONS = (
 def world_settings(**overrides: Any) -> SimpleNamespace:
     """预读设置替身：世界可用、场景扩展默认关闭、工具总闸默认关。"""
     values: dict[str, Any] = {
-        "world_enabled": True,
         "world_time_mode": "real_sync",
         "world_sim_rate": 1.0,
-        "world_household_autoseed_enabled": False,
         "scene_expansion_enabled": False,
         "tool_surface_max_tools": 12,
         "action_plan_expires_minutes": 5,

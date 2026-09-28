@@ -69,7 +69,6 @@ class TestPlanStepTraceability:
         from app.services.planning.executor_bridge import PlanExecutorBridge
 
         settings = get_settings()
-        monkeypatch.setattr(settings, "world_enabled", True)
         world_engine.ensure_world("u_bridge_trace")
         bridge = PlanExecutorBridge()
 

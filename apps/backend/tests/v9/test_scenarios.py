@@ -46,10 +46,7 @@ SCENARIOS = _load_scenarios()
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=[s["id"] for s in SCENARIOS])
 @pytest.mark.asyncio
 async def test_scenario(scenario, db_session_factory, override_settings):
-    override_settings(
-        world_enabled=True,
-        world_household_autoseed_enabled=False,
-    )
+    override_settings()
     user_id = f"scenario-{scenario['id']}"
     world_engine.ensure_world(user_id)
 

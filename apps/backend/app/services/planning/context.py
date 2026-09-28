@@ -55,7 +55,7 @@ ToolSurface 的三态：`plan_tool_required` on 且工具系统可用 → 按 `R
 ①③ 不走 `world_engine` 的同名包装：`build_time_context` / `get_location_context` 内部
 `ensure_world` 是写路径（缺世界记录即建档），与「世界事实装配全程只读」冲突；故取同一事实的
 只读内核 `TimeProvider.context(world)` / `build_location_context(world)`。任一源失败 → 空包 +
-`degraded` 登记；`world_enabled=False` 或无世界记录 → 九项全空 + `world_disabled` 一条。
+`degraded` 登记；无世界记录 → 九项全空 + `world_disabled` 一条。
 """
 
 from __future__ import annotations
@@ -384,8 +384,6 @@ async def _assemble_world(user_id: str) -> _WorldSource:
     装配全程零写库（写面探针断言见 PLAN-008 §9.2 I3）。
     """
     settings = get_settings()
-    if not settings.world_enabled:
-        return _WorldSource(degraded=[DEGRADED_WORLD_DISABLED])
     try:
         return await asyncio.to_thread(_read_world_source, user_id, settings)
     except Exception:

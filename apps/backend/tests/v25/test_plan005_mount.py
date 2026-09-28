@@ -50,7 +50,6 @@ FACT_KEYS = {
 def advance_on(override_settings):
     life_loop_budget.reset_cache()
     override_settings(
-        world_enabled="false",
         observability_persist_enabled="false")
 
 

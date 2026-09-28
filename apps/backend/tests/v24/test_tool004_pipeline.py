@@ -11,7 +11,9 @@ from app.models.action import ActionIntent
 from app.models.tool import ToolSurface
 from app.services import decision_pipeline
 from app.services.action import planner
+from app.services.tool.context import WORLD_ENABLED_KEY, ToolContext
 from app.services.tool.surface import ToolSurfaceResolver
+from app.services.tool.world_context import apply_world_facts
 from app.services.trace_collector import TurnTraceSession
 from tests.v24.tool004_support import (
     NOW,
@@ -164,7 +166,7 @@ def test_scoring_matches_legacy_capability_scores():
 # --- 计划装配：off 路径逐字节一致 -------------------------------------------
 
 
-def _snapshot(settings, *, world_available=True):
+def _snapshot(settings, *, world_available=True, tool_context=None):
     from app.services.action.registry import CapabilityRegistry
     from app.services.action import capabilities as capability_module
 
@@ -175,6 +177,7 @@ def _snapshot(settings, *, world_available=True):
         registry=registry,
         world_available=world_available,
         now=NOW,
+        tool_context=tool_context,
     )
 
 
@@ -197,11 +200,21 @@ def test_plan_assembly_on_path_uses_tool_binding(monkeypatch):
     assert set(step.model_dump()) == V9_STEP_KEYS
 
 
-def test_plan_assembly_on_path_without_binding_is_capability_unavailable(monkeypatch):
+def test_plan_assembly_world_facts_disabled_yields_no_binding(monkeypatch):
     registry = builtin_registry()
     monkeypatch.setattr(planner, "get_tool_registry", lambda: registry)
-    settings = tool_settings(world_enabled=False)
-    snapshot = _snapshot(settings)
+    settings = tool_settings()
+    facts = {
+        "world": {WORLD_ENABLED_KEY: False},
+        "inventory": [],
+        "situations": [],
+        "scene": {},
+        "relationship": {},
+    }
+    tool_context = apply_world_facts(
+        ToolContext(user_id="u-pipe", now=NOW, settings=settings), facts
+    )
+    snapshot = _snapshot(settings, tool_context=tool_context)
     moving = intent("move_object", object="牛奶", location="home.kitchen")
     assert planner.assemble_plan(moving, snapshot, NOW) is None
 

@@ -87,9 +87,6 @@ class ToolContext:
         value = self.relationship.get(RELATIONSHIP_STAGE_KEY)
         return None if value is None else str(value)
 
-    def world_enabled(self) -> bool:
-        return bool(getattr(self.settings, "world_enabled", True))
-
     def world_facts_assembled(self) -> bool:
         """世界事实是否已装配（TOOL-007 预读标记）：`world_enabled` 键存在即已装配。"""
         return WORLD_ENABLED_KEY in self.world
@@ -97,8 +94,8 @@ class ToolContext:
     def world_facts_enabled(self) -> bool | None:
         """装配态下的世界可用性；未装配返回 None（消费方降级，不误判）。
 
-        与 `world_enabled()`（读 settings）的区别：本方法读的是**预读快照**，
-        供投影规则与语义校验器判定"事实是否可信"，而非"配置是否开启"。
+        读的是**预读快照**中的装配标记，供投影规则与语义校验器判定
+        "事实是否可信"，与任何 settings 配置无关。
         """
         value = self.world.get(WORLD_ENABLED_KEY)
         return None if value is None else bool(value)

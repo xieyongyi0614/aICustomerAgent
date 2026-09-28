@@ -34,7 +34,6 @@ class TestScenarioASingleGoal:
         self, db_session_factory, override_settings, make_goal, stub_planning_llm
     ):
         override_settings(
-            world_enabled="false",
             observability_persist_enabled="false")
         steps = [
             {

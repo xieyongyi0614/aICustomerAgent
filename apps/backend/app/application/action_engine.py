@@ -130,7 +130,7 @@ def _build_snapshot(user_id: str, settings) -> GateSnapshot:
     try:
         world = world_engine.get_world(user_id)
         if world is not None:
-            snapshot.world_available = getattr(settings, "world_enabled", True)
+            snapshot.world_available = True
         snapshot.active_object_names = [o.name for o in world_engine.list_active_objects(user_id)]
         events = world_engine.list_active_events(user_id)
         snapshot.active_reminder_titles = [e.title for e in events if e.type in ("reminder", "appointment")]

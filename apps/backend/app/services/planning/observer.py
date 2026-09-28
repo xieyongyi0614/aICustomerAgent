@@ -721,9 +721,7 @@ def _step_status(record) -> str | None:
 
 
 def _world_facts(settings, user_id: str) -> dict:
-    """世界源（可降级）：世界关闭或装配失败即空包（判据按不可判定处理）。"""
-    if not settings.world_enabled:
-        return {}
+    """世界源（可降级）：装配失败即空包（判据按不可判定处理）。"""
     try:
         return world_engine.collect_facts(user_id) or {}
     except Exception:

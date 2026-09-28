@@ -273,10 +273,6 @@ def validate_actions(
     recent_dedupe_keys: set[str] | None = None,
 ) -> list[ValidationResult]:
     settings = get_settings()
-    if not settings.world_enabled:
-        for action in candidates:
-            action.transition(ActionTransitionEvent.VALIDATE_REJECT)
-        return [ValidationResult(a, "rejected", WorldActionReason.DISABLED) for a in candidates]
 
     try:
         if user_id:

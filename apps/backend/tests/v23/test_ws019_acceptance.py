@@ -66,7 +66,7 @@ def test_brief_present_after_solidification(db_session_factory, flag_env):
     assert getattr(context, "brief", None) is not None
 
 
-def test_simulation_maintenance_returns_list_when_world_enabled(db_session_factory, flag_env):
+def test_simulation_maintenance_returns_list(db_session_factory, flag_env):
     flag_env()
     user = "ws019-noop"
     world = world_repository.ensure_world(user)

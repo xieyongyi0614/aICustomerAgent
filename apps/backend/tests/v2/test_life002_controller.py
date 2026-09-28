@@ -28,7 +28,7 @@ SESSION = "ll-s1"
 @pytest.fixture()
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings( world_enabled="false")
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -176,7 +176,14 @@ class TestMaintenanceAndIdle:
         self, db_session_factory, life_loop_on
     ):
         stats = await life_loop.run_life_loop_tick(now=NOW)
-        assert stats["maintenance"] == 3  # reconcile + action_retry + action_schedule
+        kinds = {r.kind for r in loop_run_repository.list_recent()}
+        assert {
+            "world_maintenance",
+            "world_simulation",
+            "action_retry",
+            "action_schedule",
+            "trigger_reconcile",
+        } <= kinds
         runs = loop_run_repository.list_recent(kind="trigger_reconcile")
         assert len(runs) == 1 and runs[0].status == "done"
 
@@ -193,7 +200,7 @@ class TestMaintenanceAndIdle:
     async def test_world_maintenance_dispatched_when_enabled(
         self, db_session_factory, life_loop_on, override_settings
     ):
-        override_settings(world_enabled="true")
+        override_settings()
         stats = await life_loop.run_life_loop_tick(now=NOW)
         assert stats["maintenance"] >= 2
         kinds = {r.kind for r in loop_run_repository.list_recent()}

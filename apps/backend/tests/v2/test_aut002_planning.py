@@ -49,8 +49,7 @@ VALID_SUB_GOALS = [
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
     override_settings(
-        observability_persist_enabled="false",
-        world_enabled="false")
+        observability_persist_enabled="false")
     monkeypatch.setattr(
         planning,
         "_ask_llm_with_retry",
@@ -340,7 +339,7 @@ class TestLifeLoopSupplyStep:
     def test_step_wires_world_facts_and_creates(self, aut_on, override_settings, monkeypatch):
         from app.application import life_loop
 
-        override_settings(world_enabled="true")
+        override_settings()
         captured: dict = {}
 
         def _fake_materialize(user_id, world_facts=None, now=None):

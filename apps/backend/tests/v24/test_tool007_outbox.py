@@ -39,12 +39,10 @@ def _intent(action_type: str, **params) -> ActionIntent:
 
 @pytest.fixture(autouse=True)
 def _tool_path_env(override_settings, monkeypatch):
-    """总闸 + outbox 双开；自动播种关闭（库存夹具确定）。"""
+    """总闸 + outbox 双开。"""
     monkeypatch.setattr(tool_registry, "_registry", None)
     override_settings(
-        world_enabled="true",
         action_outbox_enabled="true",
-        world_household_autoseed_enabled="false",
         observability_persist_enabled="false",
     )
     yield

@@ -10,22 +10,16 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 class WorldSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    world_enabled: bool = True
     world_time_mode: str = "real_sync"
     world_sim_rate: float = 1.0
     world_context_char_budget: int = 600
     world_nearby_objects_limit: int = 3
     world_salient_events_limit: int = 3
-    world_household_autoseed_enabled: bool = True
-    world_interpreter_enabled: bool = True
-    character_action_sync_enabled: bool = False
     character_action_sync_context_lines: int = 3
-    inventory_grounding_enabled: bool = True
     inventory_grounding_mode: str = "rewrite"
     world_active_entities_limit: int = 200
     world_active_events_limit: int = 20
     world_event_grace_hours: float = 6.0
-    world_memory_bridge_enabled: bool = True
     world_memory_importance_json: str = '{"normal": 0.6, "high": 0.8}'
     world_event_retention_days: int = 90
     world_snapshot_retention_days: int = 30

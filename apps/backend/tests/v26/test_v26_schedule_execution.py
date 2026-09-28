@@ -13,7 +13,6 @@ def _enabled(monkeypatch, **extra):
     from app.core.settings import get_settings
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "world_enabled", True)
     for key, value in extra.items():
         monkeypatch.setattr(settings, key, value)
     return settings

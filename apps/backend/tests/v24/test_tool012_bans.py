@@ -265,7 +265,7 @@ def test_ban_no_second_event_world_events_is_single_source_of_truth(
     db_session_factory, override_settings, monkeypatch
 ):
     """运行期：工具产世界事实只落 `world_events`，且幂等键唯一。"""
-    override_settings(WORLD_ENABLED="true")
+    override_settings()
     support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     from app.application import world_engine
     from app.repositories import world_repository

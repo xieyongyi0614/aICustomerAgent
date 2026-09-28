@@ -61,7 +61,7 @@ def _plans_down(*_args, **_kwargs):
 @pytest.fixture
 def authority_on(override_settings):
     """装配面锚点（历史名保留）：子闸已随开关体系删除，只钉世界面。"""
-    override_settings(world_enabled="false")
+    override_settings()
     return True
 
 

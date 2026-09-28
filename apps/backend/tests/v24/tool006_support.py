@@ -30,7 +30,6 @@ def autonomy_settings(**overrides: Any) -> SimpleNamespace:
         "tool_surface_max_tools": 12,
         "tool_breaker_threshold": 3,
         "tool_breaker_cooldown_seconds": 300,
-        "world_enabled": True,
         "observability_step_extra_max_chars": 2000,
     }
     values.update(overrides)

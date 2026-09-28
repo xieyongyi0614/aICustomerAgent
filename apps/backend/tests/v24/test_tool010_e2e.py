@@ -76,17 +76,21 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/feishu/outbound.py": "50aa5f198d1793195ba32634e6d25e67fd21f160821957f96c4e5d78b1b800ac",
     "app/channels/feishu/client.py": "5f9fe0dadc8a5fa49a945f611d68600f3dc15d07e65d3d2463384a6f036bff7e",
     "app/channels/feishu/delivery.py": "b82457b2f04ac0a6cbad31ca3121bfd48fa1f5607a7dfe7473c4c9679140b390",
-    "app/services/action/capabilities/reminder.py": "d6cd1bc27a698b107a02e534c7bb3e1afe48d1cb1f887f8e21e39d4b84ebd954",
+    # 开关清理声明（2026-09-28）：world_enabled 主闸删除后，四个能力文件里的恒真死闸
+    # （world_gate / world_available 的 getattr 读取）随之移除 —— 非 TOOL-010 改脏。
+    "app/services/action/capabilities/reminder.py": "aa217128408995eb57a18f06faad82c59f0a53cd53d06f730ad007215a4c9453",
     "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
-    "app/services/action/capabilities/world_action.py": "345912ee8452d4d03c572e5e734f3b5900223be15a80524c1a6386bbffd40048",
-    "app/services/action/capabilities/environment_query.py": "d83e44ad9ba4341c42c8027915ab395bc9a7fe1bfd03f01e59e6884a252ce41d",
+    "app/services/action/capabilities/world_action.py": "2ad7ae8f5a728185129914fc4bce601dcf2d5ae4e205404d5521599f32e1422c",
+    "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     "app/services/decision_pipeline.py": "0c6713304f4b80ddab4f3b132be82ac49429a6d8ef8eaec4866f1a1461b9d612",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "25f71edc2d48bd84ea15c8da74b4aeff4b3403d199ba364ac1660a863cfee084",  # 再冻结：流式契约演进（恒逐 token + reply_replace），e2e 对齐测试覆盖
-    "app/application/post_process.py": "3f154e7616c90053df8747358d142544a4b2ad78f9a9001ddb5be4280f72e127",
-    "app/application/action_engine.py": "8dec1c865a9e58546e6096e1f61ff13be5e6a168859e6ab8181cd85c68dc4df8",
+    # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
+    # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
+    "app/application/chat_pipeline.py": "4aec8e65c5d6271e4a4c302c9b7030969ebbbbb0e4c2836498039026a2916259",  # 再冻结：grounding 门控去掉 enabled 判断
+    "app/application/post_process.py": "c1702717bd2892e81a4a7dd8379cdda11eb57ef6d32006f4f92c36b457885059",  # 再冻结：world_enabled 删除后 CAS 闸随之移除（内容回到该摘要对应状态）
+    "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }
 """整文件零 diff 冻结面。

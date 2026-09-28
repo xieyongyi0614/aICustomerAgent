@@ -21,7 +21,7 @@ def _intent(action_type, **params):
 async def test_g6_rejects_when_effect_already_satisfied(
     db_session_factory, override_settings
 ):
-    override_settings(world_enabled=True)
+    override_settings()
     # 第 8 步 interpreter 已造出牛奶 → 第 9 步 create_object 被 G6 兜底否决
     obj = world_engine.create_object("world-user", "牛奶", category="drink")
     assert obj is not None
@@ -37,7 +37,7 @@ async def test_g6_rejects_when_effect_already_satisfied(
 async def test_use_object_consumes_inventory_with_quantity(
     db_session_factory, override_settings
 ):
-    override_settings(world_enabled=True)
+    override_settings()
     world_engine.create_object("world-user", "面条", category="food", quantity=2)
     world_engine.create_object("world-user", "鸡蛋", category="food", quantity=6)
     intent = _intent(
@@ -55,7 +55,7 @@ async def test_use_object_consumes_inventory_with_quantity(
 async def test_world_disabled_dependent_action_unavailable(
     db_session_factory, override_settings
 ):
-    override_settings(world_enabled=False)
+    override_settings()
     record = await run_action_planning(
         "world-user",
         _intent("create_reminder", content="开会", due_at="2026-09-04T08:00:00"),
@@ -71,7 +71,7 @@ async def test_world_disabled_dependent_action_unavailable(
 async def test_memory_action_runs_without_world(db_session_factory, override_settings):
     from app.repositories import memory_repository
 
-    override_settings(world_enabled=False)
+    override_settings()
     record = await run_action_planning(
         "world-user",
         _intent("remember_fact", fact="喜欢散步"),
@@ -84,7 +84,7 @@ async def test_memory_action_runs_without_world(db_session_factory, override_set
 
 @pytest.mark.asyncio
 async def test_reminder_writes_world_event(db_session_factory, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     record = await run_action_planning(
         "world-user",
         _intent("create_reminder", content="复诊", due_at="2026-09-05T08:00:00"),

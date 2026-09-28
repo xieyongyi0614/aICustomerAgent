@@ -5,9 +5,6 @@
 - 环境变量名不变（.env / docker-compose 无需任何改动）。
 """
 
-import os
-import re
-from collections.abc import Mapping
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
@@ -81,28 +78,7 @@ __all__ = [
     "SettingsError",
     "LlmProfile",
     "get_settings",
-    "unknown_versioned_env_keys",
 ]
-
-
-_VERSIONED_ENV_KEY = re.compile(r"^V[0-9]+_")
-
-
-def unknown_versioned_env_keys(environ: Mapping[str, str] | None = None) -> list[str]:
-    """形如 `V2_*` / `V21_*` / … 但不对应任何 settings 字段的环境变量。
-
-    去前缀重构（轨道 A）后已无版本化设置键，本函数的作用转为**捕获重构前的遗留键**：
-    环境变量名即字段名大写（无 alias 层），故字段改名会连带改 env 名；旧名随后被
-    `extra="ignore"` 静默吞掉——服务照常启动、闸门却回落到代码默认值，日志中无任何
-    痕迹。启动边界调用本函数，可把这种静默失效变成显式告警。
-    """
-    source = os.environ if environ is None else environ
-    known = {name.upper() for name in Settings.model_fields}
-    return sorted(
-        key
-        for key in source
-        if _VERSIONED_ENV_KEY.match(key.upper()) and key.upper() not in known
-    )
 
 
 @lru_cache

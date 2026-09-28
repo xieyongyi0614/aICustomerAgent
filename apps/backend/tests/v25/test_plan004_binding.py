@@ -49,7 +49,6 @@ def _surface_context(*, channel_on: bool) -> ToolContext:
     settings = SimpleNamespace(
         feishu_enabled=channel_on,
         tool_surface_max_tools=12,
-        world_enabled=True,
     )
     return ToolContext(user_id="plan4-user", settings=settings)
 

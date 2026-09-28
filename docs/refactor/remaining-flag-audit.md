@@ -157,7 +157,7 @@ return bool(getattr(settings, f"evaluation_{dimension.value}_enabled", True))
 | `db_pool_pre_ping` | 连接池取连接前探活（`core/db.py:461`）。关掉 = 减少一次往返，但可能取到失效连接 | 同上 | ⚠️ **属运维调优位**，非功能位 |
 | `scene_idle_reset_enabled` | 场景空闲重置（`services/scene_service.py:33,53`）。关掉 = 场景状态不因空闲复位 | 同上 | |
 | `observability_persist_enabled` | 观测落库总闸（**14 处读取**：`main.py:103`、`chains/{answer,proactive,summary}_chain.py`、`application/observability.py` ×7、`post_process.py:614`、`api/v1/proactive.py` ×2）。关掉 = 全链观测不落库 | 同上 | 关断价值高（性能/隐私） |
-| `world_enabled` | 世界域总闸（**11 处读取**）。关掉 = 世界域整体旁路，聊天链路照常 | 同上 | 世界旁路纪律的载体 |
+| `world_enabled` | 世界域总闸（**11 处读取**）。关掉 = 世界域整体旁路，聊天链路照常 | 同上 | 世界旁路纪律的载体 **（已删 2026-09-28，固化常开，见 附录 E.8）** |
 | `world_household_autoseed_enabled` | 家居库存幂等播种（`world_engine.py:427`）。关掉 = 不自动播种 | 同上 | |
 | `world_interpreter_enabled` | 用户消息 → 世界迁移解释（`world_engine.py:919`）。关掉 = 世界不随对话演进 | 同上 | |
 | `world_memory_bridge_enabled` | 世界 → 记忆桥（`world_engine.py:860,908`）。关掉 = 世界事件不入记忆 | 同上 | |
@@ -257,7 +257,7 @@ return bool(getattr(settings, f"evaluation_{dimension.value}_enabled", True))
 | 去除后果类型 | 字段数 | 代表字段 | 风险 | 建议 |
 |---|---|---|---|---|
 | **零后果**（无读取点） | **2** | `autonomy_enabled`、`rel_signal_llm_enabled` | 极低 | ✅ **批次 1（已执行，见 附录 D）** |
-| **行为不变，失去应急关断** | 20 | `world_enabled`、`observability_persist_enabled`、`action_detector_enabled`… | 低（代码层）／中（运维层） | ⚠️ **批次 2 择机**，需先接受 R17 代价 |
+| **行为不变，失去应急关断** | 20 | `world_enabled`、`observability_persist_enabled`、`action_detector_enabled`… | 低（代码层）／中（运维层） | ⚠️ **批次 2 择机**，需先接受 R17 代价（`world_enabled` 已提前执行，见 附录 E.8） |
 | **删除未启用能力路径** | 13 | `runtime_*` 7 位、`feishu_*` 3 子闸、`autonomy_action_enabled`、`action_relationship_enabled` | 中（需逐项决策能力去留） | ⏸ **批次 3 逐项裁决** |
 | **静默退化为「永远开启」** | 8 | `evaluation_{dimension}_enabled`（动态读取） | **中高**（能力消失且不报错） | ❌ **保留** |
 | **环境耦合** | 1 | `feishu_enabled` | 高 | ❌ **保留** |
@@ -342,7 +342,7 @@ V4.0.0 已立下**铁律 5：禁止新增功能开关阀门**（`docs/version/v4
 | 31 | `rel_milestone_enabled` | T | 1 | B | 行为不变/失去关断 |
 | 32 | `rel_conflict_enabled` | T | 1 | B | 同上 |
 | 33 | `tool_confirm_ttl_reuse` | T | 1 | **E** | 失去策略可调性 → 保留 |
-| 34 | `world_enabled` | T | 11 | B | 行为不变/失去关断（价值高） |
+| 34 | `world_enabled` | T | 11 | B | 行为不变/失去关断（价值高）**（已删 2026-09-28，见 附录 E.8）** |
 | 35 | `world_household_autoseed_enabled` | T | 1 | B | 同上 |
 | 36 | `world_interpreter_enabled` | T | 1 | B | 同上 |
 | 37 | `character_action_sync_enabled` | F（`.env`=T） | 2 | ⚠️ 特殊 | 默认与部署不一致 |
@@ -466,6 +466,147 @@ uv run --directory apps/backend pytest -m "(unit or api) and not slow" -q
 - **批次 3（预留位逐项决策）**：范围由「~14」修正为 **13**，内容不变。
 - **新增建议**：把 §D.2 的「动态读取形态」登记进 `docs/current-system-architecture-baseline.md` 与 `docs/TESTING.md`，避免后续审计重复踩坑。
 
+## 附录 E：两个 `v2_` 段开关删除记录（2026-09-28）
+
+### E.1 执行结果
+
+按「先删 `INVENTORY_GROUNDING_ENABLED`、再删 `CHARACTER_ACTION_SYNC_ENABLED`」顺序执行，两者均**固化常开**（与真实 `.env` 取值一致），settings 字段与 env 键一并删除。
+
+| 开关 | 原代码默认 | `.env` | 处置 | 关断能力去向 |
+|---|---|---|---|---|
+| `inventory_grounding_enabled` | True | true | 删字段 + 删 env 键 | **保留**：`INVENTORY_GROUNDING_MODE=off` 是逐字节等价的关断位 |
+| `character_action_sync_enabled` | **False** | true | 删字段 + 删 env 键 | **失去**：无等价关断位（`character_action_sync_context_lines` **实测 `limit<=0` 仍返回 1 条**，无法清零读侧；写侧更不受它控制） |
+
+改动文件（11）：`core/settings/world.py`、`application/chat_pipeline.py`、`application/post_process.py`、`application/world_engine.py`、`tests/v40/support.py`、`tests/integration/test_character_action_sync.py`、`tests/e2e/test_{foreground_cutover_parity,six_stage_loop_parity,chat_http_integration,turn_meta_stream}.py`、`.env.example`。
+
+### E.2 对 §3.1 / §3.3 结论的修正
+
+- §3.1 第 38 行判 `inventory_grounding_enabled`「失去关断能力」**不准确**。`chat_pipeline.py` 的表达式
+  `mode if enabled and world_ctx is not None else "off"` 使 `enabled=False, mode=rewrite` 与
+  `enabled=True, mode=off` 产出**完全相同的 `grounding_mode="off"` / `buffer_reply=False`**。
+  故该字段是**冗余开关**，删除成本远低于同类 B 类位——本次据此直接删除，无需应急关断位豁免。
+- §3.3 对 `character_action_sync_enabled` 的「⚠️ 单独裁决」已由本次执行裁决为**固化 True**。
+  已接受代价：无 `.env` 的环境从「不同步」变为「同步」（§3.1 备注所指的行为变化）。
+
+### E.3 冻结面再冻结（必须显式声明）
+
+本次触及 3 个被整文件哈希钉死的冻结面，已同步摘要并加声明注释：
+
+| 文件 | 钉测 | 原摘要 | 新摘要 |
+|---|---|---|---|
+| `app/application/chat_pipeline.py` | `tests/v24/test_tool010_e2e.py::ZERO_DIFF_HASHES` | `25f71edc…` | `4aec8e65…` |
+| `app/application/post_process.py` | 同上 | `3f154e76…` | `c1702717…` |
+| `app/application/world_engine.py` | `tests/v24/test_tool007_integration.py::FROZEN_SOURCES` | `3bdcd4f4…` | `baa7aa5e…` |
+
+⚠️ `world_engine.py` 的原摘要 `3bdcd4f4` **在本次改动前已 stale**（HEAD `16f76cb` 实测 `178b6024`）——
+`test_frozen_sources_have_zero_diff[app/application/world_engine.py-3bdcd4f4…]` 在改动前即为红。
+本次一并纠正，该红转绿属**顺带修复**，非本次引入。
+
+### E.4 测试与基线对照
+
+- 全量：本次 **33 failed / 7145 passed**；基线树（`git worktree` @ `16f76cb` + 同 `.env`）**26 failed / 7154 passed**。
+- 集合差「仅本次独有」8 条：3 条为上述冻结面钉测（已修）；其余 5 条经隔离重复 3 次判定为 flaky 或既有——
+  `test_debug_state_history::test_state_reflects_turn_and_respects_limit` 在两棵树上均以同一断言
+  `assert 3 >= 4` 间歇失败（基线 1/3、本次 2/3），属既有 flaky。
+- 结论：**零真回归**。
+- 修复后定向复跑 `tests/v24/test_tool00{7,8,10}_*.py` + `tests/integration/test_character_action_sync.py`
+  + `tests/v40/*` + `tests/unit/test_settings_flag_guard.py` = **150 passed / 1 failed**；唯一失败
+  `test_tool008_integration::test_reminder_create_end_to_end_deposits_memory` 在两棵树上均失败（既有）。
+- 测试侧为何零行为变化：`tests/conftest.py` 未隔离 CAS 与 grounding 两个键，而 `Settings` 的
+  `env_file=".env"` 在 `apps/backend` 为 CWD 时生效（实测 `answer_max_tokens=60` 来自 `.env`）——
+  即测试环境**改动前 CAS/grounding 已为 ON**，固化常开在测试侧等价。
+
+### E.5 遗留运维动作（必须同步部署侧）
+
+`unknown_versioned_env_keys()` 只识别 `^V[0-9]+_` 前缀（原 `app/core/settings/__init__.py:88`），
+而本次删除的两个键**无版本前缀**，部署侧 `.env` 若仍保留
+`CHARACTER_ACTION_SYNC_ENABLED=true` / `INVENTORY_GROUNDING_ENABLED=true`，会被 `extra="ignore"`
+**静默吞掉**。
+
+🚨 **该守卫已于 2026-09-28 整体删除**（连同 `app/main.py` lifespan 的告警循环、`__all__` 条目与 3 条自测）。
+删除时实测全仓 `^V[0-9]+_` 键为 **0 个**、函数返回 `[]`，故**删除本身零行为变化**；代价是
+**生产启动边界不再有任何「env 键 ↔ settings 字段」一致性检查**（另一条守卫
+`tests/conftest.py::set_known_env` 只在测试进程生效）。`docs/current-system-architecture-baseline.md`
+§7.2 已同步登记。
+
+因此部署侧清理由「可选」升级为**必须人工核对**：逐条删除
+`CHARACTER_ACTION_SYNC_ENABLED` / `INVENTORY_GROUNDING_ENABLED`，并按 `flag-rename-map.md`
+的「旧 env」列清掉 `V2_*` / `V23_*` / `V24_TOOL_*` / `V26_ACTION_*`
+（`flag-removal-audit.md:1506` 遗留待办②至今未见关闭记录）。本仓库 `.env` / `.env.example` 已清。
+
+### E.6 删除后审核发现的问题与修复（2026-09-28，同日）
+
+删除落地后做了一轮审核（探针实测，非静态推断），发现 **1 条真隐患 + 2 处本次交付自身的缺陷**，均已修：
+
+| # | 级别 | 问题 | 修法 |
+|---|---|---|---|
+| 1 | **P1** | **CAS 成了唯一绕过 `world_enabled` 的世界创建路径**：第 8 步 `run_world_update` 先判 `world_enabled` 再 `ensure_world`，第 9 步 CAS 直接 `ensure_world`，而 `ensure_world` 自身也不检查该闸 → `world_enabled=False` 的部署每轮建出**永远读不到的孤儿 world**（`build_context` 仍被 `world_enabled` 挡住）。此前该路径可被 `character_action_sync_enabled=False` 关掉，本次固化常开后不再可关。**探针实测**：CAS 前 `worlds` 行数 0 → CAS 后 1。 | `run_character_action_sync` 开头补 `if not get_settings().world_enabled: return`（与第 8 步对称）；新增集成用例 `test_world_disabled_short_circuits_without_creating_world`——该路径此前**零测试覆盖**（两个 e2e parity 用例设了 `world_enabled="false"` 却断言不到它） |
+| 2 | **P1** | E.1 原写「`character_action_sync_context_lines=0` 只清读侧」——**实测 `limit<=0` 仍返回 1 条**（`context_selector.py` 先 `append` 再判 `len(rows) >= limit`），该字段**无法清零读侧**且无 validator | 更正 E.1 措辞；`recent_world_changes_from_events` 补 `if limit <= 0: return []`，使 `<=0` 语义确定为「不注入」；新增 `test_derivation_non_positive_limit_yields_nothing` |
+| 3 | **P1** | `tests/v40/support.py::V30_ENABLED_FLAGS` docstring 自称「V3.0.0 冻结基线…静态快照」，本次是其**首次删除条目**（git 历史全 `+` 零 `-`）却未登记 | docstring 补「首次删除记录（2026-09-28）」并指向本附录 |
+| 4 | P2 | `.env.example` 未记录 `INVENTORY_GROUNDING_MODE` 的 `off` 取值，而 `off` 是 grounding 唯一关断位（唯一记载处是 `flag-rename-map.md:44` 历史表） | `.env.example` / `.env` 注释块重写，列出 `off / rewrite / annotate` 语义 |
+| 5 | P3 | `.env.example` 的 CAS 注释块只剩一个调参字段却仍写 "extract CREATE/MOVE/CONSUME" | 注释块改为「调参（开关已固化常开，无配置面）」，与同文件 World Simulation 段同风格 |
+| 6 | P3 | 基线 §7.2「settings 字段总数 405」 | 改为日期戳记的实测值 **427**（原 405 系 2026-09-20 口径，附录 C 已登记「待 V4.0 回写校正」） |
+
+**冻结面**：修复再次触及 `app/application/post_process.py`（`test_tool010_e2e.py::ZERO_DIFF_HASHES`），摘要 `c1702717…` → `ff3b9a47…`，已同步并加声明注释。
+
+> 未做（属设计裁决，非缺陷）：`character_action_sync_context_lines` 字段名保留了 `character_action_sync` 前缀——CAS 子系统本身仍在（只是开关删除），命名仍准确。
+
+### E.7 world 域三个子闸删除（2026-09-28，同日后半）
+
+用户裁决「`world_interpreter_enabled` / `world_household_autoseed_enabled` / `world_memory_bridge_enabled` 都删」。实测三者性质**不对称**，处置也不同：
+
+| 开关 | app 门控点 | 行为测试依赖 | 处置 |
+|---|---|---|---|
+| `world_interpreter_enabled` | 1（`world_engine.py:936`，与 `world_enabled` 合取） | **0** | 删字段，条件收窄为 `if not settings.world_enabled` |
+| `world_memory_bridge_enabled` | 2（`:877` `complete_events` / `:925` `expire_stale`） | **0** | 删字段，两处 if 展开为无条件 `materialize_event_memory` |
+| `world_household_autoseed_enabled` | 1（`:431` 播种） | **16 个测试依赖** | 删字段 **+ 删依赖测试**（用户裁决） |
+
+🚨 **`world_household_autoseed_enabled` 不是死开关**：11 处测试显式设 `=False` 拿「确定性空世界」，实测强制播种常开后 **16 个用例挂**（`v24/test_tool007_world_context.py` 一个文件就 8 个）。已按用户裁决删除字段并删除依赖用例，**验收覆盖损失**：
+
+- `tests/v8/scenarios/world_scenarios.json` 删 `watermelon_full_chain` 条目（3 → 2 条场景链）
+- `tests/v9/scenarios/milk_chain.json` **整文件删除**（3 → 2 条场景链）
+- 删测试函数 **9 个**：`v8/test_object_lifecycle::test_object_survives_new_sessions`；`v24/test_tool007_integration::test_build_snapshot_assembles_world_facts_when_master_flag_on`；`v24/test_tool007_world_context::{test_all_facts_land_on_tool_context, test_segment_success_path_is_unaffected_by_other_segment_degradation, test_sub_builders_are_independently_callable}`；`v24/test_tool008_integration::test_reminder_create_end_to_end_deposits_memory`；`integration/test_household_inventory::test_ensure_world_no_autoseed_when_disabled`；`v25/test_plan008_world_paths::{TestReadOnlyWorldPath::test_env_query_step_writes_nothing, TestDeferredWorldWritePath::test_s3_reminder_step_defers_then_lands_through_the_consumer}`
+- 掏空 3 个 autouse 隔离夹具（`v24/test_tool007_{integration,world_context}.py`；`v24/test_tool007_surface.py` 整体移除）
+
+**已评估但未采用的替代方案**：`monkeypatch.setattr(world_engine, "seed_default_household", ...)` 夹具（技术可行——`seed_default_household` 是模块级裸名调用，已实测确认）——用户选择删测试，而非重构 12 处测试隔离。
+
+**其余改动**：`tests/v40/support.py::V30_ENABLED_FLAGS` 删 3 名（本会话累计删 **5** 名）；`tests/conftest.py` env_map 删 3 条；`.env` / `.env.example` 本就未设置这三个键。settings 字段总数 427 → **424**。
+
+**冻结面**：`app/application/world_engine.py` 本次会话**第四次** re-freeze，`354581b4…` → `e0bad4c0…`。
+
+**验证**：受影响文件定向复跑 **8 failed / 1859 passed**，8 条全部落在基线失败集内（`v24/test_tool009_reflector` × 6、`v8` 性能预算、`tool012` 迁移）→ **零新增失败**。
+
+⚠️ **过程中的一处自纠**：首轮从 `_segment_cases()` 里删了 6 个条目，导致**共用该参数源**的 `test_all_segments_failing_still_returns_usable_structure` 连带失败——已恢复参数源，改为整函数删除 `test_segment_success_path_is_unaffected_by_other_segment_degradation`。教训：**删除参数化用例前先查该 `parametrize` 源是否被多个测试共用**。
+
+### E.8 世界域主闸 `world_enabled` 删除（2026-09-28，同日收尾）
+
+前置：E.1~E.7 已删 world 域 3 子闸与 2 个 `v2_` 段开关；本批删除**主闸本身**（§3.2 表判「批次 2 择机」，本批提前执行固化常开裁决——代码默认 True、`.env` 从未设 false，全部已知部署取值一致）。
+
+**字段**：`WorldSettings.world_enabled` 删除（settings 字段总数 424 → **423**）。
+
+**门控点展开**（§3.1 记 11 处读取；E.7 子闸删除后实测剩主门控 8 处 + 恒真死读 4 处，全部展开为无条件路径）：
+
+| 文件 | 处置 |
+|---|---|
+| `application/life_loop.py` | `_step_goal_supply` / `_step_world_experience` / `_run_maintenance`（world_maintenance、world_simulation 两处）/ `_maintenance_pending` 守卫删除 |
+| `application/world_engine.py` | `ensure_world`（播种合取收窄）/ `run_turn_update` / `build_context` / `collect_facts` / `run_maintenance` / `run_simulation_maintenance` 守卫删除 |
+| `application/chat_pipeline.py` | grounding 合取收窄为 `world_ctx is not None` |
+| `application/post_process.py` | CAS 守卫删除（E.6 为 world_enabled=False 补的短路随主闸一并移除） |
+| `services/character_action/{extractor,validator}.py`、`services/evaluation_context.py`、`services/planning/{context,observer}.py` | 守卫删除；`planning` 的 `DEGRADED_WORLD_DISABLED` 保留（无世界记录路径仍用） |
+| `application/action_engine.py` | `world_available` 赋值的恒真 getattr 删除（字段本身保留，`planner.py` G6 仍消费） |
+| `services/action/capabilities/reminder.py` | `world_gate` 整体删除（恒放行），`world_action.py` / `environment_query.py` 两处导入同步移除 |
+| `services/tool/{context,world_context,surface}.py` | `ToolContext.world_enabled()` / `_world_reason`（配置态维度）/ surface_hash 配置项 / `_world_enabled` helper 与 builder False 分支删除 |
+
+**保留（非配置开关）**：`WORLD_ENABLED_KEY` 装配标记与 `world_facts_assembled()` / `world_facts_enabled()` —— TOOL-007「已装配 vs 未装配」数据契约；`world["world_enabled"]` 恒为 True，False 态仅作为消费方防御语义存在（E1 用例改由字面事实包覆盖）。
+
+**冻结面**：`test_tool010_e2e.py::ZERO_DIFF_HASHES` 再冻结 **4** 个文件（`reminder.py` / `world_action.py` / `environment_query.py` / `action_engine.py`），附声明注释。
+
+**测试**：配置态维度用例（`test_tool004_surface::test_world_disabled_cuts_world_namespace`）与 builder False 分支用例（`test_tool007_world_context::test_e1_world_disabled_returns_only_flag_and_reads_nothing`）删除；E1 消费方契约改由字面 False 事实包覆盖；`tool004/006/007_support` 假 settings 删该字段；`test_life002_controller::test_first_tick_runs_reconcile_and_records` 的 `== 3` 断言在 HEAD `16f76cb` 上即已 stale（实测 5），本批改按维护步 kind 集合断言。`test_ws019` 用例名去掉 `when_world_enabled` 后缀。
+
+**行为变化**：世界域从「可配置旁路」变「常开」；失去运维应急关断（§3.2 批次 2 预案作废，R17 代价随裁决接受）。`remaining-flag-audit` 正文表（§3.1 / §3.2 / §3.3）为审查期快照，**保留不改**，以本附录为准。
+
+**验证**：定向复跑 v2 / v23 / v24 / v25 / unit / integration 全量 **13 failed / 5549 passed**，13 条逐一归因为既有（`git worktree` @ `16f76cb` 复跑同样失败）：`v24/test_tool009_reflector` × 6、`tool012` 迁移 × 1（E.7 基线失败集）；`test_life002_controller::test_step_error_does_not_block_following_steps`（degraded vs done）、`test_aut005::test_clean_slice_passes_all`、`v25/test_plan001/011/012` 三条 planning prompt 字节锚 —— 四类在 HEAD 上同挂，与开关无关；`test_redis_client::test_get_redis_without_url_raises` 受本地 `.env` 的 REDIS 键干扰（无 `.env` 的基线树通过）。主流程 e2e（chat_http / 六阶段 parity / 前台切换 parity / turn_meta / world_chat）+ v8 / v9 / v40 = **321 passed / 0 failed** → **零新增失败**。
+
 ---
 
-> **文档结束**。正文为审查期（改造前）口径实测；批次 1 的执行结果与**方法论补正**见 附录 D。所有「读取点」结论均由全仓 grep 实测得出，「是否有人关它」结论由真实 `.env` / `.env.example` 实测得出。
+> **文档结束**。正文为审查期（改造前）口径实测；批次 1 的执行结果与**方法论补正**见 附录 D，两个 `v2_` 段开关与世界域四闸（3 子闸 + 主闸 `world_enabled`）的删除记录见 附录 E。所有「读取点」结论均由全仓 grep 实测得出，「是否有人关它」结论由真实 `.env` / `.env.example` 实测得出。

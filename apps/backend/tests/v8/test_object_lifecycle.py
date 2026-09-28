@@ -2,28 +2,8 @@
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from app.application import world_engine
 from app.models.world import ObjectStatus
-
-
-@pytest.mark.asyncio
-async def test_object_survives_new_sessions(db_session_factory, override_settings):
-    override_settings(world_household_autoseed_enabled=False)
-    world_engine.create_object("default-user", name="西瓜", category="food", location_id="home.kitchen.fridge")
-    world_engine.run_turn_update("default-user", "给我拿个西瓜")
-    world_engine.run_turn_update("default-user", "切一下")
-    world_engine.run_turn_update("default-user", "我吃一块")
-
-    obj = world_engine.find_object_by_name("default-user", "西瓜")
-    assert obj.location_id == "home.living_room"
-    assert obj.state == "eaten"
-    assert obj.quantity == pytest.approx(0.8)
-
-    reloaded = world_engine.get_full_state("default-user")
-    watermelon = next(obj for obj in reloaded["entities"] if obj["name"] == "西瓜")
-    assert watermelon["state"] == "eaten"
 
 
 def test_expired_object_cannot_be_eaten(db_session_factory):

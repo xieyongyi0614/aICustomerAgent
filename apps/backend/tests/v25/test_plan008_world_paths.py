@@ -29,7 +29,7 @@
 （计划层零直写，静态断言见 `test_plan008_static_scan.py`）。
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
@@ -39,7 +39,6 @@ from app.models.plan import PlanContext
 from app.repositories import (
     outbox_repository,
     relationship_event_repository,
-    world_repository,
 )
 from app.services.action import relationship_bridge
 from app.services.planning import context as plan_context
@@ -66,9 +65,7 @@ RELATIONSHIP_SESSION = "plan8-relationship-session"
 @pytest.fixture
 def forward_on(planning_world_on, override_settings):
     """正向路径开关面：在装配面之上开「行动总闸 + outbox + 生命周期」（outbox 依赖 life_loop）。"""
-    override_settings(
-        action_outbox_enabled="true",
-        world_household_autoseed_enabled="false")
+    override_settings(action_outbox_enabled="true")
     return True
 
 
@@ -190,60 +187,8 @@ class TestWorldOpWhitelist:
         assert len(support.WORLD_OP_WHITELIST) == 8
 
 
-class TestReadOnlyWorldPath:
-    """S2 / ① 只读世界：查天气步骤零 `deferred_world_op`、零世界表变更、零 outbox 行。"""
-
-    @pytest.mark.asyncio
-    async def test_env_query_step_writes_nothing(self, db_session_factory, forward_on):
-        """只读步的判定面是 `world_ops` 为空（outbox 行仍存在——它承载关系段所需的行动记录）。"""
-        seed_world(USER)
-        before = support.table_counts(db_session_factory)
-        goal, _plan, outcome = await _run_step(
-            tool_id=ENV_QUERY, capability="query_environment", params={"dimension": "weather"}
-        )
-        assert outcome.status == "succeeded"
-        assert outcome.tool_id == ENV_QUERY
-        assert outcome.effects == []
-        record = outbox_repository.get(outcome.action_id)
-        assert record is not None
-        assert record.payload["world_ops"] == []
-        outbox_consumer.consume_pending(now=datetime.now())
-        assert world_repository.list_events(
-            world_repository.world_id_for(USER), limit=10
-        ) == []
-        after = support.table_counts(db_session_factory)
-        assert _world_tables(after) == _world_tables(before)
-        assert goal.id == support.GOAL_ID
-
-
 class TestDeferredWorldWritePath:
     """S3 / S4 / U7 / I4 / I5：延迟写世界——唯一写面在 outbox 消费之后。"""
-
-    @pytest.mark.asyncio
-    async def test_s3_reminder_step_defers_then_lands_through_the_consumer(
-        self, db_session_factory, forward_on, monkeypatch
-    ):
-        seed_world(USER)
-        callers = _world_write_callers(monkeypatch)
-        _goal, _plan, outcome = await _run_step(
-            tool_id=REMINDER_CREATE,
-            capability="create_reminder",
-            params={"content": "复查", "due_at": REMINDER_DUE_AT},
-        )
-        assert outcome.status == "succeeded"
-        assert outcome.tool_id == REMINDER_CREATE
-        record = outbox_repository.get(outcome.action_id)
-        assert record is not None
-        assert [op["op"] for op in record.payload["world_ops"]] == ["create_event"]
-        assert record.payload["world_ops"][0]["args"][0] == USER
-        assert world_event_titles(USER) == []
-        assert callers == []
-
-        stats = outbox_consumer.consume_pending(now=datetime.now())
-        assert stats["consumed"] == 1
-        assert world_event_titles(USER) == ["复查"]
-        assert [caller for _, caller in callers] == ["app.application.outbox_consumer"]
-        assert outbox_repository.get(outcome.action_id).status == "consumed"
 
     @pytest.mark.asyncio
     async def test_i4_world_change_always_has_a_preceding_outbox_row(

@@ -123,7 +123,6 @@ def tools_on(monkeypatch, override_settings):
         feishu_app_secret="plan6-secret",
         feishu_verification_token="plan6-token",
         feishu_encrypt_key="plan6-encrypt",
-        world_enabled="false",
         observability_persist_enabled="false")
     return True
 
@@ -134,7 +133,6 @@ def planning_gates_on(monkeypatch, override_settings):
     reset_tool_registry(monkeypatch)
     override_settings(
         plan_tool_required="true",
-        world_enabled="false",
         observability_persist_enabled="false")
     return True
 
@@ -150,7 +148,6 @@ def action_chain_on(monkeypatch, override_settings):
     override_settings(
         action_max_active_per_user="5",
         plan_tool_required="true",
-        world_enabled="false",
         action_memory_policy_enabled="false",
         observability_persist_enabled="false",
         action_outbox_enabled="false")

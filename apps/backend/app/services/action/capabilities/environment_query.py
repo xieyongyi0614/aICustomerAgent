@@ -19,11 +19,6 @@ class EnvironmentQueryCapability:
     async def execute(self, action: str, params: dict, ctx: ExecutionContext) -> CapabilityResult:
         if action != "query":
             return CapabilityResult(status="failed", error=f"未知动作: {action}", payload={"failure_kind": "permanent"})
-        from app.services.action.capabilities.reminder import world_gate
-
-        gate = world_gate(ctx)
-        if gate is not None:
-            return gate
         world = world_engine.get_world(ctx.user_id)
         if world is None:
             return CapabilityResult(

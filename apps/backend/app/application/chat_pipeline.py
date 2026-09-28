@@ -725,9 +725,7 @@ async def run_chat_pipeline(
             )
             settings = get_settings()
             grounding_mode = (
-                settings.inventory_grounding_mode
-                if settings.inventory_grounding_enabled and world_ctx is not None
-                else "off"
+                settings.inventory_grounding_mode if world_ctx is not None else "off"
             )
             buffer_reply = grounding_mode in ("rewrite", "annotate")
             answer_llm = llm_gateway.resolve_answer_llm(run_ctx, llm)

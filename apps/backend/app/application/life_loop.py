@@ -339,9 +339,7 @@ def _step_goal_supply(user_id: str, now: datetime) -> dict:
     if last is not None and (now - last).total_seconds() < interval_minutes * 60:
         return {"status": "skipped", "skip_reason": "throttled"}
     _supply_last[user_id] = now
-    world_facts = (
-        world_engine.collect_facts(user_id) if get_settings().world_enabled else {}
-    )
+    world_facts = world_engine.collect_facts(user_id)
     result = goal_planning.materialize(user_id, world_facts=world_facts, now=now)
     _route_planning_jobs(user_id, result, settings)
     return {"status": result.get("status", "ok"), **result}
@@ -587,8 +585,6 @@ def _step_reflection_check(user_id: str, now: datetime) -> dict:
 
 
 def _step_world_experience(user_id: str, now: datetime) -> dict:
-    if not get_settings().world_enabled:
-        return {"status": "skipped", "skip_reason": "world_disabled"}
     applied = world_engine.run_maintenance(user_id=user_id)
     return {"status": "ok", "applied": applied}
 
@@ -597,17 +593,14 @@ async def _run_maintenance(now: datetime) -> int:
     """维护步骤：world / action retry / trigger reconcile 按各自间隔调度。"""
     settings = get_settings()
     executed = 0
-    if settings.world_enabled and _maintenance_due(
+    if _maintenance_due(
         "world_maintenance", settings.world_maintenance_interval_seconds
     ):
         _mark_maintenance("world_maintenance")
         entry = await _safe_sync_call("world_maintenance", world_engine.run_maintenance)
         _record_maintenance_run("world_maintenance", [entry], now)
         executed += 1
-    if (
-        settings.world_enabled
-        and _maintenance_due("world_simulation", settings.world_sim_interval_seconds)
-    ):
+    if _maintenance_due("world_simulation", settings.world_sim_interval_seconds):
         _mark_maintenance("world_simulation")
         entry = await _safe_sync_call("world_simulation", world_engine.run_simulation_maintenance)
         _record_maintenance_run("world_simulation", [entry], now)
@@ -735,11 +728,11 @@ def _maintenance_due(kind: str, interval: int) -> bool:
 
 def _maintenance_pending(settings) -> bool:
     """是否有维护步骤到期（Idle 判定项；不产生标记副作用）。"""
-    if settings.world_enabled and _maintenance_due(
+    if _maintenance_due(
         "world_maintenance", settings.world_maintenance_interval_seconds
     ):
         return True
-    if settings.world_enabled and _maintenance_due(
+    if _maintenance_due(
         "world_simulation", settings.world_sim_interval_seconds
     ):
         return True

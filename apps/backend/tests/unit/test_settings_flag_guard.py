@@ -8,7 +8,7 @@
 import re
 from pathlib import Path
 
-from app.core.settings import Settings, unknown_versioned_env_keys
+from app.core.settings import Settings
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 TESTS_ROOT = BACKEND_ROOT / "tests"
@@ -36,20 +36,3 @@ class TestEnvKeyGuard:
             "setenv 字面量不对应任何 settings 字段（字段是否已改名？）：\n"
             + "\n".join(unknown)
         )
-
-    def test_unknown_versioned_env_keys_reports_ghost(self):
-        environ = {
-            "V99_GHOST_ENABLED": "true",
-            "SOME_SETTING": "true",
-            "PATH": "/usr/bin",
-        }
-        assert unknown_versioned_env_keys(environ) == ["V99_GHOST_ENABLED"]
-
-    def test_unknown_versioned_env_keys_ignores_non_versioned(self):
-        assert unknown_versioned_env_keys({"SOME_OTHER_SETTING": "1"}) == []
-
-    def test_unknown_versioned_env_keys_matches_any_version_digit(self):
-        """去前缀之后已无版本化设置键；本守卫仍须能识别形如 `V<数字>_` 的幽灵键。"""
-        assert unknown_versioned_env_keys({"V2_MEMORY_ENABLED": "true"}) == [
-            "V2_MEMORY_ENABLED"
-        ]

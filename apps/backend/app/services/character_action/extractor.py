@@ -273,9 +273,6 @@ def extract_actions(
     turn_ref: TurnRef | None = None,
     context_text: str = "",
 ) -> ExtractionResult:
-    settings = get_settings()
-    if not settings.world_enabled:
-        return ExtractionResult(skipped_reason="world_disabled")
     if not ai_reply or not isinstance(ai_reply, str):
         return ExtractionResult(skipped_reason="empty_reply")
 
