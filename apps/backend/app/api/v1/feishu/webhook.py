@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from app.api.v1.feishu_http import read_body_limited as _read_body
-from app.api.v1.feishu_http import reject as _reject
+from app.api.v1.feishu.http import read_body_limited as _read_body
+from app.api.v1.feishu.http import reject as _reject
 from app.application import observability
 from app.channels.feishu import adapter, events, shards
 from app.channels.feishu.errors import FeishuAuthError, FeishuConfigError

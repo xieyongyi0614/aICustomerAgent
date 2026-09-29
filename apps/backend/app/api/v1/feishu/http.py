@@ -1,6 +1,6 @@
 """飞书 HTTP 入口的共用助手：限长读体与统一拒绝响应。
 
-被 `feishu.py`（webhook 端点）与 `feishu_ingress.py`（C2 轻量 router）共用。
+被 `webhook.py`（webhook 端点）与 `ingress.py`（C2 轻量 router）共用。
 """
 
 from fastapi import Request

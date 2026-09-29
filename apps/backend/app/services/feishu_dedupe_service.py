@@ -4,7 +4,7 @@
 同一 `event_id` 会被每个实例各受理一次（重复 LLM 调用 + 重复回复）。本模块把判定
 落到 `feishu_dedupe_ledger` 表的主键唯一约束上，提供跨进程原子判定。
 
-**分层**：通道层保持纯函数、不感知存储；由组合根（`api/v1/feishu.py`）按
+**分层**：通道层保持纯函数、不感知存储；由组合根（`api/v1/feishu/webhook.py`）按
 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 选择内存表还是本模块（`app/channels/**` 的
 依赖 allowlist 是 fail-closed 的，不得反向 import `app.repositories`）。
 

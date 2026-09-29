@@ -50,7 +50,7 @@ User Message ───────┼── Feishu（本阶段新增，双向）
 User / Feishu Event
         │
         ▼
-api/v1/feishu.py          传输：限长 / 验签 / 解密 / 新鲜度 / 过滤 / 去重 / 限流 / 快速 ack
+api/v1/feishu/webhook.py  传输：限长 / 验签 / 解密 / 新鲜度 / 过滤 / 去重 / 限流 / 快速 ack
         │
         ▼
 channels/feishu/inbox.py     收件箱：连发合并 + per-session FIFO 批次链 + 队列背压
@@ -96,7 +96,7 @@ agent_service.stream_chat → application/chat_pipeline.run_chat_pipeline
                         飞书用户
 ```
 
-**入站与出站共享同一层（Channel Adapter），但走不同的入口与出口函数**：入站由 `api/v1/feishu.py` 驱动，出站由 `channels/base.py` 的通道无关契约驱动。两者都汇入 `channels/feishu/` 的实现，但**互不调用**。
+**入站与出站共享同一层（Channel Adapter），但走不同的入口与出口函数**：入站由 `api/v1/feishu/webhook.py` 驱动，出站由 `channels/base.py` 的通道无关契约驱动。两者都汇入 `channels/feishu/` 的实现，但**互不调用**。
 
 ### 2.2 唯一新增概念：Channel Adapter 层（内含 base/impl 两层）
 
@@ -113,7 +113,7 @@ app/channels/<impl>/     具体渠道实现（feishu/）
 
 | 层 | 位置 | 内容 | 允许依赖 | 禁止依赖 |
 |---|---|---|---|---|
-| api | `app/api/v1/feishu.py` | 路由、原始 body 读取、验签/解密、**快速 ack**、把处理投递到后台 | `channels`（含实现）、`core` | 业务域服务、repositories、langchain |
+| api | `app/api/v1/feishu/webhook.py` | 路由、原始 body 读取、验签/解密、**快速 ack**、把处理投递到后台 | `channels`（含实现）、`core` | 业务域服务、repositories、langchain |
 | **channels · 契约** | `app/channels/base.py` | 通道无关契约：入站基元（`InboundMessage`/`ChannelIdentity`/`ChannelReply`）+ 出站契约（`OutboundMessage`/`RecipientRef`/`SendResult`/`ChannelAdapter` Protocol/`ChannelErrorKind`） | **标准库 only** | 任何第三方库、任何 `app.*` 模块 |
 | **channels · 实现** | `app/channels/feishu/` | 事件校验解析、身份组装、管线调用、**出站发送（Reply / Proactive）**、Feishu 错误分类 | `channels.base`、`api`❌、`application`（管线入口）、`services.channel_identity_service`、`services.trace_collector`、`core` | `character.*`、`services.memory*`、`services.world*`、`services.state*`、`services.relationship*`、`repositories.*`（直连）、`chains.*`、**任何 Autonomy 相关模块** |
 | application | `app/application/**` | 既有编排（**零修改**） | 既有不变 + 允许 import `channels.base`（**仅契约**） | `channels.<impl>` |
@@ -128,7 +128,7 @@ app/channels/<impl>/     具体渠道实现（feishu/）
 | R2 | 核心层**可以** import `app.channels.base`（仅契约） | 核心要能对"通道"编程，而不是对"飞书"编程 |
 | R3 | `app.channels.<impl>` **不得** import 任何 Autonomy / Life Loop / Scheduler / Policy 模块 | 飞书不决定"何时开口" |
 | R4 | `app.channels.base` 必须保持**零第三方依赖、零 `app.*` 依赖** | 它是被所有人依赖的最底层契约，一旦带上依赖就会污染核心 |
-| R5 | `api` → `channels` → `application` 保持单向；`api/v1/feishu.py` 是唯一从 HTTP 进入 channels 的入口 | 入站链路确定性 |
+| R5 | `api` → `channels` → `application` 保持单向；`api/v1/feishu/webhook.py` 是唯一从 HTTP 进入 channels 的入口 | 入站链路确定性 |
 
 > **R1/R2 的边界由 FEISHU-006 的静态断言守门**：denylist 命中 `app.channels.` 且**不在** `app.channels.base` 白名单内即失败。这条取代了此前"核心层一律不得 import `app.channels.*`"的粗粒度禁令——因为那个写法会让"核心依赖通道抽象"（R2）变成违规，与终局架构冲突。
 >
@@ -643,12 +643,12 @@ Feishu Event（im.message.receive_v1）
 - **多实例（多 worker）硬化 —— 开多 worker 的硬前置，部分实现 + 已上闸**：入站的 `event_id` 去重、出站幂等（`delivery._delivered`）、会话串行（`inbox.SessionInbox` + `adapter` 的锁）**默认全部是进程内状态**。当前进度：
   0. ✅ **多实例就绪契约（FEISHU-011，已实现）**：`FEISHU_ENABLED=true` 且 `FEISHU_INSTANCE_COUNT > 1` 时，必须显式声明「ingress 已按分片分流」（`FEISHU_INGRESS_SHARDED_ROUTING_ENABLED`）+「跨进程去重已开」（`FEISHU_DEDUPE_PERSISTENT_ENABLED`），缺一即启动期 `SettingsError`。把「无人拦截的静默风险」换成显式失败——多实例的故障形态是**偶发**的（同会话 + 跨实例 + 时间重叠），比启动报错贵得多。
   1. ✅ **去重落库（FEISHU-010，已实现，默认关闭）**：新增 `feishu_dedupe_ledger` 表（`event_id` 主键 + `received_at`）与迁移 `0050`；开启 `FEISHU_DEDUPE_PERSISTENT_ENABLED` 后判定改由该表唯一约束承担，跨进程共享。**未开启时行为与以前完全一致**。
-     - **存储分派在组合根**：`api/v1/feishu.py` 的 `_claim_event()` 按配置选择通道层的内存表或 `services/feishu_dedupe_service`（DB 路径经 `asyncio.to_thread` 下放，不阻塞事件循环）。**不得**让 `app/channels/**` 直接 import `app.repositories`——通道依赖 allowlist 是 fail-closed 的（`tests/unit/test_feishu_boundary.py`）。
+     - **存储分派在组合根**：`api/v1/feishu/webhook.py` 的 `_claim_event()` 按配置选择通道层的内存表或 `services/feishu_dedupe_service`（DB 路径经 `asyncio.to_thread` 下放，不阻塞事件循环）。**不得**让 `app/channels/**` 直接 import `app.repositories`——通道依赖 allowlist 是 fail-closed 的（`tests/unit/test_feishu_boundary.py`）。
      - **失败语义 fail-open**：存储不可用时**放行**并记 warning。去重的收益是省掉重复处理，fail-closed 会直接丢掉用户消息。（与限流取向相反。）
      - **TTL 语义与内存表对齐**：`claim` 先摘除该 `event_id` 的过期行再插入（主键约束本身不知道过期），并每 `PURGE_EVERY=256` 次成功占位做一次摊还清理。
   2. ✅ **跨进程会话串行 —— 由方案 C 承担，形态选定 C2（轻量 router）并已落地**。做法、收益、代价与三种 ingress 形态的对比/排除理由见 **`ingress-routing-options.md`**。
      - **分片算法（ingress 必须逐字复刻）**：`crc32(open_id.encode("utf-8")) % FEISHU_INSTANCE_COUNT`。用标准库 `zlib.crc32`，取值稳定且各语言都有等价实现。**`open_id` 是飞书用户 open_id**，不是 `session_id`（后者形如 `feishu:{open_id}`，整串哈希结果不同）。
-     - **应用侧契约**：`channels/feishu/shards.py`（`shard_of` / `owns`，纯函数、无状态）；`api/v1/feishu.py::_owns_shard` 做归属校验——非本分片返回 **503**（可重试）并抽样记 error。
+     - **应用侧契约**：`channels/feishu/shards.py`（`shard_of` / `owns`，纯函数、无状态）；`api/v1/feishu/webhook.py::_owns_shard` 做归属校验——非本分片返回 **503**（可重试）并抽样记 error。
      - **归属校验必须在去重之前**：否则飞书重投会被去重表吞掉（FEISHU-009 修过的坑）。返回 503 而非 200，是为了让重投有机会落到正确实例；静默丢弃会让消息永久丢失且无任何可观测信号。
      - **多实例就绪契约**：`FEISHU_ENABLED=true` 且 `count>1` 时必须显式声明两项——`FEISHU_ROUTER_ENABLED`（或 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED`，表示 ingress 已分流）+ `FEISHU_DEDUPE_PERSISTENT_ENABLED`（跨进程去重，路由配错时的兜底），缺一即启动期 `SettingsError`。**出站幂等不在契约里**：它是必需能力、无开关，由组合根无条件安装。
      - **形态已选定 C2（内置轻量 router 端点 `/feishu/ingress/events`）**：解密 → 算分片 → 把**原始 body 与原始签名头**转发到目标实例，**不做鉴权决策**（校验全在下游）、**失败不自行改投**（返回 503 让飞书重投）。C1（LB 粘性）因「需 LB 持密钥做加解密 + 算法漂移风险最高 + 扩缩容需跨系统原子变更」已排除；C3（分区队列）已评估、登记为后续演进选项。详见 `ingress-routing-options.md`。
@@ -668,8 +668,11 @@ Feishu Event（im.message.receive_v1）
 ```text
 app/
 ├── api/v1/
-│   ├── feishu.py                      # ★ 传输层：路由 / 限长 / 验签 / 解密 / 新鲜度 / 去重 / 限流 / 快速 ack
-│   └── router.py                      #   +1 行注册（既有文件的最小接线）
+│   ├── feishu/                        # ★ 传输层（包）：
+│   │   ├── webhook.py                 #   路由 / 限长 / 验签 / 解密 / 新鲜度 / 去重 / 限流 / 快速 ack
+│   │   ├── ingress.py                 #   C2 轻量 router：算分片 + 原样转发（FEISHU-011）
+│   │   └── http.py                    #   共用请求助手（限长读体 / 统一拒绝）
+│   └── router.py                      #   注册（既有文件的最小接线）
 ├── channels/                          # ★ 新增：Channel Adapter 层（契约 + 实现两分）
 │   ├── base.py                        #   ★ 通道无关契约（零第三方依赖，可被核心层 import）：
 │   │                                  #     入站 InboundMessage / ChannelIdentity / ChannelReply

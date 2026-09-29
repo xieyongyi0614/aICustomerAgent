@@ -25,7 +25,7 @@ import urllib.request
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from app.api.v1.feishu_http import read_body_limited, reject
+from app.api.v1.feishu.http import read_body_limited, reject
 from app.channels.feishu import events, shards
 from app.core.settings import get_settings
 

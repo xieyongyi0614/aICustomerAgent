@@ -9,7 +9,7 @@ import pytest
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from httpx import ASGITransport, AsyncClient
 
-from app.api.v1 import feishu_ingress
+from app.api.v1.feishu import ingress as feishu_ingress
 from app.main import app
 
 URL = "/api/v1/feishu/ingress/events"

@@ -9,7 +9,7 @@ import pytest
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from httpx import ASGITransport, AsyncClient
 
-from app.api.v1 import feishu as feishu_api
+from app.api.v1.feishu import webhook as feishu_api
 from app.channels.feishu import adapter, events
 from app.channels.feishu.adapter import FALLBACK_TEXTS
 from app.main import app
@@ -839,7 +839,7 @@ async def test_dispatch_failure_is_logged_not_silent(override_settings, monkeypa
         return False
 
     monkeypatch.setattr(feishu_api.observability, "spawn_background", _refuse)
-    with caplog.at_level(logging.ERROR, logger="app.api.v1.feishu"):
+    with caplog.at_level(logging.ERROR, logger="app.api.v1.feishu.webhook"):
         response = await post_event(
             override_settings, payload=event_payload(event_id="evt-noloop")
         )

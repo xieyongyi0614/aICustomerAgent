@@ -200,10 +200,10 @@ return bool(getattr(settings, f"evaluation_{dimension.value}_enabled", True))
 
 | 字段 | 用处 | 去除后果 |
 |---|---|---|
-| `feishu_enabled` | 飞书通道总闸（`main.py:66`、`api/v1/feishu.py:36`、`client.py:187`、settings 校验器 `:107`）；**也是 `channel_tools_enabled()` 的唯一剩余闸**（`channel_tools.py:89`） | ❌ **部署闸**，见 D 类 |
-| `feishu_dedupe_persistent_enabled` | 入站去重落库（`api/v1/feishu.py:151`、校验器 `:175`）；关闭 = 仅进程内去重 | 删 = 固定为「不落库」→ **多实例部署下重复消费风险**（架构文档已记多实例硬前置） |
+| `feishu_enabled` | 飞书通道总闸（`main.py:66`、`api/v1/feishu/webhook.py:36`、`client.py:187`、settings 校验器 `:107`）；**也是 `channel_tools_enabled()` 的唯一剩余闸**（`channel_tools.py:89`） | ❌ **部署闸**，见 D 类 |
+| `feishu_dedupe_persistent_enabled` | 入站去重落库（`api/v1/feishu/webhook.py:151`、校验器 `:175`）；关闭 = 仅进程内去重 | 删 = 固定为「不落库」→ **多实例部署下重复消费风险**（架构文档已记多实例硬前置） |
 | `feishu_ingress_sharded_routing_enabled` | 分片路由（校验器 `:171`） | 删 = 固定为不分片 → **多实例部署能力丧失** |
-| `feishu_router_enabled` | 路由器入口（`api/v1/feishu_ingress.py:50`、校验器 `:121,171`） | 删 = 该入口永久不可用 |
+| `feishu_router_enabled` | 路由器入口（`api/v1/feishu/ingress.py:50`、校验器 `:121,171`） | 删 = 该入口永久不可用 |
 
 > 三个子闸在 `.env.example` 中**均为注释状态**（即示例配置不启用），真实 `.env` 也未设置。
 
