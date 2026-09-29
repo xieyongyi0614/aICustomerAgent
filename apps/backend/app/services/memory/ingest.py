@@ -211,8 +211,19 @@ def _enum_value(value):
     return getattr(value, "value", value)
 
 
+def _completed_event_content(event) -> str:
+    """完结事件的描述句（与 `world/memory_bridge.to_memory_candidates` 同源）。
+
+    两侧必须逐字一致：世界旁路（v1）与 v2 正门对同一事件都会写入，内容相同时
+    精确重复会被评估器判为 `duplicate_exact` 拒绝，从而不再出现「富描述被裸标题顶掉」。
+    """
+
+    moment = event.completed_at or event.due_at or datetime.now()
+    return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
+
+
 def ingest_from_world_event(event, user_id: str, trace=None) -> MemoryCandidateRow | None:
-    """仅完结（completed）事件；内容用事件标题。user_id 由调用方提供（WorldEvent 只含 world_id）。"""
+    """仅完结（completed）事件；user_id 由调用方提供（WorldEvent 只含 world_id）。"""
     if _enum_value(event.status) != "completed":
         return None
     importance = _enum_value(event.importance)
@@ -221,7 +232,7 @@ def ingest_from_world_event(event, user_id: str, trace=None) -> MemoryCandidateR
         character_id="asuna",
         source_table=SOURCE_WORLD,
         source_id=event.id,
-        content=event.title,
+        content=_completed_event_content(event),
         proposed_type="important_event",
         source_kind="user_stated",
         salience_init=_salience_from_world_importance(importance),

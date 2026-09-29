@@ -223,12 +223,27 @@ class TestIngestFromWorldEvent:
             id="w1", status="completed", title="面试通过",
             importance="high", user_id="u1",
         )
+        event.completed_at = datetime.datetime(2026, 9, 29, 12, 0)
         row = ingest.ingest_from_world_event(event, user_id="u1")
         assert row is not None
         assert row.source_table == "world_events"
-        assert row.content == "面试通过"
+        assert row.content == "用户在09月29日完成了面试通过"
         assert row.proposed_type == "important_event"
         assert row.salience == 0.8
+
+    def test_content_matches_world_bridge_format(self, ingest_db):
+        """两通道内容必须逐字一致，否则富描述会被裸标题顶掉（台账 §5.2.1）。"""
+
+        from app.services.world import memory_bridge as world_memory_bridge
+
+        event = _world_event(
+            id="w3", status="completed", title="面试通过",
+            importance="high", user_id="u1",
+        )
+        event.completed_at = datetime.datetime(2026, 9, 29, 12, 0)
+        row = ingest.ingest_from_world_event(event, user_id="u1")
+        expected = world_memory_bridge.to_memory_candidates(event)[0]["content"]
+        assert row.content == expected
 
     def test_non_completed_skipped(self, ingest_db):
         event = _world_event(

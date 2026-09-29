@@ -272,9 +272,65 @@ services/world/memory_bridge.py:66
 
 将 `world/memory_bridge.materialize_event_memory` 与 `action/memory_bridge.deliver` 的直写分支改为投 v2 候选。
 
-**前置条件**：先连库确认重复记忆是否真实存在（§六）；动 `application/world_engine.py`（`tool007 FROZEN_SOURCES`）与 `application/action_engine.py`（`ZERO_DIFF_HASHES`）需显式声明。
+**前置条件**：~~先连库确认重复记忆是否真实存在（§六）~~ → **✅ 已完成（2026-09-29），结论见 §5.2.1**；动 `application/world_engine.py`（`tool007 FROZEN_SOURCES`）与 `application/action_engine.py`（`ZERO_DIFF_HASHES`）需显式声明。
 
 **行为语义变化**：同一事件从「可能落 2 条」变为「落 1 条」，属产品可感知变更。
+
+#### 5.2.1 ✅ 前置验证结论：重复写入**已确认**（确定性复现，2026-09-29）
+
+**背景**：`asuna` 库为空库（所有表 0 行），无法用存量数据验证 → 改为**构造确定性复现**：造一个 `completed` 的 `world_events` 行（`type=interview` / `importance=high`），分别按两种顺序跑两条通道，再查 `memories` 全量行（含 `superseded`）。
+
+| 顺序 | `memories` 总行数 | 结果 |
+|---|---|---|
+| **A：旁路 → v2**（先 v1 直写，再 v2 摄取+评估） | **2** | `active` = v2 的「面试」；**`superseded` = 旁路的「用户在09月29日完成了面试」** |
+| **B：v2 → 旁路**（先 v2 摄取+评估，再 v1 直写） | **2** | **两行均为 `active`** ← 真重复 |
+
+**两条通道的产出差异**（同一 `world_events` 行）：
+
+| 通道 | content | type | source | 幂等键 |
+|---|---|---|---|---|
+| v1 旁路 `materialize_event_memory` | `用户在{MM月dd日}完成了{title}` | `important_event` | `user_derived` | `world_events.payload.memory_materialized` |
+| v2 正门 `ingest_from_world_event` → 转正 | `event.title`（裸标题） | `experience` | `user_stated` | `memory_candidates(source_table, source_id)` |
+
+**结论（三点）**：
+
+1. **两行确实都被写入**——无论顺序如何，同一事件都会产生 2 条 `memories` 行；两套幂等键互不可见，**没有任何一层阻止第二次写入**。
+2. **顺序 A 是「内容降级」而非「安全」**：信息量更大的「用户在09月29日完成了面试」被裸标题「面试」顶成 `superseded`，用户侧看到的是后者。
+3. **顺序 B 是可见重复**：两条同时 `active`，记忆列表出现内容不同、类型不同的同源条目。
+
+**生产顺序判定**：`post_process.STEP_HANDLERS` 中 `run_memory_extract`（第 5 步，v2 正门）**先于** `run_world_update`（第 10 步，内部 `complete_events_by_type` → v1 旁路）。故**同一轮内完成的事件**走顺序 A（跨轮被 v2 顶掉）；但事件的完成驱动方有**多个**（前台 `world_engine.py:985`、后台世界维护 `world_engine.py:1222` 的 `expire_stale_events`），**顺序 B 可达且不受任何一层保护**。
+
+**复现方法（可重放）**：建 `world_repository.ensure_world(user_id)` → 造 `WorldEvent(status=COMPLETED, importance=HIGH, title="面试")` → 依次调 `world_memory_bridge.materialize_event_memory(event, user_id)` 与 `memory_ingest.ingest_from_world_event(event, user_id)` + `await memory_evaluator.evaluate_pending(user_id)` → 用 `memory_repository.SessionLocal()` 查 `Memory` 全量行。
+
+**处置建议**：第 3 批**应执行**（非可选）。收敛方向——把旁路直写改为投 v2 候选，或让 v2 摄取时识别旁路已写并跳过；同时需解决「v2 用裸标题覆盖富内容」的问题（`ingest_from_world_event` 的 content 宜改为与旁路同源的描述句）。
+
+#### 5.2.2 ✅ 内容降级已修（2026-09-29，第 3 批第 1 步）
+
+**改动**：`app/services/memory/ingest.py::ingest_from_world_event` 的 `content` 由 `event.title`（裸标题）改为与旁路同源的描述句，抽为模块级 `_completed_event_content(event)`：
+
+```python
+moment = event.completed_at or event.due_at or datetime.now()
+return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
+```
+
+**为什么这样就够**：两侧内容逐字一致后，v2 候选在评估器 `_is_exact_duplicate` 处被判 `duplicate_exact` **拒绝**（`memory/evaluator.py:397`），而非 supersede → 顺序 A 下**不再产生第二条记忆**，旁路的富描述得以保留。
+
+**实测效果**（同一探针重放）：
+
+| 顺序 | 修复前 | 修复后 |
+|---|---|---|
+| A：旁路 → v2（**生产默认**） | 2 行；`active` = 裸标题「面试」，`superseded` = 富描述 | **1 行**；`active` = 「用户在09月29日完成了面试」 |
+| B：v2 → 旁路 | 2 行均 `active`，内容**不同** | 2 行均 `active`，内容**完全一致** |
+
+**残余（留给第 3 批本体）**：顺序 B 仍是 2 行——内容已一致，属**冗余行**而非信息损失；根治需通道收敛（§5.2 主体）。
+
+**测试**：
+- `tests/v2/test_mem002_ingest.py::TestIngestFromWorldEvent::test_completed_deposits`：断言更新为富描述（原断言 `== "面试通过"` 在新实现下必然失败），并显式钉 `completed_at` 消除日期不确定性。
+- **新增** `test_content_matches_world_bridge_format`：直接比对 `world/memory_bridge.to_memory_candidates(event)[0]["content"]`，**钉住两通道内容必须逐字一致**，防未来单侧漂移。
+
+**未触碰任何冻结面**：`services/memory/ingest.py` 不在 `ZERO_DIFF_HASHES` / `FROZEN_SOURCES` 清单内。
+
+**验证**：全量 `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit eval integration` → **17 failed / 6594 passed / 2 skipped**，失败集与修复前**逐条一致**（14 基线 + 3 已知既存）→ 零新增。
 
 ### 5.3 附带发现（待后续批次）
 
@@ -286,7 +342,7 @@ services/world/memory_bridge.py:66
 
 ## 六、待人工验证项
 
-1. **重复记忆查库**（第 3 批前置）：对同一 `world_events` / `action_records` 行，确认 `memories` 表中是否存在旁路与 v2 各写一条的重复行。
+1. ~~**重复记忆查库**（第 3 批前置）：对同一 `world_events` / `action_records` 行，确认 `memories` 表中是否存在旁路与 v2 各写一条的重复行。~~ **✅ 已完成（2026-09-29）**：空库无法用存量数据验证 → 改为确定性复现，**确认两行都被写入**（顺序 A 为内容降级、顺序 B 为可见重复）。结论与复现方法见 **§5.2.1**。
 2. **真实模型人工回归**：`reclaim` 循环移除后，确认无「过期记忆未回收」的线上反馈（该循环恒空转，理论上零影响，但需观察）。
 3. ~~**`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。~~ **✅ 已完成（2026-09-29）**：全量回归零新增失败，`conftest` 的 9 条 import 与 9 项模块登记已同步（§3.3.6）。
 4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.3）：需先确定 `proposed_type` 的遗留名归一化时机。
