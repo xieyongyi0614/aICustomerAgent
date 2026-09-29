@@ -10,7 +10,7 @@ from app.services.governance.prompt_guard import (
     FinancialDetailInPrompt,
     assert_no_financial_detail,
 )
-from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory import ingest as memory_ingest
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def filter_and_ingest(
         assert_no_financial_detail(text)
     except FinancialDetailInPrompt:
         return IngestOutcome(False, None, "financial_detail")
-    row = memory2_ingest._create_candidate(
+    row = memory_ingest._create_candidate(
         user_id=user_id,
         character_id="asuna",
         source_table=SOURCE_TABLE,

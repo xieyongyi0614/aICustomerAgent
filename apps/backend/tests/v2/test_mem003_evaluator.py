@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.models.memory import EvaluationVerdict
-from app.services.memory2 import evaluator
+from app.services.memory import evaluator
 
 
 @pytest.fixture

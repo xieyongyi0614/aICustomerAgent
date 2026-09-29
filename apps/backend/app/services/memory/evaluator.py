@@ -21,11 +21,11 @@ from app.core.db import Memory, MemoryCandidateRow, SessionLocal
 from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
 from app.models.memory import EvaluationVerdict
-from app.prompts.memory2_evaluator import build_memory_evaluation_messages
-from app.services.memory2 import embeddings as memory_embeddings
-from app.services.memory2 import lifecycle as memory_lifecycle
-from app.services.memory2 import types as memory2_types
-from app.services.memory_conflict import _lcs_length, same_topic
+from app.prompts.memory_evaluator import build_memory_evaluation_messages
+from app.services.memory import embeddings as memory_embeddings
+from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import types as memory_types
+from app.services.memory.conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ def _novelty(content: str, active_contents: list[str]) -> float:
 def _type_affinity(content: str, proposed_type: str) -> float:
     hit_types = {
         memory_type
-        for memory_type, keywords in memory2_types.TYPE_AFFINITY_KEYWORDS.items()
+        for memory_type, keywords in memory_types.TYPE_AFFINITY_KEYWORDS.items()
         if any(keyword in content for keyword in keywords)
     }
     if not hit_types:
@@ -176,13 +176,13 @@ def _related_contents(content: str, active_contents: list[str]) -> list[str]:
 
 def _final_type(proposed_type: str | None, llm_suggestion: str | None) -> str:
     """type 终值由代码映射决定：建议类型仅作参考，统一归一化为 v2 规范 7 类。"""
-    normalized = memory2_types.normalize_type(proposed_type)
+    normalized = memory_types.normalize_type(proposed_type)
     if normalized is not None:
         return normalized
-    normalized = memory2_types.normalize_type(llm_suggestion)
+    normalized = memory_types.normalize_type(llm_suggestion)
     if normalized is not None:
         return normalized
-    return memory2_types.DEFAULT_MEMORY_TYPE
+    return memory_types.DEFAULT_MEMORY_TYPE
 
 
 def _memory_source_of(candidate_source: str | None) -> str:

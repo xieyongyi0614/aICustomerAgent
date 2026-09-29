@@ -19,7 +19,7 @@ from app.models.action import ActionRecord
 from app.models.memory import MemoryCandidate
 from app.models.tool import ToolDefinition
 from app.repositories import memory_repository
-from app.services import memory_policy
+from app.services.memory import policy as memory_policy
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.tool.registry import get_tool_registry
 

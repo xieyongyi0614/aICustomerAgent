@@ -17,9 +17,9 @@ from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import UserMemory
 from app.repositories import memory_repository
-from app.services.memory2 import embeddings as memory_embeddings
-from app.services.memory2 import lifecycle as memory_lifecycle
-from app.services.memory_conflict import same_topic
+from app.services.memory import embeddings as memory_embeddings
+from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory.conflict import same_topic
 
 logger = logging.getLogger(__name__)
 

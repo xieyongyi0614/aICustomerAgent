@@ -955,7 +955,7 @@ POLICY_RULE_CASES: dict[str, dict] = {
 def test_g_memory_rules_r1_r8_have_no_exemption(rule, payload):
     """R1~R8 零豁免：政策闸对工具结果候选与记忆候选一视同仁。"""
     from app.models.memory import MemoryCandidate
-    from app.services import memory_policy
+    from app.services.memory import policy as memory_policy
 
     candidate = MemoryCandidate(
         action=payload["action"],
@@ -974,7 +974,7 @@ def test_g_memory_rules_r1_r8_have_no_exemption(rule, payload):
 def test_g_memory_r2_r3_r7_rules_reachable():
     """R2 / R3 / R7 同样零豁免（suppress 阻断、forget 转隐私、完全重复）。"""
     from app.models.memory import MemoryCandidate
-    from app.services import memory_policy
+    from app.services.memory import policy as memory_policy
 
     base = MemoryCandidate(
         action="save",

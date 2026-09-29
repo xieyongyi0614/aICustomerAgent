@@ -337,8 +337,8 @@ def install_delivery_probe(monkeypatch, *, ingest_content: str | None = None) ->
     `ingest_content=None` 时摄取探针返回桩行（内容由用例给定）；给 `""` 即模拟「无候选行」。
     """
     from app.repositories import memory_repository as repo
-    from app.services import memory_policy as policy_gate
-    from app.services.memory2 import ingest as ingest_mod
+    from app.services.memory import policy as policy_gate
+    from app.services.memory import ingest as ingest_mod
 
     probe = DeliveryProbe()
     original_policy = policy_gate.apply_policy
@@ -399,7 +399,7 @@ def read_only_definition(tool_id: str, *, policy_key: str | None = None):
 
 def install_ingest_stub(monkeypatch, *, content: str | None = None) -> list[tuple]:
     """只打桩既有摄取入口（返回桩行 / 无行），记录调用参数——I6 复用举证的轻量探针。"""
-    from app.services.memory2 import ingest as ingest_mod
+    from app.services.memory import ingest as ingest_mod
 
     calls: list[tuple] = []
 

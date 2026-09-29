@@ -5,8 +5,8 @@
 **与 Task Detail §4.2.2 的实现核对（本任务唯一需要裁决的硬冲突，已按裁决落地并留痕）**
 
 > §4.2.2 的备选路径称「复用既有 `ingest_from_goal_completion`（其 `source` 取自目标本身）」——
-> 该前提与真实源码不符：`memory2/ingest.py` 的该函数**硬编码** `source_kind="ai_inferred"`，
-> 且在 `memory_policy` 之外另走 `memory_candidates → memory2.evaluator → memories` 通道。
+> 该前提与真实源码不符：`memory/ingest.py` 的该函数**硬编码** `source_kind="ai_inferred"`，
+> 且在 `memory_policy` 之外另走 `memory_candidates → memory.evaluator → memories` 通道。
 > 故若把它的返回值直接当候选基座，三类终态会被 R1 恒定丢弃（G-MEMORY 不成立）；若把它当写入
 > 路径，则违反 D8「R1~R8 零豁免」。裁决（用户）：**完成类复用其候选语义与幂等锚点，失败 / 放弃
 > 类走 §4.2.2 的加权重路径**（内容锚定目标描述 + 未完成语义 + `importance ≥ floor`），
@@ -15,7 +15,7 @@
 > `test_the_reused_row_would_be_rejected_by_r1`（若不覆盖 `source`，R1 会拒收）。
 """
 
-from app.services import memory_policy as policy_gate
+from app.services.memory import policy as policy_gate
 from app.services.planning import memory_policy as plan_memory_policy
 from app.services.tool import memory_policy as tool_memory_policy
 
@@ -183,7 +183,7 @@ class TestPrivacyBranch:
 
     def test_privacy_routing_reuses_the_existing_command_detector(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
-        assert "memory2_commands.detect_command" in source
+        assert "memory_commands.detect_command" in source
         assert "ACTION_FORGET" in source
 
 
@@ -197,7 +197,7 @@ class TestNoNewCandidateConstructor:
 
     def test_the_ingest_entry_point_is_called_once_from_this_module(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
-        assert source.count("memory2_ingest.ingest_from_goal_completion(") == 1
+        assert source.count("memory_ingest.ingest_from_goal_completion(") == 1
 
     def test_module_does_not_reimplement_the_ingest_content_logic(self):
         literals = support.module_literals(MODULE_PATH)

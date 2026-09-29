@@ -32,7 +32,7 @@ from app.services.evaluation_rules.relationship import (
     NarrativeFactProvenanceRule,
     NarrativeMilestoneProvenanceRule,
 )
-from app.services.memory2.ingest import NARRATIVE_MILESTONE_PREFIX
+from app.services.memory.ingest import NARRATIVE_MILESTONE_PREFIX
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)
 

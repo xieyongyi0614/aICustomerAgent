@@ -10,7 +10,7 @@
 | Goal | `goal_repository.get_goal` | **硬依赖**：缺失即 `PlanUnavailable("goal_missing")` |
 | World | `WORLD_READ_ENTRIES`（五项只读入口，九段装配） | 逐段空包 / `world_disabled` + 七条世界段标记 |
 | Context | `scene_profile_for` / `get_active_situation` / 关系投影 | 空包 / `scene_unavailable` 等 |
-| Memory | `memory2.retriever.retrieve` | 空列表 / `memory_unavailable` |
+| Memory | `memory.retriever.retrieve` | 空列表 / `memory_unavailable` |
 | Reflection | `list_user_active_insights` / `interest_signal` | 空列表 / `reflection_unavailable` |
 | ToolSurface | `build_tool_context` + `ToolSurfaceResolver` | **硬依赖**（总闸 off / 注册表不可得 / 无面退化见下） |
 
@@ -84,7 +84,7 @@ from app.models.world_simulation import (
     WorldBrief,
 )
 from app.repositories import goal_repository, world_simulation_repository
-from app.services.memory2 import retriever as memory_retriever
+from app.services.memory import retriever as memory_retriever
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import tool_feed as reflection_tool_feed
 from app.services.tool.context import ToolContext

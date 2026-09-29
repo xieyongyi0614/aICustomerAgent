@@ -135,7 +135,7 @@ def _stub_record(monkeypatch, record=None):
 
 def _stub_ingest(monkeypatch, *, row=None, raises=None):
     calls: list = []
-    from app.services.memory2 import ingest
+    from app.services.memory import ingest
 
     def _ingest_from_action_record(record, character_id="asuna", trace=None):
         calls.append({"record_id": record.id, "character_id": character_id})
@@ -551,7 +551,7 @@ class TestIntegration:
         self, db_session_factory, monkeypatch
     ):
         """记忆通道走既有 `ingest_from_action_record`：候选行的幂等键不变。"""
-        from app.services.memory2 import ingest
+        from app.services.memory import ingest
 
         record = _record()
         _stub_record(monkeypatch, record)

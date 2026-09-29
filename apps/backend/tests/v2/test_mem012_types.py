@@ -12,7 +12,7 @@ from app.core.db import Base, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.models.memory import MemoryType, UserMemory
 from app.repositories import memory_repository
-from app.services.memory2 import evaluator, lifecycle, retriever, types
+from app.services.memory import evaluator, lifecycle, retriever, types
 
 
 @pytest.fixture

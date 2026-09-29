@@ -68,34 +68,3 @@ def test_followup_not_exempt_from_quiet_hours():
     assert verdict.decision == "ignore"
     assert verdict.reason == "静音时段"
     trigger_evaluator._followup_registry.clear()
-
-
-def test_memory_pipeline_registers_followup(db_session_factory, fake_llm):
-    from app.services import memory_service
-
-    llm = fake_llm(
-        response=[],
-        structured_responses={
-            "MemoryExtraction": {
-                "candidates": [
-                    {
-                        "action": "save",
-                        "source": "user_stated",
-                        "type": "important_event",
-                        "content": "用户明天有一场重要的面试",
-                        "importance": 0.9,
-                        "confidence": 0.9,
-                    }
-                ]
-            }
-        },
-    )
-    import asyncio
-
-    asyncio.run(
-        memory_service.extract_and_save(
-            "u1", "我明天有面试，好紧张", "别紧张，你准备得很充分", llm=llm
-        )
-    )
-    assert trigger_evaluator._followup_registry
-    trigger_evaluator._followup_registry.clear()

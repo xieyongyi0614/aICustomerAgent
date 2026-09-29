@@ -1,10 +1,11 @@
 """REL-001 关系事实真相源统一测试。
 
 覆盖：里程碑转写通道（类型/salience/source_ref/幂等/insight 溯源位）、
-v1 直写旁路 Flag 门控、v1 遗留记忆迁移（dry-run/apply/幂等/校验）、
+v1 直写旁路已删除（静态守卫）、v1 遗留记忆迁移（dry-run/apply/幂等/校验）、
 debug timeline 账本↔记忆互相溯源。
 """
 
+import pathlib
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -12,26 +13,20 @@ import pytest
 
 from app.core.db import Memory
 from app.core.settings import get_settings
-from app.models.character_state import CharacterState
 from app.models.relationship import (
     MilestoneRecord,
     RelationshipDelta,
     RelationshipEvent,
-    RelationshipState,
 )
 from app.repositories import (
     memory_repository,
     relationship_event_repository,
     relationship_milestone_repository,
 )
-from app.services import (
-    relationship_conflict,
-    relationship_memory,
-    relationship_milestone,
-    state_service,
-)
-from app.services.memory2 import ingest, migration
-from app.services.memory2.types import V2_MEMORY_TYPES
+from app.services.memory import ingest, migration
+from app.services.memory.types import V2_MEMORY_TYPES
+
+BACKEND = pathlib.Path(__file__).resolve().parents[2]
 
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)
@@ -105,59 +100,14 @@ class TestMilestoneIngest:
 
 
 class TestV1BypassGate:
-    @pytest.fixture
-    def subsystem_stubs(self, monkeypatch):
-        relationship = RelationshipState()
-        monkeypatch.setattr(
-            relationship_conflict,
-            "evaluate_conflict",
-            lambda *a, **k: SimpleNamespace(
-                state=relationship, system_events=[], record=None, transition=""
-            ),
-        )
-        monkeypatch.setattr(
-            relationship_conflict,
-            "decay_tension",
-            lambda *a, **k: SimpleNamespace(system_events=[], state=relationship),
-        )
-        monkeypatch.setattr(
-            relationship_milestone,
-            "process_milestones",
-            lambda ctx, state: (state, []),
-        )
-        monkeypatch.setattr(state_service, "_capture_snapshot_if_needed", lambda *a, **k: None)
-        calls: list[str] = []
-        monkeypatch.setattr(
-            relationship_memory,
-            "to_memory_candidates",
-            lambda *a, **k: calls.append("shape") or [SimpleNamespace(content="x")],
-        )
-        monkeypatch.setattr(
-            relationship_memory,
-            "deliver_candidates",
-            lambda candidates, user_id: calls.append(f"deliver:{user_id}"),
-        )
-        return calls, relationship
+    """v1 直写旁路已随 memory 域清理删除（2026-09-29）：关系记忆不再有 v1 投递通道。"""
 
-    def _run(self, relationship, user_id="u-rel1"):
-        state_service._run_relationship_subsystems(
-            user_id=user_id,
-            session_id="s-1",
-            state=None,
-            analysis=None,
-            character=CharacterState(),
-            new_relationship=relationship,
-            turn_events=[],
-            user_input="",
-            recent_events=[],
-            now=NOW,
-        )
+    def test_v1_delivery_module_is_removed(self):
+        assert not (BACKEND / "app/services/relationship_memory.py").exists()
 
-
-    def test_flag_on_skips_v1_delivery(self, _offline_repos, subsystem_stubs, monkeypatch):
-        calls, relationship = subsystem_stubs
-        self._run(relationship)
-        assert calls == []
+    def test_state_service_has_no_v1_delivery_reference(self):
+        source = (BACKEND / "app/services/state_service.py").read_text(encoding="utf-8")
+        assert "relationship_memory" not in source
 
 
 class TestLegacyMigration:

@@ -27,7 +27,7 @@ from app.models.action import ActionIntent
 from app.models.character_action import TurnRef
 from app.models.memory import MemoryExtraction
 from app.repositories import memory_repository, world_repository
-from app.services.memory2 import (
+from app.services.memory import (
     commands as memory_commands,
     ingest as memory_ingest,
     sources as memory_sources,

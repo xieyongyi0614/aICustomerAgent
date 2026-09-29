@@ -16,7 +16,7 @@ from app.repositories import (
     goal_repository,
 )
 from app.services import goal_planning as planning
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 
 NOW = datetime(2026, 9, 8, 12, 0, 0)
 USER = "aut2-user"
@@ -309,7 +309,7 @@ class TestJobHandler:
         override_settings()
         planning.register_runtime()
         assert (
-            memory2_job_worker._JOB_HANDLERS[planning.JOB_TYPE_PLANNING]
+            memory_job_worker._JOB_HANDLERS[planning.JOB_TYPE_PLANNING]
             is planning.run_planning_jobs
         )
 

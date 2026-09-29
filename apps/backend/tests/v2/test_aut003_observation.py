@@ -158,7 +158,7 @@ class TestAdvanceGoal:
         assert detail["outcome"] == "completed"
         assert goal_repository.get_goal(goal.id).status == "completed"
         from app.core.db import MemoryCandidateRow
-        from app.services.memory2 import ingest as memory_ingest
+        from app.services.memory import ingest as memory_ingest
 
         with memory_ingest.SessionLocal() as session:
             row = (

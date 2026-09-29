@@ -8,7 +8,7 @@
 - **只读投影**：不写 `memories` / `world_*` / `relationship_*` / `character_state` /
   `scene_state`；零新增表列。
 - **零 LLM**：不触碰 `llm_gateway` / `chains` / `prompts`。
-- **零二次检索**（D2）：记忆信号复用 RT-004 的召回结果，**禁止**调 `memory2.retriever`。
+- **零二次检索**（D2）：记忆信号复用 RT-004 的召回结果，**禁止**调 `memory.retriever`。
 - **失败不中断**（D5）：任一事实集读取失败 → 该集 `None` + `ObservationDegradation`，
   绝不外抛（感知失败不应中断 Run，旁路纪律）。
 """

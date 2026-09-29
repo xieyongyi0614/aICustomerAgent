@@ -33,12 +33,9 @@ USER = "review-fix-user"
 OTHER = "review-fix-other"
 
 DOMAIN_MODULES = (
-    "app/services/memory_service.py",
-    "app/services/memory_policy.py",
-    "app/services/memory_conflict.py",
+    "app/services/memory",
     "app/services/reflection",
     "app/services/relationship_signal.py",
-    "app/services/relationship_memory.py",
     "app/services/relationship_milestone.py",
     "app/services/relationship_evolution.py",
     "app/services/action",

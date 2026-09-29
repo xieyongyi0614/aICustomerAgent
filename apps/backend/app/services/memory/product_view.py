@@ -2,7 +2,7 @@
 
 读面口径按 D5：只返 `status == "active"`，`total` 与分组同口径、同一内存快照。
 写面**委托**域内既有写面（`memory_repository.update_memory_content` /
-`memory2.lifecycle.explicit_forget`），不直写 `memories`、不硬删。
+`memory.lifecycle.explicit_forget`），不直写 `memories`、不硬删。
 
 不暴露 `status` / `salience` / `confidence` / 上限 / 衰减（D5 / D12）。
 
@@ -21,8 +21,8 @@ from datetime import datetime, timedelta
 from app.core.db import Memory as MemoryRow
 from app.core.db import SessionLocal
 from app.repositories import memory_repository, trace_repository
-from app.services.memory2 import lifecycle as memory_lifecycle
-from app.services.memory2.types import normalize_type
+from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory.types import normalize_type
 
 logger = logging.getLogger(__name__)
 

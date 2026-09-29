@@ -8,8 +8,8 @@ import pytest
 
 from app.core.db import Memory, RuntimeTraceRow
 from app.repositories import memory_repository, trace_repository
-from app.services.memory2 import product_view
-from app.services.memory2.types import STORAGE_MEMORY_TYPES
+from app.services.memory import product_view
+from app.services.memory.types import STORAGE_MEMORY_TYPES
 
 pytestmark = pytest.mark.unit
 

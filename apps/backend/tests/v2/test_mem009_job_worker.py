@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, BackgroundJobRow, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.repositories import background_job_repository, memory_repository
-from app.services.memory2 import embeddings, job_worker, lifecycle
+from app.services.memory import embeddings, job_worker, lifecycle
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ Act / Reflect / Update）**尚未接入生产 `AgentLoop.run()`**——生产唯
 
 - 允许依赖：`contracts` / `session` / `state` / `context` / `events` 与各域的**只读**读面。
 - 禁止依赖：任何写仓储 / 写服务、`app.chains`、`app.prompts`、`llm_gateway`、
-  具体渠道实现、`memory2.retriever`（记忆信号复用 RT-004 召回结果，不二次检索）。
+  具体渠道实现、`memory.retriever`（记忆信号复用 RT-004 召回结果，不二次检索）。
 
 **导入约定**：本包只导出**值对象**，段本体按模块路径导入
 （`from app.application.agent_runtime.stages.observe import observe`）——若在此再导出同名

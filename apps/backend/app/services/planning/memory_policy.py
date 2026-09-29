@@ -28,13 +28,13 @@
 
 候选构造（§6.3）
 
-- `plan_completed`：**复用**既有 `memory2.ingest.ingest_from_goal_completion(user_id, goal_id,
+- `plan_completed`：**复用**既有 `memory.ingest.ingest_from_goal_completion(user_id, goal_id,
   description)`——其内容（`完成了目标：{description}`）即完成语义、其幂等锚点
   `{goal_id}:completed` 与既有 AUT-003 完成通道**同锚**（重复投递不产生第二条候选行）。
 - `plan_failed` / `plan_abandoned`：走 §4.2.2 的**加权重路径**——内容锚定用户委托的目标描述
   并带未完成语义（措辞逐字复用 V9 失败纪律 `上次没能帮用户完成：…`）、重要度取
   `max(FAILED_IMPORTANCE_FLOOR, plan_memory_importance_floor)`。
-- 隐私步骤参数（§4.2.2 末行）：步骤 `params` 命中既有显式遗忘指令（`memory2.commands.detect_command`
+- 隐私步骤参数（§4.2.2 末行）：步骤 `params` 命中既有显式遗忘指令（`memory.commands.detect_command`
   → `forget`）→ 候选取 `action="forget"`，经 `memory_policy` **R3** 分支判为
   `DECISION_PRIVACY`（「用户要求遗忘，转隐私执行」）并移交既有隐私通道；**本层不复制遗忘执行
   逻辑、不写 `memories`**。隐私优先于沉淀：一个终态只出一个候选。
@@ -74,7 +74,7 @@
 PLAN-003 的既有链路（单步计划在 PLAN-003 用例中就被断言会落库），在此处插入判据 A 会改变
 PLAN-003 / PLAN-005 的既有行为，违反零回归纪律。接入点留待后续任务按需评估。
 
-非范围：`memory_policy` R1~R8 改动、`memory2.*` 改动、工具侧边界表改动、`memories` 表结构
+非范围：`memory_policy` R1~R8 改动、`memory.*` 改动、工具侧边界表改动、`memories` 表结构
 （零迁移）、反思证据窗（PLAN-010）、世界写入（PLAN-008）、自治 `plan_facts`（PLAN-007）。
 """
 
@@ -88,9 +88,9 @@ from app.core.settings import get_settings
 from app.models.memory import MemoryCandidate
 from app.models.plan import PLAN_STEP_DEDUPE_KEY_TEMPLATE
 from app.repositories import action_repository, memory_repository
-from app.services import memory_policy as memory_policy_gate
-from app.services.memory2 import commands as memory2_commands
-from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory import policy as memory_policy_gate
+from app.services.memory import commands as memory_commands
+from app.services.memory import ingest as memory_ingest
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.tool.memory_policy import (
     DEFAULT_CONFIDENCE,
@@ -107,7 +107,7 @@ from app.services.tool.memory_policy import (
 logger = logging.getLogger(__name__)
 
 CHARACTER_ID = "asuna"
-"""记忆落库的角色 id（与既有 `memory2.ingest` / `memory_bridge` 同款默认值）。"""
+"""记忆落库的角色 id（与既有 `memory.ingest` / `memory_bridge` 同款默认值）。"""
 
 ACTIVE_MEMORY_LIMIT = 200
 """政策闸 R7 的活跃记忆比对窗（与既有 `memory_service.extract_and_save` 同款取值）。"""
@@ -395,7 +395,7 @@ def _candidate(action: str, content: str, decision: PlanMemoryDecision) -> Memor
 def _content_for(goal, event_kind: str) -> str:
     """内容模板（§8 Step 3.2）：完成类复用既有摄取，失败 / 放弃类带未完成语义。"""
     if event_kind == EVENT_PLAN_COMPLETED:
-        row = memory2_ingest.ingest_from_goal_completion(
+        row = memory_ingest.ingest_from_goal_completion(
             goal.user_id, goal.id, goal.description
         )
         return "" if row is None else str(row.content or "")
@@ -407,15 +407,15 @@ def _content_for(goal, event_kind: str) -> str:
 def _privacy_target(plan) -> str | None:
     """隐私步骤参数（§4.2.2 末行）：步骤 `params` 命中既有显式遗忘指令即返回待遗忘对象。
 
-    识别复用既有 `memory2.commands.detect_command`（词表、疑问句与短对象纪律一并复用），
+    识别复用既有 `memory.commands.detect_command`（词表、疑问句与短对象纪律一并复用），
     **不新增隐私词表**；本层只做路由，遗忘执行仍归既有隐私通道。
     """
     if plan is None:
         return None
     for spec in plan.sub_goals:
         for value in _params(spec):
-            detected = memory2_commands.detect_command(value)
-            if detected is not None and detected[0] == memory2_commands.ACTION_FORGET:
+            detected = memory_commands.detect_command(value)
+            if detected is not None and detected[0] == memory_commands.ACTION_FORGET:
                 return detected[1]
     return None
 

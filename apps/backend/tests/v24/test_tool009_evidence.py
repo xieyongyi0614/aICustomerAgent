@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.character.asuna import evaluation as asuna_evaluation
-from app.services.memory2 import sources as memory_sources
+from app.services.memory import sources as memory_sources
 from app.services.reflection import evidence as reflection_evidence
 from tests.v24.tool009_support import (
     OTHER_USER,

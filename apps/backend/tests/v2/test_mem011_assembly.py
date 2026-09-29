@@ -9,8 +9,8 @@ from app.core.db import Base
 from app.core.settings import get_settings
 from app.repositories import memory_repository
 from app.services.context_builder import _select_retrieval_segment, _working_window
-from app.services.memory2 import lifecycle, retriever
-from app.services.memory2.retriever import RankedMemories, RankedMemory
+from app.services.memory import lifecycle, retriever
+from app.services.memory.retriever import RankedMemories, RankedMemory
 
 
 @pytest.fixture

@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.core.db import BackgroundJobRow, Memory, ReflectionRunRow
-from app.services.memory2 import job_worker as memory2_job_worker
-from app.services.memory2 import lifecycle as memory2_lifecycle
+from app.services.memory import job_worker as memory_job_worker
+from app.services.memory import lifecycle as memory_lifecycle
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import triggers
 
@@ -302,14 +302,14 @@ def test_day_bucket_key_format():
 
 def test_tick_hook_wiring_and_isolation(monkeypatch):
     hooks: list = []
-    monkeypatch.setattr(memory2_job_worker, "_TICK_HOOKS", hooks)
-    memory2_job_worker.register_tick_hook(hooks.append)
+    monkeypatch.setattr(memory_job_worker, "_TICK_HOOKS", hooks)
+    memory_job_worker.register_tick_hook(hooks.append)
 
     def _boom(now):
         raise RuntimeError("hook down")
 
-    memory2_job_worker.register_tick_hook(_boom)
-    stats = memory2_job_worker.run_job_tick()
+    memory_job_worker.register_tick_hook(_boom)
+    stats = memory_job_worker.run_job_tick()
     assert isinstance(stats, dict)
     assert hooks  # 正常 hook 已被调用；抛异常的 hook 被隔离不中断 tick
 
@@ -317,7 +317,7 @@ def test_tick_hook_wiring_and_isolation(monkeypatch):
 def test_flush_returns_memory_ids(db_session_factory):
     now = datetime.now()
     _seed_cluster_memory(db_session_factory, "m-flush", created_at=now)
-    memory2_lifecycle.record_reinforce("m-flush")
-    flushed = memory2_lifecycle.flush_reinforce_buffer()
+    memory_lifecycle.record_reinforce("m-flush")
+    flushed = memory_lifecycle.flush_reinforce_buffer()
     assert flushed == ["m-flush"]
-    assert memory2_lifecycle.flush_reinforce_buffer() == []
+    assert memory_lifecycle.flush_reinforce_buffer() == []

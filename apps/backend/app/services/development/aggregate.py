@@ -1,7 +1,7 @@
 """Development Aggregate 读写（DEV-001）。
 
 状态机 active→superseded|retired（终态不复活、非法转换拒绝），与 reflection
-状态机同构但独立实现（Development 只写本域两表，不 import reflection/memory2）。
+状态机同构但独立实现（Development 只写本域两表，不 import reflection/memory）。
 upsert_modulation 单事务完成「读同 key active → 仲裁 → 新建/替换/落败留痕 +
 changes 行」：select 带 with_for_update（PG 行锁串行化并发仲裁；SQLite 测试库
 顺序执行天然安全），迁移 API 全部条件化，重复输入 no-op 天然幂等。

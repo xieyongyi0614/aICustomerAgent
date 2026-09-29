@@ -27,14 +27,14 @@ from app.core.settings import get_settings
 from app.models.reflection import InsightDraft, ReflectionProposal
 from app.repositories import background_job_repository, memory_repository
 from app.services.development import aggregate, audit, evaluation, policy
-from app.services.memory2 import (
-    attribution as memory2_attribution,
-    commands as memory2_commands,
+from app.services.memory import (
+    attribution as memory_attribution,
+    commands as memory_commands,
     evaluator as memory_evaluator,
     ingest as memory_ingest,
-    job_worker as memory2_job_worker,
+    job_worker as memory_job_worker,
     lifecycle as memory_lifecycle,
-    retriever as memory2_retriever,
+    retriever as memory_retriever,
 )
 from app.services.reflection import (
     attribution as reflection_attribution,
@@ -107,13 +107,13 @@ def growth_env(monkeypatch):
     Base.metadata.create_all(engine)
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (
-        memory2_attribution,
-        memory2_commands,
+        memory_attribution,
+        memory_commands,
         memory_evaluator,
         memory_ingest,
-        memory2_job_worker,
+        memory_job_worker,
         memory_lifecycle,
-        memory2_retriever,
+        memory_retriever,
         memory_repository,
         background_job_repository,
         reflection_attribution,

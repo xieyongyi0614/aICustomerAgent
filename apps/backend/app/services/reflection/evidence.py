@@ -8,7 +8,7 @@
 
 TOOL-009 §2.1/§4.1 追加三个工具效能证据窗（工具使用效果 / Action 成功率 /
 用户反馈）与 `passes_tool_gate`，数据来源纪律：工具执行事实一律从
-`action_records` 投影读取（`memory2.sources.fetch_action_records`），**不读**
+`action_records` 投影读取（`memory.sources.fetch_action_records`），**不读**
 `ToolRegistry` 状态、**不读**健康度内存态——反思看的是"历史执行事实"，不是
 "当前运维状态"。既有四个窗口（对话/记忆/世界/关系）聚合逻辑零改动。
 
@@ -46,8 +46,8 @@ from app.models.reflection import (
     WindowStats,
 )
 from app.repositories import action_repository, goal_repository, memory_repository
-from app.services.memory2 import sources as memory_sources
-from app.services.memory_conflict import _lcs_length, same_topic
+from app.services.memory import sources as memory_sources
+from app.services.memory.conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ TOOL_GATE_SPAN = "span"
 
 
 def _parse_vector(value) -> list[float] | None:
-    """embedding 列可能为 str/list/None（同构复刻 memory2/retriever，不 import 私有函数）。"""
+    """embedding 列可能为 str/list/None（同构复刻 memory/retriever，不 import 私有函数）。"""
     if value is None:
         return None
     if isinstance(value, str):

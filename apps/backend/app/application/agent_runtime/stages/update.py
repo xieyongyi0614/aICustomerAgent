@@ -5,7 +5,7 @@
 
 边界（RT-012 §3.2 / §4.3）：
 
-- **只路由不写**（D1）：一切写经各域**合法通道**（`memory2.ingest` /
+- **只路由不写**（D1）：一切写经各域**合法通道**（`memory.ingest` /
   `action.relationship_bridge` / `post_process` 步骤 / `deferred_world_op → outbox`）；
   本段零域表直写。
 - **前台不阻塞**（D2）：前台 Run 只做 `post_process.schedule_post_process(...)` 交接即返回，
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 TRACE_STAGE = "runtime_update"
 
 ROUTE_POST_PROCESS = "post_process.schedule"
-ROUTE_MEMORY = "memory2.ingest_from_action_record"
+ROUTE_MEMORY = "memory.ingest_from_action_record"
 ROUTE_RELATIONSHIP = "action.relationship_bridge.deliver_action_signal"
 ROUTE_OUTBOX = "outbox.deferred_world_op"
 
@@ -193,7 +193,7 @@ def _apply_memory(action_outcome: Any, character_id: str, trace: Any) -> Feedbac
     的候选构造即 `memory_bridge.to_memory_candidates`（`ingest.py` 顶部导入），故**不重复**
     再调一次 `memory_bridge.deliver`——那会以另一套去重键产生第二条候选。
     """
-    from app.services.memory2 import ingest
+    from app.services.memory import ingest
 
     record = _load_action_record(getattr(action_outcome, "action_id", None))
     if record is None:

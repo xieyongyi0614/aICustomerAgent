@@ -39,7 +39,7 @@ from app.services.reflection.lifecycle import (
     STATUS_ACTIVE,
     transition,
 )
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ _REVIEW_SCOPE_NOT_ALLOWED = "insight_scope_not_allowed"
 def register_executor() -> None:
     """reflection_run 任务执行 handler 注册（main lifespan Flag ON 时调用）。"""
 
-    memory2_job_worker.register_job_type("reflection_run", run_queued_reflections)
+    memory_job_worker.register_job_type("reflection_run", run_queued_reflections)
 
 
 def run_queued_reflections(now: datetime | None = None, trace=None) -> int:

@@ -65,7 +65,7 @@ def test_api_module_imports_no_forbidden_layer():
         )
     )
     assert forbidden == []
-    assert "app.services.memory2" in imported
+    assert "app.services.memory" in imported
 
 
 def test_list_items_returns_grouped_envelope(db_session_factory):

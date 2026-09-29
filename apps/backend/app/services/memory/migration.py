@@ -10,8 +10,8 @@ import logging
 from datetime import datetime
 
 from app.core.db import Memory, SessionLocal
-from app.services.memory2.types import LEGACY_TYPE_ALIASES, TYPE_AFFINITY_KEYWORDS
-from app.services.memory2 import retriever
+from app.services.memory.types import LEGACY_TYPE_ALIASES, TYPE_AFFINITY_KEYWORDS
+from app.services.memory import retriever
 
 logger = logging.getLogger(__name__)
 

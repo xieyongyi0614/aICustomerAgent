@@ -1,7 +1,7 @@
 """Insight 生命周期（REF-001 + REF-005 策略层）。
 
 状态机 active→superseded|invalidated（两终态互斥、不复活、非法转换拒绝），
-与 memory2 状态机同构但独立实现（Reflection 只写本域三表，不 import memory2）。
+与 memory 状态机同构但独立实现（Reflection 只写本域三表，不 import memory）。
 迁移 API 全部单事务：条件 UPDATE 带 status='active'，影响 0 行即 no-op，天然幂等。
 invalidated_reason 必填由服务层前置校验 + DB CHECK 兜底；supersede 要求新行存在
 且 active，不产生悬挂引用。原行不删除（审计保留）。
@@ -19,7 +19,7 @@ from datetime import datetime
 from app.core.db import InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import Insight
-from app.services.memory_conflict import _lcs_length
+from app.services.memory.conflict import _lcs_length
 
 logger = logging.getLogger(__name__)
 

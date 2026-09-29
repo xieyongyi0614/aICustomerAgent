@@ -16,7 +16,7 @@ from app.core.db import Base
 from app.models.action import ActionResult
 from app.models.memory import MemoryCandidate, MemoryType
 from app.repositories import memory_repository
-from app.services import memory_policy
+from app.services.memory import policy as memory_policy
 from app.services.action import memory_bridge
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.world import memory_bridge as world_memory_bridge
@@ -35,11 +35,13 @@ REMINDER_PARAMS = {"content": "开会", "due_at": "2026-09-20T08:00:00"}
 OBJECT_PARAMS = {"object": "牛奶"}
 
 FROZEN_SOURCES: dict[str, str] = {
-    "app/services/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
+    # memory 域清理（2026-09-29）：文件由 services/memory_policy.py 归位至
+    # services/memory/policy.py，内容逐字节未变（摘要不变），仅键路径更新。
+    "app/services/memory/policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
-    # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory2.py`
+    # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`
     # 归位到本文件 —— 非 TOOL-008 改脏。
     "app/models/memory.py": "3d9419eb68a23f856ced8fb0db9c88088a3124735c8164b8e07788bf3d38de47",
     "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",

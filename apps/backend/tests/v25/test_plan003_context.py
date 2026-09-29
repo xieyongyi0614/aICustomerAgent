@@ -19,7 +19,7 @@ from app.models.plan import PlanContext
 from app.models.reflection import Insight
 from app.models.world_simulation import SituationDimension, UserSituation
 from app.repositories import goal_repository, world_repository, world_simulation_repository
-from app.services.memory2.retriever import RankedMemories, RankedMemory
+from app.services.memory.retriever import RankedMemories, RankedMemory
 from app.services.planning import context as plan_context
 
 from .conftest import V25_NOW, V25_USER

@@ -53,7 +53,7 @@ v2 已从 V2.0.0 全量推进至 V5.0.0，**观察期已过**。
 | `memory_service.reclaim_expired_memories` / `run_memory_reclaim_loop` | `main.py:54` 启动 | 有 | **恒空转**，见 §2.1.1 |
 | `memory_conflict.resolve_batch` / `resolve_candidate` | 无 | 有 | 冲突处理已由 `memory2/lifecycle.on_promoted` 承担 |
 | `relationship_memory.py` **整文件** | 无 | 14 个测试文件 | v1 关系记忆写路径 |
-| `planning/memory_policy.py` 写入路径 | 无 | 有 | `planning/observer.py:58` 仅注释提及 |
+| ~~`planning/memory_policy.py` 写入路径~~ | **有（实测）** | 有 | ⚠️ **本行原判有误**：`planning/observer.py:101/422/637` 是活跃调用链（PLAN-009 计划终态记忆投递），**不可删**。详见 §3.3.1 |
 | `post_process.py:21` 的 `memory_service` import | — | — | **死导入**（全文只出现 1 次 = import 行本身） |
 | `context_builder.py:19` 的 `memory_service` import | — | — | **死导入**（同上） |
 
@@ -138,6 +138,83 @@ services/world/memory_bridge.py:66
 
 `MemoryStatus` 原只声明 `active` / `superseded` / `invalidated` 三态，而 `memory2/lifecycle.py` 会写 `decayed` / `forgotten` 两态 → `memory_repository._to_memory()` 读这两态时抛 `ValidationError`（**而非返回 None**），导致「按 id 读非 active 记忆」的路径 500。
 
+### 3.3 第 2 批：去版本后缀与 v1 尸体清理（2026-09-29 执行）
+
+**执行结果**：6 项中 5 项执行、**1 项判定不可执行**（见 §3.3.1）。
+
+| # | 动作 | 结果 |
+|---|---|---|
+| 1 | `services/memory2/` → `services/memory/` | 已执行。**实测爆破半径** app/ 31 文件 71 处 + tests/ 40 文件 114 处 = 216 处（点号形态 95 处）。⚠️ **文档原写「~297 处测试 import」为高估** |
+| 2 | `prompts/memory2_evaluator.py` → `prompts/memory_evaluator.py` | 已执行（**§5.1 未列出此文件**）。它同带版本后缀，漏改会致 `ModuleNotFoundError` |
+| 3 | 删 `memory_service.py` 及其测试依赖 | 已执行（4 文件整删 / 2 文件部分编辑 / 1 处仅改字符串） |
+| 4 | 删 `relationship_memory.py` | 已执行。⚠️ **文档原写「14 个测试文件」为高估**：实测真实依赖 3 个（`v26/test_acceptance.py:287` 只是测试函数名，非依赖） |
+| 5 | ~~删 `planning/memory_policy.py` 写入路径~~ | ❌ **不可执行**，见 §3.3.1 |
+| 6 | 归位 `memory_conflict` / `memory_policy` | 已执行（含死代码裁剪） |
+
+#### 3.3.1 ❌ §5.1「删 `planning/memory_policy.py` 写入路径」前提错误，未执行
+
+§2.1 该行记「生产调用：**无** / `planning/observer.py:58` 仅注释提及」。**实测该模块是活跃生产代码**：
+
+- `planning/observer.py:101` `from app.services.planning import goal_contract, memory_policy as plan_memory_policy`
+- `planning/observer.py:422` 调用 `deliver_goal_terminal_memory(settled, plan, target)`
+- `planning/observer.py:637` → `plan_memory_policy.deliver_plan_memory(...)`
+- 8 个 `tests/v25/test_plan009_*.py` 覆盖该链路
+
+**处置**：本项从第 2 批**移除**，`planning/memory_policy.py` 保持不动——它是 PLAN-009「计划终态记忆投递」的唯一实现，删除会直接破坏计划域。
+
+#### 3.3.2 🚨 附带发现：V7-010 `scheduled_followup` 已失效（**非本次引入**）
+
+`trigger_evaluator.register_followup` 全仓**唯一调用点**是 `memory_service.py:113`（经 `_register_followups`，由 `extract_and_save` 在 `:96` 调用）。而 `extract_and_save` 生产零调用（v2 替换后）→ **该功能自 V2.0.0 记忆替换起即不可达**；v2 的 `memory/ingest` 路径**未承接** followup 登记。
+
+- 影响：「用户说『明天有面试』→ 次日 18:00 主动跟进」不成立。
+- 删除 `memory_service.py` 后该功能的**唯一实现随之消失**（可从 git 历史恢复）。
+- 原测试 `tests/unit/test_trigger_followup.py::test_memory_pipeline_registers_followup` 直接调 v1 函数故**恒绿**，给出虚假信心；已随本次删除。
+- **待裁决**：① 把 `_register_followups` 移植进 v2 ingest（恢复功能）；② 正式废弃并登记。
+
+#### 3.3.3 归位与死代码裁剪（第 6 项）
+
+| 动作 | 结果 |
+|---|---|
+| `services/memory_conflict.py` → `services/memory/conflict.py` | 已执行，并**裁掉死代码**：`resolve_batch` / `resolve_candidate` / `ConflictOutcome` / `_find_matches` / `_best_match` / 6 个 `ACTION_*` 常量（唯一消费者 `memory_service.py` 已删）。保留 `same_topic` / `_lcs_length`（被 `memory/*` 4 处 + `reflection/*` 3 处复用） |
+| `services/memory_policy.py` → `services/memory/policy.py` | 已执行，**内容逐字节未变**（摘要 `416f27a9…` 不变，仅键路径更新） |
+| 导入面改写 | 21 个文件（app 9 + tests 12） |
+
+**踩坑（已修）**：批量替换未处理 `from app.services import memory_policy as <别名>` 形态 → 生成 `... import policy as memory_policy as <别名>` 语法错误，波及 7 个文件；已二次修复并以 `compileall` 全仓复核。
+
+#### 3.3.4 冻结面与契约守卫更新（均按惯例显式声明 + 保留前值）
+
+| 面 | 文件 | 旧 → 新 |
+|---|---|---|
+| `ZERO_DIFF_HASHES` | `app/application/post_process.py` | `2040a4df…` → `30125e6e…`（改名后 import 路径变更） |
+| `ZERO_DIFF_HASHES` | `app/services/action/capabilities/memory.py` | `b8cedddd…` → `912619b5…`（memory_policy 导入路径变更） |
+| `tool008 FROZEN_SOURCES` | 键 `app/services/memory_policy.py` → `app/services/memory/policy.py` | 摘要 `416f27a9…` **不变** |
+| `v21 DOMAIN_MODULES` | `memory_service.py` / `memory_policy.py` / `memory_conflict.py` 三条 → `app/services/memory` 一条 | 顺带**强化**守卫（原三条未覆盖 memory2 包） |
+| `v25 plan009 冻结契约` | `test_plan009_flags.py:190` 绝对路径改指 `memory/policy.py`；`test_plan009_step_criteria.py:260` 期望集加 `policy` | — |
+
+#### 3.3.5 测试编辑（不整删，保留有效覆盖）
+
+| 文件 | 处理 |
+|---|---|
+| `tests/integration/test_memory.py`（14 例） | 整删（纯 v1） |
+| `tests/integration/test_memory_reclaim.py`（4 例） | 整删（纯 v1） |
+| `tests/integration/test_memory_retrieval.py`（14 例） | 整删（纯 v1） |
+| `tests/integration/test_memory_update_flow.py`（10 例） | 整删（纯 v1） |
+| `tests/integration/test_memory_context.py`（11 例） | **部分编辑**：删 `TestSelectForContext`（4 例，测 `select_for_context` 死代码）；保留 `TestPromptMemorySection`（4）+ `TestContextBuilderIntegration`（3，测 v2 活链路） |
+| `tests/unit/test_trigger_followup.py`（6 例） | **部分编辑**：删 `test_memory_pipeline_registers_followup`（1 例，死前提）；保留 5 例 `trigger_evaluator` 活测试 |
+| `tests/unit/test_memory_conflict.py`（18 例） | **重写**：删 12 例测死代码者，保留 `TestSameTopic`（6 例） |
+| `tests/v8.5/test_relationship_memory.py`（8 例） | 整删（纯 v1） |
+| `tests/v2/test_rel001_truth_source.py` | **部分编辑**：`TestV1BypassGate` 由「运行时 monkeypatch 断言未被调用」改为**静态守卫**（断言 v1 模块不存在 + `state_service` 无引用） |
+
+#### 3.3.6 验证
+
+| 面 | 结果 |
+|---|---|
+| 语法面 | `compileall app tests` 退出码 0 |
+| 目标套件 | `tests/v25`（plan009 五文件）**120 passed** |
+| 全量 | `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit eval integration` → **17 failed / 6593 passed / 2 skipped** |
+| 零回归判定 | 17 = **基线 14**（`v2` aut005/life002、`v21` agent008、`v24` tool009×6、`v25` prompt digest×3、`v26` migration head、`v30` maintenance steps）+ **3 项已知既存**（`unit/test_feishu_settings`×2 因本地 `.env` 有真实凭据；`integration/test_db_migration::test_http_lifecycle_on_postgres` 因 Redis 未起）。**失败集 ⊂ 基线 ∪ 已知既存 → 零新增** |
+| 中途发现并修复 | 3 项 flaky（`v30/test_runtime_foreground_cutover`、`v21/test_agent001`、`v21/test_agent007`）隔离复跑 3/3 通过；2 项契约守卫（§3.3.4 末行） |
+
 ---
 
 ## 四、验证
@@ -175,7 +252,9 @@ services/world/memory_bridge.py:66
 
 ## 五、剩余批次
 
-### 5.1 第 2 批：去版本后缀（中风险）
+### 5.1 第 2 批：去版本后缀（中风险）—— **✅ 已执行（2026-09-29），见 §3.3**
+
+> ⚠️ 下表为**执行前**的原始计划，其中第 4 行（删 `planning/memory_policy.py` 写入路径）经实测判定**前提错误、未执行**（§3.3.1）；改名爆破半径与 `relationship_memory` 测试引用数亦与实测有偏差（§3.3）。
 
 | 动作 | 影响面 |
 |---|---|
@@ -209,5 +288,7 @@ services/world/memory_bridge.py:66
 
 1. **重复记忆查库**（第 3 批前置）：对同一 `world_events` / `action_records` 行，确认 `memories` 表中是否存在旁路与 v2 各写一条的重复行。
 2. **真实模型人工回归**：`reclaim` 循环移除后，确认无「过期记忆未回收」的线上反馈（该循环恒空转，理论上零影响，但需观察）。
-3. **`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。
+3. ~~**`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。~~ **✅ 已完成（2026-09-29）**：全量回归零新增失败，`conftest` 的 9 条 import 与 9 项模块登记已同步（§3.3.6）。
 4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.3）：需先确定 `proposed_type` 的遗留名归一化时机。
+5. **🚨 V7-010 `scheduled_followup` 裁决**（§3.3.2，**新增**）：该功能自 V2.0.0 起已不可达，且其唯一实现随本次删除消失。需裁决：移植进 v2 ingest 恢复功能，还是正式废弃。
+6. **`relationship_lexicon.MEMORY_TEMPLATES` 已无使用者**（§3.3 附带）：原唯一消费者 `relationship_memory.py` 已删，该字典成为新的孤儿常量，待后续批次裁决去留。

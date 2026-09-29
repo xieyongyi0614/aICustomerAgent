@@ -240,32 +240,32 @@ class TestWorldAndPlanMemoryChannelsStayIndependent:
     def test_the_only_ingest_entry_point_used_is_the_goal_completion_one(self):
         touched: set[str] = set()
         for path in support.plan_modules():
-            touched |= scan.import_from_names(path).get("app.services.memory2.ingest", set())
-            touched |= scan.called_attributes(path, "memory2_ingest")
+            touched |= scan.import_from_names(path).get("app.services.memory.ingest", set())
+            touched |= scan.called_attributes(path, "memory_ingest")
         assert touched == {"ingest_from_goal_completion"}
 
-    def test_memory2_package_is_not_modified_for_this_task(self):
-        """I6 半边：`memory2` 零改动——本层只用既有函数（导入面与调用面逐条列举）。"""
+    def test_memory_package_is_not_modified_for_this_task(self):
+        """I6 半边：`memory` 零改动——本层只用既有函数（导入面与调用面逐条列举）。"""
         imports: dict[str, set[str]] = {}
         for path in support.plan_modules():
             names = scan.import_from_names(path)
             subset = {
                 module: sorted(members)
                 for module, members in names.items()
-                if module == "app.services.memory2"
-                or module.startswith("app.services.memory2.")
+                if module == "app.services.memory"
+                or module.startswith("app.services.memory.")
             }
             if subset:
                 imports[path.name] = subset
         assert imports == {
-            "context.py": {"app.services.memory2": ["retriever"]},
-            "memory_policy.py": {"app.services.memory2": ["commands", "ingest"]},
+            "context.py": {"app.services.memory": ["retriever"]},
+            "memory_policy.py": {"app.services.memory": ["commands", "ingest", "policy"]},
         }
         module = support.module_path("memory_policy.py")
-        assert scan.called_attributes(module, "memory2_ingest") == {
+        assert scan.called_attributes(module, "memory_ingest") == {
             "ingest_from_goal_completion"
         }
-        assert scan.called_attributes(module, "memory2_commands") <= {
+        assert scan.called_attributes(module, "memory_commands") <= {
             "detect_command",
             "ACTION_FORGET",
         }

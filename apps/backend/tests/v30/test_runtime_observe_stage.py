@@ -40,7 +40,7 @@ FORBIDDEN_IMPORTS = (
     "app.repositories",
     "app.chains",
     "app.prompts",
-    "app.services.memory2",
+    "app.services.memory",
     "app.application.agent_runtime.llm_gateway",
     "app.channels.feishu",
 )
@@ -270,7 +270,7 @@ class TestFactSetSources:
         )
 
     def test_memory_signal_never_calls_retriever(self, monkeypatch):
-        import app.services.memory2.retriever as retriever
+        import app.services.memory.retriever as retriever
 
         calls: list = []
         monkeypatch.setattr(

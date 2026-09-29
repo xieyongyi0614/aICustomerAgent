@@ -37,7 +37,7 @@ from app.services.evaluation_rules.relationship import (
     NarrativeFactProvenanceRule,
     NarrativeMilestoneProvenanceRule,
 )
-from app.services.memory2 import ingest
+from app.services.memory import ingest
 from app.core.db import BackgroundJobRow, MemoryCandidateRow
 from app.models.conversation import ConversationState
 from app.services.development import aggregate

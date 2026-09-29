@@ -18,8 +18,8 @@ from sqlalchemy import or_
 from app.core.db import BackgroundJobRow, SessionLocal
 from app.core.settings import get_settings
 from app.repositories import background_job_repository
-from app.services.memory2 import embeddings as memory_embeddings
-from app.services.memory2 import lifecycle as memory_lifecycle
+from app.services.memory import embeddings as memory_embeddings
+from app.services.memory import lifecycle as memory_lifecycle
 from app.application.worker_loop import run_worker_loop
 
 logger = logging.getLogger(__name__)

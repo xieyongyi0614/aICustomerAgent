@@ -15,7 +15,7 @@ from app.models.reflection import Insight
 from app.services.development import aggregate
 from app.services.development import audit
 from app.services.development import policy as development_policy
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 from app.services.reflection import lifecycle as reflection_lifecycle
 
 pytestmark = pytest.mark.xdist_group("development")
@@ -212,7 +212,7 @@ def test_refute_to_rollback_end_to_end(db_session_factory, override_settings):
             .all()
         )
         assert len(jobs) == 1 and jobs[0].status == "pending"
-    memory2_job_worker.run_job_tick()
+    memory_job_worker.run_job_tick()
     assert aggregate.list_active_modulations(USER) == []
     assert aggregate.read_overlay(USER) is None
 
@@ -297,7 +297,7 @@ def test_flag_off_no_listener_no_rollback_jobs(db_session_factory):
 def test_rollback_listener_registration_is_idempotent():
     audit.register_rollback_listener()
     audit.register_rollback_listener()
-    handlers = memory2_job_worker._JOB_HANDLERS
+    handlers = memory_job_worker._JOB_HANDLERS
     assert handlers[audit.JOB_TYPE_ROLLBACK] is audit.run_rollback_jobs
     assert (
         reflection_lifecycle._invalidation_listeners.count(audit.on_invalidation) >= 1

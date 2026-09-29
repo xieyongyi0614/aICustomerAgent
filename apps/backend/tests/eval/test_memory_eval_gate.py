@@ -2,7 +2,7 @@
 
 双态执行入口：
 - Flag ON 影子态 = 本文件（确定性 stub：LLM 由场景级拒绝表驱动、向量由字符桶
-  伪语义函数驱动），逐场景走真实 memory2 链路（ingest→evaluate→lifecycle→
+  伪语义函数驱动），逐场景走真实 memory 链路（ingest→evaluate→lifecycle→
   retriever→commands），聚合 E-MEM-01~06 报告并断言 Gate 通过。
 - Flag OFF golden 态 = tests/golden（prompt_snapshots 字节级对比），由
   regression-checklist 引用执行。
@@ -23,7 +23,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import (
+from app.services.memory import (
     attribution,
     commands,
     embeddings,
@@ -33,7 +33,7 @@ from app.services.memory2 import (
     offline_metrics,
     retriever,
 )
-from app.services.memory2.offline_metrics import build_report
+from app.services.memory.offline_metrics import build_report
 
 SCENARIO_DIR = Path(__file__).parent / "memory_scenarios"
 REPORT_DIR = Path(__file__).parent / "reports"

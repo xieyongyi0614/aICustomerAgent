@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, Memory as MemoryRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import lifecycle
+from app.services.memory import lifecycle
 
 
 @pytest.fixture
@@ -380,7 +380,7 @@ class TestPurge:
 class TestEvaluatorIntegration:
     def test_promotion_triggers_conflict_chain(self, life_db, monkeypatch):
         from app.core.db import MemoryCandidateRow
-        from app.services.memory2 import evaluator
+        from app.services.memory import evaluator
 
         monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
         monkeypatch.setattr(lifecycle, "SessionLocal", memory_repository.SessionLocal)

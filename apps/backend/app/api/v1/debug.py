@@ -63,7 +63,7 @@ from app.services.observability.metrics_aggregator import (
     build_metric_report,
     summarize_llm_records,
 )
-from app.services.memory2 import attribution as memory2_attribution
+from app.services.memory import attribution as memory_attribution
 from app.services.planning import context as plan_context
 from app.services.planning import observer as plan_observer
 from app.services.planning import scheduler as plan_scheduler
@@ -437,7 +437,7 @@ def get_tool(tool_id: str, user_id: str | None = None, limit: int = 20):
 
 @debug_router.get("/debug/memory/{memory_id}/attribution")
 def get_memory_attribution(memory_id: str):
-    view = memory2_attribution.memory_attribution(memory_id)
+    view = memory_attribution.memory_attribution(memory_id)
     if view is None:
         raise HTTPException(status_code=404, detail="memory 不存在")
     return view
@@ -445,7 +445,7 @@ def get_memory_attribution(memory_id: str):
 
 @debug_router.get("/debug/candidate/{candidate_id}/attribution")
 def get_candidate_attribution(candidate_id: str):
-    view = memory2_attribution.candidate_attribution(candidate_id)
+    view = memory_attribution.candidate_attribution(candidate_id)
     if view is None:
         raise HTTPException(status_code=404, detail="candidate 不存在")
     return view

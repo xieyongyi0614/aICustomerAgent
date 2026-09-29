@@ -11,7 +11,7 @@ from app.core import llm_factory
 from app.core.db import Base, BackgroundJobRow, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.repositories import background_job_repository, memory_repository
-from app.services.memory2 import embeddings
+from app.services.memory import embeddings
 
 
 @pytest.fixture
@@ -279,7 +279,7 @@ def _pending_candidate(id, content, source="user_stated"):
 
 
 def _approve_candidate(monkeypatch, id, content):
-    from app.services.memory2 import evaluator
+    from app.services.memory import evaluator
 
     monkeypatch.setattr(evaluator, "SessionLocal", memory_repository.SessionLocal)
     monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)

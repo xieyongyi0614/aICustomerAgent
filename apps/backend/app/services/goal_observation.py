@@ -13,7 +13,7 @@ from app.core.settings import get_settings
 from app.models.goal import SubGoalSpec
 from app.repositories import goal_repository
 from app.services import goal_planning, goal_arbitration
-from app.services.memory2 import ingest as memory_ingest
+from app.services.memory import ingest as memory_ingest
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ from app.models.memory import MemoryType
 from app.repositories import ledger_repository
 from app.services.ledger import insight, memory_bridge
 from app.services.ledger.service import ensure_user_bootstrap, record_entry
-from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory import ingest as memory_ingest
 
 BACKEND = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 9, 22, 23, 10, 0)
@@ -118,7 +118,7 @@ def test_candidate_text_passes_amount_guard(monkeypatch):
     assert calls == ["消费高度集中在餐饮"]
 
 
-def test_ingest_goes_through_memory2_entry(monkeypatch):
+def test_ingest_goes_through_memory_entry(monkeypatch):
     calls = []
 
     def spy(**kwargs):
@@ -128,7 +128,7 @@ def test_ingest_goes_through_memory2_entry(monkeypatch):
 
         return Row()
 
-    monkeypatch.setattr(memory_bridge.memory2_ingest, "_create_candidate", spy)
+    monkeypatch.setattr(memory_bridge.memory_ingest, "_create_candidate", spy)
     memory_bridge.filter_and_ingest(
         user_id=USER,
         insight_id="i4",
@@ -156,7 +156,7 @@ def test_ingest_is_idempotent(setup):
     )
     assert first.accepted and second.accepted
     assert first.candidate_id == second.candidate_id
-    with memory2_ingest.SessionLocal() as session:
+    with memory_ingest.SessionLocal() as session:
         rows = (
             session.query(MemoryCandidateRow)
             .filter(MemoryCandidateRow.user_id == USER)
@@ -169,7 +169,7 @@ def test_memories_contain_zero_amount_digits(setup):
     features = insight.project_features(USER, now=NOW)
     statements = insight.derive_pattern_statements(features)
     memory_bridge.ingest_patterns(user_id=USER, statements=statements, now=NOW)
-    with memory2_ingest.SessionLocal() as session:
+    with memory_ingest.SessionLocal() as session:
         rows = (
             session.query(MemoryCandidateRow)
             .filter(MemoryCandidateRow.user_id == USER)
@@ -210,8 +210,8 @@ def test_reflection_gates_unchanged():
             assert "ledger/insight" not in source
 
 
-def test_memory2_untouched():
-    source = (BACKEND / "app/services/memory2/ingest.py").read_text(encoding="utf-8")
+def test_memory_untouched():
+    source = (BACKEND / "app/services/memory/ingest.py").read_text(encoding="utf-8")
     assert "SpendingFeatures" not in source
     assert "ledger.insight" not in source
 
@@ -221,7 +221,7 @@ def test_hooked_into_existing_reflection_path():
     assert "ledger_insight" not in source
     assert "run_ledger_insight" not in source
     bridge = (BACKEND / "app/services/ledger/memory_bridge.py").read_text(encoding="utf-8")
-    assert "memory2_ingest._create_candidate" in bridge
+    assert "memory_ingest._create_candidate" in bridge
 
 
 def test_audit_records_filtered_insights():

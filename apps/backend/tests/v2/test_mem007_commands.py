@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import commands, evaluator, lifecycle
+from app.services.memory import commands, evaluator, lifecycle
 
 
 @pytest.fixture

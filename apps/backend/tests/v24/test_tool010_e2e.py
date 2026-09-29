@@ -79,7 +79,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 开关清理声明（2026-09-28）：world_enabled 主闸删除后，四个能力文件里的恒真死闸
     # （world_gate / world_available 的 getattr 读取）随之移除 —— 非 TOOL-010 改脏。
     "app/services/action/capabilities/reminder.py": "aa217128408995eb57a18f06faad82c59f0a53cd53d06f730ad007215a4c9453",
-    "app/services/action/capabilities/memory.py": "b8ceddddc47c1c857e35cbbe5c266de45cffe28bb5aa74903793ad6dbf7284a2",
+    "app/services/action/capabilities/memory.py": "912619b5716a44bd0abb052cd3b5ebc1f3daa58feb8feeff05cce7f8fe95f8b2",  # 前值 b8cedddd（memory 域清理：memory_policy → memory/policy 导入路径变更）
     "app/services/action/capabilities/world_action.py": "2ad7ae8f5a728185129914fc4bce601dcf2d5ae4e205404d5521599f32e1422c",
     "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
@@ -90,8 +90,8 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
     "app/application/chat_pipeline.py": "4aec8e65c5d6271e4a4c302c9b7030969ebbbbb0e4c2836498039026a2916259",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
-    # 写路径已全量走 memory2 ingest/evaluate）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "2040a4dfac66e2e98ba6878a2a40c63bc5ed245089c0f36e61a36f361178cb92",  # 前值 c1702717（world_enabled 删除后 CAS 闸随之移除）
+    # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
+    "app/application/post_process.py": "30125e6e946fe69432938dcbc91817221bb774f752ffcb34208d387be967f8ec",  # 前值 2040a4df（memory2 → memory 去版本后缀改名，import 路径变更；再前值 c1702717）
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }

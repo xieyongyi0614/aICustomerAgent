@@ -34,8 +34,8 @@ from app.models.reflection import (
 )
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
-from app.services.memory2 import job_worker as memory2_job_worker
-from app.services.memory_conflict import same_topic
+from app.services.memory import job_worker as memory_job_worker
+from app.services.memory.conflict import same_topic
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ _tool_evidence_seen: dict[str, dict[str, bool]] = {}
 def register_with_job_worker() -> None:
     """编排层接线入口：周期触发挂靠 job_worker tick（执行 handler 由 REF-004 注册）。"""
 
-    memory2_job_worker.register_tick_hook(run_reflection_trigger_tick)
+    memory_job_worker.register_tick_hook(run_reflection_trigger_tick)
 
 
 def trigger_for_user(

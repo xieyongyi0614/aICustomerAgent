@@ -12,7 +12,7 @@ from app.core.settings import get_settings
 from app.main import app
 from app.models.observability import RuntimeTrace, TraceStep
 from app.repositories import memory_repository, trace_repository
-from app.services.memory2 import attribution, evaluator, lifecycle
+from app.services.memory import attribution, evaluator, lifecycle
 
 
 @pytest.fixture

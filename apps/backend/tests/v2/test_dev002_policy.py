@@ -14,7 +14,7 @@ from app.core.db import BackgroundJobRow, DevelopmentStateRow, InsightRow
 from app.models.reflection import Insight, InsightDraft, ReflectionProposal
 from app.services.development import aggregate
 from app.services.development import policy
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector
 
@@ -323,7 +323,7 @@ def test_end_to_end_creation_event_compiles(db_session_factory, dev_on, monkeypa
             .one()
         )
         assert job.status == "pending"
-    stats = memory2_job_worker.run_job_tick()
+    stats = memory_job_worker.run_job_tick()
     assert stats["done"] >= 1
     states = _dev_states(db_session_factory)
     keys = {row.key for row in states if row.status == "active"}
@@ -347,7 +347,7 @@ def test_compile_idempotent_replay_keeps_rows(db_session_factory, dev_on, monkey
     _seed_fatigue(db_session_factory)
     _seed_run(db_session_factory, "run-dev")
     reflector.run_queued_reflections()
-    memory2_job_worker.run_job_tick()
+    memory_job_worker.run_job_tick()
     before = _dev_states(db_session_factory)
     assert policy.compile_insight_by_id(before[0].source_insight_id) is True
     after = _dev_states(db_session_factory)
@@ -358,7 +358,7 @@ def test_compile_idempotent_replay_keeps_rows(db_session_factory, dev_on, monkey
 def test_missing_insight_job_skips_cleanly(db_session_factory, dev_on):
     policy.register_runtime()
     policy.on_insight_created(USER, [{"insight_id": "ins-ghost"}])
-    stats = memory2_job_worker.run_job_tick()
+    stats = memory_job_worker.run_job_tick()
     assert stats["done"] >= 1
     assert _dev_states(db_session_factory) == []
 
@@ -383,7 +383,7 @@ def test_runtime_registration_is_idempotent(override_settings):
     override_settings()
     policy.register_runtime()
     policy.register_runtime()
-    handlers = memory2_job_worker._JOB_HANDLERS
+    handlers = memory_job_worker._JOB_HANDLERS
     assert handlers[policy.JOB_TYPE_COMPILE] is policy.run_compile_jobs
     assert reflection_lifecycle._insight_created_listeners.count(
         policy.on_insight_created

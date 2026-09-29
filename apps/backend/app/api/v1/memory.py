@@ -1,7 +1,7 @@
 """API-007 产品级记忆读写：只含 active 且未 forgotten（D5）。
 
 分层：本模块零 `app.repositories` / `app.core.db` / langchain 依赖，读写一律经
-`services/memory2/product_view.py`（记忆域唯一写面的一部分）。
+`services/memory/product_view.py`（记忆域唯一写面的一部分）。
 
 PATCH 响应直接回 `MemoryProductItemOut`：其 `last_updated` 即本次 `updated_at`，
 与 §4.1.6 要求的「item + updated_at」等价，故不额外增模型。
@@ -20,7 +20,7 @@ from app.api.v1.schemas import (
     MemoryProductItemOut,
     MemoryReceiptOut,
 )
-from app.services.memory2 import product_view
+from app.services.memory import product_view
 
 memory_router = APIRouter(prefix="/memory", tags=["memory"])
 

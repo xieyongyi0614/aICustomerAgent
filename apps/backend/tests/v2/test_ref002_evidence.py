@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timedelta
 
 from app.core.db import Memory
-from app.services.memory2 import lifecycle as memory2_lifecycle
+from app.services.memory import lifecycle as memory_lifecycle
 from app.services.reflection import evidence
 
 USER = "u-ev"

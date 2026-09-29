@@ -22,7 +22,7 @@ from app.services.development.policy import (
     register_runtime as register_development_runtime,
 )
 from app.services.goal_planning import register_runtime as register_goal_runtime
-from app.services.memory2.job_worker import run_job_worker_loop
+from app.services.memory.job_worker import run_job_worker_loop
 from app.services.planning.revision_listener import (
     register_runtime as register_plan_revision_listener,
 )

@@ -21,8 +21,8 @@ from app.repositories import (
     background_job_repository,
     relationship_milestone_repository,
 )
-from app.services.memory2.ingest import NARRATIVE_MILESTONE_PREFIX
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory.ingest import NARRATIVE_MILESTONE_PREFIX
+from app.services.memory import job_worker as memory_job_worker
 from app.services.reflection import lifecycle as reflection_lifecycle
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ def process_insight(insight_id: str, trace=None) -> bool:
 def register_narrative_listener() -> None:
     """Flag ON 编排层注册：job handler + insight_created 订阅（无注册方零行为）。"""
 
-    memory2_job_worker.register_job_type(JOB_TYPE_NARRATIVE, run_narrative_jobs)
+    memory_job_worker.register_job_type(JOB_TYPE_NARRATIVE, run_narrative_jobs)
     reflection_lifecycle.register_insight_created_listener(on_insight_created)
 
 

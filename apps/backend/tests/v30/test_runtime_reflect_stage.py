@@ -39,7 +39,7 @@ FORBIDDEN_IMPORTS = (
     "app.chains",
     "app.prompts",
     "app.channels.feishu",
-    "app.services.memory2.job_worker",
+    "app.services.memory.job_worker",
 )
 FORBIDDEN_DIRECT_WRITE_TOKENS = (
     "InsightRow",

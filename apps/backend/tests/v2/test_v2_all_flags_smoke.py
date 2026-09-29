@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from app.core import llm_factory
 from app.core.db import MemoryCandidateRow
 from app.main import app
-from app.services.memory2 import ingest as memory2_ingest
+from app.services.memory import ingest as memory_ingest
 from tests.conftest import FakeLLM, wait_until
 
 _V2_FLAGS = {
@@ -56,7 +56,7 @@ def _parse_stream(text):
 
 
 def _candidate_rows():
-    with memory2_ingest.SessionLocal() as session:
+    with memory_ingest.SessionLocal() as session:
         return session.query(MemoryCandidateRow).all()
 
 

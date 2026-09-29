@@ -7,8 +7,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.db import Base, MemoryCandidateRow
 from app.models.memory import MemoryCandidate, MemoryExtraction
-from app.services.memory2 import ingest
-from app.services.memory2.ingest import (
+from app.services.memory import ingest
+from app.services.memory.ingest import (
     VISIBILITY_HYPOTHETICAL,
     VISIBILITY_PRIVATE,
     classify_conversation_visibility,

@@ -29,7 +29,7 @@ from app.services.evaluation_context import (
 )
 from app.core.db import Memory, ReflectionRunRow, EvidenceLinkRow
 from app.models.memory import MemoryCandidate, MemoryExtraction
-from app.services.memory2 import evaluator as memory_evaluator, ingest as memory_ingest
+from app.services.memory import evaluator as memory_evaluator, ingest as memory_ingest
 from app.services.reflection import (
     lifecycle as reflection_lifecycle,
     reflector as reflection_reflector,

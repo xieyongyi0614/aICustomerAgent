@@ -39,7 +39,7 @@ from app.services.development import aggregate as development_aggregate
 from app.application import observability
 from app.models.observability import TraceKind
 from app.services import relationship_patterns as relationship_pattern_service
-from app.services.memory2 import job_worker
+from app.services.memory import job_worker
 from app.services.trace_collector import TurnTraceSession
 
 logger = logging.getLogger(__name__)

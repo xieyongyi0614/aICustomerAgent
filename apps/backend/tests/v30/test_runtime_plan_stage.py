@@ -490,7 +490,7 @@ class TestBoundaries:
     def test_planning_stack_is_imported_lazily(self):
         """规划链（引擎 / 上下文 / goal_planning）必须函数内延迟导入。
 
-        模块级导入会拉 `app.chains` + `llm_factory` + `memory2.job_worker`：实测
+        模块级导入会拉 `app.chains` + `llm_factory` + `memory.job_worker`：实测
         `import app.services.planning.engine` 耗时约 3.1s，而本包经
         `agent_runtime/__init__` 被 `chat_pipeline` 在热路径导入。
         """

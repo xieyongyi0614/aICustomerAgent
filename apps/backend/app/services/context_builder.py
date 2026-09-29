@@ -18,7 +18,7 @@ from app.services import (
 from app.services import goal_service
 from app.services import state_service
 from app.services import summary_service
-from app.services.memory2 import retriever as memory2_retriever
+from app.services.memory import retriever as memory_retriever
 from app.services.development import aggregate as development_aggregate
 from app.services.reflection import lifecycle as reflection_lifecycle
 
@@ -253,7 +253,7 @@ def _build_sync(
     insights: list[InsightSummary] = []
     insight_payload: dict = {}
     try:
-        ranked = memory2_retriever.retrieve(user_id, current_input, trace=trace)
+        ranked = memory_retriever.retrieve(user_id, current_input, trace=trace)
         selected, retrieval_used, dropped = _select_retrieval_segment(ranked)
         memories = [_with_time_anchor(m, datetime.now()) for m in selected]
         insights, insight_payload = _load_context_insights(

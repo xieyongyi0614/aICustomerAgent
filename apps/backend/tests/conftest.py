@@ -38,15 +38,15 @@ from app.services import agent_service
 from app.services import relationship_evaluation as relationship_evaluation_service
 from app.services import relationship_narrative as relationship_narrative_service
 from app.services import relationship_patterns as relationship_patterns_service
-from app.services.memory2 import attribution as memory2_attribution
-from app.services.memory2 import commands as memory2_commands
-from app.services.memory2 import evaluator as memory2_evaluator
-from app.services.memory2 import ingest as memory2_ingest
-from app.services.memory2 import job_worker as memory2_job_worker
-from app.services.memory2 import lifecycle as memory2_lifecycle
-from app.services.memory2 import migration as memory2_migration
-from app.services.memory2 import product_view as memory2_product_view
-from app.services.memory2 import retriever as memory2_retriever
+from app.services.memory import attribution as memory_attribution
+from app.services.memory import commands as memory_commands
+from app.services.memory import evaluator as memory_evaluator
+from app.services.memory import ingest as memory_ingest
+from app.services.memory import job_worker as memory_job_worker
+from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import migration as memory_migration
+from app.services.memory import product_view as memory_product_view
+from app.services.memory import retriever as memory_retriever
 from app.services import evolution as evolution_service
 from app.services.development import aggregate as development_aggregate
 from app.services.development import audit as development_audit
@@ -145,18 +145,18 @@ _REPO_MODULES = (
 )
 
 _SERVICE_DB_MODULES = (
-    memory2_attribution,
-    memory2_commands,
-    memory2_evaluator,
-    memory2_ingest,
-    memory2_job_worker,
-    memory2_lifecycle,
-    memory2_migration,
-    memory2_product_view,
+    memory_attribution,
+    memory_commands,
+    memory_evaluator,
+    memory_ingest,
+    memory_job_worker,
+    memory_lifecycle,
+    memory_migration,
+    memory_product_view,
     relationship_evaluation_service,
     relationship_narrative_service,
     relationship_patterns_service,
-    memory2_retriever,
+    memory_retriever,
     reflection_attribution,
     reflection_evidence,
     reflection_evaluation,
@@ -322,7 +322,7 @@ def use_auth_user(user_id: str) -> None:
 
 @pytest.fixture(autouse=True)
 def _offline_repos(monkeypatch):
-    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory2 服务的 SessionLocal 指向内存 SQLite。
+    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory 服务的 SessionLocal 指向内存 SQLite。
 
     修复根因B：PromptBuilder.build(analysis=...) 等“纯单测”隐含访问
     relationship_milestone_repository.SessionLocal，若不替换则连真实 PostgreSQL(.env) 而挂起。
