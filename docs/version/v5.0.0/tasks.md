@@ -29,13 +29,15 @@
 | 不得给 `loop_runs.steps` 加键 | `test_agent_loop_core.py` 断言 loop 与 legacy 的 `steps` **键集完全相同** → 工具步骤事件须走**独立通道** |
 | 不建第二套 Agent | 新能力一律以 Profile 阶段 / 段本体 / Update-handoff / 域唯一写面 / 既有 trigger 四种姿势接入 |
 
-### 0.3 前提三：迁移纪律（本版本只加 1 个迁移）
+### 0.3 前提三：迁移纪律
+
+> 🚨 **2026-09-29 迁移链已折叠**：`0001~0058` 全部并入基线迁移 `0001_squashed_full_schema.py`，另加增量 `0002_briefing_preferences.py`；**链尾现状 = `0002`**。本节及 §12~§14 中出现的 `0055` / `0056` / `0057` / `0058` 均为**折叠前的原始编号**（历史记录，保留不改）。**后续新增迁移从 `0003` 起编号。**
 
 | 项 | 内容 |
 |---|---|
-| 链尾现状 | `0054_life_ledger_domain.py`（**已核**） |
-| 本版本新增 | `0055_life_tasks.py`（仅 `life_tasks` 一张表，服务 API-005） |
-| 其余域 | 健康域若进 V1，追加 `0056_health_facts.py`；否则**零新迁移** |
+| 链尾现状 | `0002_briefing_preferences.py`（折叠后；折叠前为 `0058`） |
+| 本版本新增 | `life_tasks` 建表已并入基线 `0001`（原编号 `0055_life_tasks.py`，服务 API-005） |
+| 其余域 | 健康域若进 V1，追加 `0003+` 增量迁移；否则**零新迁移** |
 | 🚨 已知陷阱 1 | `op.create_check_constraint` **必须传完整布尔式**（`f"source IN {target_check}"`），不能传值清单 → 曾致 `0045` 在 PG 上 `DatatypeMismatch`、`0052` 不可达 |
 | 🚨 已知陷阱 2 | **加一个迁移会打破约 22 个跨版本钉测**（`v23/v24/v25/v26` 中的 `MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`SCHEMA_TABLE_COUNT`、`SCHEMA_COLUMNS_DIGEST`）→ 执行前先 `git worktree` 取干净基线测 blast radius |
 | 🚨 已知陷阱 3 | `FROZEN_BLOB_SHA_BASELINE` 已空 → 改动 `profiles.py` 的 Profile 表内容会红，属**真语义变更**须显式声明 |
@@ -77,7 +79,7 @@
 |---|---|---|
 | **D1** | 健康段**门控**：先做 `PLT-001` 实机验证再定排期 | **M4 全部任务 + `APP-023` 不得先于 `PLT-001` 开工**；`APP-014` 必须同时实现三宫格**空态 + 引导授权**分支 |
 | **D5** | 记忆只展示 active 且未 forgotten；上限与衰减不向用户暴露 | `API-007` `APP-017` 口径 |
-| **D6** | 新建轻量任务域（`life_tasks`，迁移 `0055`），不复用 plan step | `API-005` |
+| **D6** | 新建轻量任务域（`life_tasks`，原迁移 `0055`，已并入基线 `0001`），不复用 plan step | `API-005` |
 | **D9** | 设计 token 以 §06 色卡 + 原型为准 | `APP-002` 必须先拿到定稿色值再开工 |
 | **D11** | **跳过 Figma 重建**：设计依据 = 设计稿 §06 + 原型 HTML | 不产生 Figma 相关任务；token 在 `APP-002` 一次性定稿 |
 
@@ -152,7 +154,7 @@
 | ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 | 验收口径 |
 |---|---|---|---|---|---|---|
 | API-004 | **首页聚合接口** | 聚合 | P0 | API-005, API-006, API-007 | `GET /home/summary`：问候 / Orb 状态语 / 模式 / AI 总结 / 健康三宫格 / 今日任务（含 `order_reason`）/ 今日消费 / 主动待办 | ① 单请求返回全部区块；② 跨域合成在服务端；③ 零 `repositories` 依赖；④ 任一子域不可用时不整体 500（区块级降级） |
-| API-005 | 任务域（`life_tasks`） | 新领域 | P0 | — | 迁移 `0055_life_tasks.py`；CRUD + 勾选完成 + 时间提醒注册 + 排序理由 | ① 迁移钉测已升级；② `SCHEMA_TABLE_COUNT` 同步；③ `create_check_constraint` 传完整布尔式；④ 零回归 |
+| API-005 | 任务域（`life_tasks`） | 新领域 | P0 | — | 建表已并入基线迁移 `0001`（原编号 `0055_life_tasks.py`）；CRUD + 勾选完成 + 时间提醒注册 + 排序理由 | ① 迁移钉测已升级；② `SCHEMA_TABLE_COUNT` 同步；③ `create_check_constraint` 传完整布尔式；④ 零回归 |
 | API-006 | **产品级洞察（Insight）读接口** | 新接口 | P0 | — | `GET /insights?domain=ledger\|health\|home&limit=N` → `{id, domain, headline, narrative, evidence[], source_refs[], generated_at}` | ① 零 `repositories` 依赖；② 无洞察时返空列表（不返 500）；③ 「AI 叙事优先」原则有真实数据源 |
 | API-007 | 产品级记忆接口 | 新接口 | P0 | — | `GET /memory/items`（含 `source_kind` / `source_count` / `last_updated` / `usage_receipts[]`）+ 编辑 + 遗忘（置 `forgotten`） | ① 零 `repositories` 依赖；② 列表只含 active 且未 forgotten；③ 遗忘可审计；④ 用途回执有真实来源 |
 
@@ -197,7 +199,7 @@
 
 | ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 | 验收口径 |
 |---|---|---|---|---|---|---|
-| API-009 | 健康数据 ingest 与存储 | 新领域 | P1 | PLT-001 | 迁移 `0056_health_facts.py`；`health_*` 三件套；ingest 工具 `builtin.health.sync` | ① **健康数据不进 memory 域**（同 V4.0.0 裁决 2 纪律）；② 命名避开既有 `services/tool/health.py`（工具熔断健康度）；③ 幂等 ingest |
+| API-009 | 健康数据 ingest 与存储 | 新领域 | P1 | PLT-001 | 新增增量迁移 `0003+`（原规划 `0056_health_facts.py`）；`health_*` 三件套；ingest 工具 `builtin.health.sync` | ① **健康数据不进 memory 域**（同 V4.0.0 裁决 2 纪律）；② 命名避开既有 `services/tool/health.py`（工具熔断健康度）；③ 幂等 ingest |
 | API-010 | 健康评分与洞察 | 后端 | P1 | API-009, API-006 | 「综合 N 分」评分口径、睡眠趋势批注、异常趋势检测 | ① 评分口径文档化（不可黑箱）；② 文案禁医疗级宣称 |
 | APP-023 | 健康数据接入 | 端侧 | P1 | APP-021 | Health Connect（Android）/ HealthKit（iOS）细粒度读权限申请与同步 | ① Android 14+ 处理 `VIEW_PERMISSION_USAGE` + `HEALTH_PERMISSIONS`；② 权限被拒可降级 |
 | APP-024 | 健康页 | 页面 | P1 | APP-023, API-010 | 状态 Hero 卡（Orb + 综合分 + 叙事）、睡眠 7 日趋势 + AI 批注、今日指标行（每项附 AI 建议）、数据来源声明 | 首屏是结论不是数据 |
