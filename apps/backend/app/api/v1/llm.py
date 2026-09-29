@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.api.v1.schemas import LlmProfileOut, LlmProfilesOut
 from app.core.llm_factory import list_llm_profiles
-from app.core import llm_factory
 from app.core.settings import get_settings
 
 llm_router = APIRouter()

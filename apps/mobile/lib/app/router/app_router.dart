@@ -118,7 +118,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/briefing',
           builder: (_, state) => BriefingPage(
-            form: state.uri.queryParameters['form'] ?? 'morning',
+            type: state.uri.queryParameters['type'] ?? 'morning',
           ),
         ),
       ],

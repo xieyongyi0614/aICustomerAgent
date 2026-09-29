@@ -36,6 +36,7 @@ from app.core.settings.reflection_development import (
 )
 from app.core.settings.relationship import RelationshipSettings
 from app.core.settings.tool import ToolSettings
+from app.core.settings.weather import WeatherSettings
 from app.core.settings.world import WorldSettings
 from app.core.settings.world_simulation import WorldSimulationSettings
 
@@ -67,6 +68,7 @@ class Settings(
     WorldSimulationSettings,
     ToolSettings,
     PlanSettings,
+    WeatherSettings,
     BaseSettings,
 ):
     model_config = DOMAIN_MODEL_CONFIG

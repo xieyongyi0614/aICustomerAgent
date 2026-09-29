@@ -88,7 +88,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 - **LLM 唯一来源**：`core/llm_factory.get_llm()`（profile 机制）；结构化输出统一走 `chains/structured.py::build_structured_chain`（主链 + 一层降级）。
 - **DB 唯一写面**：业务层禁止直接操作 ORM，一律经 `repositories/`。
-- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，2026-09-29 起为单一基线迁移 `0001`，ADR-14），`create_all` 已退役（测试内存 SQLite 属豁免）。
+- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，2026-09-29 起为单一基线迁移 `0001` + 增量迁移（`0002` briefing_preferences 起），ADR-14），`create_all` 已退役（测试内存 SQLite 属豁免）。
 - **数据流纪律**：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理失败不影响已产出回答。
 
 ---
@@ -354,12 +354,13 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，2026-09-29 起为单一基线迁移 `0001`，原 0001~0058 折叠，ADR-14）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 `0001`（2026-09-29 由原 0001~0058 折叠，ADR-14）+ 增量迁移 `0002` 起）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
 | 会话 | `conversations`、`messages`、`conversation_summaries` | messages.conversation_id → conversations.id；summary 1:1 conversation |
 | 身份 | `users` | email 唯一**部分索引**（邮箱验证码登录绑定，原 0057 引入、随折叠并入 `0001` 基线）；`is_default` 列与唯一索引已删除（默认用户概念退役，原 0058） |
+| 简报 | `briefing_preferences` | user_id 主键（一行一人）；时刻 HH:MM 字符串 + 定位城市及地理编码坐标（API-008 偏好落库，增量 `0002` 引入） |
 | 角色状态 | `character_state`、`emotion_history`、`personality_state` | character_state.user_id 主键；emotion_history 按 user 时序；personality_state 唯一 (user,character,axis) |
 | 关系 | `relationship_state`、`relationship_events`、`relationship_milestones`、`relationship_conflicts`、`relationship_snapshots` | state 为当前态（version 乐观锁）；events 为账本（时序权威）；snapshots 版本化快照 |
 | 目标/计划 | `character_goals`、`goal_plans` | goals.parent_goal_id 自引用分层；goal_plans.goal_id → goals，版本号 version |
@@ -402,7 +403,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，2026-09-29 �
 | 维度 | 机制 | 说明 |
 |---|---|---|
 | Environment | pydantic-settings（`.env`，`extra="ignore"`） | 环境变量名 = 字段名全大写，无 alias 层、无 env_prefix |
-| Runtime Config | `Settings` = 23 个领域模块多继承组合的**扁平命名空间** | `core/settings/`：llm/database/pipeline/character/memory/reflection_development/relationship/goal/autonomy/life_loop/autonomy_advanced/agent_runtime/action/action_execution/evaluation/feishu/email/ledger/observability/world/world_simulation/tool/plan |
+| Runtime Config | `Settings` = 24 个领域模块多继承组合的**扁平命名空间** | `core/settings/`：llm/database/pipeline/character/memory/reflection_development/relationship/goal/autonomy/life_loop/autonomy_advanced/agent_runtime/action/action_execution/evaluation/feishu/email/ledger/observability/world/world_simulation/tool/plan/weather |
 | Feature Config | 按领域命名的布尔开关 + 调参字段 | 开关语义已从"版本门控"收敛为"策略位/裁决位/调试位" |
 | LLM Profiles | `llm_profiles.json`（`LLM_PROFILES_FILE`）或 `LLM_PROFILES_JSON`（内联优先） | 多模型 profile，消息级切换（body `profile_id` > header `X-LLM-Profile` > query） |
 

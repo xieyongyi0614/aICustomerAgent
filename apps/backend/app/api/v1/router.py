@@ -3,7 +3,7 @@ from app.api.v1 import (
     action,
     action_execution,
     auth,
-    brief,
+    briefing,
     chat,
     debug,
     governance,
@@ -39,6 +39,6 @@ api_router.include_router(tasks.tasks_router)
 api_router.include_router(insights.insights_router)
 api_router.include_router(memory.memory_router)
 api_router.include_router(home.home_router)
-api_router.include_router(brief.brief_router)
+api_router.include_router(briefing.briefing_router)
 api_router.include_router(auth.auth_router)
 api_router.include_router(health.health_router)

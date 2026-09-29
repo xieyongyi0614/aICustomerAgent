@@ -87,7 +87,7 @@ class AuthRepository {
         'code': code,
         'device_id': deviceId,
         'platform': platform,
-        if (deviceName != null) 'device_name': deviceName,
+        'device_name': ?deviceName,
       },
     );
     return _persistTokenResponse(resp, deviceId);

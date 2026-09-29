@@ -64,6 +64,15 @@ class HomeSummaries extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class BriefContents extends Table {
+  TextColumn get id => text()(); // 简报形态：morning | evening
+  TextColumn get payloadJson => text()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class RetryOps extends Table {
   TextColumn get id => text()();
   TextColumn get kind => text()();
@@ -83,16 +92,18 @@ class RetryOps extends Table {
   LedgerSummaries,
   LedgerEntries,
   HomeSummaries,
+  BriefContents,
   RetryOps,
 ])
 class AppCacheDb extends _$AppCacheDb {
   AppCacheDb(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (migrator, from, to) => migrator.createAll(),
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
@@ -104,6 +115,7 @@ class AppCacheDb extends _$AppCacheDb {
     await delete(ledgerSummaries).go();
     await delete(ledgerEntries).go();
     await delete(homeSummaries).go();
+    await delete(briefContents).go();
   }
 
   /// 记忆缓存只含 active 且未 forgotten（决策 D5）

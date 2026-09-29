@@ -70,7 +70,11 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
 
 SQUASHED_MIGRATION_FILE = "0001_squashed_full_schema.py"
 
-SCHEMA_TABLE_SET_DIGEST = "05a4460a97174d48"
+INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
+    "0002_briefing_preferences.py",
+)
+
+SCHEMA_TABLE_SET_DIGEST = "1f236b390fe77f97"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
@@ -80,6 +84,7 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "ledger_categories",
     "ledger_entries",
     "life_tasks",
+    "briefing_preferences",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state",)
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"

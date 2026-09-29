@@ -2062,6 +2062,275 @@ class HomeSummariesCompanion extends UpdateCompanion<HomeSummary> {
   }
 }
 
+class $BriefContentsTable extends BriefContents
+    with TableInfo<$BriefContentsTable, BriefContent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BriefContentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, payloadJson, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'brief_contents';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BriefContent> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BriefContent map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BriefContent(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BriefContentsTable createAlias(String alias) {
+    return $BriefContentsTable(attachedDatabase, alias);
+  }
+}
+
+class BriefContent extends DataClass implements Insertable<BriefContent> {
+  final String id;
+  final String payloadJson;
+  final DateTime cachedAt;
+  const BriefContent({
+    required this.id,
+    required this.payloadJson,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  BriefContentsCompanion toCompanion(bool nullToAbsent) {
+    return BriefContentsCompanion(
+      id: Value(id),
+      payloadJson: Value(payloadJson),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory BriefContent.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BriefContent(
+      id: serializer.fromJson<String>(json['id']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  BriefContent copyWith({
+    String? id,
+    String? payloadJson,
+    DateTime? cachedAt,
+  }) => BriefContent(
+    id: id ?? this.id,
+    payloadJson: payloadJson ?? this.payloadJson,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  BriefContent copyWithCompanion(BriefContentsCompanion data) {
+    return BriefContent(
+      id: data.id.present ? data.id.value : this.id,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BriefContent(')
+          ..write('id: $id, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, payloadJson, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BriefContent &&
+          other.id == this.id &&
+          other.payloadJson == this.payloadJson &&
+          other.cachedAt == this.cachedAt);
+}
+
+class BriefContentsCompanion extends UpdateCompanion<BriefContent> {
+  final Value<String> id;
+  final Value<String> payloadJson;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const BriefContentsCompanion({
+    this.id = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BriefContentsCompanion.insert({
+    required String id,
+    required String payloadJson,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       payloadJson = Value(payloadJson),
+       cachedAt = Value(cachedAt);
+  static Insertable<BriefContent> custom({
+    Expression<String>? id,
+    Expression<String>? payloadJson,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BriefContentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? payloadJson,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return BriefContentsCompanion(
+      id: id ?? this.id,
+      payloadJson: payloadJson ?? this.payloadJson,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BriefContentsCompanion(')
+          ..write('id: $id, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RetryOpsTable extends RetryOps with TableInfo<$RetryOpsTable, RetryOp> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -2533,6 +2802,7 @@ abstract class _$AppCacheDb extends GeneratedDatabase {
   );
   late final $LedgerEntriesTable ledgerEntries = $LedgerEntriesTable(this);
   late final $HomeSummariesTable homeSummaries = $HomeSummariesTable(this);
+  late final $BriefContentsTable briefContents = $BriefContentsTable(this);
   late final $RetryOpsTable retryOps = $RetryOpsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -2544,6 +2814,7 @@ abstract class _$AppCacheDb extends GeneratedDatabase {
     ledgerSummaries,
     ledgerEntries,
     homeSummaries,
+    briefContents,
     retryOps,
   ];
 }
@@ -3686,6 +3957,179 @@ typedef $$HomeSummariesTableProcessedTableManager =
       HomeSummary,
       PrefetchHooks Function()
     >;
+typedef $$BriefContentsTableCreateCompanionBuilder =
+    BriefContentsCompanion Function({
+      required String id,
+      required String payloadJson,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$BriefContentsTableUpdateCompanionBuilder =
+    BriefContentsCompanion Function({
+      Value<String> id,
+      Value<String> payloadJson,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$BriefContentsTableFilterComposer
+    extends Composer<_$AppCacheDb, $BriefContentsTable> {
+  $$BriefContentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BriefContentsTableOrderingComposer
+    extends Composer<_$AppCacheDb, $BriefContentsTable> {
+  $$BriefContentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BriefContentsTableAnnotationComposer
+    extends Composer<_$AppCacheDb, $BriefContentsTable> {
+  $$BriefContentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$BriefContentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppCacheDb,
+          $BriefContentsTable,
+          BriefContent,
+          $$BriefContentsTableFilterComposer,
+          $$BriefContentsTableOrderingComposer,
+          $$BriefContentsTableAnnotationComposer,
+          $$BriefContentsTableCreateCompanionBuilder,
+          $$BriefContentsTableUpdateCompanionBuilder,
+          (
+            BriefContent,
+            BaseReferences<_$AppCacheDb, $BriefContentsTable, BriefContent>,
+          ),
+          BriefContent,
+          PrefetchHooks Function()
+        > {
+  $$BriefContentsTableTableManager(_$AppCacheDb db, $BriefContentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BriefContentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BriefContentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BriefContentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BriefContentsCompanion(
+                id: id,
+                payloadJson: payloadJson,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String payloadJson,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => BriefContentsCompanion.insert(
+                id: id,
+                payloadJson: payloadJson,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BriefContentsTable, BriefContent>(table),
+                  BaseReferences<
+                    _$AppCacheDb,
+                    $BriefContentsTable,
+                    BriefContent
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BriefContentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppCacheDb,
+      $BriefContentsTable,
+      BriefContent,
+      $$BriefContentsTableFilterComposer,
+      $$BriefContentsTableOrderingComposer,
+      $$BriefContentsTableAnnotationComposer,
+      $$BriefContentsTableCreateCompanionBuilder,
+      $$BriefContentsTableUpdateCompanionBuilder,
+      (
+        BriefContent,
+        BaseReferences<_$AppCacheDb, $BriefContentsTable, BriefContent>,
+      ),
+      BriefContent,
+      PrefetchHooks Function()
+    >;
 typedef $$RetryOpsTableCreateCompanionBuilder = RetryOpsCompanion Function({
   required String id,
   required String kind,
@@ -3941,6 +4385,8 @@ class $AppCacheDbManager {
       $$LedgerEntriesTableTableManager(_db, _db.ledgerEntries);
   $$HomeSummariesTableTableManager get homeSummaries =>
       $$HomeSummariesTableTableManager(_db, _db.homeSummaries);
+  $$BriefContentsTableTableManager get briefContents =>
+      $$BriefContentsTableTableManager(_db, _db.briefContents);
   $$RetryOpsTableTableManager get retryOps =>
       $$RetryOpsTableTableManager(_db, _db.retryOps);
 }

@@ -8,6 +8,7 @@ from alembic.script import ScriptDirectory
 
 from app.core.db import Base, UserRow
 from tests.support.schema_pins import (
+    BASELINE_MIGRATION_REVISION,
     MIGRATION_HEAD,
     SCHEMA_TABLE_COUNT,
     schema_columns_digest,
@@ -48,7 +49,7 @@ def test_migration_chain_head_matches_pin():
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision is None
+    assert revision.down_revision == BASELINE_MIGRATION_REVISION
 
 
 def test_schema_table_count_is_pinned():

@@ -103,7 +103,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 actionLabel: d.insightAction,
                 onAction: d.insightAction == null
                     ? null
-                    : () => context.go('/briefing?form=morning'),
+                    : () => context.go('/briefing?type=morning'),
                 child: Text(
                   d.insightNarrative.isEmpty ? '今天还没有新的总结' : d.insightNarrative,
                   style: context.typography.body.copyWith(

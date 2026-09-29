@@ -68,6 +68,7 @@ from app.repositories import (
     agent_metric_repository,
     agent_state_snapshot_repository,
     background_job_repository,
+    briefing_preference_repository,
     character_state_repository,
     channel_identity_repository,
     conversation_repository,
@@ -106,6 +107,7 @@ WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
 _REPO_MODULES = (
     action_repository,
     background_job_repository,
+    briefing_preference_repository,
     channel_identity_repository,
     feishu_dedupe_ledger_repository,
     feishu_delivery_ledger_repository,

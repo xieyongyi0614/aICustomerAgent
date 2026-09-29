@@ -1359,6 +1359,18 @@ class FeishuDeliveryRow(Base):
     __table_args__ = (Index("idx_feishu_deliveries_delivered_at", "delivered_at"),)
 
 
+class BriefingPreferenceRow(Base):
+    __tablename__ = "briefing_preferences"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    morning_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    evening_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    city: Mapped[str | None] = mapped_column(String, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class PersonalityStateRow(Base):
     __tablename__ = "personality_state"
 

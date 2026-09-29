@@ -134,6 +134,7 @@ sealed class ChatEvent {
 | 10 | `flutter_local_notifications` + `timezone` | **补齐 ②** | 早间简报 / 晚间总结本地通知 |
 | 11 | `health` | **补齐 ③** | Health Connect / HealthKit |
 | 12 | `permission_handler` | **补齐 ④** | 权限流 |
+| 12a | `geolocator` | **补齐 ⑪**（APP-018 扩展，用户裁决 2026-09-29） | 简报天气端侧实时定位（`features/briefing/data/location_service.dart`）；失败一律返回 null 走服务端兜底链，不新增权限包（复用系统弹窗 + Manifest 声明） |
 | 13 | `fl_chart` | **补齐 ⑤** | 睡眠 7 日趋势柱状图 |
 | 14 | `lucide_icons` | **补齐 ⑥** | 设计稿指定图标风格 |
 | 15 | `intl` + `flutter_localizations` | **补齐 ⑦** | 金额 / 时长 / 日期格式化 |

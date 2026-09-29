@@ -1151,15 +1151,17 @@ def test_g_extend_external_api_costs_one_manifest(tmp_path):
 
 
 def test_zero_migration_reconciliation_records_breakpoints():
-    """2026-09-29 迁移链折叠为单迁移：破例台账随折叠退役，目录仅存单一基线迁移。"""
+    """2026-09-29 迁移链折叠为单迁移；此后结构变更加已登记的增量迁移（ADR-14）。"""
     versions = sorted(
         path.name
         for path in (support.BACKEND_ROOT / "migrations" / "versions").glob("0*.py")
         if path.name != "__init__.py"
     )
 
-    assert versions == [support.SQUASHED_MIGRATION_FILE]
-    assert versions[0].startswith(support.MIGRATION_HEAD)
+    assert versions == sorted(
+        [support.SQUASHED_MIGRATION_FILE, *support.INCREMENTAL_MIGRATION_FILES]
+    )
+    assert versions[-1].startswith(support.MIGRATION_HEAD)
 
 def test_zero_migration_model_structure_unchanged():
     """模型结构 diff：表集合与列摘要零变更（结构面零迁移成立）。
@@ -1204,7 +1206,7 @@ def test_zero_migration_structure_changes_are_registered():
 
 
 def test_migration_chain_head_is_current():
-    """迁移链 head 为当前唯一基线迁移（单 head、down_revision 为空）。"""
+    """迁移链 head 为最新增量迁移（单 head、直接接在基线迁移 0001 之上）。"""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -1215,7 +1217,7 @@ def test_migration_chain_head_is_current():
     assert heads == [support.MIGRATION_HEAD]
     revision = script.get_revision(support.MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision is None
+    assert revision.down_revision == "0001"
 
 def test_migration_0046_is_downgradable():
     """0046 的值域放宽已折叠进单迁移；放宽后的 insights 类型域与模型一致。"""

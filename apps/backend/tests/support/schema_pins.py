@@ -1,4 +1,4 @@
-"""迁移链头钉测单点入口（PLA-001；2026-09-29 迁移链折叠为单迁移 0001）。
+"""迁移链头钉测单点入口（PLA-001；2026-09-29 迁移链折叠为单迁移 0001，0002 起增量）。
 
 全仓唯一定义：`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` /
 `SCHEMA_COLUMNS_DIGEST`。其余测试一律 import，禁止本地字面量定义。
@@ -10,9 +10,10 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-MIGRATION_HEAD = "0001"
-SCHEMA_TABLE_COUNT = 50
-SCHEMA_COLUMNS_DIGEST = "95861a517691ceaa"
+MIGRATION_HEAD = "0002"
+BASELINE_MIGRATION_REVISION = "0001"
+SCHEMA_TABLE_COUNT = 51
+SCHEMA_COLUMNS_DIGEST = "7f5dc85009e624e2"
 
 
 @dataclass(frozen=True, slots=True)

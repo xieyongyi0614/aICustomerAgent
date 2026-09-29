@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
-import '../../../design_system/components/cards.dart';
 import '../../../design_system/components/components.dart';
 import '../data/memory_repository.dart';
 

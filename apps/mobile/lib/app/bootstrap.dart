@@ -27,8 +27,8 @@ Future<void> bootstrap() async {
   appBriefNotifier = LocalBriefNotifier(FlutterLocalNotificationsPlugin());
   await appBriefNotifier.init();
   LocalBriefNotifier.onOpenBriefing = (payload) {
-    final form = payload.contains('evening') ? 'evening' : 'morning';
-    appRouter.go('/briefing?form=$form');
+    final type = payload.contains('evening') ? 'evening' : 'morning';
+    appRouter.go('/briefing?type=$type');
   };
   final container = ProviderContainer();
   runApp(
