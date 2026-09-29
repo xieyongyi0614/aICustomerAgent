@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
+import '../../../core/notify/local_brief_notifier.dart';
 import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import '../data/auth_repository.dart';
+import '../data/care_prefs_repository.dart';
 
 /// B8 #profile 我的：相识卡 + 人格卡 + 设置组 + 主动关怀 + 退出登录。
 class ProfilePage extends ConsumerStatefulWidget {
@@ -19,13 +21,81 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _auth = AuthRepository();
+  final _careRepo = CarePrefsRepository();
   String? _nickname;
   int _days = 1;
+  CarePrefs? _care;
+  bool _careBusy = false;
 
   @override
   void initState() {
     super.initState();
     _loadIdentity();
+    _loadCare();
+  }
+
+  Future<void> _loadCare() async {
+    try {
+      final care = await _careRepo.fetch();
+      if (!mounted) return;
+      setState(() => _care = care);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _care = null);
+    }
+  }
+
+  /// 后端 PUT 是整体替换：先取当前值合并，city 原样回传避免清空天气定位。
+  Future<void> _toggleBrief({required bool evening, required bool on}) async {
+    if (_careBusy) return;
+    setState(() => _careBusy = true);
+    try {
+      final current = await _careRepo.fetch();
+      final morningAt = evening
+          ? current.morningAt
+          : (on ? (current.morningAt ?? '08:00') : null);
+      final eveningAt = !evening
+          ? current.eveningAt
+          : (on ? (current.eveningAt ?? '21:30') : null);
+      final saved = await _careRepo.save(
+        morningAt: morningAt,
+        eveningAt: eveningAt,
+        city: current.city,
+      );
+      if (!mounted) return;
+      setState(() => _care = saved);
+      await _rescheduleNotify(saved);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('保存失败，请检查网络后重试')),
+      );
+    } finally {
+      if (mounted) setState(() => _careBusy = false);
+    }
+  }
+
+  Future<void> _rescheduleNotify(CarePrefs care) async {
+    final notifier = LocalBriefNotifier.shared;
+    if (notifier == null) return;
+    await notifier.cancelAll();
+    final morning = _parseHHmm(care.morningAt);
+    if (morning != null) {
+      await notifier.scheduleDaily(hour: morning.$1, minute: morning.$2, evening: false);
+    }
+    final evening = _parseHHmm(care.eveningAt);
+    if (evening != null) {
+      await notifier.scheduleDaily(hour: evening.$1, minute: evening.$2, evening: true);
+    }
+  }
+
+  (int, int)? _parseHHmm(String? hhmm) {
+    if (hhmm == null || !hhmm.contains(':')) return null;
+    final parts = hhmm.split(':');
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return (h, m);
   }
 
   Future<void> _loadIdentity() async {
@@ -277,18 +347,49 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               children: [
                 SettingRow(
                   title: '早间简报',
-                  subtitle: '每天 08:00 · 「我整理了你的今天」',
-                  trailing: AppToggle(value: true, onChanged: (_) {}),
+                  subtitle: (_care?.morningAt) == null
+                      ? '已关闭 · 开启后每天定时推送'
+                      : '每天 ${_care!.morningAt} · 「我整理了你的今天」',
+                  trailing: _care == null
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : AppToggle(
+                          value: _care!.morningOn,
+                          onChanged: (_) => _toggleBrief(
+                            evening: false,
+                            on: !_care!.morningOn,
+                          ),
+                        ),
                 ),
                 SettingRow(
                   title: '晚间总结',
-                  subtitle: '每天 21:30 · 回顾今天，安顿明天',
-                  trailing: AppToggle(value: true, onChanged: (_) {}),
+                  subtitle: (_care?.eveningAt) == null
+                      ? '已关闭 · 开启后每天定时推送'
+                      : '每天 ${_care!.eveningAt} · 回顾今天，安顿明天',
+                  trailing: _care == null
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : AppToggle(
+                          value: _care!.eveningOn,
+                          onChanged: (_) => _toggleBrief(
+                            evening: true,
+                            on: !_care!.eveningOn,
+                          ),
+                        ),
                 ),
                 SettingRow(
                   title: '状态异常提醒',
-                  subtitle: '睡眠 / 心率出现异常趋势时主动告知',
-                  trailing: AppToggle(value: false, onChanged: (_) {}),
+                  subtitle: '健康接入完成后开放（M4 门控）',
+                  trailing: Text(
+                    '即将开放',
+                    style: type.caption.copyWith(color: colors.ink3),
+                  ),
                   showDivider: false,
                 ),
               ],

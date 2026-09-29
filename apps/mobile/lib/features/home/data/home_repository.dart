@@ -32,6 +32,20 @@ class HomeSpend {
   final String conclusion;
 }
 
+class HomeHealthMetric {
+  const HomeHealthMetric({
+    required this.label,
+    required this.value,
+    this.unit,
+    this.note,
+  });
+
+  final String label;
+  final String value;
+  final String? unit;
+  final String? note;
+}
+
 class HomeSummaryData {
   const HomeSummaryData({
     required this.dateLabel,
@@ -44,6 +58,7 @@ class HomeSummaryData {
     this.insightAction,
     required this.healthAuthorized,
     this.healthEmptyHint,
+    this.healthMetrics = const <HomeHealthMetric>[],
     required this.tasks,
     required this.tasksHint,
     this.spend,
@@ -59,6 +74,7 @@ class HomeSummaryData {
   final String? insightAction;
   final bool healthAuthorized;
   final String? healthEmptyHint;
+  final List<HomeHealthMetric> healthMetrics;
   final List<HomeTaskItem> tasks;
   final String tasksHint;
   final HomeSpend? spend;
@@ -90,6 +106,16 @@ class HomeRepository {
       insightAction: insight['action_label'] as String?,
       healthAuthorized: health['authorized'] as bool? ?? false,
       healthEmptyHint: health['empty_hint'] as String?,
+      healthMetrics: [
+        for (final cell in (health['cells'] as List?) ?? const [])
+          if (cell is Map)
+            HomeHealthMetric(
+              label: cell['label'] as String? ?? '',
+              value: cell['value'] as String? ?? '',
+              unit: cell['unit'] as String?,
+              note: cell['note'] as String?,
+            ),
+      ],
       tasks: [
         for (final t in tasksRaw)
           HomeTaskItem(

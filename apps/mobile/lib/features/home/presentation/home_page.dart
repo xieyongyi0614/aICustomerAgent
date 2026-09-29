@@ -118,8 +118,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 hint: healthAuthorized ? '来自已连接设备' : null,
               ),
               const SizedBox(height: 10),
-              if (healthAuthorized)
-                const _HealthGrid()
+              if (healthAuthorized && d.healthMetrics.isNotEmpty)
+                _HealthGrid(metrics: d.healthMetrics)
+              else if (healthAuthorized)
+                const _HealthSyncingEmpty()
               else
                 _HealthAuthEmpty(hint: d.healthEmptyHint),
               const SizedBox(height: 24),
@@ -231,10 +233,12 @@ class _HeroBlock extends StatelessWidget {
         Text(sub,
             textAlign: TextAlign.center,
             style: type.body.copyWith(color: colors.ink2, fontSize: 13.5)),
-        const SizedBox(height: 10),
-        Center(
-          child: ModeChip(label: modeChip),
-        ),
+        if (modeChip.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: ModeChip(label: modeChip),
+          ),
+        ],
       ],
     );
   }
@@ -275,24 +279,44 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _HealthGrid extends StatelessWidget {
-  const _HealthGrid();
+  const _HealthGrid({required this.metrics});
+
+  final List<HomeHealthMetric> metrics;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        Expanded(
-          child: MetricCard(label: '睡眠', value: '7h12m', note: '优于上周'),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: MetricCard(label: '静息心率', value: '62', unit: 'bpm', note: '平稳'),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: MetricCard(label: '步数', value: '6,234', note: '目标 8,000'),
-        ),
+        for (var i = 0; i < metrics.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(
+            child: MetricCard(
+              label: metrics[i].label,
+              value: metrics[i].value,
+              unit: metrics[i].unit,
+              note: metrics[i].note,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// 已授权但当日还没有同步到数据：诚实空态，不出任何数值。
+class _HealthSyncingEmpty extends StatelessWidget {
+  const _HealthSyncingEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return AppCard(
+      child: Text(
+        '已连接设备，今天的健康数据还没同步过来',
+        textAlign: TextAlign.center,
+        style: type.body.copyWith(color: colors.ink2),
+      ),
     );
   }
 }

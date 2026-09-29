@@ -1,12 +1,43 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/cards.dart';
 import '../../../design_system/components/rows.dart';
 
-/// APP-025 健康授权与免责：无论健康模块是否上线都必须交付。
-class HealthConsentPage extends StatelessWidget {
+/// APP-025 健康授权与免责：单独同意记录持久化，无论健康模块是否上线都交付。
+class HealthConsentPage extends StatefulWidget {
   const HealthConsentPage({super.key});
+
+  @override
+  State<HealthConsentPage> createState() => _HealthConsentPageState();
+}
+
+class _HealthConsentPageState extends State<HealthConsentPage> {
+  bool _granted = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await PrefsStore.load();
+    if (!mounted) return;
+    setState(() {
+      _granted = prefs.healthConsentGranted();
+      _loaded = true;
+    });
+  }
+
+  Future<void> _toggle(bool granted) async {
+    final prefs = await PrefsStore.load();
+    await prefs.setHealthConsentGranted(granted);
+    if (!mounted) return;
+    setState(() => _granted = granted);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +58,28 @@ class HealthConsentPage extends StatelessWidget {
             children: [
               SettingRow(
                 title: '读取健康数据',
-                subtitle: '睡眠 / 心率 / 步数',
+                subtitle: _loaded
+                    ? (_granted ? '已同意 · 可随时关闭' : '未同意 · 开启后用于健康趋势')
+                    : '读取同意状态…',
                 icon: Icons.favorite,
-                trailing: AppToggle(value: false, onChanged: (_) {}),
+                iconBg: colors.tileHealth,
+                iconColor: colors.health,
+                trailing: _loaded
+                    ? AppToggle(value: _granted, onChanged: _toggle)
+                    : const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                 showDivider: false,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '同意后，数据读取发生在设备端的系统健康互联（Health Connect）中；'
+            '关闭同意不会删除已同步到健康互联的数据，可在系统设置中管理。',
+            style: type.caption.copyWith(color: colors.ink3, height: 1.5),
           ),
           PrivacyNote(
             child: Column(

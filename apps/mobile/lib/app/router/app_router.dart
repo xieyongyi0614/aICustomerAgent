@@ -92,7 +92,10 @@ final appRouter = GoRouter(
       routes: [
         GoRoute(path: '/home', builder: (_, _) => const HomePage()),
         GoRoute(path: '/life', builder: (_, _) => const LifePage()),
-        GoRoute(path: '/chat', builder: (_, _) => const ChatPage()),
+        GoRoute(
+          path: '/chat',
+          builder: (_, state) => ChatPage(initialText: state.extra as String?),
+        ),
         GoRoute(
           path: '/chat/ledger',
           builder: (_, state) => ChatLedgerPage(

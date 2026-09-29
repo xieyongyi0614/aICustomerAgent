@@ -26,6 +26,7 @@ Future<void> bootstrap() async {
   await appTokenStore.readAccessToken();
   appBriefNotifier = LocalBriefNotifier(FlutterLocalNotificationsPlugin());
   await appBriefNotifier.init();
+  LocalBriefNotifier.attach(appBriefNotifier);
   LocalBriefNotifier.onOpenBriefing = (payload) {
     final type = payload.contains('evening') ? 'evening' : 'morning';
     appRouter.go('/briefing?type=$type');

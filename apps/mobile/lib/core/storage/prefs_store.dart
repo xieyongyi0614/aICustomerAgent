@@ -11,6 +11,7 @@ class PrefsStore {
   static const keyNickname = 'profile.nickname';
   static const keyLoginSeen = 'profile.login_seen';
   static const keyFirstUsedAt = 'profile.first_used_at';
+  static const keyHealthConsentGranted = 'health.consent_granted';
 
   static const allKeys = [
     keyMorningBriefAt,
@@ -19,6 +20,7 @@ class PrefsStore {
     keyLastSyncAt,
     keyNickname,
     keyLoginSeen,
+    keyHealthConsentGranted,
   ];
 
   final SharedPreferences _prefs;
@@ -53,6 +55,12 @@ class PrefsStore {
   }
 
   String? firstUsedAt() => _prefs.getString(keyFirstUsedAt);
+
+  /// APP-025 单独同意：健康数据授权的端侧同意记录（Q9 裁决）。
+  bool healthConsentGranted() =>
+      _prefs.getBool(keyHealthConsentGranted) ?? false;
+  Future<void> setHealthConsentGranted(bool granted) =>
+      _prefs.setBool(keyHealthConsentGranted, granted);
 
   Future<void> _ensureFirstUsedAt() async {
     if (_prefs.getString(keyFirstUsedAt) == null) {

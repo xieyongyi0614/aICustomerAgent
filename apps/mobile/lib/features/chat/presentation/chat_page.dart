@@ -18,7 +18,10 @@ import 'widgets/persona_status_bar.dart';
 
 /// B2 #chat 八段装配（顺序固定）。
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key});
+  const ChatPage({super.key, this.initialText});
+
+  /// 快速捕获「记账」路径的预填文本（APP-022）。
+  final String? initialText;
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -32,6 +35,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialText;
+    if (initial != null && initial.isNotEmpty) {
+      _input.text = initial;
+    }
     _scroll.addListener(_onScroll);
   }
 

@@ -11,6 +11,11 @@ class LocalBriefNotifier {
   static const channelId = 'zhaoxi_brief';
   static const channelName = '朝夕简报';
 
+  /// bootstrap 装配后的全局实例；features 经此触发调度，不自行建插件。
+  static LocalBriefNotifier? _shared;
+  static LocalBriefNotifier? get shared => _shared;
+  static void attach(LocalBriefNotifier notifier) => _shared = notifier;
+
   Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
@@ -33,6 +38,9 @@ class LocalBriefNotifier {
     required int minute,
     required bool evening,
   }) async {
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
     final tzNow = tz.TZDateTime.now(tz.local);
     var when = tz.TZDateTime(tz.local, tzNow.year, tzNow.month, tzNow.day, hour, minute);
     if (when.isBefore(tzNow)) {
