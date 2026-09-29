@@ -15,12 +15,13 @@ void main() {
       '/briefing',
       '/profile/privacy',
       '/health/consent',
+      '/health/probe',
       '/login',
       '/verify',
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 13);
+    expect(chromeByPath.length, 14);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
@@ -30,6 +31,7 @@ void main() {
       '/briefing',
       '/profile/privacy',
       '/health/consent',
+      '/health/probe',
       '/chat',
       '/login',
       '/verify',

@@ -61,6 +61,11 @@ class HealthPage extends StatelessWidget {
                     onPressed: () => context.go('/health/consent'),
                     child: const Text('健康数据授权'),
                   ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => context.go('/health/probe'),
+                    child: const Text('PLT-001 手环数据探针（验证工具）'),
+                  ),
                 ],
               ),
             ),
