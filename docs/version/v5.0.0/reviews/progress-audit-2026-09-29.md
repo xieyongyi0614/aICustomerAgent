@@ -53,7 +53,7 @@
 |---|---|---|---|
 | 11 | `apps/backend/app/api/v1/home.py:121-135` | `/home/summary` 8 区块中 AI 总结 / 问候 / Orb 状态语为硬编码占位（含「昨晚睡得不错」假健康表述）；真实仅任务与今日消费两块 | ✅ 部分已修。问候语改按时钟推导（`greeting_for`）、AI 总结改取真实洞察（`insight_block_for` → `insights_query.list_insights`，无洞察则留空由客户端出空态）、`mode_chip` 改取最新会话模式；已删假健康表述。**未修**：`spend.budget = 200.0`（无领域数据源，见 §7）、`health.authorized=False`（M4 门控，属正确值） |
 | 12 | `apps/backend/app/api/v1/memory.py:23-24` | `source_count` / `usage_receipts` schema 声明但全仓无产出点（恒空）；「遗忘」为物理删除而非任务书要求的「置 forgotten 可审计」（`memory_repository.py:233-239`） | ✅ 已修。按 `tasks/API-007.md` 冻结规格重做：`source_count` = `1 + len(merge_chain)`、`source_kind` 取 `source_ref["table"]` 回退 `source`、`usage_receipts` 只来自 `runtime_traces` 的 `memory_retrieve_v2` 步（30 天窗、每 kind 留最新、`filtered` 不算使用）；「遗忘」改置 `forgotten`（不硬删）+ `forgotten_at` 审计 + 幂等保留首次时刻；`api/v1/memory.py` 重写为零仓储依赖 |
-| 13 | `apps/backend/app/api/v1/briefing.py` | 「按设定时刻预生成」未实现（请求时合成），「供本地通知离线取用」验收项不成立 | ⬜ 未修（`briefing.py:81` 仍为请求时 `compose_brief`） |
+| 13 | `apps/backend/app/api/v1/briefing.py` | 「按设定时刻预生成」未实现（请求时合成），「供本地通知离线取用」验收项不成立 | ⬜ 未修，**但原定性有误**（见下）。按 `tasks/API-008.md` §4.1.6 / §4.2.4 落点 A：**「服务端定时预生成落库」明确不在 V1**——离线可用性由「端侧设定时刻前预取 + drift 只读缓存 + 本地通知展示缓存」承担，服务端按请求**确定性**合成（同 `period_key` 内容一致）即满足验收 ②。**真实缺口**是：① 响应缺 `period_key`（规格 §4.1.1 要求 + 专门用例 `test_period_key_is_type_and_date`）；② 现状契约 `{type,greeting,title,orb_note,cards,cta,generated_at}` 与规格 11 字段（含 `eyebrow`/`orb_line`/`cards[].key,label,text,available,degraded_reason`/`rescheduled_tasks`/`disclaimer`/`degraded_blocks`）+ `date` 参数 + 冻结逐字文案差距很大，属**整套契约重写**而非增量；③ 端上预取卡在 drift 未接线（见 §7.6） |
 
 ## 3. 文档与台账问题
 
@@ -79,12 +79,12 @@
 | P0 | #6 记账页去占位 | ✅ 已修（过程卡除外，见 §7） |
 | P1 | #2 生活页摘要真实化 + 失败/空态区分 | ✅ 已修 |
 | P1 | #7 通知调度入口接线 | ✅ 已修 |
-| P1 | #8 drift 运行时接线 | ⬜ 未修 |
-| P1 | #9 隐私页本地清空联动 + 导出落地 | ⬜ 未修 |
-| P1 | #10 ResultCard / 会话列表 / 记忆页编辑 | 🔶 记忆页编辑已修 + 契约对齐；ResultCard / 会话列表未修 |
+| P1 | #8 drift 运行时接线 | ⬜ 未修。**阻塞**：需文件级 drift DB → 需把已在 lock 的 `path_provider` 提为直接依赖 → 需 `flutter pub get`（本机工具链故障，见 §7.7）。另：`LocalStores` 整体零引用，死代码范围大于原描述（§7.6） |
+| P1 | #9 隐私页本地清空联动 + 导出落地 | ⬜ 未修。**同 #8 阻塞**（本地清空要走 `LocalStores`；导出落地需文件目标）。`privacy_page.dart:37` 的导出结果确实拿到即弃、`:82` 仅服务端删除 |
+| P1 | #10 ResultCard / 会话列表 / 记忆页编辑 | 🔶 记忆页编辑已修 + 契约对齐；**ResultCard 阻塞**：对话事件契约（`turnMeta`/`token`/`replyReplace`/`toolStep`/`done`/`failure`）**无结果卡事件**，服务端也无 chips 产出 → 属后端缺口；`sessions` 未修（D3 为端上投影，需定存储口径） |
 | P1 | #11 后端首页占位真实化 | ✅ 部分已修 |
 | P1 | #12 记忆域产出字段 + 遗忘改软删 | ✅ 已修（按 `API-007` 规格，含读面分组口径） |
-| P1 | #13 简报定时预生成 | ⬜ 未修 |
+| P1 | #13 简报定时预生成 | ⬜ 未修，**原定性有误**：服务端定时落库不在 V1（规格 §4.1.6/§4.2.4 落点 A）；真实缺口是响应缺 `period_key` + 契约需整套重写，端上预取同 #8 阻塞 |
 | P2 | 回写 41 个 Detail 状态行 | ⬜ 未修 |
 | P2 | 补 v5.0.0 验收台账 | ⬜ 未修 |
 | P2 | 修正迁移号描述 | ⬜ 未修 |
@@ -135,6 +135,8 @@
 3. `health.authorized` 保持 `False` 属**正确值**而非缺陷：后端无健康事实表（API-009 在 M4 门控后），客户端 `APP-025` 的同意只记在端侧。
 4. **`UserMemory` 投影与 memory2 域已脱节（V1 模型未随域演进）**。① `app/models/memory.py:24` 的 `MemoryStatus` 只含 `active`/`superseded`/`invalidated`，而 `memory2/lifecycle.py` 实际会写 `decayed` / `forgotten` → **`memory_repository.get_memory()` 读这两态的行会抛 Pydantic `ValidationError`（而非返回 None）**，任何按 id 读非 active 记忆的路径都会 500；② `_to_memory()` 未映射 `merge_chain` / `source_ref` / `forgotten_at`，`source_count` 与来源追溯无从派生。本轮 `API-007` 以「读原始列」绕开（`product_view.row_facts`），**未改冻结面**（`app/models/memory.py` 在 `tests/v24/test_tool008_integration.py::FROZEN_SOURCES` 内，改它须显式声明 + 同步摘要）。属独立决策，已登记待办。
 5. `apps/backend/tests/v50/test_design_principles.py` 用**相对路径读跨工程源码**（`Path("../mobile/lib/...")`）做**弱子串断言**——强依赖 CWD，且契约一变就误伤：本轮记忆页按 `API-007` 契约改为「文案由服务端下发」后，`assert "已用于" in src` 立即变红，而功能其实更正确。建议迁到 Flutter 侧或改为结构化断言。
+6. **本地存储层整体是死代码（比 #8 的描述更严重）**。`core/storage/local_stores.dart` 的 `LocalStores` 在 `lib/` 内**零引用**（仅 `briefing_cache.dart` 的注释提过一句），`AppCacheDb` 也只以 `NativeDatabase.memory()` 出现（`LocalStores.openInMemory` + 测试）→ **drift 7 表 / 3 仓储 / `DriftRetryStore` 重试队列 / `clearLocalBusiness` 全部未接进运行时**。根因单一：**启动时无人打开 drift 数据库**，而打开**文件级**数据库需要可写目录。
+7. **🚨 工具链故障的精确根因（已定位 + 已验证的绕过尝试）**：`flutter pub get` 失败**不是** pub 本身的问题——flutter_tools 在 `generateCommands` 阶段急切定位 Android SDK，执行 `where.EXE aapt` 时子进程创建失败（`CreateFile failed 231 所有的管道范例都在使用中`，`process_win.cc:744`）。本机 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 未设、`android/local.properties` 只有 `flutter.sdk`、常见 SDK 路径不存在。**实测绕过失败**：设 `ANDROID_HOME` 指向空目录仍走 `_which('aapt')`（`android_sdk.dart:127`）。**后果**：本机既不能 `pub get` 也不能 `analyze`/`test`（Dart→子进程一律失败）。**阻塞面**：任何需要新增/变更 Flutter 依赖的修复（如把已在 lock 中的传递依赖 `path_provider` 提为直接依赖）在本机无法完成，故 #6 / #7 / #11 端上部分被卡住。**修法**：修复该机 `CreateNamedPipe` 路径（疑 EDR hook），或在另一台可用机器上执行依赖变更 + 全量 `flutter test`。
 
 ## 8. 本报告自身更正
 
