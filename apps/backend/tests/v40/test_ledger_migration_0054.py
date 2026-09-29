@@ -1,6 +1,11 @@
+"""PLA 账本域：ORM 最终态与仓储约束测试。
+
+2026-09-29 迁移链折叠为单迁移 0001（原 0054），迁移文件级断言退役，
+仅保留 ORM/仓储断言；迁移链头一致性由 `tests/support/schema_pins.py` 统一钉测。
+"""
+
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from pathlib import Path
 
@@ -17,13 +22,11 @@ from app.core.db import (
 )
 from tests.support.schema_pins import (
     MIGRATION_HEAD,
-    SCHEMA_PREVIOUS_HEAD,
     SCHEMA_TABLE_COUNT,
     schema_pin,
 )
 
 BACKEND = Path(__file__).resolve().parents[2]
-MIGRATION_PATH = BACKEND / "migrations" / "versions" / "0054_life_ledger_domain.py"
 
 
 def _account(db, *, user_id="u1", name="现金"):
@@ -94,7 +97,7 @@ def test_migration_chain_head_matches_pin():
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD
+    assert revision.down_revision is None
 
 
 def test_schema_table_count_matches_pin():
@@ -209,26 +212,15 @@ def test_reversal_fk_enforced(db_session_factory):
         raise AssertionError("reversal_of 悬空引用未被拒绝")
 
 
-def test_migration_has_upgrade_and_downgrade():
-    source = MIGRATION_PATH.read_text(encoding="utf-8")
-    assert "def upgrade()" in source
-    assert "def downgrade()" in source
-    for table in ("ledger_accounts", "ledger_categories", "ledger_entries"):
-        assert f'"{table}"' in source
-    drop_order = [
-        source.index('op.drop_table("ledger_entries")'),
-        source.index('op.drop_table("ledger_categories")'),
-        source.index('op.drop_table("ledger_accounts")'),
-    ]
-    assert drop_order == sorted(drop_order)
-
-
-def test_check_constraints_are_boolean_expressions():
-    source = MIGRATION_PATH.read_text(encoding="utf-8")
-    expressions = re.findall(
-        r"CheckConstraint\(\s*\"([^\"]+)\"",
-        source,
-    )
-    assert expressions
-    for expr in expressions:
-        assert any(op in expr for op in (">", "<", "=", "IN", "LIKE")), expr
+def test_check_constraints_declared_in_orm():
+    """账本三表的 CHECK 约束全部在 ORM 声明（折叠迁移由元数据生成）。"""
+    for table in (
+        LedgerAccountRow.__table__,
+        LedgerCategoryRow.__table__,
+        LedgerEntryRow.__table__,
+    ):
+        checks = {
+            constraint.name for constraint in table.constraints
+            if type(constraint).__name__ == "CheckConstraint"
+        }
+        assert checks, table.name

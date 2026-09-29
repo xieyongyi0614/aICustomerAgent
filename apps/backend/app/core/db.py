@@ -1277,6 +1277,14 @@ class DevelopmentStateRow(Base):
         ),
         Index("idx_development_state_user_status", "user_id", "status"),
         Index("idx_development_state_user_kind", "user_id", "kind", "status"),
+        Index(
+            "uq_development_state_active_key",
+            "user_id",
+            "key",
+            unique=True,
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
+        ),
     )
 
 
@@ -1297,6 +1305,10 @@ class DevelopmentChangeRow(Base):
             "reason IN ('compiled', 'arbitrated', 'arbitrated_lost',"
             " 'rolled_back', 'retired', 'replayed', 'personality')",
             name="ck_development_changes_reason",
+        ),
+        CheckConstraint(
+            "development_state_id IS NOT NULL OR personality_state_id IS NOT NULL",
+            name="ck_development_changes_subject",
         ),
         Index("idx_development_changes_state", "development_state_id"),
         Index("idx_development_changes_insight", "insight_id"),

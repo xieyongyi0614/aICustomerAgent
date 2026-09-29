@@ -312,8 +312,10 @@ def sqlite_round_trip(tmp_path_factory):
     yield cfg, url
 
 
-def test_round_trip_status_constraint_and_column(sqlite_round_trip):
+def test_head_schema_admits_failed_status_and_arbitration_state(sqlite_round_trip):
+    """原 0030 逆放用例随迁移链折叠退役；保留 head 态值域与列断言。"""
     cfg, url = sqlite_round_trip
+    del cfg
     engine = create_engine(url)
     with engine.begin() as connection:
         connection.execute(
@@ -326,29 +328,12 @@ def test_round_trip_status_constraint_and_column(sqlite_round_trip):
                 " '2026-09-01 00:00:00', 'long_term', 'personal', '{}')"
             )
         )
-    engine.dispose()
-
-    command.downgrade(cfg, "0030")
-    engine = create_engine(url)
     inspector = inspect(engine)
     goal_columns = {c["name"] for c in inspector.get_columns("character_goals")}
-    assert "arbitration_state" not in goal_columns
-    with engine.connect() as conn:
-        statuses = {
-            row[0] for row in conn.execute(text("SELECT status FROM character_goals"))
-        }
-        kinds = {
-            row[0] for row in conn.execute(text("SELECT DISTINCT kind FROM decision_records"))
-        }
-    assert "failed" not in statuses
-    assert "goal_lifecycle" not in kinds
-    engine.dispose()
-
-    command.upgrade(cfg, "head")
-    engine = create_engine(url)
+    assert "arbitration_state" in goal_columns
     with engine.connect() as conn:
         count = conn.execute(
             text("SELECT COUNT(*) FROM character_goals WHERE status = 'failed'")
         ).scalar()
-    assert count == 0
+    assert count == 1
     engine.dispose()

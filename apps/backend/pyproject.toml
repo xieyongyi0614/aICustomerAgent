@@ -53,6 +53,7 @@ exclude_also = [
 
 [tool.pylint.main]
 source-roots = ["."]
+ignore-paths = ["migrations/"]
 init-hook = "import sys, os; cwd = os.getcwd(); candidates = [os.path.join(cwd, 'apps', 'backend', '.venv', 'Lib', 'site-packages'), os.path.join(cwd, '.venv', 'Lib', 'site-packages')]; [sys.path.insert(0, p) for p in candidates if os.path.isdir(p)]"
 
 [tool.pytest.ini_options]

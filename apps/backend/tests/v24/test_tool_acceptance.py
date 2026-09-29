@@ -1151,22 +1151,15 @@ def test_g_extend_external_api_costs_one_manifest(tmp_path):
 
 
 def test_zero_migration_reconciliation_records_breakpoints():
-    """零迁移断言已破例：破例点登记在 `MIGRATION_ADDED_VS_BASELINE`，且与实况逐条对齐。"""
+    """2026-09-29 迁移链折叠为单迁移：破例台账随折叠退役，目录仅存单一基线迁移。"""
     versions = sorted(
         path.name
         for path in (support.BACKEND_ROOT / "migrations" / "versions").glob("0*.py")
         if path.name != "__init__.py"
     )
 
-    assert len(versions) == support.MIGRATION_FILE_COUNT_CURRENT
-    assert len(versions) - support.MIGRATION_FILE_COUNT_BASELINE == len(
-        support.MIGRATION_ADDED_VS_BASELINE
-    )
-    assert versions[-1] == support.MIGRATION_BREAKPOINT
-    assert tuple(support.MIGRATION_ADDED_VS_BASELINE) == tuple(
-        versions[support.MIGRATION_FILE_COUNT_BASELINE :]
-    )
-    assert all(name in versions for name in support.V23_MIGRATION_TAIL)
+    assert versions == [support.SQUASHED_MIGRATION_FILE]
+    assert versions[0].startswith(support.MIGRATION_HEAD)
 
 def test_zero_migration_model_structure_unchanged():
     """模型结构 diff：表集合与列摘要零变更（结构面零迁移成立）。
@@ -1191,8 +1184,8 @@ def test_zero_migration_model_structure_unchanged():
         assert name in tables
 
 
-def test_zero_migration_only_insights_check_domain_changed():
-    """唯一结构差异是 `insights.ck_insights_type` 值域放宽（与 0046 一致）。"""
+def test_zero_migration_structure_changes_are_registered():
+    """相对冻结基线的结构差异必须逐表登记（insights 值域放宽 + 0026 兜底约束补回模型）。"""
     from app.core.db import Base
 
     table = Base.metadata.tables["insights"]
@@ -1206,12 +1199,12 @@ def test_zero_migration_only_insights_check_domain_changed():
         "type IN ('belief', 'preference', 'pattern', 'capability_note',"
         " 'usage_preference', 'interaction_calibration')"
     )
-    assert support.SCHEMA_CHECKS_CHANGED_TABLES == ("insights",)
-    assert support.SCHEMA_INDEXES_CHANGED_TABLES == ()
+    assert support.SCHEMA_CHECKS_CHANGED_TABLES == ("insights", "development_changes")
+    assert support.SCHEMA_INDEXES_CHANGED_TABLES == ("development_state",)
 
 
 def test_migration_chain_head_is_current():
-    """迁移链 head 为当前最新且线性（无分支、无多 head）。"""
+    """迁移链 head 为当前唯一基线迁移（单 head、down_revision 为空）。"""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -1222,22 +1215,28 @@ def test_migration_chain_head_is_current():
     assert heads == [support.MIGRATION_HEAD]
     revision = script.get_revision(support.MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == support.MIGRATION_HEAD_PREVIOUS
+    assert revision.down_revision is None
 
 def test_migration_0046_is_downgradable():
-    """0046 性质=可降级（有 downgrade 实现，非破坏性值域放宽）。"""
+    """0046 的值域放宽已折叠进单迁移；放宽后的 insights 类型域与模型一致。"""
     source = (
-        support.BACKEND_ROOT / "migrations" / "versions" / "0046_tool_insight_types.py"
+        support.BACKEND_ROOT
+        / "migrations"
+        / "versions"
+        / support.SQUASHED_MIGRATION_FILE
     ).read_text(encoding="utf-8")
 
     assert "def downgrade()" in source
-    assert re.search(r"LEGACY_TYPES\s*=", source)
+    assert "'capability_note'" in source
 
 
 def test_latest_breakpoint_is_downgradable():
-    """每次零迁移破例都必须可回退：最新破例点同样要有 downgrade 实现。"""
+    """折叠后的单迁移必须可回退（有完整 downgrade 实现）。"""
     source = (
-        support.BACKEND_ROOT / "migrations" / "versions" / support.MIGRATION_BREAKPOINT
+        support.BACKEND_ROOT
+        / "migrations"
+        / "versions"
+        / support.SQUASHED_MIGRATION_FILE
     ).read_text(encoding="utf-8")
 
     assert "def downgrade()" in source

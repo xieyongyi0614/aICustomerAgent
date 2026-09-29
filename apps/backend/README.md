@@ -58,7 +58,7 @@ curl http://localhost:8020/health
 ## 数据库
 
 - 运行库为 PostgreSQL 16，连接串由 `DATABASE_URL` 配置（默认 `postgresql+psycopg://asuna:asuna@localhost:5432/asuna`）。
-- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，当前链尾 `0057`）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
+- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，当前为单一基线迁移 `0001`，2026-09-29 全链折叠）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
 - 存量 SQLite 数据可用 `uv run python -m scripts.migrate_sqlite_to_postgres --source sqlite:///./asuna.db` 一次性搬运（幂等，目标表先清后写）。
 - 连接池参数（`DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` / `DB_POOL_PRE_PING`）见配置项表。
 

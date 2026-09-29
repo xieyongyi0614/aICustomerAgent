@@ -246,17 +246,13 @@ def _pg_url():
 
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", pg_url)
-    command.upgrade(alembic_cfg, "0035")
-    command.upgrade(alembic_cfg, "0036")
+    command.upgrade(alembic_cfg, "head")
     yield alembic_cfg, pg_url
-    command.downgrade(alembic_cfg, "0035")
 
 
 @pytest.mark.xdist_group("migration")
 def test_migration_0036_roundtrip_on_postgres(_pg_url):
-    from alembic import command
-    from sqlalchemy import text
-
+    """FEISHU-005：channel_identities 表的 PG 最终态断言（原 0035/0036 往返已随折叠退役）。"""
     alembic_cfg, pg_url = _pg_url
     engine = create_engine(pg_url)
     inspector = inspect(engine)
@@ -278,13 +274,6 @@ def test_migration_0036_roundtrip_on_postgres(_pg_url):
     assert set(pk["constrained_columns"]) == {"channel", "external_id"}
     index_names = {index["name"] for index in inspector.get_indexes("channel_identities")}
     assert "idx_channel_identities_user" in index_names
-    engine.dispose()
-
-    command.downgrade(alembic_cfg, "0035")
-    engine = create_engine(pg_url)
-    inspector = inspect(engine)
-    assert "channel_identities" not in inspector.get_table_names()
-    command.upgrade(alembic_cfg, "0036")
     engine.dispose()
 
 

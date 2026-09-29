@@ -88,7 +88,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 
 - **LLM 唯一来源**：`core/llm_factory.get_llm()`（profile 机制）；结构化输出统一走 `chains/structured.py::build_structured_chain`（主链 + 一层降级）。
 - **DB 唯一写面**：业务层禁止直接操作 ORM，一律经 `repositories/`。
-- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，当前链尾 `0052`），`create_all` 已退役（测试内存 SQLite 属豁免）。
+- **Schema 唯一真相**：Alembic 迁移链（`migrations/versions/`，2026-09-29 起为单一基线迁移 `0001`，ADR-14），`create_all` 已退役（测试内存 SQLite 属豁免）。
 - **数据流纪律**：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理失败不影响已产出回答。
 
 ---
@@ -354,12 +354,12 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，2026-09-29 起为单一基线迁移 `0001`，原 0001~0058 折叠，ADR-14）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
 | 会话 | `conversations`、`messages`、`conversation_summaries` | messages.conversation_id → conversations.id；summary 1:1 conversation |
-| 身份 | `users` | email 唯一**部分索引**（0057，邮箱验证码登录绑定）；`is_default` 列与唯一索引已于 0058 删除（默认用户概念退役） |
+| 身份 | `users` | email 唯一**部分索引**（邮箱验证码登录绑定，原 0057 引入、随折叠并入 `0001` 基线）；`is_default` 列与唯一索引已删除（默认用户概念退役，原 0058） |
 | 角色状态 | `character_state`、`emotion_history`、`personality_state` | character_state.user_id 主键；emotion_history 按 user 时序；personality_state 唯一 (user,character,axis) |
 | 关系 | `relationship_state`、`relationship_events`、`relationship_milestones`、`relationship_conflicts`、`relationship_snapshots` | state 为当前态（version 乐观锁）；events 为账本（时序权威）；snapshots 版本化快照 |
 | 目标/计划 | `character_goals`、`goal_plans` | goals.parent_goal_id 自引用分层；goal_plans.goal_id → goals，版本号 version |
@@ -456,7 +456,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 |-|-|-|
 | `services/agent_service.py` 是"兼容壳"，编排已迁 `chat_pipeline` 但壳仍保留供 api/测试依赖 | 双入口符号残留，新同学易误入旧路径 | P2 |
 | ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
-| **迁移链头钉测散落在 v24/v25/v26 共 15 个测试文件**（`MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`max(numbered) == NN`、`SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`）。每加一个迁移都要机械升级一遍（FEISHU-010 加 `0050` 时实测 **22 个用例由绿转红**，见 `review-v1.2.md` §7.10） | 加迁移的隐性成本高、易漏改；`v25` 的 `ZeroMigration` 类与 `v26` 的版本号命名会随升级逐渐名不副实 | P1 |
+| **迁移链头钉测已收口**（2026-09-29 全链折叠为单迁移 `0001`，ADR-14）：钉测单点 `tests/support/schema_pins.py`（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`），v24 取证常量单点 `tool012_support.py`；新增迁移只需 bump 钉文件 | 残余：`v24`/`v25`/`v26`/`v30`/`v40` 部分测试文件名仍带历史版本号字面量（如 `test_runtime_migration_0052.py`），语义已泛化为最终态断言，待未来顺手改名 | P2 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
 | 调试台面端点（`/debug/*`、`/state`、action）`user_id` 省略时取 token 身份（`require_user`），可显式传入覆盖——**已无魔法默认值**（2026-09-28 IDENT-009）；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离 | 调试面无多用户隔离；产品面已隔离 | P2 |
 | `docs/` 169 文件、1589 处 `vXX_` 引用未改写（历史文档不改写是约定，靠 `flag-rename-map.md` 桥接） | 读历史文档需查对照表，存在导航断层 | P2 |
@@ -484,6 +484,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/` 0001~0057）；
 11. **前台/后台同一决策代码路径**：统一 `decision_pipeline`，前台目标栈只读（长期化写入只发生在后台）。
 12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
 13. **用户身份收口（token 唯一身份源，2026-09-27；默认用户概念整体退役 2026-09-28）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）。**IDENT-009（2026-09-28）：默认用户概念不再存在**——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。具体：①删 `settings.default_user` 字段与 `DEFAULT_USER` env 键；②删启动播种 `ensure_default_user()` / `upsert_default()`（空库冷启动不再造幽灵行）；③`/debug/*` 与 `/state`（共 20 个端点）的回落值由魔法 id 改为 **token 身份**（`user_id` 省略即取 `require_user`，显式传入可覆盖）；④删 `users.is_default` 列与唯一索引（迁移 `0058`；该列此前是纯装饰，全仓无查询用它）与 `UserContext.is_default`；⑤删一次性归并脚本 `adopt_owner_identity.py` 与 `resolve_user` 死代码。历史 owner 行的 id 迁移由 `scripts/migrate_owner_id_to_email.py` 承担（幂等 / 默认 dry-run，级联 `user_id` + `worlds.id` + `world_id`；**执行后所有已签发 token 失效**）。V4.0.0 任务册 §14 为本次登记。
+14. **迁移链折叠为单迁移（2026-09-29）**：`migrations/versions/` 由 0001~0058（58 个增量）折叠为单一基线迁移 `0001_squashed_full_schema.py`（revision `0001`、`down_revision = None`），由 `Base.metadata` autogenerate 生成并人工校正（PG 分支保留 pgvector 扩展可用性守卫与 `idx_memories_embedding_hnsw` HNSW 索引；布尔默认值修正为 `sa.false()`；补回 0026 兜底约束；`VectorType` 以迁移内本地副本声明，不依赖 `app.core.db`，基线迁移自包含）。**前提**：项目处开发期、库可整库重建，无线上存量数据需保留；**旧库（≤`0058`）与新链不兼容，必须删库重跑 `alembic upgrade head`**。**顺带修正三处模型/迁移漂移**：①`character_goals.ck_character_goals_domain` 值域补 `budget`（旧链漏更，迁移库上写 budget 域目标会违约）；②`action_records.ix_action_records_user_id` 由 UNIQUE 改普通索引（对齐模型；旧链 0047 误建唯一索引）；③`uq_development_state_active_key` 部分唯一索引与 `ck_development_changes_subject` CHECK 补回 ORM 模型（此前仅存在于迁移、测试建表路径缺失）。迁移头钉测保持 `tests/support/schema_pins.py` 单点（`MIGRATION_HEAD="0001"`）；v24 取证常量同步改写（`SQUASHED_MIGRATION_FILE` 等）。此后结构变更加 `0002+` 增量迁移，禁止再折叠除非再次整库重建。
 
 ---
 

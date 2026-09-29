@@ -1,5 +1,7 @@
-"""V8.5-001 迁移一致性：扩列 server_default 旧行兼容 + upgrade/downgrade 往返。
+"""V8.5-001 迁移一致性：V8.5 扩列/扩值域的 PG 最终态断言。
 
+2026-09-29 迁移链折叠为单迁移 0001，原 0017/0018 upgrade/downgrade 往返用例
+随折叠退役（server_default 旧行兼容保证已由折叠迁移的建表默认值承接）。
 需要 PostgreSQL（TEST_DATABASE_URL），不可用时跳过（同 test_db_migration 模式）。
 """
 
@@ -59,23 +61,9 @@ def _run_alembic(url: str, target: str, *, downgrade: bool = False) -> None:
         command.upgrade(alembic_cfg, target)
 
 
-def _legacy_relationship_state_row(engine):
-    """模拟 V5 旧行：只写 V5 既有列。"""
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO relationship_state"
-                " (user_id, intimacy, trust, familiarity, tension, stage,"
-                "  created_at, updated_at)"
-                " VALUES ('legacy-user', 0.3, 0.35, 0.3, 0.0, 'friend',"
-                "          NOW(), NOW())"
-            )
-        )
-
-
 def test_upgrade_adds_columns_with_defaults(postgres_url):
     engine = create_engine(postgres_url)
-    _run_alembic(postgres_url, "0018")
+    _run_alembic(postgres_url, "head")
     inspector = inspect(engine)
     state_columns = {
         column["name"]: column for column in inspector.get_columns("relationship_state")
@@ -93,26 +81,6 @@ def test_upgrade_adds_columns_with_defaults(postgres_url):
         column["name"] for column in inspector.get_columns("relationship_events")
     }
     assert {"impact_respect", "impact_comfort"} <= event_columns
-    engine.dispose()
-
-
-def test_legacy_row_defaults_after_upgrade(postgres_url):
-    _run_alembic(postgres_url, "0017", downgrade=True)
-    engine = create_engine(postgres_url)
-    _legacy_relationship_state_row(engine)
-    _run_alembic(postgres_url, "0018")
-    with engine.connect() as connection:
-        row = connection.execute(
-            text(
-                "SELECT respect, comfort, conflict_status, neglect_active, version"
-                " FROM relationship_state WHERE user_id = 'legacy-user'"
-            )
-        ).one()
-    assert row.respect == 0.6
-    assert row.comfort == 0.6
-    assert row.conflict_status == "none"
-    assert row.neglect_active is False
-    assert row.version == 0
     engine.dispose()
 
 
@@ -150,20 +118,6 @@ def test_event_new_enum_values_and_legacy_impact_defaults(postgres_url):
         ).one()
     assert row.impact_respect == 0.0
     assert row.impact_comfort == 0.0
-    engine.dispose()
-
-
-def test_downgrade_roundtrip(postgres_url):
-    _run_alembic(postgres_url, "0017", downgrade=True)
-    engine = create_engine(postgres_url)
-    inspector = inspect(engine)
-    state_columns = {column["name"] for column in inspector.get_columns("relationship_state")}
-    assert "respect" not in state_columns
-    assert "version" not in state_columns
-    _run_alembic(postgres_url, "head")
-    inspector = inspect(engine)
-    state_columns = {column["name"] for column in inspector.get_columns("relationship_state")}
-    assert "respect" in state_columns
     engine.dispose()
 
 

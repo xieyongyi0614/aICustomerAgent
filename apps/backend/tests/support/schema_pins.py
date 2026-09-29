@@ -1,6 +1,6 @@
-"""迁移链头钉测单点入口（PLA-001）。
+"""迁移链头钉测单点入口（PLA-001；2026-09-29 迁移链折叠为单迁移 0001）。
 
-全仓唯一定义：`MIGRATION_HEAD` / `SCHEMA_PREVIOUS_HEAD` / `SCHEMA_TABLE_COUNT` /
+全仓唯一定义：`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` /
 `SCHEMA_COLUMNS_DIGEST`。其余测试一律 import，禁止本地字面量定义。
 升级迁移时只改本模块（+ 迁移文件本身），目标改动文件数 ≤ 3。
 """
@@ -10,8 +10,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-MIGRATION_HEAD = "0058"
-SCHEMA_PREVIOUS_HEAD = "0057"
+MIGRATION_HEAD = "0001"
 SCHEMA_TABLE_COUNT = 50
 SCHEMA_COLUMNS_DIGEST = "95861a517691ceaa"
 
@@ -19,7 +18,6 @@ SCHEMA_COLUMNS_DIGEST = "95861a517691ceaa"
 @dataclass(frozen=True, slots=True)
 class SchemaPin:
     migration_head: str
-    schema_previous_head: str
     schema_table_count: int
     schema_columns_digest: str
 
@@ -27,7 +25,6 @@ class SchemaPin:
 def schema_pin() -> SchemaPin:
     return SchemaPin(
         migration_head=MIGRATION_HEAD,
-        schema_previous_head=SCHEMA_PREVIOUS_HEAD,
         schema_table_count=SCHEMA_TABLE_COUNT,
         schema_columns_digest=SCHEMA_COLUMNS_DIGEST,
     )

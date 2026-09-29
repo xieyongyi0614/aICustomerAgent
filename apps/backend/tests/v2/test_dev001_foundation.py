@@ -203,22 +203,11 @@ def _seed_round_trip_rows(url):
     engine.dispose()
 
 
-def test_round_trip_structure_and_data(sqlite_round_trip):
-    cfg, url = sqlite_round_trip
+def test_head_structure_and_seed_data(sqlite_round_trip):
+    """原 0025 逆放用例随迁移链折叠退役；保留 head 态结构与数据写入断言。"""
+    _cfg, url = sqlite_round_trip
     _seed_round_trip_rows(url)
 
-    command.downgrade(cfg, "0025")
-    engine = create_engine(url)
-    inspector = inspect(engine)
-    assert not (DEVELOPMENT_TABLES & set(inspector.get_table_names()))
-    with engine.connect() as conn:
-        insight = conn.execute(
-            text("SELECT id, status FROM insights WHERE id = 'ins-rt'")
-        ).fetchone()
-    assert insight == ("ins-rt", "active")
-    engine.dispose()
-
-    command.upgrade(cfg, "head")
     engine = create_engine(url)
     inspector = inspect(engine)
     assert DEVELOPMENT_TABLES <= set(inspector.get_table_names())
@@ -238,7 +227,7 @@ def test_round_trip_structure_and_data(sqlite_round_trip):
         ).fetchone()
         state_count = conn.execute(text("SELECT COUNT(*) FROM development_state")).scalar()
     assert insight == ("ins-rt", "active")
-    assert state_count == 0
+    assert state_count == 1
     engine.dispose()
 
 

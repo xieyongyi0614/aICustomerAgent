@@ -23,7 +23,6 @@ from tests.support.schema_pins import (
     SCHEMA_COLUMNS_DIGEST,
     SCHEMA_TABLE_COUNT,
 )
-from tests.support.schema_pins import SCHEMA_PREVIOUS_HEAD as MIGRATION_HEAD_PREVIOUS
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"
@@ -69,26 +68,7 @@ BUILTIN_TOOL_IDS: tuple[str, ...] = (
     "world.object.use",
 )
 
-MIGRATION_FILE_COUNT_BASELINE = 45
-MIGRATION_FILE_COUNT_CURRENT = 55
-MIGRATION_BREAKPOINT = "0055_life_tasks.py"
-MIGRATION_ADDED_VS_BASELINE: tuple[str, ...] = (
-    "0046_tool_insight_types.py",
-    "0047_action_schedules_priority.py",
-    "0048_action_records_run_id.py",
-    "0049_loop_runs_kind_maintenance_steps.py",
-    "0050_feishu_dedupe_ledger.py",
-    "0051_feishu_deliveries.py",
-    "0052_runtime_session_trace_links.py",
-    "0053_life_user_identity.py",
-    "0054_life_ledger_domain.py",
-    "0055_life_tasks.py",
-)
-
-V23_MIGRATION_TAIL: tuple[str, ...] = (
-    "0047_action_schedules_priority.py",
-    "0048_action_records_run_id.py",
-)
+SQUASHED_MIGRATION_FILE = "0001_squashed_full_schema.py"
 
 SCHEMA_TABLE_SET_DIGEST = "05a4460a97174d48"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
@@ -101,9 +81,9 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "ledger_entries",
     "life_tasks",
 )
-SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ()
+SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state",)
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
-SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights",)
+SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights", "development_changes")
 BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "action_records": ("90f5e647f8f1d8a8", "fccaeb1aee8d6cba", "8a7a52790352b2d8"),
     "conversations": ("ecfdeb39838b39bc", "18f3a52de812d1f3", "e3b0c44298fc1c14"),

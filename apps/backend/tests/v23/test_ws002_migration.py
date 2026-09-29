@@ -1,4 +1,8 @@
-"""WS-002：迁移 0044/0045 正放与逆放（PostgreSQL；不可用则跳过）。"""
+"""WS-002：世界模拟 Schema 正放（PostgreSQL；不可用则跳过）。
+
+2026-09-29 迁移链折叠为单迁移 0001，原 0044/0045 逆放用例随折叠退役；
+本文件仅保留 head 态的对象存在性断言。
+"""
 
 import os
 
@@ -37,6 +41,9 @@ def alembic_cfg():
     if url is None:
         pytest.skip("PostgreSQL 不可用：docker compose up -d 后重跑")
     engine = create_engine(url, pool_pre_ping=True)
+    from app.core.db import Base
+
+    Base.metadata.drop_all(engine)
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     engine.dispose()
@@ -76,15 +83,3 @@ def test_upgrade_creates_simulation_tables_and_extensions(alembic_cfg):
         assert "uq_world_events_idempotency" in indexes
     finally:
         engine.dispose()
-
-
-def test_downgrade_to_0043_removes_simulation_objects(alembic_cfg):
-    command.downgrade(alembic_cfg, "0043")
-    engine = create_engine(PG_TEST_URL, pool_pre_ping=True)
-    try:
-        assert not {"daily_plans", "user_situations"} & _tables(engine)
-        assert "sim_last_advanced_at" not in _columns(engine, "worlds")
-        assert "idempotency_key" not in _columns(engine, "world_events")
-    finally:
-        engine.dispose()
-    command.upgrade(alembic_cfg, "head")

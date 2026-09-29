@@ -291,20 +291,22 @@ class TestRegressionCheck:
         assert "memory_repository." not in source
 
     def test_v25_migration_head_documented(self):
-        """v2.5 交付时链头为 0049；链头随后续版本推进，故只断言「≥ 0049 且自洽」。
+        """v2.5 交付时链头为 0049；2026-09-29 全链折叠为单迁移 `0001` 后，V2.5 及
+        之后全部 Schema 已并入折叠基线，守卫改断言「目录仅存单一折叠迁移且自洽」。
 
-        钉死绝对版本号会让本守卫在每次正常迁移后变成必须跟着改的谎。本用例原名
-        `test_v25_migration_head_0049_documented`，在 FEISHU-010 加迁移 0050 时改写。
+        本用例原名 `test_v25_migration_head_0049_documented`，FEISHU-010 加 0050 时
+        改写为「≥ 0049 且自洽」，折叠时再次改写。
         """
         from pathlib import Path
+
+        from tests.support.schema_pins import MIGRATION_HEAD
 
         migrations = sorted(
             p.name for p in Path("migrations/versions").glob("*.py")
         )
         numeric = [int(name[:4]) for name in migrations if name[:4].isdigit()]
-        assert numeric
-        assert max(numeric) >= 49
-        assert migrations[-1].startswith(f"{max(numeric):04d}_")
+        assert numeric == [int(MIGRATION_HEAD)]
+        assert migrations == [f"{MIGRATION_HEAD}_squashed_full_schema.py"]
 
     def test_debug_surface_always_served(self):
         action = manager.create(

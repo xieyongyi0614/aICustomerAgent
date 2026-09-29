@@ -142,59 +142,6 @@ def test_memories_type_constraint_widened(postgres_url):
         assert value in definition, f"约束缺少 v2 类型 {value}"
 
 
-def test_upgrade_downgrade_upgrade_round_trip(postgres_url):
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", postgres_url)
-
-    command.downgrade(alembic_cfg, "0021")
-    engine = create_engine(postgres_url)
-    inspector = inspect(engine)
-    assert not (NEW_TABLES & set(inspector.get_table_names()))
-    memory_columns = {c["name"] for c in inspector.get_columns("memories")}
-    assert not (NEW_COLUMNS & memory_columns)
-
-    command.upgrade(alembic_cfg, "head")
-    inspector = inspect(engine)
-    assert NEW_TABLES <= set(inspector.get_table_names())
-    memory_columns = {c["name"] for c in inspector.get_columns("memories")}
-    assert NEW_COLUMNS <= memory_columns
-    engine.dispose()
-
-
-def test_v1_data_preserved_across_round_trip(postgres_url):
-    engine = create_engine(postgres_url)
-    now = "2026-01-01 00:00:00"
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO memories (id, user_id, content, type, importance,"
-                " character_id, confidence, source, status, created_at, updated_at)"
-                " VALUES ('mem-rt', 'u-rt', '往返数据', 'user_fact', 0.5, '*',"
-                " 0.9, 'ai_inferred', 'active', :now, :now)"
-            ),
-            {"now": now},
-        )
-
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", postgres_url)
-    command.downgrade(alembic_cfg, "0021")
-    command.upgrade(alembic_cfg, "head")
-
-    with engine.connect() as connection:
-        row = connection.execute(
-            text(
-                "SELECT id, user_id, content, type, importance, confidence, source,"
-                " status FROM memories WHERE id = 'mem-rt'"
-            )
-        ).fetchone()
-    assert row == (
-        "mem-rt", "u-rt", "往返数据", "user_fact", 0.5, 0.9, "ai_inferred", "active",
-    )
-    with engine.begin() as connection:
-        connection.execute(text("DELETE FROM memories WHERE id = 'mem-rt'"))
-    engine.dispose()
-
-
 def test_upgrade_is_idempotent_when_already_at_head(postgres_url):
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", postgres_url)
@@ -203,7 +150,7 @@ def test_upgrade_is_idempotent_when_already_at_head(postgres_url):
     assert NEW_TABLES <= set(_inspector(postgres_url).get_table_names())
 
 
-def test_sqlite_round_trip(tmp_path):
+def test_sqlite_upgrade_reaches_head_with_memory_v2_objects(tmp_path):
     url = f"sqlite:///{(tmp_path / 'v2_foundation.db').as_posix()}"
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", url)
@@ -214,20 +161,6 @@ def test_sqlite_round_trip(tmp_path):
     assert NEW_TABLES <= set(inspector.get_table_names())
     memory_columns = {c["name"] for c in inspector.get_columns("memories")}
     assert NEW_COLUMNS <= memory_columns
-    engine.dispose()
-
-    command.downgrade(alembic_cfg, "0021")
-    engine = create_engine(url)
-    inspector = inspect(engine)
-    assert not (NEW_TABLES & set(inspector.get_table_names()))
-    memory_columns = {c["name"] for c in inspector.get_columns("memories")}
-    assert not (NEW_COLUMNS & memory_columns)
-    engine.dispose()
-
-    command.upgrade(alembic_cfg, "head")
-    engine = create_engine(url)
-    inspector = inspect(engine)
-    assert NEW_TABLES <= set(inspector.get_table_names())
     engine.dispose()
 
 

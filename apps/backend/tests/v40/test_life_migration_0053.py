@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import re
 from pathlib import Path
 
@@ -10,15 +9,12 @@ from alembic.script import ScriptDirectory
 from app.core.db import Base, UserRow
 from tests.support.schema_pins import (
     MIGRATION_HEAD,
-    SCHEMA_PREVIOUS_HEAD,
     SCHEMA_TABLE_COUNT,
     schema_columns_digest,
     schema_pin,
 )
 
 BACKEND = Path(__file__).resolve().parents[2]
-VERSIONS = BACKEND / "migrations" / "versions"
-MIGRATION_PATH = VERSIONS / "0053_life_user_identity.py"
 
 
 def test_orm_has_users_columns():
@@ -35,10 +31,15 @@ def test_orm_has_users_columns():
 
 
 def test_default_index_removed_from_orm():
-    """默认用户概念退役（0058）：ORM 不再声明 is_default 及其唯一索引。"""
+    """默认用户概念退役（原 0058，已折叠）：ORM 不再声明 is_default 及其唯一索引。"""
     indexes = {index.name for index in UserRow.__table__.indexes}
     assert "ux_users_is_default" not in indexes
     assert "is_default" not in UserRow.__table__.columns
+
+
+def test_email_partial_unique_index_declared():
+    indexes = {index.name for index in UserRow.__table__.indexes}
+    assert "ux_users_email" in indexes
 
 
 def test_migration_chain_head_matches_pin():
@@ -47,17 +48,7 @@ def test_migration_chain_head_matches_pin():
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == SCHEMA_PREVIOUS_HEAD
-
-
-def test_migration_has_upgrade_and_downgrade():
-    source = MIGRATION_PATH.read_text(encoding="utf-8")
-    assert "def upgrade()" in source
-    assert "def downgrade()" in source
-    assert "op.create_table" in source and '"users"' in source
-    assert "op.drop_table" in source
-    assert "ux_users_is_default" in source
-    assert "sqlite_where" in source and "postgresql_where" in source
+    assert revision.down_revision is None
 
 
 def test_schema_table_count_is_pinned():

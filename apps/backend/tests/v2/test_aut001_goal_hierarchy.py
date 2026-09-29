@@ -389,24 +389,11 @@ def _seed_round_trip_rows(url):
     engine.dispose()
 
 
-def test_round_trip_structure_and_data(sqlite_round_trip):
-    cfg, url = sqlite_round_trip
+def test_head_structure_and_seed_data(sqlite_round_trip):
+    """原 0030/0031 往返用例随迁移链折叠退役；保留 head 态结构与数据写入断言。"""
+    _cfg, url = sqlite_round_trip
     _seed_round_trip_rows(url)
 
-    command.downgrade(cfg, "0030")
-    engine = create_engine(url)
-    inspector = inspect(engine)
-    assert "goal_plans" not in inspector.get_table_names()
-    goal_columns = {c["name"] for c in inspector.get_columns("character_goals")}
-    assert not ({"parent_goal_id", "layer", "domain", "failure_reason"} & goal_columns)
-    with engine.connect() as conn:
-        row = conn.execute(
-            text("SELECT description, status FROM character_goals WHERE id = 'goal-v1'")
-        ).fetchone()
-    assert row == ("v1旧目标", "active")
-    engine.dispose()
-
-    command.upgrade(cfg, "head")
     engine = create_engine(url)
     inspector = inspect(engine)
     assert "goal_plans" in inspector.get_table_names()
@@ -423,5 +410,5 @@ def test_round_trip_structure_and_data(sqlite_round_trip):
         ).fetchone()
         plan_count = conn.execute(text("SELECT COUNT(*) FROM goal_plans")).scalar()
     assert v1 == (None, None, None)
-    assert plan_count == 0
+    assert plan_count == 1
     engine.dispose()

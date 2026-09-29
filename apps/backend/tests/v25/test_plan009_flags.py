@@ -135,7 +135,11 @@ class TestZeroMigration:
         ) == MEMORIES_COLUMNS
 
     def test_memories_check_constraints_are_unexpanded(self):
-        """`memories` 的 CHECK 约束名集合逐字冻结（值集未扩 = 零新 COLUMN/CHECK 迁移）。"""
+        """`memories` 的 CHECK 约束名集合逐字冻结（值集未扩 = 零新 COLUMN/CHECK 迁移）。
+
+        2026-09-29 迁移链折叠为单迁移后，历史名 `ck_memories_memory_type` 随旧链退役，
+        冻结集合只余现役名 `ck_memories_type`。
+        """
         versions = Path(goal_repository.__file__).parents[2] / "migrations" / "versions"
         constraints = sorted(
             {
@@ -144,7 +148,7 @@ class TestZeroMigration:
                 for name in re.findall(r"ck_memories\w*", path.read_text(encoding="utf-8"))
             }
         )
-        assert constraints == ["ck_memories_memory_type", "ck_memories_type"]
+        assert constraints == ["ck_memories_type"]
 
     def test_memory_type_and_source_value_sets_are_unexpanded(self):
         from typing import get_args

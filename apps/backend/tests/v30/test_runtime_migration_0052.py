@@ -1,4 +1,8 @@
-"""RT-002 迁移 0052 / Schema 挂接列与仓储过滤测试。"""
+"""RT-002 迁移一致性：Runtime 会话追踪列挂接与仓储过滤测试。
+
+2026-09-29 迁移链折叠为单迁移 0001，本文件仅保留 ORM 最终态与仓储行为断言；
+迁移链头一致性由 `tests/support/schema_pins.py` 统一钉测。
+"""
 
 from __future__ import annotations
 
@@ -12,9 +16,6 @@ from app.core.db import LoopRunRow, RuntimeTraceRow
 from app.repositories import loop_run_repository
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-MIGRATION_PATH = (
-    BACKEND_ROOT / "migrations" / "versions" / "0052_runtime_session_trace_links.py"
-)
 
 
 def test_orm_has_session_id_and_correlation_id_columns():
@@ -36,27 +37,12 @@ def test_indexes_declared():
 
 
 def test_migration_chain_head_matches_pin():
-    from tests.support.schema_pins import MIGRATION_HEAD, SCHEMA_PREVIOUS_HEAD
+    from tests.support.schema_pins import MIGRATION_HEAD
 
     config = Config(str(BACKEND_ROOT / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
 
     assert script.get_heads() == [MIGRATION_HEAD]
-    revision = script.get_revision("0052")
-    assert revision is not None
-    assert revision.down_revision == "0051"
-    assert script.get_revision(SCHEMA_PREVIOUS_HEAD) is not None
-
-
-def test_migration_has_upgrade_and_downgrade_for_both_columns():
-    source = MIGRATION_PATH.read_text(encoding="utf-8")
-
-    assert "def upgrade()" in source
-    assert "def downgrade()" in source
-    assert source.count("add_column") == 2
-    assert source.count("drop_column") == 2
-    assert '"session_id"' in source
-    assert '"correlation_id"' in source
 
 
 def test_list_recent_filters_by_session_id(db_session_factory, override_settings):

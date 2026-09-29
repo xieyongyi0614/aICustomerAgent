@@ -448,7 +448,7 @@ class TestContextVarLifecycle:
 
 @pytest.mark.xdist_group("migration")
 class TestMigrationChain:
-    """0038~0043 单链可升级 + 可回滚 + 可再升级。"""
+    """迁移链已折叠为单迁移 0001：可升级 + 可回退 + 可再升级。"""
 
     def test_v21_chain_round_trip(self, tmp_path):
         from alembic import command
@@ -459,5 +459,5 @@ class TestMigrationChain:
         cfg.set_main_option("sqlalchemy.url", url)
 
         command.upgrade(cfg, "head")
-        command.downgrade(cfg, "0037")
+        command.downgrade(cfg, "base")
         command.upgrade(cfg, "head")
