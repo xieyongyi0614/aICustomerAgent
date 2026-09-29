@@ -158,8 +158,9 @@ def type_label_for(normalized_type: str | None) -> str:
 def row_facts(memory_ids: list[str]) -> dict[str, dict]:
     """按 id 补读原始行事实：`merge_chain` / `source_ref` / `forgotten_at` / `user_id` / `status`。
 
-    `UserMemory` 未映射 `merge_chain` / `source_ref` / `forgotten_at`，且其 `status` 值域
-    不含 `decayed` / `forgotten`（读这两态会触发校验错误）——守卫与派生都走本函数读原始列。
+    `UserMemory` 未映射 `merge_chain` / `source_ref` / `forgotten_at` —— 守卫与派生都走本函数
+    读原始列。`status` 值域已于 2026-09-29 补全 `decayed` / `forgotten`（原缺致读这两态抛
+    `ValidationError`），但仍统一以原始列为准，避免两处口径分叉。
     """
     if not memory_ids:
         return {}
@@ -320,7 +321,7 @@ def list_product_memories(user_id: str, limit: int = 200) -> ProductMemoryList:
 
 
 def _guard(memory_id: str, user_id: str, allowed: tuple[str, ...]) -> dict:
-    """归属与状态守卫（读原始列，避免 `UserMemory` 的 status 值域限制）。"""
+    """归属与状态守卫（读原始列，避免 `UserMemory` 投影丢列）。"""
     facts = row_facts([memory_id]).get(memory_id)
     if facts is None:
         raise MemoryNotFoundError(memory_id)

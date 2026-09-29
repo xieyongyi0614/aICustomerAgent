@@ -56,7 +56,7 @@ class _StubLLM:
         self.reject_contents: set[str] = set()
 
     async def __call__(self, content, proposed_type, related_contents, llm=None):
-        from app.models.memory2 import EvaluationVerdict
+        from app.models.memory import EvaluationVerdict
 
         self.calls += 1
         if content in self.reject_contents:

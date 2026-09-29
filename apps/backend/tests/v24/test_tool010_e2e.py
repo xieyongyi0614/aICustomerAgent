@@ -89,7 +89,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
     "app/application/chat_pipeline.py": "4aec8e65c5d6271e4a4c302c9b7030969ebbbbb0e4c2836498039026a2916259",  # 再冻结：grounding 门控去掉 enabled 判断
-    "app/application/post_process.py": "c1702717bd2892e81a4a7dd8379cdda11eb57ef6d32006f4f92c36b457885059",  # 再冻结：world_enabled 删除后 CAS 闸随之移除（内容回到该摘要对应状态）
+    # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
+    # 写路径已全量走 memory2 ingest/evaluate）—— 非 TOOL-010 改脏。
+    "app/application/post_process.py": "2040a4dfac66e2e98ba6878a2a40c63bc5ed245089c0f36e61a36f361178cb92",  # 前值 c1702717（world_enabled 删除后 CAS 闸随之移除）
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }

@@ -13,7 +13,7 @@ from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core import redis_client
 from app.core.settings import get_settings
-from app.services import memory_service, proactive_delivery
+from app.services import proactive_delivery
 from app.services.tool import channel_tools
 from app.services.tool.ext_api import get_manifest_loader
 from app.application.life_loop import run_life_loop_worker
@@ -32,7 +32,6 @@ from app.services.relationship_narrative import register_narrative_listener
 
 logging.basicConfig(level=logging.INFO)
 
-_reclaim_task: asyncio.Task | None = None
 _observability_cleanup_task: asyncio.Task | None = None
 _job_worker_task: asyncio.Task | None = None
 _life_loop_task: asyncio.Task | None = None
@@ -41,7 +40,7 @@ _agent_evolution_task: asyncio.Task | None = None
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    global _reclaim_task, _observability_cleanup_task
+    global _observability_cleanup_task
     global _job_worker_task
     global _life_loop_task, _agent_evolution_task
     if redis_client.is_configured():
@@ -51,7 +50,6 @@ async def lifespan(application: FastAPI):
             logging.getLogger(__name__).warning(
                 "Redis 连接失败，邮箱验证码登录将不可用"
             )
-    _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
     observability.set_main_loop(asyncio.get_running_loop())
     _job_worker_task = asyncio.create_task(run_job_worker_loop())
     register_goal_runtime()
@@ -115,7 +113,6 @@ async def lifespan(application: FastAPI):
     )
     yield
     for task in (
-        _reclaim_task,
         _observability_cleanup_task,
         _job_worker_task,
         _life_loop_task,
@@ -127,7 +124,6 @@ async def lifespan(application: FastAPI):
                 await task
             except asyncio.CancelledError:
                 pass
-    _reclaim_task = None
     _observability_cleanup_task = None
     _job_worker_task = None
     _life_loop_task = None

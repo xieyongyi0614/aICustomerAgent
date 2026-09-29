@@ -21,7 +21,13 @@ MemoryAction = Literal["save", "update", "invalidate", "forget", "suppress", "no
 
 MemoryRelation = Literal["refine", "replace", "negate"]
 
-MemoryStatus = Literal["active", "superseded", "invalidated"]
+MemoryStatus = Literal[
+    "active",
+    "superseded",
+    "invalidated",
+    "decayed",
+    "forgotten",
+]
 
 TARGETED_ACTIONS = ("update", "invalidate")
 
@@ -68,3 +74,11 @@ class MemoryCandidate(BaseModel):
 
 class MemoryExtraction(BaseModel):
     candidates: list[MemoryCandidate] = Field(default_factory=list)
+
+
+class EvaluationVerdict(BaseModel):
+    """评估器 LLM 兜底输出；type 仅为建议，终值由代码映射规则决定。"""
+
+    approve: bool
+    type: str | None = None
+    reason: str = ""

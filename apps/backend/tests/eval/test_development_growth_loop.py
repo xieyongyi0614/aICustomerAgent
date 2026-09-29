@@ -79,7 +79,7 @@ class _EvaluatorStubLLM:
     """候选评估兜底 stub：灰区恒准（approve）。"""
 
     async def __call__(self, content, proposed_type, related_contents, llm=None):
-        from app.models.memory2 import EvaluationVerdict
+        from app.models.memory import EvaluationVerdict
 
         return EvaluationVerdict(approve=True, type=None, reason="离线确定性兜底")
 

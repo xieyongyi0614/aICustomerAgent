@@ -192,7 +192,7 @@ class TestCandidateAttribution:
         monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
 
         async def _reject(*args, **kwargs):
-            from app.models.memory2 import EvaluationVerdict
+            from app.models.memory import EvaluationVerdict
 
             return EvaluationVerdict(approve=False, reason="无长期价值")
 

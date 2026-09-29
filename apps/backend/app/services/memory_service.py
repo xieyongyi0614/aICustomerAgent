@@ -18,17 +18,12 @@ from app.services.memory_conflict import (
     resolve_batch,
 )
 from app.services.memory_policy import apply_policy
+# 权威定义已迁至 memory2/types.py（消除 v2 → v1 反向依赖），此处重导出保持既有引用可用。
+from app.services.memory2.types import TYPE_AFFINITY_KEYWORDS
 from app.application.worker_loop import run_worker_loop
 from app.services import trigger_evaluator
 
 logger = logging.getLogger(__name__)
-
-TYPE_AFFINITY_KEYWORDS = {
-    "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢", "讨厌"),
-    "user_fact": ("在哪", "工作", "住", "养", "做什么", "是谁"),
-    "important_event": ("面试", "经历", "发生过", "事件", "考试"),
-    "relationship_event": ("我们", "一起", "送过", "看过", "去过"),
-}
 
 
 def _tokenize(text: str) -> set[str]:

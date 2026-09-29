@@ -18,7 +18,6 @@ from app.services import (
     conversation_service,
     evaluation_engine,
     goal_service,
-    memory_service,
     scene_service,
     state_service,
     summary_service,

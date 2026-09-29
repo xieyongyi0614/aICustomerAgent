@@ -20,13 +20,12 @@ from app.chains.structured import build_structured_chain
 from app.core.db import Memory, MemoryCandidateRow, SessionLocal
 from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
-from app.models.memory2 import EvaluationVerdict
+from app.models.memory import EvaluationVerdict
 from app.prompts.memory2_evaluator import build_memory_evaluation_messages
 from app.services.memory2 import embeddings as memory_embeddings
 from app.services.memory2 import lifecycle as memory_lifecycle
 from app.services.memory2 import types as memory2_types
 from app.services.memory_conflict import _lcs_length, same_topic
-from app.services.memory_service import TYPE_AFFINITY_KEYWORDS
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +141,7 @@ def _novelty(content: str, active_contents: list[str]) -> float:
 def _type_affinity(content: str, proposed_type: str) -> float:
     hit_types = {
         memory_type
-        for memory_type, keywords in TYPE_AFFINITY_KEYWORDS.items()
+        for memory_type, keywords in memory2_types.TYPE_AFFINITY_KEYWORDS.items()
         if any(keyword in content for keyword in keywords)
     }
     if not hit_types:

@@ -16,7 +16,6 @@ from app.services import (
     relationship_patterns,
 )
 from app.services import goal_service
-from app.services import memory_service
 from app.services import state_service
 from app.services import summary_service
 from app.services.memory2 import retriever as memory2_retriever

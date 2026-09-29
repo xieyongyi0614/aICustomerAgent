@@ -37,7 +37,11 @@ OBJECT_PARAMS = {"object": "牛奶"}
 FROZEN_SOURCES: dict[str, str] = {
     "app/services/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
-    "app/models/memory.py": "4371cd849a76f8de2fcf7fcff9a1b1a4f66163329b56b59367d2a8d993591fa1",
+    # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
+    # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
+    # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory2.py`
+    # 归位到本文件 —— 非 TOOL-008 改脏。
+    "app/models/memory.py": "3d9419eb68a23f856ced8fb0db9c88088a3124735c8164b8e07788bf3d38de47",
     "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
 }
