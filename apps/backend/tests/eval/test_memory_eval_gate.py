@@ -170,7 +170,7 @@ class ScenarioRunner:
 
     def _do_seed(self, step) -> list[str]:
         failures: list[str] = []
-        row = self._create_candidate(step)
+        row = self.create_candidate(step)
         before = self.stub.calls
         decision = asyncio.run(evaluator.evaluate_candidate(row, self._active_contents()))
         expect = self._expect(step)
@@ -407,10 +407,10 @@ class ScenarioRunner:
         )
         return failures
 
-    def _create_candidate(self, step):
+    def create_candidate(self, step):
         scenario_ref = step.get("source_id") or f"{step['ref']}"
         visibility = step.get("visibility", "private")
-        return ingest._create_candidate(
+        return ingest.create_candidate(
             user_id="u1",
             character_id="asuna",
             source_table="conversation",

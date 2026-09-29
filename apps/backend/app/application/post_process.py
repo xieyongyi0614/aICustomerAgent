@@ -702,6 +702,33 @@ async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
         logger.exception("账本确认挂接失败，忽略本轮")
 
 
+async def run_memory_evaluate(ctx: PostProcessContext) -> None:
+    """收尾评估步（memory 域通道收敛第 3 批）：本轮世界/行动步骤投递的候选当轮转正。
+
+    v2 评估原本只在第 5 步执行，而世界事件完结（第 10 步）与工具记忆投递
+    （第 12 步内 `integrate_result`）产出的候选要等下一轮第 5 步才被评估——
+    记忆可见性会比旁路直写时期晚一轮。本步补一次 `evaluate_pending`：
+    无待评估候选时为一次空查询，有则同轮转正（REF 接线复用 `_run_memory_evaluate_v2`，
+    缓冲区二刷为空操作）。
+    """
+    started = time.perf_counter()
+    try:
+        await _run_memory_evaluate_v2(ctx)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "memory_evaluate_tail", (time.perf_counter() - started) * 1000
+            )
+    except Exception:
+        logger.exception("记忆收尾评估失败，不影响本轮回答")
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "memory_evaluate_tail",
+                (time.perf_counter() - started) * 1000,
+                "error",
+                error="memory evaluate tail failed",
+            )
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
@@ -715,6 +742,7 @@ STEP_HANDLERS = (
     run_world_update,
     run_character_action_sync,
     run_action_planning,
+    run_memory_evaluate,
 )
 
 

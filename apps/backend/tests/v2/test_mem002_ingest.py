@@ -109,7 +109,7 @@ class TestVocabPrefilter:
 
 class TestCreateCandidate:
     def test_assembles_fields(self, ingest_db):
-        row = ingest._create_candidate(
+        row = ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="记住用户生日在五月", proposed_type="user_fact",
@@ -120,13 +120,13 @@ class TestCreateCandidate:
         assert row.source_ref == {"table": "action_records", "id": "a1"}
 
     def test_idempotent_same_source_returns_existing(self, ingest_db):
-        ingest._create_candidate(
+        ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="内容A", proposed_type="user_fact",
             source_kind="user_derived", salience_init=0.6,
         )
-        second = ingest._create_candidate(
+        second = ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="内容B", proposed_type="user_fact",

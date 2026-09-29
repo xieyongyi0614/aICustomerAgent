@@ -164,12 +164,35 @@ def memory_count(user_id: str = USER) -> int:
     return len(memory_contents(user_id))
 
 
+def candidate_rows(user_id: str = USER) -> list:
+    """v2 候选行（通道收敛第 3 批：投递断言的目标从 memories 前移到 candidates）。"""
+    from app.core.db import MemoryCandidateRow
+
+    with memory_repository.SessionLocal() as session:
+        return (
+            session.query(MemoryCandidateRow)
+            .filter(MemoryCandidateRow.user_id == user_id)
+            .all()
+        )
+
+
+def candidate_contents(user_id: str = USER) -> list[str]:
+    return [row.content for row in candidate_rows(user_id)]
+
+
+def candidate_count(user_id: str = USER) -> int:
+    return len(candidate_contents(user_id))
+
+
 __all__ = [
     "CHARACTER",
     "OTHER_USER",
     "USER",
     "memory_contents",
     "memory_count",
+    "candidate_rows",
+    "candidate_contents",
+    "candidate_count",
     "record",
     "tool_definition",
     "tool_step",

@@ -729,21 +729,21 @@ def test_s6_read_only_tool_deposits_nothing(
 def test_s6_important_result_deposits_candidate(
     db_session_factory, override_settings, monkeypatch
 ):
-    """重要结果沉淀：`builtin.reminder.cancel` 成功 → memories 落 1 行。"""
+    """重要结果沉淀：`builtin.reminder.cancel` 成功 → v2 候选投 1 行（通道收敛第 3 批）。"""
     override_settings(ACTION_MEMORY_POLICY_ENABLED="true", memory_importance_threshold=0.5)
     support.apply_flag_env(
         monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
     from app.services.action import memory_bridge
-    from tests.v24.tool008_support import memory_contents, memory_count
+    from tests.v24.tool008_support import candidate_contents, candidate_count
 
     delivered = memory_bridge.deliver(
         _deliver_record("builtin.reminder.cancel", {"target": "开会"}), USER
     )
 
     assert delivered is not None
-    assert memory_count(USER) == 1
-    assert memory_contents(USER)[0] == "用户不想再被提醒：开会"
+    assert candidate_count(USER) == 1
+    assert candidate_contents(USER)[0] == "用户不想再被提醒：开会"
 
 
 def test_s6_untrusted_source_rejected_by_policy(

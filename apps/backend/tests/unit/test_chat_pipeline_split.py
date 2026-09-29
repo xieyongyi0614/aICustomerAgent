@@ -34,6 +34,7 @@ def test_post_process_registry_contains_v5_v6_v65_steps():
         "run_world_update",
         "run_character_action_sync",
         "run_action_planning",
+        "run_memory_evaluate",
     ]
 
 

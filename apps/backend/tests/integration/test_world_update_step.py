@@ -48,4 +48,7 @@ async def test_run_world_update_swallows_engine_crash(db_session_factory, monkey
 def test_step_registry_includes_world_update():
     names = [h.__name__ for h in post_process.STEP_HANDLERS]
     assert "run_world_update" in names
-    assert names[-1] == "run_action_planning"
+    # 通道收敛声明（2026-09-30，台账 §5.2）：末位新增收尾评估步 run_memory_evaluate，
+    # 行动规划不再是末步（非本文件主题改动）。
+    assert names[-1] == "run_memory_evaluate"
+    assert names[-2] == "run_action_planning"

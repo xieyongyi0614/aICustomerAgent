@@ -4,6 +4,7 @@ JSON 场景 = 初始世界 + 消息/时间步进序列 + 期望（实体/事件/
 全确定性：story 时间冻结、无真实 LLM、每场景独立用户世界。
 """
 
+import asyncio
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -12,6 +13,7 @@ import pytest
 
 from app.application import world_engine
 from app.repositories import memory_repository, world_repository
+from app.services.memory import evaluator as memory_evaluator
 
 SCENARIOS_PATH = Path(__file__).resolve().parent / "scenarios" / "world_scenarios.json"
 
@@ -25,6 +27,9 @@ def _run_step(db_session_factory, user_id, step):
         world_engine.advance_time(user_id, timedelta(days=step["advance_days"]))
     if "message" in step:
         world_engine.run_turn_update(user_id, step["message"])
+        # 通道收敛第 3 批（台账 §5.2）：生产 post_process 以 run_memory_evaluate 收尾，
+        # 事件记忆经候选评估转正后可见——runner 与生产链路保持同构。
+        asyncio.run(memory_evaluator.evaluate_pending(user_id))
 
 
 def _expect_object(user_id, spec):

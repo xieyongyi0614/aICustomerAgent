@@ -91,7 +91,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/application/chat_pipeline.py": "4aec8e65c5d6271e4a4c302c9b7030969ebbbbb0e4c2836498039026a2916259",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "30125e6e946fe69432938dcbc91817221bb774f752ffcb34208d387be967f8ec",  # 前值 2040a4df（memory2 → memory 去版本后缀改名，import 路径变更；再前值 c1702717）
+    # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
+    # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
+    "app/application/post_process.py": "378bdd6a1222a1cf470d0f4d596e261f26dc761484fc79a0be6aebde57575098",  # 前值 30125e6e（memory 域清理：memory_service 死导入移除；再前值 2040a4df、c1702717）
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }

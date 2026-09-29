@@ -274,8 +274,10 @@ def test_post_process_step_sequence_shape_is_frozen():
         "run_world_update",
         "run_character_action_sync",
         "run_action_planning",
+        # 通道收敛声明（2026-09-30，台账 §5.2）：新增收尾评估步（非 tool 域改脏）。
+        "run_memory_evaluate",
     ]
-    assert len(names) == 12
+    assert len(names) == 13
 
 
 def _post_process_ctx(trace, *, action_intent=None):

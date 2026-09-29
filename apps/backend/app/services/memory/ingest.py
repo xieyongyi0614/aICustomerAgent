@@ -64,7 +64,7 @@ def classify_conversation_visibility(
     return VISIBILITY_PRIVATE, None
 
 
-def _create_candidate(
+def create_candidate(
     user_id: str,
     character_id: str,
     source_table: str,
@@ -77,6 +77,7 @@ def _create_candidate(
     source_ref_extra: dict | None = None,
     created_at: datetime | None = None,
 ) -> MemoryCandidateRow:
+    """幂等投递唯一入口：跨域旁路（世界/行动/账本）统一经此投 v2 候选，禁止直写 memories。"""
     created_at = created_at or datetime.now()
     source_ref: dict = {"table": source_table, "id": source_id}
     if source_ref_extra:
@@ -135,7 +136,7 @@ def ingest_from_conversation(
             blocked += 1
             continue
         source_id = f"{source_id_base}:{index}"
-        row = _create_candidate(
+        row = create_candidate(
             user_id=user_id,
             character_id=character_id,
             source_table=SOURCE_CONVERSATION,
@@ -180,7 +181,7 @@ def ingest_from_action_record(
     candidate = candidates[0]
     if not candidate.content:
         return None
-    row = _create_candidate(
+    row = create_candidate(
         user_id=record.user_id,
         character_id=character_id,
         source_table=SOURCE_ACTION,
@@ -227,7 +228,7 @@ def ingest_from_world_event(event, user_id: str, trace=None) -> MemoryCandidateR
     if _enum_value(event.status) != "completed":
         return None
     importance = _enum_value(event.importance)
-    row = _create_candidate(
+    row = create_candidate(
         user_id=user_id,
         character_id="asuna",
         source_table=SOURCE_WORLD,
@@ -262,7 +263,7 @@ def ingest_from_relationship_event(event, trace=None) -> MemoryCandidateRow | No
     event_type = str(_enum_value(event.type))
     cause = event.cause if (event.cause and event.cause.strip()) else ""
     content = cause if cause else f"与用户的一次{event_type}互动"
-    row = _create_candidate(
+    row = create_candidate(
         user_id=event.user_id,
         character_id="asuna",
         source_table=SOURCE_RELATIONSHIP,
@@ -308,7 +309,7 @@ def ingest_from_relationship_milestone(
     insight_id = meta.get("insight_id")
     if insight_id:
         source_ref_extra["insight_id"] = insight_id
-    row = _create_candidate(
+    row = create_candidate(
         user_id=milestone.user_id,
         character_id="asuna",
         source_table=SOURCE_RELATIONSHIP_MILESTONE,
@@ -333,7 +334,7 @@ def ingest_from_relationship_milestone(
 
 def ingest_from_goal_completion(user_id: str, goal_id: str, description: str) -> MemoryCandidateRow | None:
     """AUT-003 goal 完成语义：experience 候选经 P1 通道（Goal 域不直写 memories）。"""
-    return _create_candidate(
+    return create_candidate(
         user_id=user_id,
         character_id="asuna",
         source_table=SOURCE_GOAL,

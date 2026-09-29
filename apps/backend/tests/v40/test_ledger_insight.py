@@ -128,7 +128,7 @@ def test_ingest_goes_through_memory_entry(monkeypatch):
 
         return Row()
 
-    monkeypatch.setattr(memory_bridge.memory_ingest, "_create_candidate", spy)
+    monkeypatch.setattr(memory_bridge.memory_ingest, "create_candidate", spy)
     memory_bridge.filter_and_ingest(
         user_id=USER,
         insight_id="i4",
@@ -221,7 +221,7 @@ def test_hooked_into_existing_reflection_path():
     assert "ledger_insight" not in source
     assert "run_ledger_insight" not in source
     bridge = (BACKEND / "app/services/ledger/memory_bridge.py").read_text(encoding="utf-8")
-    assert "memory_ingest._create_candidate" in bridge
+    assert "memory_ingest.create_candidate" in bridge
 
 
 def test_audit_records_filtered_insights():

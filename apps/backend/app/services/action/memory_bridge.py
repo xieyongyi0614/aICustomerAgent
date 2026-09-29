@@ -1,11 +1,13 @@
 """V9 Action Memory Bridge（memory-policy.md §2~§4，V9-007）。
 
-行动记忆第四供给方：候选经既有 memory_policy R1~R8 校验（零豁免）后由
-memory_repository 落库；source 只用 user_stated / user_derived。
+行动记忆第四供给方：候选经既有 memory_policy R1~R8 校验（零豁免）后统一经
+memory.ingest.create_candidate 投 v2 候选（通道收敛第 3 批，禁止直写 memories），
+由 v2 评估器转正；source 只用 user_stated / user_derived。
 
 V2.4.0 TOOL-008：新增 `deliver` 泛化路径（键从 action_type 升级为 memory_policy_key），
 工具记忆投递走泛化键（工具记忆子闸已随 V2.4.0 转正删除，不再回退 `deliver_action_memory`）。
-两条路径共用同一政策闸与落库入口，幂等标记同为 `effects.kind == "memory"`。
+两条路径共用同一政策闸，幂等标记同为 `effects.kind == "memory"`；候选幂等键为
+`(action_records, record.id)`，与 v2 补扫（`ingest_from_action_record`）收敛为同一行。
 """
 
 import logging
@@ -84,10 +86,11 @@ def _tool_definition(record: ActionRecord) -> ToolDefinition | None:
 
 
 def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> dict | None:
-    """工具结果记忆投递（TOOL-008 §4.2）：门控 + 幂等 + 分类 + R1~R8 + 落库。
+    """工具结果记忆投递（TOOL-008 §4.2）：门控 + 幂等 + 分类 + R1~R8 + 投 v2 候选。
 
     工具记忆子闸已随 V2.4.0 转正删除（不再回退 `deliver_action_memory`）；
     政策总开关 off → 不投递。任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
+    投递不落库：候选经 v2 评估转正后可见（评估由 post_process 第 5 步与收尾步承担）。
     """
     settings = get_settings()
     if not settings.action_memory_policy_enabled:
@@ -119,16 +122,25 @@ def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> 
             )
             return None
         candidate = saved[0]
-        memory = memory_repository.create_memory(
-            user_id,
-            character_id,
+        from app.services.memory import ingest as memory_ingest
+
+        row = memory_ingest.create_candidate(
+            user_id=user_id,
+            character_id=character_id,
+            source_table=memory_ingest.SOURCE_ACTION,
+            source_id=record.id,
             content=candidate.content or "",
-            memory_type=candidate.type,
-            importance=candidate.importance,
-            confidence=candidate.confidence,
-            source=candidate.source,
+            proposed_type=candidate.type,
+            source_kind=candidate.source,
+            salience_init=candidate.importance,
+            source_ref_extra={
+                "action_type": record.action_type,
+                "status": record.status,
+                "importance": candidate.importance,
+                "confidence": candidate.confidence,
+            },
         )
-        return {"memory_id": memory.id, "content": memory.content}
+        return {"candidate_id": row.id, "content": row.content}
     except Exception:
         logger.exception("工具结果记忆投递失败（不回滚工具执行）")
         return None

@@ -1,7 +1,9 @@
 """TOOL-008 §6.2/§6.3：投递路径泛化、政策零豁免、幂等、两通道独立与冻结面。
 
 Flag off 路径与 V9 逐字节一致（动作记忆边界表 `action_type` 键）；
-Flag on 走 `memory_policy_key` 泛化路径，写入仍必经 R1~R8。
+Flag on 走 `memory_policy_key` 泛化路径，候选仍必经 R1~R8。
+通道收敛第 3 批（台账 §5.2）：投递终点为 v2 候选（`action_records` + record.id），
+不再直写 memories；断言目标相应从 memories 前移到 candidates。
 """
 
 import hashlib
@@ -16,13 +18,16 @@ from app.core.db import Base
 from app.models.action import ActionResult
 from app.models.memory import MemoryCandidate, MemoryType
 from app.repositories import memory_repository
+from app.services.memory import ingest as memory_ingest
 from app.services.memory import policy as memory_policy
 from app.services.action import memory_bridge
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.world import memory_bridge as world_memory_bridge
 from tests.v24.tool008_support import (
     USER,
-    memory_contents,
+    candidate_count,
+    candidate_rows,
+    candidate_contents,
     memory_count,
     record,
     tool_definition,
@@ -44,7 +49,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`
     # 归位到本文件 —— 非 TOOL-008 改脏。
     "app/models/memory.py": "3d9419eb68a23f856ced8fb0db9c88088a3124735c8164b8e07788bf3d38de47",
-    "app/services/world/memory_bridge.py": "2d6311400a06fb248d44825fee27f501e3c136c9328e506adc8ce5c9f957647d",
+    # memory 域通道收敛声明（2026-09-30，台账 §5.2）：`materialize_event_memory` 直写分支
+    # 改为经 memory.ingest.create_candidate 投 v2 候选（评估转正），边界表构造不变 —— 非 TOOL-008 改脏。
+    "app/services/world/memory_bridge.py": "952f4bfcb0a4ce652d7cb95ce8bd972c6b6cc45e46232286d561288595e57410",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
@@ -122,33 +129,34 @@ def test_declined_world_mutation_writes_zero_memories(db_session_factory, tool_m
     assert memory_count(USER) == 0
 
 
-def test_important_result_lands_with_template_content(
+def test_important_result_invests_candidate_with_template_content(
     db_session_factory, tool_memory_on, override_settings
 ):
-    """重要结果进候选并经 R1~R8 后落库，内容与模板一致。"""
+    """重要结果进候选并经 R1~R8 后投递，内容与模板一致；记忆由 v2 评估转正。"""
     override_settings(memory_importance_threshold=0.5)
     payload = memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER)
     assert payload is not None
     assert payload["content"] == "用户不想再被提醒：开会"
-    memories = memory_repository.list_by_user(USER, limit=10)
-    assert [memory.content for memory in memories] == ["用户不想再被提醒：开会"]
-    assert memories[0].type == "important_event"
-    assert memories[0].importance == 0.5
-    assert memories[0].source == "user_derived"
-    assert memories[0].character_id == "asuna"
+    rows = candidate_rows(USER)
+    assert [row.content for row in rows] == ["用户不想再被提醒：开会"]
+    assert rows[0].proposed_type == "important_event"
+    assert rows[0].salience == 0.5
+    assert rows[0].source == "user_derived"
+    assert rows[0].character_id == "asuna"
+    assert memory_count(USER) == 0
 
 
-def test_world_object_create_lands_as_user_preference(
+def test_world_object_create_invests_as_user_preference(
     db_session_factory, tool_memory_on, override_settings
 ):
     override_settings(memory_importance_threshold=0.5)
     payload = memory_bridge.deliver(_tool_record("world.object.create", OBJECT_PARAMS), USER)
     assert payload is not None
     assert payload["content"] == "用户请我准备：牛奶"
-    memory = memory_repository.get_memory(payload["memory_id"])
-    assert memory is not None
-    assert memory.type == "user_preference"
-    assert memory.importance == 0.5
+    rows = [row for row in candidate_rows(USER) if row.id == payload["candidate_id"]]
+    assert len(rows) == 1
+    assert rows[0].proposed_type == "user_preference"
+    assert rows[0].salience == 0.5
 
 
 def test_reminder_create_candidate_passes_policy_and_lands(
@@ -169,12 +177,11 @@ def test_reminder_create_candidate_passes_policy_and_lands(
 
     assert payload is not None
     assert payload["content"] == "用户请我提醒：开会"
-    assert memory_count(USER) == 1
-    memories = memory_repository.list_by_user(USER, limit=10)
-    assert [memory.content for memory in memories] == ["用户请我提醒：开会"]
-    assert memories[0].type == "important_event"
-    assert memories[0].importance == 0.7
-    assert memories[0].source == "user_derived"
+    assert candidate_count(USER) == 1
+    rows = candidate_rows(USER)
+    assert rows[0].proposed_type == "important_event"
+    assert rows[0].salience == 0.7
+    assert rows[0].source == "user_derived"
 
 
 def test_candidate_with_unresolved_reference_is_rejected_by_r8(
@@ -187,7 +194,7 @@ def test_candidate_with_unresolved_reference_is_rejected_by_r8(
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
         assert memory_bridge.deliver(rec, USER) is None
     assert "R8" in caplog.text
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_one_off_content_is_rejected_by_r4(db_session_factory, tool_memory_on, caplog):
@@ -197,7 +204,7 @@ def test_one_off_content_is_rejected_by_r4(db_session_factory, tool_memory_on, c
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
         assert memory_bridge.deliver(rec, USER) is None
     assert "R4" in caplog.text
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_unresolved_reference_is_rejected_by_r8(
@@ -208,7 +215,7 @@ def test_unresolved_reference_is_rejected_by_r8(
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
         assert memory_bridge.deliver(rec, USER) is None
     assert "R8" in caplog.text
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 # --- §6.2 政策零豁免、幂等与路由 ----------------------------------------------
@@ -241,7 +248,7 @@ def test_policy_rejection_is_discarded_and_logged(
     with caplog.at_level(logging.INFO, logger=MEMORY_BRIDGE_LOGGER):
         payload = memory_bridge.deliver(rec, USER)
     assert payload is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
     assert rec.status == "succeeded"
     assert "已丢弃" in caplog.text
     assert "R8" in caplog.text
@@ -254,10 +261,10 @@ def test_delivery_is_idempotent_via_memory_effect(db_session_factory, tool_memor
     assert first is not None
     rec.result = {
         "status": "succeeded",
-        "effects": [{"kind": "memory", "ref": first["memory_id"], "detail": "已记住"}],
+        "effects": [{"kind": "memory", "ref": first["candidate_id"], "detail": "已记住"}],
     }
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
 
 
 def test_integrate_result_registers_memory_effect_for_idempotency(
@@ -266,10 +273,10 @@ def test_integrate_result_registers_memory_effect_for_idempotency(
     override_settings(memory_importance_threshold=0.5)
     rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
     action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
     assert [effect["kind"] for effect in rec.result["effects"]] == ["memory"]
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
 
 
 def test_integrate_result_flag_on_uses_generalized_path(
@@ -298,20 +305,25 @@ def test_delivery_failure_does_not_rollback_tool_execution(
     override_settings(memory_importance_threshold=0.5)
 
     def _boom(*args, **kwargs):
-        raise RuntimeError("记忆仓储不可用")
+        raise RuntimeError("候选投递通道不可用")
 
-    monkeypatch.setattr(memory_repository, "create_memory", _boom)
+    monkeypatch.setattr(memory_ingest, "create_candidate", _boom)
     rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
     action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
     assert rec.status == "succeeded"
     assert rec.result["status"] == "succeeded"
+    assert candidate_count(USER) == 0
     assert memory_count(USER) == 0
 
 
 def test_tool_channel_and_world_channel_are_independent(
     db_session_factory, tool_memory_on, override_settings
 ):
-    """两条通道各走各的幂等标记：`memory_materialized` 与 `effects.kind == "memory"`。"""
+    """两条通道各走各的幂等标记：`memory_materialized` 与 `effects.kind == "memory"`。
+
+    通道收敛第 3 批：两通道终点均为 v2 候选，且世界通道与 v2 补扫经
+    `(world_events, event.id)` 候选键收敛为同一行。
+    """
     override_settings(memory_importance_threshold=0.5)
     event = world_engine.create_event(
         USER, "meeting", "项目评审", "high", datetime(2026, 9, 20, 9, 0, 0), "user_mention"
@@ -319,28 +331,28 @@ def test_tool_channel_and_world_channel_are_independent(
     assert event is not None
     assert world_memory_bridge.materialize_event_memory(event, USER) is True
     assert world_memory_bridge.materialize_event_memory(event, USER) is False
-    world_contents = memory_contents(USER)
-    assert len(world_contents) == 1
+    assert candidate_count(USER) == 1
+    world_contents = candidate_contents(USER)
 
     rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
     payload = memory_bridge.deliver(rec, USER)
     assert payload is not None
-    assert memory_count(USER) == 2
-    assert sorted(memory_contents(USER)) == sorted([*world_contents, payload["content"]])
+    assert candidate_count(USER) == 2
+    assert sorted(candidate_contents(USER)) == sorted([*world_contents, payload["content"]])
 
     rec.result = {
         "status": "succeeded",
-        "effects": [{"kind": "memory", "ref": payload["memory_id"], "detail": "已记住"}],
+        "effects": [{"kind": "memory", "ref": payload["candidate_id"], "detail": "已记住"}],
     }
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 2
+    assert candidate_count(USER) == 2
 
     second = world_engine.create_event(
         USER, "trip", "出差", "high", datetime(2026, 9, 25, 9, 0, 0), "user_mention"
     )
     assert second is not None
     assert world_memory_bridge.materialize_event_memory(second, USER) is True
-    assert memory_count(USER) == 3
+    assert candidate_count(USER) == 3
 
 
 # --- §6.3 边界用例 ------------------------------------------------------------
@@ -353,13 +365,13 @@ def test_unknown_tool_id_deposits_nothing(db_session_factory, tool_memory_on):
     assert decision.deposit is False
     assert decision.reason == tool_memory_policy.REASON_NO_POLICY_ROW
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_missing_template_param_deposits_nothing(db_session_factory, tool_memory_on):
     """E2：渲染缺参 → 空串 → 跳过沉淀（不写半成品内容）。"""
     assert memory_bridge.deliver(_tool_record("builtin.reminder.create", {}), USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_failed_with_gate_reason_deposits_nothing(db_session_factory, tool_memory_on):
@@ -374,7 +386,7 @@ def test_failed_with_gate_reason_deposits_nothing(db_session_factory, tool_memor
             "builtin.reminder.cancel", CANCEL_PARAMS, status=status, gate_reason=gate_reason
         )
         assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_timeout_deposits_unfinished_semantics(db_session_factory, tool_memory_on):
@@ -385,17 +397,17 @@ def test_timeout_deposits_unfinished_semantics(db_session_factory, tool_memory_o
     payload = memory_bridge.deliver(rec, USER)
     assert payload is not None
     assert payload["content"] == "上次没能帮用户完成：用户不想再被提醒：开会"
-    memory = memory_repository.get_memory(payload["memory_id"])
-    assert memory is not None
-    assert memory.type == "important_event"
-    assert memory.importance >= 0.6
+    rows = [row for row in candidate_rows(USER) if row.id == payload["candidate_id"]]
+    assert len(rows) == 1
+    assert rows[0].proposed_type == "important_event"
+    assert rows[0].salience >= 0.6
 
 
 def test_memory_save_tool_never_double_delivers(db_session_factory, tool_memory_on):
     """E5：`builtin.memory.save` 直通，投递返回 None（避免二次投递）。"""
     rec = _tool_record("builtin.memory.save", {"fact": "我喜欢抹茶"})
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_retry_delivers_only_at_terminal_state(
@@ -407,21 +419,21 @@ def test_retry_delivers_only_at_terminal_state(
         "builtin.reminder.cancel", CANCEL_PARAMS, status="executing", attempt=2
     )
     action_engine.integrate_result(rec, ActionResult(status="failed", effects=[]))
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
     rec.status = "succeeded"
     action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
 
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
 
 
 def test_untrusted_namespace_tool_deposits_nothing(db_session_factory, tool_memory_on):
     """E10：`ext.api.*` 硬纪律优先（配置不可违背）→ 仍不沉淀。"""
     rec = _tool_record("ext.api.weather.current", {"dimension": "weather"})
     assert memory_bridge.deliver(rec, USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 def test_pending_confirmation_then_confirmed_deposits(
@@ -439,7 +451,7 @@ def test_pending_confirmation_then_confirmed_deposits(
     rec.status = "succeeded"
     rec.gate_reason = None
     assert memory_bridge.deliver(rec, USER) is not None
-    assert memory_count(USER) == 1
+    assert candidate_count(USER) == 1
 
 
 def test_extraction_and_tool_delivery_are_parallel(
@@ -459,6 +471,7 @@ def test_extraction_and_tool_delivery_are_parallel(
 
     payload = memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER)
     assert payload is not None
+    assert candidate_count(USER) == 1
 
     accepted = MemoryCandidate(
         action="save",
@@ -479,7 +492,7 @@ def test_extraction_and_tool_delivery_are_parallel(
         confidence=accepted.confidence,
         source=accepted.source,
     )
-    assert memory_count(USER) == 2
+    assert memory_count(USER) == 1
 
 
 def test_delivery_blocked_when_action_memory_switch_off(
@@ -488,7 +501,7 @@ def test_delivery_blocked_when_action_memory_switch_off(
     """E9：工具记忆子闸 on 但 `action_memory_policy_enabled` off → 不投递。"""
     override_settings(action_memory_policy_enabled=False, memory_importance_threshold=0.5)
     assert memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER) is None
-    assert memory_count(USER) == 0
+    assert candidate_count(USER) == 0
 
 
 # --- 冻结面：零迁移 / 零表改动 / 零 diff --------------------------------------

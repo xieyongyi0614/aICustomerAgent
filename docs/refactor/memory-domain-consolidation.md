@@ -81,7 +81,7 @@ services/world/memory_bridge.py:66
 | `models/memory.py::MemoryCandidate` / `MemoryExtraction` | `chains/extractor_chain` → `post_process` → `memory2/ingest` | v2 摄取的输入契约 |
 | `memory_refs.build_memory_refs` | `chat_pipeline.py:704` | 吃 v2 检索结果、产出 `turn_meta.memory_refs` |
 
-### 2.3 写入侧双通道（真问题，未处理）
+### 2.3 写入侧双通道（真问题，✅ 已收敛——见 §5.2.3）
 
 `memories` 表存在**两个写入入口**，且**同时活跃**：
 
@@ -93,7 +93,7 @@ services/world/memory_bridge.py:66
 
 **两套幂等键互不可见**，而 v2 的摄取源（`world_events` / `action_records`）与旁路读的是**同一批行** → 同一个事件**可能落两条内容不同的记忆**（旁路写「用户在 X 月 X 日完成了 Y」，v2 写 `event.title`）。
 
-> ⚠️ **尚未验证**：需要连库查询确认重复行是否真实存在（见 §六 待人工验证项）。
+> ✅ **已于 2026-09-29 确定性复现验证**（见 §5.2.1）；两条旁路已于 2026-09-30 收敛为投 v2 候选（见 §5.2.3）。
 
 ---
 
@@ -268,13 +268,11 @@ services/world/memory_bridge.py:66
 
 **有利条件**：`memory2/__init__.py` 是 **0 字节空文件**，无重导出 → 目录改名成本低于预期。
 
-### 5.2 第 3 批：收敛写入双通道（高风险）
+### 5.2 第 3 批：收敛写入双通道（高风险）—— **✅ 已执行（2026-09-30），见 §5.2.1 / §5.2.2 / §5.2.3**
 
 将 `world/memory_bridge.materialize_event_memory` 与 `action/memory_bridge.deliver` 的直写分支改为投 v2 候选。
 
-**前置条件**：~~先连库确认重复记忆是否真实存在（§六）~~ → **✅ 已完成（2026-09-29），结论见 §5.2.1**；动 `application/world_engine.py`（`tool007 FROZEN_SOURCES`）与 `application/action_engine.py`（`ZERO_DIFF_HASHES`）需显式声明。
-
-**行为语义变化**：同一事件从「可能落 2 条」变为「落 1 条」，属产品可感知变更。
+**前置条件**：~~先连库确认重复记忆是否真实存在（§六）~~ → **✅ 已完成（2026-09-29）**；~~解决内容降级~~ → **✅ 已完成（2026-09-29，§5.2.2）**。
 
 #### 5.2.1 ✅ 前置验证结论：重复写入**已确认**（确定性复现，2026-09-29）
 
@@ -331,6 +329,47 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 **未触碰任何冻结面**：`services/memory/ingest.py` 不在 `ZERO_DIFF_HASHES` / `FROZEN_SOURCES` 清单内。
 
 **验证**：全量 `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit eval integration` → **17 failed / 6594 passed / 2 skipped**，失败集与修复前**逐条一致**（14 基线 + 3 已知既存）→ 零新增。
+
+#### 5.2.3 ✅ 通道收敛已执行（2026-09-30，第 3 批本体）
+
+**收敛方向**：采§5.2.1 处置建议的第一方向——**旁路直写全部改为投 v2 候选**（第二方向「v2 识别旁路已写并跳过」需跨域互查两套幂等键，属永久胶水，不采）。设计原则：**bridge 保留各自候选构造语义（阈值门 / 类型映射 / 过期文案 / R1~R8），写入机制统一收敛**。
+
+**改动 4 文件**：
+
+| 文件 | 改动 |
+|---|---|
+| `app/services/memory/ingest.py` | `_create_candidate` 转正为公开入口 `create_candidate`（docstring 明示「跨域旁路统一经此投候选，禁止直写 memories」）。非 memory 域既有先例：`ledger/memory_bridge.py` 早已经此通道投候选（PLA-014） |
+| `app/services/world/memory_bridge.py` | `materialize_event_memory` 的 `create_memory` 循环改为 `memory_ingest.create_candidate`（`source_table=world_events`、`source_id=event.id`）；边界表构造（阈值门 / `EVENT_MEMORY_TYPES` / 过期文案）与 `EVENT_SOURCE_MAP` 来源映射、payload 防重旗标**原样保留** |
+| `app/services/action/memory_bridge.py` | `deliver` 的 R1~R8 后直写改为 `create_candidate`（`source_table=action_records`、`source_id=record.id`）；返回值 `{"memory_id", "content"}` → `{"candidate_id", "content"}`；tool 政策构造与 R1~R8 闸原样保留。**延迟导入** `memory.ingest`（消除与 `ingest.py` 顶部 `from action.memory_bridge import to_memory_candidates` 的循环） |
+| `app/application/post_process.py` | 新增**收尾评估步** `run_memory_evaluate`（STEP_HANDLERS 末位，第 13 步）：复用 `_run_memory_evaluate_v2`（含 REF-003/005 接线，缓冲区二刷为空操作）。**为什么必须**：v2 评估只在第 5 步执行，而收敛后候选产自第 10 步（世界完结）与第 12 步内（`integrate_result`）——若无收尾步，这批候选要等下一轮第 5 步才转正，记忆可见性比直写时期晚一轮 |
+
+**调用点零改动**：`world_engine.py` / `action_engine.py` 均未触碰（`tool007 FROZEN_SOURCES` 与 `action_engine` 的 `ZERO_DIFF_HASHES` 摘要保持有效）。`integrate_result` 对新返回值 `memory_payload.get("memory_id", "")` 得空串，效果标记仍以 `effects.kind == "memory"` 登记（`has_memory_effect` 只查 kind），幂等语义不变；候选指针可经 `(action_records, record.id)` 反查，无信息损失。
+
+**收敛后的幂等闭环**：同一事件/行动行 → 两条通道（旁路投递 + v2 补扫）命中**同一候选键** `(source_table, source_id)` → 先到者构造候选、后到者幂等命中 → **至多 1 条候选 → 至多 1 条记忆**。§5.2.1 顺序 A / 顺序 B 均收敛为 1 行（探针已固化进集成测试）。
+
+**语义变化（产品可感知，已裁决接受）**：① 同一事件从「可能 2 条」变「1 条」；② 旁路产出现经评估器记分转正（非无条件落库）——低分候选会被拒/缓，评估成为统一质量闸；③ 世界候选 proposed_type 沿用边界表映射（如 birthday → `user_fact`），不再恒为 `important_event`。
+
+**测试面**：
+
+| 文件 | 处理 |
+|---|---|
+| `tests/integration/test_world_memory_materialization.py` | 重写：完结 → 候选 → `evaluate_pending` → 记忆（顺序 A + 补扫同键收敛断言）；低重要度不沉淀（不变）；**新增顺序 B 探针**（v2 先摄取转正、旁路后到仍 1 行） |
+| `tests/v24/test_tool008_integration.py` | 投递断言目标从 memories 前移到 candidates（`tool008_support` 新增 `candidate_rows` / `candidate_contents` / `candidate_count`）；R4/R8 拒收、幂等、失败不回滚等用例同步；`FROZEN_SOURCES[world/memory_bridge.py]` 摘要更新（前值 `2d631140…`，附声明） |
+| `tests/v24/test_tool012_scenarios.py` | s6 落库断言改候选断言 |
+| 步骤序列守卫 ×4 | `test_tool004_pipeline`（12→13）、`test_tool005_integration`、`tool012_support.POST_PROCESS_STEP_SEQUENCE`（tool012_bans / tool_acceptance 共用）、`unit/test_chat_pipeline_split`：均追加 `run_memory_evaluate`（附声明） |
+| `tests/v2/test_mem002_ingest.py` 等 | `_create_candidate` → `create_candidate` 改名同步（另涉 `tests/eval/test_memory_eval_gate.py`、`tests/v40/test_ledger_insight.py` 含源码字符串守卫、`app/services/ledger/memory_bridge.py` 调用点） |
+| `tests/v24/test_tool010_e2e.py` | `ZERO_DIFF_HASHES[post_process.py]` `30125e6e…` → `378bdd6a…`（新增收尾步，附声明） |
+
+**验证**：全量 `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit eval integration` → **17 failed / 6595 passed / 2 skipped**，失败集与§5.2.2 记录的基线**逐条一致** → 零新增。
+
+**中途发现并修复 / 甄别**：
+
+- `integration/test_world_update_step` 断言 `run_action_planning` 为末步 → 随新收尾步同步（附声明）。
+- `v8/test_scenarios[interview_full_chain]`：场景 runner 只模拟到第 10 步 → runner 补 `evaluate_pending` 与生产链路同构后通过。
+- `e2e/test_debug_correlation`：提示词快照随 trace flush（post_process **结束**后）落库，测试原以「第 9 步评估可见」近似「flush 完成」——第 2 批时 9→12 步间隙极小碰巧赶上，收尾步拉大窗口后必输竞争 → 测试改为等待 answer 快照可查（附声明）。
+- `v2/test_v2_all_flags_smoke`、`e2e/test_chat_http_integration`、`e2e/test_debug_state_history`、`v7.8/test_performance`：全量并发下偶发、隔离复跑通过 → 负载 flaky（前两者与 memory 域无关联；后两者为台账 §4.2 在案的同类）。
+
+**附带残留（待后续批次裁决）**：`action/memory_bridge.deliver_action_memory`（V9 边界表投递路径）自 TOOL-008 起生产零调用，是 action 桥内**最后一个直写 memories 的函数**（`tests/v9` 仍以其为夹具测 R1~R8）；建议后续批次删除并迁移测试夹具到 `deliver` / `ingest_from_action_record`。
 
 ### 5.3 附带发现（待后续批次）
 

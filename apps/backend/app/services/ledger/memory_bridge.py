@@ -44,7 +44,7 @@ def filter_and_ingest(
         assert_no_financial_detail(text)
     except FinancialDetailInPrompt:
         return IngestOutcome(False, None, "financial_detail")
-    row = memory_ingest._create_candidate(
+    row = memory_ingest.create_candidate(
         user_id=user_id,
         character_id="asuna",
         source_table=SOURCE_TABLE,

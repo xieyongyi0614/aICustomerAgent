@@ -74,6 +74,8 @@ POST_PROCESS_STEP_SEQUENCE = (
     "run_world_update",
     "run_character_action_sync",
     "run_action_planning",
+    # 通道收敛声明（2026-09-30，台账 §5.2）：新增收尾评估步（非 tool 域改脏）。
+    "run_memory_evaluate",
 )
 
 LIFE_LOOP_MAINTENANCE_SEQUENCE = (
