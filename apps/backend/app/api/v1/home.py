@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.v1.auth import require_user
+from app.services import history_service
 from app.services.analytics.events import track_event
+from app.services.insights import query as insights_query
 from app.services.ledger import query as ledger_query
 from app.services.tasks import task_service
 
@@ -80,6 +82,50 @@ def _day_end() -> datetime:
     return _day_start() + timedelta(days=1)
 
 
+_MODE_LABELS = {
+    "professional": "Professional 模式",
+    "default": "Default 模式",
+    "immersive": "Immersive 模式",
+}
+
+
+def greeting_for(moment: datetime) -> str:
+    hour = moment.hour
+    if hour < 5:
+        return "夜深了"
+    if hour < 11:
+        return "早上好"
+    if hour < 14:
+        return "中午好"
+    if hour < 18:
+        return "下午好"
+    return "晚上好"
+
+
+def mode_chip_for(user_id: str) -> str:
+    try:
+        conversation = history_service.find_latest_conversation(user_id)
+    except Exception:
+        return ""
+    return _MODE_LABELS.get(getattr(conversation, "mode", None), "")
+
+
+def insight_block_for(user_id: str) -> InsightBlock:
+    """只映射已产出的洞察；无洞察时叙事留空，由客户端出空态，不补默认文案。"""
+    try:
+        items = insights_query.list_insights(user_id, domain="home", limit=1)
+    except Exception:
+        items = []
+    if not items:
+        return InsightBlock(title="今日 AI 总结", narrative="")
+    top = items[0]
+    return InsightBlock(
+        title=top.headline or "今日 AI 总结",
+        narrative=top.narrative,
+        action_label="查看完整早间简报 →",
+    )
+
+
 @home_router.get("/summary", response_model=HomeSummary)
 def home_summary(user_id: str = Depends(require_user)):
     track_event("home_summary")
@@ -118,22 +164,18 @@ def home_summary(user_id: str = Depends(require_user)):
             conclusion="今天还没有记账 —— 亚丝娜",
         )
     return HomeSummary(
-        greeting=GreetingBlock(date_label="今天", greeting="早上好"),
+        greeting=GreetingBlock(date_label="今天", greeting=greeting_for(datetime.now())),
         hero=HeroBlock(
             headline="今天也交给我吧",
             sub="亚丝娜已为你整理好今天的一切",
-            mode_chip="Default 模式 · 长期记忆运行中",
+            mode_chip=mode_chip_for(user_id),
         ),
-        insight=InsightBlock(
-            title="今日 AI 总结",
-            narrative="昨晚睡得不错，上午适合处理需要专注的事。",
-            action_label="查看完整早间简报 →",
-        ),
+        insight=insight_block_for(user_id),
         health=HealthGrid(
             authorized=False,
             empty_hint="连接手环后，这里会显示睡眠、心率和步数",
         ),
         tasks=tasks,
-        tasks_hint=f"{len(tasks)} 项 · AI 已排序",
+        tasks_hint=f"{len(tasks)} 项 · AI 已排序" if tasks else "",
         spend=spend,
     )
