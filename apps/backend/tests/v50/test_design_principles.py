@@ -23,11 +23,17 @@ def test_ai_narrative_first_home():
 
 
 def test_memory_visible_has_usage_receipt_slot():
+    """记忆页必须同时露出「来源」与「用途回执」两个位。
+
+    回执与来源文案自 `API-007` 起由服务端下发（`receipt.label` / `source_label`），端上零拼接；
+    措辞本身由服务端侧 `test_memory_product_view.py` 的 `recall_*` 用例钉住。
+    """
     src = Path("../mobile/lib/features/memory/presentation/memory_page.dart").read_text(
         encoding="utf-8"
     )
-    assert "已用于" in src
-    assert "来源" in src
+    assert "usageReceipts" in src
+    assert "usageNote" in src
+    assert "来源：" in src
 
 
 def test_no_hardcoded_money_in_mobile_non_tokens():

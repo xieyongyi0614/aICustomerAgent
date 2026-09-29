@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -494,3 +494,69 @@ class PlanPendingOut(BaseModel):
     """待推进步骤（`/debug/plans/pending`）：每个被阻塞的活跃计划一行。"""
 
     pending: list[PlanPendingRowOut] = []
+
+
+class MemoryReceiptOut(BaseModel):
+    """用途回执：`kind` ∈ `recall_turn` / `recall_autonomy` / `recall_proactive`。"""
+
+    kind: str
+    label: str
+    ts: str | None = None
+    ref: str | None = None
+
+
+class MemoryProductItemOut(BaseModel):
+    """产品级记忆项（D5 / D12：不暴露 status / salience / confidence / 上限 / 衰减）。"""
+
+    id: str
+    kind: str
+    type: str
+    type_label: str
+    content: str
+    source_kind: str
+    source_label: str
+    source_count: int
+    last_updated: str | None = None
+    usage_receipts: list[MemoryReceiptOut] = []
+
+
+class MemoryGroupOut(BaseModel):
+    kind: str
+    label: str
+    items: list[MemoryProductItemOut] = []
+
+
+class MemoryItemsOut(BaseModel):
+    generated_at: str
+    total: int
+    added_this_week: int
+    groups: list[MemoryGroupOut] = []
+    degraded: bool = False
+
+
+class MemoryEditIn(BaseModel):
+    content: str
+    importance: float | None = None
+
+    @field_validator("content")
+    @classmethod
+    def _check_content(cls, value: str) -> str:
+        text = (value or "").strip()
+        if not 1 <= len(text) <= 500:
+            raise ValueError("content 长度须在 1~500 之间")
+        return text
+
+    @field_validator("importance")
+    @classmethod
+    def _check_importance(cls, value: float | None) -> float | None:
+        if value is None:
+            return None
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("importance 须在 [0, 1] 之间")
+        return value
+
+
+class MemoryForgetOut(BaseModel):
+    id: str
+    status: str = "forgotten"
+    forgotten_at: str
