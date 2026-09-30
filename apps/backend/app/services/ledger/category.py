@@ -4,11 +4,15 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.character.asuna.ledger_categories import SEED_CATEGORY_TREE
 from app.core.settings import get_settings
 from app.repositories import ledger_repository
 
 _SUFFIX_RE = re.compile(r"(费|钱|开支|支出)$")
 _SPACE_RE = re.compile(r"\s+")
+_SEED_ALIASES: dict[str, frozenset[str]] = {
+    str(node["name"]): frozenset(node.get("aliases") or ()) for node in SEED_CATEGORY_TREE
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +22,13 @@ class NormalizationResult:
     matched_step: int
     reason: str
     confidence: float
+
+
+@dataclass(frozen=True, slots=True)
+class LearnedRule:
+    keyword: str
+    category_id: str
+    category_name: str
 
 
 def _normalize_text(text: str) -> str:
@@ -107,3 +118,31 @@ def add_alias(user_id: str, category_id: str, alias: str) -> bool:
     if not alias:
         return False
     return ledger_repository.append_category_alias(user_id, category_id, alias)
+
+
+def list_learned_rules(user_id: str) -> list[LearnedRule]:
+    learned: list[LearnedRule] = []
+    for row in ledger_repository.list_categories(user_id):
+        seeded = _SEED_ALIASES.get(row.name, frozenset())
+        for alias in row.aliases or []:
+            if alias in seeded:
+                continue
+            learned.append(
+                LearnedRule(
+                    keyword=str(alias), category_id=row.id, category_name=row.name
+                )
+            )
+    return learned
+
+
+FALLBACK_REASONS = ("empty_hint", "fallback")
+
+
+def classify_preview(
+    user_id: str,
+    note: str | None,
+    *,
+    kind: str = "expense",
+    now: datetime | None = None,
+) -> NormalizationResult:
+    return normalize(user_id, note, kind=kind, now=now)

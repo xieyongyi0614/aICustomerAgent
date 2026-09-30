@@ -13,7 +13,9 @@ from app.services.ledger import budget as budget_service
 from app.services.ledger import category as category_service
 from app.services.ledger import correction as correction_service
 from app.services.ledger import format as format_service
+from app.services.ledger import pending as pending_service
 from app.services.ledger import query as query_service
+from app.services.ledger import stats as stats_service
 from app.services.ledger import service as ledger_service
 
 ledger_router = APIRouter(prefix="/ledger", tags=["ledger"])
@@ -132,6 +134,91 @@ class BudgetResponse(BaseModel):
     remaining_minor: int = 0
     breached: bool = False
     reason: str = "ok"
+
+
+class PendingCandidateResponse(BaseModel):
+    value: str
+    label: str
+
+
+class PendingAiGuessResponse(BaseModel):
+    category_hint: str | None = None
+    direction: str | None = None
+    merchant_hint: str | None = None
+    confidence: float = 0.0
+
+
+class PendingItemResponse(BaseModel):
+    pending_key: str
+    reason: str
+    question: str
+    candidates: list[PendingCandidateResponse]
+    amount_minor: int | None = None
+    source_ref: str = ""
+    expires_at: str
+    occurred_at_hint: str | None = None
+    ai_guess: PendingAiGuessResponse | None = None
+
+
+class PendingListResponse(BaseModel):
+    generated_at: str
+    total: int
+    degraded: int = 0
+    items: list[PendingItemResponse]
+
+
+class PendingConfirmRequest(BaseModel):
+    category_name: str | None = None
+    direction: Literal["expense", "income", "transfer"] | None = None
+    amount_minor: int | None = Field(default=None, gt=0)
+    occurred_at: datetime | None = None
+
+
+class PendingConfirmResponse(BaseModel):
+    entry_id: str
+    created: bool
+    learned_alias: str | None = None
+
+
+class PendingIgnoreResponse(BaseModel):
+    ok: bool
+    pending_key: str
+
+
+class AutoCategoryResponse(BaseModel):
+    category_id: str | None
+    category_name: str
+    net_minor: int
+    count: int
+
+
+class AutoSummaryResponse(BaseModel):
+    period: PeriodResponse
+    auto_count: int
+    pending_count: int
+    by_category: list[AutoCategoryResponse]
+    generated_at: str
+
+
+class LearnedRuleResponse(BaseModel):
+    keyword: str
+    category_id: str
+    category_name: str
+
+
+class LearnedRulesResponse(BaseModel):
+    generated_at: str
+    total: int
+    items: list[LearnedRuleResponse]
+
+
+class ClassifyPreviewResponse(BaseModel):
+    matched: bool
+    category_id: str | None = None
+    category_name: str
+    confidence: float
+    reason: str
+    is_fallback: bool
 
 
 def _money(minor: int) -> tuple[int, str]:
@@ -385,4 +472,159 @@ def upsert_budget(
         remaining_minor=int(check.remaining_minor),
         breached=check.breached,
         reason=check.reason,
+    )
+
+
+def _pending_item_out(item) -> dict:
+    payload = {
+        "pending_key": item.pending_key,
+        "reason": item.reason,
+        "question": item.question,
+        "candidates": [
+            {"value": option.value, "label": option.label}
+            for option in item.candidates
+        ],
+        "amount_minor": item.amount_minor,
+        "source_ref": item.source_ref,
+        "expires_at": item.expires_at.isoformat(),
+        "occurred_at_hint": item.occurred_at_hint,
+    }
+    if item.has_ai_guess:
+        payload["ai_guess"] = {
+            "category_hint": item.category_hint,
+            "direction": item.direction,
+            "merchant_hint": item.merchant_hint,
+            "confidence": item.confidence,
+        }
+    return payload
+
+
+@ledger_router.get(
+    "/pending",
+    response_model=PendingListResponse,
+    response_model_exclude_unset=True,
+)
+def list_pending_endpoint(
+    limit: int = Query(default=LIMIT_DEFAULT, ge=1, le=LIMIT_MAX),
+    user_id: str = Depends(require_user),
+):
+    data = pending_service.list_pending(user_id, limit=limit)
+    return {
+        "generated_at": data.generated_at.isoformat(),
+        "total": data.total,
+        "degraded": data.degraded,
+        "items": [_pending_item_out(item) for item in data.items],
+    }
+
+
+@ledger_router.post(
+    "/pending/{pending_key}/confirm", response_model=PendingConfirmResponse
+)
+def confirm_pending_endpoint(
+    pending_key: str,
+    body: PendingConfirmRequest | None = Body(default=None),
+    user_id: str = Depends(require_user),
+):
+    payload = body or PendingConfirmRequest()
+    try:
+        outcome = pending_service.confirm_pending(
+            user_id,
+            pending_key,
+            category_name=payload.category_name,
+            direction=payload.direction,
+            amount_minor=payload.amount_minor,
+            occurred_at=payload.occurred_at,
+        )
+    except pending_service.PendingNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="待确认条目不存在或已失效") from exc
+    except pending_service.PendingValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)[:80]) from exc
+    return PendingConfirmResponse(
+        entry_id=outcome.entry_id,
+        created=outcome.created,
+        learned_alias=outcome.learned_alias,
+    )
+
+
+@ledger_router.post(
+    "/pending/{pending_key}/ignore", response_model=PendingIgnoreResponse
+)
+def ignore_pending_endpoint(
+    pending_key: str,
+    user_id: str = Depends(require_user),
+):
+    try:
+        key = pending_service.ignore_pending(user_id, pending_key)
+    except pending_service.PendingNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="待确认条目不存在或已失效") from exc
+    return PendingIgnoreResponse(ok=True, pending_key=key)
+
+
+@ledger_router.get("/auto-summary", response_model=AutoSummaryResponse)
+def get_auto_summary(
+    period: Literal["month", "week"] = Query(default="month"),
+    user_id: str = Depends(require_user),
+):
+    now = datetime.now()
+    window = (
+        query_service.Period.week(now)
+        if period == "week"
+        else query_service.Period.month(now)
+    )
+    data = stats_service.auto_summary(user_id, period=window, now=now)
+    return AutoSummaryResponse(
+        period=PeriodResponse(
+            since=data.period.since.isoformat(),
+            until=data.period.until.isoformat(),
+            label=data.period.label,
+        ),
+        auto_count=data.auto_count,
+        pending_count=data.pending_count,
+        by_category=[
+            AutoCategoryResponse(
+                category_id=item.category_id,
+                category_name=item.category_name,
+                net_minor=item.net_minor,
+                count=item.count,
+            )
+            for item in data.by_category
+        ],
+        generated_at=data.generated_at.isoformat(),
+    )
+
+
+@ledger_router.get("/rules", response_model=LearnedRulesResponse)
+def list_learned_rules(user_id: str = Depends(require_user)):
+    items = [
+        LearnedRuleResponse(
+            keyword=rule.keyword,
+            category_id=rule.category_id,
+            category_name=rule.category_name,
+        )
+        for rule in category_service.list_learned_rules(user_id)
+    ]
+    return LearnedRulesResponse(
+        generated_at=datetime.now().isoformat(),
+        total=len(items),
+        items=items,
+    )
+
+
+@ledger_router.get("/classify-preview", response_model=ClassifyPreviewResponse)
+def classify_preview(
+    note: str = Query(default=""),
+    kind: Literal["expense", "income"] = Query(default="expense"),
+    user_id: str = Depends(require_user),
+):
+    result = category_service.classify_preview(
+        user_id, note, kind=kind, now=datetime.now()
+    )
+    is_fallback = result.reason in category_service.FALLBACK_REASONS
+    return ClassifyPreviewResponse(
+        matched=not is_fallback,
+        category_id=result.category_id,
+        category_name=result.category_name,
+        confidence=result.confidence,
+        reason=result.reason,
+        is_fallback=is_fallback,
     )
