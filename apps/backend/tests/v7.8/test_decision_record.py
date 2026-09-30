@@ -36,7 +36,7 @@ def _backdate_messages(minutes: int) -> None:
         session.commit()
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():

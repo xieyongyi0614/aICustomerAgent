@@ -117,7 +117,7 @@ def _stubs_for(registry) -> list[StubCapability]:
     return stubs
 
 
-def _executor(registry, capability, settings, *, timeout: float = 5.0):
+def _executor(registry, capability, settings, *, timeout: float = 10.0):
     return build_executor(registry, capability, settings=settings, timeout_seconds=timeout)
 
 

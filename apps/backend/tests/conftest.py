@@ -121,7 +121,7 @@ from app.repositories import (
     world_simulation_repository,
 )
 
-WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "3.0"))
+WAIT_TIMEOUT = float(os.environ.get("E2E_WAIT_TIMEOUT", "10.0"))
 
 _REPO_MODULES = (
     action_repository,

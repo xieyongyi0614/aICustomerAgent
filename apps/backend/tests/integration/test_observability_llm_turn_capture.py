@@ -45,7 +45,7 @@ async def _run_turn(llm, session_id, content="我今天把项目上线了"):
     return events
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():

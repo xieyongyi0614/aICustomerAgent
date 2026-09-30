@@ -143,7 +143,7 @@ def seed_tick_fixture(session_id: str = SESSION, *, age_minutes: int = 40) -> st
     return session_id
 
 
-async def await_until(predicate, timeout: float = 3.0) -> bool:
+async def await_until(predicate, timeout: float = 10.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():

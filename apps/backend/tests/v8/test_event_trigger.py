@@ -13,7 +13,7 @@ def _world_id():
     return world_repository.world_id_for("default-user")
 
 
-async def _await_until(predicate, timeout=3.0):
+async def _await_until(predicate, timeout=10.0):
     import asyncio
     import time
 

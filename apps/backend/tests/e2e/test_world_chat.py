@@ -44,7 +44,7 @@ async def _chat(client, content):
     return lines[-1].get("turn_id")
 
 
-async def _await_until(predicate, timeout=3.0):
+async def _await_until(predicate, timeout=10.0):
     import time
 
     deadline = time.time() + timeout

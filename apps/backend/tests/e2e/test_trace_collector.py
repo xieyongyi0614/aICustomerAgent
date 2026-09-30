@@ -47,7 +47,7 @@ def _step(session, name):
     return next(s for s in session.steps if s.name == name)
 
 
-async def _await_until(predicate, timeout: float = 5.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():

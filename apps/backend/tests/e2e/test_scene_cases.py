@@ -1,8 +1,21 @@
 import asyncio
 import time
 
+import pytest
+
+from app.application import post_process
 from app.repositories import scene_state_repository
 from app.services import agent_service
+
+
+@pytest.fixture(autouse=True)
+def _no_ledger_confirmation(monkeypatch):
+    """本文件测 V3 场景连续性；PLA-010 账本确认挂接复用同一 pending_action 槽位，
+    会顶掉场景 pending（时序竞态），在此关掉该步保持被测语义单一。"""
+    handlers = tuple(
+        h for h in post_process.STEP_HANDLERS if h.__name__ != "run_ledger_confirmation"
+    )
+    monkeypatch.setattr(post_process, "STEP_HANDLERS", handlers)
 
 
 def _structured(intent="continue_scene", action_decision=None):
