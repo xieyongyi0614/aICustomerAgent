@@ -27,7 +27,7 @@ agent_created: true
 | 层级 | 文件 | 说明 |
 |---|---|---|
 | 1（最高） | 本 skill | 已裁决的定稿规范；**与下游冲突时以本 skill 为准** |
-| 2 | `design/pages/`（总览 `pages/index.html`） | **现役维护**的按页拆分原型（17 页，每页一个零依赖 HTML）；组件结构与真实文案的真源。新增 / 修改页面只改这里 |
+| 2 | `design/pages/`（总览 `pages/index.html`） | **现役维护**的按页拆分原型（22 页，每页一个零依赖 HTML）；组件结构与真实文案的真源。新增 / 修改页面只改这里 |
 | 3 | `design/ai-life-agent-design.html` | 产品设计稿；§06 视觉规范是色值真源 |
 
 > `design/ai-life-agent-prototype.html`（拆分前的单文件原型）**已冻结，不再维护**：仅为历史对照存档，不随页面演进同步更新；内容是 pages/ 拆分时的同源快照，与现役页面冲突时以 pages/ 为准。
@@ -65,7 +65,7 @@ agent_created: true
 | 文件 | 内容 |
 |---|---|
 | `references/tokens.md` | 色彩 10 项 + 3 组渐变 + 圆角 4 档 + 图标方块圆角规则 + 字号 6 级 + 投影 2 档 + 间距标尺 + 动效时长 + 图标规范 |
-| `references/components.md` | 36 个组件条目（含记账录入 / AI 自动记账 / 车辆 / 相册族）与真实文案；15 个页面的结构与信息层级 |
+| `references/components.md` | 38 个组件条目（含记账录入 / AI 自动记账 / 车辆 / 相册族）与真实文案；19 个页面的结构与信息层级 |
 | `references/orb.md` | AI 核心球：四态语义、4 个尺寸档、渲染层、性能与功耗要求 |
 | `references/principles.md` | 5 条设计原则的可判定验收规则 + 反范围清单 + 文案语气与占位文案 |
 | `references/flutter-mapping.md` | M3 五条禁令 + `ThemeExtension` 结构 + 4 处平移替代方案 + 深色模式 |

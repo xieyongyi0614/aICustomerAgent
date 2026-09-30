@@ -88,7 +88,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .album .a-nm{font-size:13.5px;font-weight:650;margin-top:9px;padding:0 3px}
 .album .a-ct{font-size:11px;color:var(--ink3);margin-top:1px;padding:0 3px 3px}
 .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.photo{aspect-ratio:1;border-radius:12px;position:relative;overflow:hidden}
+.photo{aspect-ratio:1;border-radius:12px;position:relative;overflow:hidden;display:block}
 .photo .p-badge{position:absolute;left:7px;bottom:7px;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:650;color:#fff;background:rgba(20,20,26,.55);backdrop-filter:blur(6px);border-radius:99px;padding:3px 8px}
 .photo .p-badge svg{width:10px;height:10px}
 .manage-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--card);color:var(--ink);font-size:14px;font-weight:650;border-radius:99px;padding:14px;margin-top:16px;box-shadow:var(--shadow-card);cursor:pointer;border:1px solid var(--line)}
@@ -125,8 +125,8 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
       <div class="ai-card" style="margin-top:16px">
         <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的整理建议</div>
-        <p>我在本机扫了一遍：38 张截图和 12 张相似照片可以清理，预计腾出 1.4 GB。分析全部在你手机上完成，照片不会离开设备。</p>
-        <a class="more" href="38-album-manage.html">去清理，已帮你预选 →</a>
+        <p>我在本机扫了一遍：38 张过期截图、26 张相似连拍和 12 张重复保存可以清理，能腾出 1.4 GB。分析全部在你手机上完成，照片不会离开设备。</p>
+        <a class="more" href="62-album-ai.html">看看我发现了什么 →</a>
       </div>
 
       <div class="storage">
@@ -140,7 +140,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
       <div class="sec-title"><h2>分类相簿</h2><span class="hint">6 个 · 在本机自动归类</span></div>
       <div class="album-grid">
-        <div class="album"><div class="a-cover g6"></div><div class="a-nm">旅行</div><div class="a-ct">342 张</div></div>
+        <a class="album" href="60-album-detail.html"><div class="a-cover g6"></div><div class="a-nm">旅行</div><div class="a-ct">342 张</div></a>
         <div class="album"><div class="a-cover g5"></div><div class="a-nm">美食</div><div class="a-ct">218 张</div></div>
         <div class="album"><div class="a-cover g7"></div><div class="a-nm">猫猫</div><div class="a-ct">156 张</div></div>
         <div class="album"><div class="a-cover g8"></div><div class="a-nm">截图</div><div class="a-ct">402 张 · 38 张可清理</div></div>
@@ -150,8 +150,8 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
       <div class="sec-title"><h2>最近添加</h2><span class="hint">9 月</span></div>
       <div class="photo-grid">
-        <div class="photo g1"></div>
-        <div class="photo g2"></div>
+        <a class="photo g1" href="61-photo-view.html"></a>
+        <a class="photo g2" href="61-photo-view.html"></a>
         <div class="photo g3"><span class="p-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>0:24</span></div>
         <div class="photo g4"></div>
         <div class="photo g5"></div>
@@ -168,10 +168,10 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 相册</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 相册</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

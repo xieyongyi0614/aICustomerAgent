@@ -81,6 +81,7 @@ a{color:inherit;text-decoration:none}
 .ab-btn.danger{background:rgba(240,106,106,.12);color:#E05252}
 .ab-note-line{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:9px;font-size:11px;color:var(--ink3)}
 .ab-note-line svg{width:11px;height:11px;color:var(--health)}
+.hint-link{display:flex;align-items:center;gap:4px;width:fit-content;font-size:12px;font-weight:600;color:var(--ai2);padding:0 3px;margin-bottom:6px;cursor:pointer}
 
 /* 照片占位（原型用柔和渐变代替真实照片） */
 .g1{background:linear-gradient(150deg,#FFD9C2,#FF9D76)}
@@ -108,16 +109,17 @@ a{color:inherit;text-decoration:none}
     <div class="screen" id="album-manage">
       <div class="mng-top">
         <a class="m-cancel" href="37-album.html">取消</a>
-        <span class="m-count">已选 12 张</span>
+        <span class="m-count">已选 76 张</span>
         <span class="m-all">全选</span>
       </div>
 
       <div class="ai-hint">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
-        已帮你预选 12 张：8 张过期截图 + 4 张相似照片，都在本机分析
+        已帮你预选 76 张：38 张过期截图 + 26 张相似连拍 + 12 张重复保存，都在本机分析
       </div>
+      <a class="hint-link" href="62-album-ai.html">这些预选是怎么算出来的 →</a>
 
-      <div class="group-l">过期截图 · 8 张（AI 预选）</div>
+      <div class="group-l">过期截图 · 共 38 张（AI 预选）</div>
       <div class="photo-grid">
         <div class="photo on g8"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
         <div class="photo on g2"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
@@ -127,7 +129,7 @@ a{color:inherit;text-decoration:none}
         <div class="photo on g2"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
       </div>
 
-      <div class="group-l">相似照片 · 9 月 12 日（AI 预选 4 张）</div>
+      <div class="group-l">相似连拍 · 9 月 12 日（AI 预选 · 共 26 张）</div>
       <div class="photo-grid">
         <div class="photo dim g1"><span class="chk"></span></div>
         <div class="photo on g1"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
@@ -153,7 +155,7 @@ a{color:inherit;text-decoration:none}
       <div class="ab-row">
         <span class="ab-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12v8H4v-8M2 7h20v5H2zM12 20V7"/></svg>移动</span>
         <span class="ab-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 12 22 2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01"/></svg>加标签</span>
-        <span class="ab-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>删除 12 张</span>
+        <span class="ab-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>删除 76 张</span>
       </div>
       <div class="ab-note-line">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg>
@@ -163,10 +165,10 @@ a{color:inherit;text-decoration:none}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 相册批量管理</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 相册批量管理</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

@@ -109,6 +109,13 @@ a{color:inherit;text-decoration:none}
 .tx .x-v{margin-left:auto;font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums}
 .add-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:#fff;font-size:15px;font-weight:700;border-radius:99px;padding:15px;margin-top:20px;box-shadow:0 12px 26px rgba(27,28,35,.22);cursor:pointer}
 .add-btn svg{width:17px;height:17px}
+.entry{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:13px 18px;margin-top:14px;cursor:pointer}
+.entry .e-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(122,92,255,.12);color:var(--ai1)}
+.entry .e-ic svg{width:17px;height:17px}
+.entry .e-t{font-size:14px;font-weight:600}
+.entry .e-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.entry .e-go{margin-left:auto;color:var(--ink3);display:flex;flex:none}
+.entry .e-go svg{width:16px;height:16px}
 </style>
 </head>
 <body>
@@ -179,15 +186,21 @@ a{color:inherit;text-decoration:none}
         <div class="tx"><div class="x-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18M3 12h18"/></svg></div><div><div class="x-t">里程 · 通勤往返</div><div class="x-s">每天自动记录 · 本周 190 km</div></div><span class="x-v" style="font-size:12.5px;color:var(--ink2)">38 km</span></div>
       </div>
 
+      <a class="entry" href="39-car-profile.html">
+        <div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+        <div><div class="e-t">车辆档案</div><div class="e-s">我的车 · 保险 / 年检 / 保养记录</div></div>
+        <span class="e-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
       <a class="add-btn" href="36-car-add.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>记一笔养车费用</a>
     </div>
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 车辆</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 车辆</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

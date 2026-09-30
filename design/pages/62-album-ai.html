@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 62 AI 整理建议 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--ink2);margin-top:3px}
+
+/* ============ 共享组件 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title h2{font-size:16.5px;font-weight:700}
+.sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Album AI（整理建议 · 仅本地） ============ */
+.sug-card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:6px 18px}
+.sug{display:flex;align-items:center;gap:13px;padding:15px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.sug:last-child{border-bottom:none}
+.sug .s-ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none}
+.sug .s-ic svg{width:20px;height:20px}
+.sug .s-t{font-size:14.5px;font-weight:600}
+.sug .s-s{font-size:11.5px;color:var(--ink3);margin-top:3px;line-height:1.5}
+.sug .s-v{margin-left:auto;text-align:right;flex:none}
+.sug .s-v b{display:block;font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.sug .s-v small{display:block;font-size:11px;color:var(--ink3);margin-top:2px;font-variant-numeric:tabular-nums}
+.prin{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:16px 18px}
+.prin .p-i{display:flex;align-items:flex-start;gap:9px;padding:6px 0;font-size:12.5px;line-height:1.65;color:var(--ink2)}
+.prin .p-i svg{width:14px;height:14px;color:var(--health);flex:none;margin-top:3px}
+.prin .p-i b{color:var(--ink);font-weight:650}
+.add-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:#fff;font-size:15px;font-weight:700;border-radius:99px;padding:15px;margin-top:20px;box-shadow:0 12px 26px rgba(27,28,35,.22);cursor:pointer}
+.add-btn svg{width:17px;height:17px}
+.privacy{margin-top:18px;padding:15px 16px;border-radius:var(--r-md);background:rgba(51,188,140,.07);border:1px solid rgba(51,188,140,.18);font-size:12px;line-height:1.7;color:#2E7D5F}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Album AI ================= -->
+    <div class="screen" id="album-ai">
+      <a class="back" href="37-album.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>相册</a>
+      <h1 class="pt">整理建议</h1>
+      <div class="sub">在你这台手机上扫完 2,847 张 · 本机分析</div>
+
+      <div class="ai-card" style="margin-top:16px">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的整理建议</div>
+        <p>我扫了一遍，有 76 张可以清理：过期截图 38 张、相似连拍 26 张、重复保存 12 张，加起来能腾出 1.4 GB。我先替你预选好，删之前由你确认——我不会自己动手。</p>
+      </div>
+
+      <div class="sec-title"><h2>可清理的 76 张</h2><span class="hint">合计 1.4 GB</span></div>
+      <div class="sug-card">
+        <a class="sug" href="38-album-manage.html">
+          <div class="s-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></div>
+          <div><div class="s-t">过期截图</div><div class="s-s">验证码、付款码、外卖订单，早就没用了</div></div>
+          <div class="s-v"><b>38 张</b><small>620 MB</small></div>
+        </a>
+        <a class="sug" href="38-album-manage.html">
+          <div class="s-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M8 21h10a3 3 0 0 0 3-3V8"/></svg></div>
+          <div><div class="s-t">相似连拍</div><div class="s-s">9 月 12 日青海湖 12 组，每组我留了 1 张</div></div>
+          <div class="s-v"><b>26 张</b><small>480 MB</small></div>
+        </a>
+        <a class="sug" href="38-album-manage.html">
+          <div class="s-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg></div>
+          <div><div class="s-t">重复保存</div><div class="s-s">微信里同一张图存了 3 次，只留最早的一张</div></div>
+          <div class="s-v"><b>12 张</b><small>300 MB</small></div>
+        </a>
+      </div>
+
+      <div class="sec-title"><h2>我的整理原则</h2><span class="hint">一直这样</span></div>
+      <div class="prin">
+        <div class="p-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>只在本机算</b>：分类、相似比对、截图识别都在你手机上完成，照片不离开设备。</span></div>
+        <div class="p-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>只预选，不自动删</b>：每一张都由你确认，我永远不替你做删除决定。</span></div>
+        <div class="p-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>删错了也能回来</b>：删除进「最近删除」保留 30 天，之后才真正清除。</span></div>
+        <div class="p-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>你的推翻我会记住</b>：取消过的预选，下次不再提。</span></div>
+      </div>
+
+      <a class="add-btn" href="38-album-manage.html">看看这 76 张，已帮你预选</a>
+
+      <div class="privacy">整份建议都来自本机分析，相册不需要联网权限，也没有任何云同步。清理随时可以停下，停下的部分不会有任何改变。</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · AI 整理建议</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>
