@@ -6,6 +6,7 @@
 > **上游（现状约束）**：`docs/current-system-architecture-baseline.md`；`docs/version/v4.0.0/tasks.md`（九条前提裁决）；`docs/version/v3.0.0/acceptance-report.md`（`CONDITIONAL — NOT RELEASED`）。
 > **状态**：Task Registry（任务定义）+ **Task Detail 已生成（41/41）**（2026-09-23，位于 `docs/version/v5.0.0/tasks/`，体例对齐 `docs/version/v4.0.0/tasks/PLA-XXX.md`，撰写规范见 `tasks/README.md`）。索引与生成记录见 **§11**。
 > **主干**：41 个任务 / 5 个里程碑 / 3 条任务线（`APP-` 客户端、`API-` 后端补齐、`PLT-` 平台横切）。
+> **V5.1 增量（2026-09-30）**：`design/pages/` 新增 10 页 + 改动 2 页，按「记账 → 车辆 → 相册」三期增量注册 **24 个任务**（`PLT-007` / `API-015~020` / `APP-027~043`），见 **§15**；需求依据 `requirements-analysis.md` §2.4 / §3.5 / §4.10~§4.13 / §6.1 / §7.1，覆盖核对 `traceability.md` §13，需求确定件 `reviews/v5.1-requirements-determination.md`。
 > **本文档不含代码、不含 DDL、不含 UI 稿。**
 
 ---
@@ -38,6 +39,7 @@
 | 链尾现状 | `0002_briefing_preferences.py`（折叠后；折叠前为 `0058`） |
 | 本版本新增 | `life_tasks` 建表已并入基线 `0001`（原编号 `0055_life_tasks.py`，服务 API-005） |
 | 其余域 | 健康域若进 V1，追加 `0003+` 增量迁移；否则**零新迁移** |
+| **V5.1 新增（2026-09-30）** | **车辆域占用 `0003`**（`revision="0003"`、`down_revision="0002"`，见 §15 / `API-018`）。健康域若届时也进 V1，顺延为 `0004`；**同一批迁移必须串行入链，不得并行改链尾** |
 | 🚨 已知陷阱 1 | `op.create_check_constraint` **必须传完整布尔式**（`f"source IN {target_check}"`），不能传值清单 → 曾致 `0045` 在 PG 上 `DatatypeMismatch`、`0052` 不可达 |
 | 🚨 已知陷阱 2 | **加一个迁移会打破约 22 个跨版本钉测**（`v23/v24/v25/v26` 中的 `MIGRATION_HEAD` 常量、`test_migration_chain_head_is_still_00NN` 用例名、`SCHEMA_TABLE_COUNT`、`SCHEMA_COLUMNS_DIGEST`）→ 执行前先 `git worktree` 取干净基线测 blast radius |
 | 🚨 已知陷阱 3 | `FROZEN_BLOB_SHA_BASELINE` 已空 → 改动 `profiles.py` 的 Profile 表内容会红，属**真语义变更**须显式声明 |
@@ -312,6 +314,17 @@ API-001 → API-002 ──┘
 | **M4** 健康（门控） | `APP-023`~`APP-025` | `tasks/APP-023.md` ~ `tasks/APP-025.md` |
 | **PLT** 平台横切 | `PLT-001`~`PLT-006` | `tasks/PLT-001.md` ~ `tasks/PLT-006.md` |
 
+> **V5.1 增量明细已生成（2026-09-30）**：`PLT-007` / `API-015~020` / `APP-027~043` 共 **24 个 Task Detail 已全部生成**（10 章体例，与 41 个既有明细同规范），索引如下；注册表见 **§15**，生成记录与偏离声明见 **§15.9** / **§15.12**。
+
+| 期 | 任务线 | 明细文件 |
+|---|---|---|
+| 一期 记账扩展 | `API-015`~`API-017` | `tasks/API-015.md` ~ `tasks/API-017.md` |
+| 一期 记账扩展 | `APP-027`~`APP-029` `APP-041` | `tasks/APP-027.md` ~ `tasks/APP-029.md`、`tasks/APP-041.md` |
+| 二期 车辆域 | `API-018`~`API-020` | `tasks/API-018.md` ~ `tasks/API-020.md` |
+| 二期 车辆域 | `APP-030`~`APP-033` `APP-042` | `tasks/APP-030.md` ~ `tasks/APP-033.md`、`tasks/APP-042.md` |
+| 三期 相册域 | `PLT-007` | `tasks/PLT-007.md` |
+| 三期 相册域 | `APP-034`~`APP-040` `APP-043` | `tasks/APP-034.md` ~ `tasks/APP-040.md`、`tasks/APP-043.md` |
+
 **每个明细文件的结构**：`1. Task Overview`（含 `完成判据` 与 `新增设置`）/ `2. Background`（现状证据带 `文件:行号`）/ `3. Scope`（In / Out，Out 是反范围护栏）/ `4. Technical Design Requirements`（4.1 契约 · 4.2 关键裁决 · 4.3 数据流 · 4.4 依赖与边界）/ `5. Implementation Plan` / `6. File Impact`（含 6.3 禁止修改红线）/ `7. Testing Requirements`（用例名 + 断言）/ `8. Acceptance Criteria`（AC# + 判据 + 验证方式）/ `9. Commit Requirement` / `10. 需求溯源`（设计稿条目 → REQ → 覆盖状态，带 `traceability.md` 行号）。
 
 ### 11.2 生成过程中发现的 5 个跨任务缺口（**需回写，不是本次撰写能自行了结的**）
@@ -442,3 +455,209 @@ API-001 → API-002 ──┘
 2. App 登录（owner 邮箱）→ 发消息 → 杀 App 重开 → 会话历史恢复；`conversations` / `memories` / `character_state` 均在 default-user 名下。**注意：归并前拿到的旧 token 指向已删的 email-* 行（令牌无状态不校验库），须退出登录重登一次换新令牌**。
 3. 首页任务 / 今日消费非空（聊天链路创建的任务与账目对 token 用户可见）——归并前创建的历史数据需第 1 步完成后新产生的对话验证口径。
 4. 无 token 直接请求 `/api/v1/chat/message`、`/life/export`、`/ledger/summary`、`/conversations/latest` → 401；隐私页「导出数据」只含本人数据。
+
+---
+
+## 15. 增量注册：V5.1 设计稿新增模块（2026-09-30）
+
+> **背景**：`design/pages/` 于 2026-09-30 新增 10 页（33 / 34 / 35 / 36 / 37 / 38 / 39 / 60 / 61 / 62）并改动 2 页（30 生活 / 31 账本）。三块能力的技术形态**完全不同**（记账扩展 = 接线补读面；车辆 = 新建域 + 迁移；相册 = 纯端侧原生能力），故按「**记账 → 车辆 → 相册**」三期交付，每期独立可验收。
+> **上游（需求依据）**：`requirements-analysis.md` §2.4 / §3.5 / §4.10~§4.13 / §6.1（D12~D22）/ §7.1 —— 本注册表之外的任何能力不得开工。
+> **上游（覆盖核对）**：`traceability.md` **§13**（V5.1 增量覆盖矩阵，12 页 × 5 行，44 ✅ / 12 ⚠️ / 4 🚫）。
+> **上游（需求确定件）**：`reviews/v5.1-requirements-determination.md`（14 项冲突缺口 15~28 + 决策 D12~D22 + 反范围补充）。
+> **体例**：沿用 §12~§14 的**增量注册体例**（从简，不另立 41 任务式 Detail）——见 **§15.9 关于 Task Detail 产出时机的决策 D22**。
+> **主干**：**24 个任务** / 3 条任务线（`APP-027~043` 客户端、`API-015~020` 后端、`PLT-007` 平台横切）/ 3 期 + 1 个前置。
+> **本文档不含代码、不含 DDL、不含 UI 稿。**
+
+### 15.1 任务总览
+
+| 期 | 主题 | 任务 | 数量 |
+|---|---|---|---|
+| **前置** | 工具链与依赖可行性（相册期硬门槛） | `PLT-007` | 1 |
+| **一期** | 记账扩展：手动记账 / AI 自动记账 / 账本双入口 | `API-015~017` + `APP-027~029` `APP-041` | 7 |
+| **二期** | 车辆域：车辆 / 养车记一笔 / 车辆档案 / 生活页车辆卡 | `API-018~020` + `APP-030~033` `APP-042` | 8 |
+| **三期** | 相册域（仅本机）：相册 / 批量管理 / 相簿详情 / 单张照片 / AI 整理建议 / 生活页相册卡 | `APP-034~040` `APP-043` | 8 |
+| | | **合计** | **24** |
+
+### 15.2 新增路由（10 条子流程路由，全部复用 `chromeImmersive`）
+
+| 路由 | 页面 | 设计稿 | 期 |
+|---|---|---|---|
+| `/ledger/add` | 手动记账 | 33 | 一 |
+| `/ledger/auto` | AI 自动记账 | 34 | 一 |
+| `/car` | 车辆 | 35 | 二 |
+| `/car/add` | 养车记一笔 | 36 | 二 |
+| `/car/profile` | 我的车（车辆档案） | 39 | 二 |
+| `/album` | 相册 | 37 | 三 |
+| `/album/manage` | 相册批量管理 | 38 | 三 |
+| `/album/detail` | 相簿详情（带 `?album=`） | 60 | 三 |
+| `/album/photo` | 单张照片（带 `?id=`） | 61 | 三 |
+| `/album/ai` | AI 整理建议 | 62 | 三 |
+
+> 落点：`apps/mobile/lib/app/router/app_router.dart` 的 `chromeByPath`（L39-54）逐条追加 `'<path>': chromeImmersive`；`_tabIndex`（L141-147）按域归位（`/car*` 归「生活」Tab；`/album*` 归「生活」Tab；`/ledger/add`、`/ledger/auto` 归「生活」Tab）。
+
+---
+
+### 15.3 一期 · 记账扩展（`API-015~017` + `APP-027~029` `APP-041`）
+
+| ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
+|---|---|---|---|---|---|
+| `API-015` | **待确认账单产品级读 / 写接口** | 后端 | P0 | — | `GET /ledger/pending`（条目 / 金额 / 商家 / **AI 判断** / 来源）、`POST /ledger/pending/{id}/confirm`（可带改后分类）、`POST /ledger/pending/{id}/ignore`。**复用 `app/services/ledger/pending.py` 既有语义**（`PENDING_PREFIX`、`load_pending` / `clear_pending` 不改）；零 `app/repositories` 依赖 |
+| `API-016` | **记账智能读面** | 后端 | P0 | — | `GET /ledger/auto-summary`（本月自动记账笔数 / 分类准确率 / 待确认数）、`GET /ledger/rules`（别名规则：关键词 → 类目）、`GET /ledger/classify-preview?note=`（备注 → 分类预览）。⚠️ **准确率与「修正 N 次」须有真实来源，无来源则不出该字段**（§3.5 缺口 20） |
+| `API-017` | **「养车」分类种子** | 后端 | P0 | — | `app/character/asuna/ledger_categories.py::SEED_CATEGORY_TREE` 新增**「养车」父类目 + 子项**（充电 / 加油 / 停车 / 过路 / 保养 / 洗车）与别名；评估 `app/services/tool/builtin.py::LEDGER_SOURCES`（L71）是否需扩展来源值 |
+| `APP-041` | **设计系统扩展：记账族** | 设计系统 | P0 | `APP-002` `APP-007` | 按 skill **A31**（entry 功能入口行卡）、**A32**（seg / amount / kind / form / pad / save）、**A33**（stat / confirm / rule）落成组件 + golden；复用既有 `AiCard` / `CategoryBar` / `TxRow` / `ChipButton`。**纪律**：金额 `tabular-nums`；保存按钮用 ink 深色，**禁 ai 渐变** |
+| `APP-027` | **手动记账页（33）** | 页面 | P0 | `APP-041` `API-016` | `features/ledger/presentation/ledger_add_page.dart` + 路由 `/ledger/add` + skill **B10**；`ledger_repository.dart` 增手动记账写方法（`POST /ledger/entries`）与分类列表读 |
+| `APP-028` | **AI 自动记账页（34）** | 页面 | P0 | `APP-041` `API-015` `API-016` | `ledger_auto_page.dart` + 路由 `/ledger/auto` + skill **B11**；**来源区块按 D14 呈诚实未接入态**（三条来源标注不可用原因 + 语音记账标为可用），**禁止**渲染「已连接 / 今天同步 N 笔」 |
+| `APP-029` | **账本页双入口（31 改）** | 页面 | P0 | `APP-041` `API-016` | `ledger_page.dart` 在 AI 观察卡后插入 A31 双入口；AI 自动记账入口副文案用**真实笔数**（无数据时改诚实措辞） |
+
+**一期验收口径**：从账本页双入口进 33，填金额 + 分类 + 备注保存后，**账本页数字立刻一致**；进 34 能看到**真实待确认条目**并可确认 / 修改 / 忽略；任一统计数字无来源时呈**空态或省略**，不出现伪造值。
+
+---
+
+### 15.4 二期 · 车辆域（`API-018~020` + `APP-030~033` `APP-042`）
+
+| ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
+|---|---|---|---|---|---|
+| `API-018` | **车辆域建域与迁移 `0003`** | 后端 | P0 | — | ⚠️ **落点已按 §15.12 A1 修正**：ORM 表进 **`app/core/db.py`**（4 张 `car_*`，与 `LedgerEntryRow` L1498 / `LifeTaskRow` L1544 同级；全仓 51 张表集中于此），pydantic 域模型进 **`app/models/car.py`**；`migrations/versions/0003_car_domain.py`（`revision="0003"`、`down_revision="0002"`，`create_check_constraint` **传完整布尔式**）；`tests/support/schema_pins.py` 同步 `MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST` + 钉测用例名升级。**不触碰** `world_*` / `memories` / `relationship_state` / `loop_runs` |
+| `API-019` | **车辆费用入账与养车聚合** | 后端 | P0 | `API-017` `API-018` | 养车费用经 `app/services/ledger/service.py::record_entry`（L40-42）+ `resolve_account_id`（L122）落账，**不建第二套记账**（D12）；车辆页「本月养车支出」按**子类目**聚合，**聚合在服务端完成** |
+| `API-020` | **车辆域产品级 API** | 后端 | P0 | `API-018` | `app/api/v1/car.py`（档案 / 车贷 / 保养记录 / 里程 CRUD + 提醒计算）+ `app/api/v1/schemas.py` 模型 + `app/api/v1/router.py` 注册；零 `app/repositories` 依赖；**限行按 D19 为用户手动配置**；**提醒按 D20 复用本地通知，参数类设置（禁 `*_enabled`）** |
+| `APP-042` | **设计系统扩展：车辆族** | 设计系统 | P0 | `APP-002` `APP-007` | 按 skill **A34**（loan-card，深色 + warm 进度条，**禁 ai 渐变**）、**A35**（type-scroll，选中描边用类型语义色 55%）、**A37**（timeline，**末行必须为未发生态**）落成组件 + golden；`app_icons.dart` 按 `apps/mobile/docs/icons.md` 流程补车辆 / 充电类 Lucide 图标 |
+| `APP-030` | **车辆主页（35）** | 页面 | P0 | `API-019` `API-020` `APP-042` | `features/car/presentation/car_page.dart` + 路由 `/car` + skill **B12**；`features/car/data/car_repository.dart` 自建数据面（**禁 import `features/ledger`**，先例 `life_repository.dart` / `chat_ledger_repository.dart`） |
+| `APP-031` | **养车记一笔（36）** | 页面 | P0 | `API-019` `API-020` `APP-042` | `car_add_page.dart` + 路由 `/car/add` + skill **B13**；表单字段随类型切换（充电 = 度数 / 站点；里程 = 本次 / 总里程；保养 = 项目 / 下次里程）；**联动口径常驻** |
+| `APP-032` | **车辆档案（39）** | 页面 | P0 | `API-020` `APP-042` | `car_profile_page.dart` + 路由 `/car/profile` + skill **B16**；⚠️ **文案按 D13 改口径**（`pages/39-car-profile.html:125` 的「都在本机」**不得原样落地**） |
+| `APP-033` | **生活页车辆入口（30 改）** | 页面 | P0 | `APP-030` | `features/life/presentation/life_page.dart` 宫格新增车辆卡（摘要为**真实数据或诚实空态**）；**日历 / 旅行按 D21 呈诚实未接入态**（禁「15:00 方案对齐」类伪造摘要）。⚠️ **与 `APP-040` 同改一个文件，两者串行执行、不得并行编辑**（§15.12 A8） |
+
+**二期验收口径**：记一笔养车费用后，**车辆页支出条与账本页养车分类数字一致**（同源同口径）；车辆档案与保养时间线可读写、时间线末行为「下一次保养」未发生态；生活页车辆卡摘要非伪造；**迁移钉测全绿且 `alembic upgrade head` 产出的 schema 与 ORM metadata 逐列一致**。
+
+---
+
+### 15.5 三期 · 相册域（仅本机，`APP-034~040` + `APP-043`）
+
+| ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
+|---|---|---|---|---|---|
+| `PLT-007` | **Flutter 工具链修复与相册依赖可行性验证** | 前置验证 | P0 | — | 修复本机 `flutter pub get / analyze / test`（根因：flutter_tools 在 `generateCommands` 阶段定位 Android SDK，`where.EXE aapt` 子进程创建失败，`process_win.cc:744`；见 `reviews/progress-audit-2026-09-29.md` §7.7）；验证原生相册库在当前约束（`sdk: ^3.13.4`）下可 `pub get` 并跑通**最小读相册 demo**（授权 → 读数量 → 读缩略图）。**产出结论报告；结论直接决定三期能否开工** |
+| `APP-034` | **album 域与本机相册数据面** | 端侧 | P0 | `PLT-007` | `features/album/{data,domain}`：原生相册库接入 + 系统权限申请 + **后台 isolate** 本机分析（**过期截图 + 重复保存**，D16）+ 端侧元数据存储（**不复用已死的 `LocalStores`**，见 `progress-audit` §7.6）；`test/scaffold/layer_guards_test.dart` **登记 album 域**（L32-41）；**新增 D18 守卫**：`lib/features/album/**` 禁止 import `core/network/**` 与 `package:dio` |
+| `APP-043` | **设计系统扩展：相册族** | 设计系统 | P0 | `APP-002` `APP-007` | 按 skill **A36**（storage / album / photo / actionbar）、**A38**（sug，张数 + 体积成对 + 判定理由）落成组件 + golden；`app_icons.dart` 补相册 / 照片 / 相机类 Lucide 图标 |
+| `APP-035` | **相册主页（37）** | 页面 | P0 | `APP-034` `APP-043` | `album_page.dart` + 路由 `/album` + skill **B14**；文案按 **D17**（删除后进系统「最近删除」）；「仅本机」口径常驻（红线 9） |
+| `APP-036` | **批量管理（38）** | 页面 | P0 | `APP-034` `APP-043` | `album_manage_page.dart` + 路由 `/album/manage` + skill **B15**；**AI 未选的原片必须可见**（opacity .55）；**相似连拍分组按 D16 呈诚实未支持态** |
+| `APP-037` | **相簿详情（60）** | 页面 | P0 | `APP-034` `APP-043` | `album_detail_page.dart` + 路由 `/album/detail` + skill **B18**；按拍摄日期分组 + 视频时长徽章；连拍相关标记按 D16 呈诚实态 |
+| `APP-038` | **单张照片（61）** | 页面 | P0 | `APP-034` `APP-043` | `photo_view_page.dart` + 路由 `/album/photo` + skill **B19**；大图**不切深色底**；信息行逐项标注「本机读取 / 本机归类」 |
+| `APP-039` | **AI 整理建议详情（62）** | 页面 | P0 | `APP-034` `APP-043` | `album_ai_page.dart` + 路由 `/album/ai` + skill **B17**；**只呈现已实现类别**（过期截图 / 重复保存），相似连拍按 D16 呈诚实态；四条整理原则 |
+| `APP-040` | **生活页相册入口（30 改）** | 页面 | P0 | `APP-035` | `life_page.dart` 宫格新增相册卡（**真实张数 + 「仅本机」** 或诚实空态）。⚠️ 与 `APP-033` **同改一个文件**，两者**串行执行、不得并行编辑** |
+
+**三期验收口径**：授权后可读到本机相册**真实张数**；AI 预选**可推翻**、删除走系统「最近删除」；**任意相册页零网络请求**（D18 守卫测试 + `PLT-004` 走查双证）；**相似连拍区块呈诚实未支持态**；本机分析在后台 isolate 且**可中断、中断不改变任何照片**（缺口 28）。
+
+---
+
+### 15.6 依赖与关键路径
+
+```text
+PLT-007（工具链修复 + 依赖可行性）────────────────────────┐
+                                                          ↓
+一期：API-017 ─┐                                 三期：APP-034 ─→ APP-035 ─→ APP-040
+              ├─→ API-019 ─┐                              ├─→ APP-036 / APP-037
+API-015/016 ──┴───────────┼─→ 二期：API-018 ─→ API-020 ──┼─→ APP-038
+                          │                              └─→ APP-039
+APP-041（记账族）─→ APP-027 / APP-028 / APP-029          APP-043（相册族）─↗
+APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
+```
+
+**关键路径**：`PLT-007 → APP-034 → APP-035 → APP-040`（三期工具链门槛最长）；后端侧最长为 `API-017 → API-019 → API-020 → APP-030`。
+
+**四个收口点**：
+
+| 收口点 | 判定标准 |
+|---|---|
+| **V1**（一期末） | 账本双入口闭环：33 保存后账本数字一致；34 待确认可确认 / 忽略；**无伪造同步数据** |
+| **V2**（二期末） | 同源同口径：车辆页养车支出与账本养车分类数字一致；迁移 `0003` 上链且钉测全绿 |
+| **V3**（三期末） | 仅本机可验证：`album` 域禁网络守卫绿 + 相册页零网络请求；相似连拍呈诚实态 |
+| **V4**（全量） | 24 个任务全部可追溯到 `traceability.md` §13 的行；`flutter analyze` + `flutter test` 真跑通过；后端零回归（基线对照法） |
+
+### 15.7 阻塞清单（🚫 未闭环不得开工）
+
+| # | 阻塞项 | 阻塞任务 | 闭环判据 |
+|---|---|---|---|
+| 1 | 设计系统 skill 内部相册数值不一致（B14/B15 vs B17/B18） | `APP-036` `APP-039` | 端侧按 B17/B18 + `pages/` 自洽口径实现，**skill 回写登记待办**（`traceability.md` §13.5 V1） |
+| 2 | 「所有档案都在本机」文案（`pages/39-car-profile.html:125`） | `APP-032` | 按 D13 改口径后方可实现 |
+| 3 | 「不需要联网权限」表述（`pages/37-album.html:166`） | `APP-035` | 按 D17 配套口径收敛 |
+| 4 | 日历 / 旅行被提升为常规模块 | `APP-033` | 按 D21 维持 🚫 后置 + 诚实未接入态 |
+| 5 | 账单自动同步来源平台不可行 | `APP-028` | 按 D14 降级为诚实未接入态 |
+| 6 | 相似连拍分析成本不匹配 | `APP-036` `APP-037` `APP-038` `APP-039` | 按 D16 本期不做，呈诚实未支持态，**列 V2** |
+| 7 | 「仅本机」无可验证约束 | `APP-034` | 按 D18 新增分层守卫 + 零网络断言 |
+| 8 | 本机 Flutter 工具链故障 | 三期全部任务 | `PLT-007` 产出结论报告 |
+
+### 15.8 迁移与铁律检查（V5.1 逐项过 §10 检查表）
+
+- [x] 新 API 是否**零** `app/repositories` 依赖？→ `API-015`~`API-020` 全部走 `app/services/*`，同 `tasks.py` / `memory.py` 先例
+- [x] 新增设置项是否为**参数类**（非 `*_enabled`）？→ 车辆提醒提前量 / 限行配置均为参数类（D19 / D20）
+- [x] 新增事件类型是否已登记 `EXPECTED_EVENT_TYPES`？→ **本次零新事件类型**（待确认账单走 HTTP 读写，不改流式契约）
+- [x] 是否触碰 `loop_runs.steps` 键集？→ **否**
+- [x] 是否新增迁移？→ **是，`0003`（车辆域）**：`create_check_constraint` 传完整布尔式；钉测升级清单 = `MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST` / `test_migration_chain_head_is_still_00NN` 用例名（`tasks/support/schema_pins.py`）；**执行前先 `git worktree` 测 blast radius**（约 22 条跨版本钉测）
+- [x] 是否改动 `world_*` / `memories` / `relationship_state` / `loop_runs`？→ **否**
+- [x] `services` 是否 import `app.application`？→ **否**
+- [x] 新增 `runtime_*` 字段是否登记 `V30_RUNTIME_FIELDS`？→ **本次无**
+- [x] 零回归是否用**基线对照法**验证？→ 是（判据 = 当前失败集 ⊂ 基线失败集）
+- [x] 新建 `app/` / `tests/` 文件是否转了 CRLF？→ 是；`docs/**` 保持 LF
+- [x] 是否误用 `git rm`？→ **禁止**（删文件用 `find <file> -delete`）；提交后复核 `git rev-parse HEAD`
+- [x] 移动端是否真跑了 `flutter analyze` + `flutter test`？→ **`PLT-007` 修复前不得以静态检查替代**（`tasks.md` §0.4 / `progress-audit` §6.2 明文禁止）
+
+### 15.9 Task Detail 生成记录（决策 D22 及其执行偏离）
+
+> **原决策 D22**：只出任务注册表，逐任务 Detail 在**各期开工前**生成。
+> **执行结果（2026-09-30）**：**24 个 Detail 已一次性全部生成**（见 §11.1 索引）。这是一次**对 D22 的显式偏离**，理由与影响见下表；`requirements-analysis.md` §6.1 的 `D22` 行须同批回写。
+
+| 项 | 说明 |
+|---|---|
+| 体例依据 | 与 41 个既有明细**同规范**：`tasks/README.md` 的 10 章体例 + 三条任务线差异化要求（`APP-*` 引用 skill 组件/页面编号；`API-*` 写字段级契约并留痕 §10 铁律检查表；`PLT-*` 写可复现验收） |
+| **偏离 D22 的理由** | ① 用户明确要求「对 tasks 的任务拆解」；② 24 个任务的**上游已全部冻结**（`traceability.md` §13 矩阵 + §6.1 决策 + §3.5 裁决），不存在"等现状定稿"的悬空项；③ 一次性生成使三期的**跨任务接口一致性**（如 `hint` 由服务端下发、相似连拍统一呈未支持态、隐私口径三页逐字一致）可被统一裁决，分期生成反而易分叉 |
+| **偏离的代价（须认领）** | 分期生成能随实现漂移而微调，一次性生成后改动需**回改 Detail**；缓解：每份 Detail 的 §4.2 都写明"待实现期求证/回填"的证据项（如 `API-017` §10 的两条待证事项、`API-016` §4.2 裁决 2 的准确率求证），把不确定项显式化而非隐藏 |
+| 反向约束 | Detail 的 `In Scope` 必须落在 §15.3~§15.5 的「交付面」范围内；**新增能力须先回改 §15 + `requirements-analysis.md` + `traceability.md` §13**（顺序不可颠倒，见 `traceability.md` §12） |
+| 生成后校验 | 逐份核对 §10「需求溯源」能否在 `traceability.md` §13 找到对应行 → **24/24 全部可核对**（结果见 §15.12） |
+
+### 15.10 任务编号占用登记
+
+| 任务线 | §12~§14 已占用 | V5.1 新增（本节） | 下一可用号 |
+|---|---|---|---|
+| `APP-` | `APP-026` | `APP-027`~`APP-043`（17 个） | `APP-044` |
+| `API-` | `API-011`~`API-014` | `API-015`~`API-020`（6 个） | `API-021` |
+| `PLT-` | `PLT-001`~`PLT-006` | `PLT-007`（1 个） | `PLT-008` |
+| `IDENT-` | `IDENT-001`~`IDENT-009`（`010`/`011` 为 P2 留白） | — | `IDENT-012` |
+
+### 15.11 待回写台账（本轮发现，非本注册表能自行了结）
+
+| # | 事项 | 归属 | 处置 |
+|---|---|---|---|
+| 1 | **41 个 Task Detail 状态行全部失真**（2026-09-23 生成后未回写，实际约 16 个已达真实现） | `tasks/*.md` | 与 V5.1 增量注册同批校订（`progress-audit-2026-09-29.md` §3.1 / §5 P2） |
+| 2 | **v5.0.0 无验收报告 / 进度台账** | `docs/version/v5.0.0/` | 补验收台账（`progress-audit` §3.3 / §5 P2） |
+| 3 | **旧迁移号描述未回写折叠事实**（本文件 §0.3 与 §12~§14 仍出现 `0055`~`0058`） | 本文件 | §0.3 已补 V5.1 行；历史编号**保留不改**（`tasks.md` §0.3 顶部已有说明） |
+| 4 | **skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」） | `.agents/skills/zhaoxi-design-system/references/components.md` | 设计侧回写；端侧已裁决以 B17/B18 为准（§13.5 V1） |
+| 5 | **`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正** | `design/pages/` | 设计侧回写（§13.5 V3 / V4） |
+| 6 | **`PLT-007` 的工具链结论须回写 `PLT-001` 式报告** | `apps/mobile/docs/` | 参照 `plt001-probe.md` 体例 |
+
+### 15.12 Detail 生成期的上游修正与零偏离声明（2026-09-30）
+
+> 24 份 Detail 撰写时按证据发现 **9 处上游表述需修正**。这些**不是明细擅自扩张**，而是本节与 `requirements-analysis.md` / `traceability.md` 的回写项（顺序纪律见 `traceability.md` §12）。
+
+| # | 事项 | 涉及任务 | §15 原表述 | 实际证据 | 处置 |
+|---|---|---|---|---|---|
+| **A1** | **OR M 表落点** | `API-018` | `app/models/car.py（车辆档案 / 车贷 / 保养记录 / 里程）` | 全仓 ORM 表**集中定义在 `app/core/db.py`**（`LedgerEntryRow` L1498 / `LifeTaskRow` L1544 等 51 张表）；`app/models/**` 只放 pydantic 域模型（`app/models/ledger.py:52-117`） | **已回写 §15.4**：表进 `app/core/db.py`，域模型进 `app/models/car.py` |
+| **A2** | 仓储未列 | `API-019` | 目录结构未列 car 仓储 | 与 `ledger_repository` 同级约定 | 已在 `API-019` §6.1 登记 `app/repositories/car_repository.py` |
+| **A3** | 设置域文件未列 | `API-020` | §15.4 只写「参数类设置」 | 设置按域拆分（先例 `app/core/settings/ledger.py:7-15`、`email.py`） | 已在 `API-020` §6.1 登记 `app/core/settings/car.py` |
+| **A4** | 组件文件名未列 | `APP-041/042/043` | 目录结构只写 `lib/design_system/components/` | 三个族的组件需落到具体文件 | 已在三份 Detail §6.1 定为 `entry_card.dart` / `ledger_input.dart` / `ledger_auto.dart` / `car_cards.dart` / `car_input.dart` / `timeline.dart` / `album_cards.dart` / `album_report.dart` |
+| **A5** | **跨域通道缺失** | `APP-040` | 未含应用级状态文件 | 相册张数是**纯端侧数据**（§2.4：后端零端点），而 `layer_guards_test.dart:49` **禁止 `features/life` import `features/album`** → 需要一个既非跨域 import、又非后端的通道；`lib/app/state/` 已存在（`persona_mode.dart`）且现有 9 条守卫未对其设限 | 已在 `APP-040` §6.1 新增 `lib/app/state/album_summary_provider.dart`（album 写 / life 只读） |
+| **A6** | 三层目录占位 | `APP-034` | 未提 `presentation/` | `layer_guards_test.dart:20` 断言 `features/<domain>/{data,domain,presentation}` **三层目录存在** | 已在 `APP-034` §6.1 登记 `features/album/presentation/.gitkeep`（由 `APP-035` 填实） |
+| **A7** | **分类重名风险（D15 细化）** | `API-017` `API-019` | §15.4 说「新增『养车』父类 + 子项（充电 / 加油 / 停车 / 过路 / 保养 / 洗车）」 | 既有 `ledger_categories.py:12-13` **已有 `交通/加油`（别名含「洗车」「充电桩」）与 `交通/停车`** → 同名子项会被 `ensure_seed_categories` 静默跳过，且迁移既有节点会破坏既有用户数据 | 已在 `API-017` §4.1 定子项名 `加油费` / `停车费`（别名含口语），并在 `API-019` §4.2 裁决 1 加**读侧显式映射**（养车子树 ∪ `交通/加油` ∪ `交通/停车`） |
+| **A8** | 同文件冲突 | `APP-033` `APP-040` | 两者均登记改 `life_page.dart` | 同文件并行编辑会互相覆盖 | 已在两份 Detail §1 / §4.2 标注 **串行执行、不得并行** |
+| **A9** | **对 D22 的偏离** | 全部 24 份 | D22：只出注册表，Detail 分区生成 | 用户要求本次完成拆解，且上游已全部冻结 | 已在 §15.9 记录偏离理由与代价；`requirements-analysis.md` §6.1 的 `D22` 行须同批回写 |
+
+**生成后校验结果**：
+
+| 校验项 | 结果 |
+|---|---|
+| 10 章体例完整（缺一节即不合格，`tasks/README.md:19`） | 24/24 完整 |
+| §10「需求溯源」可在 `traceability.md` §13 找到对应行 | **24/24 可核对**（无凭空发明） |
+| §3.2 Out of Scope ≥5 条且每条给理由 | 24/24 满足 |
+| §6.3 红线点名具体路径 | 24/24 满足 |
+| 现状断言带 `文件:行号` | 24/24 满足（无法当场求证的已显式标注"待实现期回填"，见 `API-016` §4.2 裁决 2、`API-017` §10） |
+| 跨任务一致性（`hint` 服务端下发 / 相似连拍统一未支持态 / 隐私口径三页逐字一致） | 已统一裁决并在对应 Detail 落条款 |
+
+**须回写清单**（本注册表已就地改 A1 / A8；其余见各 Detail）：`requirements-analysis.md` §6.1 的 `D22` 行（A9）；`.agents/skills/zhaoxi-design-system/references/components.md` 的 B14/B15 相册数值（`traceability.md` §13.5 V1，设计侧）；`design/pages/37-album.html:166` 与 `design/pages/39-car-profile.html:125` 的文案（V3 / V4，设计侧）。
