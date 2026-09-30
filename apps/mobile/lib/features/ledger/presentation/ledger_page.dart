@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
@@ -6,19 +7,26 @@ import '../data/ledger_repository.dart';
 
 /// B5 #ledger 账本：深色总览 + AI 观察 + 分类 + 账单。
 class LedgerPage extends StatefulWidget {
-  const LedgerPage({super.key, this.debugSummary, this.debugEntries});
+  const LedgerPage({
+    super.key,
+    this.debugSummary,
+    this.debugEntries,
+    this.repository,
+  });
 
   final LedgerSummaryData? debugSummary;
   final List<LedgerEntryData>? debugEntries;
+  final LedgerRepository? repository;
 
   @override
   State<LedgerPage> createState() => _LedgerPageState();
 }
 
 class _LedgerPageState extends State<LedgerPage> {
-  final _repo = LedgerRepository();
+  late final LedgerRepository _repo = widget.repository ?? LedgerRepository();
   LedgerSummaryData? _summary;
   List<LedgerEntryData> _entries = [];
+  int? _autoCount;
   bool _loading = true;
   Object? _error;
 
@@ -42,10 +50,12 @@ class _LedgerPageState extends State<LedgerPage> {
     try {
       final summary = await _repo.fetchSummary();
       final entries = await _repo.fetchEntries();
+      final autoCount = await _loadAutoCount();
       if (!mounted) return;
       setState(() {
         _summary = summary;
         _entries = entries;
+        _autoCount = autoCount;
         _loading = false;
       });
     } catch (e) {
@@ -55,6 +65,28 @@ class _LedgerPageState extends State<LedgerPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<int?> _loadAutoCount() async {
+    try {
+      final summary = await _repo.fetchAutoSummary();
+      return summary.autoCount;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get _autoSubtitle {
+    final count = _autoCount;
+    if (count == null) return '看看 AI 记了什么';
+    if (count == 0) return '本月还没有自动记账';
+    return '本月已自动记 $count 笔';
+  }
+
+  Future<void> _openEntry(String location) async {
+    await context.push<bool>(location);
+    if (!mounted) return;
+    await _load();
   }
 
   @override
@@ -138,6 +170,30 @@ class _LedgerPageState extends State<LedgerPage> {
                   style: type.body
                       .copyWith(color: colors.bodyOnCard, height: 1.65),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: EntryCard(
+                      title: '手动记一笔',
+                      subtitle: '金额 + 分类，备注我帮你填',
+                      icon: AppIcons.wallet,
+                      accent: EntryAccent.money,
+                      onTap: () => _openEntry('/ledger/add'),
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: EntryCard(
+                      title: 'AI 自动记账',
+                      subtitle: _autoSubtitle,
+                      icon: AppIcons.sparkles,
+                      accent: EntryAccent.ai,
+                      onTap: () => _openEntry('/ledger/auto'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               _SectionTitle(title: '分类支出', hint: s.periodLabel),
