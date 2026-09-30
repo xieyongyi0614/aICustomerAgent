@@ -92,6 +92,65 @@ class LedgerCreateResult {
   final String id;
 }
 
+class LedgerPendingCandidate {
+  const LedgerPendingCandidate({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
+class LedgerPendingData {
+  const LedgerPendingData({
+    required this.pendingKey,
+    required this.reason,
+    required this.question,
+    this.candidates = const [],
+    this.amountMinor,
+    this.categoryHint,
+    this.direction,
+    this.merchantHint,
+  });
+
+  final String pendingKey;
+  final String reason;
+  final String question;
+  final List<LedgerPendingCandidate> candidates;
+  final int? amountMinor;
+  final String? categoryHint;
+  final String? direction;
+  final String? merchantHint;
+
+  String get amountText => amountMinor == null
+      ? ''
+      : (amountMinor! / 100).toStringAsFixed(2);
+}
+
+class LedgerAutoSummaryData {
+  const LedgerAutoSummaryData({
+    required this.periodLabel,
+    required this.autoCount,
+    required this.pendingCount,
+    this.accuracy,
+  });
+
+  final String periodLabel;
+  final int autoCount;
+  final int pendingCount;
+  final double? accuracy;
+}
+
+class LedgerRuleData {
+  const LedgerRuleData({
+    required this.keyword,
+    required this.categoryName,
+    this.sourceNote,
+  });
+
+  final String keyword;
+  final String categoryName;
+  final String? sourceNote;
+}
+
 class LedgerRepository {
   LedgerRepository({Dio? dio}) : _dio = dio ?? createDio();
 
@@ -212,5 +271,77 @@ class LedgerRepository {
     );
     final data = resp.data ?? const {};
     return LedgerCreateResult(id: data['id'] as String? ?? '');
+  }
+
+  Future<LedgerAutoSummaryData> fetchAutoSummary() async {
+    final resp = await _dio.get<Map<String, dynamic>>('/ledger/auto-summary');
+    final data = resp.data ?? const {};
+    final period = data['period'] as Map? ?? const {};
+    final accuracy = data['accuracy'];
+    return LedgerAutoSummaryData(
+      periodLabel: period['label'] as String? ?? 'month',
+      autoCount: data['auto_count'] as int? ?? 0,
+      pendingCount: data['pending_count'] as int? ?? 0,
+      accuracy: accuracy is num ? accuracy.toDouble() : null,
+    );
+  }
+
+  Future<List<LedgerPendingData>> fetchPending() async {
+    final resp = await _dio.get<Map<String, dynamic>>('/ledger/pending');
+    final items = (resp.data?['items'] as List?) ?? const [];
+    return [
+      for (final raw in items)
+        LedgerPendingData(
+          pendingKey: (raw as Map)['pending_key'] as String? ?? '',
+          reason: raw['reason'] as String? ?? '',
+          question: raw['question'] as String? ?? '',
+          amountMinor: raw['amount_minor'] as int?,
+          candidates: [
+            for (final option in (raw['candidates'] as List?) ?? const [])
+              LedgerPendingCandidate(
+                value: (option as Map)['value'] as String? ?? '',
+                label: option['label'] as String? ?? '',
+              ),
+          ],
+          categoryHint: (raw['ai_guess'] as Map?)?['category_hint'] as String?,
+          direction: (raw['ai_guess'] as Map?)?['direction'] as String?,
+          merchantHint: (raw['ai_guess'] as Map?)?['merchant_hint'] as String?,
+        ),
+    ];
+  }
+
+  Future<void> confirmPending(
+    String pendingKey, {
+    String? categoryName,
+    String? direction,
+    int? amountMinor,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/ledger/pending/$pendingKey/confirm',
+      data: {
+        'category_name': ?categoryName,
+        'direction': ?direction,
+        'amount_minor': ?amountMinor,
+      },
+    );
+  }
+
+  Future<void> ignorePending(String pendingKey) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/ledger/pending/$pendingKey/ignore',
+    );
+  }
+
+  Future<List<LedgerRuleData>> fetchRules() async {
+    final resp = await _dio.get<Map<String, dynamic>>('/ledger/rules');
+    final items = (resp.data?['items'] as List?) ?? const [];
+    return [
+      for (final raw in items)
+        LedgerRuleData(
+          keyword: (raw as Map)['keyword'] as String? ?? '',
+          categoryName: raw['category_name'] as String? ?? '',
+          sourceNote: raw['learned_from'] as String?,
+        ),
+    ];
   }
 }

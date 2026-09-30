@@ -10,6 +10,7 @@ void main() {
       '/life',
       '/ledger',
       '/ledger/add',
+      '/ledger/auto',
       '/health',
       '/memory',
       '/profile',
@@ -22,13 +23,14 @@ void main() {
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 15);
+    expect(chromeByPath.length, 16);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
     for (final p in const [
       '/ledger',
       '/ledger/add',
+      '/ledger/auto',
       '/chat/ledger',
       '/briefing',
       '/profile/privacy',
