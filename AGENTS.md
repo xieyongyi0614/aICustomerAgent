@@ -13,8 +13,7 @@
   - **V2.2.0** Character（CHAR-001~007）、**V2.3.0** World Simulation（WS-001~019）、**V2.4.0** Tool System（TOOL-001~012）、**V2.5.0** Planning System（PLAN-001~012）、**V2.6.0 / V2.6.1** Action Execution（TASK-001~009）+ Reflection（REF-001~007）。
   - **横切**：Channel Adapter 接入（Web + 飞书机器人真实链路验证）、后端架构重构（新增 `application/` 编排层）、Feature Flag 清理、`vXX_` 版本变量清理（2026-09-19 收官）、邮箱验证码登录（Redis 验证码存储 + EmailSender/SMTP 163 MVP，2026-09-27）。
 - **迁移链：基线迁移 `0001`（2026-09-29 将 0001~0058 折叠）+ 增量迁移（`0002` briefing_preferences 起）**；Schema 唯一真相 = Alembic 迁移链，新变更加 `0003+` 增量迁移。
-- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 六 phase / V2.1.0~V2.6.1 均已有清单）。已关闭的留白：V7.8-014 Metrics 周期快照由 V2.1.0 AGENT-006（`agent_metric_snapshots`）补齐。
-- memory 域 v1 残留清理已收官（2026-09-30：v1 尸体删除、`memory2/` 去后缀、写入双通道收敛投 v2 候选、类型亲和映射统一、V7-010 `scheduled_followup` 登记恢复）：v1 reclaim 循环移除系零功能损失（`memories.expires_at` 全仓无写入者，记忆老化由 v2 decay 状态机承接），上线后例行观察即可；台账全文见 git 历史 `docs/refactor/memory-domain-consolidation.md`（已移除）。
+- 上线前待办：按各版本 regression-checklist 执行真实模型人工回归（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 六 phase / V2.1.0~V2.6.1 均已有清单）。上线后另需例行观察一项：无「过期记忆未回收」类反馈（记忆老化已由 v2 decay 状态机承接）。
 
 ## 目录结构
 
