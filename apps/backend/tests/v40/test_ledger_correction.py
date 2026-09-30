@@ -192,7 +192,7 @@ def test_corrected_amount_reflected_in_summary(bootstrapped):
 
 
 def test_correction_audited(bootstrapped):
-    from app.services.governance.provenance import resolve_provenance
+    from app.services.governance.core import resolve_provenance
 
     account, original = bootstrapped
     outcome = cancel_entry(original.id, reason="撤", idempotency_key="audit-1", now=NOW)

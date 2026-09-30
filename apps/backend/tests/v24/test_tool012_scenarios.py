@@ -81,7 +81,7 @@ FAR_FUTURE = "2026-12-31T09:00:00"
 @pytest.fixture(autouse=True)
 def _clean_mutable_registries():
     from app.application import life_loop
-    from app.services import trigger_evaluator
+    from app.services.autonomy import trigger as trigger_evaluator
     from app.services.reflection import triggers
 
     trigger_evaluator._followup_registry.clear()
@@ -558,7 +558,7 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
         outbox_repository,
         world_repository,
     )
-    from app.services import trigger_evaluator
+    from app.services.autonomy import trigger as trigger_evaluator
     from tests.v24.tool006_support import NOW, await_until, seed_tick_fixture
 
     override_settings(

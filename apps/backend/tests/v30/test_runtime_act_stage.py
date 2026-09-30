@@ -209,7 +209,7 @@ class TestSingleEntry:
         assert outcome.result is None
 
     def test_noop_records_trace_reason(self, monkeypatch):
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         _stub_engine(monkeypatch, _record())
         trace = TurnTraceSession()
@@ -221,7 +221,7 @@ class TestSingleEntry:
 
     def test_unmappable_candidate_returns_empty_outcome(self, monkeypatch):
         calls = _stub_engine(monkeypatch, _record())
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         trace = TurnTraceSession()
         outcome = _run_act(_intention(tool_id=None), trace=trace)

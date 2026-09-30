@@ -15,7 +15,7 @@ import pytest
 from app.application import autonomy_engine
 from app.models.autonomy import ProactiveAction
 from app.repositories import proactive_repository
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 

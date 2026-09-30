@@ -12,7 +12,7 @@ from app.character.asuna import PERSISTENT_GOALS
 from app.core import llm_factory
 from app.core.db import Message
 from app.repositories import conversation_repository, decision_repository
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 
 NOW = datetime(2026, 8, 30, 14, 0)
 USER = "default-user"

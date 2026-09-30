@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 from app.services.autonomy_policy import PolicySnapshot, evaluate
 
 NOW = datetime(2026, 8, 30, 14, 0)

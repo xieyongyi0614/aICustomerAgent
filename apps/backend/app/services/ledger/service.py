@@ -7,9 +7,9 @@ from app.character.asuna.ledger_categories import SEED_CATEGORY_TREE
 from app.core.db import LedgerEntryRow
 from app.models.ledger import LedgerEntryDraft
 from app.repositories import ledger_repository
-from app.services.governance.models import DomainHandlers, ProvenanceRef
-from app.services.governance.provenance import record_provenance
-from app.services.governance.registry import register_domain
+from app.services.governance.core import DomainHandlers, ProvenanceRef
+from app.services.governance.core import record_provenance
+from app.services.governance.core import register_domain
 
 _REVERSE_DIRECTION = {"expense": "income", "income": "expense", "transfer": "transfer"}
 

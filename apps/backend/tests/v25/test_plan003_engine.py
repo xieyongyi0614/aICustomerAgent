@@ -13,7 +13,7 @@ from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK, RunCo
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import background_job_repository, goal_repository, loop_run_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
 

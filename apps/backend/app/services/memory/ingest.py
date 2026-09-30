@@ -14,7 +14,7 @@ from app.core.db import MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
 from app.services.action.memory_bridge import has_memory_effect, to_memory_candidates
-from app.services.relationship_milestone import MILESTONES
+from app.services.relationship.milestone import MILESTONES
 
 logger = logging.getLogger(__name__)
 

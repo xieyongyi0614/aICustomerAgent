@@ -17,7 +17,7 @@ from app.models.style_contract import (
 from app.prompts.builder import PromptBuilder
 from app.services.experience import style_context
 from app.services.experience.style_context import build_style_context
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 
 def _state() -> ConversationState:

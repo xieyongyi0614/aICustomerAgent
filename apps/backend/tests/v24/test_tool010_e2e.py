@@ -75,7 +75,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/base.py": "f992542b7585468c09f169a16d1f6d4aab36639eb35ae840936b201402359617",
     "app/channels/feishu/outbound.py": "50aa5f198d1793195ba32634e6d25e67fd21f160821957f96c4e5d78b1b800ac",
     "app/channels/feishu/client.py": "5f9fe0dadc8a5fa49a945f611d68600f3dc15d07e65d3d2463384a6f036bff7e",
-    "app/channels/feishu/delivery.py": "b82457b2f04ac0a6cbad31ca3121bfd48fa1f5607a7dfe7473c4c9679140b390",
+    # services 归位声明（2026-09-30，批次 3）：`channel_identity_service` → `identity/channel`
+    # 导入路径变更 —— 非 TOOL-010 改脏。原值 b82457b2。
+    "app/channels/feishu/delivery.py": "21f80983c08175e32542f1106d7fbfedd670a47e7540be9ecd30c097bb4e9749",
     # 开关清理声明（2026-09-28）：world_enabled 主闸删除后，四个能力文件里的恒真死闸
     # （world_gate / world_available 的 getattr 读取）随之移除 —— 非 TOOL-010 改脏。
     "app/services/action/capabilities/reminder.py": "aa217128408995eb57a18f06faad82c59f0a53cd53d06f730ad007215a4c9453",
@@ -84,24 +86,28 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
-    # services 归位声明（2026-09-30，批次 1~2）：`llm_budget_gate` → `life/gate`、
-    # `state_engine` / `goal_alignment` → `engines/*` 导入路径变更 —— 非 TOOL-010 改脏。
+    # services 归位声明（2026-09-30，批次 1~3）：`llm_budget_gate` → `life/gate`、
+    # `state_engine` / `goal_alignment` → `engines/*`、`state_service` 等领域包归位
+    # 导入路径变更 —— 非 TOOL-010 改脏。原值 0c671330、92f5d7b4。
     "app/services/decision_pipeline.py": "92f5d7b46313d925f0ce62fc2110af0b704a4f3eeab59c47f5480d50b502a6e4",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
     # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
-    # services 归位声明（2026-09-30，批次 1~2）：`memory_refs` → `memory/refs`、
-    # `behavior_engine` / `mode_service` → `engines/*` 导入路径变更 —— 非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "ee5ada6a83bcd2d03203940d56d980dc06b9ebb5404ccedd236ae7bfde3e9cc6",  # 再冻结：grounding 门控去掉 enabled 判断
+    # services 归位声明（2026-09-30，批次 1~3）：`memory_refs` → `memory/refs`、
+    # `behavior_engine` / `mode_service` / `state_engine` 等引擎收口、领域包归位
+    # 导入路径变更 —— 非 TOOL-010 改脏。原值 4aec8e65、ea741a87。
+    "app/application/chat_pipeline.py": "9054ce0d615eaec5f1be6af37bd29fcb8acf46f9e2a6648e31882ec0130febb0",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "6778abc47d72ac7542c3ada88593e36097c6ed79decd3cf18b6206135cc5d3d4",  # 前值 8920af98（services 归位批次 2：`behavior_engine` → `engines/behavior` 导入路径变更）；再前值 378bdd6a、30125e6e、2040a4df、c1702717
+    "app/application/post_process.py": "8aa2b63fb77c70a59b5f0648444811a4232fa7a20f7232eecad53a044c1d439d",  # 前值 6778abc4（services 归位批次 3：conversation/state 等领域包导入路径变更）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
-    "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
+    # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
+    # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。
+    "app/prompts/builder.py": "2683cf60bb2ea47740e274364c54a5775cc0500d6cfb278cf0769db68549b7de",
 }
 """整文件零 diff 冻结面。
 

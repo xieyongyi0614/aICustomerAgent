@@ -25,7 +25,7 @@ from app.engines import relationship_evolution
 from app.engines import relationship_signal
 from app.engines import state as state_engine
 from app.engines import relationship_conflict
-from app.services import relationship_milestone
+from app.services.relationship import milestone as relationship_milestone
 from app.repositories import (
     relationship_conflict_repository,
     relationship_snapshot_repository,

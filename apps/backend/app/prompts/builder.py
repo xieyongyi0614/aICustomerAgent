@@ -30,7 +30,7 @@ from app.prompts.goal import build_goal_section, build_intention_section
 from app.prompts.scene import build_scene_sections
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import render_action_section
-from app.services.relationship_milestone import MILESTONES
+from app.services.relationship.milestone import MILESTONES
 
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",

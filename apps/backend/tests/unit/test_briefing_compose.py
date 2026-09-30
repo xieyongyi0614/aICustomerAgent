@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.repositories import briefing_preference_repository
-from app.services import weather
+from app.services.briefing import weather
 from app.services.briefing import compose
 from app.services.life import tasks as task_service
 

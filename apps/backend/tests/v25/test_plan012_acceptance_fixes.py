@@ -15,7 +15,8 @@ from app.application import life_loop
 from app.core.settings import get_settings
 from app.models.plan import PlanStepOutcome
 from app.repositories import goal_repository
-from app.services import goal_execution, goal_planning
+from app.services.goal import execution as goal_execution
+from app.services.goal import planning as goal_planning
 from app.services.planning import observer as observer_mod
 from app.services.planning.executor_bridge import PlanExecutorBridge
 

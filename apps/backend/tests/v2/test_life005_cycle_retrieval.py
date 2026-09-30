@@ -22,7 +22,7 @@ from app.repositories import (
 from app.models.goal import GoalRecord
 from app.repositories import goal_repository
 from app.services.life import budget as life_loop_budget
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 USER = "life-memory-user"
@@ -126,7 +126,7 @@ class TestProactiveDigestInjection:
         self, db_session_factory, monkeypatch, override_settings
     ):
         from app.models.autonomy import ProactiveAction
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
 
         override_settings()
         token = memory_digest_var.set("重要记忆摘要")
@@ -180,7 +180,7 @@ class TestProactiveDigestInjection:
         self, db_session_factory, monkeypatch, override_settings
     ):
         from app.models.autonomy import ProactiveAction
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
 
         assert memory_digest_var.get() is None
         captured: dict = {}

@@ -39,7 +39,7 @@ AUTONOMY_MODULES = (
     "app/services/autonomy_policy.py",
     "app/application/autonomy_engine.py",
     "app/services/decision_pipeline.py",
-    "app/services/trigger_evaluator.py",
+    "app/services/autonomy/trigger.py",
 )
 
 TOOL_MODULES = (
@@ -188,7 +188,7 @@ class TestBoundaryStaticAssertions:
             "app.services.autonomy_policy",
             "app.application.autonomy_engine",
             "app.services.decision_pipeline",
-            "app.services.proactive_executor",
+            "app.services.autonomy.executor",
             "app.repositories.proactive_repository",
         )
         for path in scan.planning_modules():

@@ -22,7 +22,7 @@ import pytest
 from app.character.asuna.tool import TOOL_UNAVAILABLE_REASON, TOOL_UNAVAILABLE_TOOL_IDS
 from app.core.settings import get_settings
 from app.models.plan import PlanContext
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
 from app.services.planning import goal_contract

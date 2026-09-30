@@ -19,10 +19,11 @@ from app.repositories import (
     conversation_repository,
     goal_repository,
 )
-from app.services import goal_arbitration, goal_observation
-from app.services.evaluation_context import collect_goal_slice
-from app.services.evaluation_rules import run_rules
-from app.services.goal_planning import (
+from app.services.goal import arbitration as goal_arbitration
+from app.services.goal import observation as goal_observation
+from app.services.evaluation.context import collect_goal_slice
+from app.services.evaluation.rules import run_rules
+from app.services.goal.planning import (
     TRIGGER_CREATED,
     materialize,
     plan_goal,
@@ -77,13 +78,13 @@ def gate_env(db_session_factory, override_settings, monkeypatch):
     from app.repositories import decision_repository
 
     monkeypatch.setattr(
-        "app.services.goal_planning.development_aggregate.read_overlay", _overlay
+        "app.services.goal.planning.development_aggregate.read_overlay", _overlay
     )
     monkeypatch.setattr(
-        "app.services.goal_arbitration.development_aggregate.read_overlay", _overlay
+        "app.services.goal.arbitration.development_aggregate.read_overlay", _overlay
     )
     monkeypatch.setattr(
-        "app.services.goal_planning._ask_llm_with_retry",
+        "app.services.goal.planning._ask_llm_with_retry",
         lambda messages, settings: _planning_stub(messages, settings),
     )
     monkeypatch.setattr(
@@ -97,7 +98,7 @@ def gate_env(db_session_factory, override_settings, monkeypatch):
 def _planning_stub(messages, settings):
     import json
 
-    from app.services.goal_planning import PlanningProposal
+    from app.services.goal.planning import PlanningProposal
 
     payload = json.loads(messages[1][1])
     steps = 1 if payload.get("goal", {}).get("domain") == "relationship" else 2
@@ -142,7 +143,7 @@ def _new_session(user_id: str, index: int) -> str:
 
 def _run_issues(user_id: str) -> set:
     slice_ = collect_goal_slice(user_id, now=NOW)
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     context = EvaluationContext(
         subject="goal",

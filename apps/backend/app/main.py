@@ -21,14 +21,14 @@ from app.services.development.audit import register_rollback_listener
 from app.services.development.policy import (
     register_runtime as register_development_runtime,
 )
-from app.services.goal_planning import register_runtime as register_goal_runtime
+from app.services.goal.planning import register_runtime as register_goal_runtime
 from app.services.memory.job_worker import run_job_worker_loop
 from app.services.planning.revision_listener import (
     register_runtime as register_plan_revision_listener,
 )
 from app.services.reflection.reflector import register_executor
 from app.services.reflection.triggers import register_with_job_worker
-from app.services.relationship_narrative import register_narrative_listener
+from app.services.relationship.narrative import register_narrative_listener
 
 logging.basicConfig(level=logging.INFO)
 

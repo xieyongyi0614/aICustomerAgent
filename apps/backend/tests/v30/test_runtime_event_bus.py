@@ -14,7 +14,7 @@ from app.application.agent_runtime.contracts import (
     EVENT_RUN_OPENED,
     EVENT_STAGE_COMPLETED,
 )
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 EVENTS_PATH = Path(events.__file__)
 FORBIDDEN_IMPORTS = (

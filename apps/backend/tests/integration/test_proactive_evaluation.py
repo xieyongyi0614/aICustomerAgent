@@ -6,7 +6,7 @@ import pytest
 from app.models.autonomy import ProactiveAction
 from app.models.evaluation_judge import ProactiveJudgeResult
 from app.repositories import evaluation_repository, proactive_repository
-from app.services.evaluation_engine import schedule_proactive_evaluation
+from app.services.evaluation.engine import schedule_proactive_evaluation
 
 ACTION_ID = "act-eval-1"
 
@@ -106,7 +106,7 @@ async def test_proactive_evaluation_quiet_hours_issue(
 async def test_evaluation_failure_does_not_break_send_path(
     db_session_factory, fake_llm, enable_evaluation, monkeypatch
 ):
-    from app.services import evaluation_engine
+    from app.services.evaluation import engine as evaluation_engine
 
     def boom(*args, **kwargs):
         raise RuntimeError("merge failed")

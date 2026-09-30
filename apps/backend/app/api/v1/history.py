@@ -7,7 +7,7 @@ from app.api.v1.schemas import (
     MemoryItemOut,
     MessageItemOut,
 )
-from app.services import history_service
+from app.services.conversation import history as history_service
 
 history_router = APIRouter()
 

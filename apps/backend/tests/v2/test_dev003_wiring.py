@@ -16,7 +16,7 @@ from app.models.behavior_strategy import BehaviorDirective
 from app.models.conversation import ConversationState
 from app.models.development import DevelopmentOverlay, DevelopmentStyleParams
 from app.engines import behavior as behavior_engine
-from app.services import goal_service
+from app.services.goal import service as goal_service
 from app.services.development import aggregate
 
 pytestmark = pytest.mark.xdist_group("development")

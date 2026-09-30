@@ -6,8 +6,8 @@
 
 from dataclasses import dataclass
 
-from app.services.goal_service import SelectedGoal
-from app.services.intention_policy import ValidatedIntention
+from app.services.goal.service import SelectedGoal
+from app.services.goal.intention import ValidatedIntention
 
 GOAL_BUDGET_CHARS = 120
 INTENTION_BUDGET_CHARS = 80

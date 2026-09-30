@@ -46,17 +46,17 @@ from app.application.agent_runtime.models import (
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.engines import behavior as behavior_engine
-from app.services import context_builder
-from app.services import conversation_service
-from app.services import goal_service
+from app.services.conversation import context as context_builder
+from app.services.conversation import service as conversation_service
+from app.services.goal import service as goal_service
 from app.engines import mode as mode_service
-from app.services import scene_service
-from app.services import state_service
-from app.services import trace_collector
-from app.services.goal_service import SelectedGoal
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
+from app.services.observability import collector as trace_collector
+from app.services.goal.service import SelectedGoal
 from app.services.action.detector import detect_action_intent
 from app.services.experience.style_context import build_style_context
-from app.services.intention_policy import enforce as enforce_intention
+from app.services.goal.intention import enforce as enforce_intention
 from app.chains.answer_chain import answer_max_tokens
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import build_action_context
@@ -277,7 +277,8 @@ def _run_foreground_decision(
     目标栈为只读模式（铁律 4：长期化写入只发生在后台）。
     """
     try:
-        from app.services import decision_pipeline, goal_stack as goal_stack_service
+        from app.services import decision_pipeline
+        from app.services.goal import stack as goal_stack_service
 
         stack = goal_stack_service.evaluate_stack(
             user_id, now, retire_overdue_enabled=False

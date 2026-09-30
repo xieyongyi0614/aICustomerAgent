@@ -13,7 +13,7 @@ from app.application import life_loop
 from app.application.agent_runtime import profiles
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.repositories import goal_repository, loop_run_repository
-from app.services import goal_observation
+from app.services.goal import observation as goal_observation
 from app.services.life import budget as life_loop_budget
 from app.services.planning import observer as plan_observer
 from app.services.planning.observer import PlanObserver
@@ -84,7 +84,7 @@ class TestShapeSnapshots:
         assert "_process_due_retries" in source, "退避仍由既有 action 维护步承载"
 
     def test_goal_observation_entry_points_are_still_registered(self):
-        from app.services.trace_collector import TRACE_STEP_NAMES
+        from app.services.observability.collector import TRACE_STEP_NAMES
 
         assert "goal_observation" in TRACE_STEP_NAMES
         assert callable(goal_observation.advance_user_goals)

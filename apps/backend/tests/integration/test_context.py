@@ -1,6 +1,7 @@
 import pytest
 
-from app.services import context_builder, conversation_service
+from app.services.conversation import context as context_builder
+from app.services.conversation import service as conversation_service
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.relationship import RelationshipState

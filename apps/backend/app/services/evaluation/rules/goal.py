@@ -15,8 +15,8 @@ from app.models.evaluation import (
     IssueCode,
     build_issue,
 )
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import EvaluationRule
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import EvaluationRule
 
 _TERMINAL_STATUSES = ("completed", "failed", "abandoned", "expired", "cancelled")
 _DOMAIN_VALUES = ("personal", "relationship", "world")

@@ -14,7 +14,7 @@ from app.repositories import (
     relationship_repository,
     world_repository,
 )
-from app.services import channel_identity_service
+from app.services.identity import channel as channel_identity_service
 
 TOKEN_URL_PART = "tenant_access_token"
 APP_SETTINGS = {

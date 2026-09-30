@@ -24,7 +24,8 @@ from app.repositories import (
     outbox_repository,
     world_repository,
 )
-from app.services import decision_pipeline, trigger_evaluator
+from app.services import decision_pipeline
+from app.services.autonomy import trigger as trigger_evaluator
 from app.services.action.executor import ActionExecutor
 from app.services.tool.executor import ToolExecutor
 from tests.v24.tool006_support import (
@@ -185,7 +186,7 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
     assert {candidate["tool_id"] for candidate in capability_candidates} == set(capabilities)
 
     session = __import__(
-        "app.services.trace_collector", fromlist=["get_trace_collector"]
+        "app.services.observability.collector", fromlist=["get_trace_collector"]
     ).get_trace_collector().get(delivered[0])
     step = next(s for s in session.steps if s.name == autonomy_engine.AUTONOMY_TOOL_SURFACE_STEP)
     assert step.extra["run_kind"] == "autonomous_tick"

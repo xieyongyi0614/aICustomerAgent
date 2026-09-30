@@ -13,7 +13,7 @@ from app.models.action import ActionRecord
 from app.models.relationship import RelationshipDelta, RelationshipEvent
 from app.repositories import relationship_event_repository, relationship_repository
 from app.engines import state as state_engine
-from app.services.state_service import _day_impact_totals
+from app.services.conversation.state import _day_impact_totals
 
 logger = logging.getLogger(__name__)
 

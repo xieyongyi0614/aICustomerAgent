@@ -19,7 +19,7 @@ from app.models.relationship import RelationshipState
 from app.models.scene import SceneContext, SceneState
 from app.prompts.builder import PromptBuilder
 from app.prompts.goal import GoalContext
-from app.services.goal_service import SelectedGoal
+from app.services.goal.service import SelectedGoal
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent / "golden"
 

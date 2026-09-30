@@ -1,9 +1,9 @@
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     EvaluationContext,
     MemoryRef,
     RecentMessage,
 )
-from app.services.evaluation_rules import memory as memory_rules
+from app.services.evaluation.rules import memory as memory_rules
 
 
 def make_ctx(
@@ -103,7 +103,7 @@ def test_missed_memory_skips_irrelevant():
 
 
 def test_rules_registered():
-    from app.services import evaluation_rules
+    from app.services.evaluation import rules as evaluation_rules
 
     codes = {rule.code for rule in evaluation_rules.RULES}
     assert "memory_fabrication_candidate" in codes

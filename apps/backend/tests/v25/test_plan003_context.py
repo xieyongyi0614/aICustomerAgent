@@ -172,7 +172,7 @@ class TestHardDependencies:
     ):
         calls: list = []
         monkeypatch.setattr(
-            "app.services.goal_planning._ask_llm_with_retry",
+            "app.services.goal.planning._ask_llm_with_retry",
             lambda messages, settings: calls.append("llm"),
         )
         ghost = GoalRecord(
@@ -437,7 +437,7 @@ class TestAssemblyDiscipline:
         monkeypatch.setattr(goal_repository, "get_goal", _forbidden)
         monkeypatch.setattr(world_engine, "collect_facts", _forbidden)
         monkeypatch.setattr(
-            "app.services.goal_planning.propose_plan", _forbidden
+            "app.services.goal.planning.propose_plan", _forbidden
         )
         probe = plan_context.PlanContextProbe()
         assert probe.world_available(V25_USER) is False

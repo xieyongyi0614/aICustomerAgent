@@ -1,5 +1,5 @@
 from app.models.scene import PendingAction, SceneState
-from app.services import scene_service
+from app.services.conversation import scene as scene_service
 
 
 def _state(pending=None):

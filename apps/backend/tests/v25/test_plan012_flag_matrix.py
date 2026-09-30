@@ -10,7 +10,7 @@ import pytest
 
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 
 from . import plan012_support as support
 from .test_plan001_flag_regression import FROZEN_PROMPT_DIGEST, _digest

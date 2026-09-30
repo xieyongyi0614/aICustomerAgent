@@ -28,7 +28,7 @@ from app.repositories import (
 )
 from app.services import decision_pipeline
 from app.services.development import evolution
-from app.services import goal_stack
+from app.services.goal import stack as goal_stack
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "review-fix-user"
@@ -38,7 +38,7 @@ DOMAIN_MODULES = (
     "app/services/memory",
     "app/services/reflection",
     "app/engines/relationship_signal.py",
-    "app/services/relationship_milestone.py",
+    "app/services/relationship/milestone.py",
     "app/engines/relationship_evolution.py",
     "app/services/action",
     "app/services/character_action",
@@ -428,7 +428,7 @@ class TestContextVarLifecycle:
     @pytest.mark.asyncio
     async def test_background_run_resets_snapshot(self, db_session_factory, v21_on, monkeypatch):
         from app.application import autonomy_engine, life_loop
-        from app.services import trigger_evaluator
+        from app.services.autonomy import trigger as trigger_evaluator
 
         trigger_evaluator._followup_registry.clear()
         conversation_repository.get_or_create_conversation("cv-s1", USER)

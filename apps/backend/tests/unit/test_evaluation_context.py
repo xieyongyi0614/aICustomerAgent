@@ -13,7 +13,7 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import EmotionEvent, TurnAnalysis
 from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     build_digest,
     collect_turn_context,
 )
@@ -27,7 +27,7 @@ def stub_repos(monkeypatch):
         emotion_history_repository,
         relationship_repository,
     )
-    from app.services import conversation_service
+    from app.services.conversation import service as conversation_service
 
     monkeypatch.setattr(conversation_service, "load_window", lambda *a, **k: [])
     monkeypatch.setattr(

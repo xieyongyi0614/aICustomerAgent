@@ -14,7 +14,7 @@ from app.repositories import (
     relationship_repository,
     world_repository,
 )
-from app.services import channel_identity_service as service
+from app.services.identity import channel as service
 
 
 def _resolve(open_id):

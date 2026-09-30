@@ -8,7 +8,8 @@ from app.application import outbox_consumer
 from app.core.settings import get_settings
 from app.models.world import EventSource
 from app.repositories import goal_repository, outbox_repository, world_repository
-from app.services import goal_arbitration, goal_observation
+from app.services.goal import arbitration as goal_arbitration
+from app.services.goal import observation as goal_observation
 from app.services.world import event_bridge
 
 pytestmark = pytest.mark.xdist_group("ws010")

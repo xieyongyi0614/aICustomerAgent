@@ -11,8 +11,8 @@ from app.models.evaluation import (
     IssueCode,
     build_issue,
 )
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import EvaluationRule, lexicons
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import EvaluationRule, lexicons
 from app.character.asuna.evaluation import PERSONA_CONTRADICTION_PATTERNS
 
 _PERSONA_PATTERNS: dict[str, tuple] = {}

@@ -117,7 +117,7 @@ def resolve_session(
     `session_id` 一律经既有 `channel_identity_service.build_session_id` 派生（**结果不变**）。
     """
     from app.application.agent_runtime import session as session_module
-    from app.services import channel_identity_service
+    from app.services.identity import channel as channel_identity_service
 
     _require_known(channel)
     session_id = channel_identity_service.build_session_id(channel, external_user_id)

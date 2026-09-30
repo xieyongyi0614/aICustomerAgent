@@ -195,7 +195,7 @@ async def _run_plan_step(
     """
     from app.application import life_loop
     from app.core.settings import get_settings
-    from app.services import goal_service
+    from app.services.goal import service as goal_service
 
     def _load() -> tuple[Any, Any]:
         return (

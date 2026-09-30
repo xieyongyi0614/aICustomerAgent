@@ -4,9 +4,9 @@ from dataclasses import replace
 
 from app.models.evaluation import IssueCode, IssueSeverity
 from app.models.relationship import RelationshipDelta, RelationshipEvent
-from app.services.evaluation_context import EvaluationContext, RelationshipSlice
-from app.services.evaluation_rules import relationship as rel_rules
-from app.services.evaluation_rules.relationship import (
+from app.services.evaluation.context import EvaluationContext, RelationshipSlice
+from app.services.evaluation.rules import relationship as rel_rules
+from app.services.evaluation.rules.relationship import (
     LEDGER_RECONCILIATION,
     RATE_COMPLIANCE,
     RELATIONSHIP_JUMP,

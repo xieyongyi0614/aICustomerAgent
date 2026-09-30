@@ -14,7 +14,7 @@ from app.core import llm_factory
 from app.core.db import Message
 from app.main import app
 from app.repositories import conversation_repository, goal_repository, trace_repository
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from tests.conftest import wait_until
 
 NOW = datetime(2026, 8, 30, 14, 0)

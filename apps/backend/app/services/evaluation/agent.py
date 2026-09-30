@@ -15,7 +15,7 @@ from app.repositories import (
     decision_repository,
     goal_repository,
 )
-from app.services import state_service
+from app.services.conversation import state as state_service
 
 logger = logging.getLogger(__name__)
 

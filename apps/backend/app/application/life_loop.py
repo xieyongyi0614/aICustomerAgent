@@ -36,11 +36,11 @@ from app.repositories import (
 from app.application.life_loop_context import memory_digest_var
 from app.services.tool.confirmation import non_todo_payload_kinds
 from app.services.life import budget as life_loop_budget
-from app.services import state_service
-from app.services import goal_planning
-from app.services import goal_arbitration
-from app.services import goal_execution
-from app.services import goal_observation
+from app.services.conversation import state as state_service
+from app.services.goal import planning as goal_planning
+from app.services.goal import arbitration as goal_arbitration
+from app.services.goal import execution as goal_execution
+from app.services.goal import observation as goal_observation
 from app.services import autonomy_policy
 from app.services.planning import engine as planning_engine
 from app.services.planning import observer as plan_observer
@@ -51,7 +51,7 @@ from app.application.worker_loop import run_worker_loop
 from app.models.observability import TraceKind
 from app.repositories import memory_repository, outbox_repository
 from app.services.reflection import triggers as reflection_triggers
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 logger = logging.getLogger(__name__)
 

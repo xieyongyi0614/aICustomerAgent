@@ -17,19 +17,18 @@ from app.services.governance import (
     registered_domains,
     resolve_provenance,
 )
-from app.services.governance import provenance as provenance_mod
-from app.services.governance import registry as registry_mod
+from app.services.governance import core as governance_core
 
 BACKEND = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
-    registry_mod.reset_registry()
-    provenance_mod.reset_provenance_store()
+    governance_core.reset_registry()
+    governance_core.reset_provenance_store()
     yield
-    registry_mod.reset_registry()
-    provenance_mod.reset_provenance_store()
+    governance_core.reset_registry()
+    governance_core.reset_provenance_store()
 
 
 def _handlers(name: str, *, export=None, delete=None, provenance=None):
@@ -121,7 +120,7 @@ def test_delete_reports_failed_domains():
 
 
 def test_delete_goes_through_repositories():
-    source = (BACKEND / "app" / "services" / "governance" / "delete.py").read_text(
+    source = (BACKEND / "app" / "services" / "governance" / "core.py").read_text(
         encoding="utf-8"
     )
     assert "Base.metadata" not in source

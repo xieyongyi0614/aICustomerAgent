@@ -11,7 +11,7 @@ import pytest
 from app.application.agent_runtime import inbound as gateway
 from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
 from app.channels.base import InboundMessage
-from app.services import channel_identity_service
+from app.services.identity import channel as channel_identity_service
 
 INBOUND_PATH = Path(gateway.__file__)
 FORBIDDEN_IMPORTS = (

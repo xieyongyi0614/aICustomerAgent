@@ -16,15 +16,15 @@ from app.core.db import DevelopmentChangeRow, DevelopmentStateRow
 from app.main import app
 from app.services.development import aggregate
 from app.services.development import evaluation as development_evaluation
-from app.services.evaluation_context import DevelopmentChangeRef, DevelopmentStateRef, DevelopmentSlice
-from app.services.evaluation_rules import run_rules
-from app.services.evaluation_rules.development import (
+from app.services.evaluation.context import DevelopmentChangeRef, DevelopmentStateRef, DevelopmentSlice
+from app.services.evaluation.rules import run_rules
+from app.services.evaluation.rules.development import (
     ChangeUnattributedRule,
     ConcurrentActiveRule,
     OverCapRule,
     StaleActiveRule,
 )
-from app.services.trace_collector import TRACE_STEP_NAMES
+from app.services.observability.collector import TRACE_STEP_NAMES
 
 pytestmark = pytest.mark.xdist_group("development")
 
@@ -127,7 +127,7 @@ def test_rule_skips_when_slice_absent():
 
 
 def _ctx(development: DevelopmentSlice | None):
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     return EvaluationContext(
         subject="offline_batch",
@@ -183,7 +183,7 @@ def test_stale_active_rule_detects_invalidated_source():
 
 
 def test_rules_registered_in_engine():
-    from app.services.evaluation_rules import RULES
+    from app.services.evaluation.rules import RULES
 
     codes = {type(rule).code for rule in RULES}
     assert {

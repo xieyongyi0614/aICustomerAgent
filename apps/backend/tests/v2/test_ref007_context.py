@@ -10,7 +10,7 @@ import pytest
 
 from app.core.db import InsightRow
 from app.prompts.builder import PromptBuilder
-from app.services.context_builder import _load_context_insights
+from app.services.conversation.context import _load_context_insights
 from app.services.reflection import lifecycle as reflection_lifecycle
 
 USER = "u-ctx"

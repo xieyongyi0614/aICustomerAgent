@@ -1,7 +1,7 @@
 import pytest
 
 from app.repositories import conversation_repository as repo
-from app.services import conversation_service as svc
+from app.services.conversation import service as svc
 
 
 def test_context_across_turns(db_session_factory):

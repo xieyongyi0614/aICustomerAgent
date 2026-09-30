@@ -391,7 +391,7 @@ class TestRepositoryAccessLayering:
 
     def test_domain_reads_go_through_service_facades(self):
         from app.services.ledger import domain as domain_ledger
-        from app.services import goal_service
+        from app.services.goal import service as goal_service
         from app.services.delivery import outbox as outbox_service
         from app.services.action import manager as action_manager
 

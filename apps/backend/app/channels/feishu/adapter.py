@@ -24,7 +24,9 @@ from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.channels.feishu.inbox import SessionInbox
 from app.core import llm_factory
 from app.core.settings import get_settings
-from app.services import agent_service, channel_identity_service, trace_collector
+from app.services import agent_service
+from app.services.identity import channel as channel_identity_service
+from app.services.observability import collector as trace_collector
 from app.services.agent_service import EmptyLLMResponseError
 
 logger = logging.getLogger(__name__)

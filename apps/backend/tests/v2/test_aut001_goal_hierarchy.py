@@ -19,7 +19,7 @@ from app.models.goal import (
     validate_sub_goals,
 )
 from app.repositories import goal_repository
-from app.services import goal_service
+from app.services.goal import service as goal_service
 from app.character.asuna import PERSISTENT_GOALS
 
 pytestmark = pytest.mark.xdist_group("migration")

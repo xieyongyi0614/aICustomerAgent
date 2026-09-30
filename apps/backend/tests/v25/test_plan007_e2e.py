@@ -29,7 +29,8 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import conversation_service, trigger_evaluator
+from app.services.conversation import service as conversation_service
+from app.services.autonomy import trigger as trigger_evaluator
 
 from . import plan007_support as support
 

@@ -40,7 +40,8 @@ from app.application.agent_runtime.models import (
     RUN_KIND_FOREGROUND_CHAT,
 )
 from app.application.agent_runtime.profiles import ProfileSpec
-from app.services import decision_pipeline, goal_stack
+from app.services import decision_pipeline
+from app.services.goal import stack as goal_stack
 
 logger = logging.getLogger(__name__)
 

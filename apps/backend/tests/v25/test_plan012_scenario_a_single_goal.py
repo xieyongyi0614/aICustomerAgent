@@ -11,7 +11,7 @@ from app.models.tool import ToolSurface
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.models.goal import SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import memory_policy as plan_memory_policy
 from app.services.planning.decompose import PlanValidator

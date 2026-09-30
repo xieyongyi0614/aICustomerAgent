@@ -21,9 +21,9 @@ from app.repositories import (
     decision_repository,
     proactive_repository,
 )
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from app.services.delivery import outbound as proactive_delivery
-from app.services import proactive_executor
+from app.services.autonomy import executor as proactive_executor
 from app.services.delivery.outbound import ProactiveOutbound
 
 NOW = datetime(2026, 8, 30, 14, 0)

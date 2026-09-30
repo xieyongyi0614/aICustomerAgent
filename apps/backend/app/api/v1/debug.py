@@ -81,7 +81,7 @@ from app.services.tool.surface import ToolSurfaceResolver
 from app.services.tool.user_defined import get_user_tool_registrar
 from app.services.tool.world_context import build_tool_context
 from app.services.tool.world_intent import get_world_intent_submitter
-from app.services.trace_collector import get_trace_collector
+from app.services.observability.collector import get_trace_collector
 from app.repositories import (
     relationship_milestone_repository,
     relationship_repository,

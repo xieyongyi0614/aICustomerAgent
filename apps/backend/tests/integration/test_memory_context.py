@@ -5,7 +5,7 @@ import pytest
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.memory import UserMemory
 from app.prompts.builder import PromptBuilder
-from app.services.context_builder import build as build_context
+from app.services.conversation.context import build as build_context
 
 
 def make_v4_memory(id: str, content: str, type: str = "user_preference", **overrides):

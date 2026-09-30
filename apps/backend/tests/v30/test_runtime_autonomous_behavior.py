@@ -117,7 +117,7 @@ class TestDeliveryCoordination:
         assert fallback.calls == [(USER, "hi", DEDUPE)]
 
     async def test_quiet_hours_blocks_delivery(self, monkeypatch):
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
         from app.models.autonomy import ProactiveAction
         from datetime import datetime
 

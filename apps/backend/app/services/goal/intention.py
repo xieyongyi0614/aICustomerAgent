@@ -19,7 +19,7 @@ from app.models.intention import (
     IntentionType,
     ValidatedIntention,
 )
-from app.services.goal_service import GOAL_DESCRIPTION_REPAIR, SelectedGoal
+from app.services.goal.service import GOAL_DESCRIPTION_REPAIR, SelectedGoal
 
 logger = logging.getLogger(__name__)
 

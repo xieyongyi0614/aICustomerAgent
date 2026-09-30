@@ -16,7 +16,7 @@ from app.core.db import ActionRecordRow, BackgroundJobRow, InsightRow
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
 from app.services.planning import goal_contract

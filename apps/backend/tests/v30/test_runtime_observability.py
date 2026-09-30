@@ -36,7 +36,7 @@ from app.repositories import (
     trace_repository,
 )
 from app.services.observability import trace_query
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 QUERY_PATH = Path(trace_query.__file__)
 FACADE_PATH = Path(debug_view_module.__file__)

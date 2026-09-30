@@ -18,7 +18,7 @@ from app.application.agent_runtime.session import (
     resume_session,
 )
 from app.repositories import loop_run_repository
-from app.services.channel_identity_service import build_session_id
+from app.services.identity.channel import build_session_id
 
 SESSION_PATH = Path(session_module.__file__)
 FORBIDDEN = ("app.chains", "app.prompts", "app.channels.feishu", "conversation_repository")

@@ -28,7 +28,7 @@ from app.core.settings import get_settings
 from app.models.observability import DecisionKind
 from app.models.plan import PlanAdvance
 from app.repositories import goal_repository, outbox_repository
-from app.services import goal_arbitration
+from app.services.goal import arbitration as goal_arbitration
 from app.services.planning import observer as observer_mod
 from app.services.planning.observer import PlanObserver
 
@@ -153,8 +153,8 @@ class TestTerminalBroadcast:
     ):
         """既有两条路径的广播未被动过（本任务只加计划层的迁移路径接线）。"""
         sources = {
-            "app/services/goal_observation.py": ('"completed"',),
-            "app/services/goal_arbitration.py": ('"abandoned"',),
+            "app/services/goal/observation.py": ('"completed"',),
+            "app/services/goal/arbitration.py": ('"abandoned"',),
         }
         for relative, fragments in sources.items():
             text = (support.repo_root() / relative).read_text(encoding="utf-8")

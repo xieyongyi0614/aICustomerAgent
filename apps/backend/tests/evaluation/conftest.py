@@ -13,8 +13,9 @@ from app.models.evaluation_judge import (
     ProactiveJudgeResult,
     TurnJudgeResult,
 )
-from app.services import evaluation_engine, evaluation_rules
-from app.services.evaluation_context import (
+from app.services.evaluation import engine as evaluation_engine
+from app.services.evaluation import rules as evaluation_rules
+from app.services.evaluation.context import (
     BehaviorSlice,
     EmotionSlice,
     EvaluationContext,

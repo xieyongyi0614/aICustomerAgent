@@ -22,7 +22,7 @@ from app.repositories import (
     memory_repository,
     personality_state_repository,
 )
-from app.services import state_service
+from app.services.conversation import state as state_service
 from app.services.development import aggregate as development_aggregate
 from app.application import agent_state_context
 

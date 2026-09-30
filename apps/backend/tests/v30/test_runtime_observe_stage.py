@@ -376,7 +376,7 @@ class TestDegradation:
         assert item.present_fact_sets() == ("user_input",)
 
     def test_trace_records_degradation(self):
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         class _Exploding:
             @property

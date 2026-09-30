@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.v1.auth import require_user
-from app.services import history_service
+from app.services.conversation import history as history_service
 from app.services.observability.analytics import track_event
 from app.services.insights import query as insights_query
 from app.services.ledger import query as ledger_query

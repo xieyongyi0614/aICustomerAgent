@@ -13,7 +13,7 @@ import pytest
 from app.core.settings import get_settings
 from app.models.goal import GoalRecord
 from app.models.tool import ToolSurface
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import decompose as decompose_mod
 from app.services.tool.registry import ToolRegistry, register_builtin_tools
 

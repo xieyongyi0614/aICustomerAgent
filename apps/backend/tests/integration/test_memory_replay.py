@@ -10,7 +10,7 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import state_service
+from app.services.conversation import state as state_service
 
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)

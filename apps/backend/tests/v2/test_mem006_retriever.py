@@ -292,7 +292,7 @@ class TestContextBuilderWiring:
     def test_v2_branch_feeds_select_for_context(self, retrieve_db, monkeypatch):
         from app.models.character_state import CharacterState
         from app.models.relationship import RelationshipState
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         _memory("m1", "用户喜欢吃西瓜")
 

@@ -13,7 +13,7 @@ from datetime import datetime
 from app.application.agent_runtime import profiles, trigger_router
 from app.application import agent_state_assembler
 from app.application.agent_state_assembler import run_state_snapshot_stage
-from app.services import goal_stack
+from app.services.goal import stack as goal_stack
 from app.application.agent_runtime.llm_gateway import acquire
 from app.application.agent_runtime.models import (
     RUN_KIND_AUTONOMOUS_TICK,

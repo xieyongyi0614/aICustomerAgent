@@ -11,7 +11,7 @@ from app.models.goal import CRITERION_FACT_SOURCES, CRITERION_METRIC_PATHS
 from app.models.observability import DecisionKind
 from app.models.plan import PLAN_ADVANCE_TERMINAL_DECISIONS, PlanAdvance
 from app.repositories import action_repository, goal_repository
-from app.services import goal_observation
+from app.services.goal import observation as goal_observation
 from app.services.planning import observer as observer_mod
 from app.services.planning.observer import (
     FACT_SOURCE_MEMORY,

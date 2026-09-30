@@ -14,8 +14,8 @@ from app.models.evaluation import (
     IssueCode,
     build_issue,
 )
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import EvaluationRule
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import EvaluationRule
 
 _TOLERANCE = 1e-6
 _SYSTEM_SOURCE = "system"

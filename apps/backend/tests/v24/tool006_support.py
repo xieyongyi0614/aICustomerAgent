@@ -12,7 +12,7 @@ from app.character.asuna import PERSISTENT_GOALS
 from app.character.asuna.tool import SurfaceRule
 from app.core.db import Message
 from app.models.tool import PermissionProfile, ToolDefinition, ToolSchema
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from app.services.tool.context import ToolContext
 from app.services.tool.registry import ToolRegistry, register_builtin_tools
 from app.services.tool.surface import ToolSurfaceResolver

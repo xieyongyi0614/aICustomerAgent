@@ -2,12 +2,12 @@ import pytest
 
 from app.core.settings import get_settings
 from app.models.evaluation import EvaluationDimension, IssueCode
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     BehaviorSlice,
     EvaluationContext,
 )
-from app.services.evaluation_rules import behavior as behavior_rules
-from app.services.evaluation_rules.lexicons import classify_actions, expression_density
+from app.services.evaluation.rules import behavior as behavior_rules
+from app.services.evaluation.rules.lexicons import classify_actions, expression_density
 
 
 def make_ctx(
@@ -147,7 +147,7 @@ def test_expression_density_and_classify():
 
 
 def test_rules_registered_in_engine():
-    from app.services import evaluation_rules
+    from app.services.evaluation import rules as evaluation_rules
 
     codes = {rule.code for rule in evaluation_rules.RULES}
     assert {

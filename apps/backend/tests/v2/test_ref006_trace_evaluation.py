@@ -87,8 +87,8 @@ def test_three_rules_table_driven(override_settings):
     from datetime import datetime as dt
 
     from app.models.evaluation_judge import ReflectionJudgeResult  # noqa: F401
-    from app.services.evaluation_context import EvaluationContext, InsightRef, ReflectionSlice
-    from app.services.evaluation_rules import run_rules
+    from app.services.evaluation.context import EvaluationContext, InsightRef, ReflectionSlice
+    from app.services.evaluation.rules import run_rules
 
     override_settings()
 
@@ -339,7 +339,7 @@ def test_noise_scenarios_zero_llm(env):
 
 
 def test_trace_step_names_registered():
-    from app.services.trace_collector import TRACE_STEP_NAMES
+    from app.services.observability.collector import TRACE_STEP_NAMES
 
     for name in (
         "reflection_evidence",
@@ -352,7 +352,7 @@ def test_trace_step_names_registered():
 
 def test_reflection_step_payload_contract():
     """五步骤 payload 必填字段规范（trace.record extra 透传）。"""
-    from app.services.trace_collector import TurnTraceSession
+    from app.services.observability.collector import TurnTraceSession
 
     session = TurnTraceSession()
     session.record(

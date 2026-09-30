@@ -16,7 +16,7 @@ from app.application.agent_runtime.llm_gateway import _CAPABILITY_DEFAULTS
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK, RunContext
 from app.core.db import GoalPlanRow
 from app.repositories import background_job_repository, goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.life import budget as life_loop_budget
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine

@@ -1,6 +1,6 @@
 from app.character.asuna.evaluation import PersonaContradictionPattern
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import persona as persona_rules
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import persona as persona_rules
 
 
 def make_ctx(reply: str, mode: str = "default", character_id: str = "asuna") -> EvaluationContext:
@@ -66,7 +66,7 @@ def test_persona_patterns_loaded_for_asuna():
 
 
 def test_rules_registered():
-    from app.services import evaluation_rules
+    from app.services.evaluation import rules as evaluation_rules
 
     codes = {rule.code for rule in evaluation_rules.RULES}
     assert "persona_abusive_language" in codes

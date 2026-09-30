@@ -29,7 +29,7 @@ from app.models.goal import (
     validate_sub_goals,
 )
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import goal_contract
 
 from .conftest import V25_NOW

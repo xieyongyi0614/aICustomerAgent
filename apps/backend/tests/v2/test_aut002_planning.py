@@ -15,7 +15,7 @@ from app.repositories import (
     background_job_repository,
     goal_repository,
 )
-from app.services import goal_planning as planning
+from app.services.goal import planning
 from app.services.memory import job_worker as memory_job_worker
 
 NOW = datetime(2026, 9, 8, 12, 0, 0)
@@ -71,7 +71,7 @@ def _stub_overlay(monkeypatch, weights=None):
 
 
 def _stub_patterns(monkeypatch, patterns):
-    from app.services import relationship_patterns as pattern_service
+    from app.services.relationship import patterns as pattern_service
 
     monkeypatch.setattr(
         pattern_service, "read_relationship_patterns", lambda user_id, character_id="asuna": (patterns, {})
@@ -357,6 +357,6 @@ class TestLifeLoopSupplyStep:
 
 
 def test_trace_step_registered():
-    from app.services.trace_collector import TRACE_STEP_NAMES
+    from app.services.observability.collector import TRACE_STEP_NAMES
 
     assert "goal_planning" in TRACE_STEP_NAMES

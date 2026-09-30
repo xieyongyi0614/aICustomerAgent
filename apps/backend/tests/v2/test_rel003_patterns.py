@@ -13,7 +13,7 @@ from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.development import RelationshipPattern
 from app.prompts.builder import PromptBuilder
-from app.services import relationship_patterns
+from app.services.relationship import patterns as relationship_patterns
 from app.services.autonomy_policy import PolicySnapshot, effective_interval_minutes
 from app.services.development import aggregate
 
@@ -185,7 +185,7 @@ class TestRenderAndAssembly:
     def test_end_to_end_wiring(self, _offline_repos, rel_flags, monkeypatch):
         _seed_insight("ins-rel")
         _seed_pattern("goal.user_care.weight", 0.8, "ins-rel")
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         monkeypatch.setattr(
             context_builder, "_load_shared_experiences", lambda *a, **k: ([], {})

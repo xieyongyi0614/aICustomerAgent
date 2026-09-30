@@ -31,7 +31,7 @@ from app.models.goal import GoalPlanRecord, GoalRecord, SubGoalSpec
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
 from app.services.planning import scheduler as plan_scheduler
@@ -63,7 +63,7 @@ FORBIDDEN_WRITE_TOKENS = (
 LAZY_ONLY_MODULES = (
     "app.services.planning.engine",
     "app.services.planning.context",
-    "app.services.goal_planning",
+    "app.services.goal.planning",
 )
 
 NOW = datetime(2026, 9, 21, 12, 0, 0)
@@ -205,7 +205,7 @@ class TestEnablement:
         assert assembler_calls == []
 
     def test_plan_stage_skipped_records_trace(self, override_settings):
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         override_settings(runtime_loop_optional_stages="")
         trace = TurnTraceSession()
@@ -234,7 +234,7 @@ class TestGuards:
         override_settings(runtime_loop_optional_stages="plan")
         monkeypatch.setattr(goal_repository, "get_goal", lambda goal_id: None)
         engine_calls = _stub_engine(monkeypatch, _outcome())
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         trace = TurnTraceSession()
         value = _run_plan(_intention(), _spec(optional=("plan",)), trace=trace)
@@ -341,7 +341,7 @@ class TestOutcome:
         assert value.plan_id == record.id
 
     def test_validated_outcome_records_ok_trace(self, monkeypatch, override_settings):
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         override_settings(runtime_loop_optional_stages="plan")
         monkeypatch.setattr(goal_repository, "get_goal", lambda goal_id: _goal())
@@ -512,7 +512,7 @@ class TestBoundaries:
                     nested.update(alias.name for alias in sub.names)
                 elif isinstance(sub, ast.ImportFrom) and sub.module:
                     nested.add(sub.module)
-        assert {"app.services", "app.services.planning"} <= nested
+        assert {"app.services.goal", "app.services.planning"} <= nested
 
     def test_plan_value_is_frozen(self):
         value = to_plan_value(_plan_record(), GOAL_ID)

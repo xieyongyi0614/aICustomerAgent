@@ -12,8 +12,8 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import state_service
-from app.services.trace_collector import TurnTraceSession
+from app.services.conversation import state as state_service
+from app.services.observability.collector import TurnTraceSession
 from tests.conftest import FakeLLM
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)

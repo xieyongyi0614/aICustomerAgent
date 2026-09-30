@@ -8,7 +8,7 @@ import pytest
 from app.core.settings import get_settings
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 
 V25_NOW = datetime(2026, 9, 8, 12, 0, 0)
 V25_USER = "plan1-user"

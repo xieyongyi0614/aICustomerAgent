@@ -35,9 +35,9 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
 from app.services import agent_service
-from app.services import relationship_evaluation as relationship_evaluation_service
-from app.services import relationship_narrative as relationship_narrative_service
-from app.services import relationship_patterns as relationship_patterns_service
+from app.services.relationship import evaluation as relationship_evaluation_service
+from app.services.relationship import narrative as relationship_narrative_service
+from app.services.relationship import patterns as relationship_patterns_service
 from app.services.memory import attribution as memory_attribution
 from app.services.memory import commands as memory_commands
 from app.services.memory import evaluator as memory_evaluator

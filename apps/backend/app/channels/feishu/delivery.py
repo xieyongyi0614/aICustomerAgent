@@ -24,7 +24,7 @@ from app.channels.feishu import client
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.channels.feishu.outbound import normalize_text, split_text
 from app.core.settings import get_settings
-from app.services import channel_identity_service
+from app.services.identity import channel as channel_identity_service
 
 logger = logging.getLogger(__name__)
 

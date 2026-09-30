@@ -15,8 +15,8 @@ APP_DIR = Path("app")
 CHANNELS_ALLOWLIST_PREFIXES = (
     "app.core",
     "app.channels",
-    "app.services.channel_identity_service",
-    "app.services.trace_collector",
+    "app.services.identity.channel",
+    "app.services.observability.collector",
     "app.services.agent_service",
     # R-7'：通道只依赖独立叶子门面，不绑定 agent_runtime 包内路径。
     "app.application.channel_gateway",
@@ -188,7 +188,7 @@ def test_direction2_core_never_imports_channel_impl():
 
 
 def test_direction2_r2_channel_identity_service_may_import_base():
-    service_path = APP_DIR / "services" / "channel_identity_service.py"
+    service_path = APP_DIR / "services" / "identity" / "channel.py"
     flat = [
         name
         for _, module, names in _collect_import_groups(service_path)
@@ -196,7 +196,7 @@ def test_direction2_r2_channel_identity_service_may_import_base():
         if name
     ]
     assert "app.channels.base" in flat
-    violations = [v for v in _scan_core() if "channel_identity_service" in v]
+    violations = [v for v in _scan_core() if "identity.channel" in v]
     assert violations == []
 
 

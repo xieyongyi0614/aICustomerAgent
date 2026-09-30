@@ -169,7 +169,7 @@ async def deliver_proactive(
 
 
 def _resolve_recipient(internal_user_id: str, channel: str) -> RecipientRef | None:
-    from app.services import channel_identity_service
+    from app.services.identity import channel as channel_identity_service
 
     return channel_identity_service.resolve_recipient(internal_user_id, channel)
 

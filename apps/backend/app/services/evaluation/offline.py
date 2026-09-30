@@ -22,25 +22,26 @@ from app.repositories import (
     memory_repository,
     proactive_repository,
 )
-from app.services import evaluation_engine, evaluation_rules
-from app.services.evaluation_context import (
+from app.services.evaluation import engine as evaluation_engine
+from app.services.evaluation import rules as evaluation_rules
+from app.services.evaluation.context import (
     EvaluationContext,
     MemoryRef,
     RecentMessage,
     StateSlice,
     build_digest,
 )
-from app.services.evaluation_rules import lexicons
+from app.services.evaluation.rules import lexicons
 from app.chains import evaluation_judge_chain
 from app.repositories import character_state_repository, relationship_repository
 from app.services.development.evaluation import (
     build_db_report as build_development_db_report,
 )
-from app.services.evaluation_context import collect_life_loop_slice, collect_goal_slice
+from app.services.evaluation.context import collect_life_loop_slice, collect_goal_slice
 from app.services.reflection.evaluation import (
     build_db_report as build_reflection_db_report,
 )
-from app.services.relationship_evaluation import (
+from app.services.relationship.evaluation import (
     build_db_report as build_relationship_db_report,
 )
 

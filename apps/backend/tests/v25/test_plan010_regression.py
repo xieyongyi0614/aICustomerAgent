@@ -18,7 +18,7 @@ from app.repositories import (
     goal_repository,
     relationship_milestone_repository,
 )
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.development.policy import on_insight_created as development_consumer
 from app.services.planning import context as plan_context
 from app.services.planning import engine as plan_engine
@@ -27,7 +27,7 @@ from app.services.planning import revision_listener as listener_mod
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector, triggers
-from app.services.relationship_narrative import on_insight_created as narrative_consumer
+from app.services.relationship.narrative import on_insight_created as narrative_consumer
 from app.services.world.event_bridge import on_insight_created as world_consumer
 
 from .plan010_support import (

@@ -12,8 +12,9 @@ import pytest
 
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_execution, goal_observation
-from app.services.goal_planning import TRIGGER_BLOCKED, TRIGGER_REPLAN
+from app.services.goal import execution as goal_execution
+from app.services.goal import observation as goal_observation
+from app.services.goal.planning import TRIGGER_BLOCKED, TRIGGER_REPLAN
 
 NOW = datetime(2026, 9, 8, 12, 0, 0)
 USER = "aut3-user"
@@ -277,7 +278,7 @@ class TestFailureReplanReactivation:
         assert record.status == "failed"
         assert record.failure_reason == "replan_exhausted"
 
-        from app.services import goal_planning
+        from app.services.goal import planning as goal_planning
 
         monkeypatch.setattr(
             goal_planning,
@@ -398,6 +399,6 @@ class TestWorkDiscovery:
 
 
 def test_trace_step_registered():
-    from app.services.trace_collector import TRACE_STEP_NAMES
+    from app.services.observability.collector import TRACE_STEP_NAMES
 
     assert "goal_observation" in TRACE_STEP_NAMES

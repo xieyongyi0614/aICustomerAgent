@@ -14,7 +14,7 @@ from app.prompts.goal import (
     build_goal_section,
     build_intention_section,
 )
-from app.services.goal_service import SelectedGoal
+from app.services.goal.service import SelectedGoal
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)
 

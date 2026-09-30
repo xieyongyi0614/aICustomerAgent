@@ -47,7 +47,7 @@ INSIGHT_SCOPE_VALUES = ("user", "relationship", "world")
 
 REFLECTION_CONSUMERS = (
     "app/services/development/policy.py",
-    "app/services/relationship_narrative.py",
+    "app/services/relationship/narrative.py",
     "app/services/world/event_bridge.py",
 )
 
@@ -323,7 +323,7 @@ class TestZeroMigration:
     def test_background_job_type_is_not_expanded(self):
         """重规划 job 复用既有 `goal_planning`（零新 job_type）。"""
         assert listener_mod.STEP_NAME == "plan_revision_listener"
-        from app.services import goal_planning
+        from app.services.goal import planning as goal_planning
 
         assert goal_planning.JOB_TYPE_PLANNING == "goal_planning"
         from app.core.db import BackgroundJobRow

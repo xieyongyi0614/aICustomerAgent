@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.models.goal import GoalRecord
-from app.services import goal_service
+from app.services.goal import service as goal_service
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)
 

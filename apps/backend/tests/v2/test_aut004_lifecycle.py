@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from app.models.goal import GoalPlanRecord, IllegalGoalTransition
 from app.repositories import goal_repository
-from app.services import goal_arbitration
+from app.services.goal import arbitration as goal_arbitration
 
 pytestmark = pytest.mark.xdist_group("migration")
 
@@ -27,7 +27,7 @@ def aut_on(override_settings, monkeypatch):
     override_settings(
         observability_persist_enabled="false")
     monkeypatch.setattr(
-        "app.services.goal_arbitration.development_aggregate.read_overlay",
+        "app.services.goal.arbitration.development_aggregate.read_overlay",
         lambda user_id, character_id="asuna": None,
     )
     yield
@@ -298,7 +298,7 @@ class TestOrchestration:
 
 
 def test_trace_step_registered():
-    from app.services.trace_collector import TRACE_STEP_NAMES
+    from app.services.observability.collector import TRACE_STEP_NAMES
 
     assert "goal_arbitration" in TRACE_STEP_NAMES
 

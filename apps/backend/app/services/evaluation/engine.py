@@ -28,8 +28,8 @@ from app.models.evaluation import (
     overall_score_from,
 )
 from app.repositories import evaluation_repository
-from app.services import evaluation_rules
-from app.services.evaluation_context import (
+from app.services.evaluation import rules as evaluation_rules
+from app.services.evaluation.context import (
     EvaluationContext,
     build_digest,
     collect_proactive_context,

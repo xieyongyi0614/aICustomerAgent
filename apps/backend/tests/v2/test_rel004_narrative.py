@@ -18,17 +18,15 @@ from app.repositories import (
     relationship_repository,
     relationship_snapshot_repository,
 )
-from app.services import (
-    relationship_audit,
-    relationship_narrative,
-)
-from app.services.evaluation_context import (
+from app.services.relationship import audit as relationship_audit
+from app.services.relationship import narrative as relationship_narrative
+from app.services.evaluation.context import (
     EvaluationContext,
     NarrativeFactRef,
     NarrativeMilestoneRef,
     NarrativeSlice,
 )
-from app.services.evaluation_rules.relationship import (
+from app.services.evaluation.rules.relationship import (
     NarrativeFactProvenanceRule,
     NarrativeMilestoneProvenanceRule,
 )

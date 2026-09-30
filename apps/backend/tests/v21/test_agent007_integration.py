@@ -22,7 +22,7 @@ from app.repositories import (
 )
 from app.character.asuna import evolution as persona_evolution
 from app.services.development import evolution
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 from tests.conftest import TEST_USER_ID
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
@@ -114,7 +114,7 @@ class TestEvolutionLoopE2E:
         goal_repository.create_hierarchical_goal(
             USER, "long_term", "relationship", "成为信任的伙伴", 3, origin="insight"
         )
-        result = __import__("app.services.agent_evaluation", fromlist=["run_daily_snapshot"]).run_daily_snapshot(
+        result = __import__("app.services.evaluation.agent", fromlist=["run_daily_snapshot"]).run_daily_snapshot(
             USER, NOW
         )
         assert result["status"] == "ok"
@@ -156,7 +156,7 @@ class TestEvolutionLoopE2E:
         )
         _failed_action(NOW)
         agent_evaluation = __import__(
-            "app.services.agent_evaluation", fromlist=["run_daily_snapshot"]
+            "app.services.evaluation.agent", fromlist=["run_daily_snapshot"]
         )
         agent_evaluation.run_daily_snapshot(USER, NOW)
         next_day = NOW + timedelta(days=1)

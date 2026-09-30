@@ -17,8 +17,8 @@ from app.repositories import (
     loop_run_repository,
 )
 from app.engines import goal_alignment
-from app.services import goal_stack
-from app.services import trigger_evaluator
+from app.services.goal import stack as goal_stack
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "goal-stack-user"
@@ -116,7 +116,7 @@ class TestAlignmentScorer:
 
 class TestSupplyOrigin:
     def test_commitment_memory_creates_medium_goal(self, db_session_factory, stack_on, monkeypatch):
-        import app.services.goal_planning as planning
+        import app.services.goal.planning as planning
 
         monkeypatch.setattr(
             planning.memory_repository,
@@ -134,7 +134,7 @@ class TestSupplyOrigin:
     def test_materialize_persists_origin(self, db_session_factory, stack_on, override_settings):
         
         override = {"salient_events": [{"importance": "high", "title": "面试日"}]}
-        result = __import__("app.services.goal_planning", fromlist=["materialize"]).materialize(
+        result = __import__("app.services.goal.planning", fromlist=["materialize"]).materialize(
             USER, world_facts=override, now=NOW
         )
         created = result["created"]

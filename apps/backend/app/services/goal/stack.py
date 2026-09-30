@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from app.core.settings import get_settings
 from app.models.goal import GOAL_TIER, GoalRecord
 from app.repositories import goal_repository
-from app.services import state_service
+from app.services.conversation import state as state_service
 
 logger = logging.getLogger(__name__)
 

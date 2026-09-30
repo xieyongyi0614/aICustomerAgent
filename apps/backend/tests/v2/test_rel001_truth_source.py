@@ -106,7 +106,7 @@ class TestV1BypassGate:
         assert not (BACKEND / "app/services/relationship_memory.py").exists()
 
     def test_state_service_has_no_v1_delivery_reference(self):
-        source = (BACKEND / "app/services/state_service.py").read_text(encoding="utf-8")
+        source = (BACKEND / "app/services/conversation/state.py").read_text(encoding="utf-8")
         assert "relationship_memory" not in source
 
 

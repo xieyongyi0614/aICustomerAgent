@@ -26,7 +26,7 @@ from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.core.settings import Settings, get_settings
 from app.repositories import conversation_repository, loop_run_repository
 from app.services.life import budget as life_loop_budget
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 from tests.v40.support import V30_ENABLED_FLAGS
 
 BACKEND = Path(__file__).resolve().parents[2]

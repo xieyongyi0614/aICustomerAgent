@@ -20,7 +20,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.repositories import briefing_preference_repository
-from app.services import weather
+from app.services.briefing import weather
 from app.services.life import tasks as task_service
 
 logger = logging.getLogger(__name__)

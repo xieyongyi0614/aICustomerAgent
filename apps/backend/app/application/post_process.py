@@ -14,13 +14,13 @@ from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.engines import behavior as behavior_engine
-from app.services import conversation_service
-from app.services import evaluation_engine
-from app.services import goal_service
-from app.services import scene_service
-from app.services import state_service
-from app.services import summary_service
-from app.services import trigger_evaluator
+from app.services.conversation import service as conversation_service
+from app.services.evaluation import engine as evaluation_engine
+from app.services.goal import service as goal_service
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
+from app.services.conversation import summary as summary_service
+from app.services.autonomy import trigger as trigger_evaluator
 from app.application import world_engine
 from app.models.action import ActionIntent
 from app.models.character_action import TurnRef

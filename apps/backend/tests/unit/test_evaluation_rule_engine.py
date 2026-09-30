@@ -7,9 +7,9 @@ from app.models.evaluation import (
     Issue,
     IssueCode,
 )
-from app.services import evaluation_rules
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import (
+from app.services.evaluation import rules as evaluation_rules
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import (
     RULES,
     compute_rule_scores,
     eligible_dimensions,

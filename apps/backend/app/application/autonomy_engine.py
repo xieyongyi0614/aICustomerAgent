@@ -41,16 +41,14 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import (
-    autonomy_policy,
-    goal_service,
-    proactive_executor,
-    scene_service,
-    state_service,
-    trigger_evaluator,
-)
+from app.services import autonomy_policy
+from app.services.goal import service as goal_service
+from app.services.autonomy import executor as proactive_executor
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
+from app.services.autonomy import trigger as trigger_evaluator
 from app.services.planning import scheduler as plan_scheduler
-from app.services.trace_collector import TurnTraceSession, get_trace_collector
+from app.services.observability.collector import TurnTraceSession, get_trace_collector
 from app.application.action_engine import collect_facts, run_action_planning
 from app.application.chat_pipeline import active_generations
 from app.character.asuna.action import (
@@ -60,7 +58,7 @@ from app.character.asuna.action import (
 from app.character.asuna.tool import RUN_KIND_AUTONOMOUS_TICK
 from app.models.action import ActionIntent
 from app.repositories import action_repository, relationship_milestone_repository
-from app.services import relationship_patterns as relationship_pattern_service
+from app.services.relationship import patterns as relationship_pattern_service
 from app.services.tool.context import ToolContext
 from app.services.tool.registry import get_tool_registry
 from app.services.tool.surface import ToolSelector, ToolSurfaceResolver
@@ -540,7 +538,8 @@ def _pipeline_intention(
     """
     try:
         from app.application import agent_state_context
-        from app.services import decision_pipeline, goal_stack as goal_stack_service
+        from app.services import decision_pipeline
+        from app.services.goal import stack as goal_stack_service
 
         stack = goal_stack_service.evaluate_stack(user_id, now)
         facts = world_engine.collect_facts(user_id)

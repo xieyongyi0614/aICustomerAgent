@@ -12,10 +12,10 @@ from app.core.settings import get_settings
 from app.models.evaluation import EvaluationDimension, IssueCode
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_arbitration
-from app.services.evaluation_context import collect_goal_slice
-from app.services.evaluation_rules import run_rules
-from app.services.evaluation_rules.goal import RULES
+from app.services.goal import arbitration as goal_arbitration
+from app.services.evaluation.context import collect_goal_slice
+from app.services.evaluation.rules import run_rules
+from app.services.evaluation.rules.goal import RULES
 
 NOW = datetime(2026, 9, 8, 12, 0, 0)
 USER = "aut5-user"
@@ -26,7 +26,7 @@ def aut_on(override_settings, monkeypatch):
     override_settings(
         observability_persist_enabled="false")
     monkeypatch.setattr(
-        "app.services.goal_arbitration.development_aggregate.read_overlay",
+        "app.services.goal.arbitration.development_aggregate.read_overlay",
         lambda user_id, character_id="asuna": None,
     )
     yield
@@ -66,7 +66,7 @@ def _done_spec(index=1, capability="create_reminder"):
 
 
 def _ctx(slice_):
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     return EvaluationContext(
         subject="goal",
@@ -205,7 +205,7 @@ class TestDimensionMapping:
             assert dimension_of(code) == EvaluationDimension.GOAL
 
     def test_goal_rules_registered(self):
-        from app.services.evaluation_rules import RULES
+        from app.services.evaluation.rules import RULES
 
         goal_codes = {rule.code for rule in RULES if rule.dimension == EvaluationDimension.GOAL}
         assert len(goal_codes) == 6
@@ -213,7 +213,7 @@ class TestDimensionMapping:
 
 class TestOfflineStats:
     def test_goal_stats_section(self, db_session_factory, aut_on):
-        from app.services.offline_evaluator import _goal_stats
+        from app.services.evaluation.offline import _goal_stats
 
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)])

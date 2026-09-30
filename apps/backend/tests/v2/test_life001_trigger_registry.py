@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.repositories import trigger_registry_repository as repo
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 

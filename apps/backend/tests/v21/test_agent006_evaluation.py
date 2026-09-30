@@ -16,7 +16,7 @@ from app.repositories import (
     agent_metric_repository,
     goal_repository,
 )
-from app.services import agent_evaluation
+from app.services.evaluation import agent as agent_evaluation
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "metric-user"

@@ -151,8 +151,8 @@ PLANNING_READ_INTERFACES: tuple[tuple[str, str], ...] = (
     ("app.repositories.goal_repository", "list_plans"),
     ("app.repositories.goal_repository", "count_plans"),
     ("app.repositories.goal_repository", "list_active_plans"),
-    ("app.services.goal_arbitration", "compute_priority"),
-    ("app.services.goal_stack", "evaluate_stack"),
+    ("app.services.goal.arbitration", "compute_priority"),
+    ("app.services.goal.stack", "evaluate_stack"),
     ("app.models.goal", "goal_transitions"),
 )
 
@@ -173,12 +173,12 @@ PLANNING_WRITE_FUNCTION_NAMES: tuple[str, ...] = (
 )
 
 PLANNING_ATTRIBUTION_TARGET: tuple[str, str] = (
-    "app.services.goal_arbitration",
+    "app.services.goal.arbitration",
     "record_goal_lifecycle",
 )
 
 PLANNING_TRIGGER_TARGET: tuple[str, str] = (
-    "app.services.goal_planning",
+    "app.services.goal.planning",
     "enqueue_planning",
 )
 

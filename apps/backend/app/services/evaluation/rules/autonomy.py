@@ -16,8 +16,8 @@ from app.services.autonomy_policy import (
     effective_interval_minutes,
     in_quiet_hours,
 )
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import EvaluationRule
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import EvaluationRule
 
 
 class TimingViolationRule(EvaluationRule):

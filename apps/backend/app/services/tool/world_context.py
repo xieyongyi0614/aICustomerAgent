@@ -44,7 +44,7 @@ from typing import Any
 from app.application import world_engine
 from app.character.asuna.scene_profiles import scene_profile_for
 from app.character.asuna.world import WORLD_LOCATION_REGISTRY
-from app.services.state_service import load_relationship
+from app.services.conversation.state import load_relationship
 from app.services.tool.context import WORLD_ENABLED_KEY, ToolContext
 from app.services.world import daily_plan, user_situation
 from app.services.world.locations import location_name

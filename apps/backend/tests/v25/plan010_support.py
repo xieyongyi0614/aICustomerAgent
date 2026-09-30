@@ -82,7 +82,7 @@ class LLMProbe:
 
 def install_llm_probe(monkeypatch) -> LLMProbe:
     """把反思与规划的 LLM 链条构建换成探针（调用即失败）。"""
-    from app.services import goal_planning
+    from app.services.goal import planning as goal_planning
     from app.services.reflection import reflector
 
     probe = LLMProbe()
@@ -431,7 +431,7 @@ def insights(session_factory, *, user_id: str = USER) -> list:
 
 
 def planning_jobs(session_factory) -> list:
-    from app.services import goal_planning
+    from app.services.goal import planning as goal_planning
 
     jobs = []
     with session_factory() as session:

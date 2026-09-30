@@ -11,8 +11,8 @@ from app.models.evaluation import (
     build_issue,
 )
 from app.engines import behavior as behavior_engine
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import EvaluationRule, lexicons
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import EvaluationRule, lexicons
 
 _CONTACT_ORDER = ("none", "light", "moderate")
 

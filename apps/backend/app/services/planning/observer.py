@@ -97,7 +97,9 @@ from app.models.plan import (
     PlanRevision,
 )
 from app.repositories import action_repository, goal_repository, memory_repository
-from app.services import goal_arbitration, goal_observation, state_service
+from app.services.goal import arbitration as goal_arbitration
+from app.services.goal import observation as goal_observation
+from app.services.conversation import state as state_service
 from app.services.planning import goal_contract, memory_policy as plan_memory_policy
 from app.services.planning import scheduler as plan_scheduler
 from app.services.world import event_bridge

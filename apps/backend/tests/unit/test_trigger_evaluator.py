@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
-from app.services.trigger_evaluator import SessionTail, evaluate_inactivity
+from app.services.autonomy.trigger import SessionTail, evaluate_inactivity
 
 NOW = datetime(2026, 8, 30, 14, 0)
 CONFIG = get_settings()

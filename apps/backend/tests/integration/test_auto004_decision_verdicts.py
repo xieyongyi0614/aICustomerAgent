@@ -21,7 +21,7 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from app.services.autonomy_policy import PolicySnapshot, evaluate
 from app.models.autonomy import TriggerSignal
 

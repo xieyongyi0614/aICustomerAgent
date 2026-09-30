@@ -4,7 +4,7 @@
 本模块是 Step 1 的出口条件——**未通过前不得进入执行桥接与观测推进**（§10.3「先搬后改可举证」）。
 """
 
-from app.services import goal_observation
+from app.services.goal import observation as goal_observation
 from app.services.planning import scheduler
 from app.services.planning.scheduler import (
     BLOCKED_COOLDOWN,

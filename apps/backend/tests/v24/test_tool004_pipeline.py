@@ -14,7 +14,7 @@ from app.services.action import planner
 from app.services.tool.context import WORLD_ENABLED_KEY, ToolContext
 from app.services.tool.surface import ToolSurfaceResolver
 from app.services.tool.world_context import apply_world_facts
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 from tests.v24.tool004_support import (
     NOW,
     RUN_KIND_FOREGROUND_CHAT,

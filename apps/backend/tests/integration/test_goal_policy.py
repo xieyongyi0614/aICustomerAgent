@@ -6,7 +6,7 @@ from app.models.goal import GOAL_DESCRIPTION_MAX_LENGTH
 from app.models.relationship import RelationshipState
 from app.models.scene import PendingAction, SceneState
 from app.repositories import goal_repository
-from app.services import goal_service
+from app.services.goal import service as goal_service
 
 USER = "u-policy"
 SESSION = "s-policy"

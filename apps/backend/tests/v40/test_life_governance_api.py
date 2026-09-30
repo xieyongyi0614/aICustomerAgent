@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.services.governance import DomainHandlers, register_domain
-from app.services.governance import provenance as provenance_mod
-from app.services.governance import registry as registry_mod
+from app.services.governance import core as provenance_mod
+from app.services.governance import core as registry_mod
 from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]

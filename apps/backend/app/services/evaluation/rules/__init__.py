@@ -16,7 +16,7 @@ from app.models.evaluation import (
     IssueSeverity,
     clamp_score,
 )
-from app.services.evaluation_context import EvaluationContext
+from app.services.evaluation.context import EvaluationContext
 
 logger = logging.getLogger(__name__)
 
@@ -107,16 +107,16 @@ def to_dimension_scores(
     }
 
 
-from app.services.evaluation_rules import action as _action  # noqa: E402
-from app.services.evaluation_rules import autonomy as _autonomy  # noqa: E402
-from app.services.evaluation_rules import behavior as _behavior  # noqa: E402
-from app.services.evaluation_rules import development as _development  # noqa: E402
-from app.services.evaluation_rules import emotion as _emotion  # noqa: E402
-from app.services.evaluation_rules import memory as _memory  # noqa: E402
-from app.services.evaluation_rules import persona as _persona  # noqa: E402
-from app.services.evaluation_rules import reflection as _reflection  # noqa: E402
-from app.services.evaluation_rules import relationship as _relationship  # noqa: E402
-from app.services.evaluation_rules import goal as _goal  # noqa: E402
+from app.services.evaluation.rules import action as _action  # noqa: E402
+from app.services.evaluation.rules import autonomy as _autonomy  # noqa: E402
+from app.services.evaluation.rules import behavior as _behavior  # noqa: E402
+from app.services.evaluation.rules import development as _development  # noqa: E402
+from app.services.evaluation.rules import emotion as _emotion  # noqa: E402
+from app.services.evaluation.rules import memory as _memory  # noqa: E402
+from app.services.evaluation.rules import persona as _persona  # noqa: E402
+from app.services.evaluation.rules import reflection as _reflection  # noqa: E402
+from app.services.evaluation.rules import relationship as _relationship  # noqa: E402
+from app.services.evaluation.rules import goal as _goal  # noqa: E402
 
 RULES: list[EvaluationRule] = [
     *_behavior.RULES,

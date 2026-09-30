@@ -10,7 +10,7 @@
 from datetime import timedelta
 
 from app.repositories import goal_repository
-from app.services import goal_observation
+from app.services.goal import observation as goal_observation
 
 from .conftest import V25_NOW
 

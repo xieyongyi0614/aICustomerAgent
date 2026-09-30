@@ -5,7 +5,7 @@ import pytest
 from app.application.post_process import PostProcessContext, run_budget_observer
 from app.models.behavior_strategy import ActionBudget
 from app.engines import behavior as behavior_engine
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 
 @pytest.mark.parametrize(

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from app.models.memory import UserMemory
 from app.models.world import EventImportance, EventSource, EventStatus, WorldEvent
 from app.prompts.scene import build_scene_section
-from app.services.context_builder import _relative_time_label, _with_time_anchor
+from app.services.conversation.context import _relative_time_label, _with_time_anchor
 from app.services.world.memory_bridge import to_memory_candidates
 
 

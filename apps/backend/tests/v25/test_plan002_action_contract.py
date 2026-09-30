@@ -26,7 +26,7 @@ from app.models.plan import (
     PLAN_STEP_OUTCOMES,
     PLAN_STEP_OUTCOME_ACTION_STATUS,
 )
-from app.services import goal_execution
+from app.services.goal import execution as goal_execution
 from app.services.planning import goal_contract
 
 STATUS_MAP_SNAPSHOT = {

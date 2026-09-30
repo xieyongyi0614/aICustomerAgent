@@ -27,7 +27,7 @@ from app.channels.feishu.errors import (
 )
 from app.channels.feishu import events
 from app.channels.feishu.identity import FEISHU_CHANNEL
-from app.services import channel_identity_service
+from app.services.identity import channel as channel_identity_service
 from app.services.agent_service import EmptyLLMResponseError
 
 
@@ -94,7 +94,7 @@ def _fake_retry_sleep(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _stub_identity(monkeypatch):
-    from app.services.channel_identity_service import ResolvedIdentity
+    from app.services.identity.channel import ResolvedIdentity
 
     def _resolve(channel, external_id, **kwargs):
         return ResolvedIdentity(

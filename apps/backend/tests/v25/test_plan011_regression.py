@@ -265,7 +265,7 @@ class TestAlwaysOnCompat:
         assert autonomy_on
         recorder: dict = {}
         stub_planning_llm(recorder=recorder)
-        from app.services import goal_planning
+        from app.services.goal import planning as goal_planning
 
         goal = make_goal(description="prompt 快照目标", priority=4, domain="relationship")
         assert goal_planning.plan_goal(

@@ -20,8 +20,9 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import conversation_service, proactive_executor
-from app.services.trace_collector import TurnTraceSession
+from app.services.conversation import service as conversation_service
+from app.services.autonomy import executor as proactive_executor
+from app.services.observability.collector import TurnTraceSession
 from tests.conftest import wait_until
 
 NOW = datetime(2026, 8, 30, 14, 0)
@@ -116,7 +117,7 @@ def test_case14_scenario_full_chain(db_session_factory, fake_llm, monkeypatch):
             assert ack.status_code == 200
 
         session = __import__(
-            "app.services.trace_collector", fromlist=["get_trace_collector"]
+            "app.services.observability.collector", fromlist=["get_trace_collector"]
         ).get_trace_collector().get(delivered_ids[0])
         assert session is not None
         step_names = [s.name for s in session.steps]

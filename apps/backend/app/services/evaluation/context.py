@@ -11,8 +11,8 @@ from datetime import datetime
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
 from app.engines import behavior as behavior_engine
-from app.services import state_service
-from app.services import conversation_service
+from app.services.conversation import state as state_service
+from app.services.conversation import service as conversation_service
 from app.repositories import (
     decision_repository,
     llm_call_repository,
@@ -669,7 +669,7 @@ def _collect_behavior(ctx) -> BehaviorSlice:
 def _collect_behavior_history(session_id: str, settings) -> list[list[str]]:
     """近窗每轮动作类别（behavior-evaluation.md §3.3 轻量重放，仅计数不重跑管线）。"""
     try:
-        from app.services.evaluation_rules import lexicons
+        from app.services.evaluation.rules import lexicons
 
         history = conversation_service.load_window(session_id)
         ai_messages = [m.content for m in history if m.role == "ai" and m.content]

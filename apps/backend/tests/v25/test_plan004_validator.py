@@ -13,7 +13,7 @@ from app.models.goal import SubGoalSpec
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import context as plan_context
 from app.services.planning import decompose as decompose_mod
 from app.services.planning import engine as plan_engine

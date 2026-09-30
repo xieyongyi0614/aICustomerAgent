@@ -1,6 +1,6 @@
 from app.models.scene import PendingAction, SceneActionDecision, SceneState
 from app.repositories import scene_state_repository
-from app.services import scene_service
+from app.services.conversation import scene as scene_service
 
 
 def _state(pending=None, location="客厅", current_action=None):

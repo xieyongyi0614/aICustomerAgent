@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services import weather
+from app.services.briefing import weather
 
 
 class FakeTransport(weather.WeatherTransport):

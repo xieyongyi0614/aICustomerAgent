@@ -155,7 +155,7 @@ def test_ledger_scope_follows_token(real_auth):
 
 def test_life_export_scoped_to_token(real_auth):
     from app.services.governance import DomainHandlers, register_domain
-    from app.services.governance import registry as registry_mod
+    from app.services.governance import core as registry_mod
 
     store: dict[str, list[str]] = {OWNER: ["own-1"], STRANGER: ["stray-1"]}
 

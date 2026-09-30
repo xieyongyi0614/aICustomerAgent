@@ -12,7 +12,7 @@ import pytest
 from app.application import agent_runtime, life_loop
 from app.application.agent_runtime.llm_gateway import Grant
 from app.repositories import loop_run_repository, outbox_repository
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "agent-runtime-user"

@@ -6,7 +6,8 @@ from app.channels.feishu import adapter
 from app.channels.feishu.adapter import FALLBACK_TEXTS, TurnOutcome, reset_feishu_adapter
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core.settings import get_settings
-from app.services import agent_service, channel_identity_service
+from app.services import agent_service
+from app.services.identity import channel as channel_identity_service
 from app.services.agent_service import EmptyLLMResponseError
 
 EXPECTED_ERROR_KINDS = ("llm_error", "empty_response", "pipeline_error", "identity_error", "overloaded")
@@ -21,7 +22,7 @@ def _reset_adapter_state():
 
 @pytest.fixture(autouse=True)
 def _stub_identity(monkeypatch):
-    from app.services.channel_identity_service import ResolvedIdentity
+    from app.services.identity.channel import ResolvedIdentity
 
     def _resolve(channel, external_id, **kwargs):
         return ResolvedIdentity(

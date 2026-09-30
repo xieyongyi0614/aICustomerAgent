@@ -19,7 +19,7 @@ from app.repositories import (
     outbox_repository,
 )
 from app.services.life import budget as life_loop_budget
-from app.services import trigger_evaluator
+from app.services.autonomy import trigger as trigger_evaluator
 
 BACKEND = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 9, 7, 12, 0, 0)

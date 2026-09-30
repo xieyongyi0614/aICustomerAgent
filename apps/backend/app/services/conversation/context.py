@@ -10,14 +10,12 @@ from app.models.conversation import ConversationState
 from app.models.reflection import InsightSummary
 from app.models.relationship import RelationshipState
 from app.prompts.builder import SHARED_EXPERIENCE_HEADER, SHARED_EXPERIENCE_NOTE
-from app.services import (
-    conversation_service,
-    relationship_shared,
-    relationship_patterns,
-)
-from app.services import goal_service
-from app.services import state_service
-from app.services import summary_service
+from app.services.conversation import service as conversation_service
+from app.services.relationship import shared as relationship_shared
+from app.services.relationship import patterns as relationship_patterns
+from app.services.goal import service as goal_service
+from app.services.conversation import state as state_service
+from app.services.conversation import summary as summary_service
 from app.services.memory import retriever as memory_retriever
 from app.services.development import aggregate as development_aggregate
 from app.services.reflection import lifecycle as reflection_lifecycle

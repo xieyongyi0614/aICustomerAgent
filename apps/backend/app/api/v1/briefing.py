@@ -16,7 +16,7 @@ from pydantic import BaseModel, field_validator
 from app.api.v1.auth import require_user
 from app.core.settings import get_settings
 from app.repositories import briefing_preference_repository
-from app.services import weather
+from app.services.briefing import weather
 from app.services.briefing import compose
 
 briefing_router = APIRouter(prefix="/briefing", tags=["briefing"])

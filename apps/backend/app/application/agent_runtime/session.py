@@ -17,7 +17,7 @@ from app.application.agent_runtime.contracts import (
 )
 from app.application.agent_runtime.models import TRIGGER_CHANNEL_MESSAGE
 from app.repositories import loop_run_repository
-from app.services.channel_identity_service import build_session_id
+from app.services.identity.channel import build_session_id
 
 
 @dataclass(frozen=True, slots=True)

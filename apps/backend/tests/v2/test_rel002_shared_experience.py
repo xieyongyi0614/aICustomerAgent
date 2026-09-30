@@ -18,8 +18,8 @@ from app.repositories import (
     relationship_event_repository,
     world_repository,
 )
-from app.services import relationship_shared
-from app.services.context_builder import _load_shared_experiences, _select_shared_entries
+from app.services.relationship import shared as relationship_shared
+from app.services.conversation.context import _load_shared_experiences, _select_shared_entries
 
 BASE = datetime(2026, 9, 1, 10, 0, 0)
 
@@ -267,7 +267,7 @@ class TestAssemblyWiring:
 
     def test_flag_on_end_to_end(self, _offline_repos, monkeypatch):
         self._seed()
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         state = _run_build(context_builder)
         titles = [entry.title for entry in state.shared_experiences]

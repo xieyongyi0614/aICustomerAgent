@@ -11,7 +11,7 @@ from app.application.chat_pipeline import (
     run_chat_pipeline,
 )
 from app.application import observability
-from app.services import trace_collector
+from app.services.observability import collector as trace_collector
 
 __all__ = ["stream_chat", "EmptyLLMResponseError", "background_tasks"]
 

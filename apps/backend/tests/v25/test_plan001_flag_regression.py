@@ -13,7 +13,7 @@
 import hashlib
 import json
 
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 
 from . import _plan_scan as scan
 

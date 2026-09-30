@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from app.services import goal_service
+from app.services.goal import service as goal_service
 from app.services.planning import scheduler as plan_scheduler
 
 logger = logging.getLogger(__name__)
@@ -193,7 +193,7 @@ async def plan(
         )
         return None
 
-    from app.services import goal_planning
+    from app.services.goal import planning as goal_planning
     from app.services.planning import context as plan_context
     from app.services.planning import engine as plan_engine
 

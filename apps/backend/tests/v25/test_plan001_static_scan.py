@@ -156,7 +156,7 @@ def test_i6_priority_algorithm_is_defined_once_repo_wide():
         for path in (scan.REPO_ROOT / "app").rglob("*.py")
         if "def compute_priority" in path.read_text(encoding="utf-8")
     ]
-    assert definitions == ["app/services/goal_arbitration.py"]
+    assert definitions == ["app/services/goal/arbitration.py"]
 
 
 def test_scanner_flags_synthetic_violations(tmp_path):

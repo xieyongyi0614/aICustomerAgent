@@ -87,7 +87,7 @@ import importlib
 import pytest
 
 from app.repositories import goal_repository
-from app.services import goal_observation
+from app.services.goal import observation as goal_observation
 from app.services.planning import goal_contract
 
 from .conftest import V25_NOW, V25_USER

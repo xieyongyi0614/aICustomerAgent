@@ -48,7 +48,7 @@ def save_proactive_turn(session_id: str, text: str) -> int:
 
 def set_preferred_mode(user_id: str, mode: str) -> str | None:
     """N3 Role Mode 写路径：写最近会话的 confirmed mode。"""
-    from app.services import history_service
+    from app.services.conversation import history as history_service
 
     conversation = history_service.find_latest_conversation(user_id)
     if conversation is None:

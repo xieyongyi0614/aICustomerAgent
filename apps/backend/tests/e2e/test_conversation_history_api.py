@@ -7,7 +7,7 @@ user_id 自 v5.0.0 §14 起由 token 解析（测试内经 conftest override 注
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import conversation_service as svc
+from app.services.conversation import service as svc
 from tests.conftest import TEST_USER_ID
 
 

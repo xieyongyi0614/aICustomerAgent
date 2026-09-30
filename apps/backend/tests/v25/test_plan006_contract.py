@@ -25,7 +25,7 @@ from app.models.action import ActionRecord
 from app.models.goal import SubGoalSpec
 from app.models.plan import PlanContext
 from app.models.tool import TOOL_EFFECT_KIND_VALUES, TOOL_FAILURE_KINDS, ToolSurface
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.action.planner import assemble_plan
 from app.services.planning import executor_bridge as bridge_mod
 from app.services.planning.executor_bridge import PlanExecutorBridge

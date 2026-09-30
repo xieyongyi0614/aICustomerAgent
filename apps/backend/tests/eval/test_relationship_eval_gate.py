@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from app.core.settings import get_settings
-from app.services import relationship_evaluation as evaluation
+from app.services.relationship import evaluation
 
 pytestmark = pytest.mark.xdist_group("relationship")
 

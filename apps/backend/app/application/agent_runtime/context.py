@@ -20,7 +20,7 @@ from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
 from app.core.settings import get_settings
 from app.models.agent_state import AgentStateSnapshot
-from app.services import context_builder
+from app.services.conversation import context as context_builder
 
 SEGMENT_PRIORITY: tuple[str, ...] = ("character", "user", "world", "memory")
 PROTECTED_SEGMENTS: frozenset[str] = frozenset({"character", "user"})

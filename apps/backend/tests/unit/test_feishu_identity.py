@@ -7,8 +7,8 @@ import pytest
 
 from app.channels.base import InboundMessage
 from app.channels.feishu.identity import FEISHU_CHANNEL, to_channel_identity
-from app.services import channel_identity_service as service
-from app.services.channel_identity_service import (
+from app.services.identity import channel as service
+from app.services.identity.channel import (
     build_internal_user_id,
     build_session_id,
 )

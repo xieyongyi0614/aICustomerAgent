@@ -7,8 +7,8 @@ from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.intention import IntentionDecision
 from app.models.relationship import RelationshipState
-from app.services import intention_policy
-from app.services.goal_service import (
+from app.services.goal import intention as intention_policy
+from app.services.goal.service import (
     GOAL_DESCRIPTION_COMPANION,
     GOAL_DESCRIPTION_REPAIR,
     SelectedGoal,

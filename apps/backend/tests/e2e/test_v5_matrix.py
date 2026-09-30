@@ -13,7 +13,8 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.relationship import RelationshipState
 from app.repositories import character_state_repository
-from app.services import scene_service, state_service
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
 from tests.conftest import FakeLLM
 
 DECISION = {"inner_state": "平静", "current_topic": "日常"}

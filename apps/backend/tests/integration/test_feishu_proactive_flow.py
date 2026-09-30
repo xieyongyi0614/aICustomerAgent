@@ -7,7 +7,7 @@ from app.channels.feishu.delivery import (
     send_proactive,
 )
 from app.repositories import conversation_repository, memory_repository
-from app.services import channel_identity_service
+from app.services.identity import channel as channel_identity_service
 
 TOKEN_URL_PART = "tenant_access_token"
 APP_SETTINGS = {

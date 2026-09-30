@@ -36,7 +36,8 @@ from app.application.agent_runtime.stages.reason import (
     reason,
 )
 from app.models.agent_state import AgentStateSnapshot
-from app.services import decision_pipeline, goal_stack as goal_stack_service
+from app.services import decision_pipeline
+from app.services.goal import stack as goal_stack_service
 
 REASON_PATH = Path(reason_module.__file__)
 FORBIDDEN_IMPORTS = (
@@ -516,7 +517,7 @@ class TestDegradation:
         assert calls[-1]["snapshot"] is None
 
     async def test_trace_records_intention(self, monkeypatch):
-        from app.services.trace_collector import TurnTraceSession
+        from app.services.observability.collector import TurnTraceSession
 
         _stub_pipeline(monkeypatch)
         trace = TurnTraceSession()

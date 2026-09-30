@@ -22,7 +22,7 @@ from app.core.settings import get_settings
 from app.services.development import aggregate
 from app.services.development import audit as development_audit
 from app.services.development import policy as development_policy
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     DevelopmentChangeRef,
     DevelopmentSlice,
     DevelopmentStateRef,

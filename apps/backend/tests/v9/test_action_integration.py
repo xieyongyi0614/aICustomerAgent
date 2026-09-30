@@ -9,9 +9,9 @@ from app.core.settings import get_settings
 from app.models.action import ActionIntent, ActionResult, ActionEffect
 from app.services.action.context import ActionContext, build_action_context, render_action_section
 from app.services.action.relationship_bridge import deliver_action_signal, lookup_signal
-from app.services.evaluation_context import ActionSlice
-from app.services.evaluation_rules.action import ActionOverclaimRule, ActionUnreportedFailureRule
-from app.services.evaluation_context import EvaluationContext
+from app.services.evaluation.context import ActionSlice
+from app.services.evaluation.rules.action import ActionOverclaimRule, ActionUnreportedFailureRule
+from app.services.evaluation.context import EvaluationContext
 
 
 def _intent(action_type="create_reminder", **params):

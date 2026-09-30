@@ -47,13 +47,13 @@ def test_post_process_step_isolation(db_session_factory, monkeypatch):
         run_state_update,
     )
     from app.models.conversation import ChatMessage, ConversationState
-    from app.services.trace_collector import TurnTraceSession
+    from app.services.observability.collector import TurnTraceSession
     from tests.conftest import FakeLLM
 
     async def boom(*args, **kwargs):
         raise RuntimeError("state down")
 
-    import app.services.state_service as state_service_module
+    import app.services.conversation.state as state_service_module
 
     monkeypatch.setattr(state_service_module.state_update_chain, "update", boom)
     ctx = PostProcessContext(

@@ -7,7 +7,7 @@ from datetime import datetime
 import pytest
 
 from app.api.v1 import home as home_api
-from app.services import history_service
+from app.services.conversation import history as history_service
 from app.services.insights import query as insights_query
 
 pytestmark = pytest.mark.unit

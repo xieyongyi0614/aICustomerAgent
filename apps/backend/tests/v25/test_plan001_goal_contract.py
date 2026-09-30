@@ -38,7 +38,8 @@ from app.models.goal import (
     goal_transitions,
 )
 from app.repositories import goal_repository
-from app.services import goal_observation, goal_planning
+from app.services.goal import observation as goal_observation
+from app.services.goal import planning as goal_planning
 from app.services.planning import goal_contract
 
 VALUE_SET_SNAPSHOT = {

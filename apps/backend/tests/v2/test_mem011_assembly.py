@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.context_builder import _select_retrieval_segment, _working_window
+from app.services.conversation.context import _select_retrieval_segment, _working_window
 from app.services.memory import lifecycle, retriever
 from app.services.memory.retriever import RankedMemories, RankedMemory
 
@@ -145,7 +145,7 @@ class TestWorkingWindow:
 class TestAssembleTrace:
     def test_trace_records_budget_usage(self, asm_db, monkeypatch):
         from app.models.conversation import ChatMessage
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         _memory("m1", "用户喜欢吃西瓜")
 

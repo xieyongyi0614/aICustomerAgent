@@ -13,7 +13,9 @@ from app.api.v1.schemas import (
     StateSnapshotOut,
 )
 from app.core.settings import get_settings
-from app.services import history_service, state_service, trace_collector
+from app.services.conversation import history as history_service
+from app.services.conversation import state as state_service
+from app.services.observability import collector as trace_collector
 
 state_router = APIRouter()
 
@@ -131,7 +133,7 @@ def set_mode(body: ModeSetRequest, caller: str = Depends(require_user)):
     if session_id is None:
         # 无会话时仅回传期望模式，待首轮对话落库
         return {"ok": True, "mode": body.mode, "session_id": None}
-    from app.services import conversation_service
+    from app.services.conversation import service as conversation_service
 
     conversation_service.set_preferred_mode(user_id, body.mode)
     return {"ok": True, "mode": body.mode, "session_id": session_id}

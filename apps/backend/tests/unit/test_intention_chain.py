@@ -6,7 +6,7 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.goal import GoalRecord
 from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
-from app.services.goal_service import SelectedGoal
+from app.services.goal.service import SelectedGoal
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)
 

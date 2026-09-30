@@ -12,9 +12,10 @@ import pytest
 
 from app.models.evaluation import IssueCode
 from app.repositories import goal_repository
-from app.services import goal_observation, goal_planning
-from app.services.evaluation_context import EvaluationContext, collect_goal_slice
-from app.services.evaluation_rules.goal import GoalArbitrationRule
+from app.services.goal import observation as goal_observation
+from app.services.goal import planning as goal_planning
+from app.services.evaluation.context import EvaluationContext, collect_goal_slice
+from app.services.evaluation.rules.goal import GoalArbitrationRule
 from app.services.planning import goal_contract
 
 from .conftest import V25_NOW, V25_USER
@@ -167,7 +168,7 @@ def test_i4_single_top_level_active_goal_passes_the_same_rule(make_goal):
 
 
 def test_i4_rule_is_owned_by_the_existing_evaluation_layer():
-    assert GoalArbitrationRule.__module__ == "app.services.evaluation_rules.goal"
+    assert GoalArbitrationRule.__module__ == "app.services.evaluation.rules.goal"
     assert GoalArbitrationRule.__name__ == "GoalArbitrationRule"
     assert GoalArbitrationRule.subjects == ("goal",)
 

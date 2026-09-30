@@ -21,19 +21,17 @@ from app.repositories import (
     relationship_event_repository,
     relationship_milestone_repository,
 )
-from app.services import (
-    relationship_narrative,
-    relationship_shared,
-    relationship_patterns,
-)
-from app.services.context_builder import _select_shared_entries
-from app.services.evaluation_context import (
+from app.services.relationship import narrative as relationship_narrative
+from app.services.relationship import shared as relationship_shared
+from app.services.relationship import patterns as relationship_patterns
+from app.services.conversation.context import _select_shared_entries
+from app.services.evaluation.context import (
     EvaluationContext,
     NarrativeFactRef,
     NarrativeMilestoneRef,
     NarrativeSlice,
 )
-from app.services.evaluation_rules.relationship import (
+from app.services.evaluation.rules.relationship import (
     NarrativeFactProvenanceRule,
     NarrativeMilestoneProvenanceRule,
 )

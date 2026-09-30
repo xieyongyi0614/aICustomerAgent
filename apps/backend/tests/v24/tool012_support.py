@@ -331,7 +331,7 @@ def render_acceptance_artifacts() -> dict[str, str]:
     from app.prompts.builder import PromptBuilder
     from app.prompts.goal import GoalContext
     from app.prompts.reflection import build_reflection_messages
-    from app.services.goal_service import SelectedGoal
+    from app.services.goal.service import SelectedGoal
 
     now = datetime(2026, 8, 29, 12, 0, 0, tzinfo=timezone.utc)
     base_state = ConversationState(

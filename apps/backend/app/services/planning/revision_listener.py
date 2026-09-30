@@ -62,7 +62,7 @@ from app.models.goal import LAYER_VALUES
 from app.models.plan import PlanRevision
 from app.models.reflection import InsightScopeEnum
 from app.repositories import goal_repository
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.planning import revision as plan_revision
 
 logger = logging.getLogger(__name__)

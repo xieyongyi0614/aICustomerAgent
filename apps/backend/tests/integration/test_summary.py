@@ -6,7 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.core import llm_factory
 from app.repositories import summary_repository as repo
-from app.services import summary_service
+from app.services.conversation import summary as summary_service
 
 
 def test_threshold_boundary(override_settings):

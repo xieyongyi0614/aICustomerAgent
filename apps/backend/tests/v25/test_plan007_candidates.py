@@ -11,7 +11,8 @@ from datetime import timedelta
 
 import pytest
 
-from app.services import decision_pipeline, goal_stack
+from app.services import decision_pipeline
+from app.services.goal import stack as goal_stack
 from app.services.planning import goal_contract
 
 from . import _plan_scan as scan

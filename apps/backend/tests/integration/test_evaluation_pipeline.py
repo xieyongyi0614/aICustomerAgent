@@ -15,7 +15,7 @@ from app.models.emotion import TurnAnalysis
 from app.models.evaluation import EvaluationDimension
 from app.models.relationship import RelationshipState
 from app.repositories import evaluation_repository
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 JUDGE_OK = {
     "persona": {

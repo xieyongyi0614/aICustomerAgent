@@ -88,7 +88,7 @@ from app.models.tool import (
     ToolDefinition,
     ToolSurface,
 )
-from app.services import goal_planning
+from app.services.goal import planning as goal_planning
 from app.services.tool.registry import TOOL_ID_PATTERN, ToolRegistry, get_tool_registry
 from app.services.tool.surface import ToolSelector
 
