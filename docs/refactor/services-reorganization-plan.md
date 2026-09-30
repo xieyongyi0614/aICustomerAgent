@@ -428,7 +428,8 @@ app/services/
 
 ⚠️ **坑位记录（后续拆分必读）**：端口 `__getattr__` 与 monkeypatch 组合存在「快照残留」陷阱——`monkeypatch.setattr(端口模块, "attr", fake)` 会在 undo 时把真实函数**永久写入端口模块字典**，遮蔽 `__getattr__`，导致后续对实现模块的补丁全部失效（`test_character_action_mutator` 污染 `test_character_action_validator` 即此因）。**测试打桩一律打实现模块（`app.application.world_engine.X`），端口读穿天然生效。**
 
-### 15.2 债② 巨型文件拆分：试点 1/5，其余待排期 ⏸
+### 15.2 债② 巨型文件拆分：1/5（context 试点）+ evidence 审计与试拆回滚 ⏸
 
 - ✅ **`evaluation/context.py`（834）→ `evaluation/context/` 包**（`639f3b0`）：`slices.py`（切片数据类 + 常量 + `_clip`）/ `collectors.py`（收集器）/ `digest.py`（digest 组装与截断），`__init__` 全量再导出，全部消费面（`from ...context import X` 形态）零改动。拆分前审计确认：无任何 monkeypatch 依赖 `context.<X>` 包属性 → 再导出安全。
-- ⏸ **`reflection/evidence.py`(1856) / `tool/ext_api.py`(1507) / `planning/decompose.py`(963) / `planning/observer.py`(863) 暂缓**：这四个文件被 v25/v21 精确守卫与 conftest 模块级打桩深度耦合（plan001_scope_markers 文件清单、plan008 源码串断言、plan009 导入面扫描、`_SERVICE_DB_MODULES` 对 `evidence` 模块的 `SessionLocal` 打桩、大量 `observer.<X>` 属性补丁）。机械套用 `__init__` 再导出会触发 §十三 警告的「打桩静默失效」：包属性补丁不影响子模块内部调用、SessionLocal 打桩落不到持久化子模块。**前置条件 = 逐文件补丁缝审计**（决定每处补丁改打子模块还是改经命名空间对象读穿），非机械可迁。
+- ↩️ **`reflection/evidence.py`（1856）试拆后回滚**：补丁缝审计（模块属性补丁仅 3 处、SessionLocal 仅 2 点、零落库 → 无 persistence 切片）与 AST 调用图分类（纯窗构造 78 符号 → windows；DB/采集 23 符号 → collectors）均已完成并实现两刀拆分；`_SERVICE_DB_MODULES` 打桩改指 collectors、`_human_messages_after` 补丁目标改指子模块后专项测试全绿。**但全量回归暴露审计漏项**：plan010/plan011 对 evidence.py 有**分节级源码语义守卫族**（`# --- PLAN-010` 分节标记、计划通道上界不重定义断言、`__file__` 整文件读取、`aggregate_plan_evidence` 唯一落点检查，共 10+ 断言分布于 plan010_static_scan / plan010_regression / plan010_evidence / plan010_listener / plan011_regression）——任何代码搬移都会打散分节标记，适配需逐守卫重写语义，非机械迁移。已整体回滚（工作区零残留，原模块行为逐字节不变）。
+- ⏸ **结论修正**：`evidence` / `ext_api` / `decompose` / `observer` 四个文件的拆分**全部需要「逐守卫语义适配」专项**（守卫清单：plan010 全家桶、plan001_scope_markers 文件清单、plan008 源码串断言、plan009 导入面扫描、conftest `_SERVICE_DB_MODULES` 打桩缝）。可复用资产：AST 纯/IO 分类脚本、包化 + 全量再导出（含私有名）模板、补丁缝审计清单。
