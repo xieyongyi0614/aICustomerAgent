@@ -13,6 +13,7 @@ import '../../features/health/presentation/health_consent_page.dart';
 import '../../features/health/presentation/health_page.dart';
 import '../../features/health/presentation/health_probe_page.dart';
 import '../../features/home/presentation/home_page.dart';
+import '../../features/ledger/presentation/ledger_add_page.dart';
 import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/life_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
@@ -46,6 +47,7 @@ const chromeByPath = <String, RouteChrome>{
   '/login': chromeImmersive,
   '/verify': chromeImmersive,
   '/ledger': chromeImmersive,
+  '/ledger/add': chromeImmersive,
   '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
@@ -121,6 +123,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(path: '/health/probe', builder: (_, _) => const HealthProbePage()),
         GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
+        GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(
           path: '/briefing',
           builder: (_, state) => BriefingPage(

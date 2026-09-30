@@ -54,6 +54,44 @@ class LedgerEntryData {
   final String? categoryId;
 }
 
+class LedgerCategoryData {
+  const LedgerCategoryData({
+    required this.id,
+    required this.name,
+    required this.kind,
+    this.parentId,
+    this.aliases = const [],
+  });
+
+  final String id;
+  final String name;
+  final String kind;
+  final String? parentId;
+  final List<String> aliases;
+}
+
+class LedgerPreviewData {
+  const LedgerPreviewData({
+    required this.matched,
+    required this.categoryName,
+    required this.reason,
+    required this.isFallback,
+    this.categoryId,
+  });
+
+  final bool matched;
+  final String categoryName;
+  final String reason;
+  final bool isFallback;
+  final String? categoryId;
+}
+
+class LedgerCreateResult {
+  const LedgerCreateResult({required this.id});
+
+  final String id;
+}
+
 class LedgerRepository {
   LedgerRepository({Dio? dio}) : _dio = dio ?? createDio();
 
@@ -115,5 +153,64 @@ class LedgerRepository {
           categoryId: raw['category_id'] as String?,
         ),
     ];
+  }
+
+  Future<List<LedgerCategoryData>> fetchCategories({String? kind}) async {
+    final resp = await _dio.get<List<dynamic>>('/ledger/categories');
+    final items = resp.data ?? const [];
+    return [
+      for (final raw in items)
+        LedgerCategoryData(
+          id: (raw as Map)['id'] as String? ?? '',
+          name: raw['name'] as String? ?? '',
+          kind: raw['kind'] as String? ?? 'expense',
+          parentId: raw['parent_id'] as String?,
+          aliases: [
+            for (final alias in (raw['aliases'] as List?) ?? const [])
+              alias as String,
+          ],
+        ),
+    ].where((row) => kind == null || row.kind == kind).toList();
+  }
+
+  Future<LedgerPreviewData> classifyPreview(
+    String note, {
+    String kind = 'expense',
+  }) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/ledger/classify-preview',
+      queryParameters: {'note': note, 'kind': kind},
+    );
+    final data = resp.data ?? const {};
+    return LedgerPreviewData(
+      matched: data['matched'] as bool? ?? false,
+      categoryId: data['category_id'] as String?,
+      categoryName: data['category_name'] as String? ?? '',
+      reason: data['reason'] as String? ?? '',
+      isFallback: data['is_fallback'] as bool? ?? false,
+    );
+  }
+
+  Future<LedgerCreateResult> createEntry({
+    required int amountMinor,
+    required String direction,
+    required String idempotencyKey,
+    String? categoryId,
+    DateTime? occurredAt,
+    String? note,
+  }) async {
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '/ledger/entries',
+      data: {
+        'amount_minor': amountMinor,
+        'direction': direction,
+        'category_id': ?categoryId,
+        'occurred_at': ?occurredAt?.toIso8601String(),
+        if (note != null && note.isNotEmpty) 'note': note,
+        'idempotency_key': idempotencyKey,
+      },
+    );
+    final data = resp.data ?? const {};
+    return LedgerCreateResult(id: data['id'] as String? ?? '');
   }
 }
