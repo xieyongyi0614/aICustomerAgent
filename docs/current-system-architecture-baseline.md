@@ -63,7 +63,9 @@ API / Application     （api/v1/ HTTP 表现层；application/ 编排层：chat_
    ↓
 Agent Runtime         （application/agent_runtime/：Run Controller、Profile Registry、Trigger Router、LLM Gateway、Models）
    ↓
-Domain Services       （services/：业务服务 + 纯函数引擎；chains/：LangChain LLM 链）
+Domain Services       （services/：领域服务，按领域子包组织（goal/ relationship/ conversation/ evaluation/ delivery/ …）+ 门面；chains/：LangChain LLM 链）
+   ↓
+Pure Engines          （engines/：纯函数引擎，无 IO / 无 LLM / 无 DB；application 与 services 均可直接调用）
    ↓
 Repositories          （repositories/：每张表一个仓储，唯一 DB 访问面）
    ↓
@@ -80,6 +82,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 | `application/` | 编排：只做调度与容错，不做状态计算 | services、chains | 直接 SQL、prompt 文本 |
 | `agent_runtime/` | Run 生命周期唯一管理者：open→执行阶段→close，唯一写面 = loop_runs | services、repositories | 持有业务语义 |
 | `services/` | 领域服务 + 纯函数引擎（无 IO/LLM 的引擎可直接单测） | engines、repositories、chains、core | api |
+| `engines/` | 纯函数引擎：无 IO / 无 LLM / 无 DB，可零 fixture 单测（state / autonomy / decision / behavior / mode / memory_policy 等） | models、core.settings、core.constants、纯数据资产 | repositories、chains、services 业务模块、任何 IO |
 | `chains/` | LangChain 链，统一经 `chains/structured.py` 结构化输出 | prompts、models、core.llm_factory | repositories、services |
 | `repositories/` | CRUD/Query，唯一 DB 访问面 | core.db、models | 一切业务判断 |
 | `core/` | 配置（settings/）、DB 引擎（db.py）、LLM 工厂（llm_factory.py）、常量 | — | 业务 |
@@ -465,6 +468,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | settings 命名一致性建议未采纳（`flag-rename-map.md` §七：部分字段去前缀后丧失域归属，如 `decision_weight`、`planning_enabled`） | 扁平命名空间局部可读性下降 | P3 |
 | `ActionExecutor.execute_external` 返回 `external_adapter_reserved` 占位（外部 API 功能实际经 Tool 路径 `execute_tool` 实现，`external` ExecutionKind 是保留桩） | 分派面与实现面存在语义错位 | P2 |
 | `enablement.py` 源文件已删但 `__pycache__/enablement.cpython-313.pyc` 残留 | 字节码残留（gitignore 兜底，非功能影响） | P3 |
+| `services/` 目录组织不一致：20 个子包与 **49 个顶层散落单文件模块**并存，同域文件散在顶层（relationship 9 / goal 7 / evaluation 5），命名后缀 6 种以上混用；`services/__init__.py` 为空文件（无门面），外部 1333 处 import 全走深层路径；`engines/`（`target-architecture.md` §2 目标态）从未落地。**归类方案见 `docs/refactor/services-reorganization-plan.md`** | 模块难定位；移动任一文件会打断外部深层 import，迁移成本高 | P2 |
 
 ---
 
@@ -486,6 +490,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
 13. **用户身份收口（token 唯一身份源，2026-09-27；默认用户概念整体退役 2026-09-28）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）。**IDENT-009（2026-09-28）：默认用户概念不再存在**——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。具体：①删 `settings.default_user` 字段与 `DEFAULT_USER` env 键；②删启动播种 `ensure_default_user()` / `upsert_default()`（空库冷启动不再造幽灵行）；③`/debug/*` 与 `/state`（共 20 个端点）的回落值由魔法 id 改为 **token 身份**（`user_id` 省略即取 `require_user`，显式传入可覆盖）；④删 `users.is_default` 列与唯一索引（迁移 `0058`；该列此前是纯装饰，全仓无查询用它）与 `UserContext.is_default`；⑤删一次性归并脚本 `adopt_owner_identity.py` 与 `resolve_user` 死代码。历史 owner 行的 id 迁移由 `scripts/migrate_owner_id_to_email.py` 承担（幂等 / 默认 dry-run，级联 `user_id` + `worlds.id` + `world_id`；**执行后所有已签发 token 失效**）。V4.0.0 任务册 §14 为本次登记。
 14. **迁移链折叠为单迁移（2026-09-29）**：`migrations/versions/` 由 0001~0058（58 个增量）折叠为单一基线迁移 `0001_squashed_full_schema.py`（revision `0001`、`down_revision = None`），由 `Base.metadata` autogenerate 生成并人工校正（PG 分支保留 pgvector 扩展可用性守卫与 `idx_memories_embedding_hnsw` HNSW 索引；布尔默认值修正为 `sa.false()`；补回 0026 兜底约束；`VectorType` 以迁移内本地副本声明，不依赖 `app.core.db`，基线迁移自包含）。**前提**：项目处开发期、库可整库重建，无线上存量数据需保留；**旧库（≤`0058`）与新链不兼容，必须删库重跑 `alembic upgrade head`**。**顺带修正三处模型/迁移漂移**：①`character_goals.ck_character_goals_domain` 值域补 `budget`（旧链漏更，迁移库上写 budget 域目标会违约）；②`action_records.ix_action_records_user_id` 由 UNIQUE 改普通索引（对齐模型；旧链 0047 误建唯一索引）；③`uq_development_state_active_key` 部分唯一索引与 `ck_development_changes_subject` CHECK 补回 ORM 模型（此前仅存在于迁移、测试建表路径缺失）。迁移头钉测保持 `tests/support/schema_pins.py` 单点（折叠时 `MIGRATION_HEAD="0001"`，**现值 `"0002"`**——随 `0002_briefing_preferences` 入链同步）；v24 取证常量同步改写（`SQUASHED_MIGRATION_FILE` 等）。此后结构变更加 `0002+` 增量迁移，禁止再折叠除非再次整库重建。
+15. **services 目录领域化重组（2026-09-30）**：裁决「领域优先 + 引擎收口 + 统一去后缀」——①49 个顶层散落单文件模块按业务领域收进领域子包（goal / relationship / conversation / evaluation / delivery / autonomy 等），`goal_planning` 不并入 `planning/`（Goal 写面与 Planning 白名单分域）；②无 IO / 无 LLM / 无 DB 的纯函数模块收口 `app/engines/`（**独立层，与 services 平级**，落地 `target-architecture.md` §2 目标态），依赖规则 = 只允许 models / core.settings / core.constants / 纯数据资产，禁止 repositories / chains / services 业务模块 / 任何 IO；③文件名去 `_service` / `_engine` 等后缀（已有子包内文件不改名）；④`services/__init__.py` 落 PEP 562 惰性门面；⑤`governance/` 6→2、`analytics/` `tasks/` 命名空间包并入相邻领域包。方案与逐文件映射见 `docs/refactor/services-reorganization-plan.md`。
 
 ---
 
