@@ -436,3 +436,20 @@ app/services/
 - ⏸ **`tool/ext_api.py`(1507) / `planning/decompose.py`(963) 待排期**：与 observer 同属 planning/tool 守卫体系（decompose 在 plan001_scope_markers 的 11 项清单 + plan004 清单；ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（14 文件的清单语义从文件名改为相对包路径，一次性解除全部 planning 子包化的守卫障碍），之后 decompose 可复用 evidence 全套方法论；ext_api 另需 tool 域钉测审计。
 
 ⚠️ **端口快照残留第二形态（本轮新发现，比 §15.1 第一形态更隐蔽）**：经**模块属性链**打到端口对象的补丁（如 `monkeypatch.setattr(plan_context.world_engine, "build_context", fake)`，其中 `plan_context.world_engine` 已是端口）——undo 时 monkeypatch 把「getattr 的快照」（即真实函数）**永久写进端口字典**，此后端口 `__getattr__` 被字典短路：①后续对实现模块的补丁全部失效（跨测试污染，`test_plan008_context` 文件内 TestWorldBriefBudget 污染 TestNineWorldFacts / TestAssemblyZeroWrite 即此因）；②形式上看不出「打的是端口」，审计极易漏。**修法与铁律同前**：补丁目标一律改打实现模块（`app.application.world_engine.X`），端口读穿天然生效。
+
+---
+
+## 附录：上线前人工回归移交（D1，2026-09-30 登记）
+
+**执行前提**：代码改动冻结（含本台账全部批次与三类架构债工作）后执行，避免返工。
+
+**清单总册**（26 份，均需真实模型人工执行）：
+- V1.x 主线：`docs/version/v1.0.0/v{3,4,5,6.5,7,7.5,7.8,8,8.5,9}/regression-checklist.md`
+- V2.0.0 六 Phase：`docs/version/v2.0.0/phases/phase-{1..6}-*/regression-checklist.md`
+- V2.1.0 ~ V2.6.1：`docs/version/v2.{1.0,2.0,3.0,4.0,5.0/planning-system,6.0}/regression-checklist.md`
+- V3.0.0 / V4.0.0：`docs/version/v{3,4}.0.0/regression-checklist.md`（V3.0.0 验收报告为 CONDITIONAL — NOT RELEASED，含 G7 既存失败，执行前先确认是否已被后续版本消化）
+- 横切：`docs/integrations/feishu/regression-checklist.md`
+
+**自动化回归基线**（人工回归前的机械门槛）：全量 `pytest tests -q`，判据 = 失败集与基线一致（当前基线 18 failed，均为既存失败 + 3 例已知抖动性能测试，见 §15.2 与提交 `b461c4c`）。
+
+**上线后例行观察**：无「过期记忆未回收」类反馈（记忆老化由 v2 decay 状态机承接）；`test_memory_e2e` 召回竞态已根修（等待谓词改为检索可见），若再现按真 bug 处理。
