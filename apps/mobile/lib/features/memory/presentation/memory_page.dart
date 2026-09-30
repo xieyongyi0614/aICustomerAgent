@@ -189,9 +189,9 @@ class _MemoryPageState extends State<MemoryPage> {
       body: SafeArea(
         bottom: false,
         child: _loading && data == null
-            ? const ListView(
-                padding: EdgeInsets.all(18),
-                children: [SkeletonCard(), SkeletonCard()],
+            ? ListView(
+                padding: const EdgeInsets.all(18),
+                children: const [SkeletonCard(), SkeletonCard()],
               )
             : _error != null && data == null
                 ? ErrorState(message: StateCopy.serverError, onRetry: _load)
