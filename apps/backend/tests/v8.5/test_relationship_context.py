@@ -7,7 +7,7 @@ from app.models.conversation import ConversationState
 from app.models.intention import ValidatedIntention
 from app.models.relationship import RelationshipState
 from app.models.scene import SceneContext, SceneState
-from app.services.behavior_engine import (
+from app.engines.behavior import (
     RelationshipBehaviorContext,
     resolve,
 )

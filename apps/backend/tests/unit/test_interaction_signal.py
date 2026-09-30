@@ -2,7 +2,7 @@
 
 from app.models.emotion import TurnAnalysis
 from app.models.relationship import InteractionSignal
-from app.services import relationship_signal as rs
+from app.engines import relationship_signal as rs
 
 
 def _signal(kind, quality="positive", salience=0.6):

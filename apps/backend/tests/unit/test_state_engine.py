@@ -5,7 +5,7 @@ import pytest
 from app.models.character_state import CharacterState, StateUpdateDecision
 from app.models.emotion import TurnAnalysis, UserEmotion
 from app.models.behavior import BehaviorDecision
-from app.services import state_engine
+from app.engines import state as state_engine
 
 
 def _analysis(event, behavior="normal_reply", emotion="neutral"):

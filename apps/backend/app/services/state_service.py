@@ -21,13 +21,11 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import (
-    relationship_evolution,
-    relationship_signal,
-    state_engine,
-    relationship_conflict,
-    relationship_milestone,
-)
+from app.engines import relationship_evolution
+from app.engines import relationship_signal
+from app.engines import state as state_engine
+from app.engines import relationship_conflict
+from app.services import relationship_milestone
 from app.repositories import (
     relationship_conflict_repository,
     relationship_snapshot_repository,

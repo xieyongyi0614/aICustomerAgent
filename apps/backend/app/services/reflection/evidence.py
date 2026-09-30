@@ -47,7 +47,7 @@ from app.models.reflection import (
 )
 from app.repositories import action_repository, goal_repository, memory_repository
 from app.services.memory import sources as memory_sources
-from app.services.memory.conflict import _lcs_length, same_topic
+from app.engines.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.models.action import ActionIntent
-from app.services import character_assets
+from app.engines import character as character_assets
 
 logger = logging.getLogger(__name__)
 

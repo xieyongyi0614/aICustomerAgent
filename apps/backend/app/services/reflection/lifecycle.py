@@ -19,7 +19,7 @@ from datetime import datetime
 from app.core.db import InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import Insight
-from app.services.memory.conflict import _lcs_length
+from app.engines.memory_conflict import _lcs_length
 
 logger = logging.getLogger(__name__)
 

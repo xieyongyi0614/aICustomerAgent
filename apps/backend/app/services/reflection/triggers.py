@@ -35,7 +35,7 @@ from app.models.reflection import (
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
 from app.services.memory import job_worker as memory_job_worker
-from app.services.memory.conflict import same_topic
+from app.engines.memory_conflict import same_topic
 
 logger = logging.getLogger(__name__)
 

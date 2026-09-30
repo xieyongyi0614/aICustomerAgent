@@ -10,7 +10,7 @@ from app.models.evaluation import (
     IssueCode,
     build_issue,
 )
-from app.services import behavior_engine
+from app.engines import behavior as behavior_engine
 from app.services.evaluation_context import EvaluationContext
 from app.services.evaluation_rules import EvaluationRule, lexicons
 

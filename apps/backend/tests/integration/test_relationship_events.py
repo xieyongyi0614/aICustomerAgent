@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from app.models.relationship import RelationshipDelta, RelationshipEvent
 from app.repositories import relationship_event_repository as repo
 from app.repositories import relationship_repository
-from app.services import state_engine
+from app.engines import state as state_engine
 
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)

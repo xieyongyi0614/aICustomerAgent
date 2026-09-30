@@ -25,7 +25,7 @@ from app.prompts.memory_evaluator import build_memory_evaluation_messages
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import lifecycle as memory_lifecycle
 from app.services.memory import types as memory_types
-from app.services.memory.conflict import _lcs_length, same_topic
+from app.engines.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 

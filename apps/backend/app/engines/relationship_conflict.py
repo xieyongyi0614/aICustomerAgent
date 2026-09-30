@@ -16,7 +16,7 @@ from app.models.relationship import (
     RelationshipState,
     RelationshipEvent,
 )
-from app.services.relationship_evolution import clamp01
+from app.engines.relationship_evolution import clamp01
 
 logger = logging.getLogger(__name__)
 

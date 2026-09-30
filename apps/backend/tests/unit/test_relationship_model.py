@@ -14,7 +14,8 @@ from app.models.relationship import (
     RelationshipDelta,
     RelationshipState,
 )
-from app.services import relationship_evolution, state_engine
+from app.engines import relationship_evolution
+from app.engines import state as state_engine
 
 
 NOW = datetime(2026, 8, 31, 12, 0, 0)

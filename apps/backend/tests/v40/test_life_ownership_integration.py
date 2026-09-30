@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.core.db import WorldRow
 from app.repositories import world_repository
-from app.services.character_assets import DEFAULT_CHARACTER_ID
+from app.engines.character import DEFAULT_CHARACTER_ID
 from app.services.life.ownership import resolve_owner, assert_access
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]

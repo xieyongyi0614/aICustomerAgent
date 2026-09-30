@@ -40,7 +40,7 @@ from app.models.world import (
     part_of_day,
 )
 from app.repositories import world_repository, world_simulation_repository
-from app.services.character_assets import DEFAULT_CHARACTER_ID
+from app.engines.character import DEFAULT_CHARACTER_ID
 from app.services.life.ownership import assert_access, resolve_owner
 from app.services.world.locations import build_location_context
 from app.services.world.time_provider import TimeProvider

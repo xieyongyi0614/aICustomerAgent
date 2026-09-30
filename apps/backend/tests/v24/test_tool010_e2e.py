@@ -84,20 +84,22 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
-    # services 归位声明（2026-09-30，批次 1）：`llm_budget_gate` → `life/gate` 导入路径变更 —— 非 TOOL-010 改脏。
-    "app/services/decision_pipeline.py": "f8094c0525ffb55800b110a5fe4470146502a4cd70ccf886634ff3fca6561bd0",
+    # services 归位声明（2026-09-30，批次 1~2）：`llm_budget_gate` → `life/gate`、
+    # `state_engine` / `goal_alignment` → `engines/*` 导入路径变更 —— 非 TOOL-010 改脏。
+    "app/services/decision_pipeline.py": "92f5d7b46313d925f0ce62fc2110af0b704a4f3eeab59c47f5480d50b502a6e4",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
     # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
-    # services 归位声明（2026-09-30，批次 1）：`memory_refs` → `memory/refs` 导入路径变更 —— 非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "ea741a875997bc9ce22c5bfb73fb3f070388594e1a58d3d557cc557903d8bc73",  # 再冻结：grounding 门控去掉 enabled 判断
+    # services 归位声明（2026-09-30，批次 1~2）：`memory_refs` → `memory/refs`、
+    # `behavior_engine` / `mode_service` → `engines/*` 导入路径变更 —— 非 TOOL-010 改脏。
+    "app/application/chat_pipeline.py": "ee5ada6a83bcd2d03203940d56d980dc06b9ebb5404ccedd236ae7bfde3e9cc6",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "8920af98660870c594929bd61c3ff24dbf46ff3a06fa1b1e70928996ecb10dfd",  # 前值 378bdd6a（memory 域清理 + followup 恢复）；再前值 30125e6e、2040a4df、c1702717
+    "app/application/post_process.py": "6778abc47d72ac7542c3ada88593e36097c6ed79decd3cf18b6206135cc5d3d4",  # 前值 8920af98（services 归位批次 2：`behavior_engine` → `engines/behavior` 导入路径变更）；再前值 378bdd6a、30125e6e、2040a4df、c1702717
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }

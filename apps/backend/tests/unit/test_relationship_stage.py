@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.state_engine import next_stage
+from app.engines.state import next_stage
 
 
 class TestUpgradeThresholds:

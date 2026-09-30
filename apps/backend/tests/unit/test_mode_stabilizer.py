@@ -2,8 +2,8 @@ import pytest
 from datetime import datetime, timedelta, timezone
 
 from app.application.chat_pipeline import _idle_seconds_since, _stabilize_mode
-from app.services import mode_service
-from app.services.mode_service import stabilize
+from app.engines import mode as mode_service
+from app.engines.mode import stabilize
 
 
 class _StateStub:

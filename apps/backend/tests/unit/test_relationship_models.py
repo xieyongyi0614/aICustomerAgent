@@ -10,7 +10,7 @@ from app.models.relationship import (
     RelationshipState,
 )
 from app.repositories import relationship_repository
-from app.services.state_engine import RELATIONSHIP_EVENT_DELTAS
+from app.engines.state import RELATIONSHIP_EVENT_DELTAS
 
 
 class TestRelationshipStateTension:

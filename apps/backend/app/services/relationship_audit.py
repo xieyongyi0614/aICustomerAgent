@@ -17,7 +17,7 @@ from app.repositories import (
     relationship_repository,
     relationship_snapshot_repository,
 )
-from app.services import relationship_evolution
+from app.engines import relationship_evolution
 
 logger = logging.getLogger(__name__)
 

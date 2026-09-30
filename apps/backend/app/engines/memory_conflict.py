@@ -3,6 +3,7 @@
 随 memory 域清理从 `services/memory_conflict.py` 归位（2026-09-29）：
 v1 的 resolve_batch / resolve_candidate 冲突消解路径已删除——生产零调用，
 冲突处理由 `memory/lifecycle.py::on_promoted` 承担。
+随 services 归位批次 2 再迁 `engines/memory_conflict.py`（2026-09-30，纯函数收口）。
 """
 
 from app.core.settings import get_settings

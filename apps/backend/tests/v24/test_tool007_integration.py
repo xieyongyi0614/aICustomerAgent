@@ -34,7 +34,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # 再冻结（2026-09-28）：CAS 门控去掉（固化常开）+ 删除 world_interpreter_enabled /
     # world_memory_bridge_enabled / world_household_autoseed_enabled / world_enabled
     # （四者固化常开，门控点展开）。原 3bdcd4f4 在首次改动前已 stale。
-    "app/application/world_engine.py": "c57307c7b4b9ff7189f8d2b79b701101ece2c816813c722f219c88452732298d",
+    # services 归位声明（2026-09-30，批次 2）：`character_assets` → `engines/character`
+    # 导入路径变更 —— 非 TOOL-007 改脏。原值 c57307c7。
+    "app/application/world_engine.py": "f0ba90cbbdb068473a7890cd0c4c1e55d7f13eee17f04ab53c365e9a19c251fa",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。

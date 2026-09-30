@@ -22,7 +22,7 @@ from app.models.intention import (
     INTENTION_GOAL_FIT,
     IntentionType,
 )
-from app.services import goal_alignment
+from app.engines import goal_alignment
 
 logger = logging.getLogger(__name__)
 

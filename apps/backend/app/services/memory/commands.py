@@ -17,7 +17,7 @@ from app.core.db import Memory, MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory import evaluator as memory_evaluator
 from app.services.memory import lifecycle as memory_lifecycle
-from app.services.memory.conflict import _lcs_length, same_topic
+from app.engines.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 

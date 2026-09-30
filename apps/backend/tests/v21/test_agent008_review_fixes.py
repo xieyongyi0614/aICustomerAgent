@@ -37,9 +37,9 @@ OTHER = "review-fix-other"
 DOMAIN_MODULES = (
     "app/services/memory",
     "app/services/reflection",
-    "app/services/relationship_signal.py",
+    "app/engines/relationship_signal.py",
     "app/services/relationship_milestone.py",
-    "app/services/relationship_evolution.py",
+    "app/engines/relationship_evolution.py",
     "app/services/action",
     "app/services/character_action",
     "app/services/world",

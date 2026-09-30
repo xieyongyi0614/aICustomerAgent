@@ -16,7 +16,7 @@ from app.models.relationship import (
     RelationshipEvent,
     RelationshipState,
 )
-from app.services.state_engine import build_relationship_impact, next_stage
+from app.engines.state import build_relationship_impact, next_stage
 
 DEFAULT_CONFLICT_BASELINE_PENALTY = 0.10
 

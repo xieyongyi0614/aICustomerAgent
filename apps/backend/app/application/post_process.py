@@ -13,16 +13,14 @@ from datetime import datetime, timedelta
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
-from app.services import (
-    behavior_engine,
-    conversation_service,
-    evaluation_engine,
-    goal_service,
-    scene_service,
-    state_service,
-    summary_service,
-    trigger_evaluator,
-)
+from app.engines import behavior as behavior_engine
+from app.services import conversation_service
+from app.services import evaluation_engine
+from app.services import goal_service
+from app.services import scene_service
+from app.services import state_service
+from app.services import summary_service
+from app.services import trigger_evaluator
 from app.application import world_engine
 from app.models.action import ActionIntent
 from app.models.character_action import TurnRef

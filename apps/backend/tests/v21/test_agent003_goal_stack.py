@@ -16,7 +16,9 @@ from app.repositories import (
     goal_repository,
     loop_run_repository,
 )
-from app.services import goal_alignment, goal_stack, trigger_evaluator
+from app.engines import goal_alignment
+from app.services import goal_stack
+from app.services import trigger_evaluator
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "goal-stack-user"

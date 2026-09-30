@@ -45,16 +45,14 @@ from app.application.agent_runtime.models import (
 )
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
-from app.services import (
-    behavior_engine,
-    context_builder,
-    conversation_service,
-    goal_service,
-    mode_service,
-    scene_service,
-    state_service,
-    trace_collector,
-)
+from app.engines import behavior as behavior_engine
+from app.services import context_builder
+from app.services import conversation_service
+from app.services import goal_service
+from app.engines import mode as mode_service
+from app.services import scene_service
+from app.services import state_service
+from app.services import trace_collector
 from app.services.goal_service import SelectedGoal
 from app.services.action.detector import detect_action_intent
 from app.services.experience.style_context import build_style_context
@@ -62,7 +60,7 @@ from app.services.intention_policy import enforce as enforce_intention
 from app.chains.answer_chain import answer_max_tokens
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import build_action_context
-from app.services.behavior_engine import RelationshipBehaviorContext
+from app.engines.behavior import RelationshipBehaviorContext
 from app.services.memory.refs import build_memory_refs
 
 logger = logging.getLogger(__name__)

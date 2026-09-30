@@ -21,7 +21,7 @@ from app.models.behavior_strategy import (
     StageBehaviorParams,
 )
 from app.models.scene import SceneContext
-from app.services import habit_runtime
+from app.engines import habit as habit_runtime
 from app.character.asuna.behavior_instructions import BEHAVIOR_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)

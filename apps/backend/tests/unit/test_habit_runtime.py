@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.services import habit_runtime
-from app.services.behavior_engine import match_habits
-from app.services.habit_runtime import derive_habit_candidates, load_effective_habits
+from app.engines import habit as habit_runtime
+from app.engines.behavior import match_habits
+from app.engines.habit import derive_habit_candidates, load_effective_habits
 
 
 class _Event:

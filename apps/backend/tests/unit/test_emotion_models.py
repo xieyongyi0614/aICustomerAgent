@@ -6,7 +6,7 @@ from typing import get_args
 
 from app.models.character_state import CharacterEmotion, EmotionLabel, Mood
 from app.models.emotion import EmotionEvent
-from app.services.state_engine import EMOTION_EVENTS, MAGNITUDE_COEFFICIENTS
+from app.engines.state import EMOTION_EVENTS, MAGNITUDE_COEFFICIENTS
 
 
 class TestCharacterEmotion:

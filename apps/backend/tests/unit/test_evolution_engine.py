@@ -3,8 +3,8 @@
 from datetime import datetime
 
 from app.models.relationship import InteractionSignal, RelationshipDelta, RelationshipState
-from app.services import relationship_evolution as revo
-from app.services import relationship_signal as rs
+from app.engines import relationship_evolution as revo
+from app.engines import relationship_signal as rs
 
 
 def _state(**overrides) -> RelationshipState:

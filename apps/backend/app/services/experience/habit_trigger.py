@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from app.character.asuna.habit_triggers import HABIT_TRIGGER_SPECS
 from app.models.emotion import TurnAnalysis
 from app.models.style_contract import TriggeredHabit
-from app.services.behavior_engine import HABIT_MAX_COUNT
-from app.services.habit_runtime import load_effective_habits
+from app.engines.behavior import HABIT_MAX_COUNT
+from app.engines.habit import load_effective_habits
 
 DOMAIN_ORDER: dict[str, int] = {"relate": 0, "express": 1, "pace": 2}
 

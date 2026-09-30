@@ -10,7 +10,7 @@ from app.models.relationship import (
     RelationshipEvent,
     RelationshipState,
 )
-from app.services import relationship_evolution as revo
+from app.engines import relationship_evolution as revo
 
 EVENT_TYPES = ("user_care", "praise", "intimate_moment", "conflict", "criticized", "long_interaction")
 MAGNITUDES = ("weak", "normal", "strong")

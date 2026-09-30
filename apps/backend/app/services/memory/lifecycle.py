@@ -21,7 +21,7 @@ from sqlalchemy import or_
 from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory import types as memory_types
-from app.services.memory.conflict import _lcs_length, same_topic
+from app.engines.memory_conflict import _lcs_length, same_topic
 
 logger = logging.getLogger(__name__)
 

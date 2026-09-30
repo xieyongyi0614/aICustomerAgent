@@ -10,7 +10,9 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
-from app.services import behavior_engine, state_service, conversation_service
+from app.engines import behavior as behavior_engine
+from app.services import state_service
+from app.services import conversation_service
 from app.repositories import (
     decision_repository,
     llm_call_repository,

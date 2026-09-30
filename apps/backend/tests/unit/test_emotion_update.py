@@ -4,7 +4,7 @@ import pytest
 
 from app.models.character_state import CharacterState
 from app.models.emotion import EmotionEvent
-from app.services import state_engine
+from app.engines import state as state_engine
 
 
 def make_state(**overrides):

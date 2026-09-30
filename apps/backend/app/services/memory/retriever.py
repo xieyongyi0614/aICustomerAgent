@@ -20,7 +20,7 @@ from app.repositories import memory_repository
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import lifecycle as memory_lifecycle
 from app.services.memory import types as memory_types
-from app.services.memory.conflict import same_topic
+from app.engines.memory_conflict import same_topic
 
 logger = logging.getLogger(__name__)
 

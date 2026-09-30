@@ -20,7 +20,7 @@ from app.models.emotion import EmotionEvent, TurnAnalysis, UserEmotion
 from app.models.relationship import RelationshipState
 from app.models.style_contract import StyleContract
 from app.prompts.builder import PromptBuilder
-from app.services import state_engine
+from app.engines import state as state_engine
 from app.services.experience.emotion_expression import (
     build_emotion_expression,
     describe_transition,

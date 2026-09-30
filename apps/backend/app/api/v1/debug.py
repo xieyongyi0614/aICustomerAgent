@@ -90,10 +90,10 @@ from app.repositories import (
     relationship_event_repository,
     relationship_snapshot_repository,
 )
-from app.services import relationship_evolution
+from app.engines import relationship_evolution
 from app.services.development import attribution as development_attribution
 from app.services.observability.prompt_capture import diff_prompt_snapshots
-from app.services.relationship_evolution import distance_index
+from app.engines.relationship_evolution import distance_index
 
 logger = logging.getLogger(__name__)
 

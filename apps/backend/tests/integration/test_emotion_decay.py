@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.repositories import character_state_repository
-from app.services import state_engine, state_service
+from app.engines import state as state_engine
+from app.services import state_service
 from app.models.character_state import CharacterState
 
 

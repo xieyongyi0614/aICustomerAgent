@@ -1,4 +1,4 @@
-from app.services.memory.conflict import same_topic
+from app.engines.memory_conflict import same_topic
 
 
 class TestSameTopic:
