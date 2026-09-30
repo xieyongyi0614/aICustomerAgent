@@ -375,3 +375,36 @@ app/services/
 - 每批次跑全量 `pytest tests -q --basetemp=<每次换名的新目录> -rf`，**判据 = 失败集 diff，不是计数**（基线本身非全绿）。
 - 动哈希冻结模块时，同步更新 `tests/support/schema_pins.py` 之外的钉测键，并在文件内写「归位至 …」留痕注释（沿用 `memory/conflict.py` 既有体例）。
 - 批次 0~5 全部完成后，回写本台账的「实际执行结果」章节（含实测失败集 diff）。
+
+---
+
+## 十四、实际执行结果（2026-09-30 收官）
+
+**批次 0~5 全部完成**，逐批独立提交：`455ad7f`（docs 规划 + 基线 ADR-15）→ `616c7d7`（批次 0 骨架）→ `b4c86d5`（批次 1）→ `d4d652f`（批次 2）→ `8969b42`（批次 3）→ `1b39d14`（批次 4）→ `b6c68ca`（批次 5 门面）。
+
+### 14.1 判据与结果
+
+- 基线全量：**20 failed / 7160 passed / 2 skipped**；收官全量：**19 failed / 7161 passed / 2 skipped**——失败集为基线的**严格子集**（唯一差异 = 基线中抖动的 `v7.8::test_observability_overhead_within_budget` 本次通过），**零真实回归**。
+- 每批次均以「基线失败集 ∪ 已知抖动名单」为期望集做 diff；过程中暴露的真实回归（tool007/tool010 零差异哈希、feishu_boundary direction2、plan_stage 懒加载断言、plan009 两守卫）全部当场修复并复验。
+- 已知抖动名单（12 项，非本次引入）：e2e debug 家族 5 例、`test_world_chat` 2 例、`test_scene_cases::test_case4_topic_switch`、`test_chat_http_integration::test_http_summary_trigger`、v7.8/v8 performance 预算 2 例、`test_runtime_background_cutover::test_maintenance_steps_unchanged`。
+- **观察项**：`tests/e2e/test_memory_e2e.py::test_memory_roundtrip_across_turns` 全量偶发（召回轮 prompt 缺失刚存记忆，后台记忆管线竞态；单跑连过 3 轮）——本次仅改 import 路径不改运行时逻辑，判定为既有抖动，上线后例行观察。
+
+### 14.2 实际搬迁面
+
+- 批次 1：11 个叶子模块（memory_refs / domain_ledger / llm_budget_gate / life_loop_budget / evolution / outbox / outbound / dedupe / delivery ledger / analytics.events / tasks.task_service）+ 消灭 `analytics/` `tasks/` 命名空间包 + 补 `insights/__init__.py`。
+- 批次 2：10 个纯函数模块收口 `app/engines/`（state / mode / habit / goal_alignment / behavior / relationship_{evolution,signal,conflict} / character / **memory_conflict**——§6.2 清单内、未排批次的补齐）。
+- 批次 3：28 个顶层模块归位 goal/ relationship/ conversation/ evaluation/ autonomy/ identity/ observability/ briefing 八域 + `evaluation_rules/`→`evaluation/rules/`（12 文件整体并入）+ governance 6→2（core.py 合并五文件，prompt_guard 独立）。
+- 批次 4：`decision_pipeline`→`engines/decision.py`、`memory/policy`→`engines/memory_policy.py`、`autonomy_policy`→`engines/autonomy.py`——**内容逐字节未变（摘要不变），仅键路径更新**（沿用 tool008 memory/policy 先例；§十三的「文件内留痕」改为钉测字典留痕，与既有体例一致）。
+- 批次 5：`services/__init__.py` 落 PEP 562 惰性门面（54 个旧名映射，`importlib.import_module` 按需解析并缓存）；深路径改写未依赖门面，已在批次 1~4 由 codemod 全量完成（批次 1~4 分别改写 50 / 49 / 214 / 52 个文件）。
+
+### 14.3 与规划的偏差
+
+1. 待裁决 A~F 按文档倾向执行（A1 = `app/engines/` 独立层）。
+2. `trigger_evaluator` 归入批次 3（§八批次 3/4 重复列名；plan007 路径断言同批同步）。
+3. 零差异冻结面**再冻结 8 处**（§九未预见）：tool007 `world_engine`；tool010 `chat_pipeline`×2、`post_process`×2、`channels/feishu/delivery`、`prompts/builder`、`action/capabilities/memory`——均为 import 路径改写所致，钉测字典内按既有「非 TOOL-010/007 改脏」声明体例留痕。
+4. §九之外的守卫同步：`test_feishu_boundary` direction2（identity/channel 路径 + 过滤串）、`test_runtime_plan_stage` 懒加载断言（`{"app.services.goal","app.services.planning"} <= nested`，原 `from app.services import goal_planning` 包形式经归位后字面失配）、`test_plan009_flags`（engines/memory_policy 读取路径）、`test_plan009_step_criteria`（导入面期望字典去 `policy`）、`test_life_governance`（改读 `governance/core.py` + reset 入口）。
+5. 未动范围兑现：`action/*` / `world/` / `tool/` / `reflection/` / `planning/` 内部结构未触碰，`agent_service.py` 兼容壳原位保留。
+
+### 14.4 遗留
+
+§十 债①（`services → application` 反向依赖 35 处，含 world_engine 14 处端口化）与债②（巨型文件拆分 5 个）不在批次 0~5 范围，**保持未动**，沿用本台账 §十 规划要点另行排期。

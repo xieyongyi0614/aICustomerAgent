@@ -468,7 +468,6 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | settings 命名一致性建议未采纳（`flag-rename-map.md` §七：部分字段去前缀后丧失域归属，如 `decision_weight`、`planning_enabled`） | 扁平命名空间局部可读性下降 | P3 |
 | `ActionExecutor.execute_external` 返回 `external_adapter_reserved` 占位（外部 API 功能实际经 Tool 路径 `execute_tool` 实现，`external` ExecutionKind 是保留桩） | 分派面与实现面存在语义错位 | P2 |
 | `enablement.py` 源文件已删但 `__pycache__/enablement.cpython-313.pyc` 残留 | 字节码残留（gitignore 兜底，非功能影响） | P3 |
-| `services/` 目录组织不一致：20 个子包与 **49 个顶层散落单文件模块**并存，同域文件散在顶层（relationship 9 / goal 7 / evaluation 5），命名后缀 6 种以上混用；`services/__init__.py` 为空文件（无门面），外部 1333 处 import 全走深层路径；`engines/`（`target-architecture.md` §2 目标态）从未落地。**归类方案见 `docs/refactor/services-reorganization-plan.md`** | 模块难定位；移动任一文件会打断外部深层 import，迁移成本高 | P2 |
 
 ---
 
