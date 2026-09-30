@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 34 AI 自动记账 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ 共享组件 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title h2{font-size:16.5px;font-weight:700}
+.sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Ledger Auto（AI 自动记账） ============ */
+.stat-row{display:flex;gap:11px;margin-top:14px}
+.stat{flex:1;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:13px 12px}
+.stat .s-v{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
+.stat .s-v small{font-size:11px;font-weight:600;color:var(--ink3);margin-left:2px}
+.stat .s-n{font-size:11px;color:var(--ink3);margin-top:3px}
+.confirm{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:6px 18px}
+.cf{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.cf:last-child{border-bottom:none}
+.cf .c-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none}
+.cf .c-ic svg{width:17px;height:17px}
+.cf .c-t{font-size:14px;font-weight:600}
+.cf .c-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.cf .c-acts{margin-left:auto;display:flex;gap:7px;flex:none}
+.btn-ok{font-size:12.5px;font-weight:600;color:#fff;background:var(--health);border-radius:99px;padding:7px 13px;cursor:pointer}
+.btn-fix{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 12px;cursor:pointer}
+.set-group{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);overflow:hidden}
+.s-row{display:flex;align-items:center;gap:12px;padding:14px 17px;border-bottom:1px solid var(--line)}
+.s-row:last-child{border-bottom:none}
+.s-row .s-ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.s-row .s-ic svg{width:16px;height:16px}
+.s-row .s-t{font-size:14.5px;font-weight:550}
+.s-row .s-d{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.s-row .s-r{margin-left:auto;font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:6px;text-align:right}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--health);flex:none}
+.rule{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rule:last-child{border-bottom:none}
+.rule .r-k{font-size:13px;font-weight:650;background:#F3F2ED;border-radius:8px;padding:5px 10px;flex:none}
+.rule .r-arrow{color:var(--ink3);flex:none}
+.rule .r-arrow svg{width:14px;height:14px;display:block}
+.rule .r-v{font-size:13.5px;font-weight:600}
+.rule .r-s{margin-left:auto;font-size:11px;color:var(--ink3);text-align:right;flex:none;max-width:96px;line-height:1.5}
+.privacy{margin-top:20px;padding:15px 16px;border-radius:var(--r-md);background:rgba(51,188,140,.07);border:1px solid rgba(51,188,140,.18);font-size:12px;line-height:1.7;color:#2E7D5F}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Ledger Auto ================= -->
+    <div class="screen" id="ledger-auto">
+      <a class="back" href="31-ledger.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>记账</a>
+
+      <div class="ai-card">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>本月 AI 自动记账</div>
+        <p>这个月我帮你自动记了 42 笔，分类准确率 96%。只有 2 笔拿不准，需要你看一眼——其余的都已经入帐了。</p>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="s-v">42<small>笔</small></div><div class="s-n">本月自动记账</div></div>
+        <div class="stat"><div class="s-v">96<small>%</small></div><div class="s-n">分类准确率</div></div>
+        <div class="stat"><div class="s-v">2<small>笔</small></div><div class="s-n">待你确认</div></div>
+      </div>
+
+      <div class="sec-title"><h2>需要你的确认</h2><span class="hint">确认后我会记住</span></div>
+      <div class="confirm">
+        <div class="cf">
+          <div class="c-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 21h8M12 19v2"/></svg></div>
+          <div><div class="c-t">Apple Store · ¥68</div><div class="c-s">今天 09:14 · 我的判断：娱乐 · 应用订阅</div></div>
+          <div class="c-acts"><span class="btn-ok">确认</span><span class="btn-fix">修改</span></div>
+        </div>
+        <div class="cf">
+          <div class="c-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+          <div><div class="c-t">转账 · 给「老妈」· ¥500</div><div class="c-s">昨天 19:40 · 转账不算支出，要记吗？</div></div>
+          <div class="c-acts"><span class="btn-ok">记为亲情</span><span class="btn-fix">忽略</span></div>
+        </div>
+      </div>
+
+      <div class="sec-title"><h2>自动同步来源</h2><span class="hint">随时可关</span></div>
+      <div class="set-group">
+        <div class="s-row">
+          <div class="s-ic" style="background:rgba(51,188,140,.12);color:var(--health)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4c-1.5 0-3-.4-4.2-1L3 20l1.2-5.2A8.4 8.4 0 0 1 3 11.5 8.4 8.4 0 0 1 11.5 3h1A8.4 8.4 0 0 1 21 11.5z"/></svg></div>
+          <div><div class="s-t">微信账单</div><div class="s-d">今天同步 6 笔 · 仅读取消费记录</div></div>
+          <div class="s-r"><span class="dot"></span>已连接</div>
+        </div>
+        <div class="s-row">
+          <div class="s-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg></div>
+          <div><div class="s-t">支付宝账单</div><div class="s-d">昨天同步 11 笔 · 每周日凌晨自动对账</div></div>
+          <div class="s-r"><span class="dot"></span>已连接</div>
+        </div>
+        <div class="s-row">
+          <div class="s-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div>
+          <div><div class="s-t">银行卡短信</div><div class="s-d">只识别消费类短信，其余不读取</div></div>
+          <div class="s-r"><span class="dot"></span>已开启</div>
+        </div>
+        <div class="s-row">
+          <div class="s-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+          <div><div class="s-t">语音记账</div><div class="s-d">对我说「午饭 35 元」就行</div></div>
+          <div class="s-r">一直开着</div>
+        </div>
+      </div>
+
+      <div class="sec-title"><h2>我学会的规则</h2><span class="hint">来自你的 9 次修正</span></div>
+      <div class="confirm">
+        <div class="rule"><span class="r-k">「咖啡不加糖」</span><span class="r-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="r-v">餐饮 · 咖啡</span><span class="r-s">修正 3 次后学会</span></div>
+        <div class="rule"><span class="r-k">「滴滴 / 高德打车」</span><span class="r-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="r-v">交通 · 打车</span><span class="r-s">修正 2 次后学会</span></div>
+        <div class="rule"><span class="r-k">「Steam」</span><span class="r-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="r-v">娱乐 · 游戏</span><span class="r-s">修正 4 次后学会</span></div>
+      </div>
+
+      <div class="privacy">账单数据只用于帮你记账和生成消费观察，不会用于其他用途。每条自动记录的账单你都可以在账本里修改或删除，关闭同步后我会立刻停止读取。</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · AI 自动记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

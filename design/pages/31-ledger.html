@@ -82,7 +82,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .orb.lg{width:76px;height:76px}.orb.md{width:34px;height:34px}.orb.sm{width:22px;height:22px}
 
 /* ============ 演示导航 ============ */
-.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:150px}
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
 .demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
 .demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
 .demo-nav a:hover{text-decoration:underline}
@@ -106,6 +106,13 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .tx .x-t{font-size:14px;font-weight:600}
 .tx .x-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
 .tx .x-v{margin-left:auto;font-size:14.5px;font-weight:700}
+.entry-row{display:flex;gap:11px;margin-top:14px}
+.entry{flex:1;display:flex;align-items:center;gap:11px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:14px;cursor:pointer;transition:transform .15s}
+.entry:active{transform:scale(.97)}
+.entry .e-ic{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.entry .e-ic svg{width:18px;height:18px}
+.entry .e-t{font-size:13.5px;font-weight:650}
+.entry .e-s{font-size:11px;color:var(--ink3);margin-top:2px}
 </style>
 </head>
 <body>
@@ -134,6 +141,16 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
         <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的观察</div>
         <p>你的餐饮支出在下降，但周末消费占了一周的 52%。如果周末想出去玩，建议把旅行基金目标从 ¥500/月调到 ¥650/月，我帮你自动划转。</p>
       </div>
+      <div class="entry-row">
+        <a class="entry" href="33-ledger-add.html">
+          <div class="e-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+          <div><div class="e-t">手动记一笔</div><div class="e-s">金额 + 分类，备注我帮你填</div></div>
+        </a>
+        <a class="entry" href="34-ledger-auto.html">
+          <div class="e-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg></div>
+          <div><div class="e-t">AI 自动记账</div><div class="e-s">本月已自动记 42 笔</div></div>
+        </a>
+      </div>
       <div class="sec-title"><h2>分类支出</h2><span class="hint">9 月</span></div>
       <div class="card">
         <div class="cat"><div class="c-top"><b>餐饮</b><span>¥1,240</span></div><div class="c-bar"><i style="width:78%;background:linear-gradient(90deg,#EFA63C,#FFD08A)"></i></div></div>
@@ -151,10 +168,10 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">11 页总览</a> · <a href="../ai-life-agent-prototype.html#ledger">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-prototype.html#ledger">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

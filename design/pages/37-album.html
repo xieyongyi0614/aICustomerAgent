@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 37 相册 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--ink2)}
+
+/* ============ 共享组件 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.ai-card .more{margin-top:11px;font-size:13px;font-weight:600;color:var(--ai2);display:flex;align-items:center;gap:3px;cursor:pointer}
+.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title h2{font-size:16.5px;font-weight:700}
+.sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Album（相册 · 仅本地） ============ */
+.storage{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;margin-top:16px}
+.storage .st-top{display:flex;align-items:baseline}
+.storage .st-v{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums}
+.storage .st-v small{font-size:12px;font-weight:600;color:var(--ink3);margin-left:4px}
+.storage .st-r{margin-left:auto;font-size:12px;color:var(--ink3)}
+.storage .st-bar{height:7px;border-radius:99px;background:#F0EFE9;margin-top:12px;overflow:hidden}
+.storage .st-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7A5CFF,#C3B3FF)}
+.storage .st-note{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink3);margin-top:9px}
+.storage .st-note svg{width:12px;height:12px;color:var(--health)}
+.album-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.album{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:9px;cursor:pointer;transition:transform .15s}
+.album:active{transform:scale(.97)}
+.album .a-cover{height:86px;border-radius:12px;position:relative;overflow:hidden}
+.album .a-nm{font-size:13.5px;font-weight:650;margin-top:9px;padding:0 3px}
+.album .a-ct{font-size:11px;color:var(--ink3);margin-top:1px;padding:0 3px 3px}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.photo{aspect-ratio:1;border-radius:12px;position:relative;overflow:hidden}
+.photo .p-badge{position:absolute;left:7px;bottom:7px;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:650;color:#fff;background:rgba(20,20,26,.55);backdrop-filter:blur(6px);border-radius:99px;padding:3px 8px}
+.photo .p-badge svg{width:10px;height:10px}
+.manage-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--card);color:var(--ink);font-size:14px;font-weight:650;border-radius:99px;padding:14px;margin-top:16px;box-shadow:var(--shadow-card);cursor:pointer;border:1px solid var(--line)}
+.manage-btn svg{width:16px;height:16px;color:var(--ink2)}
+.privacy{margin-top:18px;padding:15px 16px;border-radius:var(--r-md);background:rgba(51,188,140,.07);border:1px solid rgba(51,188,140,.18);font-size:12px;line-height:1.7;color:#2E7D5F}
+
+/* 照片占位（原型用柔和渐变代替真实照片） */
+.g1{background:linear-gradient(150deg,#FFD9C2,#FF9D76)}
+.g2{background:linear-gradient(150deg,#B9CCFF,#6E93FF)}
+.g3{background:linear-gradient(150deg,#9FE8CF,#33BC8C)}
+.g4{background:linear-gradient(150deg,#C3B3FF,#7A5CFF)}
+.g5{background:linear-gradient(150deg,#FFE3A8,#EFA63C)}
+.g6{background:linear-gradient(150deg,#A8E6F0,#1FA8BC)}
+.g7{background:linear-gradient(150deg,#F3C6D3,#E08CA8)}
+.g8{background:linear-gradient(150deg,#D8D3E8,#8F89B0)}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Album ================= -->
+    <div class="screen" id="album">
+      <a class="back" href="30-life.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>生活</a>
+      <h1 class="pt" style="margin-bottom:4px">相册</h1>
+      <div class="sub">只存在这台手机上，不会上传服务器</div>
+
+      <div class="ai-card" style="margin-top:16px">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的整理建议</div>
+        <p>我在本机扫了一遍：38 张截图和 12 张相似照片可以清理，预计腾出 1.4 GB。分析全部在你手机上完成，照片不会离开设备。</p>
+        <a class="more" href="38-album-manage.html">去清理，已帮你预选 →</a>
+      </div>
+
+      <div class="storage">
+        <div class="st-top"><span class="st-v">2,847<small>张</small></span><span class="st-r">本机剩余 96 GB</span></div>
+        <div class="st-bar"><i style="width:34%"></i></div>
+        <div class="st-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg>
+          占用 8.2 GB · 仅本机存储 · 未开启任何云同步
+        </div>
+      </div>
+
+      <div class="sec-title"><h2>分类相簿</h2><span class="hint">6 个 · 在本机自动归类</span></div>
+      <div class="album-grid">
+        <div class="album"><div class="a-cover g6"></div><div class="a-nm">旅行</div><div class="a-ct">342 张</div></div>
+        <div class="album"><div class="a-cover g5"></div><div class="a-nm">美食</div><div class="a-ct">218 张</div></div>
+        <div class="album"><div class="a-cover g7"></div><div class="a-nm">猫猫</div><div class="a-ct">156 张</div></div>
+        <div class="album"><div class="a-cover g8"></div><div class="a-nm">截图</div><div class="a-ct">402 张 · 38 张可清理</div></div>
+        <div class="album"><div class="a-cover g2"></div><div class="a-nm">工作</div><div class="a-ct">189 张</div></div>
+        <div class="album"><div class="a-cover" style="background:#F1F0EA;display:flex;align-items:center;justify-content:center;color:#B9B8AF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 20"/></svg></div><div class="a-nm">未分类</div><div class="a-ct">96 张 · 点我帮你分</div></div>
+      </div>
+
+      <div class="sec-title"><h2>最近添加</h2><span class="hint">9 月</span></div>
+      <div class="photo-grid">
+        <div class="photo g1"></div>
+        <div class="photo g2"></div>
+        <div class="photo g3"><span class="p-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>0:24</span></div>
+        <div class="photo g4"></div>
+        <div class="photo g5"></div>
+        <div class="photo g6"></div>
+      </div>
+
+      <a class="manage-btn" href="38-album-manage.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        批量管理照片
+      </a>
+
+      <div class="privacy">相册完全离线：分类、清理、编辑都在本机完成，不需要联网权限，也不会上传服务器。删除的照片会放进「最近删除」保留 30 天，之后彻底清除。</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · 相册</b> — 高保真原型 · 按页拆分<br><a href="index.html">17 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

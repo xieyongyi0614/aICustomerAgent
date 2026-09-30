@@ -27,7 +27,7 @@ agent_created: true
 | 层级 | 文件 | 说明 |
 |---|---|---|
 | 1（最高） | 本 skill | 已裁决的定稿规范；**与下游冲突时以本 skill 为准** |
-| 2 | `design/pages/`（总览 `pages/index.html`） | **现役维护**的按页拆分原型（11 页，每页一个零依赖 HTML）；组件结构与真实文案的真源。新增 / 修改页面只改这里 |
+| 2 | `design/pages/`（总览 `pages/index.html`） | **现役维护**的按页拆分原型（17 页，每页一个零依赖 HTML）；组件结构与真实文案的真源。新增 / 修改页面只改这里 |
 | 3 | `design/ai-life-agent-design.html` | 产品设计稿；§06 视觉规范是色值真源 |
 
 > `design/ai-life-agent-prototype.html`（拆分前的单文件原型）**已冻结，不再维护**：仅为历史对照存档，不随页面演进同步更新；内容是 pages/ 拆分时的同源快照，与现役页面冲突时以 pages/ 为准。
@@ -49,6 +49,7 @@ agent_created: true
 6. **动效全部 ≤ 400ms**，无弹跳滥用。唯一例外是 Orb 呼吸（4.2s 循环）。
 7. **Material 3 只当底座，不当皮肤**。禁止 `ColorScheme.fromSeed`、禁止 M3 默认 `TextTheme`、必须关闭 `surfaceTint` 与默认 elevation、图标用 Lucide 不用 Material Icons、Tab 栏自绘。详见 `references/flutter-mapping.md`。
 8. **医疗免责常驻**：涉及健康数据的任何界面必须带「非医疗建议」表述，且**不得**宣称医疗级血压 / 血糖 / 血氧诊断能力。
+9. **相册仅本地**：涉及相册的任何界面必须明示「仅本机存储、不上传服务器」；AI 整理（分类 / 清理建议）必须注明「本机分析」；批量删除必须给出可恢复口径（「最近删除」30 天）。**禁止**出现云同步、云端相册类表述。
 
 ## 使用流程
 
@@ -64,7 +65,7 @@ agent_created: true
 | 文件 | 内容 |
 |---|---|
 | `references/tokens.md` | 色彩 10 项 + 3 组渐变 + 圆角 4 档 + 图标方块圆角规则 + 字号 6 级 + 投影 2 档 + 间距标尺 + 动效时长 + 图标规范 |
-| `references/components.md` | 20 个组件规格与真实文案；9 个页面的结构与信息层级 |
+| `references/components.md` | 36 个组件条目（含记账录入 / AI 自动记账 / 车辆 / 相册族）与真实文案；15 个页面的结构与信息层级 |
 | `references/orb.md` | AI 核心球：四态语义、4 个尺寸档、渲染层、性能与功耗要求 |
 | `references/principles.md` | 5 条设计原则的可判定验收规则 + 反范围清单 + 文案语气与占位文案 |
 | `references/flutter-mapping.md` | M3 五条禁令 + `ThemeExtension` 结构 + 4 处平移替代方案 + 深色模式 |
