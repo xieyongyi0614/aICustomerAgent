@@ -433,9 +433,29 @@ app/services/
 - ✅ **`evaluation/context.py`（834）→ `evaluation/context/` 包**（`639f3b0`）：`slices.py`（切片数据类 + 常量 + `_clip`）/ `collectors.py`（收集器）/ `digest.py`（digest 组装与截断），`__init__` 全量再导出，全部消费面（`from ...context import X` 形态）零改动。拆分前审计确认：无任何 monkeypatch 依赖 `context.<X>` 包属性 → 再导出安全。
 - ✅ **`reflection/evidence.py`（1856）→ `reflection/evidence/` 包**（`75e0d22`，首轮回滚后带守卫适配重做）：`windows.py`（882 行，纯窗构造 + 门槛数学，零 IO）/ `collectors.py`（911 行，DB 采集 + trace 记录 + 聚合编排）；AST 调用图做纯/IO 精确分类（引用 SessionLocal/仓储/trace 助手的符号传递闭包 → collectors，其余 → windows，含 8 个 AnnAssign 常量），`__init__` 显式全量再导出 153 个名字（含私有名与仓储模块引用）。**首轮回滚的原因（plan010/011 分节级源码语义守卫族 10+ 断言）本轮逐守卫完成语义适配**：分节标记源码扫描改为 `plan010_support.plan_section_source()` AST 按符号抽段（44 个 PLAN-010 符号跨 windows/collectors 两文件拼接，语义等价「计划通道源码段」）；`__file__` 整文件读取改包内 `*.py` glob 拼接（plan011/ledger_insight/tool009 三处）；conftest 与 growth_loop 自建打桩清单的 `reflection_evidence` 绑定改指 `collectors`（唯一 DB 触点，防 §十三 打桩静默失效）；`_human_messages_after` / `_aggregate` 两处补丁目标改指子模块。
 - ⏸ **`planning/observer.py`（863）：审计完成后判定不拆**（2026-09-30 第二批）。补丁缝审计结论：模块属性补丁仅 4 处、零 SessionLocal、零源码路径串——耦合面本身干净；**真正障碍是 v25 的 planning 包「扁平文件清单纪律」**：`planning_modules()` / `PLANNING_PACKAGE_MODULES` / `rglob("*.py") + path.name` 精确清单断言分布在 **14 个测试文件**（plan001/002/004/005/006/007/008/009/010 的 static_scan、scope_markers、boundary 等），observer 包化会引入 `observer/__init__.py`、`observer/core.py`、`observer/broadcast.py` 三个新条目与重名 `__init__.py`，需把全部清单从「文件名」升级为「相对包路径」语义。适配 churn（14 文件）超过拆分收益（863 行 → 两块），且 AST 闭包分析证实 PlanObserver.settle 与广播函数双向调用（core ↔ broadcast 无法单向切分，PlanObserver 须与广播同侧，语义别扭）。**可维护性替代**：文件内已有 `# ---` 分节注释体例，后续维护靠分节导航。
-- ⏸ **`tool/ext_api.py`(1507) / `planning/decompose.py`(963) 待排期**：与 observer 同属 planning/tool 守卫体系（decompose 在 plan001_scope_markers 的 11 项清单 + plan004 清单；ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（14 文件的清单语义从文件名改为相对包路径，一次性解除全部 planning 子包化的守卫障碍），之后 decompose 可复用 evidence 全套方法论；ext_api 另需 tool 域钉测审计。
+- ⏸ **`tool/ext_api.py`(1507) / `planning/decompose.py`(963) 待排期**：与 observer 同属 planning/tool 守卫体系（decompose 在 plan001_scope_markers 的 11 项清单 + plan004 清单；ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（清单语义从文件名改为相对包路径，一次性解除全部 planning 子包化的守卫障碍）—— **该前置已完成（`b9c2aaf`，见 §15.3）**，之后 decompose 可复用 evidence 全套方法论；ext_api 另需 tool 域钉测审计。
 
-⚠️ **端口快照残留第二形态（本轮新发现，比 §15.1 第一形态更隐蔽）**：经**模块属性链**打到端口对象的补丁（如 `monkeypatch.setattr(plan_context.world_engine, "build_context", fake)`，其中 `plan_context.world_engine` 已是端口）——undo 时 monkeypatch 把「getattr 的快照」（即真实函数）**永久写进端口字典**，此后端口 `__getattr__` 被字典短路：①后续对实现模块的补丁全部失效（跨测试污染，`test_plan008_context` 文件内 TestWorldBriefBudget 污染 TestNineWorldFacts / TestAssemblyZeroWrite 即此因）；②形式上看不出「打的是端口」，审计极易漏。**修法与铁律同前**：补丁目标一律改打实现模块（`app.application.world_engine.X`），端口读穿天然生效。
+⚠️ **端口快照残留第二形态（本轮新发现，比 §15.1 第一形态更隐蔽）**：经**模块属性链**打到端口对象的补丁（如 `monkeypatch.setattr(plan_context.world_engine, "build_context", fake)`，其中 `plan_context.world_engine` 已是端口）——undo 时 monkeypatch 把「getattr 的快照」（即真实函数）**永久写进端口字典**，此后端口 `__getattr__` 被字典短路：①后续对实现模块的补丁全部失效（跨测试污染，`test_plan008_context` 文件内 TestWorldBriefBudget 污染 TestNineWorldFacts / TestAssemblyZeroWrite 即此因）；②形式上看不出「打的是端口」，审计极易漏。**修法与铁律同前**：补丁目标一律打实现模块（`app.application.world_engine.X`），端口读穿天然生效。
+
+---
+
+### 15.3 v25 清单守卫体系升级（2026-09-30 第三批，`b9c2aaf`）✅
+
+§15.2 记录的「planning 子包化唯一障碍」— **清单断言的「文件名」语义** — 已单独成批解除。
+
+**改动面**：`tests/v25/_plan_scan.py` 新增 `planning_module_paths()`（`PLANNING_PACKAGE_DIR.rglob("*.py")` → **相对包路径**：单文件 `name.py`、子包文件 `pkg/file.py`），与既有 `planning_modules()`（`Path` 列表，供其余遍历断言继续使用）并存；`plan001_static_scan` / `plan001_scope_markers` / `plan002_static_scan` / `plan004_static_scan` / `plan005_static_scan` / `plan006_static_scan` / `plan008_static_scan` 七个断言的清单口径改吃新函数（提交含 8 文件）。
+
+**语义变化**：包化引入的 `pkg/__init__.py` 不再与「planning 包只含已落地模块」的精确清单断言冲突——`planning_module_paths()` 天然把 `decompose.py` 与 `decompose/__init__.py` 表达为同一条目的两种形态，清单改写从「改扫描口径」降为「改清单字面量」。
+
+**对 §15.2 遗留的意义**（2026-09-30 复核，行数用 `python` 逐文件核准，§15.2 记录值一致）：
+
+| 文件 | 实测行数 | 包化障碍现状 |
+|---|---|---|
+| `planning/observer.py` | 864 | 清单语义已解除；残留 = 源码路径读取守卫 + AST 双向调用（结论仍为「不拆」，见 §15.2） |
+| `planning/decompose.py` | 963 | 清单语义已解除；残留 = `__file__` 整文件源码扫描守卫（plan006_static_scan / plan011_contract） |
+| `tool/ext_api.py` | 1507 | 不受本专项影响，仍待 tool 域钉测审计 |
+
+即：**本专项是一次性投入，解除的是「清单语义」这一共性障碍**；`decompose` 的剩余适配可复用 `reflection/evidence` 的 `*.py` glob 拼接手法（§15.2 已记录该手法）。
 
 ---
 
@@ -443,12 +463,14 @@ app/services/
 
 **执行前提**：代码改动冻结（含本台账全部批次与三类架构债工作）后执行，避免返工。
 
-**清单总册**（26 份，均需真实模型人工执行）：
-- V1.x 主线：`docs/version/v1.0.0/v{3,4,5,6.5,7,7.5,7.8,8,8.5,9}/regression-checklist.md`
-- V2.0.0 六 Phase：`docs/version/v2.0.0/phases/phase-{1..6}-*/regression-checklist.md`
-- V2.1.0 ~ V2.6.1：`docs/version/v2.{1.0,2.0,3.0,4.0,5.0/planning-system,6.0}/regression-checklist.md`
-- V3.0.0 / V4.0.0：`docs/version/v{3,4}.0.0/regression-checklist.md`（V3.0.0 验收报告为 CONDITIONAL — NOT RELEASED，含 G7 既存失败，执行前先确认是否已被后续版本消化）
-- 横切：`docs/integrations/feishu/regression-checklist.md`
+**清单总册**（**25 份**，均需真实模型人工执行；实测清点 = 10 + 6 + 6 + 2 + 1）：
+- V1.x 主线（10）：`docs/version/v1.0.0/v{3,4,5,6.5,7,7.5,7.8,8,8.5,9}/regression-checklist.md`
+- V2.0.0 六 Phase（6）：`docs/version/v2.0.0/phases/phase-{1..6}-*/regression-checklist.md`
+- V2.1.0 ~ V2.6.0（6）：`docs/version/v2.{1.0,2.0,3.0,4.0,5.0/planning-system,6.0}/regression-checklist.md`（V2.6.1 无独立清单）
+- V3.0.0 / V4.0.0（2）：`docs/version/v{3,4}.0.0/regression-checklist.md`（V3.0.0 验收报告为 CONDITIONAL — NOT RELEASED，含 G7 既存失败，执行前先确认是否已被后续版本消化）
+- 横切（1）：`docs/integrations/feishu/regression-checklist.md`
+
+**执行状态**：全部 **未执行**（需真实模型 + 人工判定，非自动化可覆盖）；登记时点为 2026-09-30，待代码冻结后启动。
 
 **自动化回归基线**（人工回归前的机械门槛）：全量 `pytest tests -q`，判据 = 失败集与基线一致（当前基线 18 failed，均为既存失败 + 3 例已知抖动性能测试，见 §15.2 与提交 `b461c4c`）。
 
