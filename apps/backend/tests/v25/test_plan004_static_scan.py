@@ -66,7 +66,7 @@ FROZEN_INTERFACE_FUNCTIONS = (
 
 
 def test_decompose_module_is_discovered_by_the_package_scan():
-    names = [path.name for path in scan.planning_modules()]
+    names = scan.planning_module_paths()
     assert "decompose.py" in names
     assert "app.services.planning.decompose" in scan.module_names()
 

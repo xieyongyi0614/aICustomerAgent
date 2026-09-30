@@ -47,7 +47,7 @@ def test_package_modules_are_discoverable():
     names = scan.module_names()
     assert "app.services.planning" in names
     assert "app.services.planning.goal_contract" in names
-    assert "goal_contract.py" in [path.name for path in PLANNING_MODULES]
+    assert "goal_contract.py" in scan.planning_module_paths()
 
 
 def test_step3_no_character_priority_asset_imports():

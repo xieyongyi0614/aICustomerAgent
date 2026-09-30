@@ -488,9 +488,12 @@ def test_plan_011_lands_the_audit_faces_without_a_new_module():
 
 
 def test_planning_package_holds_only_landed_modules():
-    modules = sorted(
-        path.name for path in _planning_dir().rglob("*.py") if "__pycache__" not in path.parts
-    )
+    modules = [
+        path.relative_to(_planning_dir()).as_posix()
+        for path in _planning_dir().rglob("*.py")
+        if "__pycache__" not in path.parts
+    ]
+    modules.sort()
     assert modules == [
         "__init__.py",
         "context.py",

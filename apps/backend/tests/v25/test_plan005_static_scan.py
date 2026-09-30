@@ -85,15 +85,11 @@ class TestModuleInventory:
     """
 
     def test_planning_package_holds_exactly_the_landed_modules(self):
-        names = sorted(
-            path.name
-            for path in scan.PLANNING_PACKAGE_DIR.rglob("*.py")
-            if "__pycache__" not in path.parts
-        )
+        names = scan.planning_module_paths()
         assert names == list(PLANNING_PACKAGE_MODULES)
 
     def test_plan_005_modules_are_discovered_by_the_package_scan(self):
-        discovered = {path.name for path in scan.planning_modules()}
+        discovered = set(scan.planning_module_paths())
         assert set(PLAN_005_MODULES) <= discovered
         assert discovered <= set(PLANNING_PACKAGE_MODULES)
 

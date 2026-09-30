@@ -291,11 +291,7 @@ class TestZeroMigration:
 
         PLAN-009 落地后按同一纪律收编 `memory_policy.py`（该任务新建记忆边界表模块）。
         """
-        names = sorted(
-            path.name
-            for path in scan.PLANNING_PACKAGE_DIR.rglob("*.py")
-            if "__pycache__" not in path.parts
-        )
+        names = scan.planning_module_paths()
         assert names == [
             "__init__.py",
             "context.py",

@@ -132,15 +132,15 @@ class TestPackageInventory:
     """范围标记：本任务不加模块（契约补齐与断言加固）。"""
 
     def test_planning_package_holds_exactly_the_landed_modules(self):
-        names = sorted(path.name for path in PLANNING_MODULES)
+        names = scan.planning_module_paths()
         assert names == list(PLANNING_PACKAGE_MODULES)
 
     def test_no_task_local_module_is_planted(self):
         """PLAN-006 不新建模块：`planning/` 下不得出现本任务命名的实现文件。"""
         unexpected = [
-            path.name
-            for path in PLANNING_MODULES
-            if "tool" in path.name or "gate" in path.name
+            name
+            for name in scan.planning_module_paths()
+            if "tool" in name or "gate" in name
         ]
         assert unexpected == []
 

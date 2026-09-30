@@ -58,6 +58,19 @@ def planning_modules() -> list[Path]:
     )
 
 
+def planning_module_paths() -> list[str]:
+    """planning 包内全部模块的相对包路径（posix，含子包文件）。
+
+    清单守卫统一语义：单文件为 `name.py`，子包文件为 `pkg/file.py`——
+    包化不再与「计划包只含已落地模块」的精确清单断言冲突。
+    """
+    return sorted(
+        path.relative_to(PLANNING_PACKAGE_DIR).as_posix()
+        for path in PLANNING_PACKAGE_DIR.rglob("*.py")
+        if "__pycache__" not in path.parts
+    )
+
+
 def module_name(path: Path) -> str:
     parts = list(path.relative_to(REPO_ROOT).with_suffix("").parts)
     if parts[-1] == "__init__":
