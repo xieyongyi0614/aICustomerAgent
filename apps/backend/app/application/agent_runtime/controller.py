@@ -26,7 +26,7 @@ from app.application.agent_runtime.models import (
 )
 from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
-from app.application import logical_clock
+from app.core import clock as logical_clock
 from app.repositories import llm_call_repository, loop_run_repository
 from app.services.life import budget as life_loop_budget
 from app.services.delivery import outbox as outbox_service

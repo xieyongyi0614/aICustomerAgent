@@ -175,7 +175,8 @@ class TestCleanupDelegatedToLoop:
     async def test_cleanup_delegated_to_loop(
         self, db_session_factory, fake_llm, monkeypatch
     ):
-        from app.application import agent_state_assembler, logical_clock
+        from app.application import agent_state_assembler
+        from app.core import clock as logical_clock
         from app.application.agent_runtime import controller as runtime_controller
 
         unbind_calls: list = []

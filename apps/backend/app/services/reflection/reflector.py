@@ -19,8 +19,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.application.logical_clock import bind as _bind_logical_clock
-from app.application.logical_clock import logical_now, unbind as _unbind_logical_clock
+from app.core.clock import bind as _bind_logical_clock
+from app.core.clock import logical_now, unbind as _unbind_logical_clock
 from app.chains.structured import build_structured_chain
 from app.core.db import EvidenceLinkRow, InsightRow, ReflectionRunRow, SessionLocal
 from app.core.llm_factory import get_llm

@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
-from app.application import logical_clock
+from app.core import clock as logical_clock
 from app.models.action import (
     Action,
     ActionEffect,

@@ -32,7 +32,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from app.application import agent_state_assembler, logical_clock
+from app.application import agent_state_assembler
+from app.core import clock as logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
 from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.stages import act as stages_act

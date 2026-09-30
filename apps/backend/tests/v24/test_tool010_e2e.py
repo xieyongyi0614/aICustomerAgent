@@ -106,7 +106,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
     "app/application/post_process.py": "f2a25b668b8374f709d67a7136937209138b447b5a5b3ca910cfb819e5719074",  # 前值 8aa2b63f（批次 4：decision_pipeline → engines/decision 导入路径变更）、6778abc4（批次 3）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
-    "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
+    "app/application/action_engine.py": "36ea379811984d7e04da9af0b6af4114c88e3eaab70635ac3c76d545ee620525",  # 再冻结：world_available 赋值去掉恒真 getattr；前值 6ea39eaf（反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）
     # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
     # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。
     "app/prompts/builder.py": "2683cf60bb2ea47740e274364c54a5775cc0500d6cfb278cf0769db68549b7de",

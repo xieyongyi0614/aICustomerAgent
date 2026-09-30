@@ -25,7 +25,7 @@ def _bind_scenario_clock():
     否则工具层的 `future_datetime` 语义校验会拿真实时间比 `NOW + 1d` 的 `due_at`，
     把合法提醒判成 `not_future`（V2.4.0 校验段转正常开后才会显形）。
     """
-    from app.application import logical_clock
+    from app.core import clock as logical_clock
 
     token = logical_clock.bind(NOW)
     yield

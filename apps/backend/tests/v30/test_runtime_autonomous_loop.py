@@ -216,7 +216,8 @@ class TestCycleEquivalence:
     async def test_cleanup_and_digest_reset_equivalent(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        from app.application import agent_state_assembler, logical_clock
+        from app.application import agent_state_assembler
+        from app.core import clock as logical_clock
 
         unbind_calls: list = []
         reset_calls: list = []
