@@ -10,8 +10,11 @@ import logging
 from datetime import datetime
 
 from app.core.db import Memory, SessionLocal
-from app.services.memory.types import LEGACY_TYPE_ALIASES, TYPE_AFFINITY_KEYWORDS
-from app.services.memory import retriever
+from app.services.memory.types import (
+    LEGACY_TYPE_ALIASES,
+    TYPE_AFFINITY_KEYWORDS,
+    normalize_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +53,7 @@ def _verify() -> dict:
     return {
         "remaining_rows": collect_report()["pending_rows"],
         "alias_mapping_ok": LEGACY_TYPE_ALIASES.get(LEGACY_TYPE) == TARGET_TYPE,
-        "retriever_alias_ok": (
-            retriever._AFFINITY_TYPE_ALIASES.get(LEGACY_TYPE) == TARGET_TYPE
-        ),
-        "v1_affinity_ok": LEGACY_TYPE in TYPE_AFFINITY_KEYWORDS,
+        "affinity_normalize_ok": normalize_type(LEGACY_TYPE) in TYPE_AFFINITY_KEYWORDS,
     }
 
 

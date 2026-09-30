@@ -169,6 +169,20 @@ class TestRetrieverAffinityAliases:
         assert retriever._affinity_score(memory, {"experience"}) == 1.0
 
 
+class TestEvaluatorAffinityUnification:
+    def test_canonical_and_legacy_proposed_types_score_alike(self):
+        """映射统一后规范名与遗留名同分（原规范名 experience 被误罚 0.0 的不一致消除）。"""
+        assert evaluator._type_affinity("用户明天有一场面试", "experience") == 1.0
+        assert evaluator._type_affinity("用户明天有一场面试", "important_event") == 1.0
+
+    def test_cross_group_still_rejected(self):
+        assert evaluator._type_affinity("我喜欢吃西瓜", "important_event") == 0.0
+        assert evaluator._type_affinity("我喜欢吃西瓜", "user_preference") == 1.0
+
+    def test_no_hit_neutral(self):
+        assert evaluator._type_affinity("今天天气不错", "user_preference") == 0.5
+
+
 class TestDecayLambdaAliases:
     def test_legacy_type_uses_canonical_lambda(self, monkeypatch):
         monkeypatch.setattr(

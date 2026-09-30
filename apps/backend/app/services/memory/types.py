@@ -28,16 +28,16 @@ STORAGE_MEMORY_TYPES = V2_MEMORY_TYPES + LEGACY_MEMORY_TYPES
 DEFAULT_MEMORY_TYPE = "user_fact"
 
 TYPE_AFFINITY_KEYWORDS = {
-    "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢", "讨厌"),
+    "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢"),
     "user_fact": ("在哪", "工作", "住", "养", "做什么", "是谁"),
-    "important_event": ("面试", "经历", "发生过", "事件", "考试"),
-    "relationship_event": ("我们", "一起", "送过", "看过", "去过"),
+    "experience": ("面试", "经历", "发生过", "事件", "考试"),
+    "relationship_fact": ("我们", "一起", "送过", "看过", "去过"),
 }
-"""类型亲和关键词表（权威定义）。
+"""类型亲和关键词表（权威定义，全仓唯一一份，键为 v2 规范类型名）。
 
-原在 `services/memory_service.py`，迁入本模块以消除 v2 → v1 反向依赖。键保持遗留类型名
-以维持既有评分行为不变；`retriever.QUERY_TYPE_KEYWORDS` 语义重合但键为规范类型名、消费方
-不同，统一留待后续批次。
+评估侧（`evaluator._type_affinity`）对 `proposed_type` 先经 `normalize_type` 归一，
+检索侧（`retriever._detect_query_types` / `_affinity_score`）对查询与存储类型同样
+归一后消费本表；遗留类型名经 `LEGACY_TYPE_ALIASES` 映入同组，评分语义不变。
 """
 
 

@@ -19,6 +19,7 @@ from app.models.memory import UserMemory
 from app.repositories import memory_repository
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import types as memory_types
 from app.services.memory.conflict import same_topic
 
 logger = logging.getLogger(__name__)
@@ -33,18 +34,6 @@ VISIBILITY_HYPOTHETICAL = "hypothetical"
 STATUS_ACTIVE = "active"
 STATUS_CANDIDATE_REJECTED = "rejected"
 RELATION_CONTRADICTS = "contradicts"
-
-QUERY_TYPE_KEYWORDS = {
-    "user_preference": ("喜欢", "讨厌", "偏好", "爱", "不爱", "不喜欢"),
-    "user_fact": ("在哪", "工作", "住", "养", "做什么", "是谁"),
-    "experience": ("面试", "经历", "发生过", "事件", "考试"),
-    "relationship_fact": ("我们", "一起", "送过", "看过", "去过"),
-}
-
-_AFFINITY_TYPE_ALIASES = {
-    "important_event": "experience",
-    "relationship_event": "relationship_fact",
-}
 
 TEMPORAL_QUERY_KEYWORDS = (
     "什么时候",
@@ -85,7 +74,7 @@ class RankedMemories:
 def _detect_query_types(query: str) -> set[str]:
     return {
         memory_type
-        for memory_type, keywords in QUERY_TYPE_KEYWORDS.items()
+        for memory_type, keywords in memory_types.TYPE_AFFINITY_KEYWORDS.items()
         if any(keyword in query for keyword in keywords)
     }
 
@@ -124,8 +113,8 @@ def _structured_score(memory: UserMemory, salience: float | None, now: datetime)
 def _affinity_score(memory: UserMemory, query_types: set[str]) -> float:
     if not query_types:
         return 0.5
-    memory_type = _AFFINITY_TYPE_ALIASES.get(memory.type, memory.type)
-    return 1.0 if memory_type in query_types else 0.0
+    memory_type = memory_types.normalize_type(memory.type)
+    return 1.0 if memory_type is not None and memory_type in query_types else 0.0
 
 
 def _recently_rejected_contents(user_id: str, now: datetime) -> list[str]:

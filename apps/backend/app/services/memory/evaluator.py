@@ -146,7 +146,8 @@ def _type_affinity(content: str, proposed_type: str) -> float:
     }
     if not hit_types:
         return 0.5
-    return 1.0 if proposed_type in hit_types else 0.0
+    canonical = memory_types.normalize_type(proposed_type)
+    return 1.0 if canonical is not None and canonical in hit_types else 0.0
 
 
 def _score_components(

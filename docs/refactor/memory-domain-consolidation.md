@@ -412,11 +412,30 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 
 **验证**：`tests/v24 unit integration v2` → **10 failed / 4046 passed**，失败集 = 在案基线（tool009×6 + db_migration + redis + aut005 + life002）逐条一致 → 零新增；`tests/unit/test_trigger_followup.py` **7/7 passed**。
 
-### 5.6 附带发现（待后续批次）
+### 5.6 附带发现 —— **✅ 已于 2026-09-30 统一并执行（见 §5.7）**
 
 `memory2/retriever.py::QUERY_TYPE_KEYWORDS` 与 `memory2/types.py::TYPE_AFFINITY_KEYWORDS` 是**同一份类型亲和映射的新旧两版** —— 前者键为 v2 规范类型名（`experience` / `relationship_fact`），后者键为遗留名（`important_event` / `relationship_event`）。
 
-本次**只做物理搬迁、未动内容**，因为合并键名会改变 `evaluator._type_affinity` 的评分行为（`candidate.proposed_type` 可能携带遗留名，见 `ingest_from_world_event` 的 `proposed_type="important_event"`）。统一需单独评估。
+统一需单独评估的原因：合并键名会改变 `evaluator._type_affinity` 的评分行为（`candidate.proposed_type` 可能携带遗留名，见 `ingest_from_world_event` 的 `proposed_type="important_event"`）。评估结论与执行见 **§5.7**。
+
+### 5.7 第 6 批：类型亲和映射统一（2026-09-30 执行）
+
+**评估结论**：`retriever` 内还存在第三处重复——私有 `_AFFINITY_TYPE_ALIASES`（与 `types.LEGACY_TYPE_ALIASES` 逐字相同），且 `migration._verify` 跨模块探测该私有变量。四组关键词值两表逐字一致（`TYPE_AFFINITY_KEYWORDS` 的 user_preference 组多一个重复 `"讨厌"`）。**潜伏不一致（本批修复）**：评估侧键为遗留名，`proposed_type` 为规范名 `experience` 的候选（如 `ingest_from_goal_completion`、LLM 抽取可能产出）在内容命中「面试/考试」时被误罚 affinity=0.0，同内容遗留名候选却得 1.0——同一语义因提案方键名风格得分翻转（affinity 权重 0.20，直接影响评分闸）。
+
+**方案**：单一定义（`types.TYPE_AFFINITY_KEYWORDS`，键=规范 7 类中的实际 4 类）+ **消费点归一**（`normalize_type`）。改动 4 app 文件 + 2 测试文件：
+
+| 文件 | 改动 |
+|---|---|
+| `app/services/memory/types.py` | `TYPE_AFFINITY_KEYWORDS` 键改规范名（`important_event`→`experience`、`relationship_event`→`relationship_fact`），去重复 `"讨厌"`；docstring 更新为唯一权威定义 |
+| `app/services/memory/evaluator.py` | `_type_affinity` 对 `proposed_type` 先 `normalize_type` 再判定——遗留名候选行为不变（别名 1:1 映到同关键词组），规范名候选不再被误罚 |
+| `app/services/memory/retriever.py` | 删 `QUERY_TYPE_KEYWORDS` 与 `_AFFINITY_TYPE_ALIASES`；`_detect_query_types` / `_affinity_score` 改用共享表 + `normalize_type`（读侧行为逐点等价） |
+| `app/services/memory/migration.py` | `_verify` 别名检查收敛到 `types` 单一来源（`retriever_alias_ok`+`v1_affinity_ok` 两键合并为 `affinity_normalize_ok`），删 `retriever` 导入 |
+| `tests/v2/test_rel001_truth_source.py` | 验证键断言同步（3 键 → 2 键） |
+| `tests/v2/test_mem012_types.py` | 新增 `TestEvaluatorAffinityUnification`：规范名/遗留名同分（+1.0）、跨组拒收（0.0）、无命中中性（0.5） |
+
+**行为变化面**：评估侧仅「规范名候选 + 内容命中同组关键词」从 0.0 → 1.0（不一致修复）；检索侧与迁移侧零行为变化。存量数据无感：遗留类型行由读侧归一覆盖，无需迁移。
+
+**验证**：目标面（mem003/mem006/mem012/rel001/eval）**100 passed**；全量 `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit integration eval` → **17 failed / 6600 passed / 2 skipped**，16 项与在案基线逐条一致；`integration/test_feishu_adapter_turn::test_session_queue_limit_rejects_latest` 为**基线 worktree（1f98d4b）2/2 复现的环境漂移既存失败**（turn 启动时序类，与本批无关，非台账原 16 项在案口径）→ 零新增。
 
 ---
 
@@ -425,6 +444,6 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 1. ~~**重复记忆查库**（第 3 批前置）：对同一 `world_events` / `action_records` 行，确认 `memories` 表中是否存在旁路与 v2 各写一条的重复行。~~ **✅ 已完成（2026-09-29）**：空库无法用存量数据验证 → 改为确定性复现，**确认两行都被写入**（顺序 A 为内容降级、顺序 B 为可见重复）。结论与复现方法见 **§5.2.1**。
 2. **真实模型人工回归**：`reclaim` 循环移除后，确认无「过期记忆未回收」的线上反馈（该循环恒空转，理论上零影响，但需观察）。
 3. ~~**`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。~~ **✅ 已完成（2026-09-29）**：全量回归零新增失败，`conftest` 的 9 条 import 与 9 项模块登记已同步（§3.3.6）。
-4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.6）：需先确定 `proposed_type` 的遗留名归一化时机。
+4. ~~**`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**~~ **✅ 已统一（2026-09-30，第 6 批，§5.7）**：单一定义（规范键）+ 消费点 `normalize_type` 归一；规范名候选误罚不一致顺带修复。
 5. ~~**🚨 V7-010 `scheduled_followup` 裁决**~~ **✅ 已裁决并恢复（2026-09-30，方向 ①，第 5 批，§5.5）**：登记点已承接进 v2 摄取链路，管线级测试恢复。
 6. ~~**`relationship_lexicon.MEMORY_TEMPLATES` 已无使用者**~~ **✅ 已删除（2026-09-30，第 4 批，§5.4）**。

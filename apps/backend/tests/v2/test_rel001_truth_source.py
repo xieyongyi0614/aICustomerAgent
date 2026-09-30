@@ -138,8 +138,7 @@ class TestLegacyMigration:
         assert report["migrated"] == 1
         assert report["verification"]["remaining_rows"] == 0
         assert report["verification"]["alias_mapping_ok"] is True
-        assert report["verification"]["retriever_alias_ok"] is True
-        assert report["verification"]["v1_affinity_ok"] is True
+        assert report["verification"]["affinity_normalize_ok"] is True
         row = memory_repository.get_memory(memory.id)
         assert row.type == "relationship_fact"
         assert row.content == "我们一起去看过海"
