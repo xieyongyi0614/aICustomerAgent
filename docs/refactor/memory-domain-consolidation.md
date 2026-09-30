@@ -437,6 +437,8 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 
 **验证**：目标面（mem003/mem006/mem012/rel001/eval）**100 passed**；全量 `tests/v2 v8.5 v21 v24 v25 v26 v30 v40 v50 unit integration eval` → **17 failed / 6600 passed / 2 skipped**，16 项与在案基线逐条一致；`integration/test_feishu_adapter_turn::test_session_queue_limit_rejects_latest` 为**基线 worktree（1f98d4b）2/2 复现的环境漂移既存失败**（turn 启动时序类，与本批无关，非台账原 16 项在案口径）→ 零新增。
 
+**附：feishu turn 用例根因与修复（2026-09-30，test-only）**：上述漂移失败根因为测试用**绝对墙钟 sleep/预算**做并发时序断言（`asyncio.sleep(0.05)` 等 turn 启动、`fast_elapsed < 0.2`），隔离冷进程首 turn 初始化 >0.05s/0.2s 即假失败（大套件进程已热故通过，与生产代码无关）。修复：两用例改为**确定性结构**——新增 `_wait_turn` 异步轮询（conftest `wait_until` 为同步轮询，会阻塞事件循环不可用）；队列用例三处 sleep 改谓词等待；`test_user_b_not_blocked_by_user_a` 的墙钟预算改为「慢 turn 以 Event 停住、fast 必须在其挂起期间完成（`wait_for` 超时即失败）」，设计意图不变。修复后整文件 3/3 连跑全绿。
+
 ---
 
 ## 六、待人工验证项

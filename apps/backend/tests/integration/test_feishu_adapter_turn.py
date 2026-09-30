@@ -105,9 +105,13 @@ async def test_same_session_serial_fifo(db_session_factory, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_user_b_not_blocked_by_user_a(db_session_factory, monkeypatch):
+    slow_release = asyncio.Event()
+    slow_started: list[str] = []
+
     async def _stream(session_id, user_id, content, llm=None, trace=None):
         if user_id == "feishu:ou_slow":
-            await asyncio.sleep(0.5)
+            slow_started.append(user_id)
+            await slow_release.wait()
         yield {"kind": "token", "text": "ok"}
         yield {"kind": "done", "turn_id": "t"}
 
@@ -115,15 +119,25 @@ async def test_user_b_not_blocked_by_user_a(db_session_factory, monkeypatch):
     slow_task = asyncio.create_task(
         adapter.handle_inbound_message(_inbound("slow", "ou_slow"))
     )
-    await asyncio.sleep(0.05)
-    fast_started = time.perf_counter()
-    fast = await adapter.handle_inbound_message(_inbound("fast", "ou_fast"))
-    fast_elapsed = time.perf_counter() - fast_started
+    assert await _wait_turn(lambda: bool(slow_started))
+    fast = await asyncio.wait_for(
+        adapter.handle_inbound_message(_inbound("fast", "ou_fast")), timeout=5.0
+    )
     assert fast.error_kind is None
-    assert fast_elapsed < 0.2
+    slow_release.set()
     slow = await slow_task
     assert slow.error_kind is None
     assert slow.user_id != fast.user_id
+
+
+async def _wait_turn(predicate, timeout=5.0):
+    """异步轮询等待后台 turn 推进（`conftest.wait_until` 的同步轮询会阻塞事件循环）。"""
+    deadline = time.perf_counter() + timeout
+    while time.perf_counter() < deadline:
+        if predicate():
+            return True
+        await asyncio.sleep(0.01)
+    return predicate()
 
 
 @pytest.mark.asyncio
@@ -147,7 +161,7 @@ async def test_session_queue_limit_rejects_latest(db_session_factory, monkeypatc
     monkeypatch.setattr(adapter.delivery, "deliver_reply", _record)
 
     await adapter.ingest_inbound_message(_inbound("m1", "ou_q"))
-    await asyncio.sleep(0.05)
+    assert await _wait_turn(lambda: started_calls == ["m1"])
     await adapter.ingest_inbound_message(_inbound("m2", "ou_q"))
 
     assert [outcome.error_kind for outcome in delivered] == ["overloaded"]
@@ -155,14 +169,14 @@ async def test_session_queue_limit_rejects_latest(db_session_factory, monkeypatc
     assert started_calls == ["m1"]
 
     release.set()
-    await asyncio.sleep(0.05)
+    assert await _wait_turn(lambda: len(delivered) >= 2)
     assert [outcome.outbound_text for outcome in delivered] == [
         FALLBACK_TEXTS["overloaded"],
         "m1",
     ]
 
     await adapter.ingest_inbound_message(_inbound("m3", "ou_q"))
-    await asyncio.sleep(0.05)
+    assert await _wait_turn(lambda: len(delivered) >= 3)
     assert [outcome.outbound_text for outcome in delivered] == [
         FALLBACK_TEXTS["overloaded"],
         "m1",
