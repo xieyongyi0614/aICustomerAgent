@@ -54,7 +54,7 @@ async def attempt_current_step(goal, plan, now: datetime) -> dict:
     )
 
     try:
-        from app.application.action_engine import run_action_planning
+        from app.services.action.port import run_action_planning
 
         record = await run_action_planning(
             goal.user_id,

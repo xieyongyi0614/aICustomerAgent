@@ -178,7 +178,7 @@ async def execute(action_id: str, *, session_id: str | None = None) -> ActionRes
 
     V2.6.1：`executing` 且 `next_retry_at` 未到时拒绝立即执行（退避窗口守卫）。
     """
-    from app.application import action_engine
+    from app.services.action import port as action_engine
 
     record = action_repository.get_record(action_id)
     if record is None:
@@ -203,7 +203,7 @@ async def execute(action_id: str, *, session_id: str | None = None) -> ActionRes
 
 async def retry(action_id: str) -> ActionResult | None:
     """仅 failed 可重试；受 max_attempts 约束；复用原 dedupe_key。"""
-    from app.application import action_engine
+    from app.services.action import port as action_engine
 
     record = action_repository.get_record(action_id)
     if record is None or record.status != "failed":

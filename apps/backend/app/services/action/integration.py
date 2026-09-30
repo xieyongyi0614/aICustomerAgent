@@ -143,7 +143,7 @@ def apply_result_feedback(record: ActionRecord, result: ActionResult) -> dict[st
     扩写底座取 `step_result_payload`（双写窗口：payload / world_event_id / memory_id
     旧读键保留，outbox 与记忆沉淀下游依赖）。
     """
-    from app.application import action_engine
+    from app.services.action import port as action_engine
     from app.services.action.executor import step_result_payload
 
     action_engine.integrate_result(record, result)

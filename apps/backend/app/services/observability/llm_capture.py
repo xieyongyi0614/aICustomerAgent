@@ -123,7 +123,7 @@ class _ObservedChain:
 
 
 def _observed_invoke(observed, input_data, config, kwargs, run):
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not get_settings().observability_persist_enabled:
         return run(observed, input_data, config, kwargs)
@@ -170,7 +170,7 @@ def _run_observed_sync(observed, input_data, config, kwargs):
 
 
 async def _run_observed(observed, input_data, config, kwargs, sync: bool):
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not get_settings().observability_persist_enabled:
         return await observed._inner.ainvoke(input_data, config=config, **kwargs)

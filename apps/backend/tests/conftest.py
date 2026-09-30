@@ -64,6 +64,15 @@ from app.services.reflection import triggers as reflection_triggers
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.main import app
+
+from app.application import action_engine as _action_engine_impl
+from app.application import observability as _observability_impl
+from app.services.action import port as _action_port
+from app.services.observability import port as _observability_port
+
+_action_port.register_action_engine(_action_engine_impl)
+_observability_port.register_observability(_observability_impl)
+
 from app.repositories import (
     action_repository,
     agent_metric_repository,

@@ -127,7 +127,7 @@ def capture_prompt_snapshot(
     model=None,
     section_budget: dict | None = None,
 ) -> None:
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not enabled():
         return
@@ -155,7 +155,7 @@ def capture_prompt_snapshot(
 
 def capture_judge_snapshot(call_site: CallSite, model=None) -> None:
     """judge 快照只记元数据（prompt-debug.md §6）：不存 judge prompt 原文。"""
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not enabled():
         return
