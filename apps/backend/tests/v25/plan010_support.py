@@ -506,3 +506,77 @@ class ListenerCase:
 
 
 CHANNEL_PLAN = EVIDENCE_CHANNEL_PLAN
+
+PLAN_SECTION_SYMBOLS = frozenset(
+    {
+        "PLAN_EVIDENCE_STEP_NAME",
+        "PLAN_STEP_SOURCE",
+        "PLAN_EVIDENCE_NAMESPACE",
+        "PLAN_STEP_EVIDENCE_PREFIX",
+        "GROUP_KIND_PLAN",
+        "GROUP_KIND_STEP",
+        "GROUP_KIND_CRITERIA",
+        "PLAN_WINDOW_SUCCESS_RATE",
+        "PLAN_WINDOW_STEP_FAILURE",
+        "PLAN_WINDOW_CRITERIA_DECIDABILITY",
+        "PLAN_WINDOW_KINDS",
+        "PLAN_WINDOW_PRIORITY",
+        "PLAN_WINDOW_ALLOWED_INSIGHTS",
+        "PLAN_WINDOW_FAILURE_DRIVEN_KINDS",
+        "STEP_STATUS_DONE",
+        "STEP_STATUS_FAILED",
+        "PLAN_STEP_STATUS_WORDS",
+        "PLAN_WINDOW_LABELS",
+        "PLAN_WINDOW_METRICS",
+        "_UNKNOWN_GROUP_KEY",
+        "plan_evidence_id",
+        "plan_evidence_id_of",
+        "plan_thresholds",
+        "PlanStepFact",
+        "PlanEvidencePackage",
+        "aggregate_evidence_windows",
+        "aggregate_plan_success_rate",
+        "aggregate_step_failure_modes",
+        "aggregate_criteria_decidability",
+        "aggregate_plan_windows",
+        "aggregate_plan_evidence",
+        "build_plan_evidence_windows",
+        "_plan_kind_priority",
+        "_resolve_plan_facts",
+        "_plan_facts",
+        "_plan_structure_facts",
+        "_plan_action_facts",
+        "_criteria_kind",
+        "_step_undecided",
+        "_accumulate_plan_step_group",
+        "_plan_window_members",
+        "_plan_fact_in_group",
+        "_plan_fact_content",
+        "_build_plan_window",
+        "_plan_trace",
+    }
+)
+
+
+def plan_section_source(repo_root) -> str:
+    """PLAN-010 计划通道的源码段（按符号 AST 抽取，evidence.py 拆包后语义等价物）。"""
+    import ast as _ast
+
+    pkg = repo_root / "app" / "services" / "reflection" / "evidence"
+    parts = []
+    for path in sorted(pkg.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        tree = _ast.parse(source)
+        for node in tree.body:
+            if isinstance(node, (_ast.FunctionDef, _ast.ClassDef)):
+                name = node.name
+            elif isinstance(node, _ast.AnnAssign) and isinstance(node.target, _ast.Name):
+                name = node.target.id
+            elif isinstance(node, _ast.Assign):
+                targets = [t.id for t in node.targets if isinstance(t, _ast.Name)]
+                name = targets[0] if targets else None
+            else:
+                continue
+            if name in PLAN_SECTION_SYMBOLS:
+                parts.append(_ast.get_source_segment(source, node) or "")
+    return chr(10).join(parts)

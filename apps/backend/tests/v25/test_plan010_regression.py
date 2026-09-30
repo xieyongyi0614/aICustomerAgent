@@ -5,6 +5,7 @@
 
 import hashlib
 import json
+from pathlib import Path
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -284,13 +285,12 @@ class TestNoPersonalityInsight:
         assert reflector._REVIEW_SCOPE_NOT_ALLOWED in reasons
 
     def test_i11_plan_windows_declare_the_existing_type_gate_machinery(self):
-        source = (
-            reflection_evidence.__file__
+        pkg_dir = Path(reflection_evidence.__file__).parent
+        text = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted(pkg_dir.glob("*.py"))
         )
-        with open(source, encoding="utf-8") as handle:
-            text = handle.read()
         assert "insight_types=PLAN_WINDOW_ALLOWED_INSIGHTS.get(kind, ())" in text
-        assert "TOOL_INSIGHT_SCOPES" not in text.split("# --- PLAN-010", 1)[1]
+        assert "TOOL_INSIGHT_SCOPES" not in text
 
 
 class TestEndToEndLoop:

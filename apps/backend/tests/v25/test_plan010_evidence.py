@@ -21,9 +21,11 @@ from app.models.reflection import (
     EVIDENCE_CHANNELS,
 )
 from app.services.reflection import evidence as reflection_evidence
+from app.services.reflection.evidence import collectors as reflection_evidence_collectors
 from app.services.reflection import triggers
 
 from . import _plan_scan as scan
+from . import plan010_support as support
 from .conftest import V25_NOW
 from .plan010_support import (
     NOW,
@@ -45,7 +47,9 @@ from .plan010_support import (
 )
 
 TRIGGERS_PATH = scan.PLANNING_PACKAGE_DIR.parent / "reflection" / "triggers.py"
-EVIDENCE_PATH = scan.PLANNING_PACKAGE_DIR.parent / "reflection" / "evidence.py"
+EVIDENCE_PKG = scan.PLANNING_PACKAGE_DIR.parent / "reflection" / "evidence"
+COLLECTORS = EVIDENCE_PKG / "collectors.py"
+
 
 PLAN_WINDOWS = reflection_evidence.PLAN_WINDOW_KINDS
 GATE_CHAIN = (
@@ -56,6 +60,10 @@ GATE_CHAIN = (
     "has_job",
     "enqueue_job",
 )
+
+
+def _plan_section() -> str:
+    return support.plan_section_source(support.repo_root())
 
 
 def _function_code_text(path, name: str) -> str:
@@ -260,8 +268,7 @@ class TestPlanEvidenceWindows:
 
     def test_u5_plan_module_does_not_redeclare_the_existing_caps(self):
         """上限常量只允许复用：计划段不得出现新造的上限字面量。"""
-        source = EVIDENCE_PATH.read_text(encoding="utf-8")
-        plan_section = source.split("# --- PLAN-010", 1)[1]
+        plan_section = _plan_section()
         assert "TOOL_EVIDENCE_WINDOW_DAYS" in plan_section
         assert "TOOL_EVIDENCE_MAX_MEMBERS" in plan_section
         assert "TOOL_EVIDENCE_RECORD_SCAN_LIMIT" in plan_section
@@ -304,8 +311,7 @@ class TestPlanEvidenceWindows:
 
     def test_plan_window_gate_uses_the_existing_gate_function(self):
         """D7：门槛判定复用 `passes_tool_gate` / `tool_gate_reasons`，不自造数学。"""
-        source = EVIDENCE_PATH.read_text(encoding="utf-8")
-        plan_section = source.split("# --- PLAN-010", 1)[1]
+        plan_section = _plan_section()
         assert "passes_tool_gate(" in plan_section
         assert "tool_gate_reasons(" in plan_section
         assert "passes_plan_gate" not in plan_section
@@ -593,7 +599,7 @@ class TestTriggerForUserIsUntouched:
 
     def test_i2_evidence_aggregation_only_adds_plan_windows_at_the_end(self):
         """计划窗**追加**在既有窗口之后（既有窗口的相对顺序与优先序不变）。"""
-        source = EVIDENCE_PATH.read_text(encoding="utf-8")
+        source = _plan_section()
         assert (
             'return result["windows"] + _plan_channel_windows(user_id, now, trace)'
             in source
@@ -623,7 +629,7 @@ class TestTriggerForUserIsUntouched:
             ),
         )
         monkeypatch.setattr(
-            reflection_evidence,
+            reflection_evidence_collectors,
             "_aggregate",
             lambda *args, **kwargs: {
                 "pool_size": 1,

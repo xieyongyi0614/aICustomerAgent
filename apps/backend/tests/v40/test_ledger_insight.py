@@ -202,12 +202,17 @@ def test_no_advice_language(setup):
 
 
 def test_reflection_gates_unchanged():
-    for name in ("reflector.py", "evidence.py", "evaluation.py"):
+    for name in ("reflector.py", "evaluation.py"):
         path = BACKEND / "app/services/reflection" / name
-        if path.exists():
-            source = path.read_text(encoding="utf-8")
-            assert "SpendingFeatures" not in source
-            assert "ledger/insight" not in source
+        source = path.read_text(encoding="utf-8")
+        assert "SpendingFeatures" not in source
+        assert "ledger/insight" not in source
+    evidence_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((BACKEND / "app/services/reflection/evidence").glob("*.py"))
+    )
+    assert "SpendingFeatures" not in evidence_source
+    assert "ledger/insight" not in evidence_source
 
 
 def test_memory_untouched():

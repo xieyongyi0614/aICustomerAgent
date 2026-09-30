@@ -36,9 +36,9 @@ from app.services.memory import (
     lifecycle as memory_lifecycle,
     retriever as memory_retriever,
 )
+from app.services.reflection.evidence import collectors as reflection_evidence
 from app.services.reflection import (
     attribution as reflection_attribution,
-    evidence as reflection_evidence,
     evaluation as reflection_evaluation,
     lifecycle as reflection_lifecycle,
     reflector as reflection_reflector,

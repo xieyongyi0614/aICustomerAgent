@@ -451,7 +451,7 @@ def test_projection_failure_is_isolated_per_window(
     def _boom(*args, **kwargs):
         raise RuntimeError("messages 表不可读")
 
-    monkeypatch.setattr(reflection_evidence, "_human_messages_after", _boom)
+    monkeypatch.setattr("app.services.reflection.evidence.collectors._human_messages_after", _boom)
     with caplog.at_level(logging.ERROR, logger=EVIDENCE_LOGGER):
         package = reflection_evidence.aggregate_tool_evidence(USER, now=NOW)
     assert reflection_evidence.aggregate_user_feedback(USER, now=NOW) == {}
@@ -505,9 +505,10 @@ def test_evidence_module_never_imports_tool_registry():
     """数据来源纪律（静态）：反思证据模块零导入工具注册表 / 健康度。"""
     from pathlib import Path
 
-    source = (
-        Path(__file__).resolve().parents[2] / "app/services/reflection/evidence.py"
-    ).read_text(encoding="utf-8")
+    pkg = Path(__file__).resolve().parents[2] / "app/services/reflection/evidence"
+    source = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(pkg.glob("*.py"))
+    )
     assert "from app.services.tool" not in source
     assert "services.tool.registry" not in source
     assert ".record_outcome(" not in source

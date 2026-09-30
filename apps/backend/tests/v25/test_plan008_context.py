@@ -266,7 +266,7 @@ class TestNineWorldFacts:
             lambda *args, **kwargs: WorldBrief(text=""),
         )
         monkeypatch.setattr(
-            plan_context.world_engine, "build_context", lambda *args, **kwargs: None
+            world_engine, "build_context", lambda *args, **kwargs: None
         )
         empty = await assembler.assemble(goal, now=V25_NOW)
         assert isinstance(empty, PlanContext)

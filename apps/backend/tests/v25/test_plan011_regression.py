@@ -249,7 +249,10 @@ class TestTerminalPlansInfrastructure:
         """
         from app.services.reflection import evidence as reflection_evidence
 
-        source = Path(reflection_evidence.__file__).read_text(encoding="utf-8")
+        pkg_dir = Path(reflection_evidence.__file__).parent
+        source = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted(pkg_dir.glob("*.py"))
+        )
         assert "list_terminal_plans_since" not in source.split("def aggregate", 1)[0]
         assert "goal_repository.list_active_plans" in source
         assert "def aggregate_plan_success_rate" in source

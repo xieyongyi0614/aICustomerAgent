@@ -55,7 +55,7 @@ from app.services.development import evaluation as development_evaluation
 from app.services.development import policy as development_policy
 from app.services.reflection import attribution as reflection_attribution
 from app.services.insights import query as insights_query
-from app.services.reflection import evidence as reflection_evidence
+from app.services.reflection.evidence import collectors as reflection_evidence
 from app.services.reflection import evaluation as reflection_evaluation
 from app.services.reflection import lifecycle as reflection_lifecycle
 from app.services.reflection import reflector as reflection_reflector

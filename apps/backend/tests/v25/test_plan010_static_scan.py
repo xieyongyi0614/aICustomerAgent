@@ -31,8 +31,14 @@ from . import plan010_support as support
 
 
 LISTENER_PATH = scan.PLANNING_PACKAGE_DIR / "revision_listener.py"
-EVIDENCE_PATH = support.repo_root() / "app" / "services" / "reflection" / "evidence.py"
-REFLECTION_DIR = EVIDENCE_PATH.parent
+EVIDENCE_PKG = support.repo_root() / "app" / "services" / "reflection" / "evidence"
+REFLECTION_DIR = EVIDENCE_PKG.parent
+
+
+def _evidence_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(EVIDENCE_PKG.glob("*.py"))
+    )
 
 INSIGHT_TYPE_VALUES = (
     "belief",
@@ -53,7 +59,7 @@ REFLECTION_CONSUMERS = (
 
 
 def _plan_section_source() -> str:
-    return EVIDENCE_PATH.read_text(encoding="utf-8").split("# --- PLAN-010", 1)[1]
+    return support.plan_section_source(support.repo_root())
 
 
 def _tokens(source: str):
@@ -174,11 +180,10 @@ class TestEvidenceBoundary:
         assert reflection_evidence.TOOL_EVIDENCE_WINDOW_DAYS == 7
         assert reflection_evidence.TOOL_EVIDENCE_MAX_MEMBERS == 12
         assert reflection_evidence.TOOL_EVIDENCE_RECORD_SCAN_LIMIT == 200
-        source = EVIDENCE_PATH.read_text(encoding="utf-8")
-        plan_section = source.split("# --- PLAN-010", 1)[1]
-        assert "= 7" not in plan_section
-        assert "= 12" not in plan_section
-        assert "= 200" not in plan_section
+        collectors_source = (EVIDENCE_PKG / "collectors.py").read_text(encoding="utf-8")
+        assert "TOOL_EVIDENCE_WINDOW_DAYS =" not in collectors_source
+        assert "TOOL_EVIDENCE_MAX_MEMBERS =" not in collectors_source
+        assert "TOOL_EVIDENCE_RECORD_SCAN_LIMIT =" not in collectors_source
 
     def test_the_plan_channel_does_not_touch_the_reflector(self):
         """§5.5：`reflector` 的 Insight 产出路径零改动（计划窗经 `insight_types` 复用既有类型闸）。"""
@@ -260,10 +265,10 @@ class TestStagePosition:
         callers = []
         for path in _app_sources():
             text = path.read_text(encoding="utf-8")
-            if "aggregate_plan_evidence(" in text and path != EVIDENCE_PATH:
+            if "aggregate_plan_evidence(" in text and EVIDENCE_PKG not in path.parents:
                 callers.append(path.relative_to(support.repo_root()).as_posix())
         assert callers == []
-        assert "aggregate_plan_evidence(" in EVIDENCE_PATH.read_text(encoding="utf-8")
+        assert "aggregate_plan_evidence(" in _evidence_source()
 
     def test_the_listener_runs_from_the_reflection_job_not_from_a_request_path(self):
         reflector = (REFLECTION_DIR / "reflector.py").read_text(encoding="utf-8")
