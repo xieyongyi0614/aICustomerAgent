@@ -101,7 +101,7 @@ def _event_importance(intensity: int) -> str:
 
 
 def _emit_condition_event(user_id: str, situation: UserSituation, kind: str) -> None:
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
 
     title = situation.summary if kind == "detected" else f"{situation.summary}（已结束）"
     world_engine.create_event(

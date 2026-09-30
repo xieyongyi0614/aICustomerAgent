@@ -100,7 +100,7 @@ def importance_for(prev_weather: str | None, next_weather: str) -> str:
 
 def evolve_daily_weather(user_id: str) -> str | None:
     """编排：每日演化一次天气并落事件；幂等键 weather:{date}。"""
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
     from app.repositories import world_repository, world_simulation_repository
 
     try:

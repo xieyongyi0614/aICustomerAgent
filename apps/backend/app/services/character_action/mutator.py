@@ -7,7 +7,7 @@ validated WorldAction → applied / failed：唯一真实写库出口，逐条�
 import logging
 import time
 
-from app.application import world_engine
+from app.services.world import engine_port as world_engine
 from app.character.asuna.action import infer_object_category
 from app.core.settings import get_settings
 from app.models.character_action import (

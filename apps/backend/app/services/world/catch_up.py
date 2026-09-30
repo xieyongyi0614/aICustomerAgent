@@ -76,7 +76,7 @@ def _extract_date(key: str, today: date) -> date | None:
 
 def run_catch_up(user_id: str, now=None) -> dict:
     """编排入口：检查覆盖日期 → 折叠补发；幂等键防重。"""
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
 
     try:
         world = world_repository.get_world(user_id)

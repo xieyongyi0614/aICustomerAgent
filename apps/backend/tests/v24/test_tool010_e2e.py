@@ -80,10 +80,13 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/feishu/delivery.py": "21f80983c08175e32542f1106d7fbfedd670a47e7540be9ecd30c097bb4e9749",
     # 开关清理声明（2026-09-28）：world_enabled 主闸删除后，四个能力文件里的恒真死闸
     # （world_gate / world_available 的 getattr 读取）随之移除 —— 非 TOOL-010 改脏。
-    "app/services/action/capabilities/reminder.py": "aa217128408995eb57a18f06faad82c59f0a53cd53d06f730ad007215a4c9453",
+    # 反向依赖清理声明（2026-09-30）：三个能力文件 `from app.application import world_engine`
+    # 改经 `services/world/engine_port` 端口访问 —— 非 TOOL-010 改脏。原值分别
+    # aa217128 / 2ad7ae8f / 69eeff31。
+    "app/services/action/capabilities/reminder.py": "5ddf80197aff21b0074142f6c0331224abe93047d2097be4cda668d40c860257",
     "app/services/action/capabilities/memory.py": "cfb232780c1510776b7b50e9bfb5b6bb69306c9521039d08cd16b5a8f7746119",  # 前值 912619b5（services 归位批次 4：memory/policy → engines/memory_policy 导入路径变更）；再前值 b8cedddd（memory 域清理）
-    "app/services/action/capabilities/world_action.py": "2ad7ae8f5a728185129914fc4bce601dcf2d5ae4e205404d5521599f32e1422c",
-    "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
+    "app/services/action/capabilities/world_action.py": "d01ea0b163c1e0beb3fbfb812ba6e25f31dd403a23824f65712813a46ac7be1d",
+    "app/services/action/capabilities/environment_query.py": "f48b75e8a105ea907d1c352c348e39813e3a1cbed47919783e3cbd5eb7c603f8",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     # services 归位声明（2026-09-30，批次 1~4）：`llm_budget_gate` → `life/gate`、

@@ -86,7 +86,8 @@ from datetime import datetime, timedelta
 
 from pydantic import ValidationError
 
-from app.application import observability, world_engine
+from app.services.observability import port as observability
+from app.services.world import engine_port as world_engine
 from app.core.settings import get_settings
 from app.models.goal import GoalStatus
 from app.models.observability import DecisionKind, DecisionRecord

@@ -3,7 +3,7 @@
 委托性请求（"帮我买牛奶"）而非叙事性话语；先查实体再迁移，不造事实。
 """
 
-from app.application import world_engine
+from app.services.world import engine_port as world_engine
 from app.core.settings import get_settings
 from app.character.asuna.action import infer_object_category
 from app.models.action import ActionSchema, CapabilityResult

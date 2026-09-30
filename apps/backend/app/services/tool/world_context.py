@@ -41,7 +41,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-from app.application import world_engine
+from app.services.world import engine_port as world_engine
 from app.character.asuna.scene_profiles import scene_profile_for
 from app.character.asuna.world import WORLD_LOCATION_REGISTRY
 from app.services.conversation.state import load_relationship

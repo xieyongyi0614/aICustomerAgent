@@ -45,11 +45,14 @@ async def lifespan(application: FastAPI):
     global _life_loop_task, _agent_evolution_task
     from app.services.action import port as action_port
     from app.services.observability import port as observability_port
+    from app.services.world import engine_port
 
     from app.application import action_engine as _action_engine_impl
+    from app.application import world_engine as _world_engine_impl
 
     action_port.register_action_engine(_action_engine_impl)
     observability_port.register_observability(observability)
+    engine_port.register_world_engine(_world_engine_impl)
     if redis_client.is_configured():
         if await redis_client.ping_redis():
             logging.getLogger(__name__).info("Redis 连接正常")

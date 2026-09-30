@@ -67,7 +67,7 @@ def apply(
     异常分级：仓储/IO 类（SQLAlchemyError）判定为可重试，下一 tick 会自然重放；
     其余视为逻辑缺陷，日志级别更高以便定位。
     """
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
 
     try:
         from app.character.asuna.world import WORLD_LOCATION_REGISTRY

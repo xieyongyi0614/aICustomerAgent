@@ -1,6 +1,6 @@
 """V9 environment_query 能力：环境只读切片（simulated 数据源，零写）。"""
 
-from app.application import world_engine
+from app.services.world import engine_port as world_engine
 from app.models.action import ActionSchema, CapabilityResult
 from app.services.action.registry import ExecutionContext
 

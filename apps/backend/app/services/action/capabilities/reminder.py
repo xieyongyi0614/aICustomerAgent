@@ -4,7 +4,7 @@
 世界写失败 = 行动失败（不静默假成功）。
 """
 
-from app.application import world_engine
+from app.services.world import engine_port as world_engine
 from app.core.settings import get_settings
 from app.models.action import ActionSchema, CapabilityResult
 from app.services.action.registry import ExecutionContext

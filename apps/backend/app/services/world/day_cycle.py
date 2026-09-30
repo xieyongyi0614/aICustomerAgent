@@ -157,7 +157,7 @@ def emit_time_markers(user_id: str, now: datetime | None = None) -> list[str]:
     观测锚点存 worlds.environment，因此多进程各自读取同一份状态，
     不会出现单进程内存盲区；进程重启后仍能正确判定时段切换。
     """
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
 
     try:
         world = world_repository.ensure_world(user_id)

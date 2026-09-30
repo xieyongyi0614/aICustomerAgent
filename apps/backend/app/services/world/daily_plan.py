@@ -234,7 +234,7 @@ def prune_expired_plans(user_id: str, today: date) -> int:
 
 
 def _emit_life_event(user_id: str, plan: DailyPlan, kind: str, now: datetime) -> None:
-    from app.application import world_engine
+    from app.services.world import engine_port as world_engine
 
     importance = "normal" if plan.variability_source == DailyPlanVariability.USER_INFLUENCED else "low"
     world_engine.create_event(

@@ -81,7 +81,7 @@ class TestValidateConsume:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "鸡蛋", quantity=6.0, consumable=True)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CONSUME", "鸡蛋", 2.0)
         results = validate_actions([action], user_id="u1")
@@ -93,7 +93,7 @@ class TestValidateConsume:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "鸡蛋", quantity=1.0, consumable=True)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CONSUME", "鸡蛋", 3.0)
         results = validate_actions([action], user_id="u1")
@@ -104,7 +104,7 @@ class TestValidateConsume:
     def test_object_not_found(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: []})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CONSUME", "番茄汤", 1.0)
         results = validate_actions([action], user_id="u1")
@@ -115,7 +115,7 @@ class TestValidateConsume:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "刀", quantity=1.0, consumable=False)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CONSUME", "刀", 1.0)
         results = validate_actions([action], user_id="u1")
@@ -126,7 +126,7 @@ class TestValidateConsume:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "鸡蛋", quantity=6.0, consumable=True)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CONSUME", "鸡蛋", None)
         results = validate_actions([action], user_id="u1")
@@ -138,7 +138,7 @@ class TestValidateCreate:
     def test_basic_create_pass(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: []})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CREATE", "面", 1.0)
         results = validate_actions([action], user_id="u1")
@@ -147,7 +147,7 @@ class TestValidateCreate:
     def test_entity_limit(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 0})())
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: []})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CREATE", "面", 1.0)
         results = validate_actions([action], user_id="u1")
@@ -157,7 +157,7 @@ class TestValidateCreate:
     def test_create_invalid_location(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: []})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("CREATE", "面", 1.0, location_id="nonexistent.place")
         results = validate_actions([action], user_id="u1")
@@ -170,7 +170,7 @@ class TestValidateMove:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "牛奶", location_id="home.kitchen.fridge")
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("MOVE", "牛奶", quantity=None, location_id="home.kitchen")
         results = validate_actions([action], user_id="u1")
@@ -180,7 +180,7 @@ class TestValidateMove:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "牛奶", location_id="home.kitchen")
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("MOVE", "牛奶", quantity=None, location_id="home.kitchen")
         results = validate_actions([action], user_id="u1")
@@ -191,7 +191,7 @@ class TestValidateMove:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "牛奶", location_id="home.kitchen.fridge")
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("MOVE", "牛奶", quantity=None, location_id="home.nonexistent")
         results = validate_actions([action], user_id="u1")
@@ -201,7 +201,7 @@ class TestValidateMove:
     def test_move_object_not_found(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: []})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         action = _action("MOVE", "不存在的东西", quantity=None, location_id="home.kitchen")
         results = validate_actions([action], user_id="u1")
@@ -214,7 +214,7 @@ class TestWorkingViewSequential:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "鸡蛋", quantity=1.0, consumable=True)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         a1 = _action("CONSUME", "鸡蛋", 1.0, dedupe_key="k1")
         a2 = _action("CONSUME", "鸡蛋", 1.0, dedupe_key="k2")
@@ -227,7 +227,7 @@ class TestWorkingViewSequential:
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
         obj = _FakeObj("e1", "鸡蛋", quantity=6.0, consumable=True)
         monkeypatch.setattr("app.services.character_action.validator.world_repository", type("R", (), {"list_objects": lambda self, wid: [obj]})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: type("W", (), {"world_id": "w1"})())
 
         a1 = _action("CONSUME", "鸡蛋", 1.0, dedupe_key="dup_key")
         a2 = _action("CONSUME", "鸡蛋", 1.0, dedupe_key="dup_key")
@@ -240,7 +240,7 @@ class TestWorkingViewSequential:
 class TestDisabledWorld:
     def test_world_unavailable(self, monkeypatch):
         monkeypatch.setattr("app.services.character_action.validator.get_settings", lambda: type("S", (), {"world_active_entities_limit": 200})())
-        monkeypatch.setattr("app.services.character_action.validator.ensure_world", lambda uid: None)
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: None)
 
         action = _action("CONSUME", "鸡蛋", 2.0)
         results = validate_actions([action], user_id="u1")
@@ -263,7 +263,7 @@ def _patch(monkeypatch, objects, location=None, entity_limit=200):
         type("R", (), {"list_objects": lambda self, wid: objects})(),
     )
     monkeypatch.setattr(
-        "app.services.character_action.validator.ensure_world",
+        "app.application.world_engine.ensure_world",
         lambda uid: _world(location=location),
     )
 
