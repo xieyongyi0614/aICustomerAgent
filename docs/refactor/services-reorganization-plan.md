@@ -408,3 +408,27 @@ app/services/
 ### 14.4 遗留
 
 §十 债①（`services → application` 反向依赖 35 处，含 world_engine 14 处端口化）与债②（巨型文件拆分 5 个）不在批次 0~5 范围，**保持未动**，沿用本台账 §十 规划要点另行排期。
+
+---
+
+## 十五、三类架构债执行结果（2026-09-30 第二批）
+
+### 15.1 债① `services → application` 反向依赖清零 ✅
+
+逐符号复核（§十二.5 口径差已闭合）：**26 文件 / 36 处代码引用**（另 1 处为 docstring）。逐组提交：
+
+| 提交 | 内容 |
+|---|---|
+| `a36c594` | `logical_clock` → `core/clock.py`（纯时钟下沉，reflector 2 处 + application 3 处 + 3 个测试文件同步）；`action_engine.py` 因 import 变更再冻结 |
+| `569f1d3` | action / observability 端口落地 + 8 处函数内懒调用改端口（`action/{integration,manager}`、`goal/execution` → action 端口；`observability/{llm,prompt}_capture` 4 处 → observability 端口） |
+| `5488a56` | world_engine 端口化：12 个消费文件（含 3 个哈希冻结的 `action/capabilities/*`，均再冻结留痕）+ `character_action/validator` 调用点改写 |
+| `2d64308` | `core/runtime_state.py` 下沉（`get_user_write_lock` / `active_generations` / `memory_digest_var`，post_process 与 chat_pipeline 再冻结）；executor 经 `services/autonomy/port` 访问 `autonomy_bridge`；`memory/job_worker` 改 worker_loop 注册表；observability 模块级消费 4 文件改端口 |
+
+端口模式：**服务侧端口模块 + PEP 562 `__getattr__` 代理**（消费点只改 import 行、绑定名不变，属性调用期解析）；组合根 = `main.py` lifespan + `tests/conftest.py` 顶部。豁免：`agent_service.py`（兼容壳本体，随壳退役消失）、`observability/trace_query.py`（docstring 陈述规则，非代码引用）。
+
+⚠️ **坑位记录（后续拆分必读）**：端口 `__getattr__` 与 monkeypatch 组合存在「快照残留」陷阱——`monkeypatch.setattr(端口模块, "attr", fake)` 会在 undo 时把真实函数**永久写入端口模块字典**，遮蔽 `__getattr__`，导致后续对实现模块的补丁全部失效（`test_character_action_mutator` 污染 `test_character_action_validator` 即此因）。**测试打桩一律打实现模块（`app.application.world_engine.X`），端口读穿天然生效。**
+
+### 15.2 债② 巨型文件拆分：试点 1/5，其余待排期 ⏸
+
+- ✅ **`evaluation/context.py`（834）→ `evaluation/context/` 包**（`639f3b0`）：`slices.py`（切片数据类 + 常量 + `_clip`）/ `collectors.py`（收集器）/ `digest.py`（digest 组装与截断），`__init__` 全量再导出，全部消费面（`from ...context import X` 形态）零改动。拆分前审计确认：无任何 monkeypatch 依赖 `context.<X>` 包属性 → 再导出安全。
+- ⏸ **`reflection/evidence.py`(1856) / `tool/ext_api.py`(1507) / `planning/decompose.py`(963) / `planning/observer.py`(863) 暂缓**：这四个文件被 v25/v21 精确守卫与 conftest 模块级打桩深度耦合（plan001_scope_markers 文件清单、plan008 源码串断言、plan009 导入面扫描、`_SERVICE_DB_MODULES` 对 `evidence` 模块的 `SessionLocal` 打桩、大量 `observer.<X>` 属性补丁）。机械套用 `__init__` 再导出会触发 §十三 警告的「打桩静默失效」：包属性补丁不影响子模块内部调用、SessionLocal 打桩落不到持久化子模块。**前置条件 = 逐文件补丁缝审计**（决定每处补丁改打子模块还是改经命名空间对象读穿），非机械可迁。
