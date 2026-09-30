@@ -11,16 +11,13 @@ import logging
 import time
 from datetime import datetime, timedelta
 
-from app.application import observability
-from app.application.autonomy_bridge import (
-    coordinate_delivery,
-    emit_proactive_triggered,
-)
-from app.application.post_process import get_user_write_lock
+from app.services.observability import port as observability
+from app.services.autonomy import port as autonomy_bridge
+from app.core.runtime_state import get_user_write_lock
 from app.channels.base import ChannelErrorKind, SendResult
 from app.chains import proactive_chain
 from app.core.settings import get_settings
-from app.application.life_loop_context import memory_digest_var
+from app.core.runtime_state import memory_digest_var
 from app.models.autonomy import ProactiveAction
 from app.repositories import (
     conversation_repository,
@@ -31,7 +28,7 @@ from app.services.conversation import service as conversation_service
 from app.services.delivery import outbound as proactive_delivery
 from app.engines.autonomy import in_quiet_hours
 from app.services.observability.collector import TurnTraceSession
-from app.application.chat_pipeline import active_generations
+from app.core.runtime_state import active_generations
 from app.services.evaluation.engine import schedule_proactive_evaluation
 
 logger = logging.getLogger(__name__)
@@ -134,7 +131,7 @@ async def _send_via_outbound(
     trace: TurnTraceSession | None,
 ) -> SendResult:
     """投递出口（RT-017）：统一经 `coordinate_delivery`（网关优先 / 未纳管回落）。"""
-    return await coordinate_delivery(
+    return await autonomy_bridge.coordinate_delivery(
         getattr(action, "id", None) or action.dedupe_key,
         dedupe_key=action.dedupe_key,
         user_id=action.user_id,
@@ -229,7 +226,7 @@ async def execute(
                 trace.record("proactive_deliver", 0.0, "degraded", error=reason)
             _mark_outcome(action.id, "discarded")
             return discarded
-        emit_proactive_triggered(
+        autonomy_bridge.emit_proactive_triggered(
             action.dedupe_key,
             reason=action.reason,
             trigger_type=getattr(action, "trigger_type", None),

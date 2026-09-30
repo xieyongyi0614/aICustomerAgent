@@ -101,14 +101,15 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # `behavior_engine` / `mode_service` / `state_engine` 等引擎收口、领域包归位、
     # `decision_pipeline` → `engines/decision` 导入路径变更 —— 非 TOOL-010 改脏。
     # 原值 4aec8e65、ea741a87、9054ce0d。
-    "app/application/chat_pipeline.py": "7d14ed8631e6802406509ab7837a539842abc17c9ce3ebffcc2142751c03561b",  # 再冻结：grounding 门控去掉 enabled 判断
+    # 反向依赖清理声明（2026-09-30）：`active_generations` 下沉 `core/runtime_state` 导入路径变更。
+    "app/application/chat_pipeline.py": "4d98f5d7609b9ad7b590368fa3dc7472f6fd25a4a26affbee586d69504f2a49d",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "f2a25b668b8374f709d67a7136937209138b447b5a5b3ca910cfb819e5719074",  # 前值 8aa2b63f（批次 4：decision_pipeline → engines/decision 导入路径变更）、6778abc4（批次 3）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
+    "app/application/post_process.py": "bcb7b63c718390cb6d57e26e9b04493e3df37b59b0e7e7619b7f79d6ccf09e25",  # 前值 f2a25b66（反向依赖清理：get_user_write_lock 下沉 core/runtime_state）、8aa2b63f（批次 4）、6778abc4（批次 3）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
     "app/application/action_engine.py": "36ea379811984d7e04da9af0b6af4114c88e3eaab70635ac3c76d545ee620525",  # 再冻结：world_available 赋值去掉恒真 getattr；前值 6ea39eaf（反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）
     # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
     # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。

@@ -66,15 +66,21 @@ from app.core.settings import get_settings
 from app.main import app
 
 from app.application import action_engine as _action_engine_impl
+from app.application import autonomy_bridge as _autonomy_bridge_impl
 from app.application import observability as _observability_impl
 from app.application import world_engine as _world_engine_impl
+from app.application.worker_loop import run_worker_loop as _run_worker_loop_impl
 from app.services.action import port as _action_port
+from app.services.autonomy import port as _autonomy_port
+from app.services.memory import job_worker as _memory_job_worker
 from app.services.observability import port as _observability_port
 from app.services.world import engine_port as _world_port
 
 _action_port.register_action_engine(_action_engine_impl)
 _observability_port.register_observability(_observability_impl)
 _world_port.register_world_engine(_world_engine_impl)
+_autonomy_port.register_autonomy_bridge(_autonomy_bridge_impl)
+_memory_job_worker.register_worker_loop(_run_worker_loop_impl)
 
 from app.repositories import (
     action_repository,

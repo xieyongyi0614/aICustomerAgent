@@ -36,7 +36,7 @@ from app.repositories import (
     memory_repository,
 )
 from app.services.development import aggregate as development_aggregate
-from app.application import observability
+from app.services.observability import port as observability
 from app.models.observability import TraceKind
 from app.services.relationship import patterns as relationship_pattern_service
 from app.services.memory import job_worker

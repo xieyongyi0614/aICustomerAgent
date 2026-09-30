@@ -20,8 +20,6 @@ from app.core.settings import get_settings
 from app.repositories import background_job_repository
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import lifecycle as memory_lifecycle
-from app.application.worker_loop import run_worker_loop
-
 logger = logging.getLogger(__name__)
 
 STEP_NAME = "memory_job_worker"
@@ -49,8 +47,19 @@ def register_tick_hook(hook) -> None:
     _TICK_HOOKS.append(hook)
 
 
+_worker_loop_runner = None
+
+
+def register_worker_loop(runner) -> None:
+    """组合根注册通用循环执行器（application.worker_loop），消除反向依赖。"""
+    global _worker_loop_runner
+    _worker_loop_runner = runner
+
+
 async def run_job_worker_loop() -> None:
-    await run_worker_loop(
+    if _worker_loop_runner is None:
+        raise RuntimeError("worker_loop 未注册（app.main lifespan / 测试 conftest）")
+    await _worker_loop_runner(
         "memory job worker",
         run_job_tick,
         get_settings().job_poll_interval,

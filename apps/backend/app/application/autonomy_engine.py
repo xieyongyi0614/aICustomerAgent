@@ -50,7 +50,7 @@ from app.services.autonomy import trigger as trigger_evaluator
 from app.services.planning import scheduler as plan_scheduler
 from app.services.observability.collector import TurnTraceSession, get_trace_collector
 from app.application.action_engine import collect_facts, run_action_planning
-from app.application.chat_pipeline import active_generations
+from app.core.runtime_state import active_generations
 from app.character.asuna.action import (
     PROACTIVE_ACTION_MAP,
     build_autonomy_action_params,

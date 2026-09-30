@@ -15,7 +15,7 @@ from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
 from app.repositories import goal_repository
 from app.services.development import aggregate as development_aggregate
-from app.application import observability
+from app.services.observability import port as observability
 from app.services.conversation import state as state_service
 
 logger = logging.getLogger(__name__)

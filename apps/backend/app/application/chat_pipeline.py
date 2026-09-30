@@ -65,7 +65,7 @@ from app.services.memory.refs import build_memory_refs
 
 logger = logging.getLogger(__name__)
 
-active_generations: dict[str, bool] = {}
+from app.core.runtime_state import active_generations
 
 
 class EmptyLLMResponseError(Exception):

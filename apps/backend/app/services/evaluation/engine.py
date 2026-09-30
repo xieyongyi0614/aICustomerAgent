@@ -35,7 +35,7 @@ from app.services.evaluation.context import (
     collect_proactive_context,
     collect_turn_context,
 )
-from app.application import observability
+from app.services.observability import port as observability
 
 logger = logging.getLogger(__name__)
 

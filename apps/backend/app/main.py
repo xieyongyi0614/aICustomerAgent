@@ -44,15 +44,21 @@ async def lifespan(application: FastAPI):
     global _job_worker_task
     global _life_loop_task, _agent_evolution_task
     from app.services.action import port as action_port
+    from app.services.autonomy import port as autonomy_port
+    from app.services.memory import job_worker
     from app.services.observability import port as observability_port
     from app.services.world import engine_port
 
     from app.application import action_engine as _action_engine_impl
+    from app.application import autonomy_bridge as _autonomy_bridge_impl
     from app.application import world_engine as _world_engine_impl
+    from app.application.worker_loop import run_worker_loop
 
     action_port.register_action_engine(_action_engine_impl)
     observability_port.register_observability(observability)
     engine_port.register_world_engine(_world_engine_impl)
+    autonomy_port.register_autonomy_bridge(_autonomy_bridge_impl)
+    job_worker.register_worker_loop(run_worker_loop)
     if redis_client.is_configured():
         if await redis_client.ping_redis():
             logging.getLogger(__name__).info("Redis 连接正常")
