@@ -162,14 +162,14 @@ services/world/memory_bridge.py:66
 
 **处置**：本项从第 2 批**移除**，`planning/memory_policy.py` 保持不动——它是 PLAN-009「计划终态记忆投递」的唯一实现，删除会直接破坏计划域。
 
-#### 3.3.2 🚨 附带发现：V7-010 `scheduled_followup` 已失效（**非本次引入**）
+#### 3.3.2 ✅ V7-010 `scheduled_followup` 已失效 → **已裁决恢复（2026-09-30，见 §5.5）**
 
 `trigger_evaluator.register_followup` 全仓**唯一调用点**是 `memory_service.py:113`（经 `_register_followups`，由 `extract_and_save` 在 `:96` 调用）。而 `extract_and_save` 生产零调用（v2 替换后）→ **该功能自 V2.0.0 记忆替换起即不可达**；v2 的 `memory/ingest` 路径**未承接** followup 登记。
 
 - 影响：「用户说『明天有面试』→ 次日 18:00 主动跟进」不成立。
 - 删除 `memory_service.py` 后该功能的**唯一实现随之消失**（可从 git 历史恢复）。
 - 原测试 `tests/unit/test_trigger_followup.py::test_memory_pipeline_registers_followup` 直接调 v1 函数故**恒绿**，给出虚假信心；已随本次删除。
-- **待裁决**：① 把 `_register_followups` 移植进 v2 ingest（恢复功能）；② 正式废弃并登记。
+- **裁决（2026-09-30）**：采方向 ① **恢复功能**——登记点承接进 v2 摄取链路，执行记录见 **§5.5**。
 
 #### 3.3.3 归位与死代码裁剪（第 6 项）
 
@@ -396,7 +396,23 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 | `tests/v22`（引用 relationship_lexicon） | 114 passed | ✓ |
 | `e2e/test_debug_state_history::test_state_reflects_turn_and_respects_limit` 甄别 | **HEAD 基线 worktree（894c977）3 跑 1 败** | 该 flaky 在基线即存在（台账 §4.2 记「隔离 2 次通过」为抽样巧合），非本批引入 |
 
-### 5.3 附带发现（待后续批次）
+### 5.5 第 5 批：V7-010 `scheduled_followup` 功能恢复（2026-09-30 执行）
+
+**裁决**：采方向 ①（恢复功能）——「用户说『明天有面试』→ 次日 18:00 主动跟进」自 V2.0.0 断链至今，消费端（`poll_due_followup` + `trigger_registry_repository` 持久化 + P0 优先级映射 + autonomy_engine 轮询）全程健在，仅生产端登记点缺失。
+
+**改动 3 文件（app 1 + tests 2）**：
+
+| 文件 | 改动 |
+|---|---|
+| `app/application/post_process.py` | `_run_memory_ingest_v2` 在 `ingest_from_conversation` 之后承接 `_register_followups`（自 v1 `extract_and_save` 断链处恢复）：遍历本轮会话候选行 → `find_followup_event` 关键词匹配（面试/考试/会议/答辩/体检）→ due = 最近一次 18:00（已过则顺延次日）→ `register_followup`（内存表 + 登记表持久化均为既有通道，零改动）。逐条 try/except，失败仅 log |
+| `tests/unit/test_trigger_followup.py` | **恢复**管线级测试（原 `test_memory_pipeline_registers_followup` 的 v2 适配版）：`run_memory_extract` + FakeLLM 产出「用户明天有一场重要的面试」→ 断言登记 summary=`面试近况跟进`；新增无关键词负例（登记数 == 0，防噪音 followup） |
+| `tests/v24/test_tool010_e2e.py` | `ZERO_DIFF_HASHES[post_process.py]` `378bdd6a…` → `8920af98…`（附声明，前值保留可追溯） |
+
+**语义保真**：登记源从「本轮 R1~R8 通过并落库的 v1 记忆」变为「本轮会话候选行（v2，评估前）」——事件是否跟进取决于用户是否提及（源文本真实），不依赖候选后续是否转正；关键词表、due 语义、dedupe 键格式、消费链路与 v1 逐字一致。登记点留在摄取步（第 5 步）而非收尾评估步（第 13 步）：followup 时效锚定用户输入轮次，无需等待候选转正。
+
+**验证**：`tests/v24 unit integration v2` → **10 failed / 4046 passed**，失败集 = 在案基线（tool009×6 + db_migration + redis + aut005 + life002）逐条一致 → 零新增；`tests/unit/test_trigger_followup.py` **7/7 passed**。
+
+### 5.6 附带发现（待后续批次）
 
 `memory2/retriever.py::QUERY_TYPE_KEYWORDS` 与 `memory2/types.py::TYPE_AFFINITY_KEYWORDS` 是**同一份类型亲和映射的新旧两版** —— 前者键为 v2 规范类型名（`experience` / `relationship_fact`），后者键为遗留名（`important_event` / `relationship_event`）。
 
@@ -409,6 +425,6 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 1. ~~**重复记忆查库**（第 3 批前置）：对同一 `world_events` / `action_records` 行，确认 `memories` 表中是否存在旁路与 v2 各写一条的重复行。~~ **✅ 已完成（2026-09-29）**：空库无法用存量数据验证 → 改为确定性复现，**确认两行都被写入**（顺序 A 为内容降级、顺序 B 为可见重复）。结论与复现方法见 **§5.2.1**。
 2. **真实模型人工回归**：`reclaim` 循环移除后，确认无「过期记忆未回收」的线上反馈（该循环恒空转，理论上零影响，但需观察）。
 3. ~~**`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。~~ **✅ 已完成（2026-09-29）**：全量回归零新增失败，`conftest` 的 9 条 import 与 9 项模块登记已同步（§3.3.6）。
-4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.3）：需先确定 `proposed_type` 的遗留名归一化时机。
-5. **🚨 V7-010 `scheduled_followup` 裁决**（§3.3.2，**新增**）：该功能自 V2.0.0 起已不可达，且其唯一实现随本次删除消失。需裁决：移植进 v2 ingest 恢复功能，还是正式废弃。
+4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.6）：需先确定 `proposed_type` 的遗留名归一化时机。
+5. ~~**🚨 V7-010 `scheduled_followup` 裁决**~~ **✅ 已裁决并恢复（2026-09-30，方向 ①，第 5 批，§5.5）**：登记点已承接进 v2 摄取链路，管线级测试恢复。
 6. ~~**`relationship_lexicon.MEMORY_TEMPLATES` 已无使用者**~~ **✅ 已删除（2026-09-30，第 4 批，§5.4）**。

@@ -8,7 +8,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
@@ -21,6 +21,7 @@ from app.services import (
     scene_service,
     state_service,
     summary_service,
+    trigger_evaluator,
 )
 from app.application import world_engine
 from app.models.action import ActionIntent
@@ -192,12 +193,13 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
     if not isinstance(extraction, MemoryExtraction):
         extraction = MemoryExtraction.model_validate(extraction)
     source_id_base = f"conv:{ctx.user_id}:{ctx.session_id}"
-    memory_ingest.ingest_from_conversation(
+    conversation_rows = memory_ingest.ingest_from_conversation(
         ctx.user_id,
         extraction,
         source_id_base=source_id_base,
         trace=ctx.trace,
     )
+    _register_followups(ctx.user_id, conversation_rows)
     for record in memory_sources.fetch_action_records(ctx.user_id):
         try:
             memory_ingest.ingest_from_action_record(record, trace=ctx.trace)
@@ -222,6 +224,28 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
             logger.exception(
                 "RelationshipMilestone 摄取失败（幂等安全）：%s", milestone.id
             )
+
+
+def _register_followups(user_id: str, rows) -> None:
+    """V7-010：带时间语义的事件候选 → scheduled_followup 登记。
+
+    唯一生产者原为 v1 `extract_and_save`（随其删除断链），现承接于 v2 摄取通道
+    的会话候选行；due = 最近一次 18:00（已过则顺延次日），消费端 `poll_due_followup`
+    与登记表写入均为既有通道。
+    """
+    now = datetime.now()
+    for row in rows:
+        keyword = trigger_evaluator.find_followup_event(row.content or "")
+        if keyword is None:
+            continue
+        due = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        if due <= now:
+            due += timedelta(days=1)
+        try:
+            trigger_evaluator.register_followup(user_id, due, f"{keyword}近况跟进")
+            logger.info("scheduled_followup 登记：%s due=%s", keyword, due)
+        except Exception:
+            logger.exception("followup 登记失败，跳过")
 
 
 async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:

@@ -93,7 +93,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "378bdd6a1222a1cf470d0f4d596e261f26dc761484fc79a0be6aebde57575098",  # 前值 30125e6e（memory 域清理：memory_service 死导入移除；再前值 2040a4df、c1702717）
+    # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
+    # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
+    "app/application/post_process.py": "8920af98660870c594929bd61c3ff24dbf46ff3a06fa1b1e70928996ecb10dfd",  # 前值 378bdd6a（memory 域清理 + followup 恢复）；再前值 30125e6e、2040a4df、c1702717
     "app/application/action_engine.py": "6ea39eaf1f55f7601585cf99ec95d02bc2bead0f1bbf8c4841c4bc1ba8302a7b",  # 再冻结：world_available 赋值去掉恒真 getattr
     "app/prompts/builder.py": "d3ee8bf448dd98c87afa6623361beeedd1cbe20ceb5abd22ed4d919202c9531c",
 }
