@@ -390,7 +390,9 @@ class TestRepositoryAccessLayering:
             assert set(self._repository_imports(module)) <= allowed, module.__name__
 
     def test_domain_reads_go_through_service_facades(self):
-        from app.services import domain_ledger, goal_service, outbox_service
+        from app.services.ledger import domain as domain_ledger
+        from app.services import goal_service
+        from app.services.delivery import outbox as outbox_service
         from app.services.action import manager as action_manager
 
         for facade in (
@@ -404,7 +406,9 @@ class TestRepositoryAccessLayering:
         assert callable(action_manager.get_record)
 
     def test_services_do_not_import_agent_runtime(self):
-        from app.services import decision_pipeline, domain_ledger, llm_budget_gate
+        from app.services import decision_pipeline
+        from app.services.ledger import domain as domain_ledger
+        from app.services.life import gate as llm_budget_gate
         from app.services.planning import context as plan_context
         from app.services.planning import executor_bridge
 
@@ -559,7 +563,8 @@ class TestNoPrivateServiceApi:
 
     def test_public_facades_exist_and_delegate(self):
         from app.application import life_loop
-        from app.services import decision_pipeline, life_loop_budget
+        from app.services import decision_pipeline
+        from app.services.life import budget as life_loop_budget
         from app.services.reflection import triggers
 
         assert decision_pipeline.GATE_BUDGET == "budget_cooldown"

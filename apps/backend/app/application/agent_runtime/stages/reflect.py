@@ -187,7 +187,7 @@ async def reflect(
     action_status = getattr(getattr(action_outcome, "result", None), "status", None)
 
     from app.application.agent_runtime import llm_gateway
-    from app.services import life_loop_budget
+    from app.services.life import budget as life_loop_budget
     from app.services.reflection import reflector, triggers
 
     if life_loop_budget.is_degraded(now=reflected_at) or not llm_gateway.acquire(

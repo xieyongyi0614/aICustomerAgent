@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import decision_pipeline, goal_stack
-from app.services import llm_budget_gate
+from app.services.life import gate as llm_budget_gate
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "decision-user"

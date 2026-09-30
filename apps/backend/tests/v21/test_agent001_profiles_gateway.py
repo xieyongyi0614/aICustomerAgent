@@ -12,7 +12,7 @@ from app.application.agent_runtime import llm_gateway, profiles
 from app.application.agent_runtime.llm_gateway import GatewayDeniedError
 from app.application.agent_runtime.models import RunContext
 from app.models.observability import CallSite
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 

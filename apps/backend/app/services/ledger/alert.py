@@ -211,7 +211,7 @@ def should_alert(draft: AlertDraft, *, now: datetime, settings=None) -> bool:
 def deliver_alert(draft: AlertDraft, *, now: datetime, user_id: str) -> SendResult:
     from app.models.autonomy import ProactiveAction
     from app.repositories import proactive_repository
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     try:
         action = ProactiveAction(

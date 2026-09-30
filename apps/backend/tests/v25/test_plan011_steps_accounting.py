@@ -27,7 +27,7 @@ from app.core.settings import get_settings
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import goal_repository, loop_run_repository
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 from app.services.planning import engine as plan_engine
 
 from . import plan011_support as support

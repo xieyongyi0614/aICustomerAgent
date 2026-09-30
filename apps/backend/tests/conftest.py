@@ -47,7 +47,7 @@ from app.services.memory import lifecycle as memory_lifecycle
 from app.services.memory import migration as memory_migration
 from app.services.memory import product_view as memory_product_view
 from app.services.memory import retriever as memory_retriever
-from app.services import evolution as evolution_service
+from app.services.development import evolution as evolution_service
 from app.services.development import aggregate as development_aggregate
 from app.services.development import audit as development_audit
 from app.services.development import attribution as development_attribution
@@ -363,7 +363,7 @@ def _persistent_outbound_idempotency():
     内存 SQLite，故这里装的就是真实实现。
     """
     from app.channels.feishu import delivery
-    from app.services import feishu_delivery_ledger_service
+    from app.services.delivery import ledger as feishu_delivery_ledger_service
 
     delivery.set_persistent_idempotency(
         feishu_delivery_ledger_service.claim,

@@ -70,7 +70,7 @@ def test_version_dispatches_to_registered_source(monkeypatch):
 
 
 def test_version_snapshot_domain_uses_latest_archive_version(monkeypatch):
-    from app.services import domain_ledger
+    from app.services.ledger import domain as domain_ledger
 
     row = SimpleNamespace(version=7, created_at=NOW)
     monkeypatch.setattr(

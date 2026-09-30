@@ -27,7 +27,8 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import conversation_service, proactive_delivery
+from app.services import conversation_service
+from app.services.delivery import outbound as proactive_delivery
 from app.services.autonomy_policy import in_quiet_hours
 from app.services.trace_collector import TurnTraceSession
 from app.application.chat_pipeline import active_generations

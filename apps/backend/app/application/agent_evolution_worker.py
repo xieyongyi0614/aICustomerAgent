@@ -13,7 +13,8 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.repositories import agent_metric_repository, conversation_repository
-from app.services import agent_evaluation, evolution
+from app.services import agent_evaluation
+from app.services.development import evolution
 from app.application.worker_loop import run_worker_loop
 
 logger = logging.getLogger(__name__)

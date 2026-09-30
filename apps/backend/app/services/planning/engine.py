@@ -67,7 +67,8 @@ from app.models.goal import GoalPlanRecord, GoalRecord, SubGoalSpec, validate_su
 from app.models.plan import PlanContext
 from app.models.tool import ToolSurface
 from app.repositories import goal_repository, loop_run_repository
-from app.services import goal_planning, life_loop_budget
+from app.services import goal_planning
+from app.services.life import budget as life_loop_budget
 from app.services.planning.context import context_digest
 from app.services.planning.goal_contract import PLANNING_FAILURE_REASON_PLAN_EXHAUSTED
 from app.services.tool.registry import ToolRegistry, get_tool_registry

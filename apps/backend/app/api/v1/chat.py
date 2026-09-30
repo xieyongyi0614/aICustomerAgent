@@ -10,7 +10,7 @@ from app.api.v1.auth import require_user
 from app.api.v1.deps import get_chat_llm
 from app.api.v1.schemas import ChatRequest
 from app.services import agent_service, trace_collector
-from app.services.analytics.events import track_event
+from app.services.observability.analytics import track_event
 from app.services.agent_service import EmptyLLMResponseError
 from app.services.tool.step_events import (
     CHAT_EVENT_TOOL_STEP,

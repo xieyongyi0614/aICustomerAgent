@@ -60,7 +60,7 @@ from app.application.agent_runtime.models import (
 from app.application.agent_runtime.profiles import ProfileSpec
 from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 
 logger = logging.getLogger(__name__)
 

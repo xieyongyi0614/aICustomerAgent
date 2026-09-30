@@ -84,11 +84,13 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/environment_query.py": "69eeff31f060af6d905cd502960ca9ef541aa050c03a7ef7190da4db46eeb0ec",
     "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
-    "app/services/decision_pipeline.py": "0c6713304f4b80ddab4f3b132be82ac49429a6d8ef8eaec4866f1a1461b9d612",
+    # services 归位声明（2026-09-30，批次 1）：`llm_budget_gate` → `life/gate` 导入路径变更 —— 非 TOOL-010 改脏。
+    "app/services/decision_pipeline.py": "f8094c0525ffb55800b110a5fe4470146502a4cd70ccf886634ff3fca6561bd0",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
     # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "4aec8e65c5d6271e4a4c302c9b7030969ebbbbb0e4c2836498039026a2916259",  # 再冻结：grounding 门控去掉 enabled 判断
+    # services 归位声明（2026-09-30，批次 1）：`memory_refs` → `memory/refs` 导入路径变更 —— 非 TOOL-010 改脏。
+    "app/application/chat_pipeline.py": "ea741a875997bc9ce22c5bfb73fb3f070388594e1a58d3d557cc557903d8bc73",  # 再冻结：grounding 门控去掉 enabled 判断
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步

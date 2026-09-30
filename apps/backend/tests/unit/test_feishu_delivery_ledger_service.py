@@ -11,7 +11,7 @@ import pytest
 
 from app.channels.feishu import delivery
 from app.repositories import feishu_delivery_ledger_repository as repo
-from app.services import feishu_delivery_ledger_service as service
+from app.services.delivery import ledger as service
 
 
 @pytest.fixture(autouse=True)
@@ -64,7 +64,7 @@ async def test_claim_fail_open_when_store_unavailable(override_settings, monkeyp
         raise RuntimeError("db down")
 
     monkeypatch.setattr(repo, "claim", _boom)
-    with caplog.at_level(logging.WARNING, logger="app.services.feishu_delivery_ledger_service"):
+    with caplog.at_level(logging.WARNING, logger="app.services.delivery.ledger"):
         assert await service.claim("reply:om_fo:0") is True
     assert any("fail-open" in record.getMessage() for record in caplog.records)
 
@@ -78,7 +78,7 @@ async def test_release_failure_is_ignored(override_settings, monkeypatch, caplog
         raise RuntimeError("db down")
 
     monkeypatch.setattr(repo, "release", _boom)
-    with caplog.at_level(logging.WARNING, logger="app.services.feishu_delivery_ledger_service"):
+    with caplog.at_level(logging.WARNING, logger="app.services.delivery.ledger"):
         await service.release("reply:om_rf:0")
     assert any("release failed" in record.getMessage() for record in caplog.records)
 

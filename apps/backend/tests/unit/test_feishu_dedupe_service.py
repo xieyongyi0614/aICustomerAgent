@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.repositories import feishu_dedupe_ledger_repository
-from app.services import feishu_dedupe_service
+from app.services.delivery import dedupe as feishu_dedupe_service
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +46,7 @@ def test_claim_fail_open_when_store_unavailable(override_settings, monkeypatch, 
         raise RuntimeError("db down")
 
     monkeypatch.setattr(feishu_dedupe_ledger_repository, "claim", _boom)
-    with caplog.at_level(logging.WARNING, logger="app.services.feishu_dedupe_service"):
+    with caplog.at_level(logging.WARNING, logger="app.services.delivery.dedupe"):
         assert feishu_dedupe_service.claim("evt-boom") is True
     assert any("fail-open" in record.getMessage() for record in caplog.records)
 
@@ -84,7 +84,7 @@ def test_purge_failure_does_not_affect_claim(override_settings, monkeypatch, cap
         raise RuntimeError("purge down")
 
     monkeypatch.setattr(feishu_dedupe_ledger_repository, "purge_before", _boom)
-    with caplog.at_level(logging.WARNING, logger="app.services.feishu_dedupe_service"):
+    with caplog.at_level(logging.WARNING, logger="app.services.delivery.dedupe"):
         for index in range(feishu_dedupe_service.PURGE_EVERY):
             assert feishu_dedupe_service.claim(f"evt-pf-{index}") is True
     assert any("purge failed" in record.getMessage() for record in caplog.records)

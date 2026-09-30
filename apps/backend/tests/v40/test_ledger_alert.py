@@ -237,7 +237,7 @@ def test_deliver_failure_does_not_raise(setup):
         async def send(self, *args, **kwargs):
             raise RuntimeError("boom")
 
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     proactive_delivery.register_proactive_outbound(
         proactive_delivery.ProactiveOutbound(channel="web", send=Boom().send)
@@ -273,7 +273,7 @@ def test_evaluation_runs_in_background_cycle():
 
 
 def test_delivery_goes_through_outbound_gateway(setup):
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     calls = []
 

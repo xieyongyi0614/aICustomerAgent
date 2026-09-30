@@ -35,15 +35,13 @@ from app.repositories import (
 )
 from app.application.life_loop_context import memory_digest_var
 from app.services.tool.confirmation import non_todo_payload_kinds
-from app.services import (
-    life_loop_budget,
-    state_service,
-    goal_planning,
-    goal_arbitration,
-    goal_execution,
-    goal_observation,
-    autonomy_policy,
-)
+from app.services.life import budget as life_loop_budget
+from app.services import state_service
+from app.services import goal_planning
+from app.services import goal_arbitration
+from app.services import goal_execution
+from app.services import goal_observation
+from app.services import autonomy_policy
 from app.services.planning import engine as planning_engine
 from app.services.planning import observer as plan_observer
 from app.services.planning import executor_bridge as plan_executor_bridge

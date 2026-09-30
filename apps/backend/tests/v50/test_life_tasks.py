@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.api.v1 import tasks as tasks_api
-from app.services.tasks import task_service
+from app.services.life import tasks as task_service
 
 pytestmark = pytest.mark.unit
 

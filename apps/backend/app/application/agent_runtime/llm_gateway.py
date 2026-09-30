@@ -11,7 +11,7 @@ from datetime import datetime
 
 from app.core.settings import get_settings
 from app.models.observability import CallSite
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 
 logger = logging.getLogger(__name__)
 

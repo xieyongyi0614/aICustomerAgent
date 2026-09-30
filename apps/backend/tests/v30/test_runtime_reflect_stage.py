@@ -130,7 +130,7 @@ def _stub_insights(monkeypatch, insights):
 
 def _stub_budget(monkeypatch, *, degraded=False, granted=True):
     from app.application.agent_runtime import llm_gateway
-    from app.services import life_loop_budget
+    from app.services.life import budget as life_loop_budget
 
     monkeypatch.setattr(life_loop_budget, "is_degraded", lambda now=None: degraded)
     monkeypatch.setattr(

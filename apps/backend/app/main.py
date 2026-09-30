@@ -13,7 +13,7 @@ from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core import redis_client
 from app.core.settings import get_settings
-from app.services import proactive_delivery
+from app.services.delivery import outbound as proactive_delivery
 from app.services.tool import channel_tools
 from app.services.tool.ext_api import get_manifest_loader
 from app.application.life_loop import run_life_loop_worker
@@ -87,7 +87,7 @@ async def lifespan(application: FastAPI):
         # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
         # 故出站幂等的持久化实现只能在这里注入。**无开关**——跨进程幂等是必需能力，
         # 缺了它多实例下会重复回复用户。
-        from app.services import feishu_delivery_ledger_service
+        from app.services.delivery import ledger as feishu_delivery_ledger_service
 
         delivery.set_persistent_idempotency(
             feishu_delivery_ledger_service.claim,

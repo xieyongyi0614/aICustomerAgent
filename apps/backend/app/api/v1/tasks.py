@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.api.v1.auth import require_user
-from app.services.tasks import task_service
+from app.services.life import tasks as task_service
 
 tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
 

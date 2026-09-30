@@ -15,7 +15,7 @@ from typing import Any
 
 from app.application.agent_runtime.contracts import DEFAULT_CHARACTER_ID
 from app.repositories import loop_run_repository
-from app.services import domain_ledger
+from app.services.ledger import domain as domain_ledger
 
 
 def _row_mapping(row: Any) -> dict[str, Any]:

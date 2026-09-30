@@ -21,7 +21,7 @@ from app.application.agent_runtime.contracts import (
 )
 from app.core.settings import get_settings
 from app.models.agent_state import AgentStateSnapshot
-from app.services import domain_ledger
+from app.services.ledger import domain as domain_ledger
 
 FAST_DOMAINS: frozenset[str] = frozenset(
     {"mood", "energy", "intensity", "relationship"}

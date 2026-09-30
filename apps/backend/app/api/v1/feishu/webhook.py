@@ -13,7 +13,7 @@ from app.application import observability
 from app.channels.feishu import adapter, events, shards
 from app.channels.feishu.errors import FeishuAuthError, FeishuConfigError
 from app.core.settings import get_settings
-from app.services import feishu_dedupe_service
+from app.services.delivery import dedupe as feishu_dedupe_service
 
 logger = logging.getLogger(__name__)
 

@@ -383,7 +383,7 @@ def run_risk_gates(
     Action 检定在 V9 执行链内进行（本处只声明 delegated，不冒充通过）；
     其余三闸逐候选给出真实判定与理由。
     """
-    from app.services.llm_budget_gate import preview_budget
+    from app.services.life.gate import preview_budget
 
     for candidate in candidates:
         gates = [

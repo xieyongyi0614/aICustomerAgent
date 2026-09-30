@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.core.settings import get_settings
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 
 
 @dataclass(frozen=True, slots=True)

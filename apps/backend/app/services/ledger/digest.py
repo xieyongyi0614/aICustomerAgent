@@ -175,7 +175,7 @@ def deliver_for_user(
 ) -> SendResult:
     from app.models.autonomy import ProactiveAction
     from app.repositories import proactive_repository
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     try:
         action = ProactiveAction(

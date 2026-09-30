@@ -18,7 +18,8 @@ from app.repositories import (
     loop_run_repository,
     trigger_registry_repository as trigger_repo,
 )
-from app.services import life_loop_budget, trigger_evaluator
+from app.services.life import budget as life_loop_budget
+from app.services import trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 USER = "life-budget-user"

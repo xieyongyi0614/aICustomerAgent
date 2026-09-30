@@ -21,7 +21,8 @@ from app.repositories import (
     agent_state_snapshot_repository,
 )
 from app.character.asuna import evolution as persona_evolution
-from app.services import evolution, trigger_evaluator
+from app.services.development import evolution
+from app.services import trigger_evaluator
 from tests.conftest import TEST_USER_ID
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)

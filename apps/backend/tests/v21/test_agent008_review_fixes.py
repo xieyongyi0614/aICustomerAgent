@@ -26,7 +26,9 @@ from app.repositories import (
     goal_repository,
     personality_state_repository,
 )
-from app.services import decision_pipeline, evolution, goal_stack
+from app.services import decision_pipeline
+from app.services.development import evolution
+from app.services import goal_stack
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "review-fix-user"

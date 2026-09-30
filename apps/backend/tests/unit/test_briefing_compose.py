@@ -10,7 +10,7 @@ import pytest
 from app.repositories import briefing_preference_repository
 from app.services import weather
 from app.services.briefing import compose
-from app.services.tasks import task_service
+from app.services.life import tasks as task_service
 
 
 def _snapshot():

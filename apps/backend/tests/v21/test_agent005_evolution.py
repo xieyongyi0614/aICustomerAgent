@@ -19,7 +19,7 @@ from app.repositories import (
     goal_repository,
     personality_state_repository,
 )
-from app.services import evolution
+from app.services.development import evolution
 
 NOW = datetime(2026, 9, 13, 12, 0, 0)
 USER = "evo-user"
@@ -35,7 +35,7 @@ def _seed_personality(user_id=USER):
 
 
 def _insight(statement, insight_id=None, created_at=NOW):
-    from app.services import evolution as evolution_service
+    from app.services.development import evolution as evolution_service
 
     row = InsightRow(
         id=insight_id or str(uuid4()),

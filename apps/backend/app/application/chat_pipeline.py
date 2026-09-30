@@ -63,7 +63,7 @@ from app.chains.answer_chain import answer_max_tokens
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import build_action_context
 from app.services.behavior_engine import RelationshipBehaviorContext
-from app.services.memory_refs import build_memory_refs
+from app.services.memory.refs import build_memory_refs
 
 logger = logging.getLogger(__name__)
 

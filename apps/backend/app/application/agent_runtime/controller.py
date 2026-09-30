@@ -28,8 +28,8 @@ from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
 from app.application import logical_clock
 from app.repositories import llm_call_repository, loop_run_repository
-from app.services import life_loop_budget
-from app.services import outbox_service
+from app.services.life import budget as life_loop_budget
+from app.services.delivery import outbox as outbox_service
 
 logger = logging.getLogger(__name__)
 

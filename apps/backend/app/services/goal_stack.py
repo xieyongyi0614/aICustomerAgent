@@ -136,7 +136,7 @@ def run_goal_stack_stage(user_id: str, run, now: datetime | None = None) -> dict
 
 def _apply_evolution_rebalance(user_id: str, now: datetime) -> list[str]:
     try:
-        from app.services import evolution
+        from app.services.development import evolution
 
         proposals = evolution.propose_rebalance(user_id, now)
         if not proposals:

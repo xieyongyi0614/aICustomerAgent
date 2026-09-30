@@ -132,7 +132,7 @@ def test_deliver_failure_does_not_raise(monkeypatch, settings):
         async def send(self, *args, **kwargs):
             raise RuntimeError("boom")
 
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     proactive_delivery.register_proactive_outbound(
         proactive_delivery.ProactiveOutbound(channel="web", send=Boom().send)
@@ -194,7 +194,7 @@ def test_digest_records_proactive_action(settings):
 
 
 def test_digest_delivered_via_outbound_gateway(monkeypatch, settings):
-    from app.services import proactive_delivery
+    from app.services.delivery import outbound as proactive_delivery
 
     calls = []
 

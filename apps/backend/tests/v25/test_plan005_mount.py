@@ -13,7 +13,8 @@ from app.application import life_loop
 from app.application.agent_runtime import profiles
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.repositories import goal_repository, loop_run_repository
-from app.services import goal_observation, life_loop_budget
+from app.services import goal_observation
+from app.services.life import budget as life_loop_budget
 from app.services.planning import observer as plan_observer
 from app.services.planning.observer import PlanObserver
 

@@ -21,7 +21,8 @@ from app.repositories import (
 )
 from app.models.goal import GoalRecord
 from app.repositories import goal_repository
-from app.services import life_loop_budget, trigger_evaluator
+from app.services.life import budget as life_loop_budget
+from app.services import trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 USER = "life-memory-user"

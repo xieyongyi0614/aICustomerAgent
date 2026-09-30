@@ -39,7 +39,7 @@ from app.repositories import (
     goal_repository,
     loop_run_repository,
 )
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 from app.services.planning import observer as plan_observer
 from app.services.planning import scheduler as plan_scheduler
 from app.services.tool import registry as tool_registry_module

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models.memory import UserMemory
-from app.services.memory_refs import MEMORY_REF_LABEL_MAX, build_memory_refs, memory_ref_label
+from app.services.memory.refs import MEMORY_REF_LABEL_MAX, build_memory_refs, memory_ref_label
 
 pytestmark = pytest.mark.unit
 

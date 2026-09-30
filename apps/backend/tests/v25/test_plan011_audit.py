@@ -21,7 +21,7 @@ from app.models.plan import (
     PlanRevision,
 )
 from app.repositories import decision_repository, goal_repository
-from app.services import life_loop_budget
+from app.services.life import budget as life_loop_budget
 from app.services.planning import observer as plan_observer
 
 from . import plan011_support as support

@@ -223,11 +223,9 @@ class TestIntegration:
     ):
         from app.channels.feishu import delivery
         from app.core.db import Base
-        from app.services import (
-            channel_identity_service,
-            proactive_delivery,
-            proactive_executor,
-        )
+        from app.services import channel_identity_service
+        from app.services.delivery import outbound as proactive_delivery
+        from app.services import proactive_executor
 
         def _identity_rows():
             with db_session_factory() as session:
