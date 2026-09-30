@@ -12,7 +12,7 @@ from tests.support.schema_pins import MIGRATION_HEAD
 import pytest
 
 from app.repositories import goal_repository
-from app.services.memory import policy as policy_gate
+from app.engines import memory_policy as policy_gate
 from app.services.planning import memory_policy as plan_memory_policy
 from app.services.planning import observer as observer_mod
 from app.services.tool import memory_policy as tool_memory_policy
@@ -187,7 +187,7 @@ class TestFrozenContracts:
 
     def test_memory_policy_rule_codes_and_reasons_are_frozen(self):
         repo_root = support.repo_root()
-        text = (repo_root / "app" / "services" / "memory" / "policy.py").read_text(
+        text = (repo_root / "app" / "engines" / "memory_policy.py").read_text(
             encoding="utf-8"
         )
         for anchor in (

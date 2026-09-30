@@ -259,7 +259,7 @@ class TestWorldAndPlanMemoryChannelsStayIndependent:
                 imports[path.name] = subset
         assert imports == {
             "context.py": {"app.services.memory": ["retriever"]},
-            "memory_policy.py": {"app.services.memory": ["commands", "ingest", "policy"]},
+            "memory_policy.py": {"app.services.memory": ["commands", "ingest"]},
         }
         module = support.module_path("memory_policy.py")
         assert scan.called_attributes(module, "memory_ingest") == {

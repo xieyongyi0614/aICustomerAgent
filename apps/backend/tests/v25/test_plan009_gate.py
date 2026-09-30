@@ -12,7 +12,7 @@ import pytest
 from app.models.goal import GoalPlanRecord
 from app.models.plan import PlanAdvance
 from app.repositories import goal_repository
-from app.services.memory import policy as policy_gate
+from app.engines import memory_policy as policy_gate
 from app.services.planning import memory_policy as plan_memory_policy
 from app.services.planning import observer as observer_mod
 from app.services.planning.observer import PlanObserver

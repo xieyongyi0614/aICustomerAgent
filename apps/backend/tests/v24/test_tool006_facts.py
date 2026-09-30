@@ -10,7 +10,7 @@ from app.application import autonomy_engine
 from app.models.action import ActionRecord
 from app.models.autonomy import AutonomyVerdict, TriggerSignal
 from app.repositories import action_repository
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 from app.services.tool.health import ToolHealthTracker
 from app.services.tool.registry import ToolRegistry
 from tests.v24.tool006_support import (

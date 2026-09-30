@@ -277,7 +277,7 @@ def _run_foreground_decision(
     目标栈为只读模式（铁律 4：长期化写入只发生在后台）。
     """
     try:
-        from app.services import decision_pipeline
+        from app.engines import decision as decision_pipeline
         from app.services.goal import stack as goal_stack_service
 
         stack = goal_stack_service.evaluate_stack(

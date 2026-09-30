@@ -13,7 +13,7 @@ from app.core.settings import get_settings
 from app.models.action import ActionIntent
 from app.repositories import conversation_repository, goal_repository
 from app.services.goal import observation as goal_observation
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 
 logger = logging.getLogger(__name__)
 

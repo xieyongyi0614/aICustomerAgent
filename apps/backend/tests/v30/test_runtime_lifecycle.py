@@ -406,7 +406,7 @@ class TestRepositoryAccessLayering:
         assert callable(action_manager.get_record)
 
     def test_services_do_not_import_agent_runtime(self):
-        from app.services import decision_pipeline
+        from app.engines import decision as decision_pipeline
         from app.services.ledger import domain as domain_ledger
         from app.services.life import gate as llm_budget_gate
         from app.services.planning import context as plan_context
@@ -563,7 +563,7 @@ class TestNoPrivateServiceApi:
 
     def test_public_facades_exist_and_delegate(self):
         from app.application import life_loop
-        from app.services import decision_pipeline
+        from app.engines import decision as decision_pipeline
         from app.services.life import budget as life_loop_budget
         from app.services.reflection import triggers
 

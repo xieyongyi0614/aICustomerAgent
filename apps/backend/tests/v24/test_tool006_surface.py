@@ -4,7 +4,7 @@ import pytest
 
 from app.application import autonomy_engine
 from app.application.agent_runtime import profiles
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.tool import registry as tool_registry_module
 from tests.v24.tool006_support import (
     LATE_NIGHT,

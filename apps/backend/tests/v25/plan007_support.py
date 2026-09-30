@@ -14,7 +14,7 @@ from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.models.observability import DecisionKind, DecisionRecord
 from app.models.plan import PlanAdvance
 from app.repositories import decision_repository, goal_repository
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 
 NOW = datetime(2026, 9, 16, 12, 0, 0)
 

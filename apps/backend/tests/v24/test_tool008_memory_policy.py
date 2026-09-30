@@ -348,7 +348,7 @@ def test_render_returns_empty_without_template():
 
 def test_templates_never_trigger_r8_unresolved_reference():
     """P1-3 回归护栏：模板文案自身不得命中 R8，否则该工具的记忆通道会恒定零产出。"""
-    from app.services.memory import policy as v9_memory_policy
+    from app.engines import memory_policy as v9_memory_policy
 
     for key, template in TOOL_MEMORY_TEMPLATES.items():
         assert not v9_memory_policy.UNRESOLVED_REFERENCE_PATTERN.search(template), (

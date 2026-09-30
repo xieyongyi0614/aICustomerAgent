@@ -26,7 +26,7 @@ from app.repositories import (
     goal_repository,
     personality_state_repository,
 )
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.development import evolution
 from app.services.goal import stack as goal_stack
 

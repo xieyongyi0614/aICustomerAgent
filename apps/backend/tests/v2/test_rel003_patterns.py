@@ -14,7 +14,7 @@ from app.models.conversation import ConversationState
 from app.models.development import RelationshipPattern
 from app.prompts.builder import PromptBuilder
 from app.services.relationship import patterns as relationship_patterns
-from app.services.autonomy_policy import PolicySnapshot, effective_interval_minutes
+from app.engines.autonomy import PolicySnapshot, effective_interval_minutes
 from app.services.development import aggregate
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)

@@ -8,7 +8,7 @@ from typing import Any
 
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
-from app.services.autonomy_policy import in_quiet_hours
+from app.engines.autonomy import in_quiet_hours
 from app.services.ledger.format import format_minor
 from app.services.ledger.query import Period, list_entries, summary, top_categories
 

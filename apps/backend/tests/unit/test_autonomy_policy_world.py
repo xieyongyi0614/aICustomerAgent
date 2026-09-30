@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 from app.models.autonomy import TriggerSignal
-from app.services.autonomy_policy import PolicySnapshot, evaluate
+from app.engines.autonomy import PolicySnapshot, evaluate
 
 NOW = datetime(2026, 9, 1, 14, 0)
 USER = "default-user"

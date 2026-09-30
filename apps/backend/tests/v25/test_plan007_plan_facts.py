@@ -18,7 +18,7 @@ from app.core.settings import get_settings
 from app.models.goal import SubGoalSpec
 from app.models.plan import PLAN_ADVANCE_DECISIONS
 from app.repositories import decision_repository, goal_repository
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 
 from . import plan007_support as support
 

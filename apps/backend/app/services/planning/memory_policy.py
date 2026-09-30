@@ -88,7 +88,7 @@ from app.core.settings import get_settings
 from app.models.memory import MemoryCandidate
 from app.models.plan import PLAN_STEP_DEDUPE_KEY_TEMPLATE
 from app.repositories import action_repository, memory_repository
-from app.services.memory import policy as memory_policy_gate
+from app.engines import memory_policy as memory_policy_gate
 from app.services.memory import commands as memory_commands
 from app.services.memory import ingest as memory_ingest
 from app.services.tool import memory_policy as tool_memory_policy

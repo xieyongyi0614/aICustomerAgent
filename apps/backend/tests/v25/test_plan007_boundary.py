@@ -24,7 +24,8 @@ from app.models.observability import DecisionKind
 from app.models.plan import PlanAdvance, PlanStepOutcome
 from app.models.tool import ToolResult
 from app.repositories import action_repository, goal_repository, proactive_repository
-from app.services import autonomy_policy, decision_pipeline
+from app.engines import autonomy as autonomy_policy
+from app.engines import decision as decision_pipeline
 from app.services.planning.executor_bridge import PlanExecutorBridge
 from app.services.planning.observer import PlanObserver, PlanSettlement
 from app.services.planning.scheduler import PlanScheduler
@@ -36,9 +37,9 @@ USER = support.USER
 NOW = support.NOW
 
 AUTONOMY_MODULES = (
-    "app/services/autonomy_policy.py",
+    "app/engines/autonomy.py",
     "app/application/autonomy_engine.py",
-    "app/services/decision_pipeline.py",
+    "app/engines/decision.py",
     "app/services/autonomy/trigger.py",
 )
 
@@ -165,7 +166,7 @@ class TestBoundaryStaticAssertions:
 
     def test_the_policy_layer_stays_pure(self):
         """D3 / D9：`autonomy_policy.py` 零仓储导入、零 IO（纯函数 + 纯数据）。"""
-        path = _scan("app/services/autonomy_policy.py")[0]
+        path = _scan("app/engines/autonomy.py")[0]
         imported = _imported_modules(path)
         assert not [
             module for module in imported if module.startswith("app.repositories")
@@ -185,9 +186,9 @@ class TestBoundaryStaticAssertions:
 
     def test_planning_never_imports_the_autonomy_stack(self):
         forbidden = (
-            "app.services.autonomy_policy",
+            "app.engines.autonomy",
             "app.application.autonomy_engine",
-            "app.services.decision_pipeline",
+            "app.engines.decision",
             "app.services.autonomy.executor",
             "app.repositories.proactive_repository",
         )

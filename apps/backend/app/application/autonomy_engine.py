@@ -41,7 +41,7 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 from app.services.goal import service as goal_service
 from app.services.autonomy import executor as proactive_executor
 from app.services.conversation import scene as scene_service
@@ -538,7 +538,7 @@ def _pipeline_intention(
     """
     try:
         from app.application import agent_state_context
-        from app.services import decision_pipeline
+        from app.engines import decision as decision_pipeline
         from app.services.goal import stack as goal_stack_service
 
         stack = goal_stack_service.evaluate_stack(user_id, now)

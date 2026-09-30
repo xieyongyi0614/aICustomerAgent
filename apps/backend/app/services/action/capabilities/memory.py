@@ -7,7 +7,7 @@ from app.models.action import ActionSchema, CapabilityResult
 from app.models.memory import MemoryCandidate
 from app.repositories import memory_repository
 from app.services.action.registry import ExecutionContext
-from app.services.memory import policy as memory_policy
+from app.engines import memory_policy
 
 
 class MemoryCapability:

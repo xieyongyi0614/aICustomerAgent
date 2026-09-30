@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
 from app.models.autonomy import TriggerSignal
-from app.services.autonomy_policy import (
+from app.engines.autonomy import (
     PolicySnapshot,
     effective_interval_minutes,
     evaluate,

@@ -41,7 +41,7 @@ from app.services.goal import planning as goal_planning
 from app.services.goal import arbitration as goal_arbitration
 from app.services.goal import execution as goal_execution
 from app.services.goal import observation as goal_observation
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 from app.services.planning import engine as planning_engine
 from app.services.planning import observer as plan_observer
 from app.services.planning import executor_bridge as plan_executor_bridge

@@ -15,7 +15,7 @@
 > `test_the_reused_row_would_be_rejected_by_r1`（若不覆盖 `source`，R1 会拒收）。
 """
 
-from app.services.memory import policy as policy_gate
+from app.engines import memory_policy as policy_gate
 from app.services.planning import memory_policy as plan_memory_policy
 from app.services.tool import memory_policy as tool_memory_policy
 

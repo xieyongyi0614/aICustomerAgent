@@ -22,7 +22,7 @@ from app.repositories import (
     proactive_repository,
 )
 from app.services.conversation import service as conversation_service
-from app.services.autonomy_policy import PolicySnapshot, evaluate
+from app.engines.autonomy import PolicySnapshot, evaluate
 from app.models.autonomy import TriggerSignal
 
 NOW = datetime(2026, 8, 30, 14, 0)

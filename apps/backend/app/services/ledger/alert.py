@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
-from app.services.autonomy_policy import in_quiet_hours
+from app.engines.autonomy import in_quiet_hours
 from app.services.ledger.budget import (
     REASON_NEAR_LIMIT,
     REASON_NO_DATA,

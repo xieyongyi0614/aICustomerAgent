@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models.autonomy import TriggerSignal
-from app.services.autonomy_policy import (
+from app.engines.autonomy import (
     PolicySnapshot,
     _apply_relationship_rules,
     effective_interval_minutes,

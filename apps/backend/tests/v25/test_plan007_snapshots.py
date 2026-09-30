@@ -23,7 +23,8 @@ from app.core.settings.plan import PlanSettings
 from app.models.observability import DecisionKind
 from app.application import autonomy_engine
 from app.repositories import goal_repository
-from app.services import autonomy_policy, decision_pipeline
+from app.engines import autonomy as autonomy_policy
+from app.engines import decision as decision_pipeline
 
 from . import _plan_scan as scan
 from . import plan007_support as support
@@ -426,8 +427,8 @@ class TestSingleAssemblyPoint:
 
     def test_no_other_module_assembles_the_packet(self):
         modules = (
-            "app/services/autonomy_policy.py",
-            "app/services/decision_pipeline.py",
+            "app/engines/autonomy.py",
+            "app/engines/decision.py",
             "app/application/life_loop.py",
         )
         for relative in modules:

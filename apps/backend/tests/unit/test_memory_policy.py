@@ -1,8 +1,8 @@
 import pytest
 
 from app.models.memory import MemoryCandidate
-from app.services.memory import policy as memory_policy
-from app.services.memory.policy import (
+from app.engines import memory_policy
+from app.engines.memory_policy import (
     DECISION_DISCARD,
     DECISION_PRIVACY,
     DECISION_SAVE,

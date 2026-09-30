@@ -11,7 +11,7 @@ from app.models.evaluation import (
     IssueCode,
     build_issue,
 )
-from app.services.autonomy_policy import (
+from app.engines.autonomy import (
     PolicySnapshot,
     effective_interval_minutes,
     in_quiet_hours,

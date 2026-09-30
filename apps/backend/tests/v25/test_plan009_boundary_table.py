@@ -148,7 +148,7 @@ class TestPureFunctionDiscipline:
 
     def test_decide_touches_no_repository_policy_or_ingest_surface(self, monkeypatch):
         from app.repositories import action_repository, memory_repository
-        from app.services.memory import policy as policy_gate
+        from app.engines import memory_policy as policy_gate
         from app.services.memory import ingest as ingest_mod
 
         def _boom(*args, **kwargs):

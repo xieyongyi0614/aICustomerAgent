@@ -386,7 +386,7 @@ def test_plan_006_lands_the_two_gate_predicates_without_a_new_module():
 def test_plan_007_lands_the_two_faces_without_a_new_module():
     """PLAN-007 产物面：调制 + 装配函数在位，且**没有**为自治集成新建模块。"""
     from app.application import autonomy_engine
-    from app.services import autonomy_policy
+    from app.engines import autonomy as autonomy_policy
 
     assert [
         name
@@ -404,7 +404,7 @@ def test_plan_007_lands_the_two_faces_without_a_new_module():
 
 def test_plan_007_packet_contract_is_seven_bounded_keys():
     """PLAN-007 的契约演进留痕：`plan_facts` 七键（原六键 + 当前步动作身份）。"""
-    from app.services import autonomy_policy
+    from app.engines import autonomy as autonomy_policy
 
     assert autonomy_policy.PLAN_FACTS_KEYS == (
         "active_goal_id",

@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from app.core.settings import get_settings
 from app.models.autonomy import AutonomyVerdict
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 
 from . import plan007_support as support
 

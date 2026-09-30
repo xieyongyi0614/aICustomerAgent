@@ -11,7 +11,7 @@ test_proactive_executor / test_auto005_proactive_delivery / test_proactive_repos
 from datetime import datetime, timedelta
 
 from app.models.autonomy import TriggerSignal
-from app.services.autonomy_policy import PolicySnapshot, evaluate
+from app.engines.autonomy import PolicySnapshot, evaluate
 
 NOW = datetime(2026, 8, 30, 14, 0)
 

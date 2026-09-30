@@ -337,7 +337,7 @@ def install_delivery_probe(monkeypatch, *, ingest_content: str | None = None) ->
     `ingest_content=None` 时摄取探针返回桩行（内容由用例给定）；给 `""` 即模拟「无候选行」。
     """
     from app.repositories import memory_repository as repo
-    from app.services.memory import policy as policy_gate
+    from app.engines import memory_policy as policy_gate
     from app.services.memory import ingest as ingest_mod
 
     probe = DeliveryProbe()

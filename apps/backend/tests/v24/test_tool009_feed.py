@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.core.settings import get_settings
-from app.services import autonomy_policy
-from app.services import decision_pipeline
+from app.engines import autonomy as autonomy_policy
+from app.engines import decision as decision_pipeline
 from app.services.reflection import tool_feed
 from app.services.reflection import triggers
 from tests.v24.tool009_support import (

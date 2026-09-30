@@ -24,7 +24,7 @@ from app.repositories import (
     outbox_repository,
     world_repository,
 )
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.autonomy import trigger as trigger_evaluator
 from app.services.action.executor import ActionExecutor
 from app.services.tool.executor import ToolExecutor

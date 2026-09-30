@@ -19,7 +19,7 @@ from app.models.action import ActionResult
 from app.models.memory import MemoryCandidate, MemoryType
 from app.repositories import memory_repository
 from app.services.memory import ingest as memory_ingest
-from app.services.memory import policy as memory_policy
+from app.engines import memory_policy
 from app.services.action import memory_bridge
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.world import memory_bridge as world_memory_bridge
@@ -42,7 +42,9 @@ OBJECT_PARAMS = {"object": "牛奶"}
 FROZEN_SOURCES: dict[str, str] = {
     # memory 域清理（2026-09-29）：文件由 services/memory_policy.py 归位至
     # services/memory/policy.py，内容逐字节未变（摘要不变），仅键路径更新。
-    "app/services/memory/policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
+    # services 归位批次 4（2026-09-30）：再由 services/memory/policy.py 归位至
+    # engines/memory_policy.py，内容仍逐字节未变（摘要不变），仅键路径更新。
+    "app/engines/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
     "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非

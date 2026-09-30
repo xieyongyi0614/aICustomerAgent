@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.goal import stack as goal_stack
 from app.services.life import gate as llm_budget_gate
 

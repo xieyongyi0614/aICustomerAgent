@@ -11,7 +11,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.goal import stack as goal_stack
 from app.services.planning import goal_contract
 
@@ -145,10 +145,10 @@ class TestNoNewCandidateSource:
 
     def test_the_planning_package_does_not_import_the_pipeline(self):
         """反向也零依赖：计划层不得消费决策管线（职责不交叉）。"""
-        assert "app.services.decision_pipeline" not in scan.imported_modules(
+        assert "app.engines.decision" not in scan.imported_modules(
             scan.PLANNING_PACKAGE_DIR / "goal_contract.py"
         )
-        assert "app.services.decision_pipeline" not in scan.imported_modules(
+        assert "app.engines.decision" not in scan.imported_modules(
             scan.PLANNING_PACKAGE_DIR / "observer.py"
         )
 

@@ -15,7 +15,7 @@ from app.application.action_engine import (
 from app.application.action_engine import new_record
 from app.models.action import ActionIntent
 from app.repositories import action_repository
-from app.services.autonomy_policy import (
+from app.engines.autonomy import (
     AutonomyVerdict,
     PolicySnapshot,
     _apply_action_adjustments,

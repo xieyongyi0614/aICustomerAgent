@@ -7,7 +7,7 @@ P0（scheduled_followup）/P1（action_due）覆盖普通冷却；P2/P3 不覆�
 from datetime import datetime, timedelta
 
 from app.models.autonomy import TriggerSignal
-from app.services.autonomy_policy import (
+from app.engines.autonomy import (
     PolicySnapshot,
     evaluate,
     trigger_priority,

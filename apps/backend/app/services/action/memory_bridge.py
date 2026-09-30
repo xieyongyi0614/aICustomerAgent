@@ -20,7 +20,7 @@ from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.models.memory import MemoryCandidate
 from app.models.tool import ToolDefinition
-from app.services.memory import policy as memory_policy
+from app.engines import memory_policy
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.tool.registry import get_tool_registry
 

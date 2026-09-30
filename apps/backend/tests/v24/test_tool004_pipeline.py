@@ -9,7 +9,7 @@ from app.character.asuna.action import ACTION_CAPABILITY_MAP, ACTION_TOOL_MAP
 from app.application import post_process
 from app.models.action import ActionIntent
 from app.models.tool import ToolSurface
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.action import planner
 from app.services.tool.context import WORLD_ENABLED_KEY, ToolContext
 from app.services.tool.surface import ToolSurfaceResolver

@@ -597,7 +597,7 @@ def _run_tool_decision(
     ctx: PostProcessContext, surface, goal_id: str | None, now: datetime
 ) -> dict | None:
     """把工具面作为 capability 候选接入既有决策管线（纯评分 + 审计；不改变前台回复）。"""
-    from app.services import decision_pipeline
+    from app.engines import decision as decision_pipeline
 
     if not surface.tool_ids:
         return None

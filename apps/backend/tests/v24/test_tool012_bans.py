@@ -174,7 +174,7 @@ def test_ban_no_second_memory_write_channel(monkeypatch):
     get_settings.cache_clear()
 
     from app.repositories import memory_repository
-    from app.services.memory import policy as memory_policy
+    from app.engines import memory_policy
     from app.services.action import memory_bridge
 
     calls: list[str] = []

@@ -8,7 +8,7 @@ from app.application import world_engine
 from app.application.agent_runtime import trigger_router
 from app.core.settings import get_settings
 from app.repositories import world_repository
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.goal import planning as goal_planning
 from app.services.world import event_impact
 

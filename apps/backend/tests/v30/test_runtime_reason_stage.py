@@ -36,7 +36,7 @@ from app.application.agent_runtime.stages.reason import (
     reason,
 )
 from app.models.agent_state import AgentStateSnapshot
-from app.services import decision_pipeline
+from app.engines import decision as decision_pipeline
 from app.services.goal import stack as goal_stack_service
 
 REASON_PATH = Path(reason_module.__file__)

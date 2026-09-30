@@ -26,7 +26,7 @@ from app.application import autonomy_engine
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.repositories import action_repository
-from app.services import autonomy_policy
+from app.engines import autonomy as autonomy_policy
 from app.services.planning.executor_bridge import PlanExecutorBridge
 
 from . import plan007_support as support
