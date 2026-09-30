@@ -2,18 +2,13 @@
 
 边界表逐格、source 只允许 user_stated/user_derived（ai_inferred 零出现）、
 remember_fact 双写跳过、effects 幂等、失败委托沉淀与补救提示。
+投递经 v2 摄取通道 `ingest_from_action_record`（V9-007 闸随死路径清理迁入）。
 """
-
-from datetime import datetime
-
-import pytest
 
 from app.application.action_engine import new_record
 from app.models.action import ActionIntent
-from app.services.action.memory_bridge import (
-    deliver_action_memory,
-    to_memory_candidates,
-)
+from app.services.action.memory_bridge import to_memory_candidates
+from app.services.memory import ingest as memory_ingest
 
 
 def _record(action_type, status, **params):
@@ -78,29 +73,25 @@ def test_failed_important_delegation_deposits():
 def test_remember_fact_succeeded_no_double(override_settings, db_session_factory):
     override_settings(action_memory_policy_enabled=True)
     rec = _record("remember_fact", "succeeded", fact="我喜欢猫")
-    # 边界表有 remember_fact 行，但能力已写入记忆本体 → 投递跳过（防双写）
-    assert deliver_action_memory(rec, "mem-user") is None
+    # 边界表有 remember_fact 行，但能力已写入记忆本体 → 候选跳过（防双写）
+    assert memory_ingest.ingest_from_action_record(rec) is None
 
 
-@pytest.mark.asyncio
-async def test_deliver_actual_deposit(override_settings, db_session_factory):
-    from app.repositories import memory_repository
-
+def test_boundary_deposit_creates_candidate(override_settings, db_session_factory):
     override_settings(action_memory_policy_enabled=True)
     rec = _reminder(content="提醒吃药")
-    payload = deliver_action_memory(rec, "mem-user")
-    if payload is None:
-        return
-    memory = memory_repository.get_memory(payload["memory_id"])
-    assert memory is not None
-    assert memory.source in ("user_stated", "user_derived")
+    row = memory_ingest.ingest_from_action_record(rec)
+    assert row is not None
+    assert row.source_table == "action_records"
+    assert row.source_id == rec.id
+    assert row.source in ("user_stated", "user_derived")
 
 
-def test_deliver_idempotent_when_effect_registered(override_settings, db_session_factory):
+def test_idempotent_when_effect_registered(override_settings, db_session_factory):
     override_settings(action_memory_policy_enabled=True)
     rec = _reminder(content="提醒吃药")
     rec.result = {
         "status": "succeeded",
         "effects": [{"kind": "memory", "ref": "m1", "detail": "已记住"}],
     }
-    assert deliver_action_memory(rec, "mem-user") is None
+    assert memory_ingest.ingest_from_action_record(rec) is None

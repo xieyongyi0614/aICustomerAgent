@@ -73,18 +73,6 @@ RECOVERY_LEXICON: tuple[str, ...] = (
     "我不是故意的",
 )
 
-MEMORY_TEMPLATES: dict[str, str] = {
-    "first_self_disclosure": "TA 第一次向我敞开心扉，说起了{cause}。",
-    "first_support_in_distress": "我最低落的时候，是 TA 陪着我。",
-    "first_promise_kept": "TA 答应过我的事，做到了。",
-    "first_shared_activity": "我们一起完成过一件事。",
-    "first_conflict": "我们争吵过，为了{cause}。",
-    "conflict": "我们争吵过，为了{cause}。",
-    "reconciled": "我们和好了。经过那次争吵，我更珍惜现在的相处。",
-    "promise_broken": "TA 曾答应我的事没有做到。",
-    "boundary_violation": "TA 曾越过我的边界。",
-}
-
 CONFLICT_DIRECTIVES: dict[str, str] = {
     "strain": "最近气氛有些微妙，说话留意分寸。",
     "conflict": "刚发生了不愉快，语气保持克制，不假装无事发生。",

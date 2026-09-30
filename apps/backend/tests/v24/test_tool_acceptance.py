@@ -173,32 +173,13 @@ def test_observation_persists_structured_keys(monkeypatch):
     assert "payload" in payload, "兼容双写必须保留旧 payload 读键"
 
 
-def test_tool_memory_delivery_never_falls_back_to_legacy(monkeypatch):
-    """工具记忆子闸已转正删除：投递恒走工具路径，不回退 legacy。"""
-    support.apply_flag_env(monkeypatch, support.group_env())
+def test_tool_memory_delivery_never_falls_back_to_legacy():
+    """工具记忆子闸已转正删除：legacy 直写路径已物理删除（静态守卫防复活）。"""
     from app.services.action import memory_bridge
 
-    calls: list[str] = []
-    monkeypatch.setattr(
-        memory_bridge, "deliver_action_memory", lambda *a, **k: calls.append("legacy")
+    assert not hasattr(memory_bridge, "deliver_action_memory"), (
+        "工具路径不得回退 legacy 投递"
     )
-
-    from app.models.action import ActionRecord
-
-    record = ActionRecord(
-        id="act-tool012-memory",
-        user_id="u-tool012",
-        character_id="asuna",
-        session_id="s-tool012",
-        action_type="create_reminder",
-        status="succeeded",
-        params={"content": "开会"},
-        dedupe_key="tool012-memory",
-        steps=[{"index": 0, "tool_id": "builtin.reminder.create", "status": "succeeded"}],
-    )
-    memory_bridge.deliver(record, "u-tool012")
-
-    assert calls == [], "工具路径不得回退 legacy 投递"
 
 
 

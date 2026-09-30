@@ -289,11 +289,9 @@ def test_integrate_result_flag_on_uses_generalized_path(
         calls.append((record_.id, user_id, character_id))
         return original(record_, user_id, character_id)
 
-    def _unexpected(*args, **kwargs):
-        raise AssertionError("子闸 on 时不应回退 action_type 旧路径")
-
     monkeypatch.setattr(memory_bridge, "deliver", _spy)
-    monkeypatch.setattr(memory_bridge, "deliver_action_memory", _unexpected)
+    # legacy 直写路径已物理删除（memory 域清理），静态守卫防复活
+    assert not hasattr(memory_bridge, "deliver_action_memory")
     rec = _tool_record("builtin.reminder.cancel", CANCEL_PARAMS)
     action_engine.integrate_result(rec, ActionResult(status="succeeded", effects=[]))
     assert calls == [(rec.id, USER, "asuna")]

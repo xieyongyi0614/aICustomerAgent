@@ -369,7 +369,32 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 - `e2e/test_debug_correlation`：提示词快照随 trace flush（post_process **结束**后）落库，测试原以「第 9 步评估可见」近似「flush 完成」——第 2 批时 9→12 步间隙极小碰巧赶上，收尾步拉大窗口后必输竞争 → 测试改为等待 answer 快照可查（附声明）。
 - `v2/test_v2_all_flags_smoke`、`e2e/test_chat_http_integration`、`e2e/test_debug_state_history`、`v7.8/test_performance`：全量并发下偶发、隔离复跑通过 → 负载 flaky（前两者与 memory 域无关联；后两者为台账 §4.2 在案的同类）。
 
-**附带残留（待后续批次裁决）**：`action/memory_bridge.deliver_action_memory`（V9 边界表投递路径）自 TOOL-008 起生产零调用，是 action 桥内**最后一个直写 memories 的函数**（`tests/v9` 仍以其为夹具测 R1~R8）；建议后续批次删除并迁移测试夹具到 `deliver` / `ingest_from_action_record`。
+**附带残留（✅ 已于 2026-09-30 第 4 批执行，见 §5.4）**：`action/memory_bridge.deliver_action_memory`（V9 边界表投递路径）自 TOOL-008 起生产零调用，是 action 桥内**最后一个直写 memories 的函数**（`tests/v9` 仍以其为夹具测 R1~R8）；已删除并将 V9-007 三闸迁入 `ingest_from_action_record`，测试夹具迁移到 v2 摄取通道。
+
+### 5.4 第 4 批：action 桥直写残留清理（2026-09-30 执行）
+
+删除 `deliver_action_memory`（生产零调用，action 桥最后一个直写 `memories` 的函数），并处理其迁葬语义。**改动 6 文件（app 3 + tests 3）**：
+
+| 文件 | 改动 |
+|---|---|
+| `app/services/action/memory_bridge.py` | 删 `deliver_action_memory` 及 `memory_repository` 死导入；docstring 去掉对已删函数的引用 |
+| `app/services/memory/ingest.py` | `ingest_from_action_record` **迁入 V9-007 三闸**（memory-policy.md §2/§3）：① `remember_fact`+succeeded 跳过（能力本体已直写记忆，防双写——此前 v2 通道无此闸，同一事实会落「我喜欢猫」+「用户告诉我：我喜欢猫」两行，本批顺带修复）；② `has_memory_effect` 幂等跳过；③ `gate_reason` 非空的失败行动不沉淀（未真实执行）。**不迁** `action_memory_policy_enabled` 总闸：v2 摄取自 V2.0.0 起即不读该开关，保持现状；该开关现仅剩工具通道 `deliver` 单一读者（E9 用例在案） |
+| `app/character/asuna/relationship_lexicon.py` | 删孤儿常量 `MEMORY_TEMPLATES`（原唯一消费者 `relationship_memory.py` 已随第 2 批删除；待验证项 6 关闭） |
+| `tests/v9/test_action_memory_policy.py` | 夹具迁移到 `ingest_from_action_record`：防双写/幂等两例改投 ingest 通道；deposit 用例改为断言候选行（source_table/source_id/source），转正可见性由既有 eval gate 覆盖 |
+| `tests/v9/test_failure_recovery.py` | 删 `test_memory_bridge_failure_degrades_to_none`（主体消失：行动执行路径已无直写；失败不回滚纪律由 post_process per-record try/except 与 runtime stage try/except 承接，v30 `test_channel_failure_is_isolated` + v24 tool 通道等价用例在案） |
+| `tests/v24/test_tool008_integration.py` / `test_tool_acceptance.py` | 两处「不回退 legacy」运行时 monkeypatch 守卫改为**静态断言** `not hasattr(memory_bridge, "deliver_action_memory")`（沿用 §3.3.5 静态守卫惯例） |
+
+**冻结面**：未触碰（tool007 / tool008 `FROZEN_SOURCES` / tool010 `ZERO_DIFF_HASHES` 逐键核对，均不含本次三个 app 文件；tool008:543 的源码断言只查 `ACTION_MEMORY_TEMPLATES` 存在性，不受影响）。
+
+**验证**：
+
+| 面 | 结果 | 判定 |
+|---|---|---|
+| `tests/v9 tests/v24` | 6 failed / 1519 passed | 失败集 = 基线 tool009×6，零新增 |
+| `tests/v2 v30 v25 v26 unit` | 8 failed / 4102 passed | 失败集 = 基线 aut005 / life002 / v30 maintenance / plan001·011·012 / v26 head / redis，零新增 |
+| `tests/integration eval e2e v21 v40 v50 v8.5` | 6 failed / 1215 passed | 5 项基线/已知 + `e2e/test_world_chat` 隔离复跑通过（负载 flaky） |
+| `tests/v22`（引用 relationship_lexicon） | 114 passed | ✓ |
+| `e2e/test_debug_state_history::test_state_reflects_turn_and_respects_limit` 甄别 | **HEAD 基线 worktree（894c977）3 跑 1 败** | 该 flaky 在基线即存在（台账 §4.2 记「隔离 2 次通过」为抽样巧合），非本批引入 |
 
 ### 5.3 附带发现（待后续批次）
 
@@ -386,4 +411,4 @@ return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 3. ~~**`memory2/` 目录改名**（第 2 批）：改名后需重跑全量测试并核对 `conftest` 的模块登记。~~ **✅ 已完成（2026-09-29）**：全量回归零新增失败，`conftest` 的 9 条 import 与 9 项模块登记已同步（§3.3.6）。
 4. **`QUERY_TYPE_KEYWORDS` 与 `TYPE_AFFINITY_KEYWORDS` 统一**（§5.3）：需先确定 `proposed_type` 的遗留名归一化时机。
 5. **🚨 V7-010 `scheduled_followup` 裁决**（§3.3.2，**新增**）：该功能自 V2.0.0 起已不可达，且其唯一实现随本次删除消失。需裁决：移植进 v2 ingest 恢复功能，还是正式废弃。
-6. **`relationship_lexicon.MEMORY_TEMPLATES` 已无使用者**（§3.3 附带）：原唯一消费者 `relationship_memory.py` 已删，该字典成为新的孤儿常量，待后续批次裁决去留。
+6. ~~**`relationship_lexicon.MEMORY_TEMPLATES` 已无使用者**~~ **✅ 已删除（2026-09-30，第 4 批，§5.4）**。

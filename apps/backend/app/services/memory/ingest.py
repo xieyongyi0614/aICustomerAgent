@@ -13,7 +13,7 @@ from datetime import datetime
 from app.core.db import MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
-from app.services.action.memory_bridge import to_memory_candidates
+from app.services.action.memory_bridge import has_memory_effect, to_memory_candidates
 from app.services.relationship_milestone import MILESTONES
 
 logger = logging.getLogger(__name__)
@@ -171,9 +171,20 @@ def ingest_from_conversation(
 def ingest_from_action_record(
     record, character_id: str = "asuna", trace=None
 ) -> MemoryCandidateRow | None:
-    """仅取 action_memory_policy deposit=true 的类型（内容/类型沿用 v9 边界表）。"""
+    """仅取 action_memory_policy deposit=true 的类型（内容/类型沿用 v9 边界表）。
+
+    V9-007 闸随 `deliver_action_memory` 清理迁入（memory-policy.md §2/§3）：
+    remember_fact 由能力本体直写记忆（防双写，跳过候选）；effects 已登记 memory
+    → 幂等跳过；gate_reason 非空的失败行动未真实执行 → 不沉淀失败记忆。
+    """
 
     if record.status not in ("succeeded", "failed"):
+        return None
+    if record.action_type == "remember_fact" and record.status == "succeeded":
+        return None
+    if has_memory_effect(record):
+        return None
+    if record.status == "failed" and record.gate_reason is not None:
         return None
     candidates = to_memory_candidates(record)
     if not candidates:

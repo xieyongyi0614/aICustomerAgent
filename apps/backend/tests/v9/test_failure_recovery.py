@@ -170,24 +170,6 @@ async def test_failed_action_context_shows_remedy_hint(db_session_factory, overr
         assert "上次失败" in rendered
 
 
-def test_memory_bridge_failure_degrades_to_none(db_session_factory, monkeypatch, override_settings):
-    from app.repositories import memory_repository
-    from app.services.action.memory_bridge import deliver_action_memory
-
-    override_settings(action_memory_policy_enabled=True)
-
-    def boom(*args, **kwargs):
-        raise RuntimeError("db down")
-
-    monkeypatch.setattr(memory_repository, "create_memory", boom)
-    record = new_record(
-        _intent("create_reminder", content="提醒吃药", due_at="2026-09-05T08:00:00"),
-        "rec-user-5", session_id=None,
-    )
-    record.status = "succeeded"
-    assert deliver_action_memory(record, "rec-user-5") is None
-
-
 def ctx_settings():
     from app.core.settings import get_settings
 
