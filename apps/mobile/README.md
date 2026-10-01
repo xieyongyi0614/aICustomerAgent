@@ -35,7 +35,11 @@ dart run build_runner build --delete-conflicting-outputs
 | `*_db.dart` / `*_table.dart` | drift_dev（PartBuilder） | `*.drift.dart` |
 | `*_provider.dart` | riverpod_generator | `*.g.dart` |
 
-### 3. 启动 Android 模拟器（Android 开发必读）
+### 3. 准备 Android 设备（模拟器 / 真机）
+
+两种设备共用同一条地址约定：**设备侧统一用 `127.0.0.1:8020` 访问宿主机后端**（模拟器与真机 USB 都靠 `adb reverse` 打通），只有真机走局域网直连时才改用电脑 IP。
+
+#### 3.1 模拟器（Android 开发必读）
 
 模拟器**不会随 `flutter run` 自动拉起**：手动关闭模拟器后再跑 `flutter run`，设备列表里没有 Android（或直接回落 web）。每次开发前先拉起：
 
@@ -53,11 +57,52 @@ adb reverse tcp:8020 tcp:8020
 
 关闭模拟器用 `adb emu kill` 或直接关窗口。已知坑：`adb emu kill` 可能残留 AVD 锁（`~/.android/avd/Medium_Phone_API_36.avd/` 下的 `*.lock`，锁可能是**目录**，用 `rm -rf` 删）——残留后下次启动崩溃、`flutter run` 回落 web，删锁再拉起即可。
 
+#### 3.2 真机（USB 调试）
+
+**前置**：手机连点「版本号」开启开发者选项 → 打开「USB 调试」（vivo / 小米 / OPPO 等还需打开「USB 安装」或「USB 调试（安全设置）」）；插线后手机上弹「允许 USB 调试」点允许。
+
+```bash
+adb devices -l        # 出现 <设备号> device product:... 即授权成功（unauthorized = 手机上还没点允许）
+flutter devices       # 取 device-id（即 adb 的设备号）
+```
+
+**方式 A：USB + `adb reverse`（推荐；地址与模拟器完全一致，不依赖局域网与防火墙）**
+
+```bash
+adb -s <device-id> reverse tcp:8020 tcp:8020
+flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d <device-id>
+```
+
+隧道把设备侧的 `127.0.0.1:8020` 指到电脑上的后端，因此这条路要求 `API_BASE_URL` 是 `http://127.0.0.1:8020/api/v1`：`dart_defines/dev.json` 为该值时直接跑；若它已被改成局域网 IP（见方式 B），加 `--dart-define=API_BASE_URL=http://127.0.0.1:8020/api/v1` 覆盖。插拔 USB / 手机重启后隧道失效，重跑 `adb reverse`（多设备同时在线时务必带 `-s <device-id>`）。
+
+**方式 B：同局域网直连（不插线）**
+
+1. 手机与电脑连同一 Wi-Fi；
+2. 后端监听全网卡：`uvicorn app.main:app --host 0.0.0.0 --port 8020`（仓库根 `.vscode/launch.json` 的「FastAPI 后端」已是 `0.0.0.0`）；
+3. 真机连不上时先查 Windows 防火墙是否拦了 Python 入站（启动时的弹窗选「允许专用网络」，或到「Windows Defender 防火墙 → 允许应用通过防火墙」补勾）；
+4. `ipconfig` 查电脑 IPv4（与手机同网段那个），写进 `dart_defines/dev.json`（当前入库值 `192.168.2.101:8020/api/v1` 即本机以太网地址，换网络后要同步改），或运行时覆盖：
+
+```bash
+flutter run --dart-define-from-file=dart_defines/dev.json \
+  --dart-define=API_BASE_URL=http://192.168.2.101:8020/api/v1 \
+  --flavor dev -d <device-id>
+```
+
+**真机须知**
+
+- `API_BASE_URL` **必须带 `/api/v1` 前缀**：Dio 以它作 baseUrl、请求路径直接拼在其后（`/auth/email/code` → `…:8020/api/v1/auth/email/code`），漏前缀会全量 404。
+- dev 包 applicationId 为 `com.example.mobile.dev`、应用名「朝夕 Dev」（`android/app/build.gradle.kts` 的 productFlavors），与模拟器同名包、正式包互不覆盖，可同机共存。
+- 明文 HTTP 可用（`targetSdk 36` 未配 `usesCleartextTraffic`，Flutter 请求走 Dart 侧网络栈），真机无需额外加网络安全配置。
+- **装机方式**：真机用 `flutter run -d <device-id>` / `flutter install -d <device-id>`（工具按设备 ABI 构建并安装）。**别把 `flutter build apk` 的产物直接扔给真机**——若该 APK 只含模拟器 ABI（x86_64）的引擎，真机一启动就白屏闪退，日志特征：
+  `MissingLibraryException: Could not find 'libflutter.so'. Looked for: [arm64-v8a, armeabi-v7a, armeabi], but only found: [x86_64]`。
+  必须出包时显式指定：`flutter build apk --debug --flavor dev --target-platform android-arm64`，再核对产物确实含 `lib/arm64-v8a/libflutter.so`（`unzip -l`，或 `aapt2 dump badging` 看 `native-code`）。
+- 排查：`adb logcat -s flutter` 看 `[net] req` / `[net] err`，闪退看 `adb logcat | grep AndroidRuntime`；`unauthorized` → 重新插线在手机上点允许；`no devices` → 换数据线、装厂商 USB 驱动。
+
 ### 4. 运行
 
 API 地址经 `--dart-define` 注入，**未注入时启动即崩**（`lib/core/env/app_env.dart` fail-fast，无静默回退硬编码地址）。三种方式任选：
 
-**VS Code（最简）**：仓库根 `.vscode/launch.json` 已带「朝夕 App · Android/iOS 模拟器 (dev)」两个启动配置，F5 一键运行。
+**VS Code（最简）**：仓库根 `.vscode/launch.json` 已带「朝夕 App · Android/iOS 模拟器 (dev)」两个启动配置，F5 一键运行。**真机 + 模拟器同时在线时**，先在下拉设备选择器里选中目标设备再 F5——这两个配置不带 `deviceId`，会跑在当前选中的设备上。
 
 **CLI（推荐）**：地址收敛在 `dart_defines/dev.json`，改地址只动这一处：
 
@@ -66,12 +111,11 @@ flutter run --dart-define-from-file=dart_defines/dev.json \
   --flavor dev -d emulator-5554                    # Android 模拟器（--flavor dev 必带，Gradle productFlavors）
 
 flutter run --dart-define-from-file=dart_defines/dev.json \
-  --dart-define=API_BASE_URL=http://localhost:8020 \
-  --flavor dev                                     # iOS 模拟器（共享宿主网络，后项覆盖文件值）
+  --flavor dev -d <device-id>                      # Android 真机（USB：先按 §3.2 建 adb reverse）
 
 flutter run --dart-define-from-file=dart_defines/dev.json \
-  --dart-define=API_BASE_URL=http://192.168.x.x:8020 \
-  --flavor dev -d <device-id>                      # 真机（同一局域网，替换为电脑 IP）
+  --dart-define=API_BASE_URL=http://localhost:8020/api/v1 \
+  --flavor dev                                     # iOS 模拟器（共享宿主网络，后项覆盖文件值）
 ```
 
 **原始方式（兜底）**：
