@@ -35,7 +35,9 @@ class AppSpacing extends ThemeExtension<AppSpacing> {
     gapSection: 24,
     statusBarHeight: 48,
     tabBarHeight: 88,
-    screenPadding: EdgeInsets.only(top: 60, left: 18, right: 18, bottom: 118),
+    // 设计稿屏幕内边距为 top 60 / bottom 118，其中 48 让开状态栏、88 让开 Tab 栏；
+    // Flutter 侧状态栏已由 SafeArea 让开、Tab 栏已由 Scaffold 让开，此处只取余量。
+    screenPadding: EdgeInsets.only(top: 12, left: 18, right: 18, bottom: 30),
   );
 
   @override
