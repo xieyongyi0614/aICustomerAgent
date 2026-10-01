@@ -13,6 +13,7 @@ from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.services.car import aggregate as car_aggregate
 from app.services.car import entries as car_entries
+from app.services.car import service as car_service
 from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
@@ -20,6 +21,12 @@ USER = TEST_USER_ID
 NOW = datetime(2026, 9, 30, 12, 0, 0)
 CHARGE_AT = datetime(2026, 9, 28, 9, 0, 0)
 SERVICE_AT = datetime(2026, 9, 29, 9, 0, 0)
+
+
+class _FixedClock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return NOW
 ENDPOINTS = (
     ("GET", "/api/v1/car/overview"),
     ("GET", "/api/v1/car/profile"),
@@ -64,7 +71,8 @@ def _put_profile(client, payload: dict):
     return client.put("/api/v1/car/profile", json=payload)
 
 
-def test_car_overview_returns_all_blocks_in_one_request(client):
+def test_car_overview_returns_all_blocks_in_one_request(client, monkeypatch):
+    monkeypatch.setattr(car_service, "datetime", _FixedClock)
     _seed_expenses()
     response = _put_profile(
         client,
@@ -106,11 +114,12 @@ def test_car_overview_returns_all_blocks_in_one_request(client):
     assert [item["kind"] for item in body["reminders"]] == ["service", "insurance"]
 
 
-def test_car_overview_expense_matches_aggregate(client):
+def test_car_overview_expense_matches_aggregate(client, monkeypatch):
+    monkeypatch.setattr(car_service, "datetime", _FixedClock)
     _seed_expenses()
 
     body = client.get("/api/v1/car/overview").json()
-    lines = car_aggregate.car_expense_breakdown(USER, now=datetime.now())
+    lines = car_aggregate.car_expense_breakdown(USER, now=NOW)
 
     assert [line["net_minor"] for line in body["expense_breakdown"]] == [
         line.net_minor for line in lines
