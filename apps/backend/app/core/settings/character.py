@@ -1,10 +1,17 @@
-"""角色状态域设置：情绪 / 能量 / 阶段阈值。"""
+"""角色状态域设置：情绪 / 能量 / 阶段阈值 + 演绎段注入策略位。"""
+
+from typing import Literal
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
 
 class CharacterSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
+
+    # 演绎段注入策略位（口径同 inventory_grounding_mode：模式串，off 是唯一关断位）
+    # full = 回答链 prompt 注入人设/情绪/关系/世界/场景/行为/风格段
+    # off  = 只保留功能上下文（记忆/认知/目标/行动/历史），世界与角色引擎照常运行
+    roleplay_prompt_mode: Literal["full", "off"] = "full"
 
     emotion_max_turn_delta: float = 0.4
     emotion_strong_threshold: float = 0.6

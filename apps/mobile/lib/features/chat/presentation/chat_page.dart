@@ -178,7 +178,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           MessageBubble.streaming(
             text: state.streamingText,
           ),
-        if (state.streaming)
+        if (state.awaitingReply || state.streaming)
           const Padding(
             padding: EdgeInsets.only(left: 30, top: 4),
             child: Align(
@@ -286,6 +286,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
       loading: false,
       error: null,
       lastUserText: text,
+      awaitingReply: true,
     );
     _controller?.dispose();
     final controller = ChatStreamController(
@@ -329,6 +330,8 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
       }
     } catch (e) {
       state = state.copyWith(error: e, streamingText: '');
+    } finally {
+      if (!_disposed) state = state.copyWith(awaitingReply: false);
     }
   }
 }

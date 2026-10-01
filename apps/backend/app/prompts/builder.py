@@ -331,16 +331,28 @@ class PromptBuilder:
         style_ctx=None,
     ) -> ChatPromptTemplate:
         settings = get_settings()
+        roleplay = settings.roleplay_prompt_mode == "full"
         world_budget = settings.world_prompt_char_budget
         brief = getattr(world_ctx, "brief", None) if world_ctx is not None else None
-        world_text = render_world_section(world_ctx, world_budget, brief=brief)
+        world_text = (
+            render_world_section(world_ctx, world_budget, brief=brief)
+            if roleplay
+            else None
+        )
 
         action_text = render_action_section(
             action_ctx, get_settings().action_context_char_budget
         )
-        identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
+        identity = (
+            [
+                ("system", section)
+                for section in PromptBuilder.build_identity_sections()
+            ]
+            if roleplay
+            else []
+        )
         state_sections: list[str] = []
-        if analysis is not None:
+        if analysis is not None and roleplay:
             milestone_title = _safe_recent_milestone_title(state.user_id)
             state_sections = [
                 _literal(PromptBuilder.build_emotion_section(state)),
@@ -353,7 +365,7 @@ class PromptBuilder:
             ]
         tail_sections: list[str] = []
         style_section = None
-        if style_ctx is not None:
+        if style_ctx is not None and roleplay:
             style_section = PromptBuilder.build_style_section(style_ctx)
             if style_section is not None:
                 style_section = _literal(style_section)
@@ -361,12 +373,13 @@ class PromptBuilder:
             tail_sections.append(_literal(world_text))
         if action_text:
             tail_sections.append(_literal(action_text))
-        tail_sections.append(
-            MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
-        )
+        if roleplay:
+            tail_sections.append(
+                MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
+            )
         behavior_section = None
         activity_section = None
-        if analysis is not None and behavior_ctx is not None:
+        if roleplay and analysis is not None and behavior_ctx is not None:
             activity_section = build_activity_section(behavior_ctx)
             if behavior_ctx.fallback_directive is not None:
                 tail_sections.append(_literal(build_behavior_section(behavior_ctx)))
@@ -376,14 +389,14 @@ class PromptBuilder:
                     behavior_section = _literal(behavior_section)
             if activity_section is not None:
                 activity_section = _literal(activity_section)
-        elif analysis is not None:
+        elif analysis is not None and roleplay:
             tail_sections.append(PromptBuilder.build_behavior_section(analysis))
         scene_budget = (
             behavior_ctx.budget
             if behavior_ctx is not None and behavior_ctx.fallback_directive is None
             else None
         )
-        if scene_ctx is not None:
+        if scene_ctx is not None and roleplay:
             tail_sections.extend(
                 _literal(section) for section in build_scene_sections(scene_ctx, scene_budget)
             )
@@ -454,7 +467,7 @@ class PromptBuilder:
             )
 
         overlay = getattr(state, "development_overlay", None)
-        if overlay is not None and overlay.modulation_summary:
+        if roleplay and overlay is not None and overlay.modulation_summary:
             messages.append(
                 (
                     "system",
@@ -464,7 +477,9 @@ class PromptBuilder:
                 )
             )
 
-        agent_state_section = PromptBuilder.build_agent_state_section()
+        agent_state_section = (
+            PromptBuilder.build_agent_state_section() if roleplay else None
+        )
         if agent_state_section:
             messages.append(("system", _literal(agent_state_section)))
 
@@ -472,11 +487,19 @@ class PromptBuilder:
         if goal_stack_section:
             messages.append(("system", _literal(goal_stack_section)))
 
-        pattern_section = PromptBuilder.build_relationship_pattern_section(state)
+        pattern_section = (
+            PromptBuilder.build_relationship_pattern_section(state)
+            if roleplay
+            else None
+        )
         if pattern_section:
             messages.append(("system", _literal(pattern_section)))
 
-        shared_section = PromptBuilder.build_shared_experience_section(state)
+        shared_section = (
+            PromptBuilder.build_shared_experience_section(state)
+            if roleplay
+            else None
+        )
         if shared_section:
             messages.append(("system", _literal(shared_section)))
 

@@ -54,7 +54,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：`materialize_event_memory` 直写分支
     # 改为经 memory.ingest.create_candidate 投 v2 候选（评估转正），边界表构造不变 —— 非 TOOL-008 改脏。
     "app/services/world/memory_bridge.py": "952f4bfcb0a4ce652d7cb95ce8bd972c6b6cc45e46232286d561288595e57410",
-    "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
+    # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补
+    # `花费 / 付款 / 买 / 充值 / 交了 / 缴了` —— 非 TOOL-008 改脏。原值 2da514d9。
+    "app/character/asuna/action.py": "0269c402790461de1923aa55c58195f05f68b3bb675be2eac5353f7bc50698e0",
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 

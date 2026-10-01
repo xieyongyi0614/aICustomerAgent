@@ -13,7 +13,12 @@ import secrets
 from dataclasses import dataclass
 
 from app.core.settings import get_settings
-from app.services.email.sender import EmailContent, EmailSender, get_email_sender
+from app.services.email.sender import (
+    EmailContent,
+    EmailSendFailed,
+    EmailSender,
+    get_email_sender,
+)
 from app.services.identity.code_store import (
     RedisCodeStore,
     VerificationCodeStore,
@@ -113,7 +118,12 @@ async def send_login_code(
         normalized, _code_hash(normalized, code), ttl_seconds=policy.ttl_seconds
     )
     mailer = sender or get_email_sender()
-    await mailer.send(normalized, _login_code_content(code, policy.ttl_seconds))
+    try:
+        await mailer.send(normalized, _login_code_content(code, policy.ttl_seconds))
+    except EmailSendFailed:
+        # 投递失败不得占用配额/冷却，也不留无效验证码：撤回本次预占后原样抛出
+        await code_store.clear(normalized)
+        raise
     return policy.cooldown_seconds
 
 

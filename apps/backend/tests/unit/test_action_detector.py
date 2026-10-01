@@ -95,3 +95,20 @@ def test_dedupe_key_stable(action_on):
     a = detect_action_intent("明天早上8点提醒我开会", now=NOW)
     b = detect_action_intent("明天早上8点提醒我开会", now=NOW)
     assert a.dedupe_key == b.dedupe_key
+
+
+def test_ledger_spend_phrase_records(action_on):
+    """消费动词 + 金额的组合判定要覆盖「花费 X 买 Y」这类日常说法。"""
+    intent = detect_action_intent("今天花费10块钱买鸡蛋", now=NOW)
+    assert intent is not None
+    assert intent.action_type == "record_ledger_entry"
+
+
+def test_ledger_buy_with_amount_records(action_on):
+    intent = detect_action_intent("早上买了豆浆10块", now=NOW)
+    assert intent is not None
+    assert intent.action_type == "record_ledger_entry"
+
+
+def test_ledger_buy_without_amount_is_not_recording(action_on):
+    assert detect_action_intent("帮我买牛奶", now=NOW).action_type == "create_object"

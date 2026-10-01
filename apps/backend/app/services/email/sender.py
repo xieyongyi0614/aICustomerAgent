@@ -26,6 +26,14 @@ class EmailSender(Protocol):
     async def send(self, to_address: str, content: EmailContent) -> None: ...
 
 
+class EmailSendFailed(RuntimeError):
+    """发信失败（认证失败 / 网络不可达 / 服务端拒绝）。
+
+    实现方以本异常统一表达投递失败：上层据此返回可用性错误（503）而非 500，
+    并回滚已预占的发送配额，避免「配置坏了还把用户锁在冷却里」。
+    """
+
+
 def build_message(to_address: str, content: EmailContent) -> EmailMessage:
     settings = get_settings()
     message = EmailMessage()
@@ -47,10 +55,18 @@ class SmtpEmailSender:
             "username": settings.email_smtp_user,
             "password": settings.email_smtp_password,
         }
-        if settings.email_smtp_ssl:
-            await aiosmtplib.send(message, use_tls=True, **common)
-        else:
-            await aiosmtplib.send(message, start_tls=True, **common)
+        try:
+            if settings.email_smtp_ssl:
+                await aiosmtplib.send(message, use_tls=True, **common)
+            else:
+                await aiosmtplib.send(message, start_tls=True, **common)
+        except aiosmtplib.SMTPAuthenticationError as exc:
+            raise EmailSendFailed(
+                f"SMTP 认证失败（{exc.code}）：EMAIL_SMTP_PASSWORD 需填邮箱「授权码」"
+                "（不是登录密码），且该账号需已开启 SMTP 服务"
+            ) from exc
+        except (aiosmtplib.SMTPException, OSError) as exc:
+            raise EmailSendFailed(f"SMTP 发送失败：{type(exc).__name__}") from exc
 
 
 _sender: EmailSender | None = None

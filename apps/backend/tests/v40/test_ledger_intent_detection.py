@@ -19,8 +19,10 @@ def test_detects_basic_ledger_intent():
     intent = _detect("中午吃了20块快餐")
     assert intent is not None
     assert intent.action_type == "record_ledger_entry"
-    assert intent.params.get("amount_value") == "20"
+    assert intent.params.get("amount_minor") == 2000
     assert intent.params.get("direction") == "expense"
+    assert intent.params.get("source") == "conversation"
+    assert intent.params.get("idempotency_key")
 
 
 def test_detects_spend_verbs():
@@ -35,7 +37,7 @@ def test_detects_income():
     assert intent is not None
     assert intent.action_type == "record_ledger_entry"
     assert intent.params.get("direction") == "income"
-    assert intent.params.get("amount_value") == "200"
+    assert intent.params.get("amount_minor") == 20000
 
 
 def test_detects_revise_intent():

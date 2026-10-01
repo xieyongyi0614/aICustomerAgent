@@ -438,6 +438,19 @@ def set_known_flag_env(monkeypatch, env_key: str, value) -> None:
         monkeypatch.setenv(env_key, str(value))
 
 
+@pytest.fixture(autouse=True)
+def _pin_test_settings_baseline(monkeypatch):
+    """部署侧 `.env` 不得改变测试基线：演绎段注入固定开启（用例内可显式覆盖）。
+
+    该策略位整体改写回答链 prompt，golden / answer 用例都按「开启」写死；
+    在测试进程里先钉住它，避免本机 `.env` 取 false 时出现「只有我的机器红」。
+    """
+    set_known_env(monkeypatch, "ROLEPLAY_PROMPT_MODE", "full")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture
 def override_settings(monkeypatch):
     def _apply(**kwargs):
@@ -458,6 +471,7 @@ def override_settings(monkeypatch):
         "trace_capacity": "TRACE_CAPACITY",
         "state_history_limit": "STATE_HISTORY_LIMIT",
             "stage_hysteresis": "STAGE_HYSTERESIS",
+            "roleplay_prompt_mode": "ROLEPLAY_PROMPT_MODE",
             "observability_persist_enabled": "OBSERVABILITY_PERSIST_ENABLED",
             "observability_trace_sample_rate": "OBSERVABILITY_TRACE_SAMPLE_RATE",
             "observability_prompt_capture_mode": "OBSERVABILITY_PROMPT_CAPTURE_MODE",

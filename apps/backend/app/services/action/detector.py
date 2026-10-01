@@ -22,6 +22,7 @@ from app.character.asuna.action import (
 )
 from app.core.settings import get_settings
 from app.models.action import ActionIntent, make_dedupe_key
+from app.models.ledger import LedgerAmountError, to_minor
 from app.services.action.time_parse import parse_time_phrase
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,14 @@ _IMPERATIVE_EXEMPT_TYPES = (
 
 # 触发词 → 前置主语要求：词表已含"我"的模式天然祈使，其余要求命令式主语。
 _MOVE_PATTERN = re.compile(r"(?:帮我)?把(.{1,12}?)(?:放到|放进|收到)(.{1,16}?)(?:里|里面|中)?(?:[，。！？!?.]|$)")
+
+
+def _to_minor_or_none(amount_text: str) -> int | None:
+    """金额原文 → 整数分；精度/格式不合规时返回 None（由 missing 兜成 ambiguous）。"""
+    try:
+        return to_minor(amount_text)
+    except LedgerAmountError:
+        return None
 
 
 def _ledger_false_positive(content: str) -> bool:
@@ -183,11 +192,15 @@ def _extract_params(action_type: str, content: str, trigger: str, now: datetime)
     if action_type == "record_ledger_entry":
         amount = _AMOUNT_WITH_UNIT.search(content) or _AMOUNT_AFTER_INCOME.search(content)
         if amount:
-            params["amount_value"] = amount.group(1)
+            params["amount_minor"] = _to_minor_or_none(amount.group(1))
         direction = "income" if any(m in content for m in LEDGER_INCOME_MARKERS) else "expense"
         params["direction"] = direction
+        params["source"] = "conversation"
+        params["idempotency_key"] = make_dedupe_key(
+            action_type, _core_params(action_type, params)
+        )
         for name in REQUIRED_PARAMS[action_type]:
-            if name not in params:
+            if params.get(name) in (None, ""):
                 missing.append(name)
         return params, missing
     if action_type == "revise_ledger_entry":
@@ -229,7 +242,7 @@ def _core_params(action_type: str, params: dict) -> dict:
         "query_environment": (),
         "query_search": ("query",),
         "send_notification": ("content",),
-        "record_ledger_entry": ("amount_value", "direction"),
+        "record_ledger_entry": ("amount_minor", "direction"),
         "revise_ledger_entry": ("reason",),
         "query_ledger": ("period",),
     }

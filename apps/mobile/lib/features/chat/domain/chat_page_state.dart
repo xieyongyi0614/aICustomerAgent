@@ -47,6 +47,7 @@ class ChatPageState {
     this.streamingText = '',
     this.toolSteps = const [],
     this.lastUserText,
+    this.awaitingReply = false,
   });
 
   final bool loading;
@@ -60,6 +61,9 @@ class ChatPageState {
   final String streamingText;
   final List<ChatToolStep> toolSteps;
   final String? lastUserText;
+
+  /// 已发出、还没收到任何流返回：用于「一发出去就出现回应占位」。
+  final bool awaitingReply;
 
   bool get streaming => streamingText.isNotEmpty;
 
@@ -80,6 +84,7 @@ class ChatPageState {
     String? streamingText,
     List<ChatToolStep>? toolSteps,
     String? lastUserText,
+    bool? awaitingReply,
   }) {
     return ChatPageState(
       loading: loading ?? this.loading,
@@ -91,6 +96,7 @@ class ChatPageState {
       streamingText: streamingText ?? this.streamingText,
       toolSteps: toolSteps ?? this.toolSteps,
       lastUserText: lastUserText ?? this.lastUserText,
+      awaitingReply: awaitingReply ?? this.awaitingReply,
     );
   }
 }

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -18,6 +19,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.core import redis_client
 from app.core.settings import get_settings
+from app.services.email.sender import EmailSendFailed
 from app.services.identity import user_service
 from app.services.identity import verification as verification_service
 from app.services.identity.verification import (
@@ -29,6 +31,8 @@ from app.services.identity.verification import (
 )
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+logger = logging.getLogger(__name__)
 
 TOKEN_TTL_SECONDS = 30 * 24 * 3600
 
@@ -134,6 +138,12 @@ async def send_email_code(body: EmailCodeRequest):
             detail=f"发送过于频繁，请 {denied.retry_after_seconds} 秒后重试",
             headers={"Retry-After": str(denied.retry_after_seconds)},
         ) from denied
+    except EmailSendFailed as exc:
+        logger.warning("验证码邮件发送失败：%s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="验证码邮件发不出去：服务端邮件通道配置有误，请检查 EMAIL_SMTP_* 后重试",
+        ) from exc
     return EmailCodeResponse(cooldown_seconds=cooldown)
 
 

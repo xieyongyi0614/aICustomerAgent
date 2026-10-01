@@ -88,6 +88,11 @@ def _summarize_record(record) -> ActionItem:
         summary = f"搜索：{query}"
     elif action_type == "send_notification":
         summary = "发送通知"
+    elif action_type == "record_ledger_entry":
+        minor = params.get("amount_minor")
+        amount = f"¥{minor // 100}.{minor % 100:02d}" if isinstance(minor, int) else ""
+        direction = "收入" if params.get("direction") == "income" else "支出"
+        summary = f"记一笔：{direction}{amount}"
     else:
         summary = action_type
 

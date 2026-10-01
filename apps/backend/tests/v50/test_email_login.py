@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import re
 
+import aiosmtplib
 import fakeredis.aioredis
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.api.v1 import auth as auth_api
+from app.services.email import sender as sender_module
 from app.services.email.sender import EmailContent
 from app.services.identity import user_service
 from app.services.identity import verification as verification_service
@@ -115,6 +117,47 @@ async def test_send_email_code_endpoint_maps_denied_to_429(monkeypatch):
         await auth_api.send_email_code(auth_api.EmailCodeRequest(email="u@x.com"))
     assert exc.value.status_code == 429
     assert exc.value.headers["Retry-After"] == "42"
+
+
+class FailingSender:
+    async def send(self, to_address: str, content: EmailContent) -> None:
+        raise sender_module.EmailSendFailed("SMTP 认证失败（535）")
+
+
+async def test_send_login_code_releases_quota_when_send_fails(store):
+    with pytest.raises(sender_module.EmailSendFailed):
+        await verification_service.send_login_code(
+            "user@x.com", store=store, sender=FailingSender()
+        )
+    assert await store.peek_code("user@x.com") is None
+    retry = RecordingSender()
+    cooldown = await verification_service.send_login_code(
+        "user@x.com", store=store, sender=retry
+    )
+    assert cooldown > 0
+    assert len(retry.sent) == 1
+
+
+async def test_smtp_sender_maps_auth_error_to_email_send_failed(monkeypatch):
+    def boom(*args, **kwargs):
+        raise aiosmtplib.SMTPAuthenticationError(535, "Error: authentication failed")
+
+    monkeypatch.setattr(sender_module.aiosmtplib, "send", boom)
+    with pytest.raises(sender_module.EmailSendFailed):
+        await sender_module.SmtpEmailSender().send(
+            "u@x.com", EmailContent(subject="s", text="t", html="<b>t</b>")
+        )
+
+
+async def test_send_email_code_endpoint_maps_send_failure_to_503(monkeypatch):
+    async def failed(email, **kwargs):
+        raise sender_module.EmailSendFailed("SMTP 认证失败（535）")
+
+    monkeypatch.setattr(verification_service, "send_login_code", failed)
+    monkeypatch.setattr(auth_api, "_email_login_ready", lambda: None)
+    with pytest.raises(HTTPException) as exc:
+        await auth_api.send_email_code(auth_api.EmailCodeRequest(email="u@x.com"))
+    assert exc.value.status_code == 503
 
 
 async def test_verify_email_code_endpoint_issues_bound_token(monkeypatch):

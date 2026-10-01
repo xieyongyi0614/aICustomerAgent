@@ -6,6 +6,7 @@ import fakeredis.aioredis
 import pytest
 
 from app.core import redis_client
+from app.core.settings import get_settings
 
 pytestmark = pytest.mark.unit
 
@@ -29,6 +30,12 @@ async def test_close_redis_clears_singleton(fake_redis):
 
 
 def test_get_redis_without_url_raises(monkeypatch):
+    """未配 REDIS_URL 时懒建必须显式失败（显式清空环境，不读开发机 `.env`）。"""
     monkeypatch.setattr(redis_client, "_client", None)
-    with pytest.raises(RuntimeError):
-        redis_client.get_redis()
+    monkeypatch.setenv("REDIS_URL", "")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(RuntimeError):
+            redis_client.get_redis()
+    finally:
+        get_settings.cache_clear()

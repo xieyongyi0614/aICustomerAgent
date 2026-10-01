@@ -87,7 +87,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/services/action/capabilities/memory.py": "cfb232780c1510776b7b50e9bfb5b6bb69306c9521039d08cd16b5a8f7746119",  # 前值 912619b5（services 归位批次 4：memory/policy → engines/memory_policy 导入路径变更）；再前值 b8cedddd（memory 域清理）
     "app/services/action/capabilities/world_action.py": "d01ea0b163c1e0beb3fbfb812ba6e25f31dd403a23824f65712813a46ac7be1d",
     "app/services/action/capabilities/environment_query.py": "f48b75e8a105ea907d1c352c348e39813e3a1cbed47919783e3cbd5eb7c603f8",
-    "app/character/asuna/action.py": "2da514d98fedbcc72257949e524684666899e3f20e71934218df118e3599f8f5",
+    # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补
+    # `花费 / 付款 / 买 / 充值 / 交了 / 缴了` —— 非 TOOL-010 改脏。原值 2da514d9。
+    "app/character/asuna/action.py": "0269c402790461de1923aa55c58195f05f68b3bb675be2eac5353f7bc50698e0",
     "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
     # services 归位声明（2026-09-30，批次 1~4）：`llm_budget_gate` → `life/gate`、
     # `state_engine` / `goal_alignment` → `engines/*`、领域包归位导入路径变更；
@@ -113,7 +115,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     "app/application/action_engine.py": "36ea379811984d7e04da9af0b6af4114c88e3eaab70635ac3c76d545ee620525",  # 再冻结：world_available 赋值去掉恒真 getattr；前值 6ea39eaf（反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）
     # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
     # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。
-    "app/prompts/builder.py": "2683cf60bb2ea47740e274364c54a5775cc0500d6cfb278cf0769db68549b7de",
+    # 演绎段注入策略位声明（2026-10-02）：新增 `roleplay_prompt_mode`（默认 full）——
+    # `off` 时回答链不注入人设/情绪/关系/世界/场景/行为/风格段，`full` 时字节不变。
+    # 非 TOOL-010 改脏。原值 2683cf60。
+    "app/prompts/builder.py": "ac4476d1d7b4ca49795c3f730253a9c8f14dc4b568eaee79544d40fa22decb51",
 }
 """整文件零 diff 冻结面。
 

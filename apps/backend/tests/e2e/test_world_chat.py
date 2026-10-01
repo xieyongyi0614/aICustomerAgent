@@ -62,6 +62,7 @@ async def test_world_section_reaches_prompt_and_persists(
     db_session_factory, fake_llm, llm_override, override_settings
 ):
     override_settings(
+        roleplay_prompt_mode="full",
         observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
@@ -109,6 +110,7 @@ async def test_world_prompt_carries_world_section(
     db_session_factory, fake_llm, llm_override, override_settings
 ):
     override_settings(
+        roleplay_prompt_mode="full",
         observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
