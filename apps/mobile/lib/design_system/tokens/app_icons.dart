@@ -65,4 +65,12 @@ class AppIcons {
   static const clock = IconData(0xf221, fontFamily: 'lucide');
   static const settings = IconData(0xf4b9, fontFamily: 'lucide');
   static const image = IconData(0xf365, fontFamily: 'lucide');
+  static const images = IconData(0xf322, fontFamily: 'lucide');  // lucide: gallery-thumbnails
+  static const album = IconData(0xf10a, fontFamily: 'lucide');
+  static const camera = IconData(0xf1df, fontFamily: 'lucide');
+  static const play = IconData(0xf457, fontFamily: 'lucide');
+  static const copy = IconData(0xf252, fontFamily: 'lucide');
+  static const trash = IconData(0xf546, fontFamily: 'lucide');  // lucide: trash-2
+  static const tag = IconData(0xf521, fontFamily: 'lucide');
+  static const move = IconData(0xf3f5, fontFamily: 'lucide');
 }

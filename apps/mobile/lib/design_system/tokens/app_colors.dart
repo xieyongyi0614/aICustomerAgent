@@ -50,6 +50,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.transparent,
     required this.wechat,
     required this.danger,
+    required this.dangerBg,
+    required this.dangerText,
   });
 
   final Color canvas;
@@ -103,6 +105,12 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 破坏性操作文字（退出登录等）
   final Color danger;
 
+  /// A36 actionbar 危险项底色（skill `components.md:369`：rgba(240,106,106,.12)）
+  final Color dangerBg;
+
+  /// A36 actionbar 危险项字色（skill `components.md:369`：#E05252）
+  final Color dangerText;
+
   static const light = AppColors(
     canvas: Color(0xFFF5F4F0),
     surface: Color(0xFFFFFFFF),
@@ -152,6 +160,8 @@ class AppColors extends ThemeExtension<AppColors> {
     transparent: Color(0x00000000),
     wechat: Color(0xFF07C160),
     danger: Color(0xFFE5484D),
+    dangerBg: Color(0x1FF06A6A),
+    dangerText: Color(0xFFE05252),
   );
 
   static const dark = AppColors(
@@ -203,6 +213,8 @@ class AppColors extends ThemeExtension<AppColors> {
     transparent: Color(0x00000000),
     wechat: Color(0xFF07C160),
     danger: Color(0xFFFF8588),
+    dangerBg: Color(0x29FF8588),
+    dangerText: Color(0xFFFF8588),
   );
 
   @override
@@ -255,6 +267,8 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? transparent,
     Color? wechat,
     Color? danger,
+    Color? dangerBg,
+    Color? dangerText,
   }) {
     return AppColors(
       canvas: canvas ?? this.canvas,
@@ -305,6 +319,8 @@ class AppColors extends ThemeExtension<AppColors> {
       transparent: transparent ?? this.transparent,
       wechat: wechat ?? this.wechat,
       danger: danger ?? this.danger,
+      dangerBg: dangerBg ?? this.dangerBg,
+      dangerText: dangerText ?? this.dangerText,
     );
   }
 
@@ -361,6 +377,8 @@ class AppColors extends ThemeExtension<AppColors> {
       transparent: m(transparent, other.transparent),
       wechat: m(wechat, other.wechat),
       danger: m(danger, other.danger),
+      dangerBg: m(dangerBg, other.dangerBg),
+      dangerText: m(dangerText, other.dangerText),
     );
   }
 }

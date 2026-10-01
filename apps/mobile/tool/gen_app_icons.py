@@ -72,6 +72,14 @@ ICONS = [
     ("clock", "clock"),
     ("settings", "settings"),
     ("image", "image"),
+    ("images", "gallery-thumbnails"),
+    ("album", "album"),
+    ("camera", "camera"),
+    ("play", "play"),
+    ("copy", "copy"),
+    ("trash", "trash-2"),
+    ("tag", "tag"),
+    ("move", "move"),
 ]
 
 
