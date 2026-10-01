@@ -33,6 +33,20 @@ dependencies:
   intl: ^0.20.3
   flutter_markdown: ^0.7.4+3
   shared_preferences: ^2.3.3
+  photo_manager: ^3.6.0
+  photo_manager_image_provider: ^2.1.0
+
+dependency_overrides:
+  # sqlite3 3.7.0 起改用 native-assets hook，构建期需连 GitHub 拉预编译产物
+  # （本机网络不可达，flutter test 直接超时）；钉回 3.6.0 维持既有测试管线。
+  sqlite3: 3.6.0
+
+hooks:
+  user_defines:
+    sqlite3:
+      # 本机直连 github.com 不可达：release 产物经 ghfast.top 镜像拉取
+      # （字节不变，hook 会做 sha256 校验）。网络恢复后可整段移除。
+      url_pattern: "https://ghfast.top/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME"
 
 dev_dependencies:
   flutter_test:

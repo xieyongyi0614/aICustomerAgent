@@ -35,6 +35,7 @@ void main() {
       'life',
       'ledger',
       'car',
+      'album',
       'memory',
       'health',
       'briefing',
@@ -129,5 +130,27 @@ void main() {
     final source = read(File('lib/core/scaffold_samples/drift_sample.dart'));
     expect(source.contains("part 'drift_sample.drift.dart';"), isTrue);
     expect(source.contains("part 'drift_sample.g.dart';"), isFalse);
+  });
+
+  /// D18 决策（`requirements-analysis.md` §6.1）：「仅本机」必须有可验证约束
+  /// ——相册域全程零网络，静态扫描整域（既有守卫只覆盖 presentation 层）。
+  test('test_album_feature_has_no_network_access', () {
+    for (final file in dartFiles('lib/features/album/')) {
+      final content = read(file);
+      expect(content.contains('package:dio'), isFalse, reason: file.path);
+      expect(content.contains('core/network'), isFalse, reason: file.path);
+      expect(content.contains('http://'), isFalse, reason: file.path);
+      expect(content.contains('https://'), isFalse, reason: file.path);
+    }
+  });
+
+  /// `progress-audit` §7.6：`LocalStores` / drift 表是服务端 DTO 投影且运行时
+  /// 零接线；相册元数据不得复用该死通道（`APP-034` §4.2 裁决 3）。
+  test('test_album_never_imports_local_stores', () {
+    for (final file in dartFiles('lib/features/album/')) {
+      final content = read(file);
+      expect(content.contains('local_stores.dart'), isFalse, reason: file.path);
+      expect(content.contains('cache_db.dart'), isFalse, reason: file.path);
+    }
   });
 }
