@@ -532,6 +532,8 @@ API-001 → API-002 ──┘
 
 ### 15.5 三期 · 相册域（仅本机，`APP-034~040` + `APP-043`）
 
+> **状态（2026-10-01）**：8/8 **代码完成**并过全量自动化（`flutter test` `+293 -2` = 既有红基线、`analyze` 零 issue、D18 守卫绿）；执行细节见 `v5.1-task-checklist.md` §10，真机人工项见 `v5.1-manual-regression-checklist.md` §4。
+
 | ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
 |---|---|---|---|---|---|
 | `PLT-007` | **Flutter 工具链修复与相册依赖可行性验证** | 前置验证 | P0 | — | 修复本机 `flutter pub get / analyze / test`（根因：flutter_tools 在 `generateCommands` 阶段定位 Android SDK，`where.EXE aapt` 子进程创建失败，`process_win.cc:744`；见 `reviews/progress-audit-2026-09-29.md` §7.7）；验证原生相册库在当前约束（`sdk: ^3.13.4`）下可 `pub get` 并跑通**最小读相册 demo**（授权 → 读数量 → 读缩略图）。**产出结论报告；结论直接决定三期能否开工** |
@@ -585,6 +587,8 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 7 | 「仅本机」无可验证约束 | `APP-034` | 按 D18 新增分层守卫 + 零网络断言 |
 | 8 | 本机 Flutter 工具链故障 | 三期全部任务 | `PLT-007` 产出结论报告 |
 
+> **2026-10-01 阻塞门进展**：#1~#3 已闭环（skill `components.md` 与 `pages/37` / `pages/39` 文案按 D13 / 冲突 17 / §13.5 V1 回写）；#4~#6 已在实现中按 D14 / D16 / D21 裁决落地；#7 随 `APP-034` 落地（D18 守卫）；#8 已闭环（`PLT-007` 命令面 + `photo_manager` demo 三步验证通过，报告 §7）——**三期（`APP-034~040` / `APP-043`）解除阻塞，可开工**。
+
 ### 15.8 迁移与铁律检查（V5.1 逐项过 §10 检查表）
 
 - [x] 新 API 是否**零** `app/repositories` 依赖？→ `API-015`~`API-020` 全部走 `app/services/*`，同 `tasks.py` / `memory.py` 先例
@@ -629,9 +633,9 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 1 | **41 个 Task Detail 状态行全部失真**（2026-09-23 生成后未回写，实际约 16 个已达真实现） | `tasks/*.md` | 与 V5.1 增量注册同批校订（`progress-audit-2026-09-29.md` §3.1 / §5 P2） |
 | 2 | **v5.0.0 无验收报告 / 进度台账** | `docs/version/v5.0.0/` | 补验收台账（`progress-audit` §3.3 / §5 P2） |
 | 3 | **旧迁移号描述未回写折叠事实**（本文件 §0.3 与 §12~§14 仍出现 `0055`~`0058`） | 本文件 | §0.3 已补 V5.1 行；历史编号**保留不改**（`tasks.md` §0.3 顶部已有说明） |
-| 4 | **skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」） | `.agents/skills/zhaoxi-design-system/references/components.md` | 设计侧回写；端侧已裁决以 B17/B18 为准（§13.5 V1） |
-| 5 | **`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正** | `design/pages/` | 设计侧回写（§13.5 V3 / V4） |
-| 6 | **`PLT-007` 的工具链结论须回写 `PLT-001` 式报告** | `apps/mobile/docs/` | 参照 `plt001-probe.md` 体例 |
+| 4 | ~~**skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」）~~ | `.agents/skills/zhaoxi-design-system/references/components.md` | **已闭环（2026-10-01）**：B14/B15 已按 B17/B18 的 76 = 38+26+12 口径回写；B14/B17/B18「不需要联网权限」同步收敛 |
+| 5 | ~~**`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正**~~ | `design/pages/` | **已闭环（2026-10-01）**：37 页按冲突 17 收敛；39 页按 D13 改口径（skill B16 复述同步） |
+| 6 | ~~**`PLT-007` 的工具链结论须回写 `PLT-001` 式报告**~~ | `apps/mobile/docs/` | **已闭环**：报告 2026-09-30 产出（`plt007-toolchain-report.md`）；依赖面（`photo_manager` demo）结论 2026-10-01 补记 |
 
 ### 15.12 Detail 生成期的上游修正与零偏离声明（2026-09-30）
 

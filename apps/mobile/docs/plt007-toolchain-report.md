@@ -1,8 +1,8 @@
 # PLT-007 Flutter 工具链与相册依赖可行性报告
 
 > **任务**：`docs/version/v5.0.0/tasks.md` §15.5 / `docs/version/v5.0.0/tasks/PLT-007.md`（三期硬门槛）
-> **结论摘要（2026-09-30）**：**命令行门槛已解除** —— `flutter pub get` / `flutter analyze` / `flutter test` 三条命令在本机真实可用；**原生相册库（`photo_manager`）的可行性仍未验证**（本任务未引入依赖，属三期开工前必做项）。
-> **日期**：2026-09-30 ｜ **状态**：**部分完成**（命令面已验证；依赖面无证据）
+> **结论摘要（2026-09-30，2026-10-01 闭环更新）**：**命令行门槛与依赖面门槛均已解除** —— 三条命令真实可用；`photo_manager` 解析、构建与真机读相册 demo 三步全部通过（见 §7）。**三期（`APP-034~040` / `APP-043`）解除阻塞，可开工**。
+> **日期**：2026-09-30（2026-10-01 补记 §7）｜ **状态**：**已完成**
 
 ---
 
@@ -67,6 +67,38 @@ flutter test
 
 ## 6. 待办
 
-1. 补装 Android SDK 或在已配环境机器上执行 `photo_manager` 最小读相册 demo（授权 → 读数量 → 读缩略图），回填 §2 第 5 行。
+1. ~~补装 Android SDK 或在已配环境机器上执行 `photo_manager` 最小读相册 demo~~ → **已完成（2026-10-01，见 §7；SDK 实际在位）**。
 2. 修复 §3 的 2 条既有红（或明确挂账），把移动端基线恢复到全绿。
 3. 本报告结论同步到 `v5.1-task-checklist.md` 的进度台账与 `v5.1-manual-regression-checklist.md` §0。
+
+---
+
+## 7. 依赖面验证补记（2026-10-01）—— 本任务闭环
+
+### 7.1 环境更正
+
+本机 Android SDK **实际在位**：`D:\SDK\Android`（build-tools 35.0.1/36.0.0/37.0.0、emulator、platforms、system-images、platform-tools 齐全），`ANDROID_HOME=D:\SDK\Android` 已设。本文 §1 / §4 与 `plt001-probe.md:31` 的「本机未装 Android SDK」结论**已过时**，以本节为准。
+
+### 7.2 `photo_manager` 解析与构建（仓库外探针工程，仓库零残留）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | `flutter pub add photo_manager`（Dart 3.13.4 约束） | ✅ 解析成功，无版本冲突 |
+| 2 | `flutter build apk --debug` | ✅ 构建成功（构建链：腾讯 gradle wrapper 镜像 + `~/.gradle/init.d/aliyun-mirrors.gradle` + 国内 pub 镜像） |
+| 3 | ⚠️ 构建坑登记 | Windows 上 Kotlin btapi 增量编译对 `photo_manager` 报 `Storage … already registered` / `Could not close incremental caches`（清缓存、停 daemon 均复现）；以 `kotlin.incremental=false` 稳定绕过。**三期引入该依赖时须同批写入 `android/gradle.properties`** |
+
+### 7.3 最小读相册 demo（模拟器 `emulator-5554` · Medium_Phone_API_36）
+
+```text
+PROBE_RESULT|permission=true|albums=2|assetCount=6|thumb 38 bytes=3133|thumb 39 bytes=3133|thumb 40 bytes=3133
+```
+
+| 步骤 | 结果 |
+|---|---|
+| 授权 | ✅ `requestPermissionExtend → permission=true`（应用 manifest 需自行声明 `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO`，`photo_manager` 不自动合并权限） |
+| 读数量 | ✅ `albums=2`、`assetCount=6`（`adb shell screencap -p` 灌入 3 张 PNG + `content call --uri content://media --method scan_volume` 触发 MediaStore 索引，数据为真实张数） |
+| 读缩略图 | ✅ 3 张 asset 各读出 128×128 缩略图真实字节（`bytes=3133`） |
+
+### 7.4 结论
+
+开工判据（§4）5 项全绿 → **`PLT-007` 闭环，三期（`APP-034~040` / `APP-043`）解除阻塞**。现场清理：探针工程位于仓库外 `C:/tmp/plt007_probe`，仓库无依赖 / 页面残留。
