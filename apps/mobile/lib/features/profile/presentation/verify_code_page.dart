@@ -129,8 +129,15 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     _notice('收不到验证码？看看垃圾箱，或稍后点「重新发送」');
   }
 
-  void _editEmail() =>
-      context.canPop() ? context.pop() : context.go('/login');
+  /// 返回登录页：先收起键盘，避免返回后键盘仍压在登录页上。
+  void _editEmail() {
+    FocusScope.of(context).unfocus();
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/login');
+    }
+  }
 
   Future<void> _startFirstDay() async {
     FocusScope.of(context).unfocus();
@@ -165,6 +172,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
       if (nickname.isNotEmpty) {
         await prefs.setNickname(nickname);
       }
+      await prefs.setLastEmail(email);
       await prefs.markLoginSeen();
       if (!mounted) return;
       context.go('/home');
@@ -193,11 +201,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
           children: [
-            BackLink(
-              label: '‹ 返回',
-              onTap: () =>
-                  context.canPop() ? context.pop() : context.go('/login'),
-            ),
+            BackLink(label: '‹ 返回', onTap: _editEmail),
             const SizedBox(height: 4),
             Row(
               children: [

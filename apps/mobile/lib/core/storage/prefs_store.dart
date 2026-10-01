@@ -9,6 +9,7 @@ class PrefsStore {
   static const keyLastConversationId = 'chat.last_conversation_id';
   static const keyLastSyncAt = 'sync.last_at';
   static const keyNickname = 'profile.nickname';
+  static const keyLastEmail = 'profile.last_email';
   static const keyLoginSeen = 'profile.login_seen';
   static const keyFirstUsedAt = 'profile.first_used_at';
   static const keyHealthConsentGranted = 'health.consent_granted';
@@ -19,6 +20,7 @@ class PrefsStore {
     keyLastConversationId,
     keyLastSyncAt,
     keyNickname,
+    keyLastEmail,
     keyLoginSeen,
     keyHealthConsentGranted,
   ];
@@ -48,6 +50,11 @@ class PrefsStore {
   Future<void> setNickname(String value) =>
       _prefs.setString(keyNickname, value);
 
+  /// 上次登录成功的邮箱：仅本机留存，供登录页一键回填。
+  String? lastEmail() => _prefs.getString(keyLastEmail);
+  Future<void> setLastEmail(String email) =>
+      _prefs.setString(keyLastEmail, email);
+
   bool loginSeen() => _prefs.getBool(keyLoginSeen) ?? false;
   Future<void> markLoginSeen() async {
     await _prefs.setBool(keyLoginSeen, true);
@@ -69,7 +76,8 @@ class PrefsStore {
     }
   }
 
-  /// 退出登录：清称呼与登录标记；first_used_at 保留（相识天数不因登出重置）。
+  /// 退出登录：清称呼与登录标记；first_used_at 与 last_email 保留
+  /// （相识天数不因登出重置；下次登录仍可选择上次账号一键回填）。
   Future<void> clearIdentity() async {
     await _prefs.remove(keyNickname);
     await _prefs.remove(keyLoginSeen);

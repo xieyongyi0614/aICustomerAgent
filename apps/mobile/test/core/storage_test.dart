@@ -99,7 +99,7 @@ void main() {
   });
 
   test('test_prefs_keys_centralized', () {
-    expect(PrefsStore.allKeys.length, 6);
-    expect(PrefsStore.allKeys.toSet().length, 6);
+    expect(PrefsStore.allKeys.length, 8);
+    expect(PrefsStore.allKeys.toSet().length, 8);
   });
 }

@@ -98,6 +98,7 @@ void main() {
       MaterialApp.router(theme: buildAppTheme(), routerConfig: router),
     );
     await tester.pump();
+    // 测试视口 800×600 低于设计参考机型，底部控件需滚动才可见
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -450));
     await tester.pump();
     await tester.enterText(
@@ -168,6 +169,39 @@ void main() {
     await tester.pump();
     expect(find.text('手机号登录还没接入，先用邮箱吧'), findsOneWidget);
     await _dismissSnackBar(tester);
+  });
+
+  testWidgets('login_page_restores_last_email_and_offers_switch',
+      (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532); // 设计参考机型 390×844
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues(
+        <String, Object>{PrefsStore.keyLastEmail: 'asuna@example.com'});
+    await tester.pumpWidget(_app(const LoginPage()));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'asuna@example.com',
+    );
+    expect(find.textContaining('上次登录'), findsNothing);
+    final position =
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    expect(position.maxScrollExtent, 0);
+
+    await tester.enterText(find.byType(TextField), 'other@example.com');
+    await tester.pump();
+    expect(find.text('上次登录 asuna@example.com'), findsOneWidget);
+    expect(position.maxScrollExtent, 0);
+
+    await tester.tap(find.text('上次登录 asuna@example.com'));
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'asuna@example.com',
+    );
+    expect(find.textContaining('上次登录'), findsNothing);
   });
 
   testWidgets('verify_page_renders_email_code_state', (tester) async {
@@ -268,6 +302,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString(PrefsStore.keyNickname), '小夕');
     expect(prefs.getBool(PrefsStore.keyLoginSeen), isTrue);
+    expect(prefs.getString(PrefsStore.keyLastEmail), 'asuna@example.com');
     await _drainResendCountdown(tester);
   });
 

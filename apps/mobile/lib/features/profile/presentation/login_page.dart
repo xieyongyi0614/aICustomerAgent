@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/orb/orb.dart';
 import 'widgets/agreement_check.dart';
 
@@ -18,12 +19,45 @@ class _LoginPageState extends State<LoginPage> {
 
   final _email = TextEditingController();
   bool _agreed = true;
+  String? _lastEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _email.addListener(_onEmailChanged);
+    _restoreLastEmail();
+  }
 
   @override
   void dispose() {
     _email.dispose();
     super.dispose();
   }
+
+  void _onEmailChanged() => setState(() {});
+
+  /// 上次登录成功的邮箱：回填输入框，同时保留一键切回入口。
+  Future<void> _restoreLastEmail() async {
+    final prefs = await PrefsStore.load();
+    final last = prefs.lastEmail();
+    if (!mounted || last == null || last.isEmpty) return;
+    setState(() {
+      _lastEmail = last;
+      if (_email.text.isEmpty) _email.text = last;
+    });
+  }
+
+  void _useLastEmail() {
+    final last = _lastEmail;
+    if (last == null) return;
+    setState(() {
+      _email.text = last;
+      _email.selection = TextSelection.collapsed(offset: last.length);
+    });
+  }
+
+  bool get _showLastEmail =>
+      _lastEmail != null && _email.text.trim() != _lastEmail;
 
   void _notice(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -69,26 +103,28 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: colors.canvas,
       // 键盘弹出不重排布局：Spacer 底部锚定 + 视口逐帧收缩会叠加出上挪与抖动
       resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints:
-                  BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-              const SizedBox(height: 48),
+      body: ScrollConfiguration(
+        // 一屏放得下时不给任何回弹/拉伸反馈；小屏仍可滚动兜底
+        behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+              const SizedBox(height: 40),
               Center(
                 child: SizedBox(
-                  width: 160,
-                  height: 160,
+                  width: 136,
+                  height: 136,
                   child: Stack(
                     alignment: Alignment.center,
-                    // 辉光半径到球心约 98px，超出 160 盘面，不可裁剪
+                    // 辉光半径到球心约 98px，超出 136 盘面，不可裁剪
                     clipBehavior: Clip.none,
                     children: [
                       DecoratedBox(
@@ -103,7 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 26),
               Padding(
                 padding: const EdgeInsets.only(left: 10),
                 child: Text(
@@ -117,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 '一个有长期记忆的 AI 生命管家',
                 textAlign: TextAlign.center,
@@ -127,9 +163,9 @@ class _LoginPageState extends State<LoginPage> {
                   color: colors.ink2,
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 24),
               Container(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
                 decoration: BoxDecoration(
                   color: colors.surface,
                   borderRadius: context.radii.rLg,
@@ -153,12 +189,15 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
               const Spacer(),
+              if (_showLastEmail) ...[
+                _LastEmailChip(email: _lastEmail!, onTap: _useLastEmail),
+                const SizedBox(height: 8),
+              ],
               _EmailField(controller: _email, onSubmit: _onEmailLogin),
               const SizedBox(height: 12),
               _EmailLoginButton(onTap: _onEmailLogin),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 '未注册的邮箱将自动创建账号',
                 textAlign: TextAlign.center,
@@ -167,9 +206,9 @@ class _LoginPageState extends State<LoginPage> {
                   color: colors.ink3,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               const _AltDivider(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -187,13 +226,14 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               AgreementCheck(
                 checked: _agreed,
                 onToggle: () => setState(() => _agreed = !_agreed),
               ),
-              const SizedBox(height: 20),
-                    ],
+              const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -245,6 +285,45 @@ class _EmailField extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 上次登录账号快捷入口：仅当输入框内容与上次登录邮箱不一致时出现。
+class _LastEmailChip extends StatelessWidget {
+  const _LastEmailChip({required this.email, required this.onTap});
+
+  final String email;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: context.radii.rFull,
+            border: Border.all(color: colors.line),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(AppIcons.history, size: 13, color: colors.ink3),
+              const SizedBox(width: 6),
+              Text(
+                '上次登录 $email',
+                style: type.sub.copyWith(fontSize: 11.5, color: colors.ink2),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
