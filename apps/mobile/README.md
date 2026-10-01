@@ -80,7 +80,7 @@ flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d <devic
 1. 手机与电脑连同一 Wi-Fi；
 2. 后端监听全网卡：`uvicorn app.main:app --host 0.0.0.0 --port 8020`（仓库根 `.vscode/launch.json` 的「FastAPI 后端」已是 `0.0.0.0`）；
 3. 真机连不上时先查 Windows 防火墙是否拦了 Python 入站（启动时的弹窗选「允许专用网络」，或到「Windows Defender 防火墙 → 允许应用通过防火墙」补勾）；
-4. `ipconfig` 查电脑 IPv4（与手机同网段那个），写进 `dart_defines/dev.json`（当前入库值 `192.168.2.101:8020/api/v1` 即本机以太网地址，换网络后要同步改），或运行时覆盖：
+4. `ipconfig` 查电脑 IPv4（与手机同网段那个），写进 `dart_defines/dev.json`（入库默认值是 `127.0.0.1:8020/api/v1`，走局域网时改成电脑 IP，换网络后要同步改），或运行时覆盖：
 
 ```bash
 flutter run --dart-define-from-file=dart_defines/dev.json \
