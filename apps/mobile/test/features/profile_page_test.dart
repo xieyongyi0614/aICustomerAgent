@@ -101,12 +101,12 @@ void main() {
       find.text('退出后需要重新登录才能继续同步，本机数据不会丢失。'),
       findsOneWidget,
     );
-    await tester.tap(find.text('取消'));
+    await tester.tap(find.byKey(const Key('confirm_dialog_cancel')));
     await tester.pump();
     expect(find.text('阿远'), findsOneWidget);
     await tester.tap(find.text('退出登录'));
     await tester.pump();
-    await tester.tap(find.widgetWithText(TextButton, '退出登录'));
+    await tester.tap(find.byKey(const Key('confirm_dialog_confirm')));
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('LOGIN_PAGE'), findsOneWidget);

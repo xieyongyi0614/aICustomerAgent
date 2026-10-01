@@ -132,28 +132,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _confirmSignOut() async {
-    final colors = context.colors;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConfirmDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('退出后需要重新登录才能继续同步，本机数据不会丢失。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              '退出登录',
-              style: TextStyle(color: colors.danger),
-            ),
-          ),
-        ],
-      ),
+      title: '退出登录',
+      message: '退出后需要重新登录才能继续同步，本机数据不会丢失。',
+      confirmLabel: '退出登录',
+      icon: AppIcons.logOut,
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await _auth.signOut();
     final prefs = await PrefsStore.load();
     await prefs.clearIdentity();

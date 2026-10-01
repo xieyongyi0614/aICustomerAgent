@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
+import 'package:mobile/design_system/tokens/tokens.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: buildAppTheme(),
@@ -192,6 +193,20 @@ void main() {
 
   testWidgets('golden_back_link', (t) async {
     await _golden(t, 'a30_back', const BackLink(label: '‹ 返回首页'));
+  });
+
+  testWidgets('golden_confirm_dialog', (t) async {
+    await _golden(
+      t,
+      'confirm_dialog',
+      const ConfirmDialog(
+        title: '退出登录',
+        message: '退出后需要重新登录才能继续同步，本机数据不会丢失。',
+        confirmLabel: '退出登录',
+        icon: AppIcons.logOut,
+        danger: true,
+      ),
+    );
   });
 
   testWidgets('golden_proc_card', (t) async {

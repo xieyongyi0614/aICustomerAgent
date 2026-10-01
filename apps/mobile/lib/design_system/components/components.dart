@@ -6,6 +6,7 @@ export 'car_input.dart';
 export 'cards.dart';
 export 'chat_widgets.dart';
 export 'chips.dart';
+export 'confirm_dialog.dart';
 export 'entry_card.dart';
 export 'gradient_border_card.dart';
 export 'incremental_markdown.dart';
