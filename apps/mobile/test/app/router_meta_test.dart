@@ -14,6 +14,11 @@ void main() {
       '/car',
       '/car/add',
       '/car/profile',
+      '/album',
+      '/album/manage',
+      '/album/detail',
+      '/album/photo',
+      '/album/ai',
       '/health',
       '/memory',
       '/profile',
@@ -26,7 +31,7 @@ void main() {
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 19);
+    expect(chromeByPath.length, 24);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
@@ -37,6 +42,11 @@ void main() {
       '/car',
       '/car/add',
       '/car/profile',
+      '/album',
+      '/album/manage',
+      '/album/detail',
+      '/album/photo',
+      '/album/ai',
       '/chat/ledger',
       '/briefing',
       '/profile/privacy',

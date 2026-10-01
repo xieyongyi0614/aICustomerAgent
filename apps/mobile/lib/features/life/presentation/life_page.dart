@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/state/album_summary_provider.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../data/life_repository.dart';
@@ -275,12 +277,25 @@ class _ModuleGrid extends StatelessWidget {
             ),
             const SizedBox(width: 11),
             Expanded(
-              child: ModuleCard(
-                title: '相册',
-                summary: '即将接入',
-                icon: AppIcons.image,
-                tileBg: colors.tileAi,
-                tileFg: colors.aiPrimary,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final summary = ref.watch(albumSummaryProvider);
+                  final authorized = summary?.authorized ?? false;
+                  final count = summary?.totalCount;
+                  final summaryText = !authorized
+                      ? '仅本机 · 需授权'
+                      : (count == null || count == 0)
+                          ? '仅本机'
+                          : '$count 张 · 仅本机';
+                  return ModuleCard(
+                    title: '相册',
+                    summary: summaryText,
+                    icon: AppIcons.image,
+                    tileBg: colors.tileAi,
+                    tileFg: colors.aiPrimary,
+                    onTap: () => context.push<bool>('/album'),
+                  );
+                },
               ),
             ),
             const SizedBox(width: 11),

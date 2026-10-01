@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
@@ -44,7 +45,8 @@ class _FakeLifeRepository extends LifeRepository {
   }
 }
 
-Widget _host(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
+Widget _host(Widget child) =>
+    ProviderScope(child: MaterialApp(theme: buildAppTheme(), home: child));
 
 void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(390, 1400);
@@ -124,8 +126,9 @@ void main() {
     expect(_card(tester, '旅行').onTap, isNull);
     expect(_card(tester, '日历').summary, '未接入');
     expect(_card(tester, '旅行').summary, '未接入');
-    expect(_card(tester, '相册').onTap, isNull);
-    expect(_card(tester, '相册').summary, '即将接入');
+    expect(_card(tester, '相册').onTap, isNotNull, reason: 'APP-040：相册卡可点入 /album');
+    expect(_card(tester, '相册').summary, '仅本机 · 需授权',
+        reason: '无 provider 更新时呈诚实授权引导态');
   });
 
   testWidgets('test_life_page_existing_summaries_unchanged', (tester) async {

@@ -7,6 +7,11 @@ import '../../core/storage/prefs_store.dart';
 import '../../core/storage/secure_token_store.dart';
 import '../../design_system/components/app_tab_bar.dart';
 import '../../features/briefing/presentation/briefing_page.dart';
+import '../../features/album/presentation/album_ai_page.dart';
+import '../../features/album/presentation/album_detail_page.dart';
+import '../../features/album/presentation/album_manage_page.dart';
+import '../../features/album/presentation/album_page.dart';
+import '../../features/album/presentation/photo_view_page.dart';
 import '../../features/car/presentation/car_add_page.dart';
 import '../../features/car/presentation/car_page.dart';
 import '../../features/car/presentation/car_profile_page.dart';
@@ -56,6 +61,11 @@ const chromeByPath = <String, RouteChrome>{
   '/car': chromeImmersive,
   '/car/add': chromeImmersive,
   '/car/profile': chromeImmersive,
+  '/album': chromeImmersive,
+  '/album/manage': chromeImmersive,
+  '/album/detail': chromeImmersive,
+  '/album/photo': chromeImmersive,
+  '/album/ai': chromeImmersive,
   '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
@@ -144,6 +154,21 @@ final appRouter = GoRouter(
           path: '/car/profile',
           builder: (_, _) => const CarProfilePage(),
         ),
+        GoRoute(path: '/album', builder: (_, _) => const AlbumPage()),
+        GoRoute(path: '/album/manage', builder: (_, _) => const AlbumManagePage()),
+        GoRoute(
+          path: '/album/detail',
+          builder: (_, state) => AlbumDetailPage(
+            albumId: state.uri.queryParameters['album'],
+            albumName: state.uri.queryParameters['name'],
+          ),
+        ),
+        GoRoute(
+          path: '/album/photo',
+          builder: (_, state) =>
+              PhotoViewPage(assetId: state.uri.queryParameters['id']),
+        ),
+        GoRoute(path: '/album/ai', builder: (_, _) => const AlbumAiPage()),
         GoRoute(
           path: '/briefing',
           builder: (_, state) => BriefingPage(
@@ -165,7 +190,8 @@ class _AppShell extends StatelessWidget {
     if (path.startsWith('/home') || path.startsWith('/health')) return 0;
     if (path.startsWith('/life') ||
         path.startsWith('/ledger') ||
-        path.startsWith('/car')) {
+        path.startsWith('/car') ||
+        path.startsWith('/album')) {
       return 1;
     }
     if (path.startsWith('/chat')) return 2;
