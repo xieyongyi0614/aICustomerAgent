@@ -21,6 +21,26 @@ Future<void> _golden(WidgetTester tester, String name, Widget child) async {
 }
 
 void main() {
+  testWidgets('golden_tab_bar', (t) async {
+    t.view.physicalSize = const Size(390, AppTabBar.barHeight);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          backgroundColor: Colors.transparent,
+          bottomNavigationBar: AppTabBar(currentIndex: 1, onTap: (_) {}),
+        ),
+      ),
+    );
+    await t.pump(const Duration(milliseconds: 16));
+    await expectLater(
+      find.byType(AppTabBar),
+      matchesGoldenFile('goldens/a9_tabbar.png'),
+    );
+  });
+
   testWidgets('golden_app_card', (t) async {
     await _golden(t, 'a1_app_card', const AppCard(child: Text('卡内容')));
   });

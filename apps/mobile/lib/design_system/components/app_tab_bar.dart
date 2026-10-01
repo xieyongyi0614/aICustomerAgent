@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
@@ -18,6 +20,20 @@ class AppTabBar extends StatelessWidget {
   static const barHeight = 88.0;
   static const ballSize = 56.0;
 
+  /// 设计稿 A9 `.tabbar{padding:12px 10px 0; align-items:flex-start}`：
+  /// 内容顶部对齐、上内边距 12、左右内边距 10。
+  static const contentTop = 12.0;
+  static const sidePadding = 10.0;
+
+  /// 图标 23 + 间隙 3 + 文字行高 ≈ 18（同时作为 Tab 的可点高度）。
+  static const contentHeight = 44.0;
+  static const iconSize = 23.0;
+  static const labelGap = 3.0;
+  static const orbSlotWidth = 76.0;
+
+  /// 设计稿 `.orb-tab span{margin-top:36px}`：对话文字相对栏顶 36。
+  static const orbLabelTop = 36.0;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<AppColors>()!;
@@ -32,8 +48,12 @@ class AppTabBar extends StatelessWidget {
       _TabSpec(label: '我的', icon: AppIcons.user),
     ];
 
+    final inset = MediaQuery.of(context).padding.bottom;
+    // 设计稿栏高 88（原型把 home indicator 画在 88 内）：安全区落在文字下方的空白里，
+    // 故 88 是「含安全区」的目标高度，只在安全区更高时才追加高度。
+    final height = math.max(barHeight, inset + contentTop + contentHeight);
     return SizedBox(
-      height: barHeight + MediaQuery.of(context).padding.bottom,
+      height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.surface.withValues(alpha: 0.92),
@@ -42,36 +62,47 @@ class AppTabBar extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Row(
-              children: [
-                for (var i = 0; i < tabCount; i++)
-                  if (i == 2)
-                    GestureDetector(
-                      onTap: () => onTap(2),
-                      behavior: HitTestBehavior.opaque,
-                      child: SizedBox(
-                        width: 76,
-                        height: AppTabBar.barHeight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 36),
-                          child: Text(
-                            '对话',
-                            textAlign: TextAlign.center,
-                            style:
-                                type.tabLabel.copyWith(color: colors.ink3),
+            Padding(
+              padding: const EdgeInsets.only(
+                top: contentTop,
+                left: sidePadding,
+                right: sidePadding,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < tabCount; i++)
+                    if (i == 2)
+                      GestureDetector(
+                        onTap: () => onTap(2),
+                        behavior: HitTestBehavior.opaque,
+                        child: SizedBox(
+                          width: orbSlotWidth,
+                          height: contentHeight,
+                          child: Padding(
+                            // 「对话」相对栏顶 36：减去外层已加的上内边距
+                            padding: const EdgeInsets.only(
+                              top: orbLabelTop - contentTop,
+                            ),
+                            child: Text(
+                              '对话',
+                              textAlign: TextAlign.center,
+                              style:
+                                  type.tabLabel.copyWith(color: colors.ink3),
+                            ),
                           ),
                         ),
+                      )
+                    else
+                      Expanded(
+                        child: _TabItem(
+                          spec: tabs[i],
+                          selected: currentIndex == i,
+                          onTap: () => onTap(i),
+                        ),
                       ),
-                    )
-                  else
-                    Expanded(
-                      child: _TabItem(
-                        spec: tabs[i],
-                        selected: currentIndex == i,
-                        onTap: () => onTap(i),
-                      ),
-                    ),
-              ],
+                ],
+              ),
             ),
             Positioned(
               top: -24,
@@ -119,12 +150,12 @@ class _TabItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: SizedBox(
-        height: AppTabBar.barHeight,
+        height: AppTabBar.contentHeight,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(spec.icon, size: 23, color: color),
-            const SizedBox(height: 4),
+            Icon(spec.icon, size: AppTabBar.iconSize, color: color),
+            const SizedBox(height: AppTabBar.labelGap),
             Text(spec.label, style: type.tabLabel.copyWith(color: color)),
           ],
         ),

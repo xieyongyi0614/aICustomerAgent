@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
+import 'package:mobile/design_system/tokens/tokens.dart';
 
 Widget wrap(Widget child) => MaterialApp(
       theme: buildAppTheme(),
@@ -9,6 +10,43 @@ Widget wrap(Widget child) => MaterialApp(
     );
 
 void main() {
+  testWidgets('tab bar follows design A9 metrics and keeps 记忆 tab',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          bottomNavigationBar: AppTabBar(currentIndex: 1, onTap: (_) {}),
+        ),
+      ),
+    );
+    final bar = find.byType(AppTabBar);
+    final barTop = tester.getTopLeft(bar).dy;
+
+    // A9：栏高 88（含底部安全区；测试环境安全区为 0）
+    expect(tester.getSize(bar).height, AppTabBar.barHeight);
+    // A9：内容顶部对齐 + 上内边距 12（不是垂直居中）
+    expect(
+      tester.getTopLeft(find.byIcon(AppIcons.home)).dy - barTop,
+      AppTabBar.contentTop,
+    );
+    // A9：图标 23
+    expect(
+      tester.getSize(find.byIcon(AppIcons.home)).width,
+      AppTabBar.iconSize,
+    );
+    // 五位含「记忆」（暂保留，设计稿 A9 只有 4 位）
+    for (final label in const ['首页', '生活', '对话', '记忆', '我的']) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+    // 对话球居中，文字相对栏顶 36（.orb-tab span margin-top:36px）
+    expect(tester.getCenter(find.text('对话')).dx, tester.getCenter(bar).dx);
+    expect(
+      tester.getTopLeft(find.text('对话')).dy - barTop,
+      AppTabBar.orbLabelTop,
+    );
+  });
+
   testWidgets('components build without hardcoded colors', (tester) async {
     await tester.pumpWidget(wrap(
       Column(

@@ -78,10 +78,12 @@ void main() {
       '健康',
       '车辆',
       '相册',
+      '记忆',
     ]) {
       expect(find.widgetWithText(ModuleCard, title), findsOneWidget, reason: title);
     }
-    expect(find.byType(ModuleCard), findsNWidgets(11));
+    // 宫格 9（3×3，含记忆）+ 即将上线 3
+    expect(find.byType(ModuleCard), findsNWidgets(12));
   });
 
   testWidgets('test_life_page_car_summary_is_real_amount', (tester) async {
@@ -115,6 +117,16 @@ void main() {
     await _pumpPage(tester, repo);
 
     expect(_card(tester, '车辆').onTap, isNotNull);
+  });
+
+  testWidgets('test_life_page_ledger_card_navigates_to_ledger', (tester) async {
+    final repo = _FakeLifeRepository();
+    await _pumpPage(tester, repo);
+
+    expect(_card(tester, '记账').onTap, isNotNull,
+        reason: 'B4：记账模块 → 账本页（31）');
+    expect(_card(tester, '记忆').onTap, isNotNull,
+        reason: '宫格记忆入口 → /memory');
   });
 
   testWidgets('test_life_page_calendar_travel_cards_are_not_tappable',
