@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>朝夕 · 34 AI 自动记账 — 高保真原型</title>
+<title>朝夕 · 34 同步与 AI 规则 — 高保真原型</title>
 <style>
 /* ============ 基础与主题 ============ */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -120,27 +120,13 @@ a{color:inherit;text-decoration:none}
 
       <div class="ai-card">
         <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>本月 AI 自动记账</div>
-        <p>这个月我帮你自动记了 42 笔，分类准确率 96%。只有 2 笔拿不准，需要你看一眼——其余的都已经入帐了。</p>
+        <p>这个月我帮你自动记了 42 笔，分类准确率 96%。拿不准的 2 笔已经放在账本首页等你确认——你每修正一次，我就学会一条规则。</p>
       </div>
 
       <div class="stat-row">
         <div class="stat"><div class="s-v">42<small>笔</small></div><div class="s-n">本月自动记账</div></div>
         <div class="stat"><div class="s-v">96<small>%</small></div><div class="s-n">分类准确率</div></div>
-        <div class="stat"><div class="s-v">2<small>笔</small></div><div class="s-n">待你确认</div></div>
-      </div>
-
-      <div class="sec-title"><h2>需要你的确认</h2><span class="hint">确认后我会记住</span></div>
-      <div class="confirm">
-        <div class="cf">
-          <div class="c-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 21h8M12 19v2"/></svg></div>
-          <div><div class="c-t">Apple Store · ¥68</div><div class="c-s">今天 09:14 · 我的判断：娱乐 · 应用订阅</div></div>
-          <div class="c-acts"><span class="btn-ok">确认</span><span class="btn-fix">修改</span></div>
-        </div>
-        <div class="cf">
-          <div class="c-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-          <div><div class="c-t">转账 · 给「老妈」· ¥500</div><div class="c-s">昨天 19:40 · 转账不算支出，要记吗？</div></div>
-          <div class="c-acts"><span class="btn-ok">记为亲情</span><span class="btn-fix">忽略</span></div>
-        </div>
+        <div class="stat"><div class="s-v">9<small>条</small></div><div class="s-n">学会的规则</div></div>
       </div>
 
       <div class="sec-title"><h2>自动同步来源</h2><span class="hint">随时可关</span></div>
@@ -179,10 +165,10 @@ a{color:inherit;text-decoration:none}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · AI 自动记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 同步与 AI 规则</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

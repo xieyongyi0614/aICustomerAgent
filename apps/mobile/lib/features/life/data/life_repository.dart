@@ -71,4 +71,21 @@ class LifeRepository {
     final data = resp.data ?? const {};
     return data['expense_text'] as String? ?? '0.00';
   }
+
+  Future<LifeCarSummary> monthCarExpense() async {
+    final resp = await _dio.get<Map<String, dynamic>>('/car/overview');
+    final minor = resp.data?['expense_total_minor'] as int? ?? 0;
+    return LifeCarSummary(
+      text: (minor / 100).toStringAsFixed(0),
+      isEmpty: minor <= 0,
+    );
+  }
+}
+
+/// 养车支出摘要：`isEmpty` 为真时卡片要说实话，不显示 `¥0`。
+class LifeCarSummary {
+  const LifeCarSummary({required this.text, required this.isEmpty});
+
+  final String text;
+  final bool isEmpty;
 }

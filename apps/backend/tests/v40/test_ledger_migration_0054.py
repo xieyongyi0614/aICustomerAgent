@@ -21,8 +21,8 @@ from app.core.db import (
     LedgerEntryRow,
 )
 from tests.support.schema_pins import (
-    BASELINE_MIGRATION_REVISION,
     MIGRATION_HEAD,
+    MIGRATION_HEAD_PARENT,
     SCHEMA_TABLE_COUNT,
     schema_pin,
 )
@@ -98,7 +98,7 @@ def test_migration_chain_head_matches_pin():
     assert script.get_heads() == [MIGRATION_HEAD]
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == BASELINE_MIGRATION_REVISION
+    assert revision.down_revision == MIGRATION_HEAD_PARENT
 
 
 def test_schema_table_count_matches_pin():

@@ -7,6 +7,9 @@ import '../../core/storage/prefs_store.dart';
 import '../../core/storage/secure_token_store.dart';
 import '../../design_system/components/app_tab_bar.dart';
 import '../../features/briefing/presentation/briefing_page.dart';
+import '../../features/car/presentation/car_add_page.dart';
+import '../../features/car/presentation/car_page.dart';
+import '../../features/car/presentation/car_profile_page.dart';
 import '../../features/chat/presentation/chat_ledger_page.dart';
 import '../../features/chat/presentation/chat_page.dart';
 import '../../features/health/presentation/health_consent_page.dart';
@@ -50,6 +53,9 @@ const chromeByPath = <String, RouteChrome>{
   '/ledger': chromeImmersive,
   '/ledger/add': chromeImmersive,
   '/ledger/auto': chromeImmersive,
+  '/car': chromeImmersive,
+  '/car/add': chromeImmersive,
+  '/car/profile': chromeImmersive,
   '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
@@ -127,6 +133,17 @@ final appRouter = GoRouter(
         GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
         GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(path: '/ledger/auto', builder: (_, _) => const LedgerAutoPage()),
+        GoRoute(path: '/car', builder: (_, _) => const CarPage()),
+        GoRoute(
+          path: '/car/add',
+          builder: (_, state) => CarAddPage(
+            initialKind: state.uri.queryParameters['kind'] ?? 'charge',
+          ),
+        ),
+        GoRoute(
+          path: '/car/profile',
+          builder: (_, _) => const CarProfilePage(),
+        ),
         GoRoute(
           path: '/briefing',
           builder: (_, state) => BriefingPage(
@@ -146,7 +163,11 @@ class _AppShell extends StatelessWidget {
 
   int _tabIndex(String path) {
     if (path.startsWith('/home') || path.startsWith('/health')) return 0;
-    if (path.startsWith('/life') || path.startsWith('/ledger')) return 1;
+    if (path.startsWith('/life') ||
+        path.startsWith('/ledger') ||
+        path.startsWith('/car')) {
+      return 1;
+    }
     if (path.startsWith('/chat')) return 2;
     if (path.startsWith('/memory')) return 3;
     return 4;

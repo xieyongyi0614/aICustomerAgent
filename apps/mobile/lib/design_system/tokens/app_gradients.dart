@@ -16,6 +16,7 @@ class AppGradients extends ThemeExtension<AppGradients> {
     required this.avatar,
     required this.insightHero,
     required this.orbHalo,
+    required this.warmBar,
   });
 
   final LinearGradient ai;
@@ -34,6 +35,9 @@ class AppGradients extends ThemeExtension<AppGradients> {
 
   /// 登录页 Orb 背后 160px 静态辉光
   final RadialGradient orbHalo;
+
+  /// 深色卡上的 warm 进度填充（90deg #FFD9C2 → #FF9D76）：进度不是 AI 语义
+  final LinearGradient warmBar;
 
   static const values = AppGradients(
     ai: LinearGradient(
@@ -114,6 +118,11 @@ class AppGradients extends ThemeExtension<AppGradients> {
       colors: [Color(0x337A5CFF), Color(0x007A5CFF)],
       stops: [0.0, 0.95],
     ),
+    warmBar: LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [Color(0xFFFFD9C2), Color(0xFFFF9D76)],
+    ),
   );
 
   @override
@@ -132,6 +141,7 @@ class AppGradients extends ThemeExtension<AppGradients> {
     LinearGradient? avatar,
     LinearGradient? insightHero,
     RadialGradient? orbHalo,
+    LinearGradient? warmBar,
   }) {
     return AppGradients(
       ai: ai ?? this.ai,
@@ -148,6 +158,7 @@ class AppGradients extends ThemeExtension<AppGradients> {
       avatar: avatar ?? this.avatar,
       insightHero: insightHero ?? this.insightHero,
       orbHalo: orbHalo ?? this.orbHalo,
+      warmBar: warmBar ?? this.warmBar,
     );
   }
 
@@ -171,6 +182,7 @@ class AppGradients extends ThemeExtension<AppGradients> {
       avatar: g(avatar, other.avatar),
       insightHero: g(insightHero, other.insightHero),
       orbHalo: RadialGradient.lerp(orbHalo, other.orbHalo, t)!,
+      warmBar: g(warmBar, other.warmBar),
     );
   }
 }

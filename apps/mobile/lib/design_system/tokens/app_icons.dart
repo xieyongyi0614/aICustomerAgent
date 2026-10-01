@@ -46,4 +46,23 @@ class AppIcons {
   static const logOut = IconData(0xf3b0, fontFamily: 'lucide');
   static const mail = IconData(0xf3b4, fontFamily: 'lucide');
   static const arrowRight = IconData(0xf155, fontFamily: 'lucide');
+  static const car = IconData(0xf1e5, fontFamily: 'lucide');
+  static const zap = IconData(0xf5a3, fontFamily: 'lucide');
+  static const fuel = IconData(0xf31e, fontFamily: 'lucide');
+  static const gauge = IconData(0xf328, fontFamily: 'lucide');
+  static const parking = IconData(0xf435, fontFamily: 'lucide');  // lucide: parking-square
+  static const ticket = IconData(0xf539, fontFamily: 'lucide');
+  static const wrench = IconData(0xf59d, fontFamily: 'lucide');
+  static const history = IconData(0xf35d, fontFamily: 'lucide');
+  static const coins = IconData(0xf245, fontFamily: 'lucide');
+  static const batteryCharging = IconData(0xf18f, fontFamily: 'lucide');
+  static const creditCard = IconData(0xf264, fontFamily: 'lucide');
+  static const droplet = IconData(0xf28a, fontFamily: 'lucide');
+  static const percent = IconData(0xf43e, fontFamily: 'lucide');
+  static const timer = IconData(0xf53a, fontFamily: 'lucide');
+  static const fileText = IconData(0xf2d3, fontFamily: 'lucide');
+  static const mapPin = IconData(0xf3c0, fontFamily: 'lucide');
+  static const clock = IconData(0xf221, fontFamily: 'lucide');
+  static const settings = IconData(0xf4b9, fontFamily: 'lucide');
+  static const image = IconData(0xf365, fontFamily: 'lucide');
 }

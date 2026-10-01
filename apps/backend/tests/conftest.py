@@ -88,6 +88,7 @@ from app.repositories import (
     agent_state_snapshot_repository,
     background_job_repository,
     briefing_preference_repository,
+    car_repository,
     character_state_repository,
     channel_identity_repository,
     conversation_repository,
@@ -160,6 +161,7 @@ _REPO_MODULES = (
     user_repository,
     ledger_repository,
     life_task_repository,
+    car_repository,
 )
 
 _SERVICE_DB_MODULES = (

@@ -292,21 +292,21 @@ class TestRegressionCheck:
 
     def test_v25_migration_head_documented(self):
         """v2.5 交付时链头为 0049；2026-09-29 全链折叠为单迁移 `0001` 后，V2.5 及
-        之后全部 Schema 已并入折叠基线，守卫改断言「目录仅存单一折叠迁移且自洽」。
+        之后全部 Schema 已并入折叠基线，守卫改断言「折叠基线 + 连续增量迁移且链头自洽」。
 
         本用例原名 `test_v25_migration_head_0049_documented`，FEISHU-010 加 0050 时
-        改写为「≥ 0049 且自洽」，折叠时再次改写。
+        改写为「≥ 0049 且自洽」，折叠时再次改写；增量迁移 `0002` / `0003` 引入后改为
+        「编号连续 + 首文件为折叠基线 + 链头等于钉测常量」。
         """
         from pathlib import Path
 
         from tests.support.schema_pins import MIGRATION_HEAD
 
-        migrations = sorted(
-            p.name for p in Path("migrations/versions").glob("*.py")
-        )
+        migrations = sorted(p.name for p in Path("migrations/versions").glob("0*.py"))
         numeric = [int(name[:4]) for name in migrations if name[:4].isdigit()]
-        assert numeric == [int(MIGRATION_HEAD)]
-        assert migrations == [f"{MIGRATION_HEAD}_squashed_full_schema.py"]
+        assert migrations[0] == "0001_squashed_full_schema.py"
+        assert numeric == list(range(numeric[0], numeric[0] + len(numeric)))
+        assert numeric[-1] == int(MIGRATION_HEAD)
 
     def test_debug_surface_always_served(self):
         action = manager.create(

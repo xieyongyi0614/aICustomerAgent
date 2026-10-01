@@ -1198,7 +1198,7 @@ def test_migration_chain_head_is_current():
     assert heads == [support.MIGRATION_HEAD]
     revision = script.get_revision(support.MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == "0001"
+    assert revision.down_revision == support.MIGRATION_HEAD_PARENT
 
 def test_migration_0046_is_downgradable():
     """0046 的值域放宽已折叠进单迁移；放宽后的 insights 类型域与模型一致。"""

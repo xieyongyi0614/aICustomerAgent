@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>朝夕 · 33 手动记账 — 高保真原型</title>
+<title>朝夕 · 33 记一笔 — 高保真原型</title>
 <style>
 /* ============ 基础与主题 ============ */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -59,10 +59,31 @@ a{color:inherit;text-decoration:none}
 .demo-nav a:hover{text-decoration:underline}
 @media (max-width:760px){.demo-nav{display:none}}
 
-/* ============ Ledger Add（手动记账） ============ */
+/* ============ Ledger Add（统一记一笔） ============ */
 .seg{display:flex;background:#EDECE5;border-radius:99px;padding:4px;margin-bottom:14px}
 .seg span{flex:1;text-align:center;padding:8px 0;border-radius:99px;font-size:13.5px;font-weight:650;color:var(--ink2);cursor:pointer}
 .seg span.on{background:var(--card);color:var(--ink);box-shadow:0 2px 8px rgba(27,28,35,.08)}
+.say-box{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:15px 16px}
+.say-input{display:flex;align-items:center;gap:10px}
+.say-input svg{width:17px;height:17px;color:var(--ai1);flex:none}
+.say-input .ph{font-size:14.5px;color:var(--ink)}
+.say-input .caret{display:inline-block;width:2px;height:16px;background:var(--ai1);margin-left:2px;vertical-align:-3px;animation:blink 1.1s steps(1) infinite}
+.say-chips{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+.say-chips span{font-size:12px;font-weight:600;color:var(--ink2);background:#F3F2ED;border-radius:99px;padding:6px 11px;cursor:pointer}
+.parse{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:16px 18px;margin-top:14px;overflow:hidden}
+.parse::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.parse .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:11px}
+.parse .tag svg{width:13px;height:13px}
+.p-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.p-row:last-of-type{border-bottom:none}
+.p-row .p-l{width:56px;flex:none;font-size:12.5px;color:var(--ink3)}
+.p-row .p-v{font-weight:650;font-variant-numeric:tabular-nums}
+.p-row .p-v small{font-weight:600;color:var(--ink3);font-size:11.5px}
+.parse .p-acts{display:flex;align-items:center;gap:8px;margin-top:13px}
+.btn-save{font-size:13px;font-weight:700;color:#fff;background:var(--ink);border-radius:99px;padding:10px 18px;cursor:pointer;box-shadow:0 8px 18px rgba(27,28,35,.2)}
+.btn-say-fix{font-size:12.5px;font-weight:600;color:var(--ai1);cursor:pointer}
+.state-div{display:flex;align-items:center;gap:10px;margin:22px 2px 12px;font-size:12px;color:var(--ink3)}
+.state-div::before,.state-div::after{content:"";flex:1;height:1px;background:var(--line)}
 .amount{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:22px 18px;text-align:right;font-variant-numeric:tabular-nums}
 .amount .a-l{text-align:left;font-size:12px;color:var(--ink3);margin-bottom:4px}
 .amount .a-v{font-size:38px;font-weight:750;letter-spacing:-.02em}
@@ -109,6 +130,27 @@ a{color:inherit;text-decoration:none}
     <div class="screen" id="ledger-add">
       <a class="back" href="31-ledger.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>记账</a>
 
+      <div class="seg"><span class="on">说给亚丝娜</span><span>键盘输入</span></div>
+
+      <div class="say-box">
+        <div class="say-input">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+          <span class="ph">午饭一碗拉面 35<span class="caret"></span></span>
+        </div>
+        <div class="say-chips"><span>打车 22</span><span>咖啡 28，不加糖</span><span>昨晚聚餐 186</span></div>
+      </div>
+
+      <div class="parse">
+        <div class="tag"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>我听到的</div>
+        <div class="p-row"><span class="p-l">金额</span><span class="p-v">¥35.00</span></div>
+        <div class="p-row"><span class="p-l">分类</span><span class="p-v">餐饮 · 午餐</span></div>
+        <div class="p-row"><span class="p-l">时间</span><span class="p-v">今天 12:32 <small>· 过饭点了，是午餐吧</small></span></div>
+        <div class="p-row"><span class="p-l">账户</span><span class="p-v">零钱</span></div>
+        <div class="p-acts"><span class="btn-save">确认入账</span><span class="btn-say-fix">不对？直接说改哪里</span></div>
+      </div>
+
+      <div class="state-div">切换到「键盘输入」</div>
+
       <div class="seg"><span class="on">支出</span><span>收入</span></div>
 
       <div class="amount">
@@ -151,10 +193,10 @@ a{color:inherit;text-decoration:none}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 手动记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 记一笔（说给亚丝娜 / 键盘输入）</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

@@ -106,13 +106,26 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .tx .x-t{font-size:14px;font-weight:600}
 .tx .x-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
 .tx .x-v{margin-left:auto;font-size:14.5px;font-weight:700}
-.entry-row{display:flex;gap:11px;margin-top:14px}
-.entry{flex:1;display:flex;align-items:center;gap:11px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:14px;cursor:pointer;transition:transform .15s}
+.entry{display:flex;align-items:center;gap:11px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:14px;cursor:pointer;transition:transform .15s;margin-top:14px}
 .entry:active{transform:scale(.97)}
 .entry .e-ic{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:none}
 .entry .e-ic svg{width:18px;height:18px}
 .entry .e-t{font-size:13.5px;font-weight:650}
 .entry .e-s{font-size:11px;color:var(--ink3);margin-top:2px}
+.entry .e-go{margin-left:auto;color:var(--ink3);display:flex}
+.entry .e-go svg{width:16px;height:16px}
+.sync-link{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:12px;font-size:12.5px;font-weight:600;color:var(--ink2);cursor:pointer}
+.sync-link svg{width:14px;height:14px}
+.confirm{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:6px 18px}
+.cf{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.cf:last-child{border-bottom:none}
+.cf .c-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none}
+.cf .c-ic svg{width:17px;height:17px}
+.cf .c-t{font-size:14px;font-weight:600}
+.cf .c-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.cf .c-acts{margin-left:auto;display:flex;gap:7px;flex:none}
+.btn-ok{font-size:12.5px;font-weight:600;color:#fff;background:var(--health);border-radius:99px;padding:7px 13px;cursor:pointer}
+.btn-fix{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 12px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -141,16 +154,29 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
         <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的观察</div>
         <p>你的餐饮支出在下降，但周末消费占了一周的 52%。如果周末想出去玩，建议把旅行基金目标从 ¥500/月调到 ¥650/月，我帮你自动划转。</p>
       </div>
-      <div class="entry-row">
-        <a class="entry" href="33-ledger-add.html">
-          <div class="e-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
-          <div><div class="e-t">手动记一笔</div><div class="e-s">金额 + 分类，备注我帮你填</div></div>
-        </a>
-        <a class="entry" href="34-ledger-auto.html">
-          <div class="e-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg></div>
-          <div><div class="e-t">AI 自动记账</div><div class="e-s">本月已自动记 42 笔</div></div>
-        </a>
+      <div class="sec-title"><h2>需要你的确认</h2><span class="hint">2 笔 · 确认后我会记住</span></div>
+      <div class="confirm">
+        <div class="cf">
+          <div class="c-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 21h8M12 19v2"/></svg></div>
+          <div><div class="c-t">Apple Store · ¥68</div><div class="c-s">今天 09:14 · 我的判断：娱乐 · 应用订阅</div></div>
+          <div class="c-acts"><span class="btn-ok">确认</span><span class="btn-fix">修改</span></div>
+        </div>
+        <div class="cf">
+          <div class="c-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+          <div><div class="c-t">转账 · 给「老妈」· ¥500</div><div class="c-s">昨天 19:40 · 转账不算支出，要记吗？</div></div>
+          <div class="c-acts"><span class="btn-ok">记为亲情</span><span class="btn-fix">忽略</span></div>
+        </div>
       </div>
+      <a class="entry" href="33-ledger-add.html">
+        <div class="e-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <div><div class="e-t">记一笔</div><div class="e-s">键盘输入，或直接说给亚丝娜</div></div>
+        <span class="e-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></span>
+      </a>
+      <a class="sync-link" href="34-ledger-auto.html">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--ai1)"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+        本月已自动记 42 笔 · 同步与 AI 规则
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>
+      </a>
       <div class="sec-title"><h2>分类支出</h2><span class="hint">9 月</span></div>
       <div class="card">
         <div class="cat"><div class="c-top"><b>餐饮</b><span>¥1,240</span></div><div class="c-bar"><i style="width:78%;background:linear-gradient(90deg,#EFA63C,#FFD08A)"></i></div></div>
@@ -168,10 +194,10 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-prototype.html#ledger">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 记账</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-prototype.html#ledger">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>

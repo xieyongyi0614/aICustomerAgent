@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
-import '../../../design_system/components/chips.dart';
+import '../../../design_system/components/components.dart';
 import '../data/life_repository.dart';
 import 'capture_route.dart';
 
-/// B4 #life：捕获条 → 模块 3×2 → soon 占位。模块摘要为真实数据，无数据源模块显式降级。
+/// B4 #life：捕获条 → 模块宫格 → soon 占位。模块摘要为真实数据，无数据源模块显式降级。
 class LifePage extends StatefulWidget {
-  const LifePage({super.key});
+  const LifePage({super.key, this.repository});
+
+  final LifeRepository? repository;
 
   @override
   State<LifePage> createState() => _LifePageState();
 }
 
 class _LifePageState extends State<LifePage> {
-  final _repo = LifeRepository();
+  late final LifeRepository _repo = widget.repository ?? LifeRepository();
   List<LifeTaskItem>? _tasks;
   String? _expenseText;
+  LifeCarSummary? _carSummary;
   bool _tasksFailed = false;
   bool _ledgerFailed = false;
+  bool _carFailed = false;
 
   @override
   void initState() {
@@ -30,11 +35,14 @@ class _LifePageState extends State<LifePage> {
     setState(() {
       _tasks = null;
       _expenseText = null;
+      _carSummary = null;
       _tasksFailed = false;
       _ledgerFailed = false;
+      _carFailed = false;
     });
     List<LifeTaskItem>? tasks;
     String? expense;
+    LifeCarSummary? car;
     try {
       tasks = await _repo.listOpenTasks();
     } catch (_) {
@@ -45,12 +53,19 @@ class _LifePageState extends State<LifePage> {
     } catch (_) {
       expense = null;
     }
+    try {
+      car = await _repo.monthCarExpense();
+    } catch (_) {
+      car = null;
+    }
     if (!mounted) return;
     setState(() {
       _tasks = tasks;
       _tasksFailed = tasks == null;
       _expenseText = expense;
       _ledgerFailed = expense == null;
+      _carSummary = car;
+      _carFailed = car == null;
     });
   }
 
@@ -79,7 +94,14 @@ class _LifePageState extends State<LifePage> {
     return _taskCount == 0 ? '今天没有待办' : '还有 $_taskCount 项待办';
   }
 
-  bool get _anyFailed => _tasksFailed || _ledgerFailed;
+  String get _carSummaryText {
+    if (_carFailed) return _unavailable;
+    final car = _carSummary;
+    if (car == null) return '…';
+    return car.isEmpty ? '还没有养车记录' : '本月养车 ¥${car.text}';
+  }
+
+  bool get _anyFailed => _tasksFailed || _ledgerFailed || _carFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +133,7 @@ class _LifePageState extends State<LifePage> {
               ledgerSummary: _ledgerSummary,
               memoSummary: _memoSummary,
               taskSummary: _taskSummary,
+              carSummary: _carSummaryText,
             ),
             if (_anyFailed) ...[
               const SizedBox(height: 10),
@@ -157,11 +180,13 @@ class _ModuleGrid extends StatelessWidget {
     required this.ledgerSummary,
     required this.memoSummary,
     required this.taskSummary,
+    required this.carSummary,
   });
 
   final String ledgerSummary;
   final String memoSummary;
   final String taskSummary;
+  final String carSummary;
 
   @override
   Widget build(BuildContext context) {
@@ -207,8 +232,8 @@ class _ModuleGrid extends StatelessWidget {
             Expanded(
               child: ModuleCard(
                 title: '日历',
-                summary: '即将接入',
-                icon: Icons.calendar_month,
+                summary: '未接入',
+                icon: AppIcons.calendar,
                 tileBg: colors.tileInfo,
                 tileFg: colors.aiBlue,
               ),
@@ -217,8 +242,8 @@ class _ModuleGrid extends StatelessWidget {
             Expanded(
               child: ModuleCard(
                 title: '旅行',
-                summary: '即将接入',
-                icon: Icons.flight,
+                summary: '未接入',
+                icon: AppIcons.plane,
                 tileBg: colors.tileTravel,
                 tileFg: colors.aiCyan,
               ),
@@ -233,6 +258,33 @@ class _ModuleGrid extends StatelessWidget {
                 tileFg: colors.health,
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 11),
+        Row(
+          children: [
+            Expanded(
+              child: ModuleCard(
+                title: '车辆',
+                summary: carSummary,
+                icon: AppIcons.car,
+                tileBg: colors.tileInfo,
+                tileFg: colors.aiBlue,
+                onTap: () => context.push<bool>('/car'),
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: ModuleCard(
+                title: '相册',
+                summary: '即将接入',
+                icon: AppIcons.image,
+                tileBg: colors.tileAi,
+                tileFg: colors.aiPrimary,
+              ),
+            ),
+            const SizedBox(width: 11),
+            const Expanded(child: SizedBox.shrink()),
           ],
         ),
       ],

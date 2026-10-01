@@ -20,6 +20,7 @@ from typing import Any, Iterable
 
 from tests.support.schema_pins import (
     MIGRATION_HEAD,
+    MIGRATION_HEAD_PARENT,
     SCHEMA_COLUMNS_DIGEST,
     SCHEMA_TABLE_COUNT,
 )
@@ -72,9 +73,10 @@ SQUASHED_MIGRATION_FILE = "0001_squashed_full_schema.py"
 
 INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0002_briefing_preferences.py",
+    "0003_car_domain.py",
 )
 
-SCHEMA_TABLE_SET_DIGEST = "1f236b390fe77f97"
+SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
 SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
@@ -85,6 +87,10 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "ledger_entries",
     "life_tasks",
     "briefing_preferences",
+    "car_profiles",
+    "car_loans",
+    "car_service_records",
+    "car_mileage_logs",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state",)
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"

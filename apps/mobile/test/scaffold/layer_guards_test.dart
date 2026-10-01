@@ -34,6 +34,7 @@ void main() {
       'chat',
       'life',
       'ledger',
+      'car',
       'memory',
       'health',
       'briefing',

@@ -15,6 +15,7 @@ from app.core.settings.action_execution import ActionExecutionSettings
 from app.core.settings.agent_runtime import AgentRuntimeSettings
 from app.core.settings.autonomy import AutonomySettings
 from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
+from app.core.settings.car import CarSettings
 from app.core.settings.character import CharacterSettings
 from app.core.settings.database import DatabaseSettings
 from app.core.settings.evaluation import EvaluationSettings
@@ -58,6 +59,7 @@ class Settings(
     LifeLoopSettings,
     AutonomyAdvancedSettings,
     AgentRuntimeSettings,
+    CarSettings,
     ActionSettings,
     ActionExecutionSettings,
     EvaluationSettings,

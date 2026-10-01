@@ -46,7 +46,7 @@ body{
 .statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
 
 /* ============ 屏幕通用 ============ */
-.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 118px;scrollbar-width:none}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
 .screen::-webkit-scrollbar{display:none}
 a{color:inherit;text-decoration:none}
 .row{display:flex;align-items:center}
@@ -118,6 +118,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
     <!-- ================= Memory ================= -->
     <div class="screen" id="memory">
+      <a class="back" href="50-profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>我的</a>
       <div class="row" style="margin-bottom:4px">
         <h1 class="pt">亚丝娜记住的你</h1>
         <span class="mem-count" style="margin-left:auto">128 条 · 本周 +6</span>
@@ -161,33 +162,13 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
         记忆是你的资产：全部本地可见、可逐条编辑或遗忘；也可在「我的 · 隐私设置」中一键清空。亚丝娜只会用记忆来帮你，不会对你隐瞒。
       </div>
     </div>
-
-    <!-- ================= Tab Bar ================= -->
-    <div class="tabbar" id="tabbar">
-      <a class="tab" data-go="home" href="10-home.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H14v-6h-4v6H4.5A1.5 1.5 0 0 1 3 20v-9.5z"/></svg>首页
-      </a>
-      <a class="tab" data-go="life" href="30-life.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>生活
-      </a>
-      <a class="tab orb-tab" data-go="chat" href="20-chat.html">
-        <div class="orb-btn"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg></div>
-        <span>对话</span>
-      </a>
-      <a class="tab on" data-go="memory" href="40-memory.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a7 7 0 0 0-7 7c0 2 .8 3.4 1.8 4.6.8 1 1.2 1.7 1.2 2.9V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-.5c0-1.2.4-1.9 1.2-2.9C18.2 13.4 19 12 19 10a7 7 0 0 0-7-7zM9.5 21h5"/></svg>记忆
-      </a>
-      <a class="tab" data-go="profile" href="50-profile.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>我的
-      </a>
-    </div>
   </div>
 </div>
 
-<div class="page-tip"><b>朝夕 · 记忆</b> — 高保真原型 · 按页拆分<br><a href="index.html">22 页总览</a> · <a href="../ai-life-agent-prototype.html#memory">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+<div class="page-tip"><b>朝夕 · 记忆</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-prototype.html#memory">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
 
 <div class="demo-nav"><b>页面直达</b>
-  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">手动记</a><a href="34-ledger-auto.html">自动记</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
 </div>
 
 </body>
