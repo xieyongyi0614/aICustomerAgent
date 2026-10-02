@@ -13,6 +13,7 @@ class LifeTaskItem {
     this.note,
     this.remindAt,
     this.dueDate,
+    this.completedAt,
   });
 
   final String id;
@@ -31,6 +32,9 @@ class LifeTaskItem {
   /// `yyyy-MM-dd`；`null` = 未定日期。
   final String? dueDate;
 
+  /// ISO 时间串；`null` = 未完成（DA-19 完成态数据源）。
+  final String? completedAt;
+
   static LifeTaskItem fromRow(Map row) => LifeTaskItem(
     id: row['id'] as String? ?? '',
     title: row['title'] as String? ?? '',
@@ -41,6 +45,7 @@ class LifeTaskItem {
     note: row['note'] as String?,
     remindAt: row['remind_at'] as String?,
     dueDate: row['due_date'] as String?,
+    completedAt: row['completed_at'] as String?,
   );
 
   DateTime? get remindDateTime =>
@@ -50,6 +55,9 @@ class LifeTaskItem {
     final raw = dueDate;
     return raw == null ? null : DateTime.tryParse(raw);
   }
+
+  DateTime? get completedDateTime =>
+      completedAt == null ? null : DateTime.tryParse(completedAt!);
 }
 
 /// life 域自有数据面：任务域 CRUD + 账本月度摘要。
@@ -60,7 +68,15 @@ class LifeRepository {
   final Dio _dio;
 
   Future<List<LifeTaskItem>> listOpenTasks() async {
-    final resp = await _dio.get<List<dynamic>>('/tasks');
+    return listTasks(status: 'open');
+  }
+
+  /// `status`：`open`（默认）/ `done` / `all`（open + done，不含软删 cancelled）。
+  Future<List<LifeTaskItem>> listTasks({String status = 'open'}) async {
+    final resp = await _dio.get<List<dynamic>>(
+      '/tasks',
+      queryParameters: {'status': status},
+    );
     final rows = resp.data ?? const [];
     return [
       for (final row in rows)

@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
+import 'package:mobile/design_system/tokens/tokens.dart';
 import 'package:mobile/features/ledger/data/ledger_repository.dart';
+import 'package:mobile/features/ledger/presentation/ledger_category_visuals.dart';
 import 'package:mobile/features/ledger/presentation/ledger_page.dart';
 
 const _summary = LedgerSummaryData(
@@ -59,6 +61,8 @@ class _FakeLedgerRepository extends LedgerRepository {
     this.pending = const [],
     this.pendingFails = false,
     this.confirmFails = false,
+    this.entries = _entries,
+    this.categories = const [],
   }) : super(dio: Dio());
 
   final int autoCount;
@@ -66,6 +70,8 @@ class _FakeLedgerRepository extends LedgerRepository {
   final List<LedgerPendingData> pending;
   final bool pendingFails;
   bool confirmFails;
+  final List<LedgerEntryData> entries;
+  final List<LedgerCategoryData> categories;
 
   int summaryCalls = 0;
   int entriesCalls = 0;
@@ -84,8 +90,12 @@ class _FakeLedgerRepository extends LedgerRepository {
   @override
   Future<List<LedgerEntryData>> fetchEntries({int limit = 20}) async {
     entriesCalls++;
-    return _entries;
+    return entries;
   }
+
+  @override
+  Future<List<LedgerCategoryData>> fetchCategories({String? kind}) async =>
+      categories;
 
   @override
   Future<LedgerAutoSummaryData> fetchAutoSummary() async {
@@ -381,5 +391,51 @@ void main() {
     final source = File('lib/features/ledger/presentation/ledger_page.dart')
         .readAsStringSync();
     expect(source.contains('package:dio'), isFalse);
+  });
+  testWidgets('test_ledger_page_entry_row_colors_follow_category',
+      (tester) async {
+    final repo = _FakeLedgerRepository(
+      entries: const [
+        LedgerEntryData(
+          id: 'e-9',
+          amountText: '6.00',
+          direction: 'expense',
+          occurredAt: '今天 08:47',
+          merchant: '地铁出行',
+          categoryId: 'c-traffic',
+        ),
+        LedgerEntryData(
+          id: 'e-10',
+          amountText: '35.00',
+          direction: 'expense',
+          occurredAt: '今天 12:32',
+          merchant: '一碗拉面',
+          categoryId: 'c-unknown',
+        ),
+      ],
+      categories: const [
+        LedgerCategoryData(id: 'c-traffic', name: '交通', kind: 'expense'),
+        LedgerCategoryData(id: 'c-food', name: '餐饮', kind: 'expense'),
+      ],
+    );
+    await _openLedger(tester, repo);
+  
+    final rows = tester.widgetList<TxRow>(find.byType(TxRow)).toList();
+    expect(rows[0].iconColor, AppColors.light.aiBlue, reason: '交通 → aiBlue');
+    expect(rows[0].tileColor, AppColors.light.tileInfo);
+    expect(rows[0].icon, AppIcons.train);
+    expect(rows[1].iconColor, AppColors.light.money, reason: '未知分类回落 money');
+    expect(rows[1].tileColor, AppColors.light.tileMoney);
+  });
+  
+  test('test_ledger_category_visuals_maps_design_palette', () {
+    const colors = AppColors.light;
+    expect(ledgerCategoryVisuals(colors, '餐饮').fg, colors.money);
+    expect(ledgerCategoryVisuals(colors, '交通').fg, colors.aiBlue);
+    expect(ledgerCategoryVisuals(colors, '购物').fg, colors.aiPrimary);
+    expect(ledgerCategoryVisuals(colors, '娱乐').fg, colors.health);
+    expect(ledgerCategoryVisuals(colors, '人情').fg, colors.money,
+        reason: '未识别分类回落基线');
+    expect(ledgerCategoryVisuals(colors, null).icon, AppIcons.fileText);
   });
 }

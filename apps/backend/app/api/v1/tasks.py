@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.v1.auth import require_user
@@ -41,11 +41,16 @@ class TaskOut(BaseModel):
     order_reason: str | None = None
     remind_at: str | None = None
     due_date: str | None = None
+    completed_at: str | None = None
 
 
 @tasks_router.get("", response_model=list[TaskOut])
-def list_tasks(user_id: str = Depends(require_user)):
-    return task_service.list_open(user_id)
+def list_tasks(
+    status: Literal["open", "done", "all"] = Query(default="open"),
+    user_id: str = Depends(require_user),
+):
+    # DA-19：日程页需要已完成态（status=all 含 open + done，不含软删 cancelled）。
+    return task_service.list_tasks(user_id, status=status)
 
 
 @tasks_router.post("", response_model=TaskOut)
@@ -69,6 +74,7 @@ def create_task(body: TaskCreateRequest, user_id: str = Depends(require_user)):
         order_reason=row.order_reason,
         remind_at=row.remind_at.isoformat() if row.remind_at else None,
         due_date=row.due_date,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
     )
 
 
@@ -99,6 +105,7 @@ def patch_task(
         order_reason=row.order_reason,
         remind_at=row.remind_at.isoformat() if row.remind_at else None,
         due_date=row.due_date,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
     )
 
 
@@ -118,6 +125,7 @@ def complete_task(task_id: str, user_id: str = Depends(require_user)):
         order_reason=row.order_reason,
         remind_at=row.remind_at.isoformat() if row.remind_at else None,
         due_date=row.due_date,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
     )
 
 
@@ -137,6 +145,7 @@ def reopen_task(task_id: str, user_id: str = Depends(require_user)):
         order_reason=row.order_reason,
         remind_at=row.remind_at.isoformat() if row.remind_at else None,
         due_date=row.due_date,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
     )
 
 

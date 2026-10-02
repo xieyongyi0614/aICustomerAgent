@@ -40,6 +40,9 @@ class MetricCell(BaseModel):
     unit: str | None = None
     note: str | None = None
 
+    # 指标 sparkline 序列（DA-26 健康域接入前恒为空，端上空序列不渲染）。
+    spark: list[float] = []
+
 
 class HealthGrid(BaseModel):
     authorized: bool
@@ -61,6 +64,9 @@ class SpendBlock(BaseModel):
     budget_label: str
     progress: float
     conclusion: str
+
+    # 近 7 天每日消费序列（元，旧→新；DA-25 周柱状图数据源）。
+    week_bars: list[float] = []
 
 
 class HomeSummary(BaseModel):
@@ -155,6 +161,10 @@ def home_summary(user_id: str = Depends(require_user)):
             budget_label=f"/ 今日预算 ¥{budget:.0f}",
             progress=min(1.0, spent_major / budget) if budget else 0.0,
             conclusion="节奏健康 —— 亚丝娜" if spent_major > 0 else "今天还没有记账 —— 亚丝娜",
+            week_bars=[
+                value / 100
+                for value in ledger_query.daily_expense_series(user_id, days=7)
+            ],
         )
     except Exception:
         spend = SpendBlock(

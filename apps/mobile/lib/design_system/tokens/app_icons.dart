@@ -73,4 +73,5 @@ class AppIcons {
   static const trash = IconData(0xf546, fontFamily: 'lucide');  // lucide: trash-2
   static const tag = IconData(0xf521, fontFamily: 'lucide');
   static const move = IconData(0xf3f5, fontFamily: 'lucide');
+  static const pencil = IconData(0xf43d, fontFamily: 'lucide');
 }

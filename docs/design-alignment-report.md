@@ -13,12 +13,12 @@
 |---|---|
 | 最大问题 | 生活宫格 3×3 含 4 个**悬空入口**（任务/日历/旅行无页面、记忆已降级），违反红线 10 |
 | 本轮已交付 | 宫格收敛为 6 格；补齐备忘录(41)/日程(42) 两页；AI 标识组件层（✦）对齐；账本页单一「记一笔」；健康页 IA 重排；全仓 Material 图标清零 |
-| 已完成 | DA-01~DA-16 / DA-22 / DA-23 / DA-29 / DA-30（**2026-10-03 全部收口**，明细见 §3 勾选态） |
-| 被后端卡住 | 首页数据可视化（DA-25 契约缺字段）、健康域真实内容（DA-26 卡 `PLT-001`）、DA-19/20/21（后端契约）、DA-15 之「关系 Lv.N」（无轻量关系端点，待裁决） |
-| 有意偏差 | DEV-01~04 已裁决「保留增强、登记偏差」；新增 DA-08「加标签」/ DA-10「✦ 徽章与地点」按 D16 呈诚实未支持态 |
-| 剩余待办 | DA-19 / DA-20 / DA-21 / DA-25 / DA-26 / DA-27 / DA-28（全部卡后端或产品裁决） |
-| 静态校验 | `flutter analyze` **0 issue**（工具链已恢复） |
-| 验证 | `flutter test` **342 全绿**；golden 已重生成（16 张更新 + 3 张新增），见 §5 |
+| 已完成 | DA-01~DA-16 / DA-19 / DA-22 / DA-23 / DA-25 / DA-27 / DA-28 / DA-29 / DA-30（2026-10-03 两批收口，明细见 §3 勾选态） |
+| 被后端卡住 | 健康域真实内容（DA-26 卡 `PLT-001` + `/health/sync` no-op）、DA-21（`tool_step` 持久化）、DA-15 之「关系 Lv.N」（无轻量关系端点，待裁决） |
+| 有意偏差 | DEV-01~04 已裁决「保留增强、登记偏差」；DA-08「加标签」/ DA-10「✦ 徽章与地点」按 D16 呈诚实未支持态 |
+| 剩余待办 | DA-20 / DA-21 / DA-26（卡后端或产品裁决） |
+| 静态校验 | `flutter analyze` **0 issue**；后端 unit + v50 + golden **1671 过**，integration **432/433**（唯一失败为已登记既有红 `http_lifecycle`，先于 V5.1） |
+| 验证 | `flutter test` **347 全绿**；本批 golden 无 diff（`entry_row` 取景为账单行，EntryCard 图标变更未入景） |
 
 ---
 
@@ -121,9 +121,9 @@
 
 ### P3 · 需产品 / 架构裁决或后端改动
 
-- [ ] **DA-25 首页数据可视化 · 后端契约扩展** — `/home/summary` 需补 `spend.week_bars`（7 日消费序列）与 `health.cells[].spark`（指标 sparkline）；端上 `SpendSummary.weekBars` / `MetricCard.sparkValues` 已就绪可直接接。**前置**：后端测试需 DB，本机不可验证
+- [x] **DA-25 首页数据可视化 · 后端契约扩展**（2026-10-03）：`/home/summary` 补 `spend.week_bars`（ledger 域新增 `daily_expense_series`，冲正口径同 `sum_signed_minor`，负日截 0）与 `MetricCell.spark`（DA-26 接入前恒空）；端上已接，无下发不渲染。DB 环境实测可用
 - [ ] **DA-26 健康域真实内容** — 睡眠趋势 7 柱 / 今日指标三行 / 综合评分。**前置**：`PLT-001` 通过、`/health/sync` 真正落库（当前是 no-op 骨架，`authorized` 恒 false）
-- [ ] **DA-19 日程「完成态」** — 需 `GET /tasks` 返回已完成任务（现只返未完成，设计稿时间线的删除线态永不出现）
+- [x] **DA-19 日程「完成态」**（2026-10-03）：`GET /tasks` 加 `status=open|done|all`（默认 open 向后兼容；all 含 open+done、不含软删 cancelled），TaskOut 补 `completed_at`；端上日程页拉 all，done 项限当日（有当日日期或今日完成），无提醒的完成项时间标签取完成时间，跨天旧完成项不上时间线
 - [ ] **DA-20 备忘录「过期清理建议」** — 需过期判定 + 建议数据源
 - [ ] **DA-21 对话 · AI 记账 4 步 ProcCard** — 需 `tool_step` 持久化
 - [x] **DA-22 文档修订** — `docs/version/v5.0.0/traceability.md:480` 仍写「生活宫格 3×3 / 日历·旅行后置」，加 2026-09-30 裁决修订注记。**S**
@@ -131,8 +131,8 @@
 
 ### P4 · 本轮新发现（低优先）
 
-- [ ] **DA-27 账本「最近账单」逐行语义色** — 设计为 餐饮=money / 交通=aiBlue / 购物=aiPrimary，现统一 money。需先定「分类 → 语义色」映射（`categoryId` 是 id 不是名称）。**M**
-- [ ] **DA-28 记一笔图标** — 设计用铅笔，`AppIcons` 无该字形（需 `tool/gen_app_icons.py` + 字体重生成）；现用 `AppIcons.wallet`。**S**（需动字体资产）
+- [x] **DA-27 账本「最近账单」逐行语义色**（2026-10-03）：映射实际已由设计稿 31 隐含定稿（餐饮=money / 交通=aiBlue / 购物=aiPrimary，娱乐沿用 green），无需产品再裁决；端上经 `/ledger/categories` 解析 id→名称后进 `ledger_category_visuals` 映射，未识别分类回落 money 基线
+- [x] **DA-28 记一笔图标**（2026-10-03）：`pencil` 字形已在 `fonts/lucide.ttf` cmap 内，ICONS 表登记 + 脚本重生成即得（未动字体资产本身）；账本页「记一笔」EntryCard 改 `AppIcons.pencil`，字体守卫测试过
 - [x] **DA-29 组件测试补 SparkleIcon / InsightHero** — 新组件目前只被页面测试间接覆盖。**S**
 
 ### P5 · 验证（需可用 Flutter 环境）
@@ -254,6 +254,9 @@ cd apps/mobile
 
 ## 6. 待裁决 / 待确认
 
-1. **DA-25 / DA-26 是否推进后端**：需要可跑后端测试的环境（DB）。
-2. **DA-27 分类 → 语义色映射**：需要产品定「哪些分类用哪种语义色」。
-3. **DA-28 记一笔铅笔图标**：需要接受改动字体资产（`tool/gen_app_icons.py` + 重生成）。
+1. **DA-26 健康域**：`PLT-001` M4 门控 + `/health/sync` 落库（当前 no-op，`authorized` 恒 false）。
+2. **DA-21 AI 记账 4 步 ProcCard**：需 `tool_step` 持久化（后端 + 历史链路）。
+3. **DA-20 备忘录过期清理建议**：需先定「过期」口径与数据源。
+4. **DA-15 之「关系 Lv.N」**：需后端轻量关系端点（`/state` 是全量快照，不宜为一条文案调用；stage stranger→partner 序号 +1 即 Lv，映射已备好）。
+
+> 2026-10-03 结案：DA-25 后端契约与端上已打通（DB 环境实测可用）；DA-27 映射由设计稿 31 隐含定稿、无需产品裁决；DA-28 未动字体资产（字形已在 cmap 内）。

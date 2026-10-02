@@ -180,7 +180,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   amountLabel: d.spend!.amountLabel,
                   budgetLabel: d.spend!.budgetLabel,
                   progress: d.spend!.progress,
-                  weekBars: const <double>[],
+                  weekBars: d.spend!.weekBars,
                   conclusion: d.spend!.conclusion,
                 ),
               const SizedBox(height: 20),

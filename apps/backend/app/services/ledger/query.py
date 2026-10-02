@@ -13,7 +13,7 @@ entry_count（冻结）：有效条目数 = 总行数 − 冲正行数 − 被�
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any, Literal, Sequence
 from zoneinfo import ZoneInfo
 
@@ -185,6 +185,34 @@ def trend(
     return [
         summary(user_id, period=period, compare_previous=False) for period in periods
     ]
+
+
+def daily_expense_series(
+    user_id: str, *, days: int = 7, now: datetime | None = None
+) -> list[int]:
+    """近 N 天每日净支出（分，旧→新），口径同 `sum_signed_minor`：冲正按
+    方向回冲（冲收入 = 回冲支出）；窗口内单次查询后按 `occurred_at` 当地日分桶，
+    冲正落在其发生的当日，净额为负的日截 0（仅影响展示，不影响求和口径）。"""
+    anchor = now or datetime.now()
+    first_day = anchor.date() - timedelta(days=days - 1)
+    rows = ledger_repository.list_entries(
+        user_id,
+        since=datetime.combine(first_day, time.min),
+        until=datetime.combine(anchor.date() + timedelta(days=1), time.min),
+    )
+    buckets = [0] * days
+    for row in rows:
+        offset = (row.occurred_at.date() - first_day).days
+        if offset < 0 or offset >= days:
+            continue
+        amount = int(row.amount_minor)
+        if row.reversal_of is not None:
+            if row.direction == "income":
+                buckets[offset] -= amount
+            continue
+        if row.direction == "expense":
+            buckets[offset] += amount
+    return [max(0, value) for value in buckets]
 
 
 def top_categories(

@@ -39,7 +39,8 @@ class _SchedulePageState extends State<SchedulePage> {
       _error = null;
     });
     try {
-      final tasks = await _repo.listOpenTasks();
+      // DA-19：拉 open + done，时间线的删除线完成态由此而来。
+      final tasks = await _repo.listTasks(status: 'all');
       if (!mounted) return;
       setState(() {
         _tasks = tasks.where((task) => task.kind != 'memo').toList();
@@ -71,29 +72,51 @@ class _SchedulePageState extends State<SchedulePage> {
   String _timeLabel(LifeTaskItem task) {
     final remind = task.remindDateTime;
     if (remind != null) return DateFormat('HH:mm').format(remind);
+    final completed = task.completedDateTime;
+    if (task.status != 'open' && completed != null) {
+      return DateFormat('HH:mm').format(completed);
+    }
     return _dateOf(task) == null ? '待排' : '全天';
   }
 
   List<LifeTaskItem> get _all => _tasks ?? const <LifeTaskItem>[];
 
+  /// 已完成且属于今天：有当日日期，或无日期但今天完成（跨天旧完成项不上时间线）。
+  bool _isTodayDone(LifeTaskItem task, DateTime today) {
+    if (task.status == 'open') return false;
+    final date = _dateOf(task);
+    if (date != null) return date == today;
+    final completed = task.completedDateTime;
+    return completed != null &&
+        DateTime(completed.year, completed.month, completed.day) == today;
+  }
+
   List<LifeTaskItem> get _todayItems {
     final today = _today;
-    final items = _all.where((task) => _dateOf(task) == today).toList();
+    final items = _all
+        .where(
+          (task) =>
+              task.status == 'open'
+              ? _dateOf(task) == today
+              : _isTodayDone(task, today),
+        )
+        .toList();
     items.sort((a, b) {
-      final ra = a.remindDateTime;
-      final rb = b.remindDateTime;
+      final ra = a.remindDateTime ?? (a.status != 'open' ? a.completedDateTime : null);
+      final rb = b.remindDateTime ?? (b.status != 'open' ? b.completedDateTime : null);
       if (ra == null && rb == null) return 0;
       if (ra == null) return 1;
       if (rb == null) return -1;
       return ra.compareTo(rb);
     });
-    return [...items, ..._all.where((task) => _dateOf(task) == null)];
+    return [...items, ..._all.where((task) => _dateOf(task) == null && task.status == 'open')];
   }
 
   List<LifeTaskItem> get _upcoming {
     final today = _today;
     final limit = today.add(const Duration(days: 14));
     final items = _all.where((task) {
+      if (task.status != 'open') return false;
       final date = _dateOf(task);
       return date != null && date.isAfter(today) && !date.isAfter(limit);
     }).toList();

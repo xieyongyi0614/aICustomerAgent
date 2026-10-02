@@ -23,7 +23,20 @@ def create(user_id: str, title: str, **kwargs):
 
 
 def list_open(user_id: str):
-    rows = life_task_repository.list_tasks(user_id, status="open")
+    return list_tasks(user_id, status="open")
+
+
+def list_tasks(
+    user_id: str, *, status: str = "open", kind: str | None = None
+):
+    rows = life_task_repository.list_tasks(
+        user_id,
+        status=None if status == "all" else status,
+        kind=kind,
+    )
+    if status == "all":
+        # delete 是软删（cancelled）：'all' 指开放 + 已完成，不含已取消。
+        rows = [r for r in rows if r.status != "cancelled"]
     return [
         {
             "id": r.id,
@@ -35,6 +48,7 @@ def list_open(user_id: str):
             "order_reason": r.order_reason or _order_reason(r),
             "remind_at": r.remind_at.isoformat() if r.remind_at else None,
             "due_date": r.due_date,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
         }
         for r in rows
     ]

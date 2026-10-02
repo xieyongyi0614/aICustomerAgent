@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
+import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/features/home/data/home_repository.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
 
@@ -93,5 +94,58 @@ void main() {
     expect(find.text('7h12m'), findsNothing);
     expect(find.text('62'), findsNothing);
     expect(find.text('6,234'), findsNothing);
+  });
+
+  testWidgets('spend week bars render only when backend provides them',
+      (tester) async {
+    // 消费区在折叠线下方，拉高测试面让 ListView 实际构建 SpendSummary。
+    tester.view.physicalSize = const Size(390, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: HomePage(debugSummary: _summary()),
+      ),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<SpendSummary>(find.byType(SpendSummary)).weekBars,
+      isEmpty,
+      reason: '无 week_bars 下发时周柱状图不渲染',
+    );
+
+    final withBars = HomeSummaryData(
+      dateLabel: '今天',
+      greeting: '早上好',
+      headline: '今天也交给我吧',
+      sub: '',
+      modeChip: '',
+      insightTitle: '今日 AI 总结',
+      insightNarrative: '',
+      healthAuthorized: false,
+      tasks: const [],
+      tasksHint: '',
+      spend: const HomeSpend(
+        amountLabel: '¥96',
+        budgetLabel: '/ 今日预算 ¥200',
+        progress: 0.48,
+        conclusion: '本周日均 ¥96，节奏健康 —— 亚丝娜',
+        weekBars: <double>[12, 30, 8, 0, 45, 22, 96],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        // UniqueKey 强制重建 State：同型 HomePage 复用 State 时 initState 不重跑。
+        home: HomePage(key: UniqueKey(), debugSummary: withBars),
+      ),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<SpendSummary>(find.byType(SpendSummary)).weekBars,
+      <double>[12, 30, 8, 0, 45, 22, 96],
+      reason: 'week_bars 下发后透传给周柱状图',
+    );
   });
 }

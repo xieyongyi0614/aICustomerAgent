@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../data/ledger_repository.dart';
+import 'ledger_category_visuals.dart';
 
 /// B5 #ledger 账本：深色总览 + AI 观察 + 待确认 + 单入口 + 分类 + 账单。
 ///
@@ -32,6 +33,7 @@ class _LedgerPageState extends State<LedgerPage> {
   LedgerSummaryData? _summary;
   List<LedgerEntryData> _entries = [];
   List<LedgerPendingData> _pending = const [];
+  Map<String, String> _categoryNames = const {};
   int? _autoCount;
   bool _loading = true;
   bool _actionFailed = false;
@@ -45,6 +47,7 @@ class _LedgerPageState extends State<LedgerPage> {
       _entries = widget.debugEntries ?? const [];
       _pending = widget.debugPending ?? const [];
       _loading = false;
+      _loadCategoryNames();
       return;
     }
     _load();
@@ -69,12 +72,28 @@ class _LedgerPageState extends State<LedgerPage> {
         _actionFailed = false;
         _loading = false;
       });
+      await _loadCategoryNames();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e;
         _loading = false;
       });
+    }
+  }
+
+  /// 账单行语义色需要 id → 名称解析（DA-27）；取不到时回落 money 基线，
+  /// 只降级颜色，不影响整页。
+  Future<void> _loadCategoryNames() async {
+    try {
+      final rows = await _repo.fetchCategories();
+      if (!mounted) return;
+      setState(() {
+        _categoryNames = {for (final row in rows) row.id: row.name};
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _categoryNames = const {});
     }
   }
 
@@ -414,7 +433,7 @@ class _LedgerPageState extends State<LedgerPage> {
               EntryCard(
                 title: '记一笔',
                 subtitle: '键盘输入，或直接说给亚丝娜',
-                icon: AppIcons.wallet,
+                icon: AppIcons.pencil,
                 accent: EntryAccent.money,
                 onTap: () => _openEntry('/ledger/add'),
               ),
@@ -443,24 +462,29 @@ class _LedgerPageState extends State<LedgerPage> {
               if (_entries.isEmpty)
                 Text('还没有账单', style: type.body.copyWith(color: colors.ink2))
               else
-                for (var i = 0; i < _entries.length; i++)
-                  TxRow(
-                    title: _entries[i].merchant ??
-                        _entries[i].note ??
-                        '一笔账',
-                    amountLabel: _entries[i].direction == 'income'
-                        ? '+${_entries[i].amountText}'
-                        : '-${_entries[i].amountText}',
-                    tileColor: colors.tileMoney,
-                    iconColor: colors.money,
-                    icon: AppIcons.fileText,
-                    subtitle: _entries[i].occurredAt,
-                    showDivider: i < _entries.length - 1,
-                  ),
+                for (var i = 0; i < _entries.length; i++) _entryRow(i, colors),
             ],
           ),
         ),
       ),
+    );
+  }
+  TxRow _entryRow(int index, AppColors colors) {
+    final entry = _entries[index];
+    final visuals = ledgerCategoryVisuals(
+      colors,
+      _categoryNames[entry.categoryId],
+    );
+    return TxRow(
+      title: entry.merchant ?? entry.note ?? '一笔账',
+      amountLabel: entry.direction == 'income'
+          ? '+${entry.amountText}'
+          : '-${entry.amountText}',
+      tileColor: visuals.tile,
+      iconColor: visuals.fg,
+      icon: visuals.icon,
+      subtitle: entry.occurredAt,
+      showDivider: index < _entries.length - 1,
     );
   }
 }

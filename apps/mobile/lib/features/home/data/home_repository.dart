@@ -24,12 +24,16 @@ class HomeSpend {
     required this.budgetLabel,
     required this.progress,
     required this.conclusion,
+    this.weekBars = const <double>[],
   });
 
   final String amountLabel;
   final String budgetLabel;
   final double progress;
   final String conclusion;
+
+  /// 近 7 天每日消费序列（元，旧→新）；空序列 = 后端未下发，周柱状图不渲染。
+  final List<double> weekBars;
 }
 
 class HomeHealthMetric {
@@ -38,12 +42,16 @@ class HomeHealthMetric {
     required this.value,
     this.unit,
     this.note,
+    this.sparkValues = const <double>[],
   });
 
   final String label;
   final String value;
   final String? unit;
   final String? note;
+
+  /// 指标 sparkline 序列；空序列 = 后端未下发，不渲染。
+  final List<double> sparkValues;
 }
 
 class HomeSummaryData {
@@ -119,6 +127,10 @@ class HomeRepository {
               value: cell['value'] as String? ?? '',
               unit: cell['unit'] as String?,
               note: cell['note'] as String?,
+              sparkValues: [
+                for (final v in (cell['spark'] as List?) ?? const <dynamic>[])
+                  if (v is num) v.toDouble(),
+              ],
             ),
       ],
       tasks: [
@@ -139,6 +151,10 @@ class HomeRepository {
               budgetLabel: spend['budget_label'] as String? ?? '',
               progress: (spend['progress'] as num?)?.toDouble() ?? 0,
               conclusion: spend['conclusion'] as String? ?? '',
+              weekBars: [
+                for (final v in (spend['week_bars'] as List?) ?? const <dynamic>[])
+                  if (v is num) v.toDouble(),
+              ],
             ),
     );
   }

@@ -80,6 +80,7 @@ ICONS = [
     ("trash", "trash-2"),
     ("tag", "tag"),
     ("move", "move"),
+    ("pencil", "pencil"),
 ]
 
 

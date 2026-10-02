@@ -19,8 +19,11 @@ class _FakeLifeRepository extends LifeRepository {
   int deleteCalls = 0;
 
   @override
-  Future<List<LifeTaskItem>> listOpenTasks() async {
+  Future<List<LifeTaskItem>> listTasks({String status = 'open'}) async {
     if (fails) throw Exception('tasks down');
+    if (status == 'open') {
+      return tasks.where((task) => task.status == 'open').toList();
+    }
     return tasks;
   }
 
@@ -164,6 +167,47 @@ void main() {
 
     final title = tester.widget<Text>(find.text('回复导师邮件'));
     expect(title.style?.decoration, TextDecoration.lineThrough);
+  });
+
+  testWidgets('test_schedule_page_done_without_remind_uses_completed_time',
+      (tester) async {
+    final today = _today;
+    final completedAt = DateTime(today.year, today.month, today.day, 11, 5);
+    final repo = _FakeLifeRepository(
+      tasks: [
+        LifeTaskItem(
+          id: 't-1',
+          title: '回复导师邮件',
+          kind: 'task',
+          status: 'done',
+          completedAt: completedAt.toIso8601String(),
+        ),
+      ],
+    );
+    await _pump(tester, repo);
+
+    expect(find.text('11:05'), findsOneWidget);
+    expect(find.text('回复导师邮件'), findsOneWidget);
+  });
+
+  testWidgets('test_schedule_page_old_done_task_stays_off_timeline',
+      (tester) async {
+    final yesterday = _today.subtract(const Duration(days: 1));
+    final repo = _FakeLifeRepository(
+      tasks: [
+        LifeTaskItem(
+          id: 't-1',
+          title: '昨天的已完成事项',
+          kind: 'task',
+          status: 'done',
+          dueDate: DateFormat('yyyy-MM-dd').format(yesterday),
+        ),
+      ],
+    );
+    await _pump(tester, repo);
+
+    expect(find.text('昨天的已完成事项'), findsNothing);
+    expect(find.text('今天还没有排到事，跟我说一句就好'), findsOneWidget);
   });
 
   test('test_schedule_page_never_renders_fabricated_schedule_content', () {
