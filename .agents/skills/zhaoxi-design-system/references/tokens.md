@@ -31,7 +31,7 @@
 | Token | 值 | 用途 |
 |---|---|---|
 | `fillSubtle` | `#F3F2ED` | 任务标签底、次级填充 |
-| `fillMuted` | `#F1F0EA` | 「即将上线」图标底 |
+| `fillMuted` | `#F1F0EA` | 占位 / 无数据态图标底（soon 变体已停用于生活页） |
 | `trackBar` | `#F0EFE9` | 进度条 / 分类条轨道 |
 | `borderDashed` | `#DAD9D1` | 虚线占位卡边框 |
 | `borderCheck` | `#D7D5CD` | 复选框未选中边框 |

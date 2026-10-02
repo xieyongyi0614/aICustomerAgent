@@ -3,22 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/state/album_summary_provider.dart';
+import '../../../app/state/dynamic_tab.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../data/life_repository.dart';
-import 'capture_route.dart';
+import 'dynamic_module_sheet.dart';
 
-/// B4 #life：捕获条 → 模块宫格 → soon 占位。模块摘要为真实数据，无数据源模块显式降级。
-class LifePage extends StatefulWidget {
+/// B4 #life：生活工具箱 —— 六格模块宫格；长按模块卡可把它设为「动态」位。
+/// 模块摘要为真实数据，无数据源模块显式降级。
+class LifePage extends ConsumerStatefulWidget {
   const LifePage({super.key, this.repository});
 
   final LifeRepository? repository;
 
   @override
-  State<LifePage> createState() => _LifePageState();
+  ConsumerState<LifePage> createState() => _LifePageState();
 }
 
-class _LifePageState extends State<LifePage> {
+class _LifePageState extends ConsumerState<LifePage> {
   late final LifeRepository _repo = widget.repository ?? LifeRepository();
   List<LifeTaskItem>? _tasks;
   String? _expenseText;
@@ -127,6 +129,7 @@ class _LifePageState extends State<LifePage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
+    final dynamicModule = ref.watch(dynamicModuleProvider);
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
@@ -135,25 +138,19 @@ class _LifePageState extends State<LifePage> {
           padding: context.spacing.screenPadding,
           children: [
             Text('生活', style: type.pageTitle),
-            Text('说一句话，亚丝娜帮你归位',
+            Text('你的生活工具箱',
                 style: type.sub.copyWith(color: colors.ink2)),
+            const SizedBox(height: 6),
+            Text('长按模块可设为动态',
+                style: type.caption.copyWith(color: colors.ink3)),
             const SizedBox(height: 16),
-            CaptureBar(
-              onTap: () {
-                showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => const CaptureRouteSheet(),
-                );
-              },
-            ),
-            const _SectionTitle(title: '生活模块', hint: 'Skill 化 · 可持续扩展'),
-            const SizedBox(height: 10),
             _ModuleGrid(
               ledgerSummary: _ledgerSummary,
               memoSummary: _memoSummary,
               scheduleSummary: _scheduleSummary,
               carSummary: _carSummaryText,
+              dynamicModule: dynamicModule,
+              onRequestDynamic: _openDynamicModuleSheet,
             ),
             if (_anyFailed) ...[
               const SizedBox(height: 10),
@@ -162,35 +159,18 @@ class _LifePageState extends State<LifePage> {
                 child: ChipButton(label: '重试', ghost: true, onTap: _load),
               ),
             ],
-            const SizedBox(height: 24),
-            const _SectionTitle(title: '即将上线', hint: 'Skill 商店'),
-            const SizedBox(height: 10),
-            const _SoonGrid(),
             const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
-}
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.hint});
-
-  final String title;
-  final String? hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final type = context.typography;
-    return Row(
-      children: [
-        Text(title, style: type.sectionTitle),
-        const Spacer(),
-        if (hint != null)
-          Text(hint!, style: type.caption.copyWith(color: colors.ink3)),
-      ],
+  void _openDynamicModuleSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const DynamicModuleSheet(),
     );
   }
 }
@@ -201,12 +181,16 @@ class _ModuleGrid extends StatelessWidget {
     required this.memoSummary,
     required this.scheduleSummary,
     required this.carSummary,
+    required this.dynamicModule,
+    required this.onRequestDynamic,
   });
 
   final String ledgerSummary;
   final String memoSummary;
   final String scheduleSummary;
   final String carSummary;
+  final LifeModule dynamicModule;
+  final VoidCallback onRequestDynamic;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +206,9 @@ class _ModuleGrid extends StatelessWidget {
                 icon: AppIcons.wallet,
                 tileBg: colors.tileMoney,
                 tileFg: colors.money,
+                active: dynamicModule == LifeModule.ledger,
                 onTap: () => context.push<bool>('/ledger'),
+                onLongPress: onRequestDynamic,
               ),
             ),
             const SizedBox(width: 11),
@@ -233,7 +219,9 @@ class _ModuleGrid extends StatelessWidget {
                 icon: AppIcons.fileText,
                 tileBg: colors.tileAi,
                 tileFg: colors.aiPrimary,
+                active: dynamicModule == LifeModule.memo,
                 onTap: () => context.push<bool>('/memo'),
+                onLongPress: onRequestDynamic,
               ),
             ),
             const SizedBox(width: 11),
@@ -244,7 +232,9 @@ class _ModuleGrid extends StatelessWidget {
                 icon: AppIcons.calendar,
                 tileBg: colors.tileInfo,
                 tileFg: colors.aiBlue,
+                active: dynamicModule == LifeModule.schedule,
                 onTap: () => context.push<bool>('/schedule'),
+                onLongPress: onRequestDynamic,
               ),
             ),
           ],
@@ -259,7 +249,9 @@ class _ModuleGrid extends StatelessWidget {
                 icon: AppIcons.heart,
                 tileBg: colors.tileHeart,
                 tileFg: colors.heartFg,
-                onTap: () => context.go('/health'),
+                active: dynamicModule == LifeModule.health,
+                onTap: () => context.push('/health'),
+                onLongPress: onRequestDynamic,
               ),
             ),
             const SizedBox(width: 11),
@@ -270,7 +262,9 @@ class _ModuleGrid extends StatelessWidget {
                 icon: AppIcons.car,
                 tileBg: colors.tileInfo,
                 tileFg: colors.aiBlue,
+                active: dynamicModule == LifeModule.car,
                 onTap: () => context.push<bool>('/car'),
+                onLongPress: onRequestDynamic,
               ),
             ),
             const SizedBox(width: 11),
@@ -291,50 +285,14 @@ class _ModuleGrid extends StatelessWidget {
                     icon: AppIcons.image,
                     tileBg: colors.tileWarm,
                     tileFg: colors.warm,
+                    active: dynamicModule == LifeModule.album,
                     onTap: () => context.push<bool>('/album'),
+                    onLongPress: onRequestDynamic,
                   );
                 },
               ),
             ),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SoonGrid extends StatelessWidget {
-  const _SoonGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(
-          child: ModuleCard(
-            title: '阅读',
-            summary: 'V2 见',
-            icon: AppIcons.book,
-            soon: true,
-          ),
-        ),
-        SizedBox(width: 11),
-        Expanded(
-          child: ModuleCard(
-            title: '习惯打卡',
-            summary: 'V2 见',
-            icon: AppIcons.clock,
-            soon: true,
-          ),
-        ),
-        SizedBox(width: 11),
-        Expanded(
-          child: ModuleCard(
-            title: '更多 Skill',
-            summary: '持续扩展',
-            icon: AppIcons.plus,
-            soon: true,
-          ),
         ),
       ],
     );

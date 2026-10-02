@@ -10,7 +10,7 @@ Widget wrap(Widget child) => MaterialApp(
     );
 
 void main() {
-  testWidgets('tab bar follows design A9 metrics (4 tabs, floating chat ball)',
+  testWidgets('tab bar follows design A9 metrics (5 tabs, floating chat ball)',
       (tester) async {
     // A9 参考设备 390 × 844
     tester.view.physicalSize = const Size(390, 844);
@@ -39,20 +39,20 @@ void main() {
       tester.getSize(find.byIcon(AppIcons.home)).width,
       AppTabBar.iconSize,
     );
-    // A9 / 红线 10：主 Tab 永远 4 个 —— 记忆不是主 Tab（降级为「我的 · 记忆管理」子页）
-    for (final label in const ['首页', '生活', '对话', '我的']) {
+    // A9 / 红线 10：主 Tab 固定 5 个，第 2 位是「动态」槽（默认记账）—— 记忆不是主 Tab
+    for (final label in const ['首页', '记账', '对话', '生活', '我的']) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
     expect(find.text('记忆'), findsNothing);
 
-    // A9：对话位 flex 0 0 76，是 4 位里的第 3 位（不是整栏居中）
+    // A9：对话位 flex 0 0 76，是 5 位里的第 3 位（左右各 2 位等分 → 整栏居中）
     final barWidth = tester.getSize(bar).width;
     final tabWidth =
-        (barWidth - AppTabBar.sidePadding * 2 - AppTabBar.orbSlotWidth) / 3;
+        (barWidth - AppTabBar.sidePadding * 2 - AppTabBar.orbSlotWidth) / 4;
     final orbCenterX =
         AppTabBar.sidePadding + tabWidth * 2 + AppTabBar.orbSlotWidth / 2;
     expect(tester.getCenter(find.text('对话')).dx, closeTo(orbCenterX, 0.5));
-    expect(orbCenterX / barWidth, closeTo(0.625, 0.005));
+    expect(orbCenterX / barWidth, closeTo(0.5, 0.005));
     // 对话文字相对栏顶 36（.orb-tab span margin-top:36px）
     expect(
       tester.getTopLeft(find.text('对话')).dy - barTop,

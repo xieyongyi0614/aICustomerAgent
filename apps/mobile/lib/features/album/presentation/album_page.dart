@@ -13,10 +13,18 @@ import '../domain/album_models.dart';
 ///
 /// 全程本机、零网络（D18）；每处 AI 能力都带「本机分析」定语（红线 9）。
 class AlbumPage extends ConsumerStatefulWidget {
-  const AlbumPage({super.key, this.repository, this.analyzer});
+  const AlbumPage({
+    super.key,
+    this.repository,
+    this.analyzer,
+    this.showBackLink = true,
+  });
 
   final AlbumRepository? repository;
   final AlbumAnalyzer? analyzer;
+
+  /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
+  final bool showBackLink;
 
   @override
   ConsumerState<AlbumPage> createState() => _AlbumPageState();
@@ -195,7 +203,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
             child: ListView(
               padding: const EdgeInsets.all(18),
               children: [
-                BackLink(label: '生活'),
+                if (widget.showBackLink) BackLink(label: '生活'),
                 const SizedBox(height: 40),
                 EmptyState(
                   message: '还没有相册访问权限。授权后，整理建议只在本机计算，照片不会上传服务器。',
@@ -221,7 +229,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(label: '生活'),
+            if (widget.showBackLink) BackLink(label: '生活'),
             const SizedBox(height: 10),
             Text('相册', style: type.pageTitle),
             Text(

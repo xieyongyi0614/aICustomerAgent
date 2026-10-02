@@ -94,19 +94,15 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 @media (max-width:760px){.demo-nav{display:none}}
 
 /* ============ Life ============ */
-.capture{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:13px 15px;margin-bottom:22px;cursor:pointer}
-.capture svg{width:17px;height:17px;color:var(--ai1);flex:none}
-.capture .ph{font-size:14px;color:var(--ink3)}
 .mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
-.mod{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:15px 10px 13px;text-align:center;cursor:pointer;transition:transform .15s}
+.mod{position:relative;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:15px 10px 13px;text-align:center;cursor:pointer;transition:transform .15s}
+.mod .dyn-tag{position:absolute;top:8px;right:8px;font-size:9.5px;font-weight:650;color:var(--ai1);background:rgba(122,92,255,.10);border:1px solid rgba(122,92,255,.20);border-radius:999px;padding:1px 6px;line-height:1.5}
+.tap-hint{font-size:12px;color:var(--ink3);margin:0 2px 12px}
 .mod:active{transform:scale(.96)}
 .mod .m-ic{width:42px;height:42px;border-radius:14px;margin:0 auto 9px;display:flex;align-items:center;justify-content:center}
 .mod .m-ic svg{width:20px;height:20px}
 .mod .m-n{font-size:13px;font-weight:650}
 .mod .m-s{font-size:10.5px;color:var(--ink3);margin-top:3px}
-.mod.soon{background:transparent;border:1.5px dashed #DAD9D1;box-shadow:none}
-.mod.soon .m-ic{background:#F1F0EA;color:#B9B8AF}
-.mod.soon .m-n{color:var(--ink3)}
 </style>
 </head>
 <body>
@@ -123,14 +119,12 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
     <!-- ================= Life ================= -->
     <div class="screen" id="life">
       <h1 class="pt" style="margin-bottom:4px">生活</h1>
-      <div class="sub" style="margin-bottom:16px">说一句话，亚丝娜帮你归位</div>
-      <a class="capture" href="21-chat-ledger.html">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
-        <span class="ph">「记一下，下个月准备去旅行」…</span>
-      </a>
-      <div class="sec-title" style="margin-top:0"><h2>生活模块</h2><span class="hint">Skill 化 · 可持续扩展</span></div>
+      <div class="sub" style="margin-bottom:10px">你的生活工具箱</div>
+      <div class="tap-hint">长按模块可设为动态</div>
+      <div class="sec-title" style="margin-top:4px"><h2>生活模块</h2></div>
       <div class="mod-grid">
         <a class="mod" href="31-ledger.html">
+          <span class="dyn-tag">✦ 动态</span>
           <div class="m-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg></div>
           <div class="m-n">记账</div><div class="m-s">本月 ¥3,420</div>
         </a>
@@ -155,18 +149,15 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
           <div class="m-n">相册</div><div class="m-s">2,847 张 · 仅本机</div>
         </a>
       </div>
-      <div class="sec-title"><h2>即将上线</h2><span class="hint">Skill 商店</span></div>
-      <div class="mod-grid">
-        <div class="mod soon"><div class="m-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 4.5v15zM20 17v5H6.5a2.5 2.5 0 0 1 0-5"/></svg></div><div class="m-n">阅读</div><div class="m-s">V2 见</div></div>
-        <div class="mod soon"><div class="m-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="m-n">习惯打卡</div><div class="m-s">V2 见</div></div>
-        <div class="mod soon"><div class="m-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="m-n">更多 Skill</div><div class="m-s">持续扩展</div></div>
-      </div>
     </div>
 
     <!-- ================= Tab Bar ================= -->
     <div class="tabbar" id="tabbar">
       <a class="tab" data-go="home" href="10-home.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H14v-6h-4v6H4.5A1.5 1.5 0 0 1 3 20v-9.5z"/></svg>首页
+      </a>
+      <a class="tab" data-go="dynamic" href="31-ledger.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg>记账
       </a>
       <a class="tab on" data-go="life" href="30-life.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>生活

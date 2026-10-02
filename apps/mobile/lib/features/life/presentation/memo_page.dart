@@ -12,9 +12,12 @@ import 'capture_route.dart';
 /// V1 复用任务域（`kind=memo`，APP-022 降级裁决：不建独立备忘录域）。
 /// 无 tag 的备忘不编造主题，统一落「全部备忘」。
 class MemoPage extends StatefulWidget {
-  const MemoPage({super.key, this.repository});
+  const MemoPage({super.key, this.repository, this.showBackLink = true});
 
   final LifeRepository? repository;
+
+  /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
+  final bool showBackLink;
 
   @override
   State<MemoPage> createState() => _MemoPageState();
@@ -162,13 +165,14 @@ class _MemoPageState extends State<MemoPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-              child: BackLink(
-                label: '生活',
-                onTap: () => context.go('/life'),
+            if (widget.showBackLink)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                child: BackLink(
+                  label: '生活',
+                  onTap: () => context.go('/life'),
+                ),
               ),
-            ),
             Expanded(child: _body(context, colors, type)),
           ],
         ),

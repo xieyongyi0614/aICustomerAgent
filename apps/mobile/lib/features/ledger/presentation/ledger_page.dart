@@ -17,12 +17,16 @@ class LedgerPage extends StatefulWidget {
     this.debugEntries,
     this.debugPending,
     this.repository,
+    this.showBackLink = true,
   });
 
   final LedgerSummaryData? debugSummary;
   final List<LedgerEntryData>? debugEntries;
   final List<LedgerPendingData>? debugPending;
   final LedgerRepository? repository;
+
+  /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
+  final bool showBackLink;
 
   @override
   State<LedgerPage> createState() => _LedgerPageState();
@@ -371,7 +375,7 @@ class _LedgerPageState extends State<LedgerPage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              BackLink(label: '生活'),
+              if (widget.showBackLink) BackLink(label: '生活'),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(

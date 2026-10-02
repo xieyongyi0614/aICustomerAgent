@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,6 +33,8 @@ import '../../features/profile/presentation/login_page.dart';
 import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/profile/presentation/verify_code_page.dart';
+import '../state/dynamic_tab.dart';
+import 'dynamic_tab_page.dart';
 
 /// 路由元数据：Tab 隐藏与状态栏样式由壳层统一消费，禁止页面内局部 if。
 class RouteChrome {
@@ -50,6 +53,7 @@ const chromeBriefing = RouteChrome(hideTabBar: true, lightStatusBar: true);
 
 const chromeByPath = <String, RouteChrome>{
   '/home': chromeHome,
+  '/dynamic': chromeHome,
   '/life': chromeHome,
   '/chat': chromeImmersive,
   // 记忆是「我的 · 记忆管理」子页（B7：此页无 Tab 栏）
@@ -117,6 +121,7 @@ final appRouter = GoRouter(
       ),
       routes: [
         GoRoute(path: '/home', builder: (_, _) => const HomePage()),
+        GoRoute(path: '/dynamic', builder: (_, _) => const DynamicTabPage()),
         GoRoute(path: '/life', builder: (_, _) => const LifePage()),
         GoRoute(
           path: '/chat',
@@ -194,33 +199,36 @@ final appRouter = GoRouter(
   ],
 );
 
-class _AppShell extends StatelessWidget {
+class _AppShell extends ConsumerWidget {
   const _AppShell({required this.location, required this.child});
 
   final String location;
   final Widget child;
 
   int _tabIndex(String path) {
-    if (path.startsWith('/home') || path.startsWith('/health')) return 0;
+    if (path.startsWith('/dynamic')) return 1;
+    if (path.startsWith('/chat')) return 2;
     if (path.startsWith('/life') ||
         path.startsWith('/ledger') ||
         path.startsWith('/memo') ||
         path.startsWith('/schedule') ||
         path.startsWith('/car') ||
-        path.startsWith('/album')) {
-      return 1;
+        path.startsWith('/album') ||
+        path.startsWith('/health')) {
+      return 3;
     }
-    if (path.startsWith('/chat')) return 2;
-    return 3;
+    if (path.startsWith('/profile')) return 4;
+    return 0;
   }
 
   void _onTap(BuildContext context, int index) {
-    const paths = ['/home', '/life', '/chat', '/profile'];
+    const paths = ['/home', '/dynamic', '/chat', '/life', '/profile'];
     context.go(paths[index]);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dynamicModule = ref.watch(dynamicModuleProvider);
     final chrome = chromeForLocation(location);
     final index = _tabIndex(location);
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -234,6 +242,8 @@ class _AppShell extends StatelessWidget {
             : AppTabBar(
                 currentIndex: index,
                 onTap: (i) => _onTap(context, i),
+                dynamicLabel: dynamicModule.label,
+                dynamicIcon: dynamicModule.icon,
               ),
       ),
     );

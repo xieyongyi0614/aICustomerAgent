@@ -16,7 +16,7 @@
 | 2 | **不用 M3 默认 `TextTheme`** | M3 的 display / headline / title 阶与朝夕的 6 级字号阶不对应。必须用朝夕字号阶覆盖 |
 | 3 | **显式关闭 `surfaceTintColor` 与默认 elevation** | 否则 `Card` / `ElevatedButton` 会带 M3 色渗与 tonal elevation，视觉上「脏」 |
 | 4 | **图标用 Lucide，不用 Material Icons** | 设计稿明确要求「Lucide 风格 2px 线性圆角」；AI 相关一律 ✦ 四芒星 |
-| 5 | **Tab 栏自绘** | 朝夕的 Tab 是「4 个位置、中间是悬浮球」的特殊形态，M3 `NavigationBar` 无法表达 |
+| 5 | **Tab 栏自绘** | 朝夕的 Tab 是「5 个位置、第 3 位是悬浮球、第 2 位是可变的『动态』槽」的特殊形态，M3 `NavigationBar` 无法表达 |
 
 **保留 M3 的部分（这些是白拿的）**：`InkWell` 水波纹与手势、`Focus` / 键盘导航、语义标签（TalkBack / VoiceOver）、页面转场、`MediaQuery` 文本缩放适配、`Scaffold` / `SafeArea` 插边处理。
 

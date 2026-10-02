@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/features/life/data/life_repository.dart';
+import 'package:mobile/features/life/presentation/dynamic_module_sheet.dart';
 import 'package:mobile/features/life/presentation/life_page.dart';
 
 class _FakeLifeRepository extends LifeRepository {
@@ -79,8 +80,8 @@ void main() {
     ]) {
       expect(find.widgetWithText(ModuleCard, title), findsOneWidget, reason: title);
     }
-    // 宫格 6（3×2）+ 即将上线 3
-    expect(find.byType(ModuleCard), findsNWidgets(9));
+    // 宫格 6（3×2）；「即将上线」占位区已于 2026-10-03 移除
+    expect(find.byType(ModuleCard), findsNWidgets(6));
     for (final removed in const ['任务', '日历', '旅行', '记忆']) {
       expect(find.widgetWithText(ModuleCard, removed), findsNothing,
           reason: '$removed 已按 2026-09-30 IA 裁决移出宫格');
@@ -178,6 +179,43 @@ void main() {
     }
     expect(content.contains('features/ledger'), isFalse);
     expect(content.contains('features/car'), isFalse);
+  });
+
+  testWidgets('test_life_page_drops_skill_copy_and_soon_grid', (tester) async {
+    final repo = _FakeLifeRepository();
+    await _pumpPage(tester, repo);
+
+    expect(find.text('你的生活工具箱'), findsOneWidget);
+    expect(find.text('长按模块可设为动态'), findsOneWidget);
+    for (final removed in const [
+      '说一句话，亚丝娜帮你归位',
+      'Skill 化 · 可持续扩展',
+      '即将上线',
+      'Skill 商店',
+      '更多 Skill',
+    ]) {
+      expect(find.text(removed), findsNothing, reason: removed);
+    }
+  });
+
+  testWidgets('test_life_page_long_press_opens_dynamic_module_sheet',
+      (tester) async {
+    final repo = _FakeLifeRepository();
+    await _pumpPage(tester, repo);
+
+    await tester.longPress(find.widgetWithText(ModuleCard, '车辆'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DynamicModuleSheet), findsOneWidget);
+    expect(find.text('设为动态'), findsOneWidget);
+  });
+
+  testWidgets('test_life_page_marks_current_dynamic_module', (tester) async {
+    final repo = _FakeLifeRepository();
+    await _pumpPage(tester, repo);
+
+    expect(_card(tester, '记账').active, isTrue, reason: '默认动态位是记账');
+    expect(_card(tester, '车辆').active, isFalse);
   });
 
   testWidgets('test_life_page_golden', (tester) async {
