@@ -126,6 +126,8 @@ class CarRepository {
         chargeCostMinorMonth: raw['charge_cost_minor_month'] as int? ?? 0,
         chargeCostTextMonth: raw['charge_cost_text_month'] as String? ?? '0.00',
         chargeCountMonth: raw['charge_count_month'] as int? ?? 0,
+        chargeKwhMonth: (raw['charge_kwh_month'] as num?)?.toDouble(),
+        kwhPer100km: (raw['kwh_per_100km'] as num?)?.toDouble(),
         basis: raw['basis'] as String? ?? '',
         note: raw['note'] as String? ?? '',
       );

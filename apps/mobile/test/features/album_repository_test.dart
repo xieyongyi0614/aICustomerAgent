@@ -72,6 +72,13 @@ class _FakeSource implements AlbumAssetSource {
     trashedIds.add(asset.id);
     return true;
   }
+
+  @override
+  Future<bool> setFavorite(PhotoAsset asset, {required bool favorite}) async =>
+      true;
+
+  @override
+  Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target) async => true;
 }
 
 class _RecordingStore implements AlbumLocalStore {

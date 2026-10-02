@@ -138,7 +138,8 @@ void main() {
     expect(find.text('车辆保险'), findsOneWidget);
     expect(find.text('2027-01-15 到期'), findsOneWidget);
     expect(find.text('保养记录'), findsOneWidget);
-    expect(find.text('我帮你记着 2 条'), findsOneWidget);
+    expect(find.text('2 次'), findsOneWidget);
+    expect(find.text('看本月养车账 →'), findsOneWidget);
     expect(find.byType(Timeline), findsOneWidget);
   });
 

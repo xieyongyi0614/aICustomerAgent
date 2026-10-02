@@ -108,6 +108,34 @@ void main() {
     await tester.pump();
     expect(find.text('记下了：鸡蛋 10 元'), findsOneWidget);
     expect(find.byType(TypingIndicator), findsNothing);
+    expect(find.text('查看行程'), findsOneWidget);
+    expect(find.text('调整预算'), findsOneWidget);
+    expect(find.text('换个人少的目的地'), findsOneWidget);
+  });
+
+  testWidgets('chat page hides suggestion chips while awaiting reply',
+      (tester) async {
+    const state = ChatPageState(
+      loading: false,
+      awaitingReply: true,
+      messages: [
+        ChatMessageItem(
+          id: 'local_1',
+          role: 'human',
+          content: '记账今天花费10元买鸡蛋',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatPageStateProvider.overrideWith(() => _FixedNotifier(state)),
+        ],
+        child: MaterialApp(theme: buildAppTheme(), home: const ChatPage()),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('查看行程'), findsNothing);
   });
 }
 

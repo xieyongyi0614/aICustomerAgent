@@ -314,7 +314,14 @@ void main() {
     );
     expect(find.text('记为支出'), findsOneWidget);
     expect(find.text('记为收入'), findsOneWidget);
-    expect(find.text('餐饮'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(LedgerConfirmRow),
+        matching: find.text('餐饮'),
+      ),
+      findsOneWidget,
+      reason: '分类条也有「餐饮」，待确认行断言须限定在确认行内',
+    );
     expect(find.text('忽略'), findsOneWidget);
   });
 

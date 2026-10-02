@@ -130,6 +130,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  /// B2 建议 chips：只在 AI 一次完整回复落定后出现（流式 / 等待 / 出错不出现）；
+  /// 点击 = 把建议语作为用户消息发出，不预设任何事实。
+  static const _suggestions = ['查看行程', '调整预算', '换个人少的目的地'];
+
+  bool _showSuggestions(ChatPageState state) {
+    if (state.awaitingReply ||
+        state.streaming ||
+        state.streamingText.isNotEmpty ||
+        state.error != null) {
+      return false;
+    }
+    return state.messages.isNotEmpty &&
+        state.messages.last.role != 'human';
+  }
+
   Widget _body(ChatPageState state) {
     if (state.loading) {
       return ListView(
@@ -177,6 +192,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         if (state.streamingText.isNotEmpty)
           MessageBubble.streaming(
             text: state.streamingText,
+          ),
+        if (_showSuggestions(state))
+          Padding(
+            padding: const EdgeInsets.only(left: 30, top: 10, right: 18),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final label in _suggestions)
+                  ChipButton(
+                    label: label,
+                    onTap: () => ref
+                        .read(chatPageStateProvider.notifier)
+                        .send(label),
+                  ),
+              ],
+            ),
           ),
         if (state.awaitingReply || state.streaming)
           const Padding(

@@ -126,25 +126,38 @@ class _CarPageState extends State<CarPage> {
               Row(
                 children: [
                   Expanded(
+                    child: overview.evMetrics.chargeKwhMonth == null
+                        ? MetricCard(
+                            label: '本月充电费用 元',
+                            value: _yuanText(
+                              overview.evMetrics.chargeCostMinorMonth,
+                            ),
+                          )
+                        : MetricCard(
+                            label: '本月充电',
+                            value: _kwhText(overview.evMetrics.chargeKwhMonth!),
+                            unit: 'kWh',
+                          ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
                     child: MetricCard(
-                      label: '本月充电费用 元',
-                      value: _yuanText(overview.evMetrics.chargeCostMinorMonth),
+                      label: '百公里电耗',
+                      value: overview.evMetrics.kwhPer100km == null
+                          ? '—'
+                          : _kwhText(overview.evMetrics.kwhPer100km!),
+                      unit: 'kWh',
                     ),
                   ),
                   const SizedBox(width: 9),
                   Expanded(
                     child: MetricCard(
-                      label: '本月里程 km',
-                      value: '${overview.evMetrics.odometerDeltaMonth}',
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: MetricCard(
-                      label: '总里程 km',
+                      label: '总里程',
                       value: overview.evMetrics.odometerKm == null
                           ? '—'
-                          : '${overview.evMetrics.odometerKm}',
+                          : _thousands(overview.evMetrics.odometerKm!),
+                      unit: 'km',
+                      note: '本月 +${overview.evMetrics.odometerDeltaMonth} km',
                     ),
                   ),
                 ],
@@ -169,12 +182,17 @@ class _CarPageState extends State<CarPage> {
                 Text('本月还没有养车支出',
                     style: type.body.copyWith(color: colors.ink2))
               else
-                for (final line in overview.expenseBreakdown)
+                for (var i = 0; i < overview.expenseBreakdown.length; i++)
                   CategoryBar(
-                    label: line.categoryName,
-                    amountLabel: '¥${line.netText}',
-                    ratio: maxCost == 0 ? 0 : line.netMinor / maxCost,
-                    gradient: context.gradients.barMoney,
+                    label: overview.expenseBreakdown[i].categoryName,
+                    amountLabel: '¥${overview.expenseBreakdown[i].netText}',
+                    ratio: maxCost == 0
+                        ? 0
+                        : overview.expenseBreakdown[i].netMinor / maxCost,
+                    gradient: _breakdownGradient(
+                      overview.expenseBreakdown[i].categoryName,
+                      i,
+                    ),
                   ),
               const SizedBox(height: 20),
               _SectionTitle(title: '车辆提醒', hint: '我会提前告诉你'),
@@ -228,8 +246,11 @@ class _CarPageState extends State<CarPage> {
                     amountLabel: overview.recentRecords[i].isMileage
                         ? '${overview.recentRecords[i].odometerDeltaKm ?? 0} km'
                         : '-${_minorText(overview.recentRecords[i].netMinor!)}',
-                    tileColor: colors.tileWarm,
-                    iconColor: colors.warm,
+                    tileColor: _recordTile(colors, overview.recentRecords[i].kind),
+                    iconColor: _recordForeground(
+                      colors,
+                      overview.recentRecords[i].kind,
+                    ),
                     icon: _recordIcon(overview.recentRecords[i].kind),
                     showDivider: i < overview.recentRecords.length - 1,
                   ),
@@ -252,6 +273,42 @@ class _CarPageState extends State<CarPage> {
       ),
     );
   }
+
+  /// 35 页分类条：语义色优先（充电=green / 停车=blue / 过路=purple /
+  /// 洗车保养加油=money），未识别类名按位置四色轮转。
+  LinearGradient _breakdownGradient(String categoryName, int index) {
+    final gradients = context.gradients;
+    if (categoryName.contains('充电')) return gradients.barGreen;
+    if (categoryName.contains('停车')) return gradients.barBlue;
+    if (categoryName.contains('过路')) return gradients.barPurple;
+    if (categoryName.contains('洗车') ||
+        categoryName.contains('保养') ||
+        categoryName.contains('加油')) {
+      return gradients.barMoney;
+    }
+    return switch (index % 4) {
+      0 => gradients.barMoney,
+      1 => gradients.barBlue,
+      2 => gradients.barPurple,
+      _ => gradients.barGreen,
+    };
+  }
+
+  Color _recordTile(AppColors colors, String kind) => switch (kind) {
+        'charge' => colors.tileHealth,
+        'parking' => colors.tileInfo,
+        'mileage' => colors.tileMoney,
+        'toll' => colors.tileAi,
+        _ => colors.tileWarm,
+      };
+
+  Color _recordForeground(AppColors colors, String kind) => switch (kind) {
+        'charge' => colors.health,
+        'parking' => colors.aiBlue,
+        'mileage' => colors.money,
+        'toll' => colors.aiPrimary,
+        _ => colors.warm,
+      };
 
   String _observation(CarOverviewData overview) {
     if (overview.expenseTotalMinor == 0 && overview.reminders.isEmpty) {
@@ -303,6 +360,19 @@ String? _shortDate(String? iso) {
 String _minorText(int minor) => (minor / 100).toStringAsFixed(2);
 
 String _yuanText(int minor) => (minor / 100).round().toString();
+
+String _kwhText(double kwh) =>
+    kwh % 1 == 0 ? kwh.toStringAsFixed(0) : kwh.toStringAsFixed(1);
+
+String _thousands(int value) {
+  final digits = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(digits[i]);
+  }
+  return buffer.toString();
+}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, this.hint});

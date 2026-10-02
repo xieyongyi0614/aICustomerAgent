@@ -359,7 +359,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.textContaining('发送过于频繁'), findsOneWidget);
-    expect(find.textContaining('37 s'), findsOneWidget);
+    expect(find.textContaining('37s'), findsOneWidget);
     await _dismissSnackBar(tester);
     await _drainResendCountdown(tester);
   });

@@ -141,7 +141,14 @@ class MetricCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(value, style: type.numeric(type.rowTitle)),
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.numeric(type.rowTitle),
+                ),
+              ),
               if (unit != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 2, bottom: 2),

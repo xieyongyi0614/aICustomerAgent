@@ -45,6 +45,8 @@ CarOverviewData _overview({
   ),
   List<String> degraded = const [],
   String? restrictionGuide = '还没配置限行城市、尾号与限行日，配置后我会提前提醒',
+  double? chargeKwhMonth,
+  double? kwhPer100km,
   List<CarReminderData> reminders = const [
     CarReminderData(
       kind: 'service',
@@ -67,12 +69,14 @@ CarOverviewData _overview({
         odometerKm: 12480,
       ),
       loan: loan,
-      evMetrics: const CarEvMetricsData(
+      evMetrics: CarEvMetricsData(
         odometerKm: 12480,
         odometerDeltaMonth: 320,
         chargeCostMinorMonth: 4200,
         chargeCostTextMonth: '42.00',
         chargeCountMonth: 1,
+        chargeKwhMonth: chargeKwhMonth,
+        kwhPer100km: kwhPer100km,
         basis: 'approximate',
         note: '充电度数本期未结构化存储，电耗精算列 V2（当前按充电费用近似）',
       ),
@@ -149,6 +153,22 @@ void main() {
     expect(find.text('本月充电费用 元'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
     expect(find.text('¥42.00'), findsOneWidget);
+  });
+
+  testWidgets('test_car_page_metrics_use_kwh_when_structured',
+      (tester) async {
+    final repo = _FakeCarRepository(
+      overview: _overview(chargeKwhMonth: 186, kwhPer100km: 14.2),
+    );
+    await _pumpPage(tester, repo);
+
+    expect(find.text('本月充电'), findsOneWidget);
+    expect(find.text('186'), findsOneWidget);
+    expect(find.text('百公里电耗'), findsOneWidget);
+    expect(find.text('14.2'), findsOneWidget);
+    expect(find.text('总里程'), findsOneWidget);
+    expect(find.text('12,480'), findsOneWidget);
+    expect(find.text('本月 +320 km'), findsOneWidget);
   });
 
   testWidgets('test_car_page_loan_card_absent_when_no_loan', (tester) async {

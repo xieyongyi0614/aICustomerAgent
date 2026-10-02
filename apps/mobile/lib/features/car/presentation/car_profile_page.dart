@@ -222,6 +222,8 @@ class _CarProfilePageState extends State<CarProfilePage> {
               const SizedBox(height: 14),
               AiCard(
                 title: '亚丝娜的观察',
+                actionLabel: '看本月养车账 →',
+                onAction: () => context.push('/car'),
                 child: Text(
                   _observation(profile),
                   style: type.body
@@ -229,10 +231,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              _SectionTitle(
-                title: '车辆档案',
-                hint: _editing ? null : '点「改档案」就能改',
-              ),
+              _SectionTitle(title: '车辆档案', hint: '保养记录我帮你记着'),
               const SizedBox(height: 10),
               if (_editing)
                 _editForm(context)
@@ -258,7 +257,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
               const SizedBox(height: 20),
               _SectionTitle(
                 title: '保养记录',
-                hint: '我帮你记着 ${_recordCount(profile)} 条',
+                hint: _editing ? null : '${_recordCount(profile)} 次',
               ),
               const SizedBox(height: 10),
               if (profile.services.isEmpty)

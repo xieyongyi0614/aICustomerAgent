@@ -1,20 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../data/album_analysis.dart';
 import '../data/album_repository.dart';
 import '../domain/album_models.dart';
+import 'album_move_sheet.dart';
 
 /// B15 #albumManage 批量管理：AI 预选可逐张推翻、删除走系统「最近删除」。
 ///
-/// 相似连拍本期未开启（D16）：呈诚实未支持态，不参与任何计数。
+/// 分组呈现（38）：过期截图 / 重复保存为 AI 预选组，其余落「手动挑选」；
+/// 相似连拍本期未开启（D16）→ 只呈诚实未支持说明，不参与任何计数。
 class AlbumManagePage extends StatefulWidget {
   const AlbumManagePage({
     super.key,
     this.repository,
     this.analyzer,
     this.preloaded,
+    this.bucketId,
+    this.bucketName,
   });
 
   final AlbumRepository? repository;
@@ -22,6 +29,10 @@ class AlbumManagePage extends StatefulWidget {
 
   /// 测试注入：跳过扫描直接呈现这些资产与建议。
   final AlbumManageData? preloaded;
+
+  /// 从相簿详情（60）进入时限定该相簿；空 = 全部照片流。
+  final String? bucketId;
+  final String? bucketName;
 
   @override
   State<AlbumManagePage> createState() => _AlbumManagePageState();
@@ -34,12 +45,16 @@ class AlbumManageData {
     required this.thumbnails,
     required this.preselectedIds,
     required this.totalCount,
+    this.sections = const [],
   });
 
   final List<PhotoAsset> assets;
   final Map<String, ImageProvider?> thumbnails;
   final Set<String> preselectedIds;
   final int totalCount;
+
+  /// 分析结果（决定分组与 AI 提示条；空 = 无分析，全部落手动挑选组）。
+  final List<AlbumAnalysisSection> sections;
 }
 
 class _AlbumManagePageState extends State<AlbumManagePage> {
@@ -69,7 +84,7 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       });
       return;
     }
-    final snapshots = await _repo.scanSnapshots();
+    final snapshots = await _repo.scanSnapshots(bucketId: widget.bucketId);
     if (!mounted) return;
     if (snapshots == null) {
       setState(() => _loading = false);
@@ -100,6 +115,7 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
         thumbnails: thumbnails,
         preselectedIds: preselected,
         totalCount: snapshots.length,
+        sections: result.sections,
       );
       _overrides = overrides;
       _selected = {...preselected};
@@ -111,7 +127,11 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     final assets = <PhotoAsset>[];
     var start = 0;
     while (true) {
-      final page = await _repo.assets(start: start, limit: 120);
+      final page = await _repo.assets(
+        bucketId: widget.bucketId,
+        start: start,
+        limit: 120,
+      );
       assets.addAll(page.items);
       if (!page.hasMore || page.items.isEmpty) break;
       start += page.items.length;
@@ -126,6 +146,25 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       if (keep) _selected.add(id);
       _repo.store.saveOverride(id, keep);
       _overrides[id] = keep;
+    });
+  }
+
+  bool get _allSelected {
+    final data = _data;
+    return data != null &&
+        data.assets.isNotEmpty &&
+        _selected.length == data.assets.length;
+  }
+
+  void _toggleSelectAll() {
+    final data = _data;
+    if (data == null) return;
+    setState(() {
+      if (_allSelected) {
+        _selected.clear();
+      } else {
+        _selected = {for (final asset in data.assets) asset.id};
+      }
     });
   }
 
@@ -155,10 +194,48 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       await _repo.moveToTrash(asset);
     }
     if (!mounted) return;
-    setState(() {
-      _selected.clear();
-      _begin();
-    });
+    setState(() => _selected.clear());
+    unawaited(_begin());
+  }
+
+  Future<void> _moveSelected() async {
+    final data = _data;
+    if (data == null || _selected.isEmpty || !mounted) return;
+    final target = await showAlbumMovePicker(context, _repo);
+    if (target == null || !mounted) return;
+    var moved = 0;
+    for (final id in _selected.toList()) {
+      final asset = data.assets.firstWhere((a) => a.id == id);
+      if (await _repo.moveToAlbum(asset, target)) moved++;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          moved == _selected.length
+              ? '已移动 $moved 张到「${target.name}」'
+              : '移动了 $moved 张，其余这张设备不支持移动',
+        ),
+      ),
+    );
+    setState(() {});
+    unawaited(_begin());
+  }
+
+  void _tagSelected() {
+    if (_selected.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: const Text('照片标签依赖系统能力，这台设备本期未开启。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -197,55 +274,181 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 60),
+                  GestureDetector(
+                    onTap: _toggleSelectAll,
+                    behavior: HitTestBehavior.opaque,
+                    child: Text(
+                      _allSelected ? '全不选' : '全选',
+                      style: type.caption.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: colors.aiBlue,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
+            if (data.preselectedIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: MemHint(text: _preselectHint(data)),
+              ),
+            ],
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  '亚丝娜已帮你预选，逐张可推翻；推翻会被记住',
-                  style: type.caption.copyWith(fontSize: 12, color: colors.ink2),
+                child: GestureDetector(
+                  onTap: () => context.push('/album/ai'),
+                  behavior: HitTestBehavior.opaque,
+                  child: Text(
+                    '这些预选是怎么算出来的 →',
+                    style: type.caption.copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colors.aiBlue,
+                    ),
+                  ),
                 ),
               ),
             ),
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(18),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: PhotoTile.gridCrossAxisCount,
-                  crossAxisSpacing: PhotoTile.gridSpacing,
-                  mainAxisSpacing: PhotoTile.gridSpacing,
-                  childAspectRatio: 1,
-                ),
-                itemCount: data.assets.length,
-                itemBuilder: (context, index) {
-                  final asset = data.assets[index];
-                  final selected = _selected.contains(asset.id);
-                  return PhotoTile(
-                    thumbnail: data.thumbnails[asset.id],
-                    selectionMode: true,
-                    selected: selected,
-                    onToggle: () => _toggle(asset.id),
-                  );
-                },
-              ),
-            ),
+            Expanded(child: _groupedGrid(data)),
             AlbumActionBar(
               actions: [
+                AlbumAction(
+                  label: '移动',
+                  icon: AppIcons.move,
+                  onTap: _selected.isEmpty ? null : _moveSelected,
+                ),
+                AlbumAction(
+                  label: '加标签',
+                  icon: AppIcons.tag,
+                  onTap: _selected.isEmpty ? null : _tagSelected,
+                ),
                 AlbumAction(
                   label: '删除 ${_selected.length} 张',
                   icon: AppIcons.trash,
                   danger: true,
-                  onTap: _deleteSelected,
+                  onTap: _selected.isEmpty ? null : _deleteSelected,
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  String _preselectHint(AlbumManageData data) {
+    final parts = <String>[];
+    for (final section in data.sections) {
+      final suggestion = section.suggestion;
+      if (!section.supported || suggestion == null) continue;
+      final ids = suggestion.assetIds
+          .where((id) => data.preselectedIds.contains(id))
+          .length;
+      if (ids == 0) continue;
+      parts.add('$ids 张${_kindLabel(section.kind)}');
+    }
+    if (parts.isEmpty) {
+      return '已帮你预选 ${data.preselectedIds.length} 张，都在本机分析';
+    }
+    return '已帮你预选 ${data.preselectedIds.length} 张：'
+        '${parts.join(' + ')}，都在本机分析';
+  }
+
+  String _kindLabel(AlbumSuggestionKind kind) => switch (kind) {
+        AlbumSuggestionKind.expiredScreenshots => '过期截图',
+        AlbumSuggestionKind.duplicateSaves => '重复保存',
+        AlbumSuggestionKind.similarBursts => '相似连拍',
+      };
+
+  Widget _groupedGrid(AlbumManageData data) {
+    final unsupported = data.sections
+        .where((s) => !s.supported)
+        .map((s) => s.unsupportedReason ?? '')
+        .where((reason) => reason.isNotEmpty)
+        .toList();
+    final grouped = <String, Set<String>>{};
+    for (final section in data.sections) {
+      final suggestion = section.suggestion;
+      if (!section.supported || suggestion == null) continue;
+      grouped[_kindLabel(section.kind)] = suggestion.assetIds.toSet();
+    }
+    final claimed = <String>{for (final ids in grouped.values) ...ids};
+    final children = <Widget>[];
+    grouped.forEach((label, ids) {
+      final assets =
+          data.assets.where((asset) => ids.contains(asset.id)).toList();
+      if (assets.isEmpty) return;
+      children
+        ..add(_groupLabel('$label · 共 ${assets.length} 张（AI 预选）'))
+        ..add(_grid(data, assets));
+    });
+    final manual =
+        data.assets.where((asset) => !claimed.contains(asset.id)).toList();
+    if (manual.isNotEmpty) {
+      children
+        ..add(_groupLabel('手动挑选'))
+        ..add(_grid(data, manual));
+    }
+    for (final reason in unsupported) {
+      children
+        ..add(_groupLabel('相似连拍 · 本期未开启'))
+        ..add(Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            reason,
+            style: context.typography.caption.copyWith(
+              fontSize: 11.5,
+              color: context.colors.ink3,
+            ),
+          ),
+        ));
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+      children: children,
+    );
+  }
+
+  Widget _groupLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 16, 2, 9),
+      child: Text(
+        text,
+        style: context.typography.caption.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: context.colors.ink3,
+        ),
+      ),
+    );
+  }
+
+  Widget _grid(AlbumManageData data, List<PhotoAsset> assets) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: PhotoTile.gridCrossAxisCount,
+        crossAxisSpacing: PhotoTile.gridSpacing,
+        mainAxisSpacing: PhotoTile.gridSpacing,
+        childAspectRatio: 1,
+      ),
+      itemCount: assets.length,
+      itemBuilder: (context, index) {
+        final asset = assets[index];
+        return PhotoTile(
+          thumbnail: data.thumbnails[asset.id],
+          selectionMode: true,
+          selected: _selected.contains(asset.id),
+          onToggle: () => _toggle(asset.id),
+        );
+      },
     );
   }
 }

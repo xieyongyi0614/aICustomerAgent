@@ -76,7 +76,11 @@ void main() {
     expect(find.text('护照明年 3 月到期'), findsOneWidget);
     expect(find.text('带无人机，查限飞区'), findsOneWidget);
     expect(find.text('交水费'), findsNothing, reason: '备忘录页不展示 kind=task');
-    expect(find.text('生活'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(BackLink), matching: find.text('生活')),
+      findsOneWidget,
+      reason: '「生活」同时是分组名，返回链断言须限定在 BackLink 内',
+    );
     expect(find.text('旅行灵感'), findsOneWidget);
     expect(find.text('亚丝娜整理中'), findsOneWidget);
     expect(find.byType(MemoRow), findsNWidgets(2));

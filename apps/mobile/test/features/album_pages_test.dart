@@ -49,6 +49,7 @@ class _FakeSource implements AlbumAssetSource {
   final Set<String> _videoIds;
 
   final List<String> trashedIds = [];
+  final List<String> movedIds = [];
 
   @override
   Future<AlbumPermissionStatus> requestAccess() async => permission;
@@ -87,6 +88,16 @@ class _FakeSource implements AlbumAssetSource {
   @override
   Future<bool> trashAsset(PhotoAsset asset) async {
     trashedIds.add(asset.id);
+    return true;
+  }
+
+  @override
+  Future<bool> setFavorite(PhotoAsset asset, {required bool favorite}) async =>
+      true;
+
+  @override
+  Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target) async {
+    movedIds.add(asset.id);
     return true;
   }
 }
@@ -139,12 +150,12 @@ AlbumAnalysisResult _resultWith({int expired = 38, int duplicates = 12}) {
   );
 }
 
-Widget _wrap(Widget child) => ProviderScope(
+Widget _wrap(Widget child, {double height = 1400}) => ProviderScope(
       child: MaterialApp(
         theme: buildAppTheme(),
         home: Scaffold(
           backgroundColor: AppColors.light.canvas,
-          body: SizedBox(width: 390, height: 1400, child: child),
+          body: SizedBox(width: 390, height: height, child: child),
         ),
       ),
     );
@@ -286,6 +297,92 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已选 2 张'), findsOneWidget);
     expect(tester.widgetList<PhotoTile>(find.byType(PhotoTile)).length, 3);
+  });
+
+  testWidgets('test_album_manage_page_groups_preselected_and_manual',
+      (tester) async {
+    final data = AlbumManageData(
+      assets: [_asset('old-1'), _asset('dup-1'), _asset('keep-1')],
+      thumbnails: const {},
+      preselectedIds: const {'old-1', 'dup-1'},
+      totalCount: 3,
+      sections: _resultWith().sections,
+    );
+    _tallViewport(tester);
+    await tester.pumpWidget(_wrap(AlbumManagePage(preloaded: data), height: 2600));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('过期截图 · 共 1 张（AI 预选）'), findsOneWidget);
+    expect(find.textContaining('重复保存 · 共 1 张（AI 预选）'), findsOneWidget);
+    expect(find.text('手动挑选'), findsOneWidget);
+    expect(find.textContaining('相似连拍 · 本期未开启'), findsOneWidget);
+    expect(find.textContaining('逐张画面比对'), findsOneWidget);
+    expect(find.textContaining('已帮你预选 2 张'), findsOneWidget);
+    expect(find.textContaining('1 张过期截图 + 1 张重复保存'), findsOneWidget);
+    expect(find.text('这些预选是怎么算出来的 →'), findsOneWidget);
+  });
+
+  testWidgets('test_album_manage_page_select_all_toggles', (tester) async {
+    final data = AlbumManageData(
+      assets: [_asset('old-1'), _asset('dup-1'), _asset('keep-1')],
+      thumbnails: const {},
+      preselectedIds: const {'old-1'},
+      totalCount: 3,
+    );
+    await tester.pumpWidget(_wrap(AlbumManagePage(preloaded: data)));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 1 张'), findsOneWidget);
+    await tester.tap(find.text('全选'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 3 张'), findsOneWidget);
+    await tester.tap(find.text('全不选'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 0 张'), findsOneWidget);
+  });
+
+  testWidgets('test_album_manage_page_move_uses_system_albums',
+      (tester) async {
+    final data = AlbumManageData(
+      assets: [_asset('keep-1')],
+      thumbnails: const {},
+      preselectedIds: const {},
+      totalCount: 1,
+    );
+    final repo = AlbumRepository(source: _FakeSource());
+    _tallViewport(tester);
+    await tester.pumpWidget(_wrap(AlbumManagePage(preloaded: data, repository: repo)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全选'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('移动'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('移动到相簿'), findsOneWidget);
+    await tester.tap(find.text('Screenshots'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('已移动 1 张到「Screenshots」'), findsOneWidget);
+  });
+
+  testWidgets('test_album_detail_shows_video_count_and_manage_entry',
+      (tester) async {
+    final data = AlbumManageData(
+      assets: [
+        _asset('a-1', takenAt: DateTime(2026, 9, 12)),
+        _asset('a-4', video: true, takenAt: DateTime(2026, 9, 12)),
+      ],
+      thumbnails: const {},
+      preselectedIds: const {},
+      totalCount: 2,
+    );
+    await tester.pumpWidget(_wrap(AlbumDetailPage(
+      preloaded: data,
+      albumName: '旅行',
+    )));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 张 · 1 段视频'), findsOneWidget);
+    expect(find.text('批量管理这个相簿'), findsOneWidget);
+    expect(find.textContaining('无云同步'), findsNothing, reason: '相册域禁止云表述');
+    expect(find.textContaining('不上传服务器'), findsOneWidget);
   });
 
   testWidgets('test_album_detail_groups_by_day_without_ai_badges',

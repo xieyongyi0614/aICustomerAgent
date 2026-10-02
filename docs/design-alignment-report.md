@@ -13,12 +13,12 @@
 |---|---|
 | 最大问题 | 生活宫格 3×3 含 4 个**悬空入口**（任务/日历/旅行无页面、记忆已降级），违反红线 10 |
 | 本轮已交付 | 宫格收敛为 6 格；补齐备忘录(41)/日程(42) 两页；AI 标识组件层（✦）对齐；账本页单一「记一笔」；健康页 IA 重排；全仓 Material 图标清零 |
-| 已完成 | **DA-01 / DA-02 / DA-03**，**DA-04 / DA-05 完成客户端与结构部分** |
-| 被后端卡住 | 首页数据可视化（契约缺字段）、健康域真实内容（`PLT-001` M4 门控） |
-| 有意偏差 | DEV-01~04 已裁决「保留增强、登记偏差」 |
-| 剩余待办 | DA-06~DA-30 |
-| 静态校验 | **166 文件 0 error / 0 warning**（进程内 `package:analyzer`） |
-| 未验证 | `flutter test` / golden —— 本机工具链故障，见 §5 |
+| 已完成 | DA-01~DA-16 / DA-22 / DA-23 / DA-29 / DA-30（**2026-10-03 全部收口**，明细见 §3 勾选态） |
+| 被后端卡住 | 首页数据可视化（DA-25 契约缺字段）、健康域真实内容（DA-26 卡 `PLT-001`）、DA-19/20/21（后端契约）、DA-15 之「关系 Lv.N」（无轻量关系端点，待裁决） |
+| 有意偏差 | DEV-01~04 已裁决「保留增强、登记偏差」；新增 DA-08「加标签」/ DA-10「✦ 徽章与地点」按 D16 呈诚实未支持态 |
+| 剩余待办 | DA-19 / DA-20 / DA-21 / DA-25 / DA-26 / DA-27 / DA-28（全部卡后端或产品裁决） |
+| 静态校验 | `flutter analyze` **0 issue**（工具链已恢复） |
+| 验证 | `flutter test` **342 全绿**；golden 已重生成（16 张更新 + 3 张新增），见 §5 |
 
 ---
 
@@ -105,19 +105,19 @@
 
 ### P1 · 功能缺口（数据源已在，可直接开工）
 
-- [ ] **DA-06 记一笔「说给亚丝娜 / 键盘输入」双模** — `ledger_add_page.dart`：缺 seg 切换、say-box + 示例 chip、解析卡「我听到的」。**L**｜`ledger_add`
-- [ ] **DA-07 对话页消息后建议 chip 行** — `chat_page.dart`：缺「查看行程 / 调整预算 / 换个人少的目的地」。**M**｜无
-- [ ] **DA-08 相册批量管理补全** — `album_manage_page.dart`：缺「全选」、过期截图/相似连拍/手动挑选**分组 + 组标签**、「移动」「加标签」、预选 ai-hint 与回指 62。**L**｜无
-- [ ] **DA-09 相簿详情补全** — `album_detail_page.dart`：缺 AI 整理卡、`✦` 连拍原片徽章、批量管理按钮、隐私卡；日期头缺地点/视频段数。**L**｜无
-- [ ] **DA-10 单张照片补全** — `photo_view_page.dart`：缺「我留了这张」`✦` 徽章、AI 说明卡 + chip 行、「照片信息」标题、底部 收藏/移到相簿/删除 actionbar。**L**｜无
-- [ ] **DA-11 AI 整理建议页对齐** — `album_ai_page.dart`：补底部隐私卡、建议行集合。**M**｜无
-- [ ] **DA-12 车辆页指标与配色** — `car_page.dart`：指标标签改「本月充电 186 kWh / 百公里电耗 / 总里程」；`CategoryBar` 四色；记录行强调色。**M**｜`car_page`
-- [ ] **DA-14 车辆档案微调** — `car_profile_page.dart`：section hint 文案；补 AiCard 的「看本月养车账 →」。**S**｜`car_profile`
+- [x] **DA-06 记一笔「说给亚丝娜 / 键盘输入」双模** — `ledger_add_page.dart`：缺 seg 切换、say-box + 示例 chip、解析卡「我听到的」。**L**｜`ledger_add`
+- [x] **DA-07 对话页消息后建议 chip 行** — `chat_page.dart`：缺「查看行程 / 调整预算 / 换个人少的目的地」。**M**｜无
+- [x] **DA-08 相册批量管理补全** — `album_manage_page.dart`：缺「全选」、过期截图/相似连拍/手动挑选**分组 + 组标签**、「移动」「加标签」、预选 ai-hint 与回指 62。**L**｜无
+- [x] **DA-09 相簿详情补全** — `album_detail_page.dart`：缺 AI 整理卡、`✦` 连拍原片徽章、批量管理按钮、隐私卡；日期头缺地点/视频段数。**L**｜无
+- [x] **DA-10 单张照片补全** — `photo_view_page.dart`：缺「我留了这张」`✦` 徽章、AI 说明卡 + chip 行、「照片信息」标题、底部 收藏/移到相簿/删除 actionbar。**L**｜无
+- [x] **DA-11 AI 整理建议页对齐** — `album_ai_page.dart`：补底部隐私卡、建议行集合。**M**｜无
+- [x] **DA-12 车辆页指标与配色** — `car_page.dart`：指标标签改「本月充电 186 kWh / 百公里电耗 / 总里程」；`CategoryBar` 四色；记录行强调色。**M**｜`car_page`
+- [x] **DA-14 车辆档案微调** — `car_profile_page.dart`：section hint 文案；补 AiCard 的「看本月养车账 →」。**S**｜`car_profile`
 
 ### P2 · 文案小差异（低风险）
 
-- [ ] **DA-15 我的页对齐** — `profile_page.dart`：身份行补「· 关系 Lv.N」；「健康数据授权」→「数据授权」+ 副文案；「记忆管理」副文案补条数；「隐私设置」副文案改「本地优先 · 一键清空 · 导出数据」。（状态开关按 DEV-04 保留）**S**｜无
-- [ ] **DA-16 验证码页文案** — `verify_code_page.dart`：隐私文案对齐；重发倒计时去掉多余空格。**S**｜无
+- [x] **DA-15 我的页对齐** — `profile_page.dart`：身份行补「· 关系 Lv.N」；「健康数据授权」→「数据授权」+ 副文案；「记忆管理」副文案补条数；「隐私设置」副文案改「本地优先 · 一键清空 · 导出数据」。（状态开关按 DEV-04 保留；**「关系 Lv.N」未做**：`/state` 是全量快照不宜为一条文案调用，待后端出轻量端点；「隐私设置」副文案按 skill B8 已定口径去「本地优先」，落「一键清空 · 导出数据」）**S**｜无
+- [x] **DA-16 验证码页文案** — `verify_code_page.dart`：重发倒计时 `48 s`→`48s`；隐私文案已是 skill 定稿口径（用户控制权、无「本地优先」），维持现状。**S**｜无
 
 ### P3 · 需产品 / 架构裁决或后端改动
 
@@ -126,18 +126,18 @@
 - [ ] **DA-19 日程「完成态」** — 需 `GET /tasks` 返回已完成任务（现只返未完成，设计稿时间线的删除线态永不出现）
 - [ ] **DA-20 备忘录「过期清理建议」** — 需过期判定 + 建议数据源
 - [ ] **DA-21 对话 · AI 记账 4 步 ProcCard** — 需 `tool_step` 持久化
-- [ ] **DA-22 文档修订** — `docs/version/v5.0.0/traceability.md:480` 仍写「生活宫格 3×3 / 日历·旅行后置」，加 2026-09-30 裁决修订注记。**S**
-- [ ] **DA-23 Skill 模板补齐** — `.agents/skills/zhaoxi-design-system/assets/app_tokens.dart` 缺 `danger` / `dangerBg` / `dangerText`。**S**
+- [x] **DA-22 文档修订** — `docs/version/v5.0.0/traceability.md:480` 仍写「生活宫格 3×3 / 日历·旅行后置」，加 2026-09-30 裁决修订注记。**S**
+- [x] **DA-23 Skill 模板补齐** — `.agents/skills/zhaoxi-design-system/assets/app_tokens.dart` 缺 `danger` / `dangerBg` / `dangerText`。**S**
 
 ### P4 · 本轮新发现（低优先）
 
 - [ ] **DA-27 账本「最近账单」逐行语义色** — 设计为 餐饮=money / 交通=aiBlue / 购物=aiPrimary，现统一 money。需先定「分类 → 语义色」映射（`categoryId` 是 id 不是名称）。**M**
 - [ ] **DA-28 记一笔图标** — 设计用铅笔，`AppIcons` 无该字形（需 `tool/gen_app_icons.py` + 字体重生成）；现用 `AppIcons.wallet`。**S**（需动字体资产）
-- [ ] **DA-29 组件测试补 SparkleIcon / InsightHero** — 新组件目前只被页面测试间接覆盖。**S**
+- [x] **DA-29 组件测试补 SparkleIcon / InsightHero** — 新组件目前只被页面测试间接覆盖。**S**
 
 ### P5 · 验证（需可用 Flutter 环境）
 
-- [ ] **DA-30 重生成 golden + 全量回归**
+- [x] **DA-30 重生成 golden + 全量回归**（2026-10-03 已执行：工具链恢复，`flutter test` 342 全绿；实际变更 golden 16 张 + 新增 3 张，`a6_task` / `a9_tabbar` 无 diff 属正常）
 
   ```bash
   cd apps/mobile
@@ -211,10 +211,10 @@
 
 | 项 | 结果 |
 |---|---|
-| 进程内静态分析（lib + test，166 文件） | ✅ **0 error / 0 warning** |
-| 设计系统守卫（无硬编码色 / 无 `Colors.` / 无跨 feature import / 无 w550·w650·w750） | ✅ 人工核对通过 |
-| `flutter analyze` / `flutter test` | ⛔ 本机工具链故障，未执行 |
-| Golden | ⛔ 18 张待重生成（见 DA-30） |
+| `flutter analyze`（2026-10-03 工具链恢复） | ✅ **0 issue** |
+| `flutter test`（2026-10-03） | ✅ **342 全绿**（含 golden） |
+| Golden | ✅ 已重生成：更新 16 张（a2/a8/a10/a11/a14/a17/ledger_entry/car×3/ledger×4/life_page_modules 等），新增 `ledger_sync_link` / `sparkle_icon` / `insight_hero`；`a6_task` / `a9_tabbar` 渲染未变无 diff 属正常 |
+| 前会话遗留红（工具链故障期掩盖，本轮一并修复） | memo 测试「生活」撞名、ledger 测试「餐饮」撞名、chat_ledger 测试对含 Orb 页面用 pumpAndSettle 永不收敛、schedule NextCard 日期块 4px 溢出、chat_ledger 断言 `48 s` 空格 |
 
 ### 5.1 本机 Flutter 工具链故障（重要）
 

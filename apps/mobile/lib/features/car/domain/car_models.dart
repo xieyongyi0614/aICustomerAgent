@@ -94,6 +94,8 @@ class CarEvMetricsData {
     required this.chargeCountMonth,
     required this.basis,
     required this.note,
+    this.chargeKwhMonth,
+    this.kwhPer100km,
   });
 
   final int? odometerKm;
@@ -103,6 +105,10 @@ class CarEvMetricsData {
   final int chargeCountMonth;
   final String basis;
   final String note;
+
+  /// 结构化充电度数（精算列 V2 下发前恒为 null，前端诚实回退到费用口径）。
+  final double? chargeKwhMonth;
+  final double? kwhPer100km;
 }
 
 class CarOverviewData {

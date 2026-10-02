@@ -44,7 +44,8 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('午饭 35 元'), findsOneWidget);
     expect(find.text('已记下，本月餐饮 ¥1,240'), findsOneWidget);
@@ -61,7 +62,8 @@ void main() {
         loader: (id) async => const ChatLedgerData(messages: []),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('这个会话还没有记账记录'), findsOneWidget);
     expect(find.text('工具调用 · 记账 Skill'), findsNothing);
@@ -82,11 +84,13 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('我这边有点小问题，稍后再试'), findsOneWidget);
     await tester.tap(find.text('再试一次'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(calls, 2);
     expect(find.text('打车 22'), findsOneWidget);
@@ -104,7 +108,8 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(calls, 0);
     expect(find.text('这个会话还没有记账记录'), findsOneWidget);

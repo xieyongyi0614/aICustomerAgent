@@ -52,6 +52,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.tagGoalFg,
     required this.tagRelationBg,
     required this.tagRelationFg,
+    required this.danger,
+    required this.dangerBg,
+    required this.dangerText,
   });
 
   final Color canvas;
@@ -104,6 +107,12 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color tagRelationBg;
   final Color tagRelationFg;
 
+  /// 危险动作三件套（38 批量删除 / 61 删除按钮）：底 `rgba(240,106,106,.12)`
+  /// 字 `#E05252`；`danger` 为底色同族的实色基线（深色模式取浅红）。
+  final Color danger;
+  final Color dangerBg;
+  final Color dangerText;
+
   static const light = AppColors(
     canvas: Color(0xFFF5F4F0),
     surface: Color(0xFFFFFFFF),
@@ -151,6 +160,9 @@ class AppColors extends ThemeExtension<AppColors> {
     tagGoalFg: Color(0xFF24966E),
     tagRelationBg: Color(0x1F3E8BFF),
     tagRelationFg: Color(0xFF3E8BFF),
+    danger: Color(0xFFE5484D),
+    dangerBg: Color(0x1FF06A6A),
+    dangerText: Color(0xFFE05252),
   );
 
   static const dark = AppColors(
@@ -200,6 +212,9 @@ class AppColors extends ThemeExtension<AppColors> {
     tagGoalFg: Color(0xFF5AD2A6),
     tagRelationBg: Color(0x336BA6FF),
     tagRelationFg: Color(0xFF6BA6FF),
+    danger: Color(0xFFFF8588),
+    dangerBg: Color(0x29FF8588),
+    dangerText: Color(0xFFFF8588),
   );
 
   @override
@@ -250,6 +265,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? tagGoalFg,
     Color? tagRelationBg,
     Color? tagRelationFg,
+    Color? danger,
+    Color? dangerBg,
+    Color? dangerText,
   }) {
     return AppColors(
       canvas: canvas ?? this.canvas,
@@ -298,6 +316,9 @@ class AppColors extends ThemeExtension<AppColors> {
       tagGoalFg: tagGoalFg ?? this.tagGoalFg,
       tagRelationBg: tagRelationBg ?? this.tagRelationBg,
       tagRelationFg: tagRelationFg ?? this.tagRelationFg,
+      danger: danger ?? this.danger,
+      dangerBg: dangerBg ?? this.dangerBg,
+      dangerText: dangerText ?? this.dangerText,
     );
   }
 
@@ -352,6 +373,9 @@ class AppColors extends ThemeExtension<AppColors> {
       tagGoalFg: m(tagGoalFg, other.tagGoalFg),
       tagRelationBg: m(tagRelationBg, other.tagRelationBg),
       tagRelationFg: m(tagRelationFg, other.tagRelationFg),
+      danger: m(danger, other.danger),
+      dangerBg: m(dangerBg, other.dangerBg),
+      dangerText: m(dangerText, other.dangerText),
     );
   }
 }

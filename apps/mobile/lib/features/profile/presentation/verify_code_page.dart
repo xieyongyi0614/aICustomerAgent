@@ -275,7 +275,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            '$_countdown s',
+                            '${_countdown}s',
                             style: type.rowTitle.copyWith(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,

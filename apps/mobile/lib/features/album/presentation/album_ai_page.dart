@@ -161,6 +161,11 @@ class _AlbumAiPageState extends State<AlbumAiPage> {
               label: '看看这 $_totalCleanable 张，已帮你预选',
               onTap: () => context.push('/album/manage'),
             ),
+            PrivacyNote(
+              child: Text(
+                '全部来自本机分析 · 相册功能无需联网即可使用 · 无云同步 · 随时可以停下',
+              ),
+            ),
           ],
         ),
       ),

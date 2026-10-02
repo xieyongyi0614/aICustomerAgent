@@ -32,6 +32,12 @@ abstract class AlbumAssetSource {
 
   /// 删除 = 系统回收站（D17）：不自建回收站、不复制原图。
   Future<bool> trashAsset(PhotoAsset asset);
+
+  /// 收藏状态写入（系统能力；平台不支持时返回 false，调用方呈诚实失败态）。
+  Future<bool> setFavorite(PhotoAsset asset, {required bool favorite});
+
+  /// 移动到指定相簿（Android 系统能力；平台不支持时返回 false）。
+  Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target);
 }
 
 /// `photo_manager` 实现的资产源。
@@ -128,6 +134,43 @@ class PhotoManagerAssetSource implements AlbumAssetSource {
     return result.isNotEmpty;
   }
 
+  @override
+  Future<bool> setFavorite(PhotoAsset asset, {required bool favorite}) async {
+    final entity = await AssetEntity.fromId(asset.id);
+    if (entity == null) return false;
+    try {
+      if (Platform.isAndroid) {
+        await PhotoManager.editor.android
+            .favoriteAsset(entity: entity, favorite: favorite);
+        return true;
+      }
+      if (Platform.isIOS || Platform.isMacOS) {
+        await PhotoManager.editor.darwin
+            .favoriteAsset(entity: entity, favorite: favorite);
+        return true;
+      }
+    } on OSError {
+      return false;
+    }
+    return false;
+  }
+
+  @override
+  Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target) async {
+    if (!Platform.isAndroid) return false;
+    final entity = await AssetEntity.fromId(asset.id);
+    final path = await _pathOf(target.id);
+    if (entity == null || path == null) return false;
+    try {
+      return await PhotoManager.editor.android.moveAssetToAnother(
+        entity: entity,
+        target: path,
+      );
+    } on OSError {
+      return false;
+    }
+  }
+
   Future<AssetPathEntity?> _pathOf(String? bucketId) async {
     final paths = await PhotoManager.getAssetPathList(
       type: RequestType.common,
@@ -217,6 +260,12 @@ class AlbumRepository {
 
   /// 删除 = 系统「最近删除」（D17）：交给系统能力，App 不自建回收站。
   Future<bool> moveToTrash(PhotoAsset asset) => source.trashAsset(asset);
+
+  Future<bool> setFavorite(PhotoAsset asset, {required bool favorite}) =>
+      source.setFavorite(asset, favorite: favorite);
+
+  Future<bool> moveToAlbum(PhotoAsset asset, AlbumBucket target) =>
+      source.moveAsset(asset, target);
 }
 
 /// 删除能力走 `PhotoManager.editor`（系统回收站语义）的静态说明常量，

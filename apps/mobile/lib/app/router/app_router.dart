@@ -163,7 +163,13 @@ final appRouter = GoRouter(
           builder: (_, _) => const CarProfilePage(),
         ),
         GoRoute(path: '/album', builder: (_, _) => const AlbumPage()),
-        GoRoute(path: '/album/manage', builder: (_, _) => const AlbumManagePage()),
+        GoRoute(
+          path: '/album/manage',
+          builder: (_, state) => AlbumManagePage(
+            bucketId: state.uri.queryParameters['album'],
+            bucketName: state.uri.queryParameters['name'],
+          ),
+        ),
         GoRoute(
           path: '/album/detail',
           builder: (_, state) => AlbumDetailPage(

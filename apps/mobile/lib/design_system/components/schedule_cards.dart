@@ -332,26 +332,29 @@ class NextCard extends StatelessWidget {
                 color: tint ?? colors.fillSubtle,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    dateLabel,
-                    style: type.numeric(type.rowTitle).copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                      color: accent,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      dateLabel,
+                      style: type.numeric(type.rowTitle).copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                        color: accent,
+                      ),
                     ),
-                  ),
-                  Text(
-                    dateNote,
-                    style: type.tabLabel.copyWith(
-                      fontSize: 10,
-                      color: accent.withValues(alpha: 0.75),
+                    Text(
+                      dateNote,
+                      style: type.tabLabel.copyWith(
+                        fontSize: 10,
+                        color: accent.withValues(alpha: 0.75),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 13),

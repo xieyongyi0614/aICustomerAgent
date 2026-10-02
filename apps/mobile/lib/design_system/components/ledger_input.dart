@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
+import 'gradient_border_card.dart';
 import 'press_scale.dart';
+import 'sparkle.dart';
 
 /// A32 seg 选项
 class LedgerSegOption {
@@ -477,6 +479,274 @@ class LedgerPad extends StatelessWidget {
         height: 54,
         alignment: Alignment.center,
         child: Icon(AppIcons.x, size: 20, color: colors.ink2),
+      ),
+    );
+  }
+}
+
+/// A33+ say-box（对话录入条）：✦ + 一句话输入 + 示例 chips。
+class LedgerSayBox extends StatelessWidget {
+  const LedgerSayBox({
+    super.key,
+    this.controller,
+    this.focusNode,
+    this.onChanged,
+    this.hint = '直接说，例如「午饭一碗拉面 35」',
+    this.examples = const ['打车 22', '咖啡 28，不加糖', '昨晚聚餐 186'],
+    this.onExampleTap,
+  });
+
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
+  final String hint;
+  final List<String> examples;
+  final ValueChanged<String>? onExampleTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    final radii = Theme.of(context).extension<AppRadii>()!;
+    final elevation = Theme.of(context).extension<AppElevation>()!;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: radii.rLg,
+        boxShadow: elevation.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SparkleIcon(size: 17, color: colors.aiPrimary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: onChanged,
+                  cursorWidth: 2,
+                  cursorColor: colors.aiPrimary,
+                  style: type.body.copyWith(color: colors.ink),
+                  decoration: InputDecoration.collapsed(
+                    hintText: hint,
+                    hintStyle: type.body.copyWith(color: colors.ink3),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (examples.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final example in examples)
+                  GestureDetector(
+                    onTap:
+                        onExampleTap == null ? null : () => onExampleTap!(example),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 11,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.fillSubtle,
+                        borderRadius: radii.rFull,
+                      ),
+                      child: Text(
+                        example,
+                        style: type.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: colors.ink2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A33+ parse 解析行数据。[muted] 表示 AI 没听准的诚实空值态。
+class LedgerParseRowData {
+  const LedgerParseRowData({
+    required this.label,
+    required this.value,
+    this.note,
+    this.muted = false,
+  });
+
+  final String label;
+  final String value;
+  final String? note;
+  final bool muted;
+}
+
+/// A33+ parse（AI 解析卡「我听到的」）：ai-card 渐变描边变体 + 底部动作行。
+///
+/// 纪律：解析卡是 AI 语义（渐变描边）；「确认入账」是用户动作，用 `ink` 深色，
+/// 禁止 ai 渐变按钮。
+class LedgerParseCard extends StatelessWidget {
+  const LedgerParseCard({
+    super.key,
+    required this.rows,
+    this.title = '我听到的',
+    this.confirmLabel = '确认入账',
+    this.onConfirm,
+    this.fixLabel = '不对？直接说改哪里',
+    this.onFix,
+  });
+
+  final List<LedgerParseRowData> rows;
+  final String title;
+  final String confirmLabel;
+  final VoidCallback? onConfirm;
+  final String fixLabel;
+  final VoidCallback? onFix;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    return GradientBorderCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SparkleIcon(size: 13, color: colors.aiPrimary),
+              const SizedBox(width: 7),
+              Text(
+                title,
+                style: type.caption.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.72,
+                  color: colors.aiPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          for (var index = 0; index < rows.length; index++)
+            _row(context, rows[index], index < rows.length - 1),
+          const SizedBox(height: 13),
+          Row(
+            children: [
+              _confirm(context),
+              const SizedBox(width: 8),
+              if (onFix != null)
+                GestureDetector(
+                  onTap: onFix,
+                  child: Text(
+                    fixLabel,
+                    style: type.label.copyWith(
+                      fontSize: 12.5,
+                      letterSpacing: 0,
+                      color: colors.aiPrimary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context, LedgerParseRowData row, bool showDivider) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(bottom: BorderSide(color: colors.line))
+            : null,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            child: Text(
+              row.label,
+              style: type.caption.copyWith(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w400,
+                color: colors.ink3,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: row.value),
+                  if (row.note != null) ...[
+                    const TextSpan(text: ' · '),
+                    TextSpan(
+                      text: row.note,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.ink3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              style: type.numeric(type.rowTitle).copyWith(
+                    fontWeight: row.muted ? FontWeight.w400 : FontWeight.w600,
+                    color: row.muted ? colors.ink3 : colors.ink,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _confirm(BuildContext context) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    final radii = Theme.of(context).extension<AppRadii>()!;
+    return PressScale(
+      onTap: onConfirm,
+      child: Opacity(
+        opacity: onConfirm == null ? 0.5 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+          decoration: BoxDecoration(
+            color: colors.ink,
+            borderRadius: radii.rFull,
+            boxShadow: [
+              BoxShadow(
+                color: colors.ink.withValues(alpha: 0.2),
+                offset: const Offset(0, 8),
+                blurRadius: 18,
+              ),
+            ],
+          ),
+          child: Text(
+            confirmLabel,
+            style: type.title.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: colors.onDeepPrimary,
+            ),
+          ),
+        ),
       ),
     );
   }

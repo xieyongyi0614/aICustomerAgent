@@ -10,6 +10,7 @@ import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import '../data/auth_repository.dart';
 import '../data/care_prefs_repository.dart';
+import '../data/memory_count_repository.dart';
 
 /// B8 #profile 我的：相识卡 + 人格卡 + 设置组 + 主动关怀 + 退出登录。
 class ProfilePage extends ConsumerStatefulWidget {
@@ -22,8 +23,10 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _auth = AuthRepository();
   final _careRepo = CarePrefsRepository();
+  final _memoryCountRepo = MemoryCountRepository();
   String? _nickname;
   int _days = 1;
+  int? _memoryCount;
   CarePrefs? _care;
   bool _careBusy = false;
 
@@ -32,6 +35,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     super.initState();
     _loadIdentity();
     _loadCare();
+    _loadMemoryCount();
+  }
+
+  Future<void> _loadMemoryCount() async {
+    try {
+      final total = await _memoryCountRepo.fetchTotal();
+      if (!mounted) return;
+      setState(() => _memoryCount = total);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _memoryCount = null);
+    }
   }
 
   Future<void> _loadCare() async {
@@ -285,7 +300,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   onTap: () => context.go('/health'),
                 ),
                 SettingRow(
-                  title: '健康数据授权',
+                  title: '数据授权',
                   subtitle: '单独同意 · 可随时关闭',
                   icon: AppIcons.shield,
                   iconBg: colors.tileInfo,
@@ -299,7 +314,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
                 SettingRow(
                   title: '记忆管理',
-                  subtitle: '查看、编辑、遗忘',
+                  subtitle: _memoryCount == null
+                      ? '查看、编辑、遗忘'
+                      : '$_memoryCount 条 · 查看、编辑、遗忘',
                   icon: AppIcons.brain,
                   iconBg: colors.tileAi,
                   iconColor: colors.aiPrimary,
@@ -312,7 +329,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
                 SettingRow(
                   title: '隐私设置',
-                  subtitle: '可导出 · 可清空',
+                  subtitle: '一键清空 · 导出数据',
                   icon: AppIcons.lock,
                   iconBg: colors.tileMoney,
                   iconColor: colors.tagHabitFg,
