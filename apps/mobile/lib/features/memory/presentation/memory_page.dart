@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/theme_context.dart';
@@ -183,52 +184,73 @@ class _MemoryPageState extends State<MemoryPage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
-    final data = _data;
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
         bottom: false,
-        child: _loading && data == null
-            ? ListView(
-                padding: const EdgeInsets.all(18),
-                children: const [SkeletonCard(), SkeletonCard()],
-              )
-            : _error != null && data == null
-                ? ErrorState(message: StateCopy.serverError, onRetry: _load)
-                : ListView(
-                    padding: context.spacing.screenPadding,
-                    children: [
-                      Text('亚丝娜记住的你', style: type.pageTitle),
-                      Text(
-                        '${data!.total} 条 · 本周 +${data.addedThisWeek}',
-                        style: type.sub.copyWith(color: colors.ink2),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '所有记忆对你完全可见，随时可改、可忘',
-                        style: type.sub.copyWith(color: colors.ink2),
-                      ),
-                      const SizedBox(height: 16),
-                      if (data.total == 0)
-                        const EmptyState(message: '还没有记住什么，多聊聊就好')
-                      else
-                        for (final group in data.groups)
-                          if (group.items.isNotEmpty) ...[
-                            Text(group.label, style: type.sectionTitle),
-                            const SizedBox(height: 10),
-                            for (final item in group.items) _card(context, item),
-                            const SizedBox(height: 14),
-                          ],
-                      PrivacyNote(
-                        child: Text(
-                          '记忆是你的资产：全部本地可见、可逐条编辑或遗忘；也可在「我的 · 隐私设置」中一键清空。'
-                          '亚丝娜只会用记忆来帮你，不会对你隐瞒。',
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+              child: BackLink(
+                label: '‹ 我的',
+                onTap: () => context.go('/profile'),
+              ),
+            ),
+            Expanded(child: _body(context, colors, type)),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _body(BuildContext context, AppColors colors, AppTypography type) {
+    final data = _data;
+    if (data == null) {
+      if (_loading) {
+        return ListView(
+          padding: context.spacing.screenPadding,
+          children: const [SkeletonCard(), SkeletonCard()],
+        );
+      }
+      // 拿不到数据时给诚实的兜底：有错按错误态重试，无错也不编造记忆
+      return _error == null
+          ? const EmptyState(message: '还没有记住什么，多聊聊就好')
+          : ErrorState(message: StateCopy.serverError, onRetry: _load);
+    }
+    return ListView(
+      padding: context.spacing.screenPadding,
+      children: [
+        Text('亚丝娜记住的你', style: type.pageTitle),
+        Text(
+          '${data.total} 条 · 本周 +${data.addedThisWeek}',
+          style: type.sub.copyWith(color: colors.ink2),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '所有记忆对你完全可见，随时可改、可忘',
+          style: type.sub.copyWith(color: colors.ink2),
+        ),
+        const SizedBox(height: 16),
+        if (data.total == 0)
+          const EmptyState(message: '还没有记住什么，多聊聊就好')
+        else
+          for (final group in data.groups)
+            if (group.items.isNotEmpty) ...[
+              Text(group.label, style: type.sectionTitle),
+              const SizedBox(height: 10),
+              for (final item in group.items) _card(context, item),
+              const SizedBox(height: 14),
+            ],
+        PrivacyNote(
+          child: Text(
+            '记忆是你的资产：全部本地可见、可逐条编辑或遗忘；也可在「我的 · 隐私设置」中一键清空。'
+            '亚丝娜只会用记忆来帮你，不会对你隐瞒。',
+          ),
+        ),
+        const SizedBox(height: 40),
+      ],
     );
   }
 }

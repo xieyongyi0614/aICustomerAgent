@@ -112,7 +112,11 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
     "app/application/post_process.py": "bcb7b63c718390cb6d57e26e9b04493e3df37b59b0e7e7619b7f79d6ccf09e25",  # 前值 f2a25b66（反向依赖清理：get_user_write_lock 下沉 core/runtime_state）、8aa2b63f（批次 4）、6778abc4（批次 3）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
-    "app/application/action_engine.py": "36ea379811984d7e04da9af0b6af4114c88e3eaab70635ac3c76d545ee620525",  # 再冻结：world_available 赋值去掉恒真 getattr；前值 6ea39eaf（反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）
+    # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
+    # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
+    # 原值 36ea3798（再冻结：world_available 赋值去掉恒真 getattr；再前值 6ea39eaf，
+    # 反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）。
+    "app/application/action_engine.py": "fb11fbef264f1da8aea52a5e9b955acfda15fe79e4d40b396d5919eeb2bc6d54",
     # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
     # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。
     # 演绎段注入策略位声明（2026-10-02）：新增 `roleplay_prompt_mode`（默认 full）——

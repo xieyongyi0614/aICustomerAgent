@@ -704,6 +704,31 @@ def _normalize_use_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
     return intent.model_copy(update={"params": params})
 
 
+def _normalize_ledger_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
+    """ledger record 参数归一（引擎侧唯一读 IO 点）：明细文本 → 类目 id。
+
+    对话里只有自然语言（"记账早餐20元，购买了2个鸡蛋"），类目靠归一服务按
+    name / alias / 去后缀 / 子串四级规则落定；没有明细就不猜，保持「未分类」。
+    能力层只收结构化 id（PLA-009 D2 禁自由文本入参），故解析放在这里而不在能力里。
+    """
+    if intent.action_type != "record_ledger_entry":
+        return intent
+    params = dict(intent.params)
+    if params.get("category_id"):
+        return intent
+    hint = str(params.get("note") or "").strip()
+    if not hint:
+        return intent
+    from app.services.ledger import category as category_service
+
+    kind = "income" if str(params.get("direction")) == "income" else "expense"
+    result = category_service.normalize(user_id, hint, kind=kind)
+    if not result.category_id:
+        return intent
+    params["category_id"] = result.category_id
+    return intent.model_copy(update={"params": params})
+
+
 async def run_action_planning(
     user_id: str, intent: ActionIntent, session_id: str | None = None,
     goal_id: str | None = None, source: str = "conversation",
@@ -713,6 +738,7 @@ async def run_action_planning(
     if intent is None:
         return None
     intent = _normalize_use_intent(intent, user_id)
+    intent = _normalize_ledger_intent(intent, user_id)
     record = new_record(intent, user_id, session_id, source)
 
     snapshot = _build_snapshot(user_id, settings)

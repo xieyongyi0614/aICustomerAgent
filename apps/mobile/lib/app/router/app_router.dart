@@ -50,7 +50,8 @@ const chromeByPath = <String, RouteChrome>{
   '/home': chromeHome,
   '/life': chromeHome,
   '/chat': chromeImmersive,
-  '/memory': chromeHome,
+  // 记忆是「我的 · 记忆管理」子页（B7：此页无 Tab 栏）
+  '/memory': chromeImmersive,
   '/profile': chromeHome,
   '/health': chromeHome,
   '/login': chromeImmersive,
@@ -195,12 +196,11 @@ class _AppShell extends StatelessWidget {
       return 1;
     }
     if (path.startsWith('/chat')) return 2;
-    if (path.startsWith('/memory')) return 3;
-    return 4;
+    return 3;
   }
 
   void _onTap(BuildContext context, int index) {
-    const paths = ['/home', '/life', '/chat', '/memory', '/profile'];
+    const paths = ['/home', '/life', '/chat', '/profile'];
     context.go(paths[index]);
   }
 

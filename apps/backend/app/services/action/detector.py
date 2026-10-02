@@ -154,6 +154,27 @@ def _text_after(content: str, trigger: str, limit: int = 40) -> str:
     return tail[:limit].strip()
 
 
+# 明细清理字符：去触发词与金额后残留的首尾标点
+_DETAIL_TRIM = " 　，,。.!！?？；;：:、～~·-—"
+
+
+def _extract_ledger_detail(content: str, trigger: str, limit: int = 40) -> str:
+    """记账明细（note）：触发词之后、去掉金额原文的剩余文本。
+
+    "记账早餐20元，购买了2个鸡蛋" → "早餐，购买了2个鸡蛋"；"早上买了豆浆10块" → "豆浆"。
+    只做「去触发词 + 去金额」的减法，不猜词性、不做语义裁剪；清理后为空则不写 note。
+    """
+    tail = _text_after(content, trigger, limit=limit * 2)
+    with_unit = _AMOUNT_WITH_UNIT.search(tail)
+    if with_unit is not None:
+        tail = tail[: with_unit.start()] + tail[with_unit.end():]
+    else:
+        after_income = _AMOUNT_AFTER_INCOME.search(tail)
+        if after_income is not None:
+            tail = tail[: after_income.start(1)] + tail[after_income.end(1):]
+    return tail.strip(_DETAIL_TRIM)[:limit].strip(_DETAIL_TRIM)
+
+
 def _extract_params(action_type: str, content: str, trigger: str, now: datetime) -> tuple[dict, list[str]]:
     """参数抽取（planner.md §1.2）：触发词后置文本 + 时间短语解析。"""
     params: dict = {}
@@ -196,6 +217,9 @@ def _extract_params(action_type: str, content: str, trigger: str, now: datetime)
         direction = "income" if any(m in content for m in LEDGER_INCOME_MARKERS) else "expense"
         params["direction"] = direction
         params["source"] = "conversation"
+        detail = _extract_ledger_detail(content, trigger)
+        if detail:
+            params["note"] = detail
         params["idempotency_key"] = make_dedupe_key(
             action_type, _core_params(action_type, params)
         )
@@ -242,7 +266,9 @@ def _core_params(action_type: str, params: dict) -> dict:
         "query_environment": (),
         "query_search": ("query",),
         "send_notification": ("content",),
-        "record_ledger_entry": ("amount_minor", "direction"),
+        # 明细参与幂等键：键同时是 entry_id，只按金额+方向会让「早餐20元」「午餐20元」
+        # 在 24h 窗口内撞成同一笔；同一条消息重发仍同键（note 同）。
+        "record_ledger_entry": ("amount_minor", "direction", "note"),
         "revise_ledger_entry": ("reason",),
         "query_ledger": ("period",),
     }

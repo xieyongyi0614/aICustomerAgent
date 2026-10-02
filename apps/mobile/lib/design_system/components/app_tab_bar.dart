@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
 
-/// 组件 A9：5 Tab 自绘（禁 M3 系统导航栏）。
-/// 中间是悬浮对话球（按钮，无动效），不是 Orb。
+/// 组件 A9：4 Tab 自绘（禁 M3 系统导航栏）。
+/// 第 3 位是悬浮对话球（按钮，无动效），不是 Orb。
+/// 「记忆」不是主 Tab（红线 10 / 2026-09-30 IA 裁决）：它从「我的 · 记忆管理」与生活宫格进入。
 class AppTabBar extends StatelessWidget {
   const AppTabBar({
     super.key,
@@ -16,7 +17,8 @@ class AppTabBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  static const tabCount = 5;
+  /// A9：4 个位置 —— 首页 / 生活 / 对话（悬浮球）/ 我的。
+  static const tabCount = 4;
   static const barHeight = 88.0;
   static const ballSize = 56.0;
 
@@ -31,8 +33,13 @@ class AppTabBar extends StatelessWidget {
   static const labelGap = 3.0;
   static const orbSlotWidth = 76.0;
 
-  /// 设计稿 `.orb-tab span{margin-top:36px}`：对话文字相对栏顶 36。
-  static const orbLabelTop = 36.0;
+  /// 悬浮球相对栏顶的位置：`.orb-btn{top:-24px}` 是相对 `.orb-tab` 项算的，
+  /// 而 `.orb-tab` 已落在栏顶内边距 12 之下 → 相对栏顶 = 12 - 24 = -12。
+  static const ballTop = -12.0;
+
+  /// 设计稿 `.orb-tab span{margin-top:36px}`：同样相对 `.orb-tab` 项算，
+  /// 故对话文字相对栏顶 = 12 + 36 = 48。
+  static const orbLabelTop = 48.0;
 
   @override
   Widget build(BuildContext context) {
@@ -43,8 +50,8 @@ class AppTabBar extends StatelessWidget {
     final tabs = const [
       _TabSpec(label: '首页', icon: AppIcons.home),
       _TabSpec(label: '生活', icon: AppIcons.layoutGrid),
+      // 第 3 位由悬浮球承载，图标仅占位保持索引对齐
       _TabSpec(label: '对话', icon: AppIcons.messageCircle),
-      _TabSpec(label: '记忆', icon: AppIcons.brain),
       _TabSpec(label: '我的', icon: AppIcons.user),
     ];
 
@@ -73,23 +80,42 @@ class AppTabBar extends StatelessWidget {
                 children: [
                   for (var i = 0; i < tabCount; i++)
                     if (i == 2)
+                      // 对话位：文字与悬浮球都定位在本项内（`.orb-tab{position:relative}`），
+                      // 球因此落在 4 位里的第 3 位（62.5%）而不是整栏居中。
                       GestureDetector(
                         onTap: () => onTap(2),
                         behavior: HitTestBehavior.opaque,
                         child: SizedBox(
                           width: orbSlotWidth,
                           height: contentHeight,
-                          child: Padding(
-                            // 「对话」相对栏顶 36：减去外层已加的上内边距
-                            padding: const EdgeInsets.only(
-                              top: orbLabelTop - contentTop,
-                            ),
-                            child: Text(
-                              '对话',
-                              textAlign: TextAlign.center,
-                              style:
-                                  type.tabLabel.copyWith(color: colors.ink3),
-                            ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned(
+                                top: orbLabelTop - contentTop,
+                                left: 0,
+                                right: 0,
+                                child: Text(
+                                  '对话',
+                                  textAlign: TextAlign.center,
+                                  style: type.tabLabel
+                                      .copyWith(color: colors.ink3),
+                                ),
+                              ),
+                              Positioned(
+                                top: ballTop - contentTop,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: _ChatBall(
+                                    gradient: gradients.ai,
+                                    shadows: elevation.orbButton(colors.canvas),
+                                    sparkColor: colors.onDeepPrimary,
+                                    onTap: () => onTap(2),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       )
@@ -102,20 +128,6 @@ class AppTabBar extends StatelessWidget {
                         ),
                       ),
                 ],
-              ),
-            ),
-            Positioned(
-              top: -24,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _ChatBall(
-                  gradient: gradients.ai,
-                  canvas: colors.canvas,
-                  shadows: elevation.orbButton(colors.canvas),
-                  sparkColor: colors.onDeepPrimary,
-                  onTap: () => onTap(2),
-                ),
               ),
             ),
           ],
@@ -168,14 +180,12 @@ class _TabItem extends StatelessWidget {
 class _ChatBall extends StatelessWidget {
   const _ChatBall({
     required this.gradient,
-    required this.canvas,
     required this.shadows,
     required this.sparkColor,
     required this.onTap,
   });
 
   final Gradient gradient;
-  final Color canvas;
   final List<BoxShadow> shadows;
   final Color sparkColor;
   final VoidCallback onTap;

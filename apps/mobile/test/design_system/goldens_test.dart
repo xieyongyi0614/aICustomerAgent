@@ -22,23 +22,31 @@ Future<void> _golden(WidgetTester tester, String name, Widget child) async {
 
 void main() {
   testWidgets('golden_tab_bar', (t) async {
-    t.view.physicalSize = const Size(390, AppTabBar.barHeight);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    await t.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: Scaffold(
-          backgroundColor: Colors.transparent,
-          bottomNavigationBar: AppTabBar(currentIndex: 1, onTap: (_) {}),
+    // 悬浮球的「挖空外圈 + 辉光」是 A9 的观感重点，测试默认会把影子画成硬边；
+    // 这里单独打开真实影子，让 golden 能守住球陷进栏里的样子（测试结束前必须还原）。
+    debugDisableShadows = false;
+    try {
+      // 栏高 88，上方再留 32：悬浮球顶在栏顶上方 12、外圈 6，必须完整落在画布里
+      t.view.physicalSize = const Size(390, AppTabBar.barHeight + 32);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: Scaffold(
+            backgroundColor: AppColors.light.canvas,
+            bottomNavigationBar: AppTabBar(currentIndex: 1, onTap: (_) {}),
+          ),
         ),
-      ),
-    );
-    await t.pump(const Duration(milliseconds: 16));
-    await expectLater(
-      find.byType(AppTabBar),
-      matchesGoldenFile('goldens/a9_tabbar.png'),
-    );
+      );
+      await t.pump(const Duration(milliseconds: 16));
+      await expectLater(
+        find.byType(Scaffold),
+        matchesGoldenFile('goldens/a9_tabbar.png'),
+      );
+    } finally {
+      debugDisableShadows = true;
+    }
   });
 
   testWidgets('golden_app_card', (t) async {
