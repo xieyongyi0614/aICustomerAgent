@@ -203,7 +203,7 @@ class _SchedulePageState extends State<SchedulePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
               child: BackLink(
-                label: '‹ 生活',
+                label: '生活',
                 onTap: () => context.go('/life'),
               ),
             ),

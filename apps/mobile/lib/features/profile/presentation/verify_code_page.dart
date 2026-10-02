@@ -201,7 +201,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
           children: [
-            BackLink(label: '‹ 返回', onTap: _editEmail),
+            BackLink(label: '返回', onTap: _editEmail),
             const SizedBox(height: 4),
             Row(
               children: [

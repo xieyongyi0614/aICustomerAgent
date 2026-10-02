@@ -194,7 +194,7 @@ class _MemoryPageState extends State<MemoryPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
               child: BackLink(
-                label: '‹ 我的',
+                label: '我的',
                 onTap: () => context.go('/profile'),
               ),
             ),

@@ -82,7 +82,7 @@ class _PhotoViewPageState extends State<PhotoViewPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(label: '‹ 相簿', onTap: () => Navigator.of(context).maybePop()),
+            BackLink(label: '相簿'),
             const SizedBox(height: 12),
             _bigImage(context),
             const SizedBox(height: 14),

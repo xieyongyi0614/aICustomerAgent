@@ -17,6 +17,7 @@ const _summary = LedgerSummaryData(
   entryCount: 2,
   byCategory: [
     LedgerCategoryTotal(categoryId: '餐饮', expenseMinor: 12850, incomeMinor: 0),
+    LedgerCategoryTotal(categoryId: '交通', expenseMinor: 8600, incomeMinor: 0),
   ],
   comparisonLabel: '比上月同期少 12%',
 );
@@ -31,16 +32,48 @@ const _entries = [
   ),
 ];
 
+LedgerPendingData _pending({
+  String key = 'pk-1',
+  String reason = 'amount_over_threshold',
+  String question = '这笔要怎么记？',
+  List<LedgerPendingCandidate> candidates = const [],
+  int? amountMinor,
+  String? categoryHint,
+  String? direction,
+  String? merchantHint,
+}) => LedgerPendingData(
+  pendingKey: key,
+  reason: reason,
+  question: question,
+  candidates: candidates,
+  amountMinor: amountMinor,
+  categoryHint: categoryHint,
+  direction: direction,
+  merchantHint: merchantHint,
+);
+
 class _FakeLedgerRepository extends LedgerRepository {
-  _FakeLedgerRepository({this.autoCount = 0, this.autoFails = false})
-    : super(dio: Dio());
+  _FakeLedgerRepository({
+    this.autoCount = 0,
+    this.autoFails = false,
+    this.pending = const [],
+    this.pendingFails = false,
+    this.confirmFails = false,
+  }) : super(dio: Dio());
 
   final int autoCount;
   final bool autoFails;
+  final List<LedgerPendingData> pending;
+  final bool pendingFails;
+  bool confirmFails;
 
   int summaryCalls = 0;
   int entriesCalls = 0;
   int autoCalls = 0;
+  int confirmCalls = 0;
+  int ignoreCalls = 0;
+  final List<String?> confirmedCategories = [];
+  final List<String?> confirmedDirections = [];
 
   @override
   Future<LedgerSummaryData> fetchSummary({String period = 'month'}) async {
@@ -61,13 +94,37 @@ class _FakeLedgerRepository extends LedgerRepository {
     return LedgerAutoSummaryData(
       periodLabel: 'month',
       autoCount: autoCount,
-      pendingCount: 0,
+      pendingCount: pending.length,
     );
+  }
+
+  @override
+  Future<List<LedgerPendingData>> fetchPending() async {
+    if (pendingFails) throw Exception('pending down');
+    return pending;
+  }
+
+  @override
+  Future<void> confirmPending(
+    String pendingKey, {
+    String? categoryName,
+    String? direction,
+    int? amountMinor,
+  }) async {
+    confirmCalls++;
+    confirmedCategories.add(categoryName);
+    confirmedDirections.add(direction);
+    if (confirmFails) throw Exception('confirm down');
+  }
+
+  @override
+  Future<void> ignorePending(String pendingKey) async {
+    ignoreCalls++;
   }
 }
 
 void _useTallSurface(WidgetTester tester) {
-  tester.view.physicalSize = const Size(390, 1500);
+  tester.view.physicalSize = const Size(390, 1800);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
@@ -112,35 +169,48 @@ double _topOf(WidgetTester tester, Finder finder) =>
     tester.getTopLeft(finder).dy;
 
 void main() {
-  testWidgets(
-      'test_ledger_page_entry_row_sits_between_ai_card_and_category_section',
-      (tester) async {
-    await _openLedger(tester, _FakeLedgerRepository());
-    expect(_topOf(tester, find.byType(AiCard)), lessThan(_topOf(tester, find.byType(EntryCard).first)));
+  testWidgets('test_ledger_page_order_follows_design', (tester) async {
+    await _openLedger(
+      tester,
+      _FakeLedgerRepository(pending: [_pending()]),
+    );
     expect(
-      _topOf(tester, find.byType(EntryCard).first),
+      _topOf(tester, find.byType(AiCard)),
+      lessThan(_topOf(tester, find.text('需要你的确认'))),
+    );
+    expect(
+      _topOf(tester, find.text('需要你的确认')),
+      lessThan(_topOf(tester, find.byType(EntryCard))),
+    );
+    expect(
+      _topOf(tester, find.byType(EntryCard)),
       lessThan(_topOf(tester, find.text('分类支出'))),
     );
     expect(
       _topOf(tester, find.text('分类支出')),
       lessThan(_topOf(tester, find.text('最近账单'))),
     );
-    expect(find.byType(EntryCard), findsNWidgets(2));
+    expect(
+      find.byType(EntryCard),
+      findsOneWidget,
+      reason: 'IA 裁决 2：记账不拆「手动 / AI 自动」两个并列入口',
+    );
+    expect(find.byType(SyncLink), findsOneWidget);
   });
 
-  testWidgets('test_ledger_page_entry_row_left_goes_to_ledger_add',
+  testWidgets('test_ledger_page_single_entry_goes_to_ledger_add',
       (tester) async {
     await _openLedger(tester, _FakeLedgerRepository());
-    await tester.tap(find.text('手动记一笔'));
+    await tester.tap(find.text('记一笔'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('SAVE'), findsOneWidget);
   });
 
-  testWidgets('test_ledger_page_entry_row_right_goes_to_ledger_auto',
+  testWidgets('test_ledger_page_sync_link_goes_to_ledger_auto',
       (tester) async {
-    await _openLedger(tester, _FakeLedgerRepository());
-    await tester.tap(find.text('AI 自动记账'));
+    await _openLedger(tester, _FakeLedgerRepository(autoCount: 12));
+    await tester.tap(find.byType(SyncLink));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('AUTO'), findsOneWidget);
@@ -152,7 +222,7 @@ void main() {
     await _openLedger(tester, repo);
     expect(repo.summaryCalls, 1);
     expect(repo.entriesCalls, 1);
-    await tester.tap(find.text('手动记一笔'));
+    await tester.tap(find.text('记一笔'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('SAVE'));
@@ -162,26 +232,124 @@ void main() {
     expect(repo.entriesCalls, 2);
   });
 
-  testWidgets('test_ledger_page_entry_subtitle_uses_real_auto_count',
+  testWidgets('test_ledger_page_sync_link_uses_real_auto_count',
       (tester) async {
     await _openLedger(tester, _FakeLedgerRepository(autoCount: 12));
-    expect(find.text('本月已自动记 12 笔'), findsOneWidget);
+    expect(find.text('本月已自动记 12 笔 · 同步与 AI 规则'), findsOneWidget);
     expect(find.textContaining('42'), findsNothing);
   });
 
-  testWidgets('test_ledger_page_entry_subtitle_is_honest_when_zero',
-      (tester) async {
+  testWidgets('test_ledger_page_sync_link_is_honest_when_zero', (tester) async {
     await _openLedger(tester, _FakeLedgerRepository(autoCount: 0));
-    expect(find.text('本月还没有自动记账'), findsOneWidget);
+    expect(find.text('本月还没有自动记账 · 同步与 AI 规则'), findsOneWidget);
     expect(find.textContaining('已自动记'), findsNothing);
   });
 
-  testWidgets('test_ledger_page_entry_subtitle_degrades_on_failure',
-      (tester) async {
+  testWidgets('test_ledger_page_sync_link_degrades_on_failure', (tester) async {
     await _openLedger(tester, _FakeLedgerRepository(autoFails: true));
-    expect(find.text('看看 AI 记了什么'), findsOneWidget);
-    expect(find.byType(EntryCard), findsNWidgets(2));
+    expect(find.text('同步与 AI 规则'), findsOneWidget);
+    expect(find.byType(EntryCard), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('test_ledger_page_hides_confirm_block_when_nothing_pending',
+      (tester) async {
+    await _openLedger(tester, _FakeLedgerRepository());
+    expect(find.text('需要你的确认'), findsNothing);
+    expect(find.byType(LedgerConfirmRow), findsNothing);
+  });
+
+  testWidgets('test_ledger_page_pending_failure_only_hides_the_block',
+      (tester) async {
+    await _openLedger(tester, _FakeLedgerRepository(pendingFails: true));
+    expect(find.text('需要你的确认'), findsNothing);
+    expect(
+      find.text('¥128.50'),
+      findsOneWidget,
+      reason: '待确认取不到不该把整页打成错误态',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('test_ledger_page_confirm_row_shows_title_and_judgment',
+      (tester) async {
+    await _openLedger(
+      tester,
+      _FakeLedgerRepository(
+        pending: [
+          _pending(
+            merchantHint: 'Apple Store',
+            amountMinor: 6800,
+            categoryHint: '娱乐',
+            direction: 'expense',
+          ),
+        ],
+      ),
+    );
+    expect(find.text('需要你的确认'), findsOneWidget);
+    expect(find.text('1 笔 · 确认后我会记住'), findsOneWidget);
+    expect(find.text('Apple Store · ¥68.00'), findsOneWidget);
+    expect(
+      find.text('我的判断：娱乐 · 支出'),
+      findsOneWidget,
+      reason: 'direction 要转中文，不能把枚举值直接抛给用户',
+    );
+  });
+
+  testWidgets('test_ledger_page_confirm_actions_follow_reason', (tester) async {
+    await _openLedger(
+      tester,
+      _FakeLedgerRepository(
+        pending: [
+          _pending(key: 'pk-dir', reason: 'direction_ambiguous'),
+          _pending(
+            key: 'pk-cat',
+            reason: 'category_ambiguous',
+            candidates: const [
+              LedgerPendingCandidate(value: '餐饮', label: '餐饮'),
+            ],
+          ),
+        ],
+      ),
+    );
+    expect(find.text('记为支出'), findsOneWidget);
+    expect(find.text('记为收入'), findsOneWidget);
+    expect(find.text('餐饮'), findsOneWidget);
+    expect(find.text('忽略'), findsOneWidget);
+  });
+
+  testWidgets('test_ledger_page_confirm_resolves_and_removes_row',
+      (tester) async {
+    final repo = _FakeLedgerRepository(pending: [_pending(key: 'pk-1')]);
+    await _openLedger(tester, repo);
+    await tester.tap(find.text('确认'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(repo.confirmCalls, 1);
+    expect(find.byType(LedgerConfirmRow), findsNothing);
+  });
+
+  testWidgets('test_ledger_page_confirm_failure_restores_row', (tester) async {
+    final repo = _FakeLedgerRepository(
+      pending: [_pending(key: 'pk-1')],
+      confirmFails: true,
+    );
+    await _openLedger(tester, repo);
+    await tester.tap(find.text('确认'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(LedgerConfirmRow), findsOneWidget, reason: '失败要回滚');
+    expect(find.textContaining('没处理成功'), findsOneWidget);
+  });
+
+  testWidgets('test_ledger_page_category_bars_cycle_four_gradients',
+      (tester) async {
+    await _openLedger(tester, _FakeLedgerRepository());
+    final bars = tester.widgetList<CategoryBar>(find.byType(CategoryBar));
+    expect(bars.length, 2);
+    final gradients = bars.map((b) => b.gradient).toList();
+    expect(gradients[0], isNot(gradients[1]),
+        reason: '分类条按语义四色轮转，不是全 money');
   });
 
   testWidgets('test_ledger_page_existing_sections_unchanged', (tester) async {
@@ -189,7 +357,7 @@ void main() {
     expect(find.text('¥128.50'), findsOneWidget);
     expect(find.text('本期共 2 笔。收入 0.00，结余 -128.50。'), findsOneWidget);
     expect(find.text('比上月同期少 12%'), findsOneWidget);
-    expect(find.byType(CategoryBar), findsOneWidget);
+    expect(find.byType(CategoryBar), findsNWidgets(2));
     expect(find.byType(TxRow), findsOneWidget);
     expect(find.text('-35.00'), findsOneWidget);
   });

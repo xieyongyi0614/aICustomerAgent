@@ -5,17 +5,22 @@ import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
 import '../data/ledger_repository.dart';
 
-/// B5 #ledger 账本：深色总览 + AI 观察 + 分类 + 账单。
+/// B5 #ledger 账本：深色总览 + AI 观察 + 待确认 + 单入口 + 分类 + 账单。
+///
+/// 「待确认」是账本页的灵魂（`components.md` B5）：AI 记账不是全自动黑盒，
+/// 拿不准的必须放在这里交给用户；34 只做「同步从哪来 / AI 学会了什么」。
 class LedgerPage extends StatefulWidget {
   const LedgerPage({
     super.key,
     this.debugSummary,
     this.debugEntries,
+    this.debugPending,
     this.repository,
   });
 
   final LedgerSummaryData? debugSummary;
   final List<LedgerEntryData>? debugEntries;
+  final List<LedgerPendingData>? debugPending;
   final LedgerRepository? repository;
 
   @override
@@ -26,8 +31,10 @@ class _LedgerPageState extends State<LedgerPage> {
   late final LedgerRepository _repo = widget.repository ?? LedgerRepository();
   LedgerSummaryData? _summary;
   List<LedgerEntryData> _entries = [];
+  List<LedgerPendingData> _pending = const [];
   int? _autoCount;
   bool _loading = true;
+  bool _actionFailed = false;
   Object? _error;
 
   @override
@@ -36,6 +43,7 @@ class _LedgerPageState extends State<LedgerPage> {
     if (widget.debugSummary != null) {
       _summary = widget.debugSummary;
       _entries = widget.debugEntries ?? const [];
+      _pending = widget.debugPending ?? const [];
       _loading = false;
       return;
     }
@@ -51,11 +59,14 @@ class _LedgerPageState extends State<LedgerPage> {
       final summary = await _repo.fetchSummary();
       final entries = await _repo.fetchEntries();
       final autoCount = await _loadAutoCount();
+      final pending = await _loadPending();
       if (!mounted) return;
       setState(() {
         _summary = summary;
         _entries = entries;
         _autoCount = autoCount;
+        _pending = pending;
+        _actionFailed = false;
         _loading = false;
       });
     } catch (e) {
@@ -64,6 +75,15 @@ class _LedgerPageState extends State<LedgerPage> {
         _error = e;
         _loading = false;
       });
+    }
+  }
+
+  /// 待确认是账本页的增强块，取不到时只隐藏该块，不把整页打成错误态。
+  Future<List<LedgerPendingData>> _loadPending() async {
+    try {
+      return await _repo.fetchPending();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -76,17 +96,226 @@ class _LedgerPageState extends State<LedgerPage> {
     }
   }
 
-  String get _autoSubtitle {
+  /// sync-link 文案体现 AI 动态（A31），不写静态说明。
+  String get _syncLabel {
     final count = _autoCount;
-    if (count == null) return '看看 AI 记了什么';
-    if (count == 0) return '本月还没有自动记账';
-    return '本月已自动记 $count 笔';
+    if (count == null) return '同步与 AI 规则';
+    if (count == 0) return '本月还没有自动记账 · 同步与 AI 规则';
+    return '本月已自动记 $count 笔 · 同步与 AI 规则';
   }
 
   Future<void> _openEntry(String location) async {
     await context.push<bool>(location);
     if (!mounted) return;
     await _load();
+  }
+
+  /// 待确认行：先乐观移除，失败则回滚并把失败显性化。
+  Future<void> _resolve(
+    LedgerPendingData item, {
+    String? categoryName,
+    String? direction,
+  }) async {
+    final snapshot = List<LedgerPendingData>.from(_pending);
+    setState(() {
+      _pending = [
+        for (final row in _pending)
+          if (row.pendingKey != item.pendingKey) row,
+      ];
+      _actionFailed = false;
+    });
+    try {
+      await _repo.confirmPending(
+        item.pendingKey,
+        categoryName: categoryName,
+        direction: direction,
+      );
+      await _refreshSummary();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pending = snapshot;
+        _actionFailed = true;
+      });
+    }
+  }
+
+  Future<void> _ignore(LedgerPendingData item) async {
+    final snapshot = List<LedgerPendingData>.from(_pending);
+    setState(() {
+      _pending = [
+        for (final row in _pending)
+          if (row.pendingKey != item.pendingKey) row,
+      ];
+      _actionFailed = false;
+    });
+    try {
+      await _repo.ignorePending(item.pendingKey);
+      await _refreshSummary();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pending = snapshot;
+        _actionFailed = true;
+      });
+    }
+  }
+
+  Future<void> _refreshSummary() async {
+    try {
+      final summary = await _repo.fetchSummary();
+      if (!mounted) return;
+      setState(() => _summary = summary);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<void> _revise(LedgerPendingData item) async {
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(context.radii.lg),
+        ),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing.cardPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '改成哪一类',
+                style: context.typography.sectionTitle
+                    .copyWith(color: context.colors.ink),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final candidate in item.candidates)
+                    ChipButton(
+                      label: candidate.label,
+                      onTap: () =>
+                          Navigator.of(sheetContext).pop(candidate.label),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    await _resolve(item, categoryName: chosen);
+  }
+
+  Widget _pendingBlock() {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 18),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: context.radii.rLg,
+      ),
+      child: Column(
+        children: [
+          for (var index = 0; index < _pending.length; index++)
+            LedgerConfirmRow(
+              title: _pendingTitle(_pending[index]),
+              judgment: '我的判断：${_pendingJudgment(_pending[index])}',
+              showDivider: index < _pending.length - 1,
+              actions: _pendingActions(_pending[index]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<LedgerConfirmAction> _pendingActions(LedgerPendingData item) {
+    if (item.reason == 'direction_ambiguous') {
+      return [
+        LedgerConfirmAction(
+          label: '记为支出',
+          kind: LedgerActionKind.primary,
+          onTap: () => _resolve(item, direction: 'expense'),
+        ),
+        LedgerConfirmAction(
+          label: '记为收入',
+          onTap: () => _resolve(item, direction: 'income'),
+        ),
+      ];
+    }
+    if (item.reason == 'category_ambiguous') {
+      return [
+        for (final candidate in item.candidates.take(3))
+          LedgerConfirmAction(
+            label: candidate.label,
+            onTap: () => _resolve(item, categoryName: candidate.label),
+          ),
+        LedgerConfirmAction(label: '忽略', onTap: () => _ignore(item)),
+      ];
+    }
+    return [
+      LedgerConfirmAction(
+        label: '确认',
+        kind: LedgerActionKind.primary,
+        onTap: () => _resolve(item),
+      ),
+      if (item.candidates.isNotEmpty)
+        LedgerConfirmAction(label: '修改', onTap: () => _revise(item)),
+      LedgerConfirmAction(label: '忽略', onTap: () => _ignore(item)),
+    ];
+  }
+
+  String _pendingTitle(LedgerPendingData item) {
+    final parts = <String>[
+      if (item.merchantHint != null && item.merchantHint!.isNotEmpty)
+        item.merchantHint!,
+      if (item.amountText.isNotEmpty) '¥${item.amountText}',
+    ];
+    return parts.isEmpty ? item.question : parts.join(' · ');
+  }
+
+  /// `direction` 是后端枚举，必须转成用户看得懂的中文，不能原样抛出去。
+  String _pendingJudgment(LedgerPendingData item) {
+    final parts = <String>[
+      if (item.categoryHint != null && item.categoryHint!.isNotEmpty)
+        item.categoryHint!,
+      if (item.direction == 'expense') '支出',
+      if (item.direction == 'income') '收入',
+    ];
+    return parts.isEmpty ? '待你补充' : parts.join(' · ');
+  }
+
+  Widget _actionFailure() {
+    final colors = context.colors;
+    final type = context.typography;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '刚才那笔没处理成功，账单已放回列表',
+            style: type.caption.copyWith(color: colors.danger),
+          ),
+        ),
+        ChipButton(label: '重试', ghost: true, onTap: _load),
+      ],
+    );
+  }
+
+  LinearGradient _categoryGradient(int index) {
+    final gradients = context.gradients;
+    return switch (index % 4) {
+      0 => gradients.barMoney,
+      1 => gradients.barBlue,
+      2 => gradients.barPurple,
+      _ => gradients.barGreen,
+    };
   }
 
   @override
@@ -123,10 +352,7 @@ class _LedgerPageState extends State<LedgerPage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              BackLink(
-                label: '‹ 生活',
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
+              BackLink(label: '生活'),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -172,28 +398,29 @@ class _LedgerPageState extends State<LedgerPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: EntryCard(
-                      title: '手动记一笔',
-                      subtitle: '金额 + 分类，备注我帮你填',
-                      icon: AppIcons.wallet,
-                      accent: EntryAccent.money,
-                      onTap: () => _openEntry('/ledger/add'),
-                    ),
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: EntryCard(
-                      title: 'AI 自动记账',
-                      subtitle: _autoSubtitle,
-                      icon: AppIcons.sparkles,
-                      accent: EntryAccent.ai,
-                      onTap: () => _openEntry('/ledger/auto'),
-                    ),
-                  ),
-                ],
+              if (_actionFailed) ...[
+                _actionFailure(),
+                const SizedBox(height: 8),
+              ],
+              if (_pending.isNotEmpty) ...[
+                _SectionTitle(
+                  title: '需要你的确认',
+                  hint: '${_pending.length} 笔 · 确认后我会记住',
+                ),
+                const SizedBox(height: 6),
+                _pendingBlock(),
+                const SizedBox(height: 14),
+              ],
+              EntryCard(
+                title: '记一笔',
+                subtitle: '键盘输入，或直接说给亚丝娜',
+                icon: AppIcons.wallet,
+                accent: EntryAccent.money,
+                onTap: () => _openEntry('/ledger/add'),
+              ),
+              SyncLink(
+                label: _syncLabel,
+                onTap: () => _openEntry('/ledger/auto'),
               ),
               const SizedBox(height: 20),
               _SectionTitle(title: '分类支出', hint: s.periodLabel),
@@ -201,14 +428,14 @@ class _LedgerPageState extends State<LedgerPage> {
               if (s.byCategory.isEmpty)
                 Text('还没有分类数据', style: type.body.copyWith(color: colors.ink2))
               else
-                for (final c in s.byCategory.take(6))
+                for (final (index, c) in s.byCategory.take(6).indexed)
                   CategoryBar(
                     label: c.categoryId ?? '未分类',
                     amountLabel: '¥${(c.expenseMinor / 100).toStringAsFixed(0)}',
                     ratio: maxExpense == 0
                         ? 0
                         : c.expenseMinor / maxExpense,
-                    gradient: gradients.barMoney,
+                    gradient: _categoryGradient(index),
                   ),
               const SizedBox(height: 14),
               _SectionTitle(title: '最近账单', hint: 'AI 自动分类'),
@@ -226,7 +453,7 @@ class _LedgerPageState extends State<LedgerPage> {
                         : '-${_entries[i].amountText}',
                     tileColor: colors.tileMoney,
                     iconColor: colors.money,
-                    icon: Icons.receipt_long,
+                    icon: AppIcons.fileText,
                     subtitle: _entries[i].occurredAt,
                     showDivider: i < _entries.length - 1,
                   ),

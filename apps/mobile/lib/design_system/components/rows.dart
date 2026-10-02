@@ -55,7 +55,7 @@ class TaskRow extends StatelessWidget {
                 border: done ? null : Border.all(color: colors.borderCheck),
               ),
               child: done
-                  ? Icon(Icons.check, size: 14, color: colors.onDeepPrimary)
+                  ? Icon(AppIcons.check, size: 14, color: colors.onDeepPrimary)
                   : null,
             ),
           ),
@@ -326,7 +326,7 @@ class SourceNote extends StatelessWidget {
 class BackLink extends StatelessWidget {
   const BackLink({
     super.key,
-    this.label = '‹ 返回首页',
+    this.label = '返回首页',
     this.onTap,
     this.onDark = false,
   });
@@ -344,7 +344,14 @@ class BackLink extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: GestureDetector(
         onTap: onTap ?? () => Navigator.of(context).maybePop(),
-        child: Text(label, style: type.rowTitle.copyWith(color: color)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(AppIcons.chevronLeft, size: 18, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: type.rowTitle.copyWith(color: color)),
+          ],
+        ),
       ),
     );
   }

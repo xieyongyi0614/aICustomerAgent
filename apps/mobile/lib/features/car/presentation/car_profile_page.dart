@@ -206,10 +206,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              BackLink(
-                label: '‹ 车辆',
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
+              BackLink(label: '车辆'),
               Text('我的车', style: type.pageTitle),
               const SizedBox(height: 6),
               Text(

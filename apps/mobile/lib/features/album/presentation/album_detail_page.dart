@@ -107,7 +107,7 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(label: '‹ 相册', onTap: () => Navigator.of(context).maybePop()),
+            BackLink(label: '相册'),
             const SizedBox(height: 10),
             Text(name, style: type.pageTitle),
             Text(

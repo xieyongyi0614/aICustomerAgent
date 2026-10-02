@@ -50,15 +50,31 @@ void main() {
     await _pump(
       tester,
       EntryCard(
-        title: 'AI 自动记账',
+        title: '记一笔',
         subtitle: '本月已自动记 42 笔',
-        icon: AppIcons.sparkles,
-        accent: EntryAccent.ai,
+        icon: AppIcons.wallet,
+        accent: EntryAccent.money,
         onTap: () {},
       ),
     );
-    expect(find.text('AI 自动记账'), findsOneWidget);
+    expect(find.text('记一笔'), findsOneWidget);
     expect(find.text('本月已自动记 42 笔'), findsOneWidget);
+    expect(
+      find.byIcon(AppIcons.chevronRight),
+      findsOneWidget,
+      reason: 'A31：entry 是横向行卡，右侧带 chevron',
+    );
+  });
+
+  testWidgets('test_sync_link_renders_sparkle_label_and_chevron',
+      (tester) async {
+    await _pump(
+      tester,
+      SyncLink(label: '本月已自动记 42 笔 · 同步与 AI 规则', onTap: () {}),
+    );
+    expect(find.text('本月已自动记 42 笔 · 同步与 AI 规则'), findsOneWidget);
+    expect(find.byType(SparkleIcon), findsOneWidget);
+    expect(find.byIcon(AppIcons.chevronRight), findsOneWidget);
   });
 
   testWidgets('test_ledger_amount_uses_tabular_figures', (tester) async {
@@ -225,11 +241,16 @@ void main() {
       tester,
       'ledger_entry',
       EntryCard(
-        title: '手动记一笔',
-        subtitle: '金额 · 分类 · 备注，三步入账',
+        title: '记一笔',
+        subtitle: '键盘输入，或直接说给亚丝娜',
         icon: AppIcons.wallet,
         onTap: () {},
       ),
+    );
+    await _golden(
+      tester,
+      'ledger_sync_link',
+      SyncLink(label: '本月已自动记 42 笔 · 同步与 AI 规则', onTap: () {}),
     );
     await _golden(
       tester,

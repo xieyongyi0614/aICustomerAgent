@@ -25,13 +25,13 @@ class ProfilePrivacyPage extends StatelessWidget {
               SettingRow(
                 title: '健康数据',
                 subtitle: '单独同意 · 用于趋势参考，非医疗建议',
-                icon: Icons.favorite,
+                icon: AppIcons.heart,
                 onTap: () => context.go('/health/consent'),
               ),
               SettingRow(
                 title: '导出我的数据',
                 subtitle: '生成一份完整备份',
-                icon: Icons.download,
+                icon: AppIcons.download,
                 onTap: () async {
                   final dio = createDio();
                   await dio.get('/life/export');

@@ -58,6 +58,7 @@ class HomeSummaryData {
     this.insightAction,
     required this.healthAuthorized,
     this.healthEmptyHint,
+    this.healthSource,
     this.healthMetrics = const <HomeHealthMetric>[],
     required this.tasks,
     required this.tasksHint,
@@ -74,6 +75,9 @@ class HomeSummaryData {
   final String? insightAction;
   final bool healthAuthorized;
   final String? healthEmptyHint;
+
+  /// 设备名（如「小米手环 9 Pro」）；后端未接入时缺省，端上不得编造。
+  final String? healthSource;
   final List<HomeHealthMetric> healthMetrics;
   final List<HomeTaskItem> tasks;
   final String tasksHint;
@@ -106,6 +110,7 @@ class HomeRepository {
       insightAction: insight['action_label'] as String?,
       healthAuthorized: health['authorized'] as bool? ?? false,
       healthEmptyHint: health['empty_hint'] as String?,
+      healthSource: health['source'] as String?,
       healthMetrics: [
         for (final cell in (health['cells'] as List?) ?? const [])
           if (cell is Map)

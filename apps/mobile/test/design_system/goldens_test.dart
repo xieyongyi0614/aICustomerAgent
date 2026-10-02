@@ -220,7 +220,7 @@ void main() {
   });
 
   testWidgets('golden_back_link', (t) async {
-    await _golden(t, 'a30_back', const BackLink(label: '‹ 返回首页'));
+    await _golden(t, 'a30_back', const BackLink(label: '返回首页'));
   });
 
   testWidgets('golden_confirm_dialog', (t) async {

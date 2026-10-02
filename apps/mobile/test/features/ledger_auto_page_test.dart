@@ -21,65 +21,18 @@ class _FakeLedgerRepository extends LedgerRepository {
       autoCount: 0,
       pendingCount: 0,
     ),
-    this.pending = const [],
     this.rules = const [],
-    this.confirmFails = false,
   }) : super(dio: Dio());
 
   final LedgerAutoSummaryData summary;
-  final List<LedgerPendingData> pending;
   final List<LedgerRuleData> rules;
-  bool confirmFails;
-  bool ignoreFails = false;
-
-  int confirmCalls = 0;
-  int ignoreCalls = 0;
-  final List<String?> confirmedCategories = [];
-  final List<String?> confirmedDirections = [];
 
   @override
   Future<LedgerAutoSummaryData> fetchAutoSummary() async => summary;
 
   @override
-  Future<List<LedgerPendingData>> fetchPending() async => pending;
-
-  @override
   Future<List<LedgerRuleData>> fetchRules() async => rules;
-
-  @override
-  Future<void> confirmPending(
-    String pendingKey, {
-    String? categoryName,
-    String? direction,
-    int? amountMinor,
-  }) async {
-    confirmCalls++;
-    confirmedCategories.add(categoryName);
-    confirmedDirections.add(direction);
-    if (confirmFails) throw Exception('confirm down');
-  }
-
-  @override
-  Future<void> ignorePending(String pendingKey) async {
-    ignoreCalls++;
-    if (ignoreFails) throw Exception('ignore down');
-  }
 }
-
-LedgerPendingData _pending({
-  String key = 'pk-1',
-  String reason = 'amount_over_threshold',
-  List<LedgerPendingCandidate> candidates = const [],
-}) => LedgerPendingData(
-  pendingKey: key,
-  reason: reason,
-  question: '这笔金额较大，要记吗？',
-  candidates: candidates,
-  amountMinor: 320000,
-  categoryHint: '数码',
-  direction: 'expense',
-  merchantHint: '苹果店',
-);
 
 void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(390, 1800);
@@ -104,14 +57,13 @@ List<String> _sectionTypes(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('test_ledger_auto_renders_ten_sections_in_order', (tester) async {
+  testWidgets('test_ledger_auto_sections_render_in_order', (tester) async {
     final repo = _FakeLedgerRepository(
       summary: const LedgerAutoSummaryData(
         periodLabel: 'month',
         autoCount: 42,
         pendingCount: 1,
       ),
-      pending: [_pending()],
       rules: const [LedgerRuleData(keyword: '奶茶', categoryName: '饮品')],
     );
     await _openPage(tester, repo);
@@ -124,10 +76,6 @@ void main() {
     double topOf(Finder finder) => tester.getTopLeft(finder).dy;
     expect(
       topOf(find.byType(AiCard)),
-      lessThan(topOf(find.byType(LedgerConfirmRow).first)),
-    );
-    expect(
-      topOf(find.byType(LedgerConfirmRow).first),
       lessThan(topOf(find.byType(SettingGroup))),
     );
     expect(
@@ -179,118 +127,42 @@ void main() {
     expect(find.text('来自你的 3 次修正'), findsOneWidget);
   });
 
-  testWidgets('test_ledger_auto_pending_empty_state_is_honest', (tester) async {
-    final repo = _FakeLedgerRepository(
-      summary: const LedgerAutoSummaryData(
-        periodLabel: 'month',
-        autoCount: 3,
-        pendingCount: 0,
-      ),
-    );
-    await _openPage(tester, repo);
-    expect(find.text('这个月没有拿不准的账单'), findsOneWidget);
-    expect(find.byType(LedgerConfirmRow), findsNothing);
-    expect(find.text('待你确认'), findsNothing);
-    expect(find.byType(LedgerStatCard), findsOneWidget);
-  });
-
-  testWidgets('test_ledger_auto_confirm_row_actions_follow_reason',
-      (tester) async {
+  testWidgets('test_ledger_auto_has_no_pending_block', (tester) async {
     final repo = _FakeLedgerRepository(
       summary: const LedgerAutoSummaryData(
         periodLabel: 'month',
         autoCount: 3,
         pendingCount: 2,
       ),
-      pending: [
-        _pending(key: 'pk-dir', reason: 'direction_ambiguous'),
-        _pending(
-          key: 'pk-cat',
-          reason: 'category_ambiguous',
-          candidates: const [
-            LedgerPendingCandidate(value: '餐饮', label: '餐饮'),
-            LedgerPendingCandidate(value: '购物', label: '购物'),
-          ],
-        ),
-      ],
     );
     await _openPage(tester, repo);
-    expect(find.text('记为支出'), findsOneWidget);
-    expect(find.text('记为收入'), findsOneWidget);
-    expect(find.text('餐饮'), findsOneWidget);
-    expect(find.text('购物'), findsOneWidget);
-    expect(find.text('忽略'), findsOneWidget);
+    expect(
+      find.text('需要你的确认'),
+      findsNothing,
+      reason: '待确认只出现在账本首页（31），本页是二级管理页',
+    );
+    expect(find.byType(LedgerConfirmRow), findsNothing);
+    expect(find.text('待你确认'), findsNothing);
+    expect(find.byType(LedgerStatCard), findsOneWidget);
   });
 
-  testWidgets('test_ledger_auto_confirm_optimistically_removes_row',
+  testWidgets('test_ledger_auto_conclusion_points_to_ledger_home',
       (tester) async {
     final repo = _FakeLedgerRepository(
       summary: const LedgerAutoSummaryData(
         periodLabel: 'month',
-        autoCount: 3,
-        pendingCount: 1,
+        autoCount: 42,
+        pendingCount: 2,
+        accuracy: 0.96,
       ),
-      pending: [_pending()],
     );
     await _openPage(tester, repo);
-    expect(find.byType(LedgerConfirmRow), findsOneWidget);
-    await tester.tap(find.text('确认'));
-    await tester.pump();
-    expect(find.byType(LedgerConfirmRow), findsNothing);
-    expect(repo.confirmCalls, 1);
-    await tester.pump(const Duration(milliseconds: 50));
-  });
-
-  testWidgets('test_ledger_auto_confirm_failure_rolls_back', (tester) async {
-    final repo = _FakeLedgerRepository(
-      summary: const LedgerAutoSummaryData(
-        periodLabel: 'month',
-        autoCount: 3,
-        pendingCount: 1,
+    expect(
+      find.text(
+        '本月我自动记了 42 笔 · 分类准确率 96% · 2 笔拿不准的已放在账本首页等你确认。',
       ),
-      pending: [_pending()],
-      confirmFails: true,
+      findsOneWidget,
     );
-    await _openPage(tester, repo);
-    await tester.tap(find.text('确认'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.byType(LedgerConfirmRow), findsOneWidget);
-    expect(find.text('刚才那一步没成功，我把列表恢复了，你再试一次'), findsOneWidget);
-  });
-
-  testWidgets('test_ledger_auto_direction_confirm_sends_direction',
-      (tester) async {
-    final repo = _FakeLedgerRepository(
-      summary: const LedgerAutoSummaryData(
-        periodLabel: 'month',
-        autoCount: 3,
-        pendingCount: 1,
-      ),
-      pending: [_pending(reason: 'direction_ambiguous')],
-    );
-    await _openPage(tester, repo);
-    await tester.tap(find.text('记为收入'));
-    await tester.pump();
-    expect(repo.confirmedDirections, ['income']);
-    await tester.pump(const Duration(milliseconds: 50));
-  });
-
-  testWidgets('test_ledger_auto_ignore_removes_row', (tester) async {
-    final repo = _FakeLedgerRepository(
-      summary: const LedgerAutoSummaryData(
-        periodLabel: 'month',
-        autoCount: 3,
-        pendingCount: 1,
-      ),
-      pending: [_pending()],
-    );
-    await _openPage(tester, repo);
-    await tester.tap(find.text('忽略'));
-    await tester.pump();
-    expect(find.byType(LedgerConfirmRow), findsNothing);
-    expect(repo.ignoreCalls, 1);
-    await tester.pump(const Duration(milliseconds: 50));
   });
 
   test('test_ledger_auto_never_renders_sync_counts', () {
@@ -360,14 +232,6 @@ void main() {
         pendingCount: 1,
         accuracy: 0.92,
       ),
-      pending: [
-        _pending(
-          candidates: const [
-            LedgerPendingCandidate(value: '餐饮', label: '餐饮'),
-            LedgerPendingCandidate(value: '购物', label: '购物'),
-          ],
-        ),
-      ],
       rules: const [
         LedgerRuleData(keyword: '奶茶', categoryName: '饮品'),
         LedgerRuleData(keyword: '充电桩', categoryName: '交通 / 加油'),

@@ -230,7 +230,7 @@ class _HealthProbePageState extends State<HealthProbePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    rows[i].granted ? Icons.check_circle : Icons.cancel,
+                    rows[i].granted ? AppIcons.check : AppIcons.x,
                     size: 16,
                     color: rows[i].granted ? colors.health : colors.ink3,
                   ),

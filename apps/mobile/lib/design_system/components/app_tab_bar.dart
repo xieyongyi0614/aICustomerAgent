@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
+import 'sparkle.dart';
 
 /// 组件 A9：4 Tab 自绘（禁 M3 系统导航栏）。
 /// 第 3 位是悬浮对话球（按钮，无动效），不是 Orb。
@@ -202,35 +203,8 @@ class _ChatBall extends StatelessWidget {
           gradient: gradient,
           boxShadow: shadows,
         ),
-        child: CustomPaint(painter: _SparklePainter(sparkColor)),
+        child: Center(child: SparkleIcon(size: 24, color: sparkColor)),
       ),
     );
   }
-}
-
-/// ✦ 四芒星（tokens.md 固定路径，24 坐标系）
-class _SparklePainter extends CustomPainter {
-  const _SparklePainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(12, 2)
-      ..lineTo(14.4, 9.2)
-      ..lineTo(22, 12)
-      ..lineTo(14.4, 14.8)
-      ..lineTo(12, 22)
-      ..lineTo(9.6, 14.8)
-      ..lineTo(2, 12)
-      ..lineTo(9.6, 9.2)
-      ..close();
-    canvas.translate(size.width / 2 - 12, size.height / 2 - 12);
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SparklePainter oldDelegate) =>
-      oldDelegate.color != color;
 }

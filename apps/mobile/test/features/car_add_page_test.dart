@@ -98,7 +98,7 @@ void main() {
     final repo = _FakeCarRepository();
     await _pumpPage(tester, repo);
 
-    expect(find.text('‹ 车辆'), findsOneWidget);
+    expect(find.text('车辆'), findsOneWidget);
     expect(find.byType(TypeScroll), findsOneWidget);
     expect(find.byType(LedgerAmount), findsOneWidget);
     expect(find.text('亚丝娜的提示'), findsOneWidget);

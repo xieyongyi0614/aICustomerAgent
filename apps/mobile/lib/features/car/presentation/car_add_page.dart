@@ -178,10 +178,7 @@ class _CarAddPageState extends State<CarAddPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(
-              label: '‹ 车辆',
-              onTap: () => Navigator.of(context).maybePop(),
-            ),
+            BackLink(label: '车辆'),
             TypeScroll(
               selectedKey: _kind,
               onSelected: _onKindChanged,

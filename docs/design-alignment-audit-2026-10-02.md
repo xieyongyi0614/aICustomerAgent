@@ -1,5 +1,10 @@
 # 设计稿对齐审核 · Flutter 移动端（2026-10-02）
 
+> **后续状态**：本报告是审核时点的差异快照。已完成项、有意偏差与剩余待办以
+> **`docs/design-alignment-tasks.md`**（DA-01~DA-30）为准 —— 其中 DA-01 / DA-02 / DA-03 已完成，
+> DA-04 / DA-05 完成客户端与结构部分（数据可视化与健康内容分别卡后端契约与 `PLT-001` 门控），
+> DEV-01~04 已裁决「保留增强、登记偏差」。
+
 审核对象：`design/`（现役 `design/pages/*.html` 23 页）↔ `apps/mobile/lib`
 权威顺序：`.agents/skills/zhaoxi-design-system/`（最高）> `design/pages/` > `design/ai-life-agent-design.html`
 

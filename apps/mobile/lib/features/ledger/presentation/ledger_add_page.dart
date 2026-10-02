@@ -186,7 +186,7 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
         child: ListView(
           padding: context.spacing.screenPadding,
           children: [
-            BackLink(label: '‹ 记账'),
+            BackLink(label: '记账'),
             const SizedBox(height: 14),
             LedgerSeg(
               value: _direction,

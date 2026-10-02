@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
 import 'chips.dart';
+import 'sparkle.dart';
 
 /// 过程卡步骤（设计系统内独立模型，禁止 import features）。
 class ProcStep {
@@ -58,7 +59,7 @@ class ProcCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.auto_awesome, size: 15, color: colors.aiPrimary),
+                    SparkleIcon(size: 15, color: colors.aiPrimary),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(title,
@@ -71,9 +72,9 @@ class ProcCard extends StatelessWidget {
                     if (running)
                       const _SpinRing()
                     else if (done)
-                      Icon(Icons.check_circle, size: 13, color: colors.health)
+                      Icon(AppIcons.check, size: 13, color: colors.health)
                     else if (failed)
-                      Icon(Icons.error_outline, size: 13, color: colors.warm),
+                      Icon(AppIcons.alert, size: 13, color: colors.warm),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -163,7 +164,7 @@ class _StepIcon extends StatelessWidget {
             color: colors.health.withValues(alpha: 0.14),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.check, size: 12, color: colors.health),
+          child: Icon(AppIcons.check, size: 12, color: colors.health),
         );
       case 'running':
         return const _SpinRing(size: 20, stroke: 2);
@@ -173,7 +174,7 @@ class _StepIcon extends StatelessWidget {
             color: colors.warm.withValues(alpha: 0.16),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.close, size: 12, color: colors.warm),
+          child: Icon(AppIcons.x, size: 12, color: colors.warm),
         );
       default:
         return Container(

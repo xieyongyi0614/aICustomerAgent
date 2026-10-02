@@ -120,10 +120,7 @@ class _AlbumAiPageState extends State<AlbumAiPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(
-              label: '‹ 相册',
-              onTap: () => Navigator.of(context).maybePop(),
-            ),
+            BackLink(label: '相册'),
             const SizedBox(height: 10),
             Text('整理建议', style: type.pageTitle),
             Text(

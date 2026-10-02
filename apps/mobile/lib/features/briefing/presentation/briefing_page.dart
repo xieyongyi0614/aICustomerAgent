@@ -169,9 +169,8 @@ class _BriefingPageState extends State<BriefingPage> {
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
           BackLink(
-            label: '‹ 返回首页',
+            label: '返回首页',
             onDark: true,
-            onTap: () => Navigator.of(context).maybePop(),
           ),
           Text(
             content!.greeting,

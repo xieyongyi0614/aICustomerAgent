@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
+import 'sparkle.dart';
 
 AppColors _c(BuildContext context) =>
     Theme.of(context).extension<AppColors>()!;
@@ -33,7 +34,7 @@ class ModeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.auto_awesome, size: 11, color: colors.aiPrimary),
+          SparkleIcon(size: 11, color: colors.aiPrimary),
           const SizedBox(width: 5),
           Text(label,
               style: type.label.copyWith(color: colors.aiPrimary, fontSize: 11.5)),
@@ -62,7 +63,7 @@ class MemHint extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome, size: 14, color: colors.aiPrimary),
+          SparkleIcon(size: 14, color: colors.aiPrimary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(text,
@@ -144,7 +145,7 @@ class AskPill extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome, size: 16, color: colors.aiPrimary),
+          SparkleIcon(size: 16, color: colors.aiPrimary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(hint, style: type.body.copyWith(color: colors.ink3)),
@@ -158,7 +159,7 @@ class AskPill extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: _g(context).ai,
               ),
-              child: Icon(Icons.arrow_upward, size: 17, color: colors.onDeepPrimary),
+              child: Icon(AppIcons.arrowUp, size: 17, color: colors.onDeepPrimary),
             ),
           ),
         ],
@@ -196,7 +197,7 @@ class CaptureBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.auto_awesome, size: 17, color: colors.aiPrimary),
+            SparkleIcon(size: 17, color: colors.aiPrimary),
             const SizedBox(width: 10),
             Expanded(child: Text(hint, style: type.body.copyWith(color: colors.ink3))),
           ],

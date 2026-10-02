@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
 import 'gradient_border_card.dart';
+import 'sparkle.dart';
 
 export 'gradient_border_card.dart';
 
@@ -41,6 +42,9 @@ class AppCard extends StatelessWidget {
 }
 
 /// A2 AI 结论卡
+///
+/// 标签行（✦ + 12px/700 aiPrimary）是 AI 的身份标识 —— 红线 1：
+/// 用户必须一眼分辨「哪部分是 AI」。渐变描边只属于本卡，不得下放到普通卡片。
 class AiCard extends StatelessWidget {
   const AiCard({
     super.key,
@@ -63,8 +67,24 @@ class AiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: type.sectionTitle.copyWith(color: colors.ink)),
-          const SizedBox(height: 10),
+          Row(
+            children: [
+              SparkleIcon(size: 13, color: colors.aiPrimary),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  title,
+                  style: type.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.72,
+                    color: colors.aiPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
           child,
           if (actionLabel != null) ...[
             const SizedBox(height: 12),

@@ -96,10 +96,7 @@ class _CarPageState extends State<CarPage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              BackLink(
-                label: '‹ 生活',
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
+              BackLink(label: '生活'),
               if (overview.loan != null) ...[
                 LoanCard(
                   label: '车贷 · 已还 ${overview.loan!.paidPeriods} / '

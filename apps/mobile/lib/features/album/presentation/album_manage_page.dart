@@ -186,10 +186,7 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
               child: Row(
                 children: [
-                  BackLink(
-                    label: '取消',
-                    onTap: () => Navigator.of(context).maybePop(),
-                  ),
+                  BackLink(label: '取消'),
                   Expanded(
                     child: Text(
                       '已选 ${_selected.length} 张',

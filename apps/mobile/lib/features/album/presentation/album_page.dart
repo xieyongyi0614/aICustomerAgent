@@ -195,7 +195,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
             child: ListView(
               padding: const EdgeInsets.all(18),
               children: [
-                BackLink(label: '‹ 生活', onTap: () => Navigator.of(context).maybePop()),
+                BackLink(label: '生活'),
                 const SizedBox(height: 40),
                 EmptyState(
                   message: '还没有相册访问权限。授权后，整理建议只在本机计算，照片不会上传服务器。',
@@ -221,7 +221,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
         child: ListView(
           padding: context.spacing.screenPadding.copyWith(bottom: 40),
           children: [
-            BackLink(label: '‹ 生活', onTap: () => Navigator.of(context).maybePop()),
+            BackLink(label: '生活'),
             const SizedBox(height: 10),
             Text('相册', style: type.pageTitle),
             Text(

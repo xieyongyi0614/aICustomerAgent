@@ -61,7 +61,7 @@ class _HealthConsentPageState extends State<HealthConsentPage> {
                 subtitle: _loaded
                     ? (_granted ? '已同意 · 可随时关闭' : '未同意 · 开启后用于健康趋势')
                     : '读取同意状态…',
-                icon: Icons.favorite,
+                icon: AppIcons.heart,
                 iconBg: colors.tileHealth,
                 iconColor: colors.health,
                 trailing: _loaded

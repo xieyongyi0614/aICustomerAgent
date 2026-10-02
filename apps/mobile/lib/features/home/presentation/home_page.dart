@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import '../data/home_repository.dart';
@@ -23,18 +24,31 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final _repo = HomeRepository();
   HomeSummaryData? _data;
+  String? _nickname;
   Object? _error;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadIdentity();
     if (widget.debugSummary != null) {
       _data = widget.debugSummary;
       _loading = false;
       return;
     }
     _load();
+  }
+
+  /// 头像取用户首字（设计稿 `远`），不编造昵称。
+  Future<void> _loadIdentity() async {
+    try {
+      final prefs = await PrefsStore.load();
+      if (!mounted) return;
+      setState(() => _nickname = prefs.nickname());
+    } catch (_) {
+      return;
+    }
   }
 
   Future<void> _load() async {
@@ -94,7 +108,13 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: ListView(
             padding: context.spacing.screenPadding,
             children: [
-              _GreetingRow(dateLabel: d.dateLabel, greeting: d.greeting),
+              _GreetingRow(
+                dateLabel: d.dateLabel,
+                greeting: d.greeting,
+                initial: (_nickname == null || _nickname!.isEmpty)
+                    ? '你'
+                    : _nickname!.substring(0, 1),
+              ),
               const SizedBox(height: 18),
               _HeroBlock(headline: d.headline, sub: d.sub, modeChip: d.modeChip),
               const SizedBox(height: 20),
@@ -115,7 +135,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               const SizedBox(height: 24),
               _SectionTitle(
                 title: '今日状态',
-                hint: healthAuthorized ? '来自已连接设备' : null,
+                hint: healthAuthorized ? d.healthSource : null,
               ),
               const SizedBox(height: 10),
               if (healthAuthorized && d.healthMetrics.isNotEmpty)
@@ -175,10 +195,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 }
 
 class _GreetingRow extends StatelessWidget {
-  const _GreetingRow({required this.dateLabel, required this.greeting});
+  const _GreetingRow({
+    required this.dateLabel,
+    required this.greeting,
+    required this.initial,
+  });
 
   final String dateLabel;
   final String greeting;
+  final String initial;
 
   @override
   Widget build(BuildContext context) {
@@ -198,11 +223,18 @@ class _GreetingRow extends StatelessWidget {
         Container(
           width: 38,
           height: 38,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: context.gradients.avatar,
           ),
-          child: Icon(Icons.person, size: 20, color: colors.avatarText),
+          child: Text(
+            initial,
+            style: type.sectionTitle.copyWith(
+              fontSize: 15,
+              color: colors.avatarText,
+            ),
+          ),
         ),
       ],
     );
