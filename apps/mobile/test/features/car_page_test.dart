@@ -279,6 +279,44 @@ void main() {
     }
   });
 
+  testWidgets('test_car_page_ai_card_precedes_hero', (tester) async {
+    final repo = _FakeCarRepository(overview: _overview());
+    await _pumpPage(tester, repo);
+
+    expect(find.text('比亚迪 汉 EV'), findsOneWidget);
+    expect(find.text('沪 A·D8F2K'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('亚丝娜的观察')).dy,
+      lessThan(tester.getTopLeft(find.text('比亚迪 汉 EV')).dy),
+      reason: 'AI 观察卡排在车辆 Hero 之前',
+    );
+  });
+
+  testWidgets('test_car_page_hero_marks_unwired_telemetry', (tester) async {
+    final repo = _FakeCarRepository(overview: _overview());
+    await _pumpPage(tester, repo);
+
+    expect(find.text('续航约'), findsOneWidget);
+    expect(find.text('尚未接入车机数据'), findsOneWidget);
+    expect(find.text('电量待接入'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'续航约\s*\d'), findRichText: true),
+        findsNothing,
+        reason: '红线 11：续航不得填示例数值');
+    expect(find.text('78%'), findsNothing,
+        reason: '红线 11：未接入车机时不得显示示例电量百分比');
+  });
+
+  testWidgets('test_car_page_charging_note_uses_computed_share',
+      (tester) async {
+    final repo = _FakeCarRepository(overview: _overview());
+    await _pumpPage(tester, repo);
+
+    expect(find.text('充电只占了 17%——这份账单里最轻的一块。—— 亚丝娜'),
+        findsOneWidget);
+    expect(find.byType(CategoryBar), findsNWidgets(2),
+        reason: '分类条现在包在卡片里，数量不变');
+  });
+
   testWidgets('test_car_page_golden', (tester) async {
     final repo = _FakeCarRepository(overview: _overview());
     await _pumpPage(tester, repo);

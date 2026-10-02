@@ -105,7 +105,23 @@ class _CarPageState extends State<CarPage> {
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
               if (widget.showBackLink) BackLink(label: '生活'),
+              AiCard(
+                title: '亚丝娜的观察',
+                child: Text(
+                  _observation(overview),
+                  style: type.body
+                      .copyWith(color: colors.bodyOnCard, height: 1.65),
+                ),
+              ),
+              if (overview.profile != null) ...[
+                const SizedBox(height: 14),
+                _CarHero(
+                  model: overview.profile!.model,
+                  plate: overview.profile!.plate,
+                ),
+              ],
               if (overview.loan != null) ...[
+                const SizedBox(height: 14),
                 LoanCard(
                   label: '车贷 · 已还 ${overview.loan!.paidPeriods} / '
                       '${overview.loan!.totalPeriods} 期',
@@ -118,16 +134,7 @@ class _CarPageState extends State<CarPage> {
                       ? null
                       : '${_shortDate(overview.loan!.settledNote)} 结清',
                 ),
-                const SizedBox(height: 14),
               ],
-              AiCard(
-                title: '亚丝娜的观察',
-                child: Text(
-                  _observation(overview),
-                  style: type.body
-                      .copyWith(color: colors.bodyOnCard, height: 1.65),
-                ),
-              ),
               const SizedBox(height: 20),
               _SectionTitle(title: '电车状态', hint: '本月'),
               const SizedBox(height: 10),
@@ -190,18 +197,38 @@ class _CarPageState extends State<CarPage> {
                 Text('本月还没有养车支出',
                     style: type.body.copyWith(color: colors.ink2))
               else
-                for (var i = 0; i < overview.expenseBreakdown.length; i++)
-                  CategoryBar(
-                    label: overview.expenseBreakdown[i].categoryName,
-                    amountLabel: '¥${overview.expenseBreakdown[i].netText}',
-                    ratio: maxCost == 0
-                        ? 0
-                        : overview.expenseBreakdown[i].netMinor / maxCost,
-                    gradient: _breakdownGradient(
-                      overview.expenseBreakdown[i].categoryName,
-                      i,
-                    ),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < overview.expenseBreakdown.length; i++)
+                        CategoryBar(
+                          label: overview.expenseBreakdown[i].categoryName,
+                          amountLabel:
+                              '¥${overview.expenseBreakdown[i].netText}',
+                          ratio: maxCost == 0
+                              ? 0
+                              : overview.expenseBreakdown[i].netMinor / maxCost,
+                          gradient: _breakdownGradient(
+                            overview.expenseBreakdown[i].categoryName,
+                            i,
+                          ),
+                        ),
+                      if (_chargingNote(overview) != null) ...[
+                        Container(height: 1, color: colors.line),
+                        const SizedBox(height: 12),
+                        Text(
+                          _chargingNote(overview)!,
+                          style: type.body.copyWith(
+                            fontSize: 13,
+                            height: 1.6,
+                            color: colors.ink2,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
+                ),
               const SizedBox(height: 20),
               _SectionTitle(title: '车辆提醒', hint: '我会提前告诉你'),
               const SizedBox(height: 6),
@@ -265,7 +292,7 @@ class _CarPageState extends State<CarPage> {
               const SizedBox(height: 20),
               EntryCard(
                 title: '车辆档案',
-                subtitle: overview.profile?.plate ?? '车型 · 车贷 · 保养周期',
+                subtitle: '保险 / 年检 / 保养记录',
                 icon: AppIcons.fileText,
                 accent: EntryAccent.ai,
                 onTap: () => _push('/car/profile'),
@@ -335,6 +362,18 @@ class _CarPageState extends State<CarPage> {
     return '${parts.join('，')}。';
   }
 
+  /// 账单注脚只用**已算出的占比**说话；没有充电项或没有支出时不出这一行。
+  String? _chargingNote(CarOverviewData overview) {
+    if (overview.expenseTotalMinor <= 0) return null;
+    for (final line in overview.expenseBreakdown) {
+      if (!line.categoryName.contains('充电')) continue;
+      final percent =
+          (line.netMinor / overview.expenseTotalMinor * 100).round();
+      return '充电只占了 $percent%——这份账单里最轻的一块。—— 亚丝娜';
+    }
+    return null;
+  }
+
   IconData _reminderIcon(String kind) => switch (kind) {
         'insurance' => AppIcons.shield,
         'inspection' => AppIcons.calendar,
@@ -401,4 +440,186 @@ class _SectionTitle extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 车辆 Hero：车型 + 车牌 + 续航 + 车机互联状态，右侧电量环。
+/// 续航 / 电量 / 车机互联客户端都还没有数据源，按红线 11 明示未接入，不编造数值。
+class _CarHero extends StatelessWidget {
+  const _CarHero({required this.model, required this.plate});
+
+  final String? model;
+  final String? plate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return AppCard(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        model ?? '我的车',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: type.rowTitle.copyWith(fontSize: 17),
+                      ),
+                    ),
+                    if (plate != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 3,
+                          horizontal: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.tileInfo,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          plate!,
+                          style: type.caption.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            color: colors.aiBlue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('续航约', style: type.sub.copyWith(color: colors.ink2)),
+                    const SizedBox(width: 5),
+                    Text(
+                      '—',
+                      style: type.numeric(type.heroTitle).copyWith(fontSize: 21),
+                    ),
+                    const SizedBox(width: 3),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        'km',
+                        style: type.caption.copyWith(color: colors.ink3),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: colors.ink3,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '尚未接入车机数据',
+                      style: type.caption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: colors.ink3,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          const _BatteryRing(),
+        ],
+      ),
+    );
+  }
+}
+
+/// 电量环：没有车机数据就画空环 + 中心「—」，不画示例百分比（红线 11）。
+class _BatteryRing extends StatelessWidget {
+  const _BatteryRing();
+
+  static const _size = 86.0;
+  static const _trackWidth = 7.0;
+  static const _radius = 35.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            size: const Size(_size, _size),
+            painter: _BatteryRingPainter(
+              track: colors.trackBar,
+              width: _trackWidth,
+              radius: _radius,
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '—',
+                style: type.numeric(type.heroTitle).copyWith(fontSize: 19),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '电量待接入',
+                style: type.caption.copyWith(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: colors.ink3,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatteryRingPainter extends CustomPainter {
+  const _BatteryRingPainter({
+    required this.track,
+    required this.width,
+    required this.radius,
+  });
+
+  final Color track;
+  final double width;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final ring = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    canvas.drawCircle(center, radius, ring);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BatteryRingPainter old) =>
+      old.track != track || old.width != width || old.radius != radius;
 }

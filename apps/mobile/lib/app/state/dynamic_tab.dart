@@ -19,35 +19,61 @@ enum LifeModule {
   final IconData icon;
   final String routePath;
 
-  static LifeModule fromId(String? id) {
+  static LifeModule? tryFromId(String? id) {
     for (final module in values) {
       if (module.id == id) return module;
     }
-    return defaultLifeModule;
+    return null;
   }
 }
 
 const defaultLifeModule = LifeModule.ledger;
 
-final dynamicModuleProvider =
-    NotifierProvider<DynamicModuleNotifier, LifeModule>(
-  DynamicModuleNotifier.new,
+const defaultLifeModuleOrder = LifeModule.values;
+
+final lifeModuleOrderProvider =
+    NotifierProvider<LifeModuleOrderNotifier, List<LifeModule>>(
+  LifeModuleOrderNotifier.new,
 );
 
-class DynamicModuleNotifier extends Notifier<LifeModule> {
+class LifeModuleOrderNotifier extends Notifier<List<LifeModule>> {
   @override
-  LifeModule build() => defaultLifeModule;
+  List<LifeModule> build() => defaultLifeModuleOrder;
 
   Future<void> restore() async {
     final prefs = await PrefsStore.load();
-    state = LifeModule.fromId(prefs.dynamicModuleId());
+    state = decodeLifeModuleOrder(prefs.moduleOrder());
   }
 
-  Future<void> select(LifeModule module) async {
-    if (state != module) {
-      state = module;
-    }
-    final prefs = await PrefsStore.load();
-    await prefs.setDynamicModuleId(module.id);
+  Future<void> moveTo(int from, int to) async {
+    if (from == to || from < 0 || from >= state.length) return;
+    final next = [...state];
+    next.insert(to.clamp(0, next.length), next.removeAt(from));
+    await _commit(next);
   }
+
+  Future<void> _commit(List<LifeModule> order) async {
+    state = order;
+    final prefs = await PrefsStore.load();
+    await prefs.setModuleOrder(encodeLifeModuleOrder(order));
+  }
+}
+
+final dynamicModuleProvider = Provider<LifeModule>(
+  (ref) => ref.watch(lifeModuleOrderProvider).first,
+);
+
+String encodeLifeModuleOrder(List<LifeModule> order) =>
+    order.map((module) => module.id).join(',');
+
+List<LifeModule> decodeLifeModuleOrder(String? raw) {
+  final ordered = <LifeModule>[];
+  for (final id in (raw ?? '').split(',')) {
+    final module = LifeModule.tryFromId(id);
+    if (module != null && !ordered.contains(module)) ordered.add(module);
+  }
+  for (final module in LifeModule.values) {
+    if (!ordered.contains(module)) ordered.add(module);
+  }
+  return ordered;
 }

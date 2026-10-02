@@ -33,7 +33,7 @@ Future<void> bootstrap() async {
     appRouter.go('/briefing?type=$type');
   };
   final container = ProviderContainer();
-  await container.read(dynamicModuleProvider.notifier).restore();
+  await container.read(lifeModuleOrderProvider.notifier).restore();
   runApp(
     UncontrolledProviderScope(
       container: container,

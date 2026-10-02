@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/tokens.dart';
+import 'chips.dart';
 import 'gradient_border_card.dart';
 import 'sparkle.dart';
 
@@ -52,12 +53,18 @@ class AiCard extends StatelessWidget {
     required this.child,
     this.actionLabel,
     this.onAction,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
   });
 
   final String title;
   final Widget child;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// 第二枚动作（chip 行的 ghost 位）。有它时两个动作都渲染成 chip（A2 动作行）。
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +93,22 @@ class AiCard extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           child,
-          if (actionLabel != null) ...[
+          if (secondaryActionLabel != null) ...[
+            const SizedBox(height: 13),
+            Row(
+              children: [
+                if (actionLabel != null) ...[
+                  ChipButton(label: actionLabel!, onTap: onAction),
+                  const SizedBox(width: 9),
+                ],
+                ChipButton(
+                  label: secondaryActionLabel!,
+                  onTap: onSecondaryAction,
+                  ghost: true,
+                ),
+              ],
+            ),
+          ] else if (actionLabel != null) ...[
             const SizedBox(height: 12),
             GestureDetector(
               onTap: onAction,

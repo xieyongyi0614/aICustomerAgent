@@ -218,6 +218,8 @@ class ModuleCard extends StatelessWidget {
     this.tileFg,
     this.soon = false,
     this.active = false,
+    this.trend,
+    this.trendColor,
     this.onTap,
     this.onLongPress,
   });
@@ -229,6 +231,10 @@ class ModuleCard extends StatelessWidget {
   final Color? tileFg;
   final bool soon;
   final bool active;
+
+  /// 卡片第三行：结论 / 趋势（A18）。摘要只放事实，结论走这一行。
+  final String? trend;
+  final Color? trendColor;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
@@ -258,6 +264,7 @@ class ModuleCard extends StatelessWidget {
                     boxShadow: elevation.card,
                   ),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Container(
                   width: 42,
@@ -289,6 +296,20 @@ class ModuleCard extends StatelessWidget {
                   style: type.tabLabel.copyWith(color: colors.ink3),
                   textAlign: TextAlign.center,
                 ),
+                if (trend != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    trend!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: type.tabLabel.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: trendColor ?? colors.ink3,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ),
           ),

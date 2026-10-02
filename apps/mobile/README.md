@@ -158,7 +158,7 @@ GoRouter 全量路由（壳层 Tab 5 位：首页 / 动态 / 对话 / 生活 / �
 
 | 路由 | 页面 |
 |---|---|
-| `/home` · `/dynamic` · `/chat` · `/life` · `/profile` | 主 Tab 五页（`/dynamic` 是可变「动态」位，默认渲染记账，可在生活页长按模块卡改设） |
+| `/home` · `/dynamic` · `/chat` · `/life` · `/profile` | 主 Tab 五页（`/dynamic` 是可变「动态」位，默认渲染记账；在生活页拖动模块卡重排，宫格第一格即改设） |
 | `/chat/ledger?conversationId=` | 对话记账台账 |
 | `/ledger` | 账本页 |
 | `/briefing?form=morning\|evening` | 早/晚简报（通知点开直达） |

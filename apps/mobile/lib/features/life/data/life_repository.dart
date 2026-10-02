@@ -114,18 +114,38 @@ class LifeRepository {
 
   Future<LifeCarSummary> monthCarExpense() async {
     final resp = await _dio.get<Map<String, dynamic>>('/car/overview');
-    final minor = resp.data?['expense_total_minor'] as int? ?? 0;
+    final data = resp.data ?? const {};
+    final minor = data['expense_total_minor'] as int? ?? 0;
     return LifeCarSummary(
       text: (minor / 100).toStringAsFixed(0),
       isEmpty: minor <= 0,
+      restrictionDetail: _restrictionDetail(data['reminders'] as List?),
     );
+  }
+
+  /// 限行提醒的服务端原文（`下周三 · 尾号 4 和 9 · 建议地铁通勤`）：生活页只用它拼 trend，
+  /// 不自己推算日期。没有限行项时返回 null，宁可不出这一行。
+  String? _restrictionDetail(List? reminders) {
+    for (final raw in reminders ?? const []) {
+      if (raw is! Map || raw['kind'] != 'restriction') continue;
+      final detail = raw['detail'] as String?;
+      if (detail != null && detail.isNotEmpty) return detail;
+      final title = raw['title'] as String?;
+      if (title != null && title.isNotEmpty) return title;
+    }
+    return null;
   }
 }
 
 /// 养车支出摘要：`isEmpty` 为真时卡片要说实话，不显示 `¥0`。
 class LifeCarSummary {
-  const LifeCarSummary({required this.text, required this.isEmpty});
+  const LifeCarSummary({
+    required this.text,
+    required this.isEmpty,
+    this.restrictionDetail,
+  });
 
   final String text;
   final bool isEmpty;
+  final String? restrictionDetail;
 }

@@ -69,6 +69,23 @@ a{color:inherit;text-decoration:none}
 @media (max-width:760px){.demo-nav{display:none}}
 
 /* ============ Car（车辆主页） ============ */
+.grow{flex:1}
+.car-hero{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;display:flex;align-items:center;gap:14px;margin-top:14px}
+.ch-top{display:flex;align-items:center;gap:8px}
+.ch-name{font-size:17px;font-weight:700}
+.ch-plate{font-size:12px;font-weight:700;color:var(--ai2);background:rgba(62,139,255,.12);border-radius:8px;padding:3px 8px;letter-spacing:.02em}
+.ch-range{font-size:13px;font-weight:600;color:var(--ink2);margin-top:10px}
+.ch-range b{font-size:21px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ch-sub{font-size:11.5px;color:var(--ink3);margin-top:4px}
+.ch-live{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--health);margin-top:8px}
+.ch-live i{width:6px;height:6px;border-radius:50%;background:var(--health)}
+.ch-ring{position:relative;width:86px;height:86px;flex:none}
+.ch-ring svg{width:86px;height:86px;transform:rotate(-90deg)}
+.ch-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
+.ch-pct small{font-size:9.5px;font-weight:600;color:var(--ink3);margin-top:1px}
+.metric .spark{display:flex;align-items:flex-end;gap:3px;height:22px;margin-top:9px}
+.metric .spark i{flex:1;border-radius:3px;background:linear-gradient(180deg,#33BC8C,#9FE8CF)}
+.cat-note{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--ink2)}
 .loan-card{background:linear-gradient(140deg,#23232E,#33304A 60%,#3E3A63);color:#fff;border-radius:var(--r-lg);padding:20px;box-shadow:0 16px 36px rgba(30,28,55,.35)}
 .loan-card .l-top{display:flex;align-items:center}
 .loan-card .l-l{font-size:12px;opacity:.72}
@@ -133,21 +150,38 @@ a{color:inherit;text-decoration:none}
     <div class="screen" id="car">
       <a class="back" href="30-life.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>生活</a>
 
-      <div class="loan-card">
+      <div class="ai-card">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的观察</div>
+        <p>这个月养车花了 ¥612，其中电费只有 ¥102——同级别油车大概要 ¥600。你有 80% 的充电在 23 点后的谷电时段，这个习惯一个月帮你省约 ¥45。另外，下周三限行尾号 4 和 9，建议地铁通勤，我已记进提醒。</p>
+      </div>
+
+      <div class="car-hero">
+        <div class="grow">
+          <div class="ch-top"><span class="ch-name">比亚迪 汉 EV</span><span class="ch-plate">沪 A·D8F2K</span></div>
+          <div class="ch-range">续航约 <b>470</b> km</div>
+          <div class="ch-sub">昨晚 23:10 家充完成 · 谷电 ¥0.31/kWh</div>
+          <div class="ch-live"><i></i>车机互联已连接 · 10 分钟前同步</div>
+        </div>
+        <div class="ch-ring">
+          <svg viewBox="0 0 86 86">
+            <defs><linearGradient id="batg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#33BC8C"/><stop offset="1" stop-color="#9FE8CF"/></linearGradient></defs>
+            <circle cx="43" cy="43" r="35" fill="none" stroke="#F0EFE9" stroke-width="7"/>
+            <circle cx="43" cy="43" r="35" fill="none" stroke="url(#batg)" stroke-width="7" stroke-linecap="round" stroke-dasharray="219.9" stroke-dashoffset="48.4"/>
+          </svg>
+          <div class="ch-pct">78%<small>当前电量</small></div>
+        </div>
+      </div>
+
+      <div class="loan-card" style="margin-top:14px">
         <div class="l-top"><span class="l-l">车贷 · 剩余待还</span><span class="l-badge">下期 10 月 5 日</span></div>
         <div class="l-v">¥69,300<small>月供 ¥3,850 · 已还 18 / 36 期</small></div>
         <div class="l-bar"><i style="width:50%"></i></div>
         <div class="l-meta"><span>已还 50%</span><span>2028 年 9 月结清</span></div>
       </div>
 
-      <div class="ai-card" style="margin-top:14px">
-        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的观察</div>
-        <p>这个月养车花了 ¥612，其中电费只有 ¥102——同级别油车大概要 ¥600。你有 80% 的充电在 23 点后的谷电时段，这个习惯一个月帮你省了约 ¥45。另外，下周三限行尾号 4 和 9，记得别开车。</p>
-      </div>
-
       <div class="sec-title"><h2>电车状态</h2><span class="hint">9 月</span></div>
       <div class="metric-row">
-        <div class="metric"><div class="m-ic" style="background:rgba(51,188,140,.12);color:var(--health)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg></div><div class="m-v">186<small> kWh</small></div><div class="m-n">本月充电</div></div>
+        <div class="metric"><div class="m-ic" style="background:rgba(51,188,140,.12);color:var(--health)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg></div><div class="m-v">186<small> kWh</small></div><div class="m-n">本月充电</div><div class="spark"><i style="height:42%"></i><i style="height:58%"></i><i style="height:50%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:82%"></i><i style="height:100%"></i></div></div>
         <div class="metric"><div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="m-v">14.2<small> kWh</small></div><div class="m-n">百公里电耗</div></div>
         <div class="metric"><div class="m-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg></div><div class="m-v">12,480<small> km</small></div><div class="m-n">总里程 · 本月 +890</div></div>
       </div>
@@ -158,6 +192,7 @@ a{color:inherit;text-decoration:none}
         <div class="cat"><div class="c-top"><b>停车</b><span>¥180</span></div><div class="c-bar"><i style="width:74%;background:linear-gradient(90deg,#3E8BFF,#9CC2FF)"></i></div></div>
         <div class="cat"><div class="c-top"><b>过路费</b><span>¥130</span></div><div class="c-bar"><i style="width:53%;background:linear-gradient(90deg,#7A5CFF,#C3B3FF)"></i></div></div>
         <div class="cat" style="margin-bottom:2px"><div class="c-top"><b>充电费</b><span>¥102</span></div><div class="c-bar"><i style="width:42%;background:linear-gradient(90deg,#33BC8C,#9FE8CF)"></i></div></div>
+        <div class="cat-note">充电只占了 17%——家充谷电的习惯，是这份账单这么省的主力。—— 亚丝娜</div>
       </div>
 
       <div class="sec-title"><h2>车辆提醒</h2><span class="hint">我会提前告诉你</span></div>

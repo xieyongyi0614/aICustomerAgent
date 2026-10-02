@@ -93,7 +93,20 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .demo-nav a:hover{text-decoration:underline}
 @media (max-width:760px){.demo-nav{display:none}}
 
+/* ============ AI 结论卡与操作 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.ai-actions{display:flex;gap:9px;margin-top:13px}
+.chip-btn{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ai1);background:rgba(122,92,255,.09);border:1px solid rgba(122,92,255,.20);border-radius:999px;padding:7px 14px;cursor:pointer}
+.chip-btn.ghost{color:var(--ink2);background:var(--card);border-color:var(--line)}
+
 /* ============ Life ============ */
+.life-hero{display:flex;align-items:center;margin-bottom:16px}
+.lh-date{font-size:12.5px;font-weight:600;color:var(--ink3);letter-spacing:.02em}
+.lh-hi{font-size:23px;font-weight:700;letter-spacing:-.01em;margin-top:3px}
+.lh-sub{font-size:13px;color:var(--ink2);margin-top:3px}
 .mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
 .mod{position:relative;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:15px 10px 13px;text-align:center;cursor:pointer;transition:transform .15s}
 .mod .dyn-tag{position:absolute;top:8px;right:8px;font-size:9.5px;font-weight:650;color:var(--ai1);background:rgba(122,92,255,.10);border:1px solid rgba(122,92,255,.20);border-radius:999px;padding:1px 6px;line-height:1.5}
@@ -103,6 +116,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .mod .m-ic svg{width:20px;height:20px}
 .mod .m-n{font-size:13px;font-weight:650}
 .mod .m-s{font-size:10.5px;color:var(--ink3);margin-top:3px}
+.mod .m-trend{font-size:10px;font-weight:650;margin-top:4px}
 </style>
 </head>
 <body>
@@ -118,35 +132,57 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
     <!-- ================= Life ================= -->
     <div class="screen" id="life">
-      <h1 class="pt" style="margin-bottom:4px">生活</h1>
-      <div class="sub" style="margin-bottom:10px">你的生活工具箱</div>
-      <div class="tap-hint">长按模块可设为动态</div>
-      <div class="sec-title" style="margin-top:4px"><h2>生活模块</h2></div>
+      <div class="life-hero">
+        <div class="grow">
+          <div class="lh-date">10月3日 · 周五</div>
+          <div class="lh-hi">早上好，阿远</div>
+          <div class="lh-sub">今天的生活，亚丝娜帮你看着呢</div>
+        </div>
+        <div class="orb md"></div>
+      </div>
+
+      <div class="ai-card">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的生活小结</div>
+        <p>今天有 3 项日程，15:00 和产品组对齐方案，纪要模板我已备好。本月消费 ¥3,420，节奏健康；车辆下周三限行，那天记得别开车。另外相册里躺着 76 张可以清理的照片，要现在处理吗？</p>
+        <div class="ai-actions">
+          <a class="chip-btn" href="42-schedule.html">查看今日日程</a>
+          <a class="chip-btn ghost" href="38-album-manage.html">去清理相册</a>
+        </div>
+      </div>
+
+      <div class="tap-hint" style="margin-top:14px">长按卡片拖动重排 · 第一格就是底部导航的「动态」</div>
+      <div class="sec-title" style="margin-top:2px"><h2>生活模块</h2><span class="hint">6 个 · 都在帮你跑</span></div>
       <div class="mod-grid">
         <a class="mod" href="31-ledger.html">
           <span class="dyn-tag">✦ 动态</span>
           <div class="m-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg></div>
           <div class="m-n">记账</div><div class="m-s">本月 ¥3,420</div>
+          <div class="m-trend" style="color:var(--health)">↓ 比上月少 8%</div>
         </a>
         <a class="mod" href="41-memo.html">
           <div class="m-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
-          <div class="m-n">备忘录</div><div class="m-s">12 条 · AI 已归类</div>
+          <div class="m-n">备忘录</div><div class="m-s">12 条备忘</div>
+          <div class="m-trend" style="color:var(--ai1)">已归好 3 个主题</div>
         </a>
         <a class="mod" href="42-schedule.html">
           <div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg></div>
-          <div class="m-n">日程</div><div class="m-s">今日 3 项 · AI 已排</div>
+          <div class="m-n">日程</div><div class="m-s">今日 3 项</div>
+          <div class="m-trend" style="color:var(--ai2)">15:00 产品对齐会</div>
         </a>
         <a class="mod" href="32-health.html">
           <div class="m-ic" style="background:rgba(255,107,107,.12);color:#F06A6A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
-          <div class="m-n">健康</div><div class="m-s">状态良好</div>
+          <div class="m-n">健康</div><div class="m-s">综合 86 分</div>
+          <div class="m-trend" style="color:var(--health)">状态不错 · 继续保持</div>
         </a>
         <a class="mod" href="35-car.html">
           <div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11 6.6 6.2A2 2 0 0 1 8.5 4.8h7a2 2 0 0 1 1.9 1.4L19 11M5 11h14a2 2 0 0 1 2 2v4h-2.2M5 11a2 2 0 0 0-2 2v4h2.2m0 0a2 2 0 1 0 4 0m-4 0h9.6m0 0a2 2 0 1 0 4 0"/></svg></div>
-          <div class="m-n">车辆</div><div class="m-s">本月养车 ¥612 · 很省</div>
+          <div class="m-n">车辆</div><div class="m-s">本月 ¥612</div>
+          <div class="m-trend" style="color:#E07B4F">下周三限行 · 已提醒</div>
         </a>
         <a class="mod" href="37-album.html">
           <div class="m-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 20"/></svg></div>
-          <div class="m-n">相册</div><div class="m-s">2,847 张 · 仅本机</div>
+          <div class="m-n">相册</div><div class="m-s">2,847 张</div>
+          <div class="m-trend" style="color:var(--ink2)">76 张可清理 · 仅本机</div>
         </a>
       </div>
     </div>

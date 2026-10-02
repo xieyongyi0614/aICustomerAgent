@@ -12,7 +12,7 @@
 | 项 | 状态 |
 |---|---|
 | 最大问题 | 生活宫格 3×3 含 4 个**悬空入口**（任务/日历/旅行无页面、记忆已降级），违反红线 10 |
-| 后续变更（2026-10-03） | 底部导航改 **5 位**（首页 / 动态 / 对话 / 生活 / 我的），第 2 位「动态」可变、默认记账；生活页去捕获条 / Skill 文案 / 即将上线区，改长按模块卡设动态位（明细见 §7） |
+| 后续变更（2026-10-03） | 底部导航改 **5 位**（首页 / 动态 / 对话 / 生活 / 我的），第 2 位「动态」可变、默认记账；生活页去捕获条 / Skill 文案 / 即将上线区，改「3 列宫格内拖动重排，第一格即动态位」设置动态位（明细见 §7） |
 | 本轮已交付 | 宫格收敛为 6 格；补齐备忘录(41)/日程(42) 两页；AI 标识组件层（✦）对齐；账本页单一「记一笔」；健康页 IA 重排；全仓 Material 图标清零 |
 | 已完成 | DA-01~DA-16 / DA-19 / DA-22 / DA-23 / DA-25 / DA-27 / DA-28 / DA-29 / DA-30（2026-10-03 两批收口，明细见 §3 勾选态） |
 | 被后端卡住 | 健康域真实内容（DA-26 卡 `PLT-001` + `/health/sync` no-op）、DA-21（`tool_step` 持久化）、DA-15 之「关系 Lv.N」（无轻量关系端点，待裁决） |
@@ -273,11 +273,11 @@ cd apps/mobile
 
 | 层 | 文件 | 变更 |
 |---|---|---|
-| Skill（最高） | `.agents/skills/zhaoxi-design-system/SKILL.md` | 红线 10 由「主 Tab 永远 4 个」改为「主 Tab 固定 5 个 + 第 2 位可变动态槽」；新增「信息架构裁决（2026-10-03）」5 条；2026-09-30 第 1 条标注被取代 |
-| Skill | `references/components.md` | A9 改 5 位（悬浮球落到 5 位里的第 3 位、整栏居中）、A17 注明仅备忘录页在用、A18 增「长按 / 动态位标记」、B1 第 11 条、B4 重写为「生活工具箱」 |
+| Skill（最高） | `.agents/skills/zhaoxi-design-system/SKILL.md` | 红线 10 由「主 Tab 永远 4 个」改为「主 Tab 固定 5 个 + 第 2 位可变动态槽」；新增「信息架构裁决（2026-10-03）」5 条；2026-09-30 第 1 条标注被取代；同日三轮裁决最终把动态位设置手势定为**只拖到置顶区** + 动效（见 §7.4） |
+| Skill | `references/components.md` | A9 改 5 位（悬浮球落到 5 位里的第 3 位、整栏居中）+ 动态槽为投放目标；A17 注明仅备忘录页在用；A18 增「长按拖动 / 置顶区变体」；B1 第 11 条；B4 重写为「生活工具箱（置顶区 + 5 格宫格）」 |
 | Skill | `references/flutter-mapping.md` · `references/tokens.md` | M3 禁令第 5 条改 5 位口径；`fillMuted` 用途表述更新 |
-| 原型 | `design/pages/10-home.html` · `30-life.html` · `32-health.html` · `50-profile.html` | Tab 栏补「动态」槽（默认「记账」）；30 删捕获条 / Skill 文案 / 即将上线区，改「长按模块可设为动态」提示 + 当前动态位标记 |
-| 原型 | `design/pages/index.html` · `design/README.md` | 页面索引与拆分说明同步 5 位口径 |
+| 原型 | `design/pages/10-home.html` · `30-life.html` · `32-health.html` · `50-profile.html` | Tab 栏补「动态」槽（默认「记账」）；30 删捕获条 / Skill 文案 / 即将上线区，改「3 列 6 格宫格（第一格即动态位）」+ 拖动提示 |
+| 原型 | `design/pages/index.html` · `design/README.md` | 页面索引与拆分说明同步 5 位口径与拖动语义 |
 
 `design/ai-life-agent-prototype.html`（冻结存档）未改。
 
@@ -285,16 +285,16 @@ cd apps/mobile
 
 | 层 | 文件 | 变更 |
 |---|---|---|
-| 状态 | `lib/app/state/dynamic_tab.dart`（新增） | `LifeModule` 注册表（6 项：id / 名称 / 图标 / 二级页路由）+ `dynamicModuleProvider`（默认记账、读写 `PrefsStore`） |
-| 状态 | `lib/app/router/dynamic_tab_page.dart`（新增） | `/dynamic` 宿主页：按设定渲染 6 个模块之一，统一 `showBackLink: false` |
+| 状态 | `lib/app/state/dynamic_tab.dart`（新增） | `LifeModule` 注册表（6 项：id / 名称 / 图标 / 二级页路由）+ `lifeModuleOrderProvider`（模块顺序，**首位即动态位**）+ 派生 `dynamicModuleProvider`；暴露 `promote()`（置顶）并读写 `PrefsStore` |
+| 状态 | `lib/app/router/dynamic_tab_page.dart`（新增） | `/dynamic` 宿主页：按动态位渲染 6 个模块之一，统一 `showBackLink: false` |
 | 路由 | `lib/app/router/app_router.dart` | `chromeByPath` 增 `/dynamic`；`_AppShell` 改 `ConsumerWidget` 并注入动态位文案 / 图标；`_tabIndex` / `_onTap` 重写为 5 位（`/health` 由首页位纠正为生活位） |
-| 组件 | `lib/design_system/components/app_tab_bar.dart` | `tabCount` 4 → 5；新增 `dynamicLabel` / `dynamicIcon` 注入（默认记账） |
-| 组件 | `lib/design_system/components/chips.dart` | `ModuleCard` 增 `active`（动态位 ✦ 徽标）与 `onLongPress` |
-| 页面 | `lib/features/life/presentation/life_page.dart` | 删捕获条与 `capture_route` 依赖、删「Skill 化 · 可持续扩展 / 即将上线 / Skill 商店」、副标题改「你的生活工具箱」并新增手势提示；健康卡由 `go` 改 `push` |
-| 页面 | `lib/features/life/presentation/dynamic_module_sheet.dart`（新增） | 「设为动态」底部面板（6 选 1，选中即生效） |
+| 组件 | `lib/design_system/components/app_tab_bar.dart` | `tabCount` 4 → 5；新增 `dynamicLabel` / `dynamicIcon`（默认记账）；**纯展示、不含投放目标**（首版曾加 `DragTarget` + 悬停高亮，三次裁决后移除） |
+| 组件 | `lib/design_system/components/chips.dart` | `ModuleCard` 增 `active`（动态位 ✦ 徽标） |
+| 页面 | `lib/features/life/presentation/life_page.dart` | 删捕获条与 `capture_route` 依赖、删「Skill 化 · 可持续扩展 / 即将上线 / Skill 商店」、副标题改「你的生活工具箱」；首屏 = **3 列 6 格宫格**（第一格即动态位）；网格自算坐标（`Stack` + `AnimatedPositioned`），长按拖动中其余卡片 240ms 实时让位、松手落位回弹，拖起放大 1.05 + 深阴影 + 触感反馈；健康卡由 `go` 改 `push` |
+| 页面 | ~~`lib/features/life/presentation/dynamic_module_sheet.dart`~~ | 首版「设为动态」底部面板，**同日二次裁决后删除**（改为拖拽，见 §7.4） |
 | 页面 | ledger / car / album / memo / schedule 五个模块页 | 新增 `showBackLink`（默认 `true`，为 `false` 时隐藏「‹ 生活」） |
-| 存储 | `lib/core/storage/prefs_store.dart` | 新增 `life.dynamic_module` 键并登记进 `allKeys` |
-| 启动 | `lib/app/bootstrap.dart` | 启动时 `restore()` 动态位设置 |
+| 存储 | `lib/core/storage/prefs_store.dart` | 新增 `life.module_order` 键（逗号分隔模块 id）并登记进 `allKeys` |
+| 启动 | `lib/app/bootstrap.dart` | 启动时 `restore()` 模块顺序 |
 
 健康页无 `BackLink`，无需改；`CaptureBar` / `CaptureRouteSheet` 组件保留（备忘录页仍在用）。
 
@@ -303,5 +303,71 @@ cd apps/mobile
 | 项 | 结果 |
 |---|---|
 | `flutter analyze lib test` | ✅ 0 issue |
-| `flutter test` | ✅ **350 全绿**（新增 `test/app/dynamic_tab_test.dart` 5 例、`life_page_test` 3 例；`router_meta` / `components` / `storage` / `life_page` 断言同步 5 位） |
-| Golden | ✅ 重生成 `goldens/a9_tabbar.png`（5 位、悬浮球整栏居中）与 `goldens/life_page_modules.png`（无捕获条 / 无即将上线区 / 记账卡带 ✦动态 徽标） |
+| `flutter test` | ✅ **357 全绿**（`dynamic_tab_test` 覆盖顺序 / 置顶 / 重排 / 持久化 / 非法值回落；`life_page_test` 覆盖拖动置顶与 6 卡结构；`components_test` 断言动态槽是投放目标） |
+| Golden | ✅ 重生成 `goldens/a9_tabbar.png`（5 位、悬浮球整栏居中）与 `goldens/life_page_modules.png`（动态位置顶区独享一行带 ✦ 徽标 + 其余 5 格宫格） |
+
+### 7.4 交互调整（2026-10-03，共四次）：抽屉 → 拖动 → 置顶区 → 宫格重排 + 让位动效
+
+| 轮次 | 裁决 | 落地 |
+|---|---|---|
+| 一 | 「设为动态」底部面板（长按弹面板 6 选 1） | `dynamic_module_sheet.dart`（后删除） |
+| 二 | 改为拖动，且必须拖到底部导航第 2 槽才生效 | 导航栏加 `DragTarget<Object>` + `onDynamicDrop`（后移除） |
+| 三 | 改为只拖到**独立置顶区** | 置顶区独占一行（后取消） |
+| 四（最终） | 置顶区占位显空 → 改 **3 列宫格内重排**，并参考 react-beautiful-dnd 补让位动效 | 见下表 |
+
+| 项 | 最终形态 |
+|---|---|
+| 布局 | **3 列 2 行**（6 格），**不设单独一行的置顶区**；第一格即动态位，右上角 ✦「动态」徽标随拖动预览实时移动 |
+| 拖动实现 | 网格自算坐标：`Stack` + `AnimatedPositioned`（不用 `Draggable`——它缺 `onDragUpdate` 级别的实时位置，做不出让位） |
+| 让位动效 | 手指位置 → 最近格 → 预览顺序；其余卡片 240ms `easeOutCubic` 补间让位（对齐 react-beautiful-dnd 的 move transition） |
+| 拖起反馈 | 卡片放大 1.05 + `elevation.deep` 阴影；其余卡片降至 0.72 透明度；`HapticFeedback.selectionClick()` |
+| 落位回弹 | 拖动卡的 `AnimatedPositioned` 由 `Duration.zero` 切回 240ms → 从手位补间回目标格（对齐 drop animation）；`mediumImpact` 触感 |
+| 提示行 | 常驻「长按卡片拖动重排 · 第一格就是底部导航的「动态」」；拖动中换成「松手放到想放的位置 · 第一格会成为「动态」」（aiPrimary 色 + 160ms 淡入） |
+| 状态模型 | `lifeModuleOrderProvider` 持有 `List<LifeModule>`（首位即动态位），暴露 `moveTo(from, to)`；存储键 `life.module_order` |
+| 为什么不用现成库 | Flutter 官方只有列表版 `ReorderableListView`；第三方网格库（`reorderable_grid_view` / `flutter_reorderable_grid_view`）面向「同容器重排」但要求固定尺寸与自管布局，本场景要同时呈现真实摘要与拖动预览，自绘 `Stack` 更可控；设计系统亦要求全自绘 |
+
+---
+
+## 8. 2026-10-03 · 生活页与车辆页设计稿改版同步（第二轮）
+
+> 触发：`design/pages/30-life.html` 与 `design/pages/35-car.html` 更新了一版（`31-ledger.html` 相对仓库无改动，不在本轮范围）。
+> 本轮不含信息架构变更，只做 UI 对齐 + 一条新纪律。
+
+### 8.1 真源先行
+
+| 层 | 文件 | 变更 |
+|---|---|---|
+| Skill（最高） | `SKILL.md` | 新增**红线 11 诚实未接入**：原型里的示例数值（健康评分 / 续航 / 电量 / 车机互联 / 充电趋势 / 环比 / 可清理张数）无真实数据源时不得照抄 —— 文案写「尚未接入」或整行不渲染，图形类（迷你柱状图、环形进度）无数据宁可不画；AI 结论卡只允许用已获取的真实数据拼装 |
+| Skill | `references/components.md` | A2 增「动作行」（1~2 枚 chip 的主 / ghost 规格）；A18 增「第三行 trend」并规定主摘要只放事实；A19 增 cat-note 注脚（只允许用已算出的占比）；B4 重写（Hero + AI 生活小结 + 区块标题 + 六格 trend）；B12 重写（AI 观察置顶 + 车辆 Hero + 电量环 + 分类条包卡片 + 注脚） |
+
+`design/pages/30-life.html`、`35-car.html` 属设计侧改版，客户端只做同步、未回改原型。
+
+### 8.2 客户端实现
+
+| 层 | 文件 | 变更 |
+|---|---|---|
+| 组件 | `design_system/components/cards.dart` | `AiCard` 增 `secondaryActionLabel` / `onSecondaryAction`：有第二动作时按 A2 渲染成 chip 行（无第二动作时保持原文字链接，`a2_ai_card` golden 不变） |
+| 组件 | `design_system/components/chips.dart` | `ModuleCard` 增 `trend` / `trendColor`（10px/600 单行，超长省略） |
+| 数据 | `features/life/data/life_repository.dart` | `LifeCarSummary` 增 `restrictionDetail`（取服务端限行提醒原文，不自己推算日期） |
+| 页面 | `features/life/presentation/life_page.dart` | 新增 `_LifeHero`（本地日期 + 时段问候 + 本机称呼 + Orb md，无称呼不编造）；新增 AI 生活小结卡（真实数据拼装 + 两枚 chip：查看今日日程 / 去相册看看）；新增「生活模块 · 6 个 · 都在帮你跑」区块标题；六格接 trend（日程用今日首条待办、车辆用限行提醒，其余按红线 11 写「…尚未接入」）；卡片高度 136 → 156 以容纳第三行；主摘要随设计稿收敛为纯事实（`本月 ¥612` / `今日 2 项` / `2847 张 · 仅本机`） |
+| 页面 | `features/car/presentation/car_page.dart` | AI 观察卡上移首位；新增 `_CarHero`（车型 + 车牌 chip + 续航「—」+「尚未接入车机数据」+ 空电量环「电量待接入」）；分类支出条包进 `AppCard` 并加 cat-note（用已算占比）；车辆档案副标题改「保险 / 年检 / 保养记录」（车牌已由 Hero 承载，不再重复） |
+
+健康卡保持「趋势参考 · 非诊断」隐私口径（红线 8），第三行明示未接入。
+
+### 8.3 未接入项（红线 11 落地记录）
+
+健康综合分、记账环比、备忘录主题归类、相册可清理张数与整理建议、车辆续航 / 电量 / 车机互联状态、谷电时段占比、充电趋势 spark —— 客户端均无数据源：
+
+- 前四项以卡片第三行「…尚未接入」明示；
+- 车辆 Hero 用「续航约 — km」「尚未接入车机数据」「电量待接入」+ 空环取代示例值；
+- **spark 直接不画**（图形无法用文字自证诚实）；
+- AI 小结与 cat-note 只用已获取的真实数据（今日日程 / 本月支出 / 养车支出 / 限行提醒 / 相册张数 / 已算占比）。
+
+### 8.4 验证
+
+| 项 | 结果 |
+|---|---|
+| `flutter analyze lib test` | ✅ 0 issue |
+| `flutter test` | ✅ **364 全绿**（新增 life_page 5 例、car_page 3 例；既有摘要断言随设计稿口径同步） |
+| Golden | ✅ 重生成 `features/goldens/life_page_modules.png`、`features/goldens/car_page.png` 并逐张目检 |
+| 过程中修复 | `ModuleCard` 加第三行后卡片固定高溢出 14px → `_tileHeight` 136 → 156；生活页 Hero 的 Orb 常驻呼吸动画使拖动测试 `pumpAndSettle` 永不收敛 → 改定时 `pump` |
