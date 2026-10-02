@@ -5,21 +5,27 @@ import 'package:flutter/material.dart';
 import '../tokens/tokens.dart';
 import 'sparkle.dart';
 
-/// 组件 A9：4 Tab 自绘（禁 M3 系统导航栏）。
-/// 第 3 位是悬浮对话球（按钮，无动效），不是 Orb。
-/// 「记忆」不是主 Tab（红线 10 / 2026-09-30 IA 裁决）：它从「我的 · 记忆管理」与生活宫格进入。
+/// 组件 A9：5 Tab 自绘（禁 M3 系统导航栏）。
+/// 第 3 位是悬浮对话球（按钮，无动效），不是 Orb；第 2 位是可变的「动态」槽。
+/// 「记忆」不是主 Tab（红线 10 / 2026-09-30 / 2026-10-03 IA 裁决）：它从「我的 · 记忆管理」与生活宫格进入。
 class AppTabBar extends StatelessWidget {
   const AppTabBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.dynamicLabel = '记账',
+    this.dynamicIcon = AppIcons.wallet,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  /// A9：4 个位置 —— 首页 / 生活 / 对话（悬浮球）/ 我的。
-  static const tabCount = 4;
+  /// 动态槽的文案与图标：由壳层按用户设定注入（默认「记账」）。
+  final String dynamicLabel;
+  final IconData dynamicIcon;
+
+  /// A9：5 个位置 —— 首页 / 动态 / 对话（悬浮球）/ 生活 / 我的。
+  static const tabCount = 5;
   static const barHeight = 88.0;
   static const ballSize = 56.0;
 
@@ -48,12 +54,13 @@ class AppTabBar extends StatelessWidget {
     final elevation = Theme.of(context).extension<AppElevation>()!;
     final gradients = Theme.of(context).extension<AppGradients>()!;
     final type = Theme.of(context).extension<AppTypography>()!;
-    final tabs = const [
-      _TabSpec(label: '首页', icon: AppIcons.home),
-      _TabSpec(label: '生活', icon: AppIcons.layoutGrid),
+    final tabs = [
+      const _TabSpec(label: '首页', icon: AppIcons.home),
+      _TabSpec(label: dynamicLabel, icon: dynamicIcon),
       // 第 3 位由悬浮球承载，图标仅占位保持索引对齐
-      _TabSpec(label: '对话', icon: AppIcons.messageCircle),
-      _TabSpec(label: '我的', icon: AppIcons.user),
+      const _TabSpec(label: '对话', icon: AppIcons.messageCircle),
+      const _TabSpec(label: '生活', icon: AppIcons.layoutGrid),
+      const _TabSpec(label: '我的', icon: AppIcons.user),
     ];
 
     final inset = MediaQuery.of(context).padding.bottom;
@@ -82,7 +89,7 @@ class AppTabBar extends StatelessWidget {
                   for (var i = 0; i < tabCount; i++)
                     if (i == 2)
                       // 对话位：文字与悬浮球都定位在本项内（`.orb-tab{position:relative}`），
-                      // 球因此落在 4 位里的第 3 位（62.5%）而不是整栏居中。
+                      // 球因此落在 5 位里的第 3 位；左右各 2 位等分 → 正好整栏居中。
                       GestureDetector(
                         onTap: () => onTap(2),
                         behavior: HitTestBehavior.opaque,

@@ -8,10 +8,18 @@ import '../domain/car_models.dart';
 
 /// B12 #car 车辆：车贷进度 → 电车状态 → 养车支出 → 提醒 → 最近记录。
 class CarPage extends StatefulWidget {
-  const CarPage({super.key, this.repository, this.debugOverview});
+  const CarPage({
+    super.key,
+    this.repository,
+    this.debugOverview,
+    this.showBackLink = true,
+  });
 
   final CarRepository? repository;
   final CarOverviewData? debugOverview;
+
+  /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
+  final bool showBackLink;
 
   @override
   State<CarPage> createState() => _CarPageState();
@@ -96,7 +104,7 @@ class _CarPageState extends State<CarPage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              BackLink(label: '生活'),
+              if (widget.showBackLink) BackLink(label: '生活'),
               if (overview.loan != null) ...[
                 LoanCard(
                   label: '车贷 · 已还 ${overview.loan!.paidPeriods} / '

@@ -5,6 +5,7 @@ void main() {
   test('test_all_route_anchors_mapped', () {
     for (final p in const [
       '/home',
+      '/dynamic',
       '/chat',
       '/chat/ledger',
       '/life',
@@ -33,7 +34,7 @@ void main() {
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 26);
+    expect(chromeByPath.length, 27);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {

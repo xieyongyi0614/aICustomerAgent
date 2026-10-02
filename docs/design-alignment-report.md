@@ -1,6 +1,6 @@
 # 朝夕 App · 设计稿对齐报告
 
-> **时点**：2026-10-02 ｜ **分支**：`feat/design-car-album`
+> **时点**：2026-10-02（**2026-10-03 追加 §7**：底部导航 5 位与「动态」位）｜ **分支**：`feat/design-car-album` ｜ 本轮实现分支 `feat/dynamic-tab`（同级 worktree）
 > **审核对象**：`design/`（现役 `design/pages/*.html`，23 页）↔ `apps/mobile/lib`
 > **权威顺序**：`.agents/skills/zhaoxi-design-system/`（最高）> `design/pages/` > `design/ai-life-agent-design.html`
 > 本文件是设计稿对齐的**唯一汇总文档**（已合并原 audit / tasks 两份）。
@@ -12,6 +12,7 @@
 | 项 | 状态 |
 |---|---|
 | 最大问题 | 生活宫格 3×3 含 4 个**悬空入口**（任务/日历/旅行无页面、记忆已降级），违反红线 10 |
+| 后续变更（2026-10-03） | 底部导航改 **5 位**（首页 / 动态 / 对话 / 生活 / 我的），第 2 位「动态」可变、默认记账；生活页去捕获条 / Skill 文案 / 即将上线区，改长按模块卡设动态位（明细见 §7） |
 | 本轮已交付 | 宫格收敛为 6 格；补齐备忘录(41)/日程(42) 两页；AI 标识组件层（✦）对齐；账本页单一「记一笔」；健康页 IA 重排；全仓 Material 图标清零 |
 | 已完成 | DA-01~DA-16 / DA-22 / DA-23 / DA-29 / DA-30（**2026-10-03 全部收口**，明细见 §3 勾选态） |
 | 被后端卡住 | 首页数据可视化（DA-25 契约缺字段）、健康域真实内容（DA-26 卡 `PLT-001`）、DA-19/20/21（后端契约）、DA-15 之「关系 Lv.N」（无轻量关系端点，待裁决） |
@@ -38,7 +39,7 @@
 | 5 | 车辆 | `/car` | `tileInfo` / `aiBlue` |
 | 6 | 相册 | `/album` | `tileWarm` / `warm` |
 
-「即将上线」3 个占位（阅读 / 习惯打卡 / 更多 Skill）保留，图标由 Material 改 Lucide。
+「即将上线」3 个占位（阅读 / 习惯打卡 / 更多 Skill）保留，图标由 Material 改 Lucide。**〔2026-10-03 修订〕该区块已整块移除**（见 §7.2）。
 
 ### 1.2 新增两页（41 / 42）
 
@@ -257,3 +258,47 @@ cd apps/mobile
 1. **DA-25 / DA-26 是否推进后端**：需要可跑后端测试的环境（DB）。
 2. **DA-27 分类 → 语义色映射**：需要产品定「哪些分类用哪种语义色」。
 3. **DA-28 记一笔铅笔图标**：需要接受改动字体资产（`tool/gen_app_icons.py` + 重生成）。
+
+---
+
+## 7. 2026-10-03 · 底部导航 5 位与「动态」位（IA 变更）
+
+> 触发：用户裁决把底部导航改为 5 位，并引入可配置的「动态」槽；同批把生活页收敛为纯工具箱。
+> 实施方式：从 `feat/design-car-album` 的 HEAD 切出同级 worktree（分支 `feat/dynamic-tab`）隔离开发。
+
+### 7.1 真源先行（skill → 原型 → 代码）
+
+| 层 | 文件 | 变更 |
+|---|---|---|
+| Skill（最高） | `.agents/skills/zhaoxi-design-system/SKILL.md` | 红线 10 由「主 Tab 永远 4 个」改为「主 Tab 固定 5 个 + 第 2 位可变动态槽」；新增「信息架构裁决（2026-10-03）」5 条；2026-09-30 第 1 条标注被取代 |
+| Skill | `references/components.md` | A9 改 5 位（悬浮球落到 5 位里的第 3 位、整栏居中）、A17 注明仅备忘录页在用、A18 增「长按 / 动态位标记」、B1 第 11 条、B4 重写为「生活工具箱」 |
+| Skill | `references/flutter-mapping.md` · `references/tokens.md` | M3 禁令第 5 条改 5 位口径；`fillMuted` 用途表述更新 |
+| 原型 | `design/pages/10-home.html` · `30-life.html` · `32-health.html` · `50-profile.html` | Tab 栏补「动态」槽（默认「记账」）；30 删捕获条 / Skill 文案 / 即将上线区，改「长按模块可设为动态」提示 + 当前动态位标记 |
+| 原型 | `design/pages/index.html` · `design/README.md` | 页面索引与拆分说明同步 5 位口径 |
+
+`design/ai-life-agent-prototype.html`（冻结存档）未改。
+
+### 7.2 客户端实现
+
+| 层 | 文件 | 变更 |
+|---|---|---|
+| 状态 | `lib/app/state/dynamic_tab.dart`（新增） | `LifeModule` 注册表（6 项：id / 名称 / 图标 / 二级页路由）+ `dynamicModuleProvider`（默认记账、读写 `PrefsStore`） |
+| 状态 | `lib/app/router/dynamic_tab_page.dart`（新增） | `/dynamic` 宿主页：按设定渲染 6 个模块之一，统一 `showBackLink: false` |
+| 路由 | `lib/app/router/app_router.dart` | `chromeByPath` 增 `/dynamic`；`_AppShell` 改 `ConsumerWidget` 并注入动态位文案 / 图标；`_tabIndex` / `_onTap` 重写为 5 位（`/health` 由首页位纠正为生活位） |
+| 组件 | `lib/design_system/components/app_tab_bar.dart` | `tabCount` 4 → 5；新增 `dynamicLabel` / `dynamicIcon` 注入（默认记账） |
+| 组件 | `lib/design_system/components/chips.dart` | `ModuleCard` 增 `active`（动态位 ✦ 徽标）与 `onLongPress` |
+| 页面 | `lib/features/life/presentation/life_page.dart` | 删捕获条与 `capture_route` 依赖、删「Skill 化 · 可持续扩展 / 即将上线 / Skill 商店」、副标题改「你的生活工具箱」并新增手势提示；健康卡由 `go` 改 `push` |
+| 页面 | `lib/features/life/presentation/dynamic_module_sheet.dart`（新增） | 「设为动态」底部面板（6 选 1，选中即生效） |
+| 页面 | ledger / car / album / memo / schedule 五个模块页 | 新增 `showBackLink`（默认 `true`，为 `false` 时隐藏「‹ 生活」） |
+| 存储 | `lib/core/storage/prefs_store.dart` | 新增 `life.dynamic_module` 键并登记进 `allKeys` |
+| 启动 | `lib/app/bootstrap.dart` | 启动时 `restore()` 动态位设置 |
+
+健康页无 `BackLink`，无需改；`CaptureBar` / `CaptureRouteSheet` 组件保留（备忘录页仍在用）。
+
+### 7.3 验证
+
+| 项 | 结果 |
+|---|---|
+| `flutter analyze lib test` | ✅ 0 issue |
+| `flutter test` | ✅ **350 全绿**（新增 `test/app/dynamic_tab_test.dart` 5 例、`life_page_test` 3 例；`router_meta` / `components` / `storage` / `life_page` 断言同步 5 位） |
+| Golden | ✅ 重生成 `goldens/a9_tabbar.png`（5 位、悬浮球整栏居中）与 `goldens/life_page_modules.png`（无捕获条 / 无即将上线区 / 记账卡带 ✦动态 徽标） |

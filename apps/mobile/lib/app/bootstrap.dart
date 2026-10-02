@@ -8,6 +8,7 @@ import '../core/env/app_env.dart';
 import '../core/notify/local_brief_notifier.dart';
 import '../core/storage/secure_token_store.dart';
 import 'router/app_router.dart';
+import 'state/dynamic_tab.dart';
 import 'theme/app_theme.dart';
 
 late final SecureTokenStore appTokenStore;
@@ -32,6 +33,7 @@ Future<void> bootstrap() async {
     appRouter.go('/briefing?type=$type');
   };
   final container = ProviderContainer();
+  await container.read(dynamicModuleProvider.notifier).restore();
   runApp(
     UncontrolledProviderScope(
       container: container,

@@ -13,6 +13,7 @@ class PrefsStore {
   static const keyLoginSeen = 'profile.login_seen';
   static const keyFirstUsedAt = 'profile.first_used_at';
   static const keyHealthConsentGranted = 'health.consent_granted';
+  static const keyDynamicModule = 'life.dynamic_module';
 
   static const allKeys = [
     keyMorningBriefAt,
@@ -23,6 +24,7 @@ class PrefsStore {
     keyLastEmail,
     keyLoginSeen,
     keyHealthConsentGranted,
+    keyDynamicModule,
   ];
 
   final SharedPreferences _prefs;
@@ -68,6 +70,10 @@ class PrefsStore {
       _prefs.getBool(keyHealthConsentGranted) ?? false;
   Future<void> setHealthConsentGranted(bool granted) =>
       _prefs.setBool(keyHealthConsentGranted, granted);
+
+  String? dynamicModuleId() => _prefs.getString(keyDynamicModule);
+  Future<void> setDynamicModuleId(String id) =>
+      _prefs.setString(keyDynamicModule, id);
 
   Future<void> _ensureFirstUsedAt() async {
     if (_prefs.getString(keyFirstUsedAt) == null) {

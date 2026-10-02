@@ -217,7 +217,9 @@ class ModuleCard extends StatelessWidget {
     this.tileBg,
     this.tileFg,
     this.soon = false,
+    this.active = false,
     this.onTap,
+    this.onLongPress,
   });
 
   final String title;
@@ -226,7 +228,9 @@ class ModuleCard extends StatelessWidget {
   final Color? tileBg;
   final Color? tileFg;
   final bool soon;
+  final bool active;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -236,48 +240,83 @@ class ModuleCard extends StatelessWidget {
     final elevation = _e(context);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 15, 10, 13),
-        decoration: soon
-            ? BoxDecoration(
-                borderRadius: radii.rMd,
-                border: Border.all(color: colors.borderDashed, width: 1.5),
-              )
-            : BoxDecoration(
-                color: colors.surface,
-                borderRadius: radii.rMd,
-                boxShadow: elevation.card,
-              ),
-        child: Column(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: soon ? colors.fillMuted : (tileBg ?? colors.tileAi),
-                borderRadius: BorderRadius.circular(radii.iconTile(42)),
-              ),
-              child: icon == null
-                  ? null
-                  : Icon(icon,
-                      size: 20,
-                      color: soon ? colors.inkOnSoon : (tileFg ?? colors.aiPrimary)),
+      onLongPress: onLongPress,
+      child: Stack(
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 15, 10, 13),
+            decoration: soon
+                ? BoxDecoration(
+                    borderRadius: radii.rMd,
+                    border: Border.all(color: colors.borderDashed, width: 1.5),
+                  )
+                : BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: radii.rMd,
+                    boxShadow: elevation.card,
+                  ),
+            child: Column(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: soon ? colors.fillMuted : (tileBg ?? colors.tileAi),
+                    borderRadius: BorderRadius.circular(radii.iconTile(42)),
+                  ),
+                  child: icon == null
+                      ? null
+                      : Icon(
+                          icon,
+                          size: 20,
+                          color: soon
+                              ? colors.inkOnSoon
+                              : (tileFg ?? colors.aiPrimary),
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: type.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: soon ? colors.ink3 : colors.ink,
+                  ),
+                ),
+                Text(
+                  summary,
+                  style: type.tabLabel.copyWith(color: colors.ink3),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: type.body.copyWith(
-                fontWeight: FontWeight.w600,
-                color: soon ? colors.ink3 : colors.ink,
+          ),
+          if (active)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: colors.tileAi,
+                  borderRadius: radii.rFull,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SparkleIcon(size: 9, color: colors.aiPrimary),
+                    const SizedBox(width: 3),
+                    Text(
+                      '动态',
+                      style: type.tabLabel.copyWith(color: colors.aiPrimary),
+                    ),
+                  ],
+                ),
               ),
             ),
-            Text(
-              summary,
-              style: type.tabLabel.copyWith(color: colors.ink3),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
