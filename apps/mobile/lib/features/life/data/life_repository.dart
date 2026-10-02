@@ -9,13 +9,47 @@ class LifeTaskItem {
     required this.kind,
     required this.status,
     this.orderReason,
+    this.tag,
+    this.note,
+    this.remindAt,
+    this.dueDate,
   });
 
   final String id;
   final String title;
+
+  /// `memo`（备忘录）或 `task`（日程待办）；API-005 契约。
   final String kind;
   final String status;
   final String? orderReason;
+  final String? tag;
+  final String? note;
+
+  /// ISO 时间串；`null` = 未设提醒。
+  final String? remindAt;
+
+  /// `yyyy-MM-dd`；`null` = 未定日期。
+  final String? dueDate;
+
+  static LifeTaskItem fromRow(Map row) => LifeTaskItem(
+    id: row['id'] as String? ?? '',
+    title: row['title'] as String? ?? '',
+    kind: row['kind'] as String? ?? 'task',
+    status: row['status'] as String? ?? '',
+    orderReason: row['order_reason'] as String?,
+    tag: row['tag'] as String?,
+    note: row['note'] as String?,
+    remindAt: row['remind_at'] as String?,
+    dueDate: row['due_date'] as String?,
+  );
+
+  DateTime? get remindDateTime =>
+      remindAt == null ? null : DateTime.tryParse(remindAt!);
+
+  DateTime? get dueDateTime {
+    final raw = dueDate;
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
 }
 
 /// life 域自有数据面：任务域 CRUD + 账本月度摘要。
@@ -30,14 +64,7 @@ class LifeRepository {
     final rows = resp.data ?? const [];
     return [
       for (final row in rows)
-        if (row is Map)
-          LifeTaskItem(
-            id: row['id'] as String? ?? '',
-            title: row['title'] as String? ?? '',
-            kind: row['kind'] as String? ?? 'task',
-            status: row['status'] as String? ?? '',
-            orderReason: row['order_reason'] as String?,
-          ),
+        if (row is Map) LifeTaskItem.fromRow(row),
     ];
   }
 
@@ -49,18 +76,15 @@ class LifeRepository {
       '/tasks',
       data: {'title': title, 'kind': kind},
     );
-    final row = resp.data ?? const {};
-    return LifeTaskItem(
-      id: row['id'] as String? ?? '',
-      title: row['title'] as String? ?? title,
-      kind: row['kind'] as String? ?? kind,
-      status: row['status'] as String? ?? '',
-      orderReason: row['order_reason'] as String?,
-    );
+    return LifeTaskItem.fromRow(resp.data ?? const {});
   }
 
   Future<void> deleteTask(String id) async {
     await _dio.delete<void>('/tasks/$id');
+  }
+
+  Future<void> completeTask(String id) async {
+    await _dio.post<void>('/tasks/$id/complete');
   }
 
   Future<String> monthExpenseText() async {

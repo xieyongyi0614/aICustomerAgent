@@ -211,7 +211,10 @@ class _LedgerAutoPageState extends State<LedgerAutoPage> {
             _SectionTitle('自动同步来源', hint: '随时可关'),
             _sourceBlock(),
             const SizedBox(height: 18),
-            _SectionTitle('我学会的规则', hint: '来自你的分类修正'),
+            _SectionTitle(
+              '我学会的规则',
+              hint: _rules.isEmpty ? '来自你的分类修正' : '来自你的 ${_rules.length} 次修正',
+            ),
             _rulesBlock(),
             PrivacyNote(
               child: Text(
@@ -249,11 +252,11 @@ class _LedgerAutoPageState extends State<LedgerAutoPage> {
           unit: '%',
           label: '分类准确率',
         ),
-      if (summary.pendingCount > 0)
+      if (_rules.isNotEmpty)
         LedgerStatCard(
-          value: '${summary.pendingCount}',
-          unit: '笔',
-          label: '待你确认',
+          value: '${_rules.length}',
+          unit: '条',
+          label: '学会的规则',
         ),
     ];
     return Row(

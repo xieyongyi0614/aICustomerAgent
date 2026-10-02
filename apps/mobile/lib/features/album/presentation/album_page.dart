@@ -175,7 +175,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
   String get _recentMonth {
     if (_recent.isEmpty) return '';
     final taken = _recent.first.takenAt;
-    return '${taken.year} 月 ${taken.month} 月';
+    return '${taken.month} 月';
   }
 
   @override

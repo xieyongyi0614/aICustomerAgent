@@ -11,6 +11,8 @@ void main() {
       '/ledger',
       '/ledger/add',
       '/ledger/auto',
+      '/memo',
+      '/schedule',
       '/car',
       '/car/add',
       '/car/profile',
@@ -31,7 +33,7 @@ void main() {
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 24);
+    expect(chromeByPath.length, 26);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
@@ -39,6 +41,8 @@ void main() {
       '/ledger',
       '/ledger/add',
       '/ledger/auto',
+      '/memo',
+      '/schedule',
       '/car',
       '/car/add',
       '/car/profile',

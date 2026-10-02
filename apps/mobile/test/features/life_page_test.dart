@@ -65,25 +65,26 @@ ModuleCard _card(WidgetTester tester, String title) =>
     tester.widget<ModuleCard>(find.widgetWithText(ModuleCard, title));
 
 void main() {
-  testWidgets('test_life_page_module_grid_has_vehicle_card', (tester) async {
+  testWidgets('test_life_page_module_grid_has_six_modules', (tester) async {
     final repo = _FakeLifeRepository();
     await _pumpPage(tester, repo);
 
     for (final title in const [
       '记账',
       '备忘录',
-      '任务',
-      '日历',
-      '旅行',
+      '日程',
       '健康',
       '车辆',
       '相册',
-      '记忆',
     ]) {
       expect(find.widgetWithText(ModuleCard, title), findsOneWidget, reason: title);
     }
-    // 宫格 9（3×3，含记忆）+ 即将上线 3
-    expect(find.byType(ModuleCard), findsNWidgets(12));
+    // 宫格 6（3×2）+ 即将上线 3
+    expect(find.byType(ModuleCard), findsNWidgets(9));
+    for (final removed in const ['任务', '日历', '旅行', '记忆']) {
+      expect(find.widgetWithText(ModuleCard, removed), findsNothing,
+          reason: '$removed 已按 2026-09-30 IA 裁决移出宫格');
+    }
   });
 
   testWidgets('test_life_page_car_summary_is_real_amount', (tester) async {
@@ -125,19 +126,18 @@ void main() {
 
     expect(_card(tester, '记账').onTap, isNotNull,
         reason: 'B4：记账模块 → 账本页（31）');
-    expect(_card(tester, '记忆').onTap, isNotNull,
-        reason: '宫格记忆入口 → /memory');
   });
 
-  testWidgets('test_life_page_calendar_travel_cards_are_not_tappable',
-      (tester) async {
+  testWidgets('test_life_page_module_grid_has_no_dangling_entry', (tester) async {
     final repo = _FakeLifeRepository();
     await _pumpPage(tester, repo);
 
-    expect(_card(tester, '日历').onTap, isNull);
-    expect(_card(tester, '旅行').onTap, isNull);
-    expect(_card(tester, '日历').summary, '未接入');
-    expect(_card(tester, '旅行').summary, '未接入');
+    for (final title in const ['记账', '备忘录', '日程', '健康', '车辆', '相册']) {
+      expect(_card(tester, title).onTap, isNotNull,
+          reason: '红线 10：宫格不允许悬空入口（$title 必须有真实页面）');
+    }
+    expect(_card(tester, '备忘录').summary, '1 条备忘');
+    expect(_card(tester, '日程').summary, '今日 2 项');
     expect(_card(tester, '相册').onTap, isNotNull, reason: 'APP-040：相册卡可点入 /album');
     expect(_card(tester, '相册').summary, '仅本机 · 需授权',
         reason: '无 provider 更新时呈诚实授权引导态');
@@ -149,8 +149,8 @@ void main() {
 
     expect(_card(tester, '记账').summary, '本月支出 ¥612.00');
     expect(_card(tester, '备忘录').summary, '1 条备忘');
-    expect(_card(tester, '任务').summary, '还有 2 项待办');
-    expect(_card(tester, '健康').summary, '即将接入');
+    expect(_card(tester, '日程').summary, '今日 2 项');
+    expect(_card(tester, '健康').summary, '趋势参考 · 非诊断');
   });
 
   testWidgets('test_life_page_task_failure_degrades_only_its_cards',
@@ -159,7 +159,7 @@ void main() {
     await _pumpPage(tester, repo);
 
     expect(_card(tester, '备忘录').summary, '暂时取不到，点下方重试');
-    expect(_card(tester, '任务').summary, '暂时取不到，点下方重试');
+    expect(_card(tester, '日程').summary, '暂时取不到，点下方重试');
     expect(_card(tester, '车辆').summary, '本月养车 ¥612');
     expect(_card(tester, '记账').summary, '本月支出 ¥612.00');
   });

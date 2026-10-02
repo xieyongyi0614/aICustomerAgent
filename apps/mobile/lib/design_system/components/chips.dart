@@ -322,6 +322,129 @@ class CategoryBar extends StatelessWidget {
   }
 }
 
+/// A39 计数胶囊：标题右侧「12 条 · 3 个主题」。
+class CountPill extends StatelessWidget {
+  const CountPill({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _c(context);
+    final type = _t(context);
+    final radii = _r(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: radii.rFull,
+        border: Border.all(color: colors.line),
+      ),
+      child: Text(
+        text,
+        style: type.caption.copyWith(fontSize: 12.5, color: colors.ink2),
+      ),
+    );
+  }
+}
+
+/// A39 备忘行：主题色点 + 内容 + 来源行（来源可带 AI 关联回执）。
+///
+/// 长按触发编辑 / 删除（设计稿 41「任何一条都可以长按修改或删除」）。
+class MemoRow extends StatelessWidget {
+  const MemoRow({
+    super.key,
+    required this.title,
+    required this.dotColor,
+    this.sourceNote,
+    this.aiNote,
+    this.done = false,
+    this.showDivider = true,
+    this.onLongPress,
+  });
+
+  final String title;
+  final Color dotColor;
+  final String? sourceNote;
+
+  /// AI 关联回执（如「已排进今日任务」），以 aiPrimary 高亮。
+  final String? aiNote;
+  final bool done;
+  final bool showDivider;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _c(context);
+    final type = _t(context);
+    final hasNote = sourceNote != null || aiNote != null;
+    return GestureDetector(
+      onLongPress: onLongPress,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: showDivider
+            ? BoxDecoration(
+                border: Border(bottom: BorderSide(color: colors.line)),
+              )
+            : null,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.only(top: 7),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: type.body.copyWith(
+                      height: 1.55,
+                      color: done ? colors.ink3 : colors.ink,
+                      decoration: done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (hasNote) ...[
+                    const SizedBox(height: 4),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          if (sourceNote != null) TextSpan(text: sourceNote),
+                          if (sourceNote != null && aiNote != null)
+                            const TextSpan(text: ' · '),
+                          if (aiNote != null)
+                            TextSpan(
+                              text: aiNote,
+                              style: TextStyle(
+                                color: colors.aiPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: type.caption.copyWith(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w400,
+                        color: colors.ink3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BarTrack extends StatelessWidget {
   const _BarTrack({required this.ratio, required this.gradient});
   final double ratio;

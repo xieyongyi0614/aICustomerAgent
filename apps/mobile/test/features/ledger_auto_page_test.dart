@@ -150,11 +150,12 @@ void main() {
       ),
     );
     await _openPage(tester, repo);
-    expect(find.byType(LedgerStatCard), findsNWidgets(2));
+    expect(find.byType(LedgerStatCard), findsOneWidget);
     expect(find.text('分类准确率'), findsNothing);
+    expect(find.text('学会的规则'), findsNothing);
   });
 
-  testWidgets('test_ledger_auto_shows_accuracy_card_when_present',
+  testWidgets('test_ledger_auto_stats_are_auto_accuracy_and_rules',
       (tester) async {
     final repo = _FakeLedgerRepository(
       summary: const LedgerAutoSummaryData(
@@ -163,11 +164,19 @@ void main() {
         pendingCount: 2,
         accuracy: 0.92,
       ),
+      rules: const [
+        LedgerRuleData(keyword: '瑞幸', categoryName: '餐饮'),
+        LedgerRuleData(keyword: '滴滴', categoryName: '交通'),
+        LedgerRuleData(keyword: '盒马', categoryName: '购物'),
+      ],
     );
     await _openPage(tester, repo);
     expect(find.byType(LedgerStatCard), findsNWidgets(3));
     expect(find.text('分类准确率'), findsOneWidget);
     expect(find.text('92'), findsOneWidget);
+    expect(find.text('学会的规则'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('来自你的 3 次修正'), findsOneWidget);
   });
 
   testWidgets('test_ledger_auto_pending_empty_state_is_honest', (tester) async {

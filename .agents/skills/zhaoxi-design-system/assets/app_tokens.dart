@@ -17,6 +17,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.aiCyan,
     required this.warm,
     required this.health,
+    required this.heartFg,
     required this.money,
     required this.fillSubtle,
     required this.fillMuted,
@@ -64,6 +65,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color aiCyan;
   final Color warm;
   final Color health;
+
+  /// 健康（心）图标前景（`tokens.md` §1.4：#F06A6A）——生活宫格「健康」格专用，
+  /// 与青绿 `health`（健康域 / 完成态）不是同一语义，勿合并。
+  final Color heartFg;
   final Color money;
   final Color fillSubtle;
   final Color fillMuted;
@@ -111,6 +116,7 @@ class AppColors extends ThemeExtension<AppColors> {
     aiCyan: Color(0xFF2BD2E8),
     warm: Color(0xFFFF9D76),
     health: Color(0xFF33BC8C),
+    heartFg: Color(0xFFF06A6A),
     money: Color(0xFFEFA63C),
     fillSubtle: Color(0xFFF3F2ED),
     fillMuted: Color(0xFFF1F0EA),
@@ -159,6 +165,7 @@ class AppColors extends ThemeExtension<AppColors> {
     aiCyan: Color(0xFF4FE0F2),
     warm: Color(0xFFFFB093),
     health: Color(0xFF5AD2A6),
+    heartFg: Color(0xFFFF8A8A),
     money: Color(0xFFF5BC63),
     fillSubtle: Color(0x14FFFFFF),
     fillMuted: Color(0x14FFFFFF),
@@ -208,6 +215,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? aiCyan,
     Color? warm,
     Color? health,
+    Color? heartFg,
     Color? money,
     Color? fillSubtle,
     Color? fillMuted,
@@ -255,6 +263,7 @@ class AppColors extends ThemeExtension<AppColors> {
       aiCyan: aiCyan ?? this.aiCyan,
       warm: warm ?? this.warm,
       health: health ?? this.health,
+      heartFg: heartFg ?? this.heartFg,
       money: money ?? this.money,
       fillSubtle: fillSubtle ?? this.fillSubtle,
       fillMuted: fillMuted ?? this.fillMuted,
@@ -308,6 +317,7 @@ class AppColors extends ThemeExtension<AppColors> {
       aiCyan: m(aiCyan, other.aiCyan),
       warm: m(warm, other.warm),
       health: m(health, other.health),
+      heartFg: m(heartFg, other.heartFg),
       money: m(money, other.money),
       fillSubtle: m(fillSubtle, other.fillSubtle),
       fillMuted: m(fillMuted, other.fillMuted),

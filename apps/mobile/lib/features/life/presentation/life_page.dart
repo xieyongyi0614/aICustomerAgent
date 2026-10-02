@@ -72,7 +72,22 @@ class _LifePageState extends State<LifePage> {
   }
 
   int get _memoCount => _tasks?.where((t) => t.kind == 'memo').length ?? 0;
-  int get _taskCount => _tasks?.where((t) => t.kind != 'memo').length ?? 0;
+
+  /// 日程格只算「今天」与「还没定时间」的待办；未来两周的留给日程页「即将到来」。
+  List<LifeTaskItem> get _todayTasks {
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    return [
+      for (final task in _tasks ?? const <LifeTaskItem>[])
+        if (task.kind != 'memo' && _isTodayOrUndated(task, day)) task,
+    ];
+  }
+
+  bool _isTodayOrUndated(LifeTaskItem task, DateTime day) {
+    final anchor = task.dueDateTime ?? task.remindDateTime;
+    if (anchor == null) return true;
+    return DateTime(anchor.year, anchor.month, anchor.day) == day;
+  }
 
   static const _unavailable = '暂时取不到，点下方重试';
 
@@ -90,10 +105,13 @@ class _LifePageState extends State<LifePage> {
     return _memoCount == 0 ? '还没有备忘' : '$_memoCount 条备忘';
   }
 
-  String get _taskSummary {
+  String get _scheduleSummary {
     if (_tasksFailed) return _unavailable;
     if (_tasks == null) return '…';
-    return _taskCount == 0 ? '今天没有待办' : '还有 $_taskCount 项待办';
+    final items = _todayTasks;
+    if (items.isEmpty) return '今天没有待办';
+    final ordered = items.any((task) => (task.orderReason ?? '').isNotEmpty);
+    return ordered ? '今日 ${items.length} 项 · AI 已排' : '今日 ${items.length} 项';
   }
 
   String get _carSummaryText {
@@ -134,7 +152,7 @@ class _LifePageState extends State<LifePage> {
             _ModuleGrid(
               ledgerSummary: _ledgerSummary,
               memoSummary: _memoSummary,
-              taskSummary: _taskSummary,
+              scheduleSummary: _scheduleSummary,
               carSummary: _carSummaryText,
             ),
             if (_anyFailed) ...[
@@ -181,13 +199,13 @@ class _ModuleGrid extends StatelessWidget {
   const _ModuleGrid({
     required this.ledgerSummary,
     required this.memoSummary,
-    required this.taskSummary,
+    required this.scheduleSummary,
     required this.carSummary,
   });
 
   final String ledgerSummary;
   final String memoSummary;
-  final String taskSummary;
+  final String scheduleSummary;
   final String carSummary;
 
   @override
@@ -201,7 +219,7 @@ class _ModuleGrid extends StatelessWidget {
               child: ModuleCard(
                 title: '记账',
                 summary: ledgerSummary,
-                icon: Icons.wallet,
+                icon: AppIcons.wallet,
                 tileBg: colors.tileMoney,
                 tileFg: colors.money,
                 onTap: () => context.push<bool>('/ledger'),
@@ -212,53 +230,21 @@ class _ModuleGrid extends StatelessWidget {
               child: ModuleCard(
                 title: '备忘录',
                 summary: memoSummary,
-                icon: Icons.notes,
+                icon: AppIcons.fileText,
                 tileBg: colors.tileAi,
                 tileFg: colors.aiPrimary,
+                onTap: () => context.push<bool>('/memo'),
               ),
             ),
             const SizedBox(width: 11),
             Expanded(
               child: ModuleCard(
-                title: '任务',
-                summary: taskSummary,
-                icon: Icons.checklist,
-                tileBg: colors.tileHealth,
-                tileFg: colors.health,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 11),
-        Row(
-          children: [
-            Expanded(
-              child: ModuleCard(
-                title: '日历',
-                summary: '未接入',
+                title: '日程',
+                summary: scheduleSummary,
                 icon: AppIcons.calendar,
                 tileBg: colors.tileInfo,
                 tileFg: colors.aiBlue,
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: ModuleCard(
-                title: '旅行',
-                summary: '未接入',
-                icon: AppIcons.plane,
-                tileBg: colors.tileTravel,
-                tileFg: colors.aiCyan,
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: ModuleCard(
-                title: '健康',
-                summary: '即将接入',
-                icon: Icons.favorite,
-                tileBg: colors.tileHealth,
-                tileFg: colors.health,
+                onTap: () => context.push<bool>('/schedule'),
               ),
             ),
           ],
@@ -266,6 +252,17 @@ class _ModuleGrid extends StatelessWidget {
         const SizedBox(height: 11),
         Row(
           children: [
+            Expanded(
+              child: ModuleCard(
+                title: '健康',
+                summary: '趋势参考 · 非诊断',
+                icon: AppIcons.heart,
+                tileBg: colors.tileHeart,
+                tileFg: colors.heartFg,
+                onTap: () => context.go('/health'),
+              ),
+            ),
+            const SizedBox(width: 11),
             Expanded(
               child: ModuleCard(
                 title: '车辆',
@@ -292,22 +289,11 @@ class _ModuleGrid extends StatelessWidget {
                     title: '相册',
                     summary: summaryText,
                     icon: AppIcons.image,
-                    tileBg: colors.tileAi,
-                    tileFg: colors.aiPrimary,
+                    tileBg: colors.tileWarm,
+                    tileFg: colors.warm,
                     onTap: () => context.push<bool>('/album'),
                   );
                 },
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: ModuleCard(
-                title: '记忆',
-                summary: '全部可见 · 可改可忘',
-                icon: AppIcons.brain,
-                tileBg: colors.tileAi,
-                tileFg: colors.aiPrimary,
-                onTap: () => context.push<bool>('/memory'),
               ),
             ),
           ],
@@ -328,7 +314,7 @@ class _SoonGrid extends StatelessWidget {
           child: ModuleCard(
             title: '阅读',
             summary: 'V2 见',
-            icon: Icons.menu_book,
+            icon: AppIcons.book,
             soon: true,
           ),
         ),
@@ -337,7 +323,7 @@ class _SoonGrid extends StatelessWidget {
           child: ModuleCard(
             title: '习惯打卡',
             summary: 'V2 见',
-            icon: Icons.repeat,
+            icon: AppIcons.clock,
             soon: true,
           ),
         ),
@@ -346,7 +332,7 @@ class _SoonGrid extends StatelessWidget {
           child: ModuleCard(
             title: '更多 Skill',
             summary: '持续扩展',
-            icon: Icons.add_box,
+            icon: AppIcons.plus,
             soon: true,
           ),
         ),

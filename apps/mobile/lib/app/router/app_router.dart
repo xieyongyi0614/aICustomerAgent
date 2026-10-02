@@ -25,6 +25,8 @@ import '../../features/ledger/presentation/ledger_add_page.dart';
 import '../../features/ledger/presentation/ledger_auto_page.dart';
 import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/life_page.dart';
+import '../../features/life/presentation/memo_page.dart';
+import '../../features/life/presentation/schedule_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
 import '../../features/profile/presentation/login_page.dart';
 import '../../features/profile/presentation/privacy_page.dart';
@@ -59,6 +61,9 @@ const chromeByPath = <String, RouteChrome>{
   '/ledger': chromeImmersive,
   '/ledger/add': chromeImmersive,
   '/ledger/auto': chromeImmersive,
+  // 备忘录（41）/ 日程（42）是「生活」子页（2026-09-30 IA 裁决：宫格 6 格无悬空入口）
+  '/memo': chromeImmersive,
+  '/schedule': chromeImmersive,
   '/car': chromeImmersive,
   '/car/add': chromeImmersive,
   '/car/profile': chromeImmersive,
@@ -144,6 +149,8 @@ final appRouter = GoRouter(
         GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
         GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(path: '/ledger/auto', builder: (_, _) => const LedgerAutoPage()),
+        GoRoute(path: '/memo', builder: (_, _) => const MemoPage()),
+        GoRoute(path: '/schedule', builder: (_, _) => const SchedulePage()),
         GoRoute(path: '/car', builder: (_, _) => const CarPage()),
         GoRoute(
           path: '/car/add',
@@ -191,6 +198,8 @@ class _AppShell extends StatelessWidget {
     if (path.startsWith('/home') || path.startsWith('/health')) return 0;
     if (path.startsWith('/life') ||
         path.startsWith('/ledger') ||
+        path.startsWith('/memo') ||
+        path.startsWith('/schedule') ||
         path.startsWith('/car') ||
         path.startsWith('/album')) {
       return 1;
