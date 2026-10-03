@@ -6,12 +6,14 @@
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.deps import debug_surface_gate
 
 from app.models.action import transition_action
 from app.repositories import action_repository, outbox_repository
 
-action_router = APIRouter()
+action_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
 
 
 @action_router.get("/debug/actions")

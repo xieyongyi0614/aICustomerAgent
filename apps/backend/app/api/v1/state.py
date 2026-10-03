@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.v1.deps import debug_surface_gate
 from pydantic import BaseModel
 
 from app.api.v1.auth import require_user
@@ -17,7 +19,7 @@ from app.services.conversation import history as history_service
 from app.services.conversation import state as state_service
 from app.services.observability import collector as trace_collector
 
-state_router = APIRouter()
+state_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
 
 
 def _latest_mode(user_id: str) -> str | None:

@@ -2,7 +2,9 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.deps import debug_surface_gate
 
 from app.api.v1.schemas import (
     PlanContextOut,
@@ -97,7 +99,7 @@ from app.engines.relationship_evolution import distance_index
 
 logger = logging.getLogger(__name__)
 
-debug_router = APIRouter()
+debug_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
 
 TOOL_SURFACE_DEFAULT_RUN_KIND = RUN_KIND_FOREGROUND_CHAT
 

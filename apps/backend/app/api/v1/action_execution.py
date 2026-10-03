@@ -2,11 +2,13 @@
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.deps import debug_surface_gate
 
 from app.repositories import action_repository
 
-action_execution_router = APIRouter()
+action_execution_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
 
 
 @action_execution_router.get("/debug/action-execution/actions")

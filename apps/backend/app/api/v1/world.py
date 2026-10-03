@@ -7,6 +7,8 @@ V2.3.0 WS-018 追加四个模拟观测端点（三个只读 + 一个调试触发
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.v1.deps import debug_surface_gate
 from pydantic import BaseModel
 
 from app.api.v1.auth import require_user
@@ -19,7 +21,7 @@ from app.api.v1.schemas import (
 from app.application import world_engine
 from app.repositories import world_repository
 
-world_router = APIRouter()
+world_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
 
 
 class EntityCreate(BaseModel):
