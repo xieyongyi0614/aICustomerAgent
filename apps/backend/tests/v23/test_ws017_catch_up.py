@@ -108,7 +108,7 @@ def test_storm_cap_folds_into_digest(db_session_factory, monkeypatch):
         assert sum(1 for k in emitted if k.startswith("storm:")) == 7
         assert any(k.startswith("world_digest:") for k in emitted)
         events = world_repository.list_events(
-            world_repository.world_id_for(user), limit=50
+            world_repository.ensure_world(user).world_id, limit=50
         )
         digests = [e for e in events if e.type == "world_digest"]
         assert digests and digests[0].payload["count"] == 13

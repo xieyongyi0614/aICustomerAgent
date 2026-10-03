@@ -44,7 +44,7 @@ def test_completed_event_materializes_memory_once(db_session_factory):
     assert len(candidates) == 1
     assert candidates[0].source == "user_derived"
     reloaded_event = world_repository.get_event(
-        world_repository.world_id_for("default-user"), event.id
+        world_repository.ensure_world("default-user").world_id, event.id
     )
     scanned = memory_ingest.ingest_from_world_event(reloaded_event, "default-user")
     assert scanned is not None and scanned.id == candidates[0].id
@@ -55,7 +55,7 @@ def test_completed_event_materializes_memory_once(db_session_factory):
     materialized = [m for m in memories if "面试" in m.content]
     assert all(memory.source == "user_derived" for memory in materialized)
 
-    reloaded = world_repository.get_event(world_repository.world_id_for("default-user"), event.id)
+    reloaded = world_repository.get_event(world_repository.ensure_world("default-user").world_id, event.id)
     assert reloaded.payload.get("memory_materialized") is True
     assert world_engine.complete_events_by_type("default-user", "interview") == 0
     assert world_engine.complete_events_by_type("default-user", "meeting") == 0
@@ -75,7 +75,7 @@ def test_low_importance_event_skips_memory(db_session_factory):
     assert world_engine.complete_events_by_type("default-user", "meeting") == 1
     memories = memory_repository.list_by_user("default-user", limit=20)
     assert not any("临时提醒" in memory.content for memory in memories)
-    reloaded = world_repository.get_event(world_repository.world_id_for("default-user"), event.id)
+    reloaded = world_repository.get_event(world_repository.ensure_world("default-user").world_id, event.id)
     assert reloaded.payload.get("memory_materialized") is True
 
 

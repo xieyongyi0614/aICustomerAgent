@@ -250,9 +250,8 @@ def test_isolation_matrix_between_two_open_ids(db_session_factory):
     assert conversation_repository.get_latest_for_user(user_b) is None
     assert memory_repository.list_by_user(user_b) == []
     world_b = world_repository.ensure_world(user_b)
-    assert world_b.world_id == f"home:{user_b}"
-    assert world_repository.world_id_for(user_b) == f"home:{user_b}"
-    assert world_repository.list_objects(f"home:{user_b}") == []
+    assert world_b.world_id == world_repository.find_world_id(user_b)
+    assert world_repository.list_objects(world_b.world_id) == []
     relationship_b = relationship_repository.get_relationship(user_b)
     assert relationship_b.intimacy == pytest.approx(0.3)
     assert relationship_b.intimacy != pytest.approx(0.9)
@@ -260,7 +259,7 @@ def test_isolation_matrix_between_two_open_ids(db_session_factory):
     identity_a = service.resolve("feishu", "ou_iso_a")
     assert identity_a.internal_user_id != identity_b.internal_user_id
     assert identity_a.session_id != identity_b.session_id
-    assert len(world_repository.list_objects(f"home:{identity_a.internal_user_id}")) == 1
+    assert len(world_repository.list_objects(world_repository.ensure_world(identity_a.internal_user_id).world_id)) == 1
 
 
 @pytest.fixture(scope="module")

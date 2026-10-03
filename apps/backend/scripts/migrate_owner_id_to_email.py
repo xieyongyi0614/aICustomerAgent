@@ -27,7 +27,11 @@ from typing import Any
 from sqlalchemy import inspect, text
 
 from app.core.db import SessionLocal, UserRow
-from app.repositories.world_repository import world_id_for
+
+
+def _legacy_world_id(user_id: str) -> str:
+    """存量世界行主键格式（ADR-16 C2 后新世界为雪花，本脚本只改写存量行）。"""
+    return f"home:{user_id}"
 from app.services.identity.user_service import legacy_email_user_id
 
 
@@ -85,8 +89,8 @@ def migrate_owner_id(
 
     report["to_id"] = target_id
     report["email"] = email
-    report["old_world_id"] = world_id_for(source_id)
-    report["new_world_id"] = world_id_for(target_id)
+    report["old_world_id"] = _legacy_world_id(source_id)
+    report["new_world_id"] = _legacy_world_id(target_id)
     if target_id == source_id:
         report["status"] = "noop_already_canonical"
         return report

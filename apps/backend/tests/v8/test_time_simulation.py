@@ -30,7 +30,7 @@ def test_time_advance_drives_event_and_expiry(db_session_factory, override_setti
     world_engine.run_turn_update("default-user", "今天怎么样")
 
     events = world_repository.list_events(
-        world_repository.world_id_for("default-user")
+        world_repository.ensure_world("default-user").world_id
     )
     assert any(event.status is EventStatus.ACTIVE for event in events)
     obj = world_engine.find_object_by_name("default-user", "西瓜")

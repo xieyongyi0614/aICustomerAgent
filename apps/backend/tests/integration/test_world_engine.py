@@ -21,7 +21,7 @@ def test_create_object_uses_category_initial_state(db_session_factory):
     )
     assert obj is not None
     assert obj.state == object_initial_state(OBJECT_STATE_MACHINES, "food")
-    assert obj.world_id == "home:default-user"
+    assert obj.world_id.isdigit()
     assert obj.location_id == "home.kitchen.fridge"
     placed_here = world_engine.create_object("default-user", name="书", category="misc")
     assert placed_here.location_id == "home.living_room"

@@ -22,7 +22,9 @@ def fetch_action_records(user_id: str, limit: int = 20) -> list:
 
 def fetch_completed_world_events(user_id: str, limit: int = 20) -> list:
     """最近完结 WorldEvent（status=completed）。"""
-    world_id = world_repository.world_id_for(user_id)
+    world_id = world_repository.find_world_id(user_id)
+    if world_id is None:
+        return []
     return world_repository.list_events(
         world_id, statuses=["completed"], limit=limit
     )

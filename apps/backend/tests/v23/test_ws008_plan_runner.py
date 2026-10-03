@@ -71,7 +71,7 @@ def test_block_move_updates_location(db_session_factory):
     daily_plan.advance_daily_plan(user, datetime(2026, 9, 14, 15, 0))
     assert world_repository.get_world(user).current_location == "company.workstation"
     events = world_repository.list_events(
-        world_repository.world_id_for(user), statuses=["completed"], limit=20
+        world_repository.ensure_world(user).world_id, statuses=["completed"], limit=20
     )
     moves = [e for e in events if (e.payload or {}).get("kind") == "location_change"]
     assert len(moves) == 2

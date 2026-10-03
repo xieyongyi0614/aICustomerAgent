@@ -39,7 +39,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # 雪花 ID 声明（2026-10-03，ADR-16 C3）：世界实体 id 生成由 `{category}_{uuid4[:8]}`
     # （仅 32 位熵，10 万条记录碰撞概率 68.8%）改为雪花 —— 非 TOOL-007 改脏。
     # 原值 f0ba90cb。
-    "app/application/world_engine.py": "3d462118b58ce05f061b39782c28c79bdbd2fbe9cb4d98c057ec3f8fca526c5a",
+    # C2 声明（2026-10-03，ADR-16）：`world_id_for` 纯函数退役改查库（`find_world_id`，
+    # 世界未建立返回 None，读路径空返回语义不变）—— 非 TOOL-007 改脏。原值 3d462118。
+    "app/application/world_engine.py": "648469b80829839981342278fa282439f568ec31c15ac22b22d0dea191ddefcb",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。

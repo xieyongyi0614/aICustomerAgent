@@ -113,9 +113,8 @@ async def test_two_users_six_resources_isolated(db_session_factory, fake_llm):
 
     world_a = world_repository.ensure_world(user_a)
     world_b = world_repository.ensure_world(user_b)
-    assert world_a.world_id == f"home:{user_a}"
-    assert world_b.world_id == f"home:{user_b}"
     assert world_a.world_id != world_b.world_id
+    assert world_a.world_id.isdigit() and world_b.world_id.isdigit()
     world_repository.save_object(
         WorldObject(
             id="obj_iso_a",

@@ -1154,14 +1154,19 @@ def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
             {"dimension": s.dimension.value, "summary": s.summary, "intensity": s.intensity}
             for s in situations[:3]
         ]
-        active_events = [
-            event
-            for event in world_repository.list_events(
-                world_repository.world_id_for(user_id),
-                statuses=["scheduled", "active"],
-                limit=10,
-            )
-        ]
+        world_id = world_repository.find_world_id(user_id)
+        active_events = (
+            [
+                event
+                for event in world_repository.list_events(
+                    world_id,
+                    statuses=["scheduled", "active"],
+                    limit=10,
+                )
+            ]
+            if world_id is not None
+            else []
+        )
         impacts = event_impact.evaluate_batch(active_events, context)[:3]
         if impacts:
             facts["impacts"] = [impact.to_dict() for impact in impacts]

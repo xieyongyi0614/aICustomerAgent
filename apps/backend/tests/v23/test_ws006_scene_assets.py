@@ -98,7 +98,7 @@ def test_schedule_move_applies_and_emits_event(db_session_factory):
     assert result.applied is True
     assert world_repository.get_world("ws006-mv3").current_location == "cafe.main"
     events = world_repository.list_events(
-        world_repository.world_id_for("ws006-mv3"), statuses=["completed"], limit=10
+        world_repository.ensure_world("ws006-mv3").world_id, statuses=["completed"], limit=10
     )
     moves = [e for e in events if (e.payload or {}).get("kind") == "location_change"]
     assert len(moves) == 1
@@ -162,7 +162,7 @@ def test_narrative_move_into_new_location(db_session_factory):
     assert result.applied is True
     assert world_repository.get_world(user).current_location == "school.classroom"
     events = world_repository.list_events(
-        world_repository.world_id_for(user), statuses=["completed"], limit=10
+        world_repository.ensure_world(user).world_id, statuses=["completed"], limit=10
     )
     moves = [e for e in events if (e.payload or {}).get("kind") == "location_change"]
     assert moves and moves[0].source.value == "user_mention"

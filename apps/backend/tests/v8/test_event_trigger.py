@@ -10,7 +10,7 @@ from app.repositories import world_repository
 
 
 def _world_id():
-    return world_repository.world_id_for("default-user")
+    return world_repository.ensure_world("default-user").world_id
 
 
 async def _await_until(predicate, timeout=10.0):

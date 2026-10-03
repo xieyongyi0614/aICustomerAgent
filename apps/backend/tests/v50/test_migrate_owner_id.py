@@ -14,7 +14,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.db import UserRow
-from app.repositories.world_repository import world_id_for
+def world_id_for(user_id: str) -> str:
+    """存量世界行主键格式；本脚本只改写 legacy 行（ADR-16 C2 后新世界为雪花）。"""
+    return f"home:{user_id}"
 from app.services.identity.user_service import legacy_email_user_id
 from scripts.migrate_owner_id_to_email import migrate_owner_id
 

@@ -99,7 +99,7 @@ def _world_event(
     world_repository.save_event(
         WorldEvent(
             id=event_id,
-            world_id=world_repository.world_id_for(user_id),
+            world_id=world_repository.ensure_world(user_id).world_id,
             type="task",
             title=title,
             importance=importance,

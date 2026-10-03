@@ -134,7 +134,7 @@ def _outbox_rows(user_id: str) -> list:
 
 def _world_events(user_id: str) -> list:
     return world_repository.list_events(
-        world_repository.world_id_for(user_id), order="created_at_desc"
+        world_repository.ensure_world(user_id).world_id, order="created_at_desc"
     )
 
 

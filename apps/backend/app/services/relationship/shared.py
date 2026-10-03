@@ -89,7 +89,9 @@ def _memory_entries(
 
 
 def _world_entries(user_id: str) -> list[SharedExperience]:
-    world_id = world_repository.world_id_for(user_id)
+    world_id = world_repository.find_world_id(user_id)
+    if world_id is None:
+        return []
     events = world_repository.list_events(
         world_id, statuses=["completed"], limit=_WORLD_EVENT_LIMIT
     )

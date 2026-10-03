@@ -28,7 +28,8 @@
 主键全部收敛为雪花**（P0-4 主体，见 §5.3；原记 9 处系计数口径误差，实测 8 处调用点）。
 **已取消（B2）**：列类型翻转 `VARCHAR → BIGINT`，评估后决定不做（见 §6.5）。
 **已完成（C3）**：全 app `uuid.uuid4()` 生成点 **52 处**全部收敛 `ids`（前缀裁决：**去掉**，见 §5.4）。
-**待办（C2、D）**：`worlds.id` 查库语义改造（§6.5 C2）；5 张例外表拆分 + 2 张自增表收敛（§6.5 D）。
+**已完成（C2）**：`worlds.id` 新世界发雪花、存量行保留 `home:{user_id}`，`world_id_for` 退役改查库（见 §6.5）。
+**待办（D）**：5 张例外表拆分 + 2 张自增表收敛（§6.5 D）。
 
 ---
 
@@ -273,7 +274,7 @@ id: Mapped[int] = mapped_column(
 | **B1（已完成）** | 身份域改用雪花：`user_service` 绑定驱动、`channel.resolve()` 补建 `users` 行、`channel_identities` 统一绑定表、迁移 `0004`、基线 ADR-16 | 低（`user_id` 的 Python/API 类型未变 → **无 token 失效**） |
 | **B2（评估后不做）** | 列类型翻转 `VARCHAR → BIGINT` + Python 类型翻转。**结论：收益不抵成本**，详见下方 |
 | **C1（已完成）** | **P0-4 主体**：`car_*`（4 处）/ `ledger_accounts`（2 处）/ `ledger_categories`（1 处）/ `life_tasks`（1 处）共 **9 处内嵌 `user_id` 的主键**收敛为雪花；`ids.new_id_str()` 为 `VARCHAR` 列/API 提供字符串出口 | 低（**测试侧零字面量依赖**，已实测） |
-| **C2** | `worlds.id`：新世界发雪花，**存量行 id 保留 `home:{user_id}`**（零数据迁移、零子表重映射）。`world_id_for` 纯函数退役改查库：被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`）+ 仓储内 3 处，世界未建立返回 `None`（读路径空返回语义不变）；测试侧 35 处 `world_id_for` 引用、39 处 `home:` 字面量同步改写。无 schema 迁移（`user_id` 已 UNIQUE） | 中 |
+| **C2（已完成）** | `worlds.id`：新世界发雪花，**存量行 id 保留 `home:{user_id}`**（零数据迁移、零子表重映射）。`world_id_for` 纯函数退役改查库：被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`）+ 仓储内 3 处，世界未建立返回 `None`（读路径空返回语义不变）；测试侧 35 处 `world_id_for` 引用同步改写（其中 `v50` 迁移脚本测试保留 `home:` 字面量——脚本只改写存量格式）。无 schema 迁移（`user_id` 已 UNIQUE）；基线已先行更新；tool007 冻结哈希再登记 | 中 |
 | **C3** | 全 app `uuid.uuid4()` 生成点 → 雪花。**实测 52 处**（原估「约 23 处仓储级」严重偏低：生成点跨 models/application/services/repositories/api，不止仓储层）。前缀裁决：**去掉**（与 `user_id` 一致）；测试侧格式断言同步改（`startswith("act_")` → `isdigit()`、`len == 32` → `isdigit()`）；`collector` 内存 trace key 一并收敛 | 低 |
 | **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键）+ `messages` / `emotion_history` 两张 int 自增表改雪花（`BigInteger().with_variant(Integer, "sqlite")` + 显式 `autoincrement=False`，防 BIGSERIAL 渲染坑）。迁移内回填发号用**保留机号 1023** 的独立 Sonyflake 实例，不与应用实例撞号 | 中 |
 
