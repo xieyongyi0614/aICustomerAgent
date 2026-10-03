@@ -17,7 +17,8 @@
 | 容量 | 4096 ID/毫秒/机器，1024 个机器位 |
 | 寿命 | **可用至 2095-09-07**（69.7 年） |
 | 回拨防护 | 库内单调逻辑时钟 + 跨重启水位校验 + 部署侧 NTP 约定 + DB 唯一约束兜底 |
-| 列类型 | `BIGINT`（SQLite 下 `with_variant(Integer)`）——**B2 步待执行**，当前仍为 `VARCHAR` 存雪花十进制串 |
+| 列类型 | **保持 `VARCHAR`**，存雪花十进制串。**B2（翻转 `BIGINT`）经评估后决定不做**，依据见 §6.5 |
+| 对外类型 | ID 一律以**字符串**出现在 JSON —— 雪花 ID 57+ 位，超出 JS 安全整数范围约 11 倍，数字形式会被前端静默截断 |
 
 **已完成（B1）**：发号模块 `app/core/ids.py`、配置域 `app/core/settings/ids.py`、`app/main.py` 接线、
 `tests/unit/test_ids.py`（22 项）；**身份域改用雪花**——`user_service` 改为凭据绑定驱动、
@@ -225,11 +226,30 @@ id: Mapped[int] = mapped_column(
 |---|---|---|
 | **A（已完成）** | 发号模块 + 配置 + 接线 + 单测 | 零 |
 | **B1（已完成）** | 身份域改用雪花：`user_service` 绑定驱动、`channel.resolve()` 补建 `users` 行、`channel_identities` 统一绑定表、迁移 `0004`、基线 ADR-16 | 低（`user_id` 的 Python/API 类型未变 → **无 token 失效**） |
-| **B2** | 列类型翻转：`users.id` + 37 张 `user_id` 列 `VARCHAR → BIGINT`（`USING user_id::bigint`，不碰数据）；Python 侧翻转 `user_id: str` → `int`（`app/` **824 处**）+ 测试字面量 **565 处** + API 与 Flutter 契约（JSON string → number） | 中高（契约破坏 + token 全失效） |
+| **B2（评估后不做）** | 列类型翻转 `VARCHAR → BIGINT` + Python 类型翻转。**结论：收益不抵成本**，详见下方 |
 | **C** | 其余 45 张表**自身** `id` 列迁移（与 `user_id` 列是不同列），同步改 §6.3 隐式引用列；`car_profile_{user_id}` / `task_{user_id}_{ms}` 等内嵌 user_id 的主键收敛为纯雪花 | 中 |
 | **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键） | 中 |
 
-**B1 为什么不翻转类型**（实测依据）：`user_id` 在 `app/` 下 824 处**全部是纯类型标注**（无 `startswith` / `split` / 字符串字面量比较），翻转本身是机械的；但 `tests/` 有 565 处字符串字面量（`user_id="u1"` 等 203 处）、186 个文件仍引用已退役的 `default-user` 夹具，且会改变 API 与 Flutter 客户端契约。把「数据迁移」（`USING ::bigint`，一行 DDL）与「契约翻转」（跨 1400 处 + 客户端）分开做，比捆在一次提交里安全得多 —— 且 B1 的雪花值本就是十进制串，**B2 不需要任何数据改写**。
+#### B2 为什么不做（2026-10-03 评估，含实测）
+
+原方案把「列类型翻 `BIGINT`」列为待办。动手实现后（`SnowflakeId` 类型装饰器 + 迁移 `0005` + 38 列改写）实测，发现**收益远小于预期**：
+
+| 维度 | 结论 |
+|---|---|
+| 存储 | `VARCHAR(19)` vs `BIGINT(8)` 单行差 11 字节；`users` 规模 ~10¹~10² 行 → **总差异 < 2KB**，可忽略 |
+| 索引性能 | 本项目 QPS 与行数下无实测差异 |
+| **对外契约** | **两种方案完全一致** —— ID 都必须以字符串出 JSON（JS 精度），无任何差异 |
+| 唯一真实收益 | 数据库在**类型层强制「ID 必须是数字」** |
+
+成本侧（实测）：
+
+- **584 处**非数字 `user_id` 字面量分布在 **180 个测试文件**（191 个不同字面量：`"u1"` 203 处、`"u"` 46 处、`"default-user"` 29 处…）。`TEST_USER_ID = "default-user"` 是 conftest 里**刻意保留的历史字面量**（注释明确说明是为免改 ~300 处世界域夹具），翻转后必须全部改成数字，**测试可读性显著下降**。
+- 历史口径 `email-<sha256[:16]>` / `feishu:{open_id}` 非数字、无法 `CAST`，翻转要求**删库重建** —— 而 B1 刚建立的「存量用户下次登录自动回填绑定」自愈路径会被这条前提作废，两者自相矛盾。
+- 实现过程中还踩到两个坑（已记录，供未来重启该议题时参考）：① `BigInteger` 单列主键会被 SQLAlchemy 渲染成 **`BIGSERIAL`**（凭空造序列），必须显式 `autoincrement=False` —— `users.id` 与 `briefing_preferences` / `character_state` / `relationship_state` 三张「`user_id` 即主键」的表都会中招；② 36 个 `user_id` 列里有 1 个是 `Mapped[str | None]`（`loop_runs.user_id`），按 `Mapped[str]` 批量替换会漏掉。
+
+**决策**：保留 `VARCHAR`。若将来确实需要「ID 必须是数字」的强约束，**应加在应用边界而非列类型**（写入前校验 + 一条拒绝非数字 ID 的测试），成本从 584 处降到 1 处。若未来要重启列翻转（例如阶段 C 之后表结构本就大改），上述两个坑与清单可直接复用。
+
+> 阶段 C / D 会新建或重建主键，届时若那些表**只存雪花 ID、无历史非数字数据**，可以按表就地用 `BIGINT`（不受本决策约束）—— 本决策只针对**已承载历史口径**的 38 个身份列。
 
 每阶段固定动作：
 1. 写增量迁移 `0004+`（Schema 唯一真相 = Alembic 迁移链，基线 `0001` 已折叠）。
@@ -238,11 +258,14 @@ id: Mapped[int] = mapped_column(
 3. bump `tests/support/schema_pins.py` 的 `MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`。
 4. **先更新 `docs/current-system-architecture-baseline.md`，再动代码。**
 
-### 6.6 唯一代价：令牌失效（仅 B2 触发）
+### 6.6 令牌失效：本次改造不触发
 
-令牌是无状态 HMAC，载荷 `f"{user_id}.{device_id}.{exp}"`（`api/v1/auth.py:81`）。**B2 翻转 `user_id` 类型与取值** → 所有已签发 token 失效，需强制重登一次。V5.0.0 客户端尚未上线、无存量在线用户，**不建议**做旧→新映射过渡层。
+令牌是无状态 HMAC，载荷 `f"{user_id}.{device_id}.{exp}"`（`api/v1/auth.py:81`）。
 
-**B1 不触发**：存量用户的 `user_id`（`email-<hash>`）原样保留，只有新用户拿到雪花 id；类型仍是字符串，令牌载荷不变。存量用户在下次登录时由 `find_or_create_by_email` 自动回填绑定行（`create_with_email` 撞唯一索引 → 返回既有行 → 补写绑定），无需数据迁移脚本 —— 该路径已有测试（`test_find_or_create_by_email_backfills_binding_for_legacy_user`）。
+- **B1 不触发**：存量用户的 `user_id`（`email-<hash>`）原样保留，只有新用户拿到雪花 id；类型仍是字符串，令牌载荷不变。
+- **B2 已取消**（§6.5），故整条改造链**不需要任何强制重登**。
+
+存量用户在下次登录时由 `find_or_create_by_email` 自动回填绑定行（`create_with_email` 撞唯一索引 → 返回既有行 → 补写绑定），无需数据迁移脚本 —— 该路径已有测试（`test_find_or_create_by_email_backfills_binding_for_legacy_user`）。
 
 ---
 
@@ -266,15 +289,16 @@ id: Mapped[int] = mapped_column(
 1. 全仓无自研雪花位运算；`sonyflake` 是唯一生成来源。
 2. `app/core/ids.py` 是所有新实体 ID 的唯一入口；无 `uuid4()` 直接生成主键的残留。
 3. `grep -rn "ORDER BY .*\.id" app/` 无业务时序用途命中（雪花虽趋势递增，但排序语义仍应交给 `created_at`）。
-4. （B2）主键列类型统一 `BIGINT`；§6.2 五张表已拆分为「雪花 ID + 业务唯一键」。
+4. （B2 已取消，不适用）主键列类型统一 `BIGINT`；§6.2 五张表已拆分为「雪花 ID + 业务唯一键」。
 5. 同一邮箱重复登录 → 同一 `user_id`；改绑邮箱后 `user_id` **不变**；同人邮箱 + 飞书 → **同一 `user_id`，两行 binding**。
 6. 迁移脚本重跑幂等（第二次返回 `noop`）。
 7. `schema_pins.py` 三常量已 bump。
 8. 启动时时钟早于水位 → 进程拒绝启动并给出可读错误。
 9. 产品端点传入 `user_id` 参数被忽略；调试面非 `dev` 返回 404/403。
+10. 全部 ID 以字符串出现在 JSON 响应中（前端 JS 精度安全）。
 
-**B1 已达标**：1 / 2（新代码）/ 5 / 7 / 8。
-**B2 起达标**：4 / 6 / 9（9 依赖调试面门禁，见 §7）。
+**B1 已达标**：1 / 2（新代码）/ 5 / 7 / 8 / 10。
+**阶段 C / D 达标**：6（迁移脚本幂等）/ 9（调试面门禁，见 §7）。
 
 ---
 
@@ -307,6 +331,8 @@ id: Mapped[int] = mapped_column(
 | epoch | 2026-01-01（**一次性决策，有数据后不可改**） | **已落地** |
 | 位分配 | 41 / 12 / 10，1ms | **已落地** |
 | 回拨防护 | L1 库 + L2 水位校验 + L3 部署约定 + L4 唯一约束 | **L1/L2 已落地**，L3 待运维确认 |
-| 列类型 | `BIGINT` + SQLite 变体，不用 `Identity` | 待执行（阶段 C） |
+| 对外类型 | ID 以**字符串**出 JSON（JS 精度安全） | **已落地**（B1 保持 `str`） |
+| 列类型 | **保持 `VARCHAR`**；不做 `BIGINT` 翻转 | **已定**（2026-10-03 评估后取消 B2，依据见 §6.5） |
+| **已否决：B2 列类型翻转** | `VARCHAR → BIGINT` + Python 类型翻转。**否决理由**：实测收益只剩「DB 类型层强制 ID 为数字」，而成本为 584 处测试字面量（180 文件）+ 删库重建（与 B1 自愈路径矛盾）。**替代**：需要强约束时加在应用边界。**保留价值**：两个实现坑（单列主键渲染成 `BIGSERIAL` 需显式 `autoincrement=False`；`loop_runs.user_id` 是 `Mapped[str \| None]` 会漏改）已记入 §6.5，供未来重启时复用 | 已否决 |
 | **已否决：自增 → 雪花** | 上一版方案（前期 BIGINT 自增、后期切雪花）。**否决理由**：既然终局是雪花，自增只换来 dev 可读性，却要多处理「5 张表例外 + 约 10 处插入前预知 ID 的重构 + 一次后期迁移」；而单机下雪花的运维成本与自增几乎相同。**保留价值**：其「SQLite `with_variant`」「5 张表例外清单」「`ids.py` 抽象层先行」三条结论已并入 §4/§6。 | 已否决 |
 | **已否决：ULID** | `usr_<ulid>` 字符串方案。**否决理由**：用户选择整数 ID；且需全量改值为 String 语义，而整数路线与既有 `messages` 一致。 | 已否决 |
