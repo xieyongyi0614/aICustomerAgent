@@ -33,6 +33,15 @@ PLANNING_MODULES = scan.planning_modules()
 
 ENGINE_PATH = Path(engine_mod.__file__)
 
+
+def _package_layer_files(relative_dir: str) -> tuple[str, ...]:
+    return tuple(
+        f"{relative_dir}/{path.name}"
+        for path in sorted(Path(relative_dir).glob("*.py"))
+        if "__pycache__" not in path.parts
+    )
+
+
 PLANNING_PACKAGE_MODULES = (
     "__init__.py",
     "context.py",
@@ -314,7 +323,7 @@ class TestToolLayerDoesNotDependOnPlanning:
         "app/services/tool/normalizer.py",
         "app/services/tool/builtin.py",
         "app/services/tool/dsl.py",
-        "app/services/tool/ext_api.py",
+        *_package_layer_files("app/services/tool/ext_api"),
         "app/services/tool/user_defined.py",
         "app/services/tool/memory_policy.py",
         "app/services/tool/world_intent.py",

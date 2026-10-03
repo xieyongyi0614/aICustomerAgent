@@ -155,7 +155,7 @@ def test_path_is_file_returns_empty_report(tmp_path, index):
 
 
 def test_registry_unavailable_returns_empty_report(tmp_path, index, monkeypatch):
-    monkeypatch.setattr(ext_api, "get_tool_registry", lambda: None)
+    monkeypatch.setattr(ext_api.schema, "get_tool_registry", lambda: None)
     write_manifest(tmp_path, "weather.yaml", weather_manifest())
     report = loader(index, environ={WEATHER_ENV: WEATHER_SECRET}).load(tmp_path)
     assert report.total == 0
@@ -489,7 +489,7 @@ def test_logs_never_contain_credential_value(tmp_path, index, caplog):
 
 def test_yaml_unavailable_degrades_without_crashing(tmp_path, index, monkeypatch):
     """守卫式导入：PyYAML 缺失 → 跳过加载并告警，不崩。"""
-    monkeypatch.setattr(ext_api, "_load_yaml", lambda: None)
+    monkeypatch.setattr(ext_api.schema, "_load_yaml", lambda: None)
     write_manifest(tmp_path, "weather.yaml", weather_manifest())
     registry = ToolRegistry()
     report = loader(index, environ={WEATHER_ENV: WEATHER_SECRET}).load(tmp_path, registry)

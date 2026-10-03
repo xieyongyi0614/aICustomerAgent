@@ -378,8 +378,9 @@ def test_invariant_03_credentials_never_hardcoded():
     """不变量 3：生产工具树零凭据硬编码；外部 API 只从环境读取。"""
     assert support.scan_credential_hardcode() == []
 
-    source = (support.APP_ROOT / "services" / "tool" / "ext_api.py").read_text(
-        encoding="utf-8"
+    package = support.APP_ROOT / "services" / "tool" / "ext_api"
+    source = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(package.glob("*.py"))
     )
     assert "os.environ" in source
 

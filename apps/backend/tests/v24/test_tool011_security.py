@@ -12,8 +12,17 @@ import pytest
 
 import yaml
 
+
+def _package_sources(directory: Path) -> tuple[Path, ...]:
+    return tuple(
+        sorted(
+            path for path in directory.glob("*.py") if "__pycache__" not in path.parts
+        )
+    )
+
+
 NEW_MODULES = (
-    Path("app/services/tool/ext_api.py"),
+    *_package_sources(Path("app/services/tool/ext_api")),
     Path("app/services/tool/dsl.py"),
     Path("app/services/tool/user_defined.py"),
 )
@@ -121,10 +130,12 @@ def test_no_hardcoded_credentials(path):
 
 @pytest.mark.parametrize("path", NEW_MODULES)
 def test_credentials_are_read_from_environment_only(path):
-    text = path.read_text(encoding="utf-8")
-    if path.name == "ext_api.py":
-        assert "environ.get(" in text
-        assert "os.environ" in text
+    if path.parent.name == "ext_api":
+        source = "\n".join(
+            item.read_text(encoding="utf-8") for item in _package_sources(path.parent)
+        )
+        assert "environ.get(" in source
+        assert "os.environ" in source
 
 
 @pytest.mark.parametrize("path", NEW_MODULES)
@@ -169,17 +180,21 @@ def test_no_new_third_party_dependency(path):
 
 def test_yaml_is_guarded_not_a_hard_dependency():
     """PyYAML 守卫式导入：只在函数内的 try 中 import，缺失即降级。"""
-    tree = _tree(Path("app/services/tool/ext_api.py"))
-    assert "yaml" not in _top_level_import_roots(tree)
+    trees = [
+        _tree(path) for path in _package_sources(Path("app/services/tool/ext_api"))
+    ]
+    for tree in trees:
+        assert "yaml" not in _top_level_import_roots(tree)
     guarded = False
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Try):
-            continue
-        for child in ast.walk(node):
-            if isinstance(child, ast.Import) and any(
-                alias.name == "yaml" for alias in child.names
-            ):
-                guarded = True
+    for tree in trees:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Try):
+                continue
+            for child in ast.walk(node):
+                if isinstance(child, ast.Import) and any(
+                    alias.name == "yaml" for alias in child.names
+                ):
+                    guarded = True
     assert guarded is True
 
 
