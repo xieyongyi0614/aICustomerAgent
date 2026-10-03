@@ -1,10 +1,10 @@
 import json
-import uuid
 from datetime import datetime
 from typing import get_args
 
 from sqlalchemy import text as sa_text
 
+from app.core import ids
 from app.core.db import Memory, SessionLocal
 from app.models.memory import MemoryType, UserMemory
 
@@ -51,7 +51,7 @@ def create_memory(
     now = datetime.now()
     with SessionLocal() as session:
         row = Memory(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             content=content,
             type=memory_type,
@@ -261,7 +261,7 @@ def create_memory_and_supersede(
     now = datetime.now()
     with SessionLocal() as session:
         row = Memory(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             content=content,
             type=memory_type,

@@ -4,11 +4,11 @@ outcome 幂等补写（仅写空值）；retention 惰性清理在 save 路径�
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
+from app.core import ids
 from app.core.db import DecisionRecordRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
@@ -174,4 +174,4 @@ def prune_before(cutoff: datetime) -> int:
 
 
 def new_decision_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()

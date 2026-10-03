@@ -1,6 +1,5 @@
 """V8.5 relationship_conflicts 仓储：单活跃冲突历史。"""
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import select

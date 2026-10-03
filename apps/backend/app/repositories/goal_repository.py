@@ -1,6 +1,6 @@
-import uuid
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import GoalPlanRow, GoalRow, SessionLocal
 from app.models.goal import (
     DOMAIN_VALUES,
@@ -111,7 +111,7 @@ def seed_goals(
                 continue
             session.add(
                 GoalRow(
-                    id=str(uuid.uuid4()),
+                    id=ids.new_id_str(),
                     user_id=user_id,
                     character_id=character_id,
                     type=seed.type,
@@ -330,7 +330,7 @@ def create_hierarchical_goal(
                 raise ValueError(f"父层倒挂：{parent.layer!r} 不可作 {layer!r} 的父级")
         now = datetime.now()
         row = GoalRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id=character_id,
             type=HIERARCHICAL_TYPE_MAP[domain],

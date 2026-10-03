@@ -4,7 +4,6 @@
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from app.core.db import PromptSnapshotRow, SessionLocal

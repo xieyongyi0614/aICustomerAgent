@@ -1,8 +1,8 @@
 """agent_metric_snapshots 仓储（AGENT-006）：周期快照唯一写面（评估只读旁路的例外本体）。"""
 
-import uuid
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import AgentMetricSnapshotRow, SessionLocal
 
 
@@ -42,7 +42,7 @@ def save(
         )
         if row is None:
             row = AgentMetricSnapshotRow(
-                id=str(uuid.uuid4()),
+                id=ids.new_id_str(),
                 user_id=user_id,
                 character_id=character_id,
                 window_start=window_start,

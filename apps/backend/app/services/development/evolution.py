@@ -7,7 +7,6 @@ Evolution Ledger 只读投影（personality/development/goal/relationship/memory
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from app.character.asuna import evolution
@@ -21,6 +20,7 @@ from app.core.db import (
     SessionLocal,
 )
 from app.core.settings import get_settings
+from app.core import ids
 from app.repositories import goal_repository, personality_state_repository
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ def rollback_personality_for_insight(insight_id: str, now: datetime | None = Non
             personality.updated_at = now
             session.add(
                 DevelopmentChangeRow(
-                    id=str(uuid.uuid4()),
+                    id=ids.new_id_str(),
                     personality_state_id=personality.id,
                     before={"current": after},
                     after={"current": before},
@@ -345,7 +345,7 @@ def _apply_drift(user_id: str, axis: str, delta: float, insight_id: str, now: da
         row.updated_at = now
         session.add(
             DevelopmentChangeRow(
-                id=str(uuid.uuid4()),
+                id=ids.new_id_str(),
                 development_state_id=None,
                 personality_state_id=row.id,
                 before={"current": before},

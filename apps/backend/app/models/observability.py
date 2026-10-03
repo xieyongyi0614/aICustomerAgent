@@ -6,12 +6,12 @@ LlmCallRecord / MetricReport；不绑定 LLM、数据库与 HTTP。
 
 import hashlib
 import json
-import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
+from app.core import ids
 
 
 class TraceKind(StrEnum):
@@ -92,7 +92,7 @@ def deterministic_sample(key: str, rate: float) -> bool:
 
 
 def new_record_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()
 
 
 class TraceStep(BaseModel):

@@ -4,12 +4,12 @@
 """
 
 import logging
-import uuid
 from datetime import datetime
 
 from sqlalchemy import and_ as sa_and_, or_ as sa_or_
 from sqlalchemy.orm import Session as _Session  # noqa: F401
 
+from app.core import ids
 from app.core.db import (
     WorldEntityRow,
     WorldEventRow,
@@ -369,16 +369,16 @@ def get_snapshot(world_id: str, snapshot_id: str) -> StateSnapshot | None:
         )
 
 
-def new_object_id(category: str) -> str:
-    return f"{category}_{uuid.uuid4().hex[:8]}"
+def new_object_id() -> str:
+    return ids.new_id_str()
 
 
 def new_event_id() -> str:
-    return f"evt_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def new_snapshot_id() -> str:
-    return f"snap_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def list_all_worlds() -> list[World]:

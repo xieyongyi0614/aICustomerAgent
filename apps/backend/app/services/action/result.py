@@ -1,7 +1,6 @@
 """V2.6.0 ActionResult 统一契约与投影映射（architecture.md §8.4）。"""
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +11,7 @@ from app.models.action import (
     FailureKind,
 )
 
+from app.core import ids
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +20,7 @@ def _now() -> datetime:
 
 
 def make_result_id() -> str:
-    return f"res_{uuid.uuid4().hex[:8]}"
+    return ids.new_id_str()
 
 
 def ensure_result_identity(result: ActionResult, action_id: str) -> ActionResult:

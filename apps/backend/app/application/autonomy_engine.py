@@ -21,7 +21,6 @@ V2.5.0 PLAN-007：`plan_facts`（计划运行态只读事实段）在**既有行
 
 import logging
 import time
-import uuid
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -35,6 +34,7 @@ from app.models.observability import (
     bound_extra,
 )
 from app.models.tool import ToolBinding, ToolSurface
+from app.core import ids
 from app.repositories import (
     conversation_repository,
     decision_repository,
@@ -472,7 +472,7 @@ def _build_action(
     verdict, session_id: str, now: datetime, intention_override: str | None = None
 ) -> ProactiveAction:
     return ProactiveAction(
-        id=uuid.uuid4().hex,
+        id=ids.new_id_str(),
         user_id=verdict.trigger.user_id,
         session_id=session_id,
         trigger_type=verdict.trigger.type,

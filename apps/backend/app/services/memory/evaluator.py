@@ -11,7 +11,6 @@ LLM 兜底率护栏：滑动窗口仅统计成功兜底（True）与护栏让位
 import asyncio
 import logging
 import time
-import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,6 +25,7 @@ from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import lifecycle as memory_lifecycle
 from app.services.memory import types as memory_types
 from app.engines.memory_conflict import _lcs_length, same_topic
+from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,7 @@ def _promote(
         row = session.get(MemoryCandidateRow, candidate.id)
         if row is None or row.status != "pending":
             raise CandidateNotPendingError(candidate.id)
-        memory_id = str(uuid.uuid4())
+        memory_id = ids.new_id_str()
         session.add(
             Memory(
                 id=memory_id,

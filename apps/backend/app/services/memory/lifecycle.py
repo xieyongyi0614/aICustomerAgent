@@ -13,7 +13,6 @@ on_promoted 对新转正记忆做冲突检测：同主题 → supersede/merge �
 import logging
 import math
 import time
-import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import or_
@@ -22,6 +21,7 @@ from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory import types as memory_types
 from app.engines.memory_conflict import _lcs_length, same_topic
+from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -345,7 +345,7 @@ def _link_exists(session, memory_id: str, related_memory_id: str, relation: str)
 def _create_link(session, memory_id: str, related_memory_id: str, relation: str) -> None:
     session.add(
         MemoryLinkRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             memory_id=memory_id,
             related_memory_id=related_memory_id,
             relation=relation,

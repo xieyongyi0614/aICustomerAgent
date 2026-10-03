@@ -110,7 +110,7 @@ async def test_chat_response_carries_request_id_header(
         ) as resp:
             assert resp.status_code == 200
             header_request_id = resp.headers.get("x-request-id")
-            assert header_request_id is not None and len(header_request_id) == 32
+            assert header_request_id is not None and header_request_id.isdigit()
             body = await resp.aread()
         import json
 

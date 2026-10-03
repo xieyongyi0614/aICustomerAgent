@@ -5,9 +5,9 @@ retention 惰性清理在 save 路径顺带执行。
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
+from app.core import ids
 from app.core.db import EvaluationReportRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.evaluation import EvaluationMeta, EvaluationReport, Issue
@@ -120,4 +120,4 @@ def prune_before(cutoff: datetime) -> int:
 
 
 def new_report_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()

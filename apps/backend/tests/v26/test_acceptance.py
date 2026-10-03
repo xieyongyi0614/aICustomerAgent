@@ -27,7 +27,7 @@ class TestFunctionalAcceptance:
             params={"content": "验收提醒", "due_at": "明天"},
         )
         assert action.status == "created"
-        assert action.id.startswith("act_")
+        assert action.id.isdigit()
         assert action.dedupe_key
 
     def test_execute_reuses_record(self, monkeypatch):
@@ -146,7 +146,7 @@ class TestSystemFlowAcceptance:
         record = asyncio.run(bridge._dispatch(Goal(), intent))
         assert record is not None
         assert record.source == "plan"
-        assert record.id.startswith("act_")
+        assert record.id.isdigit()
 
 
 class TestDataAcceptance:

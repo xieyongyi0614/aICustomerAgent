@@ -10,7 +10,6 @@ commands:{user_id}:{object_hash}）经 MEM-003 直通转正（salience=1.0、0 L
 import hashlib
 import logging
 import time
-import uuid
 from datetime import datetime
 
 from app.core.db import Memory, MemoryCandidateRow, SessionLocal
@@ -18,6 +17,7 @@ from app.core.settings import get_settings
 from app.services.memory import evaluator as memory_evaluator
 from app.services.memory import lifecycle as memory_lifecycle
 from app.engines.memory_conflict import _lcs_length, same_topic
+from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ def _create_command_candidate(user_id: str, *, action: str, object_text: str):
             session.expunge(existing)
             return existing
         row = MemoryCandidateRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id="asuna",
             content=object_text,

@@ -486,7 +486,7 @@ def create_object(
             return None
         now = datetime.now()
         obj = WorldObject(
-            id=world_repository.new_object_id(category),
+            id=world_repository.new_object_id(),
             world_id=world.world_id,
             name=name,
             aliases=aliases or [],

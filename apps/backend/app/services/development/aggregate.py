@@ -13,7 +13,6 @@ DEV-002 注入「同 strength 取较新 Insight」的完整比较器。
 
 import logging
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -26,6 +25,7 @@ from app.models.development import (
     DevelopmentStyleParams,
 )
 
+from app.core import ids
 logger = logging.getLogger(__name__)
 
 STEP_NAME = "development_state"
@@ -338,7 +338,7 @@ def _apply_row(overlay: DevelopmentOverlay, row, value: dict, summary_parts: lis
 
 def _insert(session, user_id, character_id, proposal: dict, status: str, now: datetime):
     row = DevelopmentStateRow(
-        id=f"dev:{uuid.uuid4().hex}",
+        id=ids.new_id_str(),
         user_id=user_id,
         character_id=character_id,
         kind=proposal["kind"],
@@ -366,7 +366,7 @@ def _record_change(
 ):
     session.add(
         DevelopmentChangeRow(
-            id=f"devc:{uuid.uuid4().hex}",
+            id=ids.new_id_str(),
             development_state_id=state_id,
             before=before,
             after=after,

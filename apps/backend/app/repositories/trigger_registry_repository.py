@@ -8,12 +8,12 @@ followup 走 register + claim_due_followups 领取。所有迁移比较基于调
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 from typing import Sequence
 
 from sqlalchemy import or_
 
+from app.core import ids
 from app.core.db import SessionLocal, TriggerRegistryRow
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def register(
         if row is None:
             session.add(
                 TriggerRegistryRow(
-                    id=str(uuid.uuid4()),
+                    id=ids.new_id_str(),
                     user_id=user_id,
                     character_id=character_id,
                     trigger_type=trigger_type,
@@ -135,7 +135,7 @@ def register_and_claim(
         )
         if row is None:
             row = TriggerRegistryRow(
-                id=str(uuid.uuid4()),
+                id=ids.new_id_str(),
                 user_id=user_id,
                 character_id=character_id,
                 trigger_type=trigger_type,

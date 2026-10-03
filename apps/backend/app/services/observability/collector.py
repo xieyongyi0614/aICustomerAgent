@@ -1,12 +1,12 @@
 import json
 import logging
 import threading
-import uuid
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.core.settings import get_settings
+from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class TurnTraceSession:
     mode_meta: dict | None = None
     turn_id: str | None = None
     steps: list[TraceStep] = field(default_factory=list)
-    request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    request_id: str = field(default_factory=ids.new_id_str)
     created_at: datetime = field(default_factory=datetime.now)
     token_usage: dict = field(default_factory=dict)
     model_name: str | None = None
@@ -207,7 +207,7 @@ class TraceCollector:
 
     def begin_trace(self) -> TurnTraceSession:
         session = TurnTraceSession()
-        key = uuid.uuid4().hex
+        key = ids.new_id_str()
         with self._lock:
             self._pending[key] = session
         session._pending_key = key

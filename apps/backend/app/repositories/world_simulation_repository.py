@@ -1,11 +1,11 @@
 """V2.3.0 世界模拟仓储：daily_plans / user_situations 两表与时间推进锚点。"""
 
 import logging
-import uuid
 from datetime import date, datetime
 
 from sqlalchemy import select, update
 
+from app.core import ids
 from app.core.db import (
     DailyPlanRow,
     SessionLocal,
@@ -31,11 +31,11 @@ DAY_CYCLE_OBSERVATION_KEY = "day_cycle_observation"
 
 
 def new_plan_id() -> str:
-    return f"plan_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def new_situation_id() -> str:
-    return f"sit_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def _to_plan(row: DailyPlanRow) -> DailyPlan:

@@ -110,7 +110,7 @@ def test_decision_record_defaults():
         decision="act",
         reason="触发 conversation_inactivity",
     )
-    assert len(record.id) == 32
+    assert record.id.isdigit()
     assert record.outcome is None
     assert record.confidence is None
     assert isinstance(record.created_at, datetime)

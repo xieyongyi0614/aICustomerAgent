@@ -4,7 +4,6 @@
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import func

@@ -36,7 +36,10 @@ FROZEN_SOURCES: dict[str, str] = {
     # （四者固化常开，门控点展开）。原 3bdcd4f4 在首次改动前已 stale。
     # services 归位声明（2026-09-30，批次 2）：`character_assets` → `engines/character`
     # 导入路径变更 —— 非 TOOL-007 改脏。原值 c57307c7。
-    "app/application/world_engine.py": "f0ba90cbbdb068473a7890cd0c4c1e55d7f13eee17f04ab53c365e9a19c251fa",
+    # 雪花 ID 声明（2026-10-03，ADR-16 C3）：世界实体 id 生成由 `{category}_{uuid4[:8]}`
+    # （仅 32 位熵，10 万条记录碰撞概率 68.8%）改为雪花 —— 非 TOOL-007 改脏。
+    # 原值 f0ba90cb。
+    "app/application/world_engine.py": "3d462118b58ce05f061b39782c28c79bdbd2fbe9cb4d98c057ec3f8fca526c5a",
     "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。

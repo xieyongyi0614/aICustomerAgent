@@ -4,9 +4,9 @@ AGENT-005 接管后新增编译写入；本阶段除种子外任何写路径不�
 """
 
 import logging
-import uuid
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import PersonalityStateRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def seed_if_absent(
             bound = float(spec["bound"])
             session.add(
                 PersonalityStateRow(
-                    id=str(uuid.uuid4()),
+                    id=ids.new_id_str(),
                     user_id=user_id,
                     character_id=character_id,
                     axis=axis,

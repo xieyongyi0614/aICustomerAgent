@@ -1,10 +1,10 @@
 """V8.5 relationship_snapshots 仓储：关键帧快照，限频保留，回滚锚点。"""
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import delete, select
 
+from app.core import ids
 from app.core.db import RelationshipSnapshotRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.relationship import RelationshipSnapshot, RelationshipState
@@ -64,7 +64,7 @@ def create_snapshot(
     created_at = now or datetime.now()
     with SessionLocal() as session:
         row = RelationshipSnapshotRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id="asuna",
             version=version,

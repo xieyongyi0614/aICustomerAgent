@@ -15,7 +15,6 @@ import json
 import logging
 import re
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -31,6 +30,7 @@ from app.models.reflection import (
     TOOL_INSIGHT_SCOPES,
     ReflectionProposal,
 )
+from app.core import ids
 from app.prompts.reflection import build_evidence_block, build_reflection_messages
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import lifecycle as reflection_lifecycle
@@ -380,7 +380,7 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
     """单事务：INSERT insights + evidence_links + supersede 同主题旧 active + run→done。"""
     settings = get_settings()
     top = accepted[: settings.reflection_max_insights_per_run]
-    insight_ids = [f"ins:{uuid.uuid4().hex}" for _ in top]
+    insight_ids = [ids.new_id_str() for _ in top]
     weights = {member.memory_id: member.weight for member in provided}
     superseded: list[dict] = []
     created: list[dict] = []
@@ -418,7 +418,7 @@ def _persist(run, accepted: list, provided, now: datetime) -> list[str]:
             for memory_id in dict.fromkeys(resolved_ids):
                 session.add(
                     EvidenceLinkRow(
-                        id=f"evl:{uuid.uuid4().hex}",
+                        id=ids.new_id_str(),
                         insight_id=insight_id,
                         memory_id=memory_id,
                         weight=weights.get(memory_id, 0.0),

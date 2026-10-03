@@ -1,10 +1,10 @@
 """V8.5 relationship_milestones 仓储：一次性里程碑，unique 幂等。"""
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import select
 
+from app.core import ids
 from app.core.db import RelationshipMilestoneRow, SessionLocal
 from app.models.relationship import MilestoneRecord, RelationshipDelta
 
@@ -97,7 +97,7 @@ def create_milestone(
         if exists is not None:
             return None
         row = RelationshipMilestoneRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id="asuna",
             milestone_key=milestone_key,

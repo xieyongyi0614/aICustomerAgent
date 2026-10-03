@@ -45,7 +45,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # services 归位批次 4（2026-09-30）：再由 services/memory/policy.py 归位至
     # engines/memory_policy.py，内容仍逐字节未变（摘要不变），仅键路径更新。
     "app/engines/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
-    "app/repositories/memory_repository.py": "9d65bc168e84743efd9fc7083907303a8a7534835de862bd5e57dbb00c5602ac",
+    # 雪花 ID 声明（2026-10-03，ADR-16 C3）：记忆 id 生成由 `str(uuid4())` 改为雪花
+    # —— 非 TOOL-008 改脏。原值 9d65bc16。
+    "app/repositories/memory_repository.py": "eb001f3ebdf6544e8aefd16a19beac876ebeaebbfb18bf6bb364f71cef252f3e",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`

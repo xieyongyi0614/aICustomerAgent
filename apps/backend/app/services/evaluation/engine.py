@@ -8,7 +8,6 @@ import asyncio
 import hashlib
 import logging
 import time
-import uuid
 from datetime import datetime
 
 from app.chains import evaluation_judge_chain
@@ -28,6 +27,7 @@ from app.models.evaluation import (
     overall_score_from,
 )
 from app.repositories import evaluation_repository
+from app.core import ids
 from app.services.evaluation import rules as evaluation_rules
 from app.services.evaluation.context import (
     EvaluationContext,
@@ -149,7 +149,7 @@ def finalize_report(
     weights = settings.evaluation_overall_weights(subject.value)
     overall = overall_score_from(scores, weights) if subject != EvaluationSubjectKind.OFFLINE_BATCH else None
     report = EvaluationReport(
-        id=uuid.uuid4().hex,
+        id=ids.new_id_str(),
         subject=subject,
         subject_id=context.subject_id,
         session_id=context.session_id,

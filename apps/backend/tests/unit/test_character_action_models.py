@@ -226,7 +226,7 @@ class TestDedupeKey:
     def test_make_action_id(self):
         id1 = make_action_id()
         id2 = make_action_id()
-        assert id1.startswith("wa_")
+        assert id1.isdigit()
         assert id1 != id2
 
 

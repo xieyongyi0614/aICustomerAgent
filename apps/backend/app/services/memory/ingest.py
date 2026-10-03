@@ -7,7 +7,6 @@ hypothetical（仍入库但不进长期检索）；瞬时动作短语 → 不产
 """
 
 import logging
-import uuid
 from datetime import datetime
 
 from app.core.db import MemoryCandidateRow, SessionLocal
@@ -15,6 +14,7 @@ from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
 from app.services.action.memory_bridge import has_memory_effect, to_memory_candidates
 from app.services.relationship.milestone import MILESTONES
+from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def create_candidate(
         if existing is not None:
             return existing
         row = MemoryCandidateRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id=character_id,
             content=content,

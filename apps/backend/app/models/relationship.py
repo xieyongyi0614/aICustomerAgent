@@ -1,9 +1,9 @@
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Literal
 
 from pydantic import BaseModel, Field
+from app.core import ids
 
 RelationshipStage = Literal["stranger", "friend", "close_friend", "partner"]
 
@@ -88,7 +88,7 @@ class RelationshipDelta(BaseModel):
 
 
 class RelationshipEvent(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     user_id: str
     character_id: str = "asuna"
     session_id: str
@@ -112,7 +112,7 @@ class MilestoneSpec:
 
 
 class MilestoneRecord(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     user_id: str
     character_id: str = "asuna"
     milestone_key: str
@@ -125,7 +125,7 @@ class MilestoneRecord(BaseModel):
 
 
 class ConflictRecord(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     user_id: str
     character_id: str = "asuna"
     status: ConflictStatus
@@ -139,7 +139,7 @@ class ConflictRecord(BaseModel):
 
 
 class RelationshipSnapshot(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     user_id: str
     character_id: str = "asuna"
     version: int = 0

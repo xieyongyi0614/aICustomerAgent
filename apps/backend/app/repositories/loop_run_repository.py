@@ -5,9 +5,9 @@ finish 落终态与汇总。全部写入单事务、幂等键为 run_id 本身�
 """
 
 import logging
-import uuid
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import LoopRunRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ def create_run(
 ) -> LoopRunRow:
     now = _now(now)
     run = LoopRunRow(
-        id=str(uuid.uuid4()),
+        id=ids.new_id_str(),
         user_id=user_id,
         kind=kind,
         run_kind=run_kind,

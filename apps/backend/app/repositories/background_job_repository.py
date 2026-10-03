@@ -4,11 +4,11 @@
 """
 
 import logging
-import uuid
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import ids
 from app.core.db import BackgroundJobRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def enqueue_job(
             return False
         session.add(
             BackgroundJobRow(
-                id=str(uuid.uuid4()),
+                id=ids.new_id_str(),
                 job_type=job_type,
                 payload=payload,
                 status="pending",

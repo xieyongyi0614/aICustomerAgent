@@ -7,7 +7,6 @@
 import asyncio
 import logging
 import time
-import uuid
 from datetime import datetime
 from typing import AsyncIterator
 
@@ -19,6 +18,7 @@ from app.chains import (
     turn_analysis_chain,
 )
 from app.core.logutils import content_preview
+from app.core import ids
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -356,7 +356,7 @@ def _ephemeral_run_context(user_id: str, session_id: str | None) -> RunContext:
     但回退路径零台账写入、零运行时事件，行为等价于收编前的线性链。
     """
     return RunContext(
-        run_id=f"ephemeral:{session_id or user_id}:{uuid.uuid4().hex}",
+        run_id=f"ephemeral:{session_id or user_id}:{ids.new_id_str()}",
         user_id=user_id,
         run_kind=RUN_KIND_FOREGROUND_CHAT,
         trigger_type=TRIGGER_CHANNEL_MESSAGE,

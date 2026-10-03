@@ -1,6 +1,5 @@
 import json
 import logging
-import uuid
 
 import openai
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -20,6 +19,7 @@ from app.services.tool.step_events import (
     reset_tool_step_sink,
 )
 
+from app.core import ids
 chat_router = APIRouter()
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ async def chat_message(
 ):
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content 不能为空")
-    session_id = body.session_id or str(uuid.uuid4())
+    session_id = body.session_id or ids.new_id_str()
     new_session = body.session_id is None
     track_event("chat_message", session_new=new_session)
     profile_id = body.profile_id or request.headers.get("x-llm-profile")

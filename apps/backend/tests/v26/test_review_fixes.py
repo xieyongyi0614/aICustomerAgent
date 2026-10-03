@@ -168,4 +168,4 @@ class TestPlanningBridgeFlagOn:
         record = asyncio.run(bridge._dispatch(Goal(), intent))
         assert record is not None
         assert record.source == "plan"
-        assert record.id.startswith("act_")
+        assert record.id.isdigit()

@@ -1,10 +1,10 @@
-import uuid
 from datetime import datetime
 from typing import Literal, get_args
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.tool import TOOL_EFFECT_KINDS, TOOL_EFFECT_KIND_VALUES
+from app.core import ids
 
 GoalType = Literal["user_care", "relationship", "conversation", "scene"]
 
@@ -155,7 +155,7 @@ class GoalSeed(BaseModel):
 
 
 class GoalRecord(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     user_id: str
     character_id: str = "asuna"
     type: GoalType
@@ -337,7 +337,7 @@ class GoalPlanRecord(BaseModel):
     4 个字段全部带默认值，故旧 JSON / 旧构造调用解析结果不变。
     """
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=ids.new_id_str)
     goal_id: str
     version: int = Field(ge=1)
     status: GoalPlanStatus = "draft"

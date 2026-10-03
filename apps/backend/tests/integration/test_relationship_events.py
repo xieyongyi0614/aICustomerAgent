@@ -65,7 +65,7 @@ class TestRelationshipEventModel:
         event = make_event()
         assert event.source == "conversation"
         assert event.character_id == "asuna"
-        assert len(event.id) == 36
+        assert event.id.isdigit()
 
     def test_invalid_source_rejected(self):
         with pytest.raises(ValidationError):

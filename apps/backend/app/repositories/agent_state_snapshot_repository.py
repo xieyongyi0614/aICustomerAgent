@@ -1,8 +1,8 @@
 """agent_state_snapshots 仓储（AGENT-002）：时点存档 + 保留期清理。投影存档，非真相源。"""
 
-import uuid
 from datetime import datetime, timedelta
 
+from app.core import ids
 from app.core.db import AgentStateSnapshotRow, SessionLocal
 
 
@@ -55,7 +55,7 @@ def save(
 ) -> AgentStateSnapshotRow:
     now = now or datetime.now()
     row = AgentStateSnapshotRow(
-        id=str(uuid.uuid4()),
+        id=ids.new_id_str(),
         run_id=run_id,
         user_id=user_id,
         character_id=character_id,

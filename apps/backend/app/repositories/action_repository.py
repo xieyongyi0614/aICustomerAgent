@@ -1,12 +1,12 @@
 """V9 action_records + V2.6.0 action_schedules 仓储（模块级函数仓储惯例）。"""
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.core import ids
 from app.core.db import ActionRecordRow, ActionScheduleRow, OutboxEventRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.action import ActionRecord, ActionSchedule
@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def new_record_id() -> str:
-    return f"act_{uuid.uuid4().hex[:8]}"
+    return ids.new_id_str()
 
 
 def new_schedule_id() -> str:
-    return f"sch_{uuid.uuid4().hex[:8]}"
+    return ids.new_id_str()
 
 
 def _to_record(row: ActionRecordRow) -> ActionRecord:
@@ -276,7 +276,7 @@ def save_record_with_outbox(
             _record_upsert(row, record, now)
         session.add(
             OutboxEventRow(
-                id=str(uuid.uuid4()),
+                id=ids.new_id_str(),
                 event_type="action_result",
                 payload=outbox_payload,
                 idempotency_key=idempotency_key,

@@ -22,7 +22,6 @@ PLAN-010 §4.1.3 ②：追加计划效能证据源（`CHANNEL_PLAN`）。**本�
 
 import logging
 import time
-import uuid
 from datetime import datetime, timedelta
 
 from app.core.db import Memory, ReflectionRunRow, SessionLocal
@@ -32,6 +31,7 @@ from app.models.reflection import (
     EVIDENCE_CHANNEL_PLAN,
     EVIDENCE_CHANNEL_TOOL,
 )
+from app.core import ids
 from app.repositories import background_job_repository
 from app.services.reflection import evidence as reflection_evidence
 from app.services.memory import job_worker as memory_job_worker
@@ -586,7 +586,7 @@ def _day_bucket_key(user_id: str, now: datetime) -> str:
 
 
 def _new_run_id() -> str:
-    return f"{_RUN_ID_PREFIX}:{uuid.uuid4().hex}"
+    return f"{_RUN_ID_PREFIX}:{ids.new_id_str()}"
 
 
 def _record_run(

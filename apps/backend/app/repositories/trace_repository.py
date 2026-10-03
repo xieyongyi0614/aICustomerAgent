@@ -4,9 +4,9 @@
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
+from app.core import ids
 from app.core.db import RuntimeTraceRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import RuntimeTrace, TraceEvent, TraceKind, TraceStep
@@ -164,4 +164,4 @@ def prune_before(cutoff: datetime) -> int:
 
 
 def new_trace_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()

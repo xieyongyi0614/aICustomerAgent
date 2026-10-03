@@ -6,7 +6,6 @@ subject=offline_batch 单行（overall 为 NULL），聚合派生不建表。
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from app.core.settings import get_settings
@@ -22,6 +21,7 @@ from app.repositories import (
     memory_repository,
     proactive_repository,
 )
+from app.core import ids
 from app.services.evaluation import engine as evaluation_engine
 from app.services.evaluation import rules as evaluation_rules
 from app.services.evaluation.context import (
@@ -195,7 +195,7 @@ def _aggregate(results: list[dict], user_id: str, settings) -> dict:
     }
     proactive_stats = _proactive_outcome_stats(user_id, settings)
     return {
-        "run_id": uuid.uuid4().hex,
+        "run_id": ids.new_id_str(),
         "turns_evaluated": len(results),
         "mean_scores": mean_scores,
         "verdict_distribution": verdict_distribution,

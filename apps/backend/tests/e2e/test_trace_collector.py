@@ -194,7 +194,7 @@ async def test_debug_trace_endpoint_unknown_404_then_snapshot(
 
 def test_trace_has_request_id_and_usage_accumulation():
     session = TurnTraceSession()
-    assert len(session.request_id) == 32
+    assert session.request_id.isdigit() and len(session.request_id) >= 16
     session.add_token_usage({"input_tokens": 10, "output_tokens": 5})
     session.add_token_usage({"input_tokens": 7, "output_tokens": 3})
     assert session.token_usage == {"input_tokens": 17, "output_tokens": 8}

@@ -104,7 +104,8 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # `decision_pipeline` → `engines/decision` 导入路径变更 —— 非 TOOL-010 改脏。
     # 原值 4aec8e65、ea741a87、9054ce0d。
     # 反向依赖清理声明（2026-09-30）：`active_generations` 下沉 `core/runtime_state` 导入路径变更。
-    "app/application/chat_pipeline.py": "4d98f5d7609b9ad7b590368fa3dc7472f6fd25a4a26affbee586d69504f2a49d",  # 再冻结：grounding 门控去掉 enabled 判断
+    # ID 体系收敛声明（2026-10-03，C3）：`uuid4()` 默认主键改 `ids.new_id_str()`（ADR-16）—— 非 TOOL-010 改脏。
+    "app/application/chat_pipeline.py": "6571ef69580e4179140dd4d65fdd19e2039f843b80f0d19ff948c943320dbdec",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
