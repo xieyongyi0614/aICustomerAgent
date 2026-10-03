@@ -4,6 +4,13 @@
 > 用途：真实模型环境下的人工验收执行单；每条含 **前置 / 操作 / 期望 / 观测点**。
 > 状态：待执行（执行结论回写本文件末尾「执行记录」区）。
 > 配套自动化：`apps/backend/tests/v23/test_ws019_acceptance.py`（CI 可跑部分）。
+>
+> **口径说明（vXX_ 开关体系收官，2026-09-19）**：原 7 个 v23 Flag（`world_simulation_enabled` /
+> `time_advance_enabled` / `daily_life_enabled` / `event_detection_enabled` / `scene_expansion_enabled` /
+> `world_llm_assist_enabled` / `debug_tick_enabled`）已随批次 4 固化常开并删除（`habit_time_enabled`
+> 更早于第 0 步删除）；世界模拟**恒常开**，主闸 `world_enabled` 亦已于 2026-09-28 退役
+> （`remaining-flag-audit.md` E.8）。本清单按收官后语义编写；下文「总闸 / 子闸 / 启用链 / Flag 关」
+> 表述视为 V2.3.0 设计期坐标，不再对应可配置项。回退方式 = `git revert`（无 env 回退路径）。
 
 ---
 
@@ -11,11 +18,10 @@
 
 | 项 | 说明 |
 |---|---|
-| Flag 默认态 | 全部 v23 Flag 默认 off；回归时按 **§8.4 启用链** 逐组开启，每组观察后再开下一组 |
-| 启用顺序 | `v23_world_simulation_enabled`（总闸）→ `v23_time_advance_enabled` → `v23_daily_life_enabled` → `v23_event_detection_enabled` → `v23_scene_expansion_enabled` / `v23_habit_time_enabled` → `v23_world_llm_assist_enabled` |
-| 调试面板 | 前端调试控制台 **World** Tab（WS-018）必须可用；总闸关时显示「世界模拟未启用」空态 |
-| 时钟控制 | `WORLD_TIME_MODE=simulated` + `WORLD_SIM_RATE` 控制推进倍率；`V23_DEBUG_TICK_ENABLED=true` 时面板「手动 tick」按钮可用，可单步推进 |
-| 调试端点 | `GET /api/v1/debug/world/simulation`、`/plan`、`/situations`；`POST /debug/world/simulation/tick` |
+| Flag 状态 | **无需配置**：世界模拟恒常开（全部 v23 Flag 已删除）；主闸 `world_enabled` 亦已退役 |
+| 时钟控制 | `WORLD_TIME_MODE=simulated` + `WORLD_SIM_RATE` 控制推进倍率；调试面板「手动 tick」按钮**恒可用**（`debug_tick_enabled` 已删） |
+| 调试面板 | 前端调试控制台 **World** Tab（WS-018）必须可用 |
+| 调试端点 | `GET /api/v1/debug/world/simulation`、`/plan`、`/situations`；`POST /debug/world/simulation/tick`（**恒可见，无 `enabled=false` 空态与 403**） |
 | 观测三件套 | ① 调试端点 JSON ② prompt trace（`runtime_traces` 的 `world_context` 步骤）③ 库断言（下节 SQL） |
 
 库断言速查（SQLite/PG 通用）：
@@ -37,7 +43,7 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 ## 2. 节律组（时间 / 天气 / 日循环）
 
 ### R-2.1 simulated 模式时间推进
-- **前置**：总闸 + `time_advance` 开；`WORLD_TIME_MODE=simulated`，`WORLD_SIM_RATE=60`。
+- **前置**：`WORLD_TIME_MODE=simulated`，`WORLD_SIM_RATE=60`（世界模拟恒常开）。
 - **操作**：等待 ≥1 个 `world_sim_interval_seconds`（默认 60s），或点「手动 tick」。
 - **期望**：`worlds.sim_time` 按真实流逝 × rate 前进；`sim_last_advanced_at` 更新；单次跨度不超过 `sim_advance_max_minutes`。
 - **观测点**：调试端点 `time_context.now`；`worlds.sim_time` / `sim_last_advanced_at`。
@@ -49,13 +55,13 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 - **观测点**：`time_context`；`advanced_minutes == 0`（tick 结果）。
 
 ### R-2.3 日循环标记
-- **前置**：总闸 + `time_advance`；跨过一次 `day_start`（或用调试时钟）。
+- **前置**：跨过一次 `day_start`（或用调试时钟）。
 - **操作**：触发 tick。
 - **期望**：`world_events` 出现 `time_marker`（`time:day_start:<date>`）；同一日重复 tick 不重复落库（幂等键去重）。
 - **观测点**：`/debug/world/simulation` 的 `recent_events`；库断言 `idempotency_key` 唯一。
 
 ### R-2.4 时段跃迁与天气演化
-- **前置**：总闸 + `time_advance`；跨过一次 `part` 边界。
+- **前置**：跨过一次 `part` 边界。
 - **操作**：推进时钟跨越 morning→noon。
 - **期望**：出现 `time:part:<date>:<part>` 标记；当日天气按季节转移表演化，出现 `weather_change` 事件（若变化）。
 - **观测点**：`recent_events` 中 `time_marker` / `weather_change`；`worlds.environment.weather`。
@@ -70,7 +76,7 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 ## 3. 生活组（日程 / 位置）
 
 ### R-3.1 当日计划生成
-- **前置**：总闸 + `time_advance` + `daily_life`；清空当日 `daily_plans`。
+- **前置**：清空当日 `daily_plans`。
 - **操作**：触发 tick。
 - **期望**：按 `ROUTINE_ASSET` 生成当日块（`seq` 连续、时段/时间窗/location 合法）；变化源标注 `fixed` / `variant` / `user_influenced`。
 - **观测点**：`/debug/world/plan`；库断言 `daily_plans`。
@@ -96,7 +102,7 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 ## 4. 事件组（处境 / 桥接 / 升级 / 提醒）
 
 ### R-4.1 确定性处境检出
-- **前置**：总闸 + `event_detection`。
+- **前置**：无（确定性检出恒开）。
 - **操作**：发消息「我今天感冒了，头疼」。
 - **期望**：`user_situations` 新增 `health` active 处境（intensity 4）；`world_events` 出现 `user_condition`（kind=detected）。
 - **观测点**：`/situations`；库断言。
@@ -113,7 +119,7 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 - **观测点**：同 R-4.2。
 
 ### R-4.4 LLM 辅助检出
-- **前置**：总闸 + `event_detection` + `llm_assist`；`V23_LLM_ASSIST_SAMPLE_RATE=1.0`。
+- **前置**：`LLM_ASSIST_SAMPLE_RATE=1.0`（提高采样率以便观察；该调参保留，门控已删）。
 - **操作**：发一条确定性规则不命中的隐含处境消息（如「明天要交的活儿还没动」）。
 - **期望**：可能新增处境，`source=llm_assist`；LLM 失败时静默降级、不影响回复。
 - **观测点**：`/situations` 的 `source`；trace 中仍 0 中断。
@@ -124,13 +130,13 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 - **观测点**：`recent_events`；`character_goals` 写路径仍由 goal_service 负责。
 
 ### R-4.6 Escalation 升级白名单
-- **前置**：总闸 + `event_detection`。
+- **前置**：无。
 - **操作**：产出 `user_condition` / `weather_change` / `calendar_event` 事件。
 - **期望**：命中白名单 → 升级为完整 Run；白名单外事件不升级（预闸 0 LLM）。
 - **观测点**：`loop_runs` / outbox 投递；`escalation_whitelist()` 返回值。
 
 ### R-4.7 主动提醒全链（World → Event → Autonomy → Goal → Action）
-- **前置**：全开（含 `daily_life` / `event_detection`）。
+- **前置**：无（全链恒开）。
 - **操作**：制造降温（`weather_change`，`next=rain`，`changed=true`），进入合适的时段（如 evening 在家）。
 - **期望**：EventImpactRules 给出 `care_relevance≥0.7` + `goal_opportunity(user_care/remind_weather)`；决策管线产出 `world_affordance` 候选；目标层写 L1 `origin=world_event`；主动消息两阶段投递。
 - **观测点**：`collect_facts` 的 `impacts`；trace 决策候选；`character_goals`（`origin=world_event`）；投递记录。
@@ -140,30 +146,30 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 ## 5. 消费组（prompt / 风格 / 习惯 / 记忆）
 
 ### R-5.1 WorldBrief 入 prompt
-- **前置**：总闸开。
+- **前置**：无。
 - **操作**：发一轮对话，抓 prompt。
 - **期望**：`【当前世界】` 段含 brief 行（时间/地点/处境/事件），预算 `world_brief_char_budget=400` 内；与 `/simulation` 的 `brief.text` 同源。
 - **观测点**：`runtime_traces.world_context` 步骤的 prompt 快照；`/simulation`。
 
 ### R-5.2 预算提升（场景档）
-- **前置**：`v23_world_simulation_enabled` 开。
-- **期望**：world 上下文预算由 600 提升至 `world_context_char_budget_v23=1000`；总闸关时回到 600 且无 brief 段。
+- **前置**：无。
+- **期望**：world 上下文预算取 `world_prompt_char_budget=1000`（约束 prompt 世界段渲染预算；原后缀式版本名 `world_context_char_budget_v23` 已在批次 8 改名）。
 - **观测点**：prompt 段长度对比。
 
 ### R-5.3 场景风格差异
-- **前置**：`scene_expansion` 开。
+- **前置**：无（场景投影恒开）。
 - **操作**：分别在「家/客厅」「安静书房」等场景对话。
 - **期望**：场景 `tone_bias` / `topic_affordances` 影响表达与话题面；**不改变** StyleContract 硬约束优先级。
 - **观测点**：风格段；`forbidden` / `principles` 与 Persona 一致。
 
 ### R-5.4 习惯时间命中
-- **前置**：`habit_time` 开。
+- **前置**：无（时间维度习惯恒开）。
 - **操作**：在 sleep/meal 等时间窗内触发对应习惯场景。
 - **期望**：时间维度习惯被命中（0 LLM 规则匹配）；上限仍 `HABIT_MAX_COUNT=2`。
 - **观测点**：风格段 `习惯：...` 行。
 
 ### R-5.5 记忆沉淀与反思证据
-- **前置**：总闸开。
+- **前置**：无。
 - **操作**：让模拟事件（处境/天气/日程）落库，走记忆桥。
 - **期望**：低重要度事件被评估器自然过滤，世界连续但记忆不被噪声淹没；反思证据可追溯到 `world_events`。
 - **观测点**：记忆候选 / 反思记录；溯源链。
@@ -173,7 +179,7 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 ## 6. 韧性组（追赶 / 风暴 / 回退）
 
 ### R-6.1 长离线追赶（≤7 天）
-- **前置**：总闸 + `daily_life`；模拟时钟落后 3 天。
+- **前置**：模拟时钟落后 3 天。
 - **操作**：触发 tick。
 - **期望**：逐日折叠 `day_summary`（`time:day_summary:<date>`），不重放每个 part 跃迁；今日边界正常处理。
 - **观测点**：`recent_events`；库断言幂等键。
@@ -190,10 +196,11 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 - **期望**：保留高重要度前 cap-1 条，其余折叠为一条 `world_digest`；单 tick 事件总数 ≤ cap。
 - **观测点**：`recent_events` 数量与 `world_digest`。
 
-### R-6.4 Flag 逐闸回退
-- **操作**：从全开逐级关闭子闸，每关一档观察。
-- **期望**：关到「总闸 off」时，prompt / 维护步序列 / 事件产出与 **V2.2.0 基线逐字节一致**；调试端点返回 `{"enabled": false}`。
+### R-6.4 回退演练（替代原「Flag 逐闸回退」）
+- **操作**：`git revert` 批次 4 的「app 去门控」提交（v23 批）并重启。
+- **期望**：回退后 prompt / 维护步序列 / 事件产出与 **V2.2.0 基线逐字节一致**；调试端点恢复 `{"enabled": false}` 空态语义。
 - **观测点**：prompt 快照 diff 为空；`loop_runs` 步骤序列；`/simulation`。
+- **说明**：门控已删，**无 env 逐闸回退路径**；回退粒度 = 整批 `git revert`。
 
 ### R-6.5 迁移可逆放
 - **操作**：`alembic downgrade 0043` → `upgrade head`。
@@ -208,10 +215,10 @@ SELECT type, title, source, status, idempotency_key FROM world_events
 |---|---|---|---|
 | 1 | 事件唯一 SoT = `world_events` | 全局搜索事件表；库断言 | 无第二事件存储 |
 | 2 | 世界写面受限 | 写域扫描（模拟路径对 `character_state` / `personality_state` / `relationship_*` / `character_goals` 零直写） | 扫描零违规 |
-| 3 | 默认路径 0 LLM | 关闭 `llm_assist`，观察 LLM 调用记录 | 模拟路径调用数 = 0 |
+| 3 | 默认路径 0 LLM | 将 `LLM_ASSIST_SAMPLE_RATE=0`，观察 LLM 调用记录 | 模拟路径确定性分支调用数 = 0 |
 | 4 | 随机性可复现 | 同日重建计划两次 | 结果一致（显式种子） |
 | 5 | `scene_state`(V3) 语义零改动 | diff / 行为对照 | 读写语义不变 |
-| 6 | Flag 全 off 逐字节一致 | prompt 快照 / `loop_runs` 序列 diff | diff 为空 |
+| 6 | 回退后逐字节一致 | `git revert` 批次 4 后 prompt 快照 / `loop_runs` 序列 diff | diff 为空 |
 | 7 | 有界：时间跨度上限 / 单 tick 事件上限 / 长离线折叠 | R-2.1 / R-6.2 / R-6.3 | 均生效 |
 | 8 | WorldBrief/场景档只增输入 | StyleContract `forbidden` / `principles` 对照 | 产生权不变 |
 

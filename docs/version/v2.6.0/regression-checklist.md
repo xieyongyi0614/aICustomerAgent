@@ -4,6 +4,16 @@
 > 用途：版本发布判据 + 真实模型人工回归执行单
 > 配套自动化：`apps/backend/tests/v26/`（实现期建立）
 > 状态：自动化验收完成（`test_acceptance.py` 23 项全绿；见 `acceptance-report.md`）；真实模型人工回归待执行
+>
+> **口径说明（vXX_ 开关体系收官，2026-09-19）**：原 `v26_*` Flag 已全部处理——
+> 第 0 步删 2 个死开关（`action_abstraction_enabled` / `action_multistep_enabled`，`app/` 零读取），
+> 批次 7 固化常开并删除 5 个门控（`action_execution_enabled` / `action_scheduler_enabled` /
+> `action_result_enabled` / `action_feedback_enabled` / `action_debug_enabled`）。
+> 行动执行层**恒常开**；`enablement.py`（含 v26 段）已删除（批次 8），基闸 `action_enabled` 亦已于
+> 2026-09-19 退役（H.15），动作引擎**无条件常开**。
+> 行动域经**裁决 B** 采用「**工具绑定优先路由**」：`ActionExecutor.run` 先经 `tool_resolver` 解析绑定，
+> 解析出绑定（含 internal 类）一律走工具五段（权限→确认→校验→调用→归一）；解析不出才按
+> `ACTION_EXECUTION_MAP` 落位。本清单按收官后语义编写；下文「总闸 / 子闸 / 启用链」表述视为设计期坐标。
 
 ---
 
@@ -12,9 +22,9 @@
 | 项 | 说明 |
 |---|---|
 | 版本 | V2.6.0 Action Execution System（TASK-001 ~ TASK-009） |
-| 迁移链头 | 实现期确认（V2.5.0 为 0046；本版本 + 1 = 0047，含 `action_schedules` 表 + `action_records.priority` 列） |
-| Flag 默认态 | 6 个 `v26_*` 全 off（总闸 `v26_action_execution_enabled` + 五子闸） |
-| 回滚路径 | 全部 `v26_*` 置 off 即回到 V2.5.0 行为（逐字节一致） |
+| 迁移链 | 本版本新增 1 revision（`action_schedules` 表 + `action_records.priority` 列）；链头以 `tests/support/schema_pins.py::MIGRATION_HEAD` 为准（当前 `0005`；V2.6.0 当时的绝对头号 `0047` 已随 2026-09-29 基线折叠作废） |
+| Flag 状态 | **无需配置**：行动执行层常开；基闸 `action_enabled` 亦已退役（动作引擎无条件常开） |
+| 回退方式 | 无 env 回退路径（门控已删）——**回退 = `git revert` 对应批次提交** |
 | 自动化入口 | `uv run pytest tests/v26 -q`（Focused）→ `tests/v25` 工具侧回归 |
 
 ---
@@ -37,32 +47,24 @@
 
 ---
 
-## 3. Flag 矩阵清单
+## 3. 策略位与门控现状（收官后）
 
-| # | Flag | 默认 | 依赖 |
-|---|---|---|---|
-| 1 | `v26_action_execution_enabled` | off | 总闸 |
-| 2 | `v26_action_abstraction_enabled` | off | 总闸 |
-| 3 | `v26_action_scheduler_enabled` | off | 总闸 |
-| 4 | `v26_action_multistep_enabled` | off | 总闸 |
-| 5 | `v26_action_result_enabled` | off | 总闸 |
-| 6 | `v26_action_feedback_enabled` | off | 总闸 |
+> 原 §3「Flag 矩阵清单（6 项）」与「串行链」已随批次 7 删除——5 个门控字段不复存在，
+> `enablement.py` 的 v26 段与 `action_execution.py` 的 `V26_MASTER_FLAG` / `V26_SUB_FLAGS` /
+> `validate_action_chain` 已删；基闸 `action_enabled` 亦于 H.15 退役。
+> **收官后 `Settings` 中已无 `action_*_enabled` 类门控**，行动执行层无条件常开。
 
-### 串行链（architecture §10.8）
+| 项 | 状态 |
+|---|---|
+| 门控字段 | **0 个**（5 个已固化删除 + 2 个死开关第 0 步已删 + 基闸 `action_enabled` 退役） |
+| 保留调参 | `action_schedule_default_priority`（默认 100）等；`validate_action_chain` 删除后其 `>= 0` 校验按 `validate_plan_config` 同款保留 |
+| 维护步挂载 | `life_loop._run_maintenance` 的 `action_schedule` 步**自动生效**（F.13 裁决：挂维护步，不进 `autonomous_tick` Profile） |
 
-| # | 链 | 违规表现 |
-|---|---|---|
-| ① | 任一 v26 子闸 ⇒ 总闸 | 启动 fail-fast，中文理由 |
-| ② | 总闸 ⇒ `action_enabled`（V9 既有） | 同上 |
-| ③ | scheduler ⇒ 总闸 | 同上 |
-| ④ | result（旧读键退役）⇒ 总闸 AND 全量测试通过 | 同上 |
-| ⑤ | feedback ⇒ 总闸 | 同上 |
+### 回退演练（替代原「总闸 off 三重对照」）
 
-### 总闸 off 三重对照
-
-1. prompt 与 V2.5.0 逐字节一致（`FROZEN_PROMPT_DIGEST`）
-2. `action_engine.run_action_planning` 原路径生效（单步、自由 payload、旧读键生效）
-3. `life_loop` 维护步骤序列零差异（`action_schedule` 步不注册）
+门控已删，**回退 = `git revert` 批次 7 的「app 去门控」提交**（`0beb427`）。回退后：
+prompt 与 V2.5.0 逐字节一致（`FROZEN_PROMPT_DIGEST`）、`action_engine.run_action_planning` 原路径生效
+（单步、自由 payload、旧读键生效）、`life_loop` 维护步骤序列零差异（`action_schedule` 步不注册）。
 
 ---
 
@@ -78,7 +80,7 @@
 | **G-RESULT** | ActionResult 统一契约；旧读键退役（双写窗口）；四类结果 | `test_task006_result.py` + `test_v26_step_result_contract.py` |
 | **G-INTEGRATE** | Planning/World/Relationship/Memory 四路接线；反馈闭环；职责不重叠 | `test_task007_integration.py` + `test_v26_feedback_consumers.py` |
 | **G-OBSERVE** | 七日志事件 + 五指标；零新建指标表 | `test_task008_api.py` |
-| **G-COMPAT** | Flag 全 off：prompt 逐字节一致；既有测试零修改；原路径生效 | `test_acceptance.py` + `test_task009_validation.py` |
+| **G-COMPAT** | 回退后 prompt 逐字节一致；既有测试零修改；原路径生效 | `test_acceptance.py` + `test_task009_validation.py` |
 
 ---
 
@@ -127,7 +129,7 @@
 3. **世界唯一写面**：Action 层零直写 `world_engine`，经 `deferred_world_op` → outbox。
 4. **记忆政策零豁免**：执行结果进记忆经 `memory_policy` R1~R8。
 5. **工具治理不绕过**：`execute_tool` 经 `ToolExecutor` 五段短路，零直调 `Capability.execute`。
-6. **Flag 全 off 逐字节一致**：prompt + 行为快照 + 维护步骤序列。
+6. **回退后逐字节一致**：prompt + 行为快照 + 维护步骤序列（回退 = `git revert`，非 env 切换）。
 
 ---
 
@@ -139,6 +141,7 @@
 - [x] TASK-009 四类测试 + Flag 矩阵 + 本清单自动化落地（V2.6.0 + V2.6.1 补齐真实文件名）
 - [x] V2.6.1 P0：结果全形态 / 调度执行 / 反馈闭环 / 来源语义 / 恢复终态
 - [x] V2.6.1 P1：Flag 治理、退避守卫、`plan_step` 溯源、`run_id` 列、多步 RESERVED、文档对齐
-- [ ] 旧读键退役：Flag on 且全量测试通过后，退役 `world_event_id` / `memory_id` / `failure_kind` 旧位置（architecture §14 R2）
+- [x] 裁决 B（工具绑定优先路由）：internal 动作保有工具五段保障（批次 7，`90bda4c`）
+- [ ] 旧读键退役：全量测试通过后，退役 `world_event_id` / `memory_id` / `failure_kind` 旧位置（architecture §14 R2）
 - [ ] 真实模型人工回归（本清单 §2 人工补充项）
 - [ ] P2 残留：`action_engine` 分层拆分、Queue/Worker 化、多角色就绪、多步真正交付（非 RESERVED）
