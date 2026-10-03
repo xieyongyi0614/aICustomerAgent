@@ -93,7 +93,6 @@ def upgrade() -> None:
                 "id",
                 existing_type=sa.Integer(),
                 type_=sa.BigInteger(),
-                autoincrement=False,
             )
 
 
