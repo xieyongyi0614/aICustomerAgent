@@ -12,6 +12,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import ids
 from app.core.db import FeishuDeliveryRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 def claim(key: str, delivered_at: datetime, expired_before: datetime) -> bool:
     """占位一个幂等键；返回 True 表示本次为**首次**投递。"""
-    row = FeishuDeliveryRow(idempotency_key=key, delivered_at=delivered_at)
+    row = FeishuDeliveryRow(
+        id=ids.new_id_str(), idempotency_key=key, delivered_at=delivered_at
+    )
     try:
         with SessionLocal() as session:
             session.query(FeishuDeliveryRow).filter(

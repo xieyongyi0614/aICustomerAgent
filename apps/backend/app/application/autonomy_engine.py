@@ -679,32 +679,34 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
             signal=signal,
             snapshot=snapshot,
             user_id=user_id,
-            session_id=conversation.id,
+            session_id=conversation.session_id or conversation.id,
         )
         observability.on_turn_finished(
             trace,
             turn_id=None,
             user_id=user_id,
-            session_id=conversation.id,
+            session_id=conversation.session_id or conversation.id,
             kind=TraceKind.AUTONOMY_TICK,
             drain_background=False,
         )
         return None
 
-    produced_action = await _produce_autonomy_action(verdict, user_id, conversation.id, now)
+    produced_action = await _produce_autonomy_action(
+        verdict, user_id, conversation.session_id or conversation.id, now
+    )
     if produced_action:
         _record_decision(
             verdict=verdict,
             signal=signal,
             snapshot=snapshot,
             user_id=user_id,
-            session_id=conversation.id,
+            session_id=conversation.session_id or conversation.id,
         )
         observability.on_turn_finished(
             trace,
             turn_id=None,
             user_id=user_id,
-            session_id=conversation.id,
+            session_id=conversation.session_id or conversation.id,
             kind=TraceKind.AUTONOMY_TICK,
             drain_background=False,
         )
@@ -727,7 +729,7 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         signal=signal,
         snapshot=snapshot,
         user_id=user_id,
-        session_id=conversation.id,
+        session_id=conversation.session_id or conversation.id,
         action_id=action.id,
         outcome=None if enqueued else "enqueue_failed",
         candidates=pipeline_audit,
@@ -751,7 +753,7 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
             trace,
             turn_id=str(delivered.message_id),
             user_id=user_id,
-            session_id=conversation.id,
+            session_id=conversation.session_id or conversation.id,
             kind=TraceKind.PROACTIVE,
             action_id=action.id,
             drain_background=False,
@@ -765,7 +767,7 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
         trace,
         turn_id=None,
         user_id=user_id,
-        session_id=conversation.id,
+        session_id=conversation.session_id or conversation.id,
         kind=TraceKind.PROACTIVE,
         action_id=action.id,
         drain_background=False,

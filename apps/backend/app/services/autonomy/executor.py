@@ -255,6 +255,9 @@ async def execute(
             if not text:
                 return await _fail_for_retry(action, trace, "generate_failed", now)
             try:
+                conversation_service.ensure_conversation(
+                    action.session_id, action.user_id
+                )
                 message_id = conversation_service.save_proactive_turn(
                     action.session_id, text
                 )

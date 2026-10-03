@@ -56,6 +56,7 @@ class LedgerCategoryRow(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     parent_id: Mapped[str | None] = mapped_column(String, nullable=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    seed_key: Mapped[str | None] = mapped_column(String, nullable=True)
     kind: Mapped[str] = mapped_column(String, nullable=False)
     aliases: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_seed: Mapped[bool] = mapped_column(
@@ -70,6 +71,12 @@ class LedgerCategoryRow(Base):
             "parent_id",
             "name",
             name="uq_ledger_categories_user_parent_name",
+        ),
+        Index(
+            "uq_ledger_categories_user_seed_key",
+            "user_id",
+            "seed_key",
+            unique=True,
         ),
         CheckConstraint(
             "kind IN ('expense', 'income')",

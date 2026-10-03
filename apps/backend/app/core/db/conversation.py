@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -24,6 +25,7 @@ class Conversation(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     mode: Mapped[str] = mapped_column(
         String(16), nullable=False, default="default", server_default="default"
     )
@@ -38,13 +40,18 @@ class Conversation(Base):
             "mode IN ('professional', 'default', 'immersive')",
             name="ck_conversations_mode",
         ),
+        Index("uq_conversations_session_id", "session_id", unique=True),
     )
 
 
 class Message(Base):
     __tablename__ = "messages"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=False,
+    )
     conversation_id: Mapped[str] = mapped_column(
         String, ForeignKey("conversations.id"), nullable=False
     )

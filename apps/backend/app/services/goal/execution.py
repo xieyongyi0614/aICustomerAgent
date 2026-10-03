@@ -59,7 +59,11 @@ async def attempt_current_step(goal, plan, now: datetime) -> dict:
         record = await run_action_planning(
             goal.user_id,
             intent,
-            session_id=conversation.id if conversation is not None else None,
+            session_id=(
+                (conversation.session_id or conversation.id)
+                if conversation is not None
+                else None
+            ),
             goal_id=goal.id,
             source="autonomy",
         )

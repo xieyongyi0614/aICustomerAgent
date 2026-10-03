@@ -4,6 +4,12 @@ from app.repositories import conversation_repository as repo
 from app.services.conversation import service as svc
 
 
+@pytest.fixture(autouse=True)
+def _seed_conversations(db_session_factory):
+    for sid in ("s1", "a", "b", "s3", "s4", "s5", "s6", "s7"):
+        repo.get_or_create_conversation(sid, "u-test")
+
+
 def test_context_across_turns(db_session_factory):
     svc.save_turn("s1", "我在学 LangGraph", "很棒")
     svc.save_turn("s1", "今天刚学 Runnable", "继续")
@@ -51,4 +57,4 @@ def test_illegal_role_rejected(db_session_factory):
 def test_get_or_create_idempotent(db_session_factory):
     first = svc.ensure_conversation("s7", "u1")
     second = svc.ensure_conversation("s7", "u1")
-    assert first.id == second.id == "s7"
+    assert first.id == second.id and first.session_id == second.session_id == "s7"

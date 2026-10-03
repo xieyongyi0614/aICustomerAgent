@@ -1,15 +1,20 @@
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import Conversation, Message, SessionLocal
 
 
-def get_or_create_conversation(conv_id: str, user_id: str) -> Conversation:
+def get_or_create_conversation(session_id: str, user_id: str) -> Conversation:
     with SessionLocal() as session:
-        conversation = session.get(Conversation, conv_id)
+        conversation = _resolve_conversation(session, session_id)
         if conversation is None:
             now = datetime.now()
             conversation = Conversation(
-                id=conv_id, user_id=user_id, created_at=now, updated_at=now
+                id=ids.new_id_str(),
+                session_id=session_id,
+                user_id=user_id,
+                created_at=now,
+                updated_at=now,
             )
             session.add(conversation)
             session.commit()
@@ -17,9 +22,13 @@ def get_or_create_conversation(conv_id: str, user_id: str) -> Conversation:
         return conversation
 
 
-def find_conversation(conv_id: str) -> Conversation | None:
+def find_conversation(session_id: str) -> Conversation | None:
     with SessionLocal() as session:
-        return session.get(Conversation, conv_id)
+        return (
+            session.query(Conversation)
+            .filter(Conversation.session_id == session_id)
+            .first()
+        )
 
 
 def get_latest_for_user(user_id: str) -> Conversation | None:
@@ -44,8 +53,12 @@ def save_message(
     if role not in ("human", "ai"):
         raise ValueError(f"非法 role: {role}")
     with SessionLocal() as session:
+        conversation = _resolve_conversation(session, conv_id)
+        if conversation is None:
+            raise ValueError(f"会话不存在: {conv_id}")
         message = Message(
-            conversation_id=conv_id,
+            id=ids.new_id(),
+            conversation_id=conversation.id,
             role=role,
             content=content,
             is_proactive=is_proactive,
@@ -57,11 +70,28 @@ def save_message(
         return message
 
 
+def _resolve_conversation(db_session, session_or_id: str) -> Conversation | None:
+    """句柄解析：优先 session_id 业务键，回退主键（存量行两者同值）。"""
+    conversation = (
+        db_session.query(Conversation)
+        .filter(Conversation.session_id == session_or_id)
+        .first()
+    )
+    if conversation is None:
+        conversation = db_session.get(Conversation, session_or_id)
+    return conversation
+
+
 def get_recent_messages(
     conv_id: str, limit: int, before_id: int | None = None
 ) -> list[Message]:
     with SessionLocal() as session:
-        query = session.query(Message).filter(Message.conversation_id == conv_id)
+        conversation = _resolve_conversation(session, conv_id)
+        if conversation is None:
+            return []
+        query = session.query(Message).filter(
+            Message.conversation_id == conversation.id
+        )
         if before_id is not None:
             query = query.filter(Message.id < before_id)
         rows = query.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit).all()
@@ -70,9 +100,12 @@ def get_recent_messages(
 
 def count_messages(conv_id: str) -> int:
     with SessionLocal() as session:
+        conversation = _resolve_conversation(session, conv_id)
+        if conversation is None:
+            return 0
         return (
             session.query(Message)
-            .filter(Message.conversation_id == conv_id)
+            .filter(Message.conversation_id == conversation.id)
             .count()
         )
 
@@ -80,9 +113,14 @@ def count_messages(conv_id: str) -> int:
 def count_human_messages(conv_id: str) -> int:
     """用户轮次计数（对齐 chat_pipeline current_turn 口径：human 消息数）。"""
     with SessionLocal() as session:
+        conversation = _resolve_conversation(session, conv_id)
+        if conversation is None:
+            return 0
         return (
             session.query(Message)
-            .filter(Message.conversation_id == conv_id, Message.role == "human")
+            .filter(
+                Message.conversation_id == conversation.id, Message.role == "human"
+            )
             .count()
         )
 
@@ -102,7 +140,7 @@ def list_messages_since(
 
 def touch_conversation(conv_id: str) -> None:
     with SessionLocal() as session:
-        conversation = session.get(Conversation, conv_id)
+        conversation = _resolve_conversation(session, conv_id)
         if conversation is not None:
             conversation.updated_at = datetime.now()
             session.commit()
@@ -110,7 +148,7 @@ def touch_conversation(conv_id: str) -> None:
 
 def update_mode(conv_id: str, mode: str) -> None:
     with SessionLocal() as session:
-        conversation = session.get(Conversation, conv_id)
+        conversation = _resolve_conversation(session, conv_id)
         if conversation is not None:
             now = datetime.now()
             conversation.mode = mode

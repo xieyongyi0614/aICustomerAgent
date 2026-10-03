@@ -78,7 +78,9 @@ async def test_second_turn_context_contains_first(db_session_factory, fake_llm):
     assert any("我叫什么名字" in context and "小明" in context for context in joined_contexts)
     with db_session_factory() as session:
         conversation_rows = (
-            session.query(Conversation).filter(Conversation.id == "feishu:ou_multi").all()
+            session.query(Conversation)
+            .filter(Conversation.session_id == "feishu:ou_multi")
+            .all()
         )
     assert len(conversation_rows) == 1
 

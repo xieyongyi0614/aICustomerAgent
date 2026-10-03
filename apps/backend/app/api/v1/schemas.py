@@ -108,7 +108,7 @@ class StateSnapshotOut(BaseModel):
 
 
 class MessageItemOut(BaseModel):
-    id: int
+    id: str
     role: str
     content: str
     created_at: datetime

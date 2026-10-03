@@ -72,7 +72,8 @@ class ChannelIdentityRow(Base):
 class FeishuDedupeLedgerRow(Base):
     __tablename__ = "feishu_dedupe_ledger"
 
-    event_id: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     received_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (Index("idx_feishu_dedupe_ledger_received_at", "received_at"),)
@@ -81,7 +82,8 @@ class FeishuDedupeLedgerRow(Base):
 class FeishuDeliveryRow(Base):
     __tablename__ = "feishu_deliveries"
 
-    idempotency_key: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     delivered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (Index("idx_feishu_deliveries_delivered_at", "delivered_at"),)

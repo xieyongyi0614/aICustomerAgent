@@ -12,7 +12,10 @@ from app.core.db import Conversation
 async def test_build_creates_conversation_record(db_session_factory):
     await context_builder.build("s6", "u1", "你好")
     with conversation_repository.SessionLocal() as session:
-        assert session.get(Conversation, "s6") is not None
+        assert (
+            session.query(Conversation).filter(Conversation.session_id == "s6").first()
+            is not None
+        )
 
 
 async def test_build_empty_fallback(db_session_factory):
@@ -25,6 +28,7 @@ async def test_build_empty_fallback(db_session_factory):
 
 
 async def test_build_keeps_window_order(db_session_factory):
+    conversation_service.ensure_conversation("s2", "u1")
     conversation_service.save_turn("s2", "first", "reply")
     conversation_service.save_turn("s2", "second", "answer")
     state = await context_builder.build("s2", "u1", "third")

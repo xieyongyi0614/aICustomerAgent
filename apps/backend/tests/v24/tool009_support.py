@@ -208,6 +208,7 @@ def seed_human_message(
             session.add(
                 Conversation(
                     id=conversation_id,
+                    session_id=conversation_id,
                     user_id=USER,
                     created_at=created_at,
                     updated_at=created_at,
@@ -215,6 +216,7 @@ def seed_human_message(
             )
         session.add(
             Message(
+                id=ids.new_id(),
                 conversation_id=conversation_id,
                 role="human",
                 content=content,
@@ -225,6 +227,7 @@ def seed_human_message(
         session.commit()
 
 
+from app.core import ids
 from app.core.db import Conversation as _Conversation  # noqa: E402  (循环规避：仅测试构造用)
 
 

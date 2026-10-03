@@ -185,39 +185,43 @@ def find_by_alias(user_id: str, text: str) -> LedgerCategoryRow | None:
 def ensure_seed_categories(user_id: str, *, seed_tree, now: datetime | None = None) -> int:
     """播种分类树。
 
-    种子 id 保持确定性（`cat_seed_{user_id}_{原始名}`）而非雪花：它承担**跨重命名的稳定身份**
-    ——用户把「餐饮」改成「吃饭」后重跑播种，不能把原分类复活。这是 ADR-16 §6.2 登记的
-    例外表之一，待引入 `seed_key` 列（雪花 id + 业务唯一键）后再收敛。
+    种子行的**跨重命名稳定身份**由 `seed_key`（播种原始名）承担：用户把「餐饮」改成
+    「吃饭」后重跑播种，按 (user_id, seed_key) 命中已有行，不复活原分类。id 一律雪花
+    （ADR-16 阶段 D 收敛）。
     """
     timestamp = now or datetime.now()
     created = 0
     by_name = {row.name: row for row in list_categories(user_id)}
+    seeded = {
+        row.seed_key: row for row in by_name.values() if row.seed_key is not None
+    }
     for node in seed_tree:
-        seed_id = f"cat_seed_{user_id}_{node['name']}"
-        if get_category(seed_id) is not None:
+        if seeded.get(node["name"]) is not None:
             continue
         parent = by_name.get(node["parent_name"])
         parent_id = parent.id if parent else None
         with SessionLocal() as session:
-            session.add(
-                LedgerCategoryRow(
-                    id=seed_id,
-                    user_id=user_id,
-                    parent_id=parent_id,
-                    name=node["name"],
-                    kind=node["kind"],
-                    aliases=node.get("aliases") or [],
-                    is_seed=True,
-                    created_at=timestamp,
-                    updated_at=timestamp,
-                )
+            row = LedgerCategoryRow(
+                id=ids.new_id_str(),
+                seed_key=node["name"],
+                user_id=user_id,
+                parent_id=parent_id,
+                name=node["name"],
+                kind=node["kind"],
+                aliases=node.get("aliases") or [],
+                is_seed=True,
+                created_at=timestamp,
+                updated_at=timestamp,
             )
+            session.add(row)
             try:
                 session.commit()
             except IntegrityError:
                 session.rollback()
                 continue
-        by_name[node["name"]] = get_category(seed_id)
+            session.refresh(row)
+            session.expunge(row)
+        by_name[node["name"]] = row
         created += 1
     return created
 

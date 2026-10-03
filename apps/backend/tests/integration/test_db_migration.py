@@ -180,11 +180,16 @@ def test_sqlite_to_postgres_migration_script(postgres_url, tmp_path):
     with Session(source_engine) as session:
         session.add(
             Conversation(
-                id="conv-mig", user_id="default-user", created_at=now, updated_at=now
+                id="conv-mig",
+                session_id="conv-mig",
+                user_id="default-user",
+                created_at=now,
+                updated_at=now,
             )
         )
         session.add(
             Message(
+                id=1,
                 conversation_id="conv-mig",
                 role="human",
                 content="我喜欢寿司",
@@ -193,7 +198,11 @@ def test_sqlite_to_postgres_migration_script(postgres_url, tmp_path):
         )
         session.add(
             Message(
-                conversation_id="conv-mig", role="ai", content="好的", created_at=now
+                id=2,
+                conversation_id="conv-mig",
+                role="ai",
+                content="好的",
+                created_at=now,
             )
         )
         session.commit()

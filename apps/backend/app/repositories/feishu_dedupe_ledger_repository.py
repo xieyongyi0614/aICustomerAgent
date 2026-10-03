@@ -13,6 +13,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import ids
 from app.core.db import FeishuDedupeLedgerRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,9 @@ def claim(event_id: str, received_at: datetime, expired_before: datetime) -> boo
     先删同 id 的过期行、再插入：两条语句在同一事务内，唯一约束由数据库保证，
     故多进程/多实例下同样原子。
     """
-    row = FeishuDedupeLedgerRow(event_id=event_id, received_at=received_at)
+    row = FeishuDedupeLedgerRow(
+        id=ids.new_id_str(), event_id=event_id, received_at=received_at
+    )
     try:
         with SessionLocal() as session:
             session.query(FeishuDedupeLedgerRow).filter(

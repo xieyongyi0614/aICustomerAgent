@@ -15,6 +15,10 @@ DEFAULT_MESSAGES_LIMIT = 200
 MAX_MESSAGES_LIMIT = 500
 
 
+def _conversation_ref(conversation) -> str:
+    return conversation.session_id or conversation.id
+
+
 @history_router.get(
     "/conversations/latest",
     response_model=ConversationMessagesOut,
@@ -28,10 +32,10 @@ def latest_conversation_messages(
         raise HTTPException(status_code=404, detail="暂无历史会话")
     rows = history_service.list_recent_messages(conversation.id, limit)
     return ConversationMessagesOut(
-        conversation_id=conversation.id,
+        conversation_id=_conversation_ref(conversation),
         messages=[
             MessageItemOut(
-                id=row.id,
+                id=str(row.id),
                 role=row.role,
                 content=row.content,
                 created_at=row.created_at,
@@ -48,20 +52,20 @@ def latest_conversation_messages(
 def list_conversation_messages(
     conversation_id: str,
     limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
-    before_id: int | None = Query(default=None),
+    before_id: str | None = Query(default=None),
     user_id: str = Depends(require_user),
 ):
     conversation = history_service.find_conversation_or_none(conversation_id)
     if conversation is None or getattr(conversation, "user_id", None) != user_id:
         raise HTTPException(status_code=404, detail="会话不存在")
     rows = history_service.list_recent_messages(
-        conversation_id, limit, before_id=before_id
+        conversation.id, limit, before_id=int(before_id) if before_id else None
     )
     return ConversationMessagesOut(
-        conversation_id=conversation_id,
+        conversation_id=_conversation_ref(conversation),
         messages=[
             MessageItemOut(
-                id=row.id,
+                id=str(row.id),
                 role=row.role,
                 content=row.content,
                 created_at=row.created_at,

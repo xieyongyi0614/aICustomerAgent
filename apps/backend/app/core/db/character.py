@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     Float,
@@ -46,7 +47,11 @@ class CharacterStateRow(Base):
 class EmotionHistoryRow(Base):
     __tablename__ = "emotion_history"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=False,
+    )
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     session_id: Mapped[str] = mapped_column(String, nullable=False)
     user_emotion: Mapped[str] = mapped_column(String, nullable=False)

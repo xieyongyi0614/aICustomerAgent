@@ -75,10 +75,12 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0002_briefing_preferences.py",
     "0003_car_domain.py",
     "0004_channel_identity_bindings.py",
+    "0005_id_scheme_split.py",
 )
 
 SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
-SCHEMA_COLUMNS_DIGEST_BASELINE = "3631831cc3c8c1d5"
+# ID 体系收敛声明（2026-10-03，ADR-16 阶段 D）：feishu 两台账表加雪花 id 主键、业务键转 UNIQUE —— 有意演进。
+SCHEMA_COLUMNS_DIGEST_BASELINE = "10134443a5903a3f"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",
@@ -98,9 +100,12 @@ SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
 SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights", "development_changes")
 BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "action_records": ("90f5e647f8f1d8a8", "fccaeb1aee8d6cba", "8a7a52790352b2d8"),
-    "conversations": ("ecfdeb39838b39bc", "18f3a52de812d1f3", "e3b0c44298fc1c14"),
+    # ID 体系收敛声明（2026-10-03，ADR-16 阶段 D）：conversations 加 session_id 业务键 +
+    # 唯一索引（存量回填 = 旧 id，新会话 id 发雪花）；messages.id 自增 Integer → 雪花
+    # BigInteger（autoincrement 关闭）—— 有意演进，非 TOOL-012 改脏。原值 ecfdeb39 / 5d424b72。
+    "conversations": ("012ca73a3e21bafa", "18f3a52de812d1f3", "619fc3bee13003f0"),
     "conversation_summaries": ("dfb4a7f2e6b6ba3a", "e3b0c44298fc1c14", "e3b0c44298fc1c14"),
-    "messages": ("5d424b72627b9678", "28485ce6aa400d11", "80cc53e497c96a49"),
+    "messages": ("859d319a9c244bfb", "28485ce6aa400d11", "80cc53e497c96a49"),
     "memory_candidates": ("2e5d80cbd4a5c8e5", "41df4f3ee6f0c7bc", "1152da1a25969f8a"),
     "memory_links": ("3d3ded6c6e54c04a", "283ca81681e4286f", "35da9fa6f9d0bbf0"),
     "memories": ("727a9d903fefaf06", "70aeda5a3b94d14f", "f548dcfb8ad1dc1a"),
