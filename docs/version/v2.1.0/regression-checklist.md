@@ -2,7 +2,7 @@
 
 > 前置：AGENT-001~007 已实现。真实模型下验证 Evolution Loop 全链贯通与三条成长主线。
 > 执行前：`alembic upgrade head`（链尾现为 0048）。
-> **本清单已随 `vXX_` 开关体系删除改写**（见 `docs/refactor/flag-removal-audit.md` F.10）：V2.1.0 的功能不再靠 env 打开。
+> **本清单已随 `vXX_` 开关体系删除改写**：V2.1.0 的功能不再靠 env 打开。
 
 ## 1. 生效确认（开关已删除，功能无条件生效）
 

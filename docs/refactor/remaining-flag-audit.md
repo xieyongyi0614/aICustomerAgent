@@ -3,7 +3,8 @@
 > **审查对象**：`vXX_` 版本开关体系删除（2026-09-19 收官）**之后**，`apps/backend/app/core/settings/` 中仍然存在的功能开关与门控字段
 > **审查范围**：仅 `apps/backend`；`docs/` 按约定不纳入改动面
 > **本文数据**：均为**实测**（字段定义 + 全仓读取点 grep + 真实 `.env` / `.env.example` 内容），非估算
-> **配套文档**：`flag-removal-audit.md`（上一代 `vXX_` 体系的删除成本审查，已收官）、`flag-rename-map.md`（历史字段名对照）
+> **配套文档**：`debug-surface-audit.md`（调试面台账）、`services-reorganization-plan.md`（services 领域化台账）
+> **历史文档提示**：上一代 `vXX_` 体系的删除成本审查台账与「旧名→新名」对照表已于 2026-10-03 删除；本文只覆盖「当前在存开关」。
 > **审查日期**：2026-09-22
 
 ---
@@ -54,7 +55,7 @@ TOOL_CONFIRM_TTL_REUSE=True
 
 **前提三：删除门控分支的风险远高于删除字段本身。**
 
-字段定义删掉是机械操作；**但删除 `if not flag: return` 这类分支会改变路径**——上一代 `vXX_` 体系删除的审查已明确记录：「改名是廉价的，删分支是昂贵的，而把功能全量转正的验证成本远超前两者之和，且目前没有可用的验证资产」（`flag-removal-audit.md` §1.1）。
+字段定义删掉是机械操作；**但删除 `if not flag: return` 这类分支会改变路径**——上一代 `vXX_` 体系删除的审查已明确记录：「改名是廉价的，删分支是昂贵的，而把功能全量转正的验证成本远超前两者之和，且目前没有可用的验证资产」。
 
 ---
 
@@ -194,7 +195,7 @@ return bool(getattr(settings, f"evaluation_{dimension.value}_enabled", True))
 | `runtime_six_stage_loop_enabled` | 六段认知循环（`loop.py:121,528`） | 删 = 六段**影子实现**永久不可达（`SHADOW_STAGE_IMPLEMENTATION=True`） |
 
 > ⚠️ **这 7 个不是"门控残留"，而是 V3.0.0 的显式灰度设计**（`docs/version/v3.0.0/tasks.md` §0.4 首批字段清单）。其中 `runtime_six_stage_loop_enabled` 是**影子实现的开关**——删掉它等于宣布「方案 A 真收编」永不推进，需先决策。
-> **V4.0 已登记处置**：`runtime_foreground_loop_enabled` 与 `runtime_autonomous_cycle_enabled` 由 PLA-018 置为唯一有效值并登记 `flag-removal-audit.md` 待清理。
+> **V4.0 已登记处置**：`runtime_foreground_loop_enabled` 与 `runtime_autonomous_cycle_enabled` 由 PLA-018 置为唯一有效值并登记为待清理。
 
 #### 3.2.2 飞书通道子闸（4 个）
 
@@ -399,7 +400,7 @@ rg -n "runtime_loop_optional_stages|runtime_inbound_gateway_channels|runtime_out
 
 ## 附录 D：批次 1 执行记录与方法论补正（2026-09-22）
 
-> 按 `flag-removal-audit.md` 的约定：正文保持**审查期口径**，执行进展记在附录。
+> 约定：正文保持**审查期口径**，执行进展记在附录。
 
 ### D.1 执行结果
 
@@ -530,9 +531,8 @@ uv run --directory apps/backend pytest -m "(unit or api) and not slow" -q
 §7.2 已同步登记。
 
 因此部署侧清理由「可选」升级为**必须人工核对**：逐条删除
-`CHARACTER_ACTION_SYNC_ENABLED` / `INVENTORY_GROUNDING_ENABLED`，并按 `flag-rename-map.md`
-的「旧 env」列清掉 `V2_*` / `V23_*` / `V24_TOOL_*` / `V26_ACTION_*`
-（`flag-removal-audit.md:1506` 遗留待办②至今未见关闭记录）。本仓库 `.env` / `.env.example` 已清。
+`CHARACTER_ACTION_SYNC_ENABLED` / `INVENTORY_GROUNDING_ENABLED`，并按原对照表的「旧 env」列清掉 `V2_*` / `V23_*` / `V24_TOOL_*` / `V26_ACTION_*`
+（该遗留项至今未见关闭记录）。本仓库 `.env` / `.env.example` 已清。
 
 ### E.6 删除后审核发现的问题与修复（2026-09-28，同日）
 
@@ -543,7 +543,7 @@ uv run --directory apps/backend pytest -m "(unit or api) and not slow" -q
 | 1 | **P1** | **CAS 成了唯一绕过 `world_enabled` 的世界创建路径**：第 8 步 `run_world_update` 先判 `world_enabled` 再 `ensure_world`，第 9 步 CAS 直接 `ensure_world`，而 `ensure_world` 自身也不检查该闸 → `world_enabled=False` 的部署每轮建出**永远读不到的孤儿 world**（`build_context` 仍被 `world_enabled` 挡住）。此前该路径可被 `character_action_sync_enabled=False` 关掉，本次固化常开后不再可关。**探针实测**：CAS 前 `worlds` 行数 0 → CAS 后 1。 | `run_character_action_sync` 开头补 `if not get_settings().world_enabled: return`（与第 8 步对称）；新增集成用例 `test_world_disabled_short_circuits_without_creating_world`——该路径此前**零测试覆盖**（两个 e2e parity 用例设了 `world_enabled="false"` 却断言不到它） |
 | 2 | **P1** | E.1 原写「`character_action_sync_context_lines=0` 只清读侧」——**实测 `limit<=0` 仍返回 1 条**（`context_selector.py` 先 `append` 再判 `len(rows) >= limit`），该字段**无法清零读侧**且无 validator | 更正 E.1 措辞；`recent_world_changes_from_events` 补 `if limit <= 0: return []`，使 `<=0` 语义确定为「不注入」；新增 `test_derivation_non_positive_limit_yields_nothing` |
 | 3 | **P1** | `tests/v40/support.py::V30_ENABLED_FLAGS` docstring 自称「V3.0.0 冻结基线…静态快照」，本次是其**首次删除条目**（git 历史全 `+` 零 `-`）却未登记 | docstring 补「首次删除记录（2026-09-28）」并指向本附录 |
-| 4 | P2 | `.env.example` 未记录 `INVENTORY_GROUNDING_MODE` 的 `off` 取值，而 `off` 是 grounding 唯一关断位（唯一记载处是 `flag-rename-map.md:44` 历史表） | `.env.example` / `.env` 注释块重写，列出 `off / rewrite / annotate` 语义 |
+| 4 | P2 | `.env.example` 未记录 `INVENTORY_GROUNDING_MODE` 的 `off` 取值，而 `off` 是 grounding 唯一关断位（取值语义 `off / rewrite / annotate` 需在注释块补全） | `.env.example` / `.env` 注释块重写，列出 `off / rewrite / annotate` 语义 |
 | 5 | P3 | `.env.example` 的 CAS 注释块只剩一个调参字段却仍写 "extract CREATE/MOVE/CONSUME" | 注释块改为「调参（开关已固化常开，无配置面）」，与同文件 World Simulation 段同风格 |
 | 6 | P3 | 基线 §7.2「settings 字段总数 405」 | 改为日期戳记的实测值 **427**（原 405 系 2026-09-20 口径，附录 C 已登记「待 V4.0 回写校正」） |
 

@@ -63,7 +63,7 @@
 **横切与集成**
 
 - `docs/integrations/feishu/` — 飞书通道：`architecture.md`（本域唯一架构依据）+ `tasks.md`（FEISHU-001~007）+ `task-details/` + `acceptance-report-v1.0.md` + `review-v1.1.md`
-- `docs/refactor/` — 横切重构：`flag-removal-audit.md`（vXX_ 开关体系删除成本审查 + 批次台账）、`flag-rename-map.md`（设置字段「旧名 → 新名」对照表）、`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）、`services-reorganization-plan.md`（services 领域化归类方案 + 实际执行结果台账；**services 顶层散落模块已按领域收进子包、纯函数模块收口 `app/engines/`，新代码勿再建顶层散落 services 模块**）
+- `docs/refactor/` — 横切重构：`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）、`services-reorganization-plan.md`（services 领域化归类方案 + 实际执行结果台账；**services 顶层散落模块已按领域收进子包、纯函数模块收口 `app/engines/`，新代码勿再建顶层散落 services 模块**）、`debug-surface-audit.md`（调试面 72 端点归类台账：门禁 / 业务域与消费方归类 / 问题清单 + 执行附录；拆包与鉴权收口**已于 2026-10-03 执行**（ADR-17），零消费端点决议保留）
 - `docs/TESTING.md` — 测试规范（marker、执行级别、AI Coding 测试规则）
 
 ## 全局约定
@@ -72,6 +72,6 @@
 - 不添加代码注释，用命名表达意图。
 - 提交风格：`feat:` / `fix:` / `refactor:` / `docs:` + 简短中文描述。单行、≤ 30 字，只概括核心变更；不罗列修改文件清单、不写实现细节与测试结果。
 - 不要提交 `.env`、`__pycache__/`、`.venv/`。
-- 设置字段与 env 键**不带版本号前缀**（`vXX_` 开关体系删除已收官，2026-09-19，台账见 `docs/refactor/flag-removal-audit.md`）：新增设置项按领域命名（如 `plan_max_steps` / `world_prompt_char_budget`），勿再引入版本前缀；环境变量名 = 字段名大写（无 alias 层），改名必须同批同步部署侧 `.env`。
+- 设置字段与 env 键**不带版本号前缀**（`vXX_` 开关体系删除已收官，2026-09-19）：新增设置项按领域命名（如 `plan_max_steps` / `world_prompt_char_budget`），勿再引入版本前缀；环境变量名 = 字段名大写（无 alias 层），改名必须同批同步部署侧 `.env`。
 - 版本门控体系已整体删除（`core/settings/enablement.py` 不再存在）；**残留的少数布尔开关是策略位 / 裁决位 / 调试位，不是版本门控**，新增开关请按领域语义命名。
 - 只有用户明确要求时才提交 / 推送 / 建 PR。

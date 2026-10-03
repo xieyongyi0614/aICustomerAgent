@@ -579,7 +579,7 @@ except BaseException:
 
 | 类别 | 处理 | 理由 |
 |---|---|---|
-| **链头钉测**（`MIGRATION_HEAD`、`test_migration_chain_head_is_still_00NN`、`max(numbered) == NN`、`MIGRATION_FILE_COUNT_CURRENT`、`MIGRATION_BREAKPOINT`、`MIGRATION_ADDED_VS_BASELINE`、`MIGRATION_HEAD_PREVIOUS`） | **机械升级到 0050** | `flag-removal-audit.md` 明确记录过 0048→0049 的同款操作，有先例 |
+| **链头钉测**（`MIGRATION_HEAD`、`test_migration_chain_head_is_still_00NN`、`max(numbered) == NN`、`MIGRATION_FILE_COUNT_CURRENT`、`MIGRATION_BREAKPOINT`、`MIGRATION_ADDED_VS_BASELINE`、`MIGRATION_HEAD_PREVIOUS`） | **机械升级到 0050** | 本仓库有过 0048→0049 的同款操作先例 |
 | **v24「零 schema 变更」保证**（`SCHEMA_COLUMNS_DIGEST_BASELINE`） | **引入显式例外登记** `SCHEMA_ADDED_TABLES_VS_BASELINE = ("feishu_dedupe_ledger",)` + 新增 `support.schema_columns_digest(exclude_tables=())`；断言变为「全库摘要 == `SCHEMA_COLUMNS_DIGEST`」且「排除已登记新增表后 == `SCHEMA_COLUMNS_DIGEST_BASELINE`」 | 直接改基线摘要常量等于**把断言改谎**。排除后实测精确复现 `506ee5d5cf357bdf`，证明「除已登记的新增表外基线零漂移」——保证仍在 |
 | **v25 `ZeroMigration` 的 `test_no_newer_revision_after_0050`** | 改写为**不钉绝对版本号**：断言版本号连续无空洞 + 链头唯一 + 本任务未新增迁移文件 | 原断言（`max == 49`）在每次正常迁移后都会失败，且重命名后语义自相矛盾 |
 | **v26 `test_v25_migration_head_0049_documented`** | 改写为「≥ 0049 且链头自洽」 | 机械改成 `_0050_` 会**事实错误**：0050 是飞书迁移，不是 v2.5 的链头 |

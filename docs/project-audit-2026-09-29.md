@@ -108,10 +108,10 @@
 | # | 问题 | 说明 |
 |---|---|---|
 | ⑩ | ORM 集中 `core/db.py`（44 表）+ `app/models/` Pydantic 领域模型 | 边界靠约定无显式约束，新增表需人工判断落位 |
-| ⑪ | settings 扁平命名空间（423 字段） | 局部可读性下降（`flag-rename-map.md` §七 未采纳的建议） |
+| ⑪ | settings 扁平命名空间（423 字段） | 局部可读性下降（未采纳的建议） |
 | ⑫ | `ActionExecutor.execute_external` 返回 `external_adapter_reserved` 占位 | `app/services/action/executor.py:169`；外部 API 实际经 Tool 路径实现，`external` ExecutionKind 是保留桩 |
 | ⑬ | 调试面无多用户隔离 | `/debug/*`、`/state` 可任意指定 `user_id` 查看他人数据（产品面已隔离） |
-| ⑭ | 文档 1589 处 `vXX_` 引用未改写 | 历史文档不改写是约定，靠 `flag-rename-map.md` 桥接 |
+| ⑭ | 文档 1589 处 `vXX_` 引用未改写 | 历史文档不改写是约定（原「旧名→新名」对照表已于 2026-10-03 删除） |
 | ⑮ | 测试侧版本标记残留 188 处 | fixture / 函数名如 `v24_tool_env`、`v21_on` |
 
 ---
