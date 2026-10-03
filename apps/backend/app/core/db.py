@@ -1321,7 +1321,7 @@ class ChannelIdentityRow(Base):
     channel: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
     external_id: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
     internal_user_id: Mapped[str] = mapped_column(String, nullable=False)
-    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_union_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_tenant_key: Mapped[str | None] = mapped_column(String, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)

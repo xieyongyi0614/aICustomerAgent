@@ -15,6 +15,7 @@ from app.repositories import (
     world_repository,
 )
 from app.services.identity import channel as service
+from app.services.identity import user_service
 
 
 def _resolve(open_id):
@@ -28,10 +29,30 @@ def test_resolve_idempotent(db_session_factory):
     second = _resolve("ou_idem")
     assert first.created is True
     assert second.created is False
-    assert first.internal_user_id == second.internal_user_id == "feishu:ou_idem"
+    assert first.internal_user_id == second.internal_user_id
+    assert first.internal_user_id.isdigit()
     assert first.session_id == second.session_id == "feishu:ou_idem"
     assert channel_identity_repository.find("feishu", "ou_idem") is not None
-    assert len(channel_identity_repository.list_by_internal_user("feishu:ou_idem")) == 1
+    assert (
+        len(channel_identity_repository.list_by_internal_user(first.internal_user_id))
+        == 1
+    )
+
+
+def test_resolve_creates_user_row(db_session_factory):
+    identity = _resolve("ou_userrow")
+    context = user_service.get_user(identity.internal_user_id)
+    assert context is not None
+    assert context.user_id == identity.internal_user_id
+    assert context.status == "active"
+
+
+def test_distinct_external_ids_get_distinct_users(db_session_factory):
+    first = _resolve("ou_distinct_a")
+    second = _resolve("ou_distinct_b")
+    assert first.internal_user_id != second.internal_user_id
+    assert user_service.get_user(first.internal_user_id) is not None
+    assert user_service.get_user(second.internal_user_id) is not None
 
 
 def test_resolve_stores_optional_metadata(db_session_factory):
@@ -43,7 +64,7 @@ def test_resolve_stores_optional_metadata(db_session_factory):
 
 
 def test_get_or_create_integrity_error_path_recovers(db_session_factory, monkeypatch):
-    _resolve("ou_conflict")
+    existing = _resolve("ou_conflict")
     real_find = channel_identity_repository.find
     calls = []
 
@@ -55,10 +76,10 @@ def test_get_or_create_integrity_error_path_recovers(db_session_factory, monkeyp
 
     monkeypatch.setattr(channel_identity_repository, "find", _find_then_none)
     row, created = channel_identity_repository.get_or_create(
-        "feishu", "ou_conflict", "feishu:ou_conflict", "feishu:ou_conflict"
+        "feishu", "ou_conflict", "999999", "feishu:ou_conflict"
     )
     assert created is False
-    assert row.internal_user_id == "feishu:ou_conflict"
+    assert row.internal_user_id == existing.internal_user_id
     assert len(calls) == 2
 
 
@@ -71,43 +92,69 @@ async def test_concurrent_resolve_single_row(db_session_factory):
 
     results = await asyncio.gather(*[_resolve_async() for _ in range(8)])
     assert len({r.internal_user_id for r in results}) == 1
-    assert results[0].internal_user_id == "feishu:ou_race"
-    assert len(channel_identity_repository.list_by_internal_user("feishu:ou_race")) == 1
+    assert results[0].internal_user_id.isdigit()
+    assert (
+        len(channel_identity_repository.list_by_internal_user(results[0].internal_user_id))
+        == 1
+    )
 
 
 def test_find_miss_and_hit_detached(db_session_factory):
     assert channel_identity_repository.find("feishu", "ou_missing") is None
-    _resolve("ou_detached")
+    identity = _resolve("ou_detached")
     row = channel_identity_repository.find("feishu", "ou_detached")
     assert row.external_id == "ou_detached"
-    assert row.internal_user_id == "feishu:ou_detached"
+    assert row.internal_user_id == identity.internal_user_id
 
 
 def test_update_identity(db_session_factory):
-    _resolve("ou_update")
+    identity = _resolve("ou_update")
     row = channel_identity_repository.update_identity(
         "feishu", "ou_update", display_name="亚丝娜", session_id="feishu:ou_update:s2"
     )
     assert row.display_name == "亚丝娜"
     assert row.session_id == "feishu:ou_update:s2"
-    assert row.internal_user_id == "feishu:ou_update"
+    assert row.internal_user_id == identity.internal_user_id
     assert channel_identity_repository.update_identity("feishu", "ou_none") is None
 
 
 def test_list_by_internal_user_filters(db_session_factory):
-    _resolve("ou_list_a")
+    identity = _resolve("ou_list_a")
     _resolve("ou_list_b")
-    rows = channel_identity_repository.list_by_internal_user("feishu:ou_list_a")
+    rows = channel_identity_repository.list_by_internal_user(identity.internal_user_id)
     assert [row.external_id for row in rows] == ["ou_list_a"]
 
 
 def test_resolve_recipient_hit(db_session_factory):
-    _resolve("ou_recipient")
-    recipient = service.resolve_recipient("feishu:ou_recipient", "feishu")
+    identity = _resolve("ou_recipient")
+    recipient = service.resolve_recipient(identity.internal_user_id, "feishu")
     assert isinstance(recipient, RecipientRef)
     assert recipient.channel == "feishu"
     assert recipient.external_id == "ou_recipient"
     assert not hasattr(recipient, "open_id")
+
+
+def test_email_rebind_keeps_user_id(db_session_factory):
+    original = user_service.find_or_create_by_email("before@example.com")
+    channel_identity_repository.get_or_create(
+        "email", "after@example.com", original.user_id
+    )
+    rebound = user_service.find_or_create_by_email("after@example.com")
+    assert rebound.user_id == original.user_id
+
+
+def test_cross_channel_binding_shares_one_user(db_session_factory):
+    email_user = user_service.find_or_create_by_email("shared@example.com")
+    _resolve("ou_shared")
+    channel_identity_repository.update_identity(
+        "feishu", "ou_shared", internal_user_id=email_user.user_id
+    )
+    feishu_identity = service.resolve("feishu", "ou_shared")
+    assert feishu_identity.internal_user_id == email_user.user_id
+    assert feishu_identity.created is False
+    assert len(
+        channel_identity_repository.list_by_internal_user(email_user.user_id)
+    ) == 2
 
 
 def test_resolve_recipient_unknown_returns_none(db_session_factory):
@@ -117,8 +164,8 @@ def test_resolve_recipient_unknown_returns_none(db_session_factory):
 
 
 def test_resolve_recipient_channel_mismatch_returns_none(db_session_factory):
-    _resolve("ou_channel")
-    assert service.resolve_recipient("feishu:ou_channel", "web") is None
+    identity = _resolve("ou_channel")
+    assert service.resolve_recipient(identity.internal_user_id, "web") is None
 
 
 def test_resolve_recipient_exact_channel_match_among_rows(db_session_factory):
@@ -156,11 +203,15 @@ def test_resolve_recipient_uses_external_id_not_session_prefix(db_session_factor
 
 
 def test_resolve_recipient_read_only(db_session_factory):
-    _resolve("ou_ro")
-    before = len(channel_identity_repository.list_by_internal_user("feishu:ou_ro"))
+    identity = _resolve("ou_ro")
+    before = len(
+        channel_identity_repository.list_by_internal_user(identity.internal_user_id)
+    )
     for _ in range(3):
-        service.resolve_recipient("feishu:ou_ro", "feishu")
-    after = len(channel_identity_repository.list_by_internal_user("feishu:ou_ro"))
+        service.resolve_recipient(identity.internal_user_id, "feishu")
+    after = len(
+        channel_identity_repository.list_by_internal_user(identity.internal_user_id)
+    )
     assert before == after == 1
 
 
@@ -194,22 +245,22 @@ def _write_minimal_chain(open_id: str) -> None:
 def test_isolation_matrix_between_two_open_ids(db_session_factory):
     _write_minimal_chain("ou_iso_a")
     identity_b = _resolve("ou_iso_b")
+    user_b = identity_b.internal_user_id
 
-    assert conversation_repository.get_latest_for_user("feishu:ou_iso_b") is None
-    assert memory_repository.list_by_user("feishu:ou_iso_b") == []
-    world_b = world_repository.ensure_world("feishu:ou_iso_b")
-    assert world_b.world_id == "home:feishu:ou_iso_b"
-    assert world_repository.world_id_for("feishu:ou_iso_a") == "home:feishu:ou_iso_a"
-    assert world_b.world_id != world_repository.world_id_for("feishu:ou_iso_a")
-    assert world_repository.list_objects("home:feishu:ou_iso_b") == []
-    assert len(world_repository.list_objects("home:feishu:ou_iso_a")) == 1
-    relationship_b = relationship_repository.get_relationship("feishu:ou_iso_b")
+    assert conversation_repository.get_latest_for_user(user_b) is None
+    assert memory_repository.list_by_user(user_b) == []
+    world_b = world_repository.ensure_world(user_b)
+    assert world_b.world_id == f"home:{user_b}"
+    assert world_repository.world_id_for(user_b) == f"home:{user_b}"
+    assert world_repository.list_objects(f"home:{user_b}") == []
+    relationship_b = relationship_repository.get_relationship(user_b)
     assert relationship_b.intimacy == pytest.approx(0.3)
     assert relationship_b.intimacy != pytest.approx(0.9)
 
     identity_a = service.resolve("feishu", "ou_iso_a")
     assert identity_a.internal_user_id != identity_b.internal_user_id
     assert identity_a.session_id != identity_b.session_id
+    assert len(world_repository.list_objects(f"home:{identity_a.internal_user_id}")) == 1
 
 
 @pytest.fixture(scope="module")

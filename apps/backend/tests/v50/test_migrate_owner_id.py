@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.db import UserRow
 from app.repositories.world_repository import world_id_for
-from app.services.identity.user_service import email_user_id
+from app.services.identity.user_service import legacy_email_user_id
 from scripts.migrate_owner_id_to_email import migrate_owner_id
 
 pytestmark = pytest.mark.unit
@@ -85,7 +85,7 @@ def test_dry_run_reports_without_writing(env):
 
     assert report["mode"] == "dry_run"
     assert report["status"] == "planned"
-    assert report["to_id"] == email_user_id(EMAIL)
+    assert report["to_id"] == legacy_email_user_id(EMAIL)
     assert report["user_id_tables"]["conversations"] == 1
     assert report["user_id_tables"]["worlds"] == 1
     assert report["worlds"] == 1
@@ -101,7 +101,7 @@ def test_apply_rewrites_user_id_and_world_cascade(env):
         SOURCE, apply=True, engine=engine, session_factory=factory
     )
 
-    target = email_user_id(EMAIL)
+    target = legacy_email_user_id(EMAIL)
     assert report["status"] == "applied"
     assert _scalar(engine, "SELECT COUNT(*) FROM users WHERE id = :v", v=target) == 1
     assert _scalar(engine, "SELECT COUNT(*) FROM users WHERE id = :v", v=SOURCE) == 0
@@ -133,7 +133,7 @@ def test_rerun_reports_source_absent(env):
 
     assert again["status"] == "noop_source_absent"
     assert _scalar(
-        engine, "SELECT COUNT(*) FROM users WHERE id = :v", v=email_user_id(EMAIL)
+        engine, "SELECT COUNT(*) FROM users WHERE id = :v", v=legacy_email_user_id(EMAIL)
     ) == 1
 
 
@@ -158,7 +158,7 @@ def test_user_without_email_is_refused(env):
 
 def test_existing_target_row_is_refused(env):
     engine, factory = env
-    target = email_user_id(EMAIL)
+    target = legacy_email_user_id(EMAIL)
     now = datetime.now()
     with factory() as session:
         session.add(

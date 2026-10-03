@@ -87,32 +87,34 @@ async def test_two_users_six_resources_isolated(db_session_factory, fake_llm):
 
     identity_a = channel_identity_service.resolve("feishu", "ou_A_iso")
     identity_b = channel_identity_service.resolve("feishu", "ou_B_iso")
-    assert identity_a.internal_user_id != identity_b.internal_user_id
-    assert identity_a.session_id != identity_b.session_id
+    user_a = identity_a.internal_user_id
+    user_b = identity_b.internal_user_id
+    session_a = identity_a.session_id
+    session_b = identity_b.session_id
+    assert user_a != user_b
+    assert session_a != session_b
 
     outcome_a = await adapter.handle_inbound_message(_inbound("我是A", "ou_A_iso", "om_iso_a1"))
     outcome_b = await adapter.handle_inbound_message(_inbound("我是B", "ou_B_iso", "om_iso_b1"))
     assert outcome_a.error_kind is None, outcome_a
     assert outcome_b.error_kind is None, outcome_b
 
-    conversation_a = conversation_repository.find_conversation("feishu:ou_A_iso")
-    conversation_b = conversation_repository.find_conversation("feishu:ou_B_iso")
+    conversation_a = conversation_repository.find_conversation(session_a)
+    conversation_b = conversation_repository.find_conversation(session_b)
     assert conversation_a is not None and conversation_b is not None
-    assert conversation_a.user_id == "feishu:ou_A_iso"
-    assert conversation_b.user_id == "feishu:ou_B_iso"
-    assert conversation_repository.count_messages("feishu:ou_A_iso") == 2
-    assert conversation_repository.count_messages("feishu:ou_B_iso") == 2
+    assert conversation_a.user_id == user_a
+    assert conversation_b.user_id == user_b
+    assert conversation_repository.count_messages(session_a) == 2
+    assert conversation_repository.count_messages(session_b) == 2
 
-    memory_repository.create_memory(
-        "feishu:ou_A_iso", "asuna", "A 喜欢寿司", "user_preference", 0.8
-    )
-    assert memory_repository.list_by_user("feishu:ou_A_iso")
-    assert memory_repository.list_by_user("feishu:ou_B_iso") == []
+    memory_repository.create_memory(user_a, "asuna", "A 喜欢寿司", "user_preference", 0.8)
+    assert memory_repository.list_by_user(user_a)
+    assert memory_repository.list_by_user(user_b) == []
 
-    world_a = world_repository.ensure_world("feishu:ou_A_iso")
-    world_b = world_repository.ensure_world("feishu:ou_B_iso")
-    assert world_a.world_id == "home:feishu:ou_A_iso"
-    assert world_b.world_id == "home:feishu:ou_B_iso"
+    world_a = world_repository.ensure_world(user_a)
+    world_b = world_repository.ensure_world(user_b)
+    assert world_a.world_id == f"home:{user_a}"
+    assert world_b.world_id == f"home:{user_b}"
     assert world_a.world_id != world_b.world_id
     world_repository.save_object(
         WorldObject(
@@ -126,22 +128,16 @@ async def test_two_users_six_resources_isolated(db_session_factory, fake_llm):
     assert world_repository.get_object(world_a.world_id, "obj_iso_a") is not None
     assert world_repository.get_object(world_b.world_id, "obj_iso_a") is None
 
-    relationship_repository.upsert_relationship(
-        "feishu:ou_A_iso", RelationshipState(intimacy=0.9)
+    relationship_repository.upsert_relationship(user_a, RelationshipState(intimacy=0.9))
+    assert (
+        relationship_repository.get_relationship(user_a).intimacy == pytest.approx(0.9)
     )
     assert (
-        relationship_repository.get_relationship("feishu:ou_A_iso").intimacy
-        == pytest.approx(0.9)
-    )
-    assert (
-        relationship_repository.get_relationship("feishu:ou_B_iso").intimacy
-        == pytest.approx(0.3)
+        relationship_repository.get_relationship(user_b).intimacy == pytest.approx(0.3)
     )
 
-    character_state_repository.upsert_state(
-        "feishu:ou_A_iso", CharacterState(mood="happy")
-    )
-    state_b = character_state_repository.get_state("feishu:ou_B_iso")
+    character_state_repository.upsert_state(user_a, CharacterState(mood="happy"))
+    state_b = character_state_repository.get_state(user_b)
     assert state_b.mood != "happy"
 
     _drain_backgrounds()
@@ -167,9 +163,18 @@ async def test_two_users_concurrent_turns_no_cross_talk(db_session_factory, monk
         yield {"kind": "token", "text": f"reply-{content}"}
         yield {"kind": "done", "turn_id": content}
 
+    identity_a = channel_identity_service.resolve("feishu", "ou_A_cc")
+    identity_b = channel_identity_service.resolve("feishu", "ou_B_cc")
+    user_a = identity_a.internal_user_id
+    user_b = identity_b.internal_user_id
+
+    async def _stream(session_id, user_id, content, llm=None, trace=None):
+        await asyncio.sleep(0.05 if user_id == user_a else 0.0)
+        order.append((user_id, content))
+        yield {"kind": "token", "text": f"reply-{content}"}
+        yield {"kind": "done", "turn_id": content}
+
     monkeypatch.setattr(adapter.agent_service, "stream_chat", _stream)
-    channel_identity_service.resolve("feishu", "ou_A_cc")
-    channel_identity_service.resolve("feishu", "ou_B_cc")
 
     tasks = [
         adapter.handle_inbound_message(_inbound("A1", "ou_A_cc", "om_cc_a1")),
@@ -179,8 +184,8 @@ async def test_two_users_concurrent_turns_no_cross_talk(db_session_factory, monk
     ]
     outcomes = await asyncio.gather(*tasks)
     assert all(outcome.error_kind is None for outcome in outcomes)
-    assert {outcome.user_id for outcome in outcomes} == {"feishu:ou_A_cc", "feishu:ou_B_cc"}
-    a_texts = [content for user_id, content in order if user_id == "feishu:ou_A_cc"]
-    b_texts = [content for user_id, content in order if user_id == "feishu:ou_B_cc"]
+    assert {outcome.user_id for outcome in outcomes} == {user_a, user_b}
+    a_texts = [content for user_id, content in order if user_id == user_a]
+    b_texts = [content for user_id, content in order if user_id == user_b]
     assert a_texts == ["A1", "A2"]
     assert b_texts == ["B1", "B2"]

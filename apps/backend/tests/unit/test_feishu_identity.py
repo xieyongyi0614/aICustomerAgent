@@ -8,10 +8,7 @@ import pytest
 from app.channels.base import InboundMessage
 from app.channels.feishu.identity import FEISHU_CHANNEL, to_channel_identity
 from app.services.identity import channel as service
-from app.services.identity.channel import (
-    build_internal_user_id,
-    build_session_id,
-)
+from app.services.identity.channel import build_session_id
 
 IDENTITY_PATH = Path("app/channels/feishu/identity.py")
 
@@ -20,24 +17,13 @@ def test_feishu_channel_constant_frozen():
     assert FEISHU_CHANNEL == "feishu"
 
 
-def test_build_internal_user_id():
-    assert build_internal_user_id("feishu", "ou_x") == "feishu:ou_x"
-
-
 def test_build_session_id():
     assert build_session_id("feishu", "ou_x") == "feishu:ou_x"
 
 
-def test_derivation_deterministic():
-    first = build_internal_user_id("feishu", "ou_a")
-    second = build_internal_user_id("feishu", "ou_a")
-    assert first == second
+def test_session_derivation_deterministic():
     assert build_session_id("feishu", "ou_a") == build_session_id("feishu", "ou_a")
-
-
-def test_different_external_ids_never_collide():
-    assert build_internal_user_id("feishu", "ou_a") != build_internal_user_id("feishu", "ou_b")
-    assert build_internal_user_id("feishu", "ou_a") != build_internal_user_id("web", "ou_a")
+    assert build_session_id("feishu", "ou_a") != build_session_id("feishu", "ou_b")
 
 
 def test_session_prefix_isolated_from_web_uuid_sessions():
@@ -51,22 +37,18 @@ def test_session_prefix_isolated_from_web_uuid_sessions():
 @pytest.mark.parametrize("channel", ["", "   "])
 def test_empty_channel_rejected(channel):
     with pytest.raises(ValueError):
-        build_internal_user_id(channel, "ou_x")
-    with pytest.raises(ValueError):
         build_session_id(channel, "ou_x")
 
 
 @pytest.mark.parametrize("external_id", ["", "   "])
 def test_empty_external_id_rejected(external_id):
     with pytest.raises(ValueError):
-        build_internal_user_id("feishu", external_id)
-    with pytest.raises(ValueError):
         build_session_id("feishu", external_id)
 
 
 def test_resolved_identity_is_frozen_value_object():
     identity = service.ResolvedIdentity(
-        channel="feishu", external_id="ou_x", internal_user_id="feishu:ou_x",
+        channel="feishu", external_id="ou_x", internal_user_id="99769178403110912",
         session_id="feishu:ou_x", created=True,
     )
     assert identity.created is True

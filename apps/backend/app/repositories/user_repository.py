@@ -21,6 +21,29 @@ def get_by_email(email: str) -> UserRow | None:
         return row
 
 
+def create(
+    user_id: str,
+    *,
+    display_name: str | None = None,
+    now: datetime | None = None,
+) -> UserRow:
+    timestamp = now or datetime.now()
+    with SessionLocal() as session:
+        row = UserRow(
+            id=user_id,
+            email=None,
+            display_name=display_name,
+            status="active",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        session.expunge(row)
+        return row
+
+
 def create_with_email(
     user_id: str,
     email: str,

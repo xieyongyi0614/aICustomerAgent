@@ -67,23 +67,23 @@ def test_closure_identity_table_is_the_source(db_session_factory):
     identity = channel_identity_service.resolve("feishu", "ou_CL_A")
     row = channel_identity_repository.find("feishu", "ou_CL_A")
     assert row is not None
-    assert identity.internal_user_id == "feishu:ou_CL_A"
+    assert identity.internal_user_id.isdigit()
     assert identity.internal_user_id != identity.external_id
     assert identity.external_id == "ou_CL_A"
 
 
 @pytest.mark.asyncio
 async def test_closure_proactive_send_via_resolved_recipient(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_CL_A")
+    identity = channel_identity_service.resolve("feishu", "ou_CL_A")
     transport = ClosureTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    result = await send_proactive("feishu:ou_CL_A", "在吗？", "k1")
+    result = await send_proactive(identity.internal_user_id, "在吗？", "k1")
     assert result.ok is True
     im_calls = _im_calls(transport)
     assert len(im_calls) == 1
     assert "receive_id_type=open_id" in im_calls[0]["url"]
     assert im_calls[0]["body"]["receive_id"] == "ou_CL_A"
-    assert im_calls[0]["body"]["receive_id"] != "feishu:ou_CL_A"
+    assert im_calls[0]["body"]["receive_id"] != identity.internal_user_id
 
 
 @pytest.mark.asyncio
@@ -109,15 +109,15 @@ async def test_closure_proactive_missing_key_rejected(db_session_factory):
 
 @pytest.mark.asyncio
 async def test_closure_proactive_idempotent_and_multi_user(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_CL_M1")
-    channel_identity_service.resolve("feishu", "ou_CL_M2")
+    user_m1 = channel_identity_service.resolve("feishu", "ou_CL_M1").internal_user_id
+    user_m2 = channel_identity_service.resolve("feishu", "ou_CL_M2").internal_user_id
     transport = ClosureTransport(_ok_responder)
     feishu_client.set_transport(transport)
 
-    await send_proactive("feishu:ou_CL_M1", "一", "k1")
-    await send_proactive("feishu:ou_CL_M1", "一", "k1")
-    await send_proactive("feishu:ou_CL_M1", "二", "k2")
-    await send_proactive("feishu:ou_CL_M2", "给 M2", "k1")
+    await send_proactive(user_m1, "一", "k1")
+    await send_proactive(user_m1, "一", "k1")
+    await send_proactive(user_m1, "二", "k2")
+    await send_proactive(user_m2, "给 M2", "k1")
     im_calls = _im_calls(transport)
     assert len(im_calls) == 3
     assert [c["body"]["receive_id"] for c in im_calls] == [
@@ -129,17 +129,17 @@ async def test_closure_proactive_idempotent_and_multi_user(db_session_factory):
 
 @pytest.mark.asyncio
 async def test_closure_proactive_pure_outbound_zero_db_writes(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_CL_W")
+    user = channel_identity_service.resolve("feishu", "ou_CL_W").internal_user_id
     transport = ClosureTransport(_error_responder)
     feishu_client.set_transport(transport)
-    before_memories = len(memory_repository.list_by_user("feishu:ou_CL_W"))
-    result = await send_proactive("feishu:ou_CL_W", "hi", "k1")
+    before_memories = len(memory_repository.list_by_user(user))
+    result = await send_proactive(user, "hi", "k1")
     assert result.ok is False
-    assert conversation_repository.get_latest_for_user("feishu:ou_CL_W") is None
-    assert len(memory_repository.list_by_user("feishu:ou_CL_W")) == before_memories == 0
-    assert world_repository.get_world("feishu:ou_CL_W") is None
+    assert conversation_repository.get_latest_for_user(user) is None
+    assert len(memory_repository.list_by_user(user)) == before_memories == 0
+    assert world_repository.get_world(user) is None
     assert (
-        channel_identity_repository.list_by_internal_user("feishu:ou_CL_W")[0].external_id
+        channel_identity_repository.list_by_internal_user(user)[0].external_id
         == "ou_CL_W"
     )
 

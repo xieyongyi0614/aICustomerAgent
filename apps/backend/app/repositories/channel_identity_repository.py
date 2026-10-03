@@ -30,7 +30,7 @@ def get_or_create(
     channel: str,
     external_id: str,
     internal_user_id: str,
-    session_id: str,
+    session_id: str | None = None,
     *,
     union_id: str | None = None,
     tenant_key: str | None = None,

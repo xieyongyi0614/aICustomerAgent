@@ -28,7 +28,7 @@ from sqlalchemy import inspect, text
 
 from app.core.db import SessionLocal, UserRow
 from app.repositories.world_repository import world_id_for
-from app.services.identity.user_service import email_user_id
+from app.services.identity.user_service import legacy_email_user_id
 
 
 def tables_with_column(engine, column: str, *, exclude: tuple[str, ...] = ()) -> list[str]:
@@ -80,7 +80,7 @@ def migrate_owner_id(
                 f"用户 {source_id} 无绑定邮箱，无法派生目标 id——请先绑定邮箱"
             )
         email = source.email.strip().lower()
-        target_id = email_user_id(email)
+        target_id = legacy_email_user_id(email)
         target_exists = session.get(UserRow, target_id) is not None
 
     report["to_id"] = target_id

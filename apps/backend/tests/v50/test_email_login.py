@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.api.v1 import auth as auth_api
+from app.repositories import channel_identity_repository, user_repository
 from app.services.email import sender as sender_module
 from app.services.email.sender import EmailContent
 from app.services.identity import user_service
@@ -88,10 +89,39 @@ async def test_verify_without_code_raises_expired(store):
 def test_find_or_create_by_email_is_idempotent():
     first = user_service.find_or_create_by_email("newuser@example.com")
     second = user_service.find_or_create_by_email("NewUser@Example.com")
-    assert first.user_id.startswith("email-")
+    assert first.user_id.isdigit()
     assert first.user_id == second.user_id
     assert first.display_name == "newuser"
     assert first.status == "active"
+
+
+def test_find_or_create_by_email_writes_channel_binding():
+    context = user_service.find_or_create_by_email("bound@example.com")
+    binding = channel_identity_repository.find("email", "bound@example.com")
+    assert binding is not None
+    assert binding.internal_user_id == context.user_id
+    assert binding.session_id is None
+
+
+def test_find_or_create_by_email_survives_dangling_binding():
+    channel_identity_repository.get_or_create(
+        "email", "dangling@example.com", "999999"
+    )
+    context = user_service.find_or_create_by_email("dangling@example.com")
+    binding = channel_identity_repository.find("email", "dangling@example.com")
+    assert binding.internal_user_id == context.user_id
+    assert context.user_id != "999999"
+
+
+def test_find_or_create_by_email_backfills_binding_for_legacy_user():
+    legacy = user_repository.create_with_email("legacy-abc123", "legacy@example.com")
+    assert channel_identity_repository.find("email", "legacy@example.com") is None
+
+    context = user_service.find_or_create_by_email("legacy@example.com")
+
+    assert context.user_id == legacy.id == "legacy-abc123"
+    binding = channel_identity_repository.find("email", "legacy@example.com")
+    assert binding.internal_user_id == "legacy-abc123"
 
 
 async def test_send_email_code_endpoint_returns_cooldown(monkeypatch):
@@ -166,7 +196,7 @@ async def test_verify_email_code_endpoint_issues_bound_token(monkeypatch):
 
     def fake_find(email):
         return user_service.UserContext(
-            user_id="email-abc123", display_name="u", status="active"
+            user_id="99769178403110912", display_name="u", status="active"
         )
 
     monkeypatch.setattr(verification_service, "verify_login_code", ok)
@@ -179,8 +209,8 @@ async def test_verify_email_code_endpoint_issues_bound_token(monkeypatch):
         )
     )
     user_id, device_id, _ = auth_api.parse_token_parts(response.token)
-    assert (user_id, device_id) == ("email-abc123", "d1")
-    assert response.user_id == "email-abc123"
+    assert (user_id, device_id) == ("99769178403110912", "d1")
+    assert response.user_id == "99769178403110912"
 
 
 def test_email_login_ready_requires_smtp(monkeypatch):

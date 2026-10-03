@@ -56,12 +56,15 @@ def _reset_state(override_settings):
     feishu_client.reset_feishu_client()
 
 
+def _internal_user_id(open_id: str) -> str:
+    return channel_identity_service.resolve("feishu", open_id).internal_user_id
+
+
 @pytest.mark.asyncio
 async def test_proactive_resolves_identity_and_sends(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_A")
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    result = await send_proactive("feishu:ou_A", "在吗？", "k1")
+    result = await send_proactive(_internal_user_id("ou_A"), "在吗？", "k1")
     assert result.ok is True
     im_calls = _im_calls(transport)
     assert len(im_calls) == 1
@@ -78,7 +81,7 @@ async def test_proactive_open_id_differs_from_internal_user_id(db_session_factor
     feishu_client.set_transport(transport)
     await send_proactive(identity.internal_user_id, "hi", "kX")
     im_calls = _im_calls(transport)
-    assert identity.internal_user_id == "feishu:ou_XYZ"
+    assert identity.internal_user_id.isdigit()
     assert identity.internal_user_id != identity.external_id
     assert im_calls[0]["body"]["receive_id"] == "ou_XYZ"
 
@@ -87,7 +90,7 @@ async def test_proactive_open_id_differs_from_internal_user_id(db_session_factor
 async def test_proactive_unknown_user_no_request_no_guess(db_session_factory):
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    result = await send_proactive("feishu:ou_ghost", "hi", "k1")
+    result = await send_proactive("99999999999999999", "hi", "k1")
     assert result.ok is False
     assert result.error.value == "not_found"
     assert _im_calls(transport) == []
@@ -95,11 +98,10 @@ async def test_proactive_unknown_user_no_request_no_guess(db_session_factory):
 
 @pytest.mark.asyncio
 async def test_proactive_missing_idempotency_key_rejected(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_K")
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
     for key in (None, "", "   "):
-        result = await send_proactive("feishu:ou_K", "hi", key)
+        result = await send_proactive(_internal_user_id("ou_K"), "hi", key)
         assert result.ok is False
         assert result.error.value == "invalid_request"
     assert _im_calls(transport) == []
@@ -107,58 +109,52 @@ async def test_proactive_missing_idempotency_key_rejected(db_session_factory):
 
 @pytest.mark.asyncio
 async def test_proactive_idempotent_same_key_single_request(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_idem")
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    await send_proactive("feishu:ou_idem", "第一条", "k1")
-    await send_proactive("feishu:ou_idem", "第一条", "k1")
+    await send_proactive(_internal_user_id("ou_idem"), "第一条", "k1")
+    await send_proactive(_internal_user_id("ou_idem"), "第一条", "k1")
     assert len(_im_calls(transport)) == 1
 
 
 @pytest.mark.asyncio
 async def test_proactive_different_keys_both_sent(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_keys")
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    await send_proactive("feishu:ou_keys", "一", "k1")
-    await send_proactive("feishu:ou_keys", "二", "k2")
+    await send_proactive(_internal_user_id("ou_keys"), "一", "k1")
+    await send_proactive(_internal_user_id("ou_keys"), "二", "k2")
     assert len(_im_calls(transport)) == 2
 
 
 @pytest.mark.asyncio
 async def test_proactive_retry_exhausts_without_raising(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_retry")
     transport = ProTransport(_error_responder)
     feishu_client.set_transport(transport)
-    result = await send_proactive("feishu:ou_retry", "hi", "k1")
+    result = await send_proactive(_internal_user_id("ou_retry"), "hi", "k1")
     assert result.ok is False
     assert len(_im_calls(transport)) == 3
 
 
 @pytest.mark.asyncio
 async def test_proactive_failure_touches_nothing(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_iso")
     transport = ProTransport(_error_responder)
     feishu_client.set_transport(transport)
     before_conversations = (
-        conversation_repository.get_latest_for_user("feishu:ou_iso") is not None
+        conversation_repository.get_latest_for_user(_internal_user_id("ou_iso")) is not None
     )
-    before_memories = len(memory_repository.list_by_user("feishu:ou_iso"))
-    await send_proactive("feishu:ou_iso", "hi", "k1")
+    before_memories = len(memory_repository.list_by_user(_internal_user_id("ou_iso")))
+    await send_proactive(_internal_user_id("ou_iso"), "hi", "k1")
     assert (
-        conversation_repository.get_latest_for_user("feishu:ou_iso") is not None
+        conversation_repository.get_latest_for_user(_internal_user_id("ou_iso")) is not None
     ) == before_conversations
-    assert len(memory_repository.list_by_user("feishu:ou_iso")) == before_memories == 0
+    assert len(memory_repository.list_by_user(_internal_user_id("ou_iso"))) == before_memories == 0
 
 
 @pytest.mark.asyncio
 async def test_proactive_multi_users_no_cross_talk(db_session_factory):
-    channel_identity_service.resolve("feishu", "ou_MA")
-    channel_identity_service.resolve("feishu", "ou_MB")
     transport = ProTransport(_ok_responder)
     feishu_client.set_transport(transport)
-    await send_proactive("feishu:ou_MA", "给A", "kA")
-    await send_proactive("feishu:ou_MB", "给B", "kB")
+    await send_proactive(_internal_user_id("ou_MA"), "给A", "kA")
+    await send_proactive(_internal_user_id("ou_MB"), "给B", "kB")
     im_calls = _im_calls(transport)
     assert [call["body"]["receive_id"] for call in im_calls] == ["ou_MA", "ou_MB"]
     assert [json.loads(call["body"]["content"])["text"] for call in im_calls] == ["给A", "给B"]

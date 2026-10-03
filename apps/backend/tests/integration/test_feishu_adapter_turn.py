@@ -54,13 +54,14 @@ async def test_full_turn_writes_exactly_two_messages(db_session_factory, fake_ll
     outcome = await adapter.handle_inbound_message(_inbound("在吗", "ou_full"))
     assert outcome.error_kind is None
     assert outcome.outbound_text == "你好呀"
-    assert outcome.user_id == "feishu:ou_full"
+    identity = channel_identity_service.resolve("feishu", "ou_full")
+    assert outcome.user_id == identity.internal_user_id
     assert outcome.session_id == "feishu:ou_full"
     assert outcome.user_id != TEST_USER_ID
     assert conversation_repository.count_messages("feishu:ou_full") == 2
     conversation = conversation_repository.find_conversation("feishu:ou_full")
     assert conversation is not None
-    assert conversation.user_id == "feishu:ou_full"
+    assert conversation.user_id == identity.internal_user_id
 
 
 @pytest.mark.asyncio
@@ -109,9 +110,10 @@ async def test_same_session_serial_fifo(db_session_factory, monkeypatch):
 async def test_user_b_not_blocked_by_user_a(db_session_factory, monkeypatch):
     slow_release = asyncio.Event()
     slow_started: list[str] = []
+    slow_user = channel_identity_service.resolve("feishu", "ou_slow").internal_user_id
 
     async def _stream(session_id, user_id, content, llm=None, trace=None):
-        if user_id == "feishu:ou_slow":
+        if user_id == slow_user:
             slow_started.append(user_id)
             await slow_release.wait()
         yield {"kind": "token", "text": "ok"}
