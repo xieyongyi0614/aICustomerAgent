@@ -13,7 +13,6 @@ REF-005 策略层：澄清话语 ↔ Insight 匹配（LCS 归一相似度，阈�
 
 import logging
 import time
-import uuid
 from datetime import datetime
 
 from app.core.db import InsightRow, SessionLocal
