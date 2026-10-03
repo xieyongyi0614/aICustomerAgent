@@ -1,3 +1,5 @@
+"""自主行为域模型：主动动作、动作执行与调度、后台任务、触发器、Outbox 与运行台账。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

@@ -1,3 +1,5 @@
+"""世界模拟域模型：世界、实体、事件、快照、日程与用户处境。"""
+
 from datetime import date, datetime
 
 from sqlalchemy import (

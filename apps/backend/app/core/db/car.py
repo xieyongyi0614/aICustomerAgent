@@ -1,3 +1,5 @@
+"""车辆域模型：车辆档案、贷款、保养记录与里程日志。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

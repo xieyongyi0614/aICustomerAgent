@@ -1,3 +1,5 @@
+"""反思域模型：洞察、反思运行与证据关联。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

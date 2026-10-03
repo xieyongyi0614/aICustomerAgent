@@ -1,3 +1,5 @@
+"""记忆域模型：长期记忆、候选记忆与记忆关联。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

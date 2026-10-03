@@ -1,3 +1,5 @@
+"""目标域模型：目标栈与目标规划。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

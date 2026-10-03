@@ -1,3 +1,5 @@
+"""身份与通道域模型：用户、通道绑定、飞书去重/投递台账与简报偏好。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

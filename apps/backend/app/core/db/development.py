@@ -1,3 +1,5 @@
+"""发展域模型：发展状态与变更流水。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

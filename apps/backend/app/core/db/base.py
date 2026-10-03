@@ -1,3 +1,5 @@
+"""ORM 基类与跨领域共享的自定义列类型。"""
+
 from sqlalchemy import types as sa_types
 from sqlalchemy.orm import DeclarativeBase
 

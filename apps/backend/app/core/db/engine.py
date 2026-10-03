@@ -1,3 +1,5 @@
+"""数据库引擎与会话工厂；engine 在本模块导入时创建。"""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

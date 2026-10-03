@@ -1,3 +1,5 @@
+"""运行时域模型：链路追踪、Prompt 快照、LLM 调用、决策记录、Agent 快照与评估报告。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

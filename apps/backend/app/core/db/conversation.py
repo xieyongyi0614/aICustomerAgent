@@ -1,3 +1,5 @@
+"""对话域模型：会话、消息、摘要与场景连续性。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

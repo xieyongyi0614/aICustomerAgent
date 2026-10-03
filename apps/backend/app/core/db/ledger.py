@@ -1,3 +1,5 @@
+"""账本域模型：账户、分类、分录与生活任务。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

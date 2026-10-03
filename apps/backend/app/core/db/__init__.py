@@ -1,3 +1,9 @@
+"""ORM 模型包门面：全领域模型统一 re-export，导入路径 `app.core.db` 保持不变。
+
+全部模型子模块必须在此导入，保证 `Base.metadata` 完整（migrations/env.py
+仅导入本包，alembic autogenerate 依赖齐表注册）。
+"""
+
 from app.core.db.autonomy import (
     ActionRecordRow,
     ActionScheduleRow,

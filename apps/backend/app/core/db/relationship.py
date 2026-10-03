@@ -1,3 +1,5 @@
+"""关系域模型：关系状态、事件流、冲突、里程碑与快照。"""
+
 from datetime import datetime
 
 from sqlalchemy import (

@@ -1,3 +1,5 @@
+"""角色域模型：角色状态、情绪历史与人格轴。"""
+
 from datetime import datetime
 
 from sqlalchemy import (
