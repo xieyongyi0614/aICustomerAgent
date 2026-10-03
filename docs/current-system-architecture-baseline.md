@@ -1,7 +1,7 @@
 # Current System Architecture Baseline
 
 > **性质**：本文档是当前系统**唯一可信架构基线**，描述当下真实存在并已实现的系统，非未来规划。
-> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` 0001~0052 + `core/db.py`）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
+> **依据**：全部结论基于当前代码（`apps/backend/app/`）、数据库模型（`migrations/` + `core/db/` 模型包）、配置系统（`core/settings/`）与已封版文档（`docs/version/`）。
 > **纪律**：不设计新功能、不修改架构、不把未实现的模块当作现状描述。后续 Agent Runtime / Memory Evolution / Self Improvement / Multi Channel 开发均以此为基准。
 > **生成时间**：2026-09-20。
 
@@ -69,7 +69,7 @@ Pure Engines          （engines/：纯函数引擎，无 IO / 无 LLM / 无 DB�
    ↓
 Repositories          （repositories/：每张表一个仓储，唯一 DB 访问面）
    ↓
-Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/ Alembic）
+Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy ORM 包；migrations/ Alembic）
 ```
 
 ### 2.2 分层职责与依赖方向
@@ -85,7 +85,7 @@ Database              （PostgreSQL 16；core/db.py SQLAlchemy ORM；migrations/
 | `engines/` | 纯函数引擎：无 IO / 无 LLM / 无 DB，可零 fixture 单测（state / autonomy / decision / behavior / mode / memory_policy 等） | models、core.settings、core.constants、纯数据资产 | repositories、chains、services 业务模块、任何 IO |
 | `chains/` | LangChain 链，统一经 `chains/structured.py` 结构化输出 | prompts、models、core.llm_factory | repositories、services |
 | `repositories/` | CRUD/Query，唯一 DB 访问面 | core.db、models | 一切业务判断 |
-| `core/` | 配置（settings/）、DB 引擎（db.py）、LLM 工厂（llm_factory.py）、常量 | — | 业务 |
+| `core/` | 配置（settings/）、DB 引擎与 ORM 模型包（db/）、LLM 工厂（llm_factory.py）、常量 | — | 业务 |
 
 关键约定：
 
@@ -357,7 +357,7 @@ Response Out →   经 OutboundMessage 契约发送
 
 ### 6.1 核心表与关系
 
-Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 `0001`（2026-09-29 由原 0001~0058 折叠，ADR-14）+ 增量迁移 `0002` 起）；ORM 模型集中定义于 `core/db.py`；领域 Pydantic 模型在 `app/models/`。
+Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 `0001`（2026-09-29 由原 0001~0058 折叠，ADR-14）+ 增量迁移 `0002` 起）；ORM 模型按领域定义于 `core/db/` 包（`__init__.py` 门面 re-export 全部符号，导入路径 `app.core.db` 不变）；领域 Pydantic 模型在 `app/models/`。
 
 | 域 | 核心表 | 关系/关键约束 |
 |---|---|---|
@@ -460,7 +460,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 |-|-|-|
 | `services/agent_service.py` 是"兼容壳"，编排已迁 `chat_pipeline` 但壳仍保留供 api/测试依赖 | 双入口符号残留，新同学易误入旧路径 | P2 |
 | `services/` 巨型文件尚未拆完：`tool/ext_api.py`(1507) / `planning/decompose.py`(963) / `planning/observer.py`(864)，次一级 `tool/confirmation.py`(771) / `grounding/inventory_guard.py`(768) / `planning/context.py`(742) / `development/evaluation.py`(708)（`evaluation/context.py` 与 `reflection/evidence.py` 已于 2026-09-30 包化） | 单文件承担多职责，阅读与改动半径变大；`observer` 经补丁缝 + AST 调用图审计判定**不拆**（广播与 settle 双向调用，改用文件内分节导航） | P3 |
-| ORM 模型集中于 `core/db.py`（44 表），`app/models/` 为 Pydantic 领域模型，二者边界靠约定无显式约束 | 模型层职责易混淆，新增表需人工判断落位 | P2 |
+| **ORM 模型已按领域包化**（2026-10-03，`core/db.py` → `core/db/`：`base`/`engine` + 13 个领域子模块，`app/core/db/__init__.py` 显式 re-export 全部符号，217 处 `from app.core.db import …` 零改动；门面 import 全部子模块保证 `Base.metadata` 完整供 autogenerate）；`app/models/` 仍为 Pydantic 领域模型 | 新增表先选领域子模块落位；`Memory` 与 `*Row` 命名不统一仍是历史遗留 | 已收口 |
 | **迁移链头钉测已收口**（2026-09-29 全链折叠为单迁移 `0001`，ADR-14）：钉测单点 `tests/support/schema_pins.py`（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`），v24 取证常量单点 `tool012_support.py`；新增迁移只需 bump 钉文件 | 残余：`v24`/`v25`/`v26`/`v30`/`v40` 部分测试文件名仍带历史版本号字面量（如 `test_runtime_migration_0052.py`），语义已泛化为最终态断言，待未来顺手改名 | P2 |
 | `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
 | 调试台面端点（`/debug/*`、`/state`、action）`user_id` 省略时取 token 身份（`require_user`），可显式传入覆盖——**已无魔法默认值**（2026-09-28 IDENT-009）；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离 | 调试面无多用户隔离；产品面已隔离 | P2 |
