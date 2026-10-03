@@ -75,6 +75,14 @@ def new_id() -> int:
     return _record(generator, generator.next_id())
 
 
+def new_id_str() -> str:
+    """字符串形态：用于 `VARCHAR` 主键列与 API 出参。
+
+    雪花 ID 为 57+ 位，超出 JS 安全整数范围，对外一律字符串（见 ADR-16）。
+    """
+    return str(new_id())
+
+
 async def new_id_async() -> int:
     generator = get_generator()
     return _record(generator, await generator.next_id_async())

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Mapping
-from uuid import uuid4
 
+from app.core import ids
 from app.core.db import (
     CarLoanRow,
     CarMileageLogRow,
@@ -52,8 +52,8 @@ LOAN_FIELDS = frozenset(
 )
 
 
-def _new_id(prefix: str, user_id: str) -> str:
-    return f"{prefix}_{user_id}_{uuid4().hex[:12]}"
+def _new_id() -> str:
+    return ids.new_id_str()
 
 
 def get_profile(user_id: str) -> CarProfileRow | None:
@@ -86,7 +86,7 @@ def upsert_profile(
         )
         if row is None:
             row = CarProfileRow(
-                id=f"car_profile_{user_id}",
+                id=ids.new_id_str(),
                 user_id=user_id,
                 odometer_km=0,
                 created_at=timestamp,
@@ -128,7 +128,7 @@ def upsert_loan(
         )
         if row is None:
             row = CarLoanRow(
-                id=f"car_loan_{user_id}",
+                id=ids.new_id_str(),
                 user_id=user_id,
                 paid_periods=0,
                 created_at=timestamp,
@@ -153,7 +153,7 @@ def create_service_record(
     timestamp = now or datetime.now()
     with SessionLocal() as session:
         row = CarServiceRecordRow(
-            id=_new_id("carsvc", user_id),
+            id=_new_id(),
             user_id=user_id,
             title=draft.title,
             place=draft.place,
@@ -202,7 +202,7 @@ def create_mileage_log(
     timestamp = now or datetime.now()
     with SessionLocal() as session:
         row = CarMileageLogRow(
-            id=_new_id("carmil", user_id),
+            id=_new_id(),
             user_id=user_id,
             odometer_km=draft.odometer_km,
             delta_km=draft.delta_km,

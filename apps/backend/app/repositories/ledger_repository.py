@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import ids
 from app.core.db import (
     LedgerAccountRow,
     LedgerCategoryRow,
@@ -24,7 +25,7 @@ def create_account(
     timestamp = now or datetime.now()
     with SessionLocal() as session:
         row = LedgerAccountRow(
-            id=f"acc_{user_id}_{name}_{int(timestamp.timestamp() * 1000)}",
+            id=ids.new_id_str(),
             user_id=user_id,
             name=name,
             type=type,
@@ -75,7 +76,7 @@ def ensure_default_account(
             session.expunge(existing)
             return existing, False
         row = LedgerAccountRow(
-            id=f"acc_{user_id}_cash_default",
+            id=ids.new_id_str(),
             user_id=user_id,
             name="现金",
             type="cash",
@@ -117,7 +118,7 @@ def create_category(
     timestamp = now or datetime.now()
     with SessionLocal() as session:
         row = LedgerCategoryRow(
-            id=f"cat_{user_id}_{name}_{int(timestamp.timestamp() * 1000)}",
+            id=ids.new_id_str(),
             user_id=user_id,
             parent_id=parent_id,
             name=name,
@@ -182,6 +183,12 @@ def find_by_alias(user_id: str, text: str) -> LedgerCategoryRow | None:
 
 
 def ensure_seed_categories(user_id: str, *, seed_tree, now: datetime | None = None) -> int:
+    """播种分类树。
+
+    种子 id 保持确定性（`cat_seed_{user_id}_{原始名}`）而非雪花：它承担**跨重命名的稳定身份**
+    ——用户把「餐饮」改成「吃饭」后重跑播种，不能把原分类复活。这是 ADR-16 §6.2 登记的
+    例外表之一，待引入 `seed_key` 列（雪花 id + 业务唯一键）后再收敛。
+    """
     timestamp = now or datetime.now()
     created = 0
     by_name = {row.name: row for row in list_categories(user_id)}

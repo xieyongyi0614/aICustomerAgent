@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.core import ids
 from app.core.db import LifeTaskRow, SessionLocal
 
 
@@ -19,7 +20,7 @@ def create_task(
 ) -> LifeTaskRow:
     timestamp = now or datetime.now()
     row = LifeTaskRow(
-        id=f"task_{user_id}_{int(timestamp.timestamp() * 1000)}",
+        id=ids.new_id_str(),
         user_id=user_id,
         title=title,
         kind=kind,
