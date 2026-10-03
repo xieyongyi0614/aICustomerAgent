@@ -88,6 +88,41 @@ RouteChrome chromeForLocation(String location) {
   return chromeByPath[path] ?? chromeHome;
 }
 
+/// 主 Tab 的语义标识。Tab 归属与切换都以此为唯一真源：
+/// 声明顺序即 TabBar 从左到右的顺序，禁止再用裸下标表达归属。
+enum ShellTab {
+  home(path: '/home'),
+  dynamic(path: '/dynamic'),
+  chat(path: '/chat'),
+  life(
+    path: '/life',
+    owns: ['/ledger', '/memo', '/schedule', '/car', '/album', '/health'],
+  ),
+  profile(path: '/profile', owns: ['/memory']);
+
+  const ShellTab({required this.path, this.owns = const []});
+
+  final String path;
+  final List<String> owns;
+
+  /// 顶级路径段 → Tab 的查表，把原先的 startsWith 链收敛成一次 O(1) 命中。
+  static final Map<String, ShellTab> _bySegment = {
+    for (final tab in values) _segmentOf(tab.path): tab,
+    for (final tab in values)
+      for (final owned in tab.owns) _segmentOf(owned): tab,
+  };
+
+  static String _segmentOf(String path) =>
+      path.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
+
+  /// 按顶级路径段归属 Tab；`/life/detail` 与 `/life` 同为 life，
+  /// 且 `/lifestyle` 不会误命中 `/life`（段级匹配，非前缀匹配）。
+  static ShellTab forLocation(String location) {
+    final path = Uri.tryParse(location)?.path ?? location;
+    return _bySegment[_segmentOf(path)] ?? home;
+  }
+}
+
 bool _entryGateChecked = false;
 
 /// 设计稿 ⓪：无令牌且未看过登录页 → 首启落「初见登录页」；先逛逛 / 已配对直进。
@@ -205,32 +240,15 @@ class _AppShell extends ConsumerWidget {
   final String location;
   final Widget child;
 
-  int _tabIndex(String path) {
-    if (path.startsWith('/dynamic')) return 1;
-    if (path.startsWith('/chat')) return 2;
-    if (path.startsWith('/life') ||
-        path.startsWith('/ledger') ||
-        path.startsWith('/memo') ||
-        path.startsWith('/schedule') ||
-        path.startsWith('/car') ||
-        path.startsWith('/album') ||
-        path.startsWith('/health')) {
-      return 3;
-    }
-    if (path.startsWith('/profile')) return 4;
-    return 0;
-  }
-
   void _onTap(BuildContext context, int index) {
-    const paths = ['/home', '/dynamic', '/chat', '/life', '/profile'];
-    context.go(paths[index]);
+    context.go(ShellTab.values[index].path);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dynamicModule = ref.watch(dynamicModuleProvider);
     final chrome = chromeForLocation(location);
-    final index = _tabIndex(location);
+    final tab = ShellTab.forLocation(location);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: chrome.lightStatusBar
           ? SystemUiOverlayStyle.light
@@ -240,7 +258,7 @@ class _AppShell extends ConsumerWidget {
         bottomNavigationBar: chrome.hideTabBar
             ? null
             : AppTabBar(
-                currentIndex: index,
+                currentIndex: tab.index,
                 onTap: (i) => _onTap(context, i),
                 dynamicLabel: dynamicModule.label,
                 dynamicIcon: dynamicModule.icon,

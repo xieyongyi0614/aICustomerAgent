@@ -25,10 +25,14 @@ void main() {
       ),
     );
     final bar = find.byType(AppTabBar);
-    final barTop = tester.getTopLeft(bar).dy;
+    // 组件盒子比视觉栏体高 ballOverflow：多出的那一条是透明的，专门容纳溢出的球顶
+    expect(
+      tester.getSize(bar).height,
+      AppTabBar.barHeight + AppTabBar.ballOverflow,
+    );
+    // 视觉栏顶 = 组件盒子顶 + ballOverflow（下面所有「相对栏顶」都按视觉栏顶算）
+    final barTop = tester.getTopLeft(bar).dy + AppTabBar.ballOverflow;
 
-    // A9：栏高 88（含底部安全区；测试环境安全区为 0）
-    expect(tester.getSize(bar).height, AppTabBar.barHeight);
     // A9：内容顶部对齐 + 上内边距 12（不是垂直居中）
     expect(
       tester.getTopLeft(find.byIcon(AppIcons.home)).dy - barTop,
@@ -58,6 +62,53 @@ void main() {
       tester.getTopLeft(find.text('对话')).dy - barTop,
       AppTabBar.orbLabelTop,
     );
+  });
+
+  testWidgets('whole chat ball is tappable, overflow above the bar included (A9)',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final taps = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          bottomNavigationBar: AppTabBar(currentIndex: 0, onTap: taps.add),
+        ),
+      ),
+    );
+    final bar = find.byType(AppTabBar);
+    final boxTop = tester.getTopLeft(bar).dy;
+    final centerX = tester.getCenter(find.text('对话')).dx;
+    // 视觉栏顶由首页图标反推：图标恒在视觉栏顶之下 contentTop
+    final visualTop =
+        tester.getTopLeft(find.byIcon(AppIcons.home)).dy - AppTabBar.contentTop;
+
+    // 契约：组件盒子恰好比视觉栏顶高出 ballOverflow，球顶因此落在盒内而非溢出盒外
+    expect(AppTabBar.ballOverflow, -AppTabBar.ballTop);
+    expect(visualTop - boxTop, AppTabBar.ballOverflow);
+
+    // 球顶第一像素：旧实现里球顶在组件边界之外，这一整块都点不到
+    await tester.tapAt(Offset(centerX, boxTop + 1));
+    await tester.pump();
+    expect(taps, [2], reason: '球顶应可点');
+
+    // 球心
+    await tester.tapAt(Offset(centerX, boxTop + AppTabBar.ballSize / 2));
+    await tester.pump();
+    expect(taps, [2, 2], reason: '球心应可点');
+
+    // 球底最后一像素
+    await tester.tapAt(Offset(centerX, boxTop + AppTabBar.ballSize - 1));
+    await tester.pump();
+    expect(taps, [2, 2, 2], reason: '球底应可点');
+
+    // 「对话」文字下沿再往上一像素：旧命中盒底部（栏坐标 56）之下曾是死区
+    final labelBottom = tester.getBottomLeft(find.text('对话')).dy;
+    await tester.tapAt(Offset(centerX, labelBottom - 1));
+    await tester.pump();
+    expect(taps, [2, 2, 2, 2], reason: '文字下沿应可点');
   });
 
   testWidgets('components build without hardcoded colors', (tester) async {

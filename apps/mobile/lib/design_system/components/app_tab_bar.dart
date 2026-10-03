@@ -44,9 +44,18 @@ class AppTabBar extends StatelessWidget {
   /// 而 `.orb-tab` 已落在栏顶内边距 12 之下 → 相对栏顶 = 12 - 24 = -12。
   static const ballTop = -12.0;
 
+  /// 悬浮球溢出栏顶的高度。本组件把自己的盒子向上多留这么多（视觉栏体仍只占下方 88），
+  /// 否则球顶那 12px 落在组件边界外，按 `RenderBox.hitTest` 先判 `size.contains` 的规矩，
+  /// 绘制得出来却永远点不到。
+  static const ballOverflow = -ballTop;
+
   /// 设计稿 `.orb-tab span{margin-top:36px}`：同样相对 `.orb-tab` 项算，
   /// 故对话文字相对栏顶 = 12 + 36 = 48。
   static const orbLabelTop = 48.0;
+
+  /// 对话位（文字位）命中盒：自栏顶量到「对话」文字下沿（10.5px 文字的行盒按 16 计）。
+  /// 悬浮球不在此盒内——它独立挂在最外层 Stack 上，见 `build`。
+  static const orbHitHeight = orbLabelTop + 16.0;
 
   @override
   Widget build(BuildContext context) {
@@ -66,80 +75,88 @@ class AppTabBar extends StatelessWidget {
     final inset = MediaQuery.of(context).padding.bottom;
     // 设计稿栏高 88（原型把 home indicator 画在 88 内）：安全区落在文字下方的空白里，
     // 故 88 是「含安全区」的目标高度，只在安全区更高时才追加高度。
-    final height = math.max(barHeight, inset + contentTop + contentHeight);
+    final visualHeight = math.max(barHeight, inset + contentTop + contentHeight);
+    // 盒子比视觉栏体高 ballOverflow：多出来的那一条是透明的，专门容纳溢出的球顶。
     return SizedBox(
-      height: height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surface.withValues(alpha: 0.92),
-          border: Border(top: BorderSide(color: colors.line)),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                top: contentTop,
-                left: sidePadding,
-                right: sidePadding,
+      height: visualHeight + ballOverflow,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: ballOverflow,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.92),
+                border: Border(top: BorderSide(color: colors.line)),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < tabCount; i++)
-                    if (i == 2)
-                      // 对话位：文字与悬浮球都定位在本项内（`.orb-tab{position:relative}`），
-                      // 球因此落在 5 位里的第 3 位；左右各 2 位等分 → 正好整栏居中。
-                      GestureDetector(
-                        onTap: () => onTap(2),
-                        behavior: HitTestBehavior.opaque,
-                        child: SizedBox(
-                          width: orbSlotWidth,
-                          height: contentHeight,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Positioned(
-                                top: orbLabelTop - contentTop,
-                                left: 0,
-                                right: 0,
-                                child: Text(
-                                  '对话',
-                                  textAlign: TextAlign.center,
-                                  style: type.tabLabel
-                                      .copyWith(color: colors.ink3),
-                                ),
-                              ),
-                              Positioned(
-                                top: ballTop - contentTop,
-                                left: 0,
-                                right: 0,
-                                child: Center(
-                                  child: _ChatBall(
-                                    gradient: gradients.ai,
-                                    shadows: elevation.orbButton(colors.canvas),
-                                    sparkColor: colors.onDeepPrimary,
-                                    onTap: () => onTap(2),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < tabCount; i++)
+                      if (i == 2)
+                        // 对话位：只承载「对话」文字，球独立挂在最外层（见下）。
+                        // 本项自栏顶起算（其余位改在项内补 12 内边距），文字下沿才落在命中盒内。
+                        GestureDetector(
+                          onTap: () => onTap(2),
+                          behavior: HitTestBehavior.opaque,
+                          child: SizedBox(
+                            width: orbSlotWidth,
+                            height: orbHitHeight,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Positioned(
+                                  top: orbLabelTop,
+                                  left: 0,
+                                  right: 0,
+                                  child: Text(
+                                    '对话',
+                                    textAlign: TextAlign.center,
+                                    style: type.tabLabel
+                                        .copyWith(color: colors.ink3),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: contentTop),
+                            child: _TabItem(
+                              spec: tabs[i],
+                              selected: currentIndex == i,
+                              onTap: () => onTap(i),
+                            ),
                           ),
                         ),
-                      )
-                    else
-                      Expanded(
-                        child: _TabItem(
-                          spec: tabs[i],
-                          selected: currentIndex == i,
-                          onTap: () => onTap(i),
-                        ),
-                      ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          // 悬浮球独立挂在最外层 Stack：父盒覆盖整球（含溢出栏顶的那 12px）→ 整球可点。
+          // 左右各 2 位等分 + 中间固定 76 → 本组件水平中线即中间位中线，Center 即可对齐。
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: _ChatBall(
+                gradient: gradients.ai,
+                shadows: elevation.orbButton(colors.canvas),
+                sparkColor: colors.onDeepPrimary,
+                onTap: () => onTap(2),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -202,6 +219,9 @@ class _ChatBall extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      // 球体自身必须 opaque：BoxDecoration 的 DecoratedBox 与 CustomPaint 的 SparklePainter
+      // 都不参与命中测试，默认 deferToChild 会让这个手势识别器永远收不到点击。
+      behavior: HitTestBehavior.opaque,
       child: Container(
         width: AppTabBar.ballSize,
         height: AppTabBar.ballSize,
