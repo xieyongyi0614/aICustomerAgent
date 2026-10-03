@@ -24,10 +24,11 @@
 `tests/unit/test_ids.py`（22 项）；**身份域改用雪花**——`user_service` 改为凭据绑定驱动、
 `channel.resolve()` 补建 `users` 行、`channel_identities` 成为全通道统一绑定表（迁移 `0004`）、
 架构基线已同步（ADR-16）。
-**已完成（C1）**：`car_*` / `ledger_accounts` / `ledger_categories` / `life_tasks` 的 **9 处内嵌 `user_id`
-主键全部收敛为雪花**（P0-4 主体，见 §5.3）。
+**已完成（C1）**：`car_*` / `ledger_accounts` / `ledger_categories` / `life_tasks` 的 **8 处内嵌 `user_id`
+主键全部收敛为雪花**（P0-4 主体，见 §5.3；原记 9 处系计数口径误差，实测 8 处调用点）。
 **已取消（B2）**：列类型翻转 `VARCHAR → BIGINT`，评估后决定不做（见 §6.5）。
-**待办（C2/C3、D）**：`worlds.id` 与其余约 23 处 `uuid4` 仓储主键、5 张例外表拆分（见 §6.5）。
+**已完成（C3）**：全 app `uuid.uuid4()` 生成点 **52 处**全部收敛 `ids`（前缀裁决：**去掉**，见 §5.4）。
+**待办（C2、D）**：`worlds.id` 查库语义改造（§6.5 C2）；5 张例外表拆分 + 2 张自增表收敛（§6.5 D）。
 
 ---
 
@@ -125,7 +126,7 @@ sonyflake 的单调 `_elapsed_time`（§2）。覆盖所有 NTP 微调、手动�
 
 - 容器与宿主机**必须启用 NTP**（`chrony` / `systemd-timesyncd`），并**只允许 slew 平滑调整，禁止 `ntpdate` 式跳变**。
 - **禁止**用「暂停/恢复虚拟机快照」的方式回滚生产实例。
-- 多实例扩容时 `IDS_MACHINE_ID` 必须**互不相同**（0~1023），且**同一个 machine_id 不得同时被两个实例使用**——这是雪花 ID 唯一的正确性前提。
+- 多实例扩容时 `IDS_MACHINE_ID` 必须**互不相同**（0~1023），且**同一个 machine_id 不得同时被两个实例使用**——这是雪花 ID 唯一的正确性前提。机号分配约定：**0 = 默认应用实例；1023 = 迁移回填专用（保留）；1~1022 = 扩容可用**。
 - 监控项：`ids:high_water_ms:{machine_id}` 与墙钟的差值，出现「水位 > 墙钟」即告警。
 
 ### L4 — 双保险：DB 唯一约束
@@ -153,7 +154,7 @@ sonyflake 的单调 `_elapsed_time`（§2）。覆盖所有 NTP 微调、手动�
 | `app/services/identity/channel.py` | 删除 `build_internal_user_id`（`feishu:{open_id}` 派生）；`resolve()` 改为「先查绑定 → 未命中则建 `users` 行 + 建绑定」，`internal_user_id` 返回真实 `users.id`；`build_session_id`（`{channel}:{external_id}`）保留给**会话**，语义不变 |
 | `app/repositories/user_repository.py` | 新增 `create()`（无邮箱的通道用户） |
 | `app/repositories/channel_identity_repository.py` | `get_or_create` 的 `session_id` 改为可选 |
-| `app/core/db.py` + 迁移 `0004` | `channel_identities.session_id` 改为可空（邮箱绑定行无会话概念）。迁移用 `batch_alter_table` 以兼容 SQLite（其不支持 `ALTER COLUMN ... DROP NOT NULL`） |
+| `app/core/db/identity.py`（db 已拆包，原 `db.py`）+ 迁移 `0004` | `channel_identities.session_id` 改为可空（邮箱绑定行无会话概念）。迁移用 `batch_alter_table` 以兼容 SQLite（其不支持 `ALTER COLUMN ... DROP NOT NULL`） |
 | `tests/` | `test_channel_identity.py`（+3 项：resolve 建用户行、改绑邮箱不换人、跨通道共享同一 user）、`test_feishu_identity.py`、`test_email_login.py`、飞书四个集成测试文件全部改为按解析结果断言 |
 
 **B1 实际达成的能力**（对应 §1 的四类问题）：
@@ -203,6 +204,25 @@ IDS_CLOCK_ROLLBACK_TOLERANCE_MS=0
 
 ---
 
+## 5.4 残余 uuid4 生成点收敛（C3）
+
+| 文件 | 改动 |
+|---|---|
+| `app/models/*.py`、`app/application/*.py`、`app/services/**`、`app/repositories/*.py`、`app/api/v1/chat.py` | `uuid.uuid4()` 默认主键/记录 id → `ids.new_id_str()` 共 **52 处**。生成点分布实测与原估相反：仓储层早已无 uuid4，**大头在 models 的 pydantic 默认值与应用服务层**（原估「约 23 处仓储级」落空） |
+| `app/services/observability/collector.py` | `begin_trace` 的内存 pending key 一并收敛（非主键、不落库，按验收口径 2 本可豁免；归一后全 app 无 uuid4） |
+| `tests/v24/test_tool010_e2e.py` | `chat_pipeline.py` 冻结哈希再冻结，注明 ADR-16 C3 有意改脏 |
+| `tests/e2e/test_trace_collector.py`、`tests/e2e/test_debug_correlation.py` | request_id 断言 `len == 32` → 雪花数字串（`isdigit()`） |
+| `tests/v26/test_acceptance.py`、`tests/unit/test_character_action_models.py` 等 | 前缀/长度断言改数字串口径（`startswith("act_")` → `isdigit()`） |
+
+**过程教训（重要）**：本批次的批量替换曾把 `from app.core import ids` 错插进**多行 import 括号内**，
+10 个文件语法损坏、pytest collection 直接失败。已修复（移出至该 import 块闭合后）。
+**教训：机械批量加 import 必须以 AST / 全量语法检查收尾，且全量回归结果要读日志本体，不能信管道 exit code。**
+
+**验证**：全量 `pytest` = **7312 passed / 15 failed**，失败清单与 C1 基线**逐项同类**
+（tool009 ×6 / v25 ×3 / v30 / aut005 / life002 / agent008 / http_lifecycle / 耗时 flaky），**零新增失败**。
+
+---
+
 ## 6. 剩余迁移（表结构）
 
 ### 6.1 55 张表的主键形态分布（实测）
@@ -210,7 +230,7 @@ IDS_CLOCK_ROLLBACK_TOLERANCE_MS=0
 | 类别 | 数量 | 说明 |
 |---|---|---|
 | 代理主键 `id`，**String** | **45** | 迁移主体 |
-| 代理主键 `id`，int 自增 | 2 | `messages`、`emotion_history`（**需一并改为雪花**，否则两套 ID 语义并存） |
+| 代理主键 `id`，int 自增 | 2 | `messages`、`emotion_history`（**需一并改为雪花**，否则两套 ID 语义并存；归入阶段 D） |
 | 自然主键（非 `id`） | 7 | `user_id` × 3、`session_id`、`event_id`、`idempotency_key` |
 | 复合主键 | 1 | `channel_identities (channel, external_id)` |
 
@@ -220,22 +240,20 @@ IDS_CLOCK_ROLLBACK_TOLERANCE_MS=0
 
 ### 6.2 不能直接换成雪花的 5 张表
 
-它们的主键语义是「幂等键 / 外部 ID / 派生查找键」，必须**拆成「雪花 ID + 业务唯一键」两列**：
+它们的主键语义是「幂等键 / 外部 ID / 派生查找键」，必须**拆成「雪花 ID + 业务唯一键」两列**。列类型一律维持 `VARCHAR` 存雪花十进制串（B2 取消裁决的延伸：这些表都承载历史非数字数据，翻 `BIGINT` 需重映射，且会牵连 FK 列类型连锁翻转）：
 
 | 表 | 现主键 | 处理 |
 |---|---|---|
-| `feishu_dedupe_ledger` | `event_id`（外部事件 ID） | 保留 `event_id` 作业务键，另加 `id` |
+| `feishu_dedupe_ledger` | `event_id`（外部事件 ID） | 加雪花 `id` 作主键，`event_id` 转业务唯一键；存量行由迁移回填 |
 | `feishu_deliveries` | `idempotency_key` | 同上 |
-| `conversations` | `id` = `session_id`（**客户端传入**） | `id BIGINT` + `session_id TEXT UNIQUE` |
-| `worlds` | `id` = `home:{user_id}` | `id BIGINT` + `UNIQUE(user_id, kind)` |
-| `ledger_categories` | 种子 `cat_seed_{user_id}_{name}` | `id BIGINT` + `UNIQUE(user_id, name)`（`get_category(seed_id)` 改按业务键查） |
+| `conversations` | `id` = `session_id`（**客户端传入**） | 新增 `session_id` 列（存量回填 = 旧 id）+ UNIQUE；**存量行 id 保留旧会话串**（与 users 存量保留同构，避免 FK 重映射手术），新会话 `id` = 雪花、查找按 `session_id` 业务键 |
+| `worlds` | `id` = `home:{user_id}` | 新世界 `id` = 雪花，查找一律按 `user_id`（表**无 `kind` 列**、`user_id` 已 UNIQUE——原方案写 `UNIQUE(user_id, kind)` 系笔误）；**存量行 id 保留**，子表隐式引用不受影响 |
+| `ledger_categories` | 种子 `cat_seed_{user_id}_{name}` | 加 `seed_key` 列（播种原始名，业务唯一键）+ 雪花 id（含种子行）；`get_category(seed_id)` 改按 `seed_key` 查 |
 
 ### 6.3 隐式引用列（无 FK 约束但需同步改类型）
 
 约 10 个：`goal_id`、`request_id`、`action_id`、`memory_id`、`related_memory_id`、`insight_id`、`source_insight_id`、`subject_id`、`account_id`、`record_id` / `target_record_id`。
-全仓仅 6 处显式 `ForeignKey`（3 处指向 `conversations.id`，3 处在 `ledger_*` 内部）。
-
-### 6.4 列类型写法
+全仓仅 6 处显式 `ForeignKey`（3 处指向 `conversations.id`，3 处在 `ledger_*` 内部）。### 6.4 列类型写法
 
 ```python
 id: Mapped[int] = mapped_column(
@@ -255,9 +273,9 @@ id: Mapped[int] = mapped_column(
 | **B1（已完成）** | 身份域改用雪花：`user_service` 绑定驱动、`channel.resolve()` 补建 `users` 行、`channel_identities` 统一绑定表、迁移 `0004`、基线 ADR-16 | 低（`user_id` 的 Python/API 类型未变 → **无 token 失效**） |
 | **B2（评估后不做）** | 列类型翻转 `VARCHAR → BIGINT` + Python 类型翻转。**结论：收益不抵成本**，详见下方 |
 | **C1（已完成）** | **P0-4 主体**：`car_*`（4 处）/ `ledger_accounts`（2 处）/ `ledger_categories`（1 处）/ `life_tasks`（1 处）共 **9 处内嵌 `user_id` 的主键**收敛为雪花；`ids.new_id_str()` 为 `VARCHAR` 列/API 提供字符串出口 | 低（**测试侧零字面量依赖**，已实测） |
-| **C2** | `worlds.id`：`home:{user_id}` → 雪花。**需先解决 `world_id_for(user_id)` 的语义**：它现为纯函数、被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`），改查库会引入 `None` 语义（世界可能尚未建立）；另需处理 38 处测试 `home:` 字面量 | 中 |
-| **C3** | 其余约 23 处仓储级 `uuid4` 主键 → 雪花（`app/repositories/*.py`）。实测测试侧仅 **4 处**格式断言需改（`len(event.id) == 36`、3 处 `startswith("act_")`）；需同步决定是否保留类型前缀（本方案倾向**去掉前缀**，与 `user_id` 一致） | 低 |
-| **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键） | 中 |
+| **C2** | `worlds.id`：新世界发雪花，**存量行 id 保留 `home:{user_id}`**（零数据迁移、零子表重映射）。`world_id_for` 纯函数退役改查库：被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`）+ 仓储内 3 处，世界未建立返回 `None`（读路径空返回语义不变）；测试侧 35 处 `world_id_for` 引用、39 处 `home:` 字面量同步改写。无 schema 迁移（`user_id` 已 UNIQUE） | 中 |
+| **C3** | 全 app `uuid.uuid4()` 生成点 → 雪花。**实测 52 处**（原估「约 23 处仓储级」严重偏低：生成点跨 models/application/services/repositories/api，不止仓储层）。前缀裁决：**去掉**（与 `user_id` 一致）；测试侧格式断言同步改（`startswith("act_")` → `isdigit()`、`len == 32` → `isdigit()`）；`collector` 内存 trace key 一并收敛 | 低 |
+| **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键）+ `messages` / `emotion_history` 两张 int 自增表改雪花（`BigInteger().with_variant(Integer, "sqlite")` + 显式 `autoincrement=False`，防 BIGSERIAL 渲染坑）。迁移内回填发号用**保留机号 1023** 的独立 Sonyflake 实例，不与应用实例撞号 | 中 |
 
 > **C1 的一处例外**：`ledger_categories` 的**种子** id 保留确定性（`cat_seed_{user_id}_{原始名}`），未随 C1 改雪花。
 > 原因：该 id 承担**跨重命名的稳定身份**——用户把「餐饮」改成「吃饭」后重跑播种，不能把原分类复活
@@ -346,11 +364,11 @@ id: Mapped[int] = mapped_column(
 | 回拨实测 | 回拨 5s / 1h / 冻结时钟 5000 个，均无重复、单调、解码时间不回退 |
 | 容量与寿命 | `time_bits=41` → 可用至 2095-09-07；4096 ID/ms；1024 机器 |
 | SQLite 陷阱 | `BigInteger()` 在 SQLite 插入报 `NOT NULL constraint failed: x.id`；`with_variant(Integer,"sqlite")` 插入成功 `[(1,),(2,)]` |
-| 已有自增先例 | `db.py:55` `messages.id = Integer, primary_key=True, autoincrement=True` |
+| 已有自增先例 | `app/core/db/conversation.py:47` `messages.id = Integer, primary_key=True, autoincrement=True` |
 | 45 张 String 代理主键 | 脚本按 `mapped_column(... primary_key=True)` 分类统计（§6.1） |
 | 自增不适用表 | `ledger_repository.py:189` `get_category(seed_id)` 用派生 ID 当查找键；`api/v1/chat.py:52` 会话 ID 由客户端传入；`outbox_repository.py:57` 幂等键由业务计算 |
-| 隐式引用列约 10 个 | `grep "_id: Mapped\[str\]" db.py`（排除 user_id/world_id/conversation_id/session_id） |
-| 显式 FK 仅 6 处 | `grep -c ForeignKey db.py` |
+| 隐式引用列约 10 个 | `grep "_id: Mapped\[str\]" app/core/db/`（db 已拆包；排除 user_id/world_id/conversation_id/session_id） |
+| 显式 FK 仅 6 处 | `grep -rc ForeignKey app/core/db/*.py` |
 | 令牌载荷含 user_id | `api/v1/auth.py:81` |
 | 可枚举风险已登记 | `current-system-architecture-baseline.md` 技术债表（P2） |
 | 回归 | `tests/unit` 1551 passed；`tests/e2e` 179 passed |
