@@ -41,13 +41,23 @@ dart run build_runner build --delete-conflicting-outputs
 
 #### 3.1 模拟器（Android 开发必读）
 
-模拟器**不会随 `flutter run` 自动拉起**：手动关闭模拟器后再跑 `flutter run`，设备列表里没有 Android（或直接回落 web）。每次开发前先拉起：
+**模拟器必须手动拉起——它不会随 `flutter run` / F5 自动启动。** 没起模拟器时不会报「找不到设备」，而是**静默挑一个其它设备**（本机是 `windows` 桌面）；本机未装 Visual Studio，`-d windows` 构建必然失败，最终现象是**模拟器和应用都没弹出来**，极易误判成「模拟器坏了」。
+
+每次开发前先拉起（首次开机较慢）：
 
 ```bash
-flutter emulators --launch Medium_Phone_API_36    # 列表用 flutter emulators 查看
+emulator -avd Medium_Phone_API_36                 # 直接用 emulator.exe 启动，最稳
+flutter emulators --launch Medium_Phone_API_36    # 等价写法；列表用 flutter emulators 查看
 ```
 
-等开机完成后（首次较慢）`adb devices` 出现 `emulator-5554` 即就绪，然后**重建端口隧道**：
+> `emulator` / `adb` 来自 `%ANDROID_HOME%\emulator` 与 `%ANDROID_HOME%\platform-tools`（已在系统 PATH）。若 `flutter emulators` 报 `CreateFile failed 231`（Dart 工具链建管道失败），改用上面的 `emulator -avd` 直启，绕开 flutter 工具链。
+
+等开机完成：`adb devices` 出现 `emulator-5554`，且 `adb -s emulator-5554 shell getprop sys.boot_completed` 返回 `1`。**开机完成后还要选对设备**：
+
+- **VS Code（F5）**：先在底部状态栏把设备切到 `emulator-5554` 再 F5。仓库根两个「朝夕 App」启动配置**不带 `deviceId`**，只会跑在「当前选中设备」上；没切就会跑到 `windows` 上，表现同上。
+- **CLI**：显式带 `-d emulator-5554`（见 §4）。
+
+然后**重建端口隧道**：
 
 ```bash
 adb reverse tcp:8020 tcp:8020
@@ -55,7 +65,7 @@ adb reverse tcp:8020 tcp:8020
 
 模拟器是带独立网络栈的虚拟机，它的 `127.0.0.1` 是它自己——reverse 之后模拟器里的 `127.0.0.1:8020` 才指向宿主机后端（`dart_defines/dev.json` 即按此地址约定）。**reverse 在模拟器重启后丢失**，App 报「网络好像断了」时先重跑这条。
 
-关闭模拟器用 `adb emu kill` 或直接关窗口。已知坑：`adb emu kill` 可能残留 AVD 锁（`~/.android/avd/Medium_Phone_API_36.avd/` 下的 `*.lock`，锁可能是**目录**，用 `rm -rf` 删）——残留后下次启动崩溃、`flutter run` 回落 web，删锁再拉起即可。
+关闭模拟器用 `adb emu kill` 或直接关窗口。已知坑：`adb emu kill` 可能残留 AVD 锁（`~/.android/avd/Medium_Phone_API_36.avd/` 下的 `*.lock`，锁可能是**目录**，用 `rm -rf` 删）——残留后下次启动崩溃、`flutter run` 回落到 `windows` 等其它设备，删锁再拉起即可。
 
 #### 3.2 真机（USB 调试）
 
@@ -102,7 +112,7 @@ flutter run --dart-define-from-file=dart_defines/dev.json \
 
 API 地址经 `--dart-define` 注入，**未注入时启动即崩**（`lib/core/env/app_env.dart` fail-fast，无静默回退硬编码地址）。三种方式任选：
 
-**VS Code（最简）**：仓库根 `.vscode/launch.json` 已带「朝夕 App · Android/iOS 模拟器 (dev)」两个启动配置，F5 一键运行。**真机 + 模拟器同时在线时**，先在下拉设备选择器里选中目标设备再 F5——这两个配置不带 `deviceId`，会跑在当前选中的设备上。
+**VS Code（最简）**：仓库根 `.vscode/launch.json` 已带「朝夕 App · Android/iOS 模拟器 (dev)」两个启动配置，F5 一键运行。这两个配置**不带 `deviceId`**，只会跑在「当前选中设备」上——所以 **F5 前必须先手动拉起模拟器，并把状态栏设备切到 `emulator-5554`**（见 §3.1）。真机 + 模拟器同时在线时同理，先在下拉设备选择器里选中目标设备再 F5。选错设备不报错，只会静默跑到别的设备上（本机无 Visual Studio，跑到 `windows` 会直接构建失败、什么都不弹）。
 
 **CLI（推荐）**：地址收敛在 `dart_defines/dev.json`，改地址只动这一处：
 

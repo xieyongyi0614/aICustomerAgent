@@ -72,8 +72,9 @@ npm run dev                 # http://localhost:2000，/api 代理到 :8020（VIT
 # 4. 移动端（apps/mobile/ 下）：朝夕 App，模拟器/登录流程见 apps/mobile/README.md
 cd apps/mobile
 flutter pub get
+emulator -avd Medium_Phone_API_36                           # 模拟器不会自动拉起，必须先手动启动（等 adb devices 出现 emulator-5554）
 adb reverse tcp:8020 tcp:8020                               # 模拟器端口隧道（重启模拟器后重跑）
-flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d emulator-5554   # 或 VS Code 打开仓库根，F5 选「朝夕 App」启动配置
+flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d emulator-5554   # VS Code：先在状态栏选中 emulator-5554 再 F5
 ```
 
 > 移动端要求 Flutter ≥ 3.44.0（Dart ≥ 3.13.4）；`API_BASE_URL` 未注入时启动即 fail-fast，地址改 `apps/mobile/dart_defines/dev.json` 一处即可。登录走**邮箱验证码**（未注册邮箱自动建号）：后端 `.env` 需配置 `REDIS_URL` + `EMAIL_SMTP_*`（163 用授权码）+ `AUTH_TOKEN_SECRET`，缺一登录端点 503；配对码链路已退役。
