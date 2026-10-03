@@ -2,7 +2,7 @@
 
 > 范围：`apps/backend` 全量 ID 生成点（身份 + 55 张表主键）
 > 策略基线：**直接采用雪花 ID**（不经过「自增前期」）
-> 审查日期：2026-10-03 ｜ 状态：**发号模块已落地，表结构迁移待执行**
+> 审查日期：2026-10-03 ｜ 状态：**A / B1 / C1 / C2 / C3 / D 全部落地；B2 评估后否决并经复审维持；L3 运维确认与生产部署项（DEBUG_SURFACE_ENABLED=false）待办**
 
 ---
 
@@ -29,7 +29,7 @@
 **已取消（B2）**：列类型翻转 `VARCHAR → BIGINT`，评估后决定不做（见 §6.5）。
 **已完成（C3）**：全 app `uuid.uuid4()` 生成点 **52 处**全部收敛 `ids`（前缀裁决：**去掉**，见 §5.4）。
 **已完成（C2）**：`worlds.id` 新世界发雪花、存量行保留 `home:{user_id}`，`world_id_for` 退役改查库（见 §6.5）。
-**待办（D）**：5 张例外表拆分 + 2 张自增表收敛（§6.5 D）。
+**已完成（D）**：5 张例外表拆分（迁移 `0005`）+ `messages` / `emotion_history` 自增表收敛 + §7 安全三动作（调试面门禁 + 产品端点身份钉测），见 §6.5。
 
 ---
 
@@ -129,6 +129,7 @@ sonyflake 的单调 `_elapsed_time`（§2）。覆盖所有 NTP 微调、手动�
 - **禁止**用「暂停/恢复虚拟机快照」的方式回滚生产实例。
 - 多实例扩容时 `IDS_MACHINE_ID` 必须**互不相同**（0~1023），且**同一个 machine_id 不得同时被两个实例使用**——这是雪花 ID 唯一的正确性前提。机号分配约定：**0 = 默认应用实例；1023 = 迁移回填专用（保留）；1~1022 = 扩容可用**。
 - 监控项：`ids:high_water_ms:{machine_id}` 与墙钟的差值，出现「水位 > 墙钟」即告警。
+- **生产部署 `.env` 必设项（2026-10-03 登记）**：`IDS_EPOCH_DATE` / `IDS_MACHINE_ID` / `IDS_HIGH_WATER_KEY` / `IDS_HIGH_WATER_FLUSH_SECONDS` / `IDS_CLOCK_ROLLBACK_TOLERANCE_MS` 五键随部署侧登记；`DEBUG_SURFACE_ENFORCED=true` 关闭调试台面（§7）。
 
 ### L4 — 双保险：DB 唯一约束
 
@@ -273,10 +274,16 @@ id: Mapped[int] = mapped_column(
 | **A（已完成）** | 发号模块 + 配置 + 接线 + 单测 | 零 |
 | **B1（已完成）** | 身份域改用雪花：`user_service` 绑定驱动、`channel.resolve()` 补建 `users` 行、`channel_identities` 统一绑定表、迁移 `0004`、基线 ADR-16 | 低（`user_id` 的 Python/API 类型未变 → **无 token 失效**） |
 | **B2（评估后不做）** | 列类型翻转 `VARCHAR → BIGINT` + Python 类型翻转。**结论：收益不抵成本**，详见下方 |
-| **C1（已完成）** | **P0-4 主体**：`car_*`（4 处）/ `ledger_accounts`（2 处）/ `ledger_categories`（1 处）/ `life_tasks`（1 处）共 **9 处内嵌 `user_id` 的主键**收敛为雪花；`ids.new_id_str()` 为 `VARCHAR` 列/API 提供字符串出口 | 低（**测试侧零字面量依赖**，已实测） |
+| **C1（已完成）** | **P0-4 主体**：`car_*`（4 处）/ `ledger_accounts`（2 处）/ `ledger_categories`（1 处）/ `life_tasks`（1 处）共 **8 处内嵌 `user_id` 的主键**收敛为雪花；`ids.new_id_str()` 为 `VARCHAR` 列/API 提供字符串出口 | 低（**测试侧零字面量依赖**，已实测） |
 | **C2（已完成）** | `worlds.id`：新世界发雪花，**存量行 id 保留 `home:{user_id}`**（零数据迁移、零子表重映射）。`world_id_for` 纯函数退役改查库：被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`）+ 仓储内 3 处，世界未建立返回 `None`（读路径空返回语义不变）；测试侧 35 处 `world_id_for` 引用同步改写（其中 `v50` 迁移脚本测试保留 `home:` 字面量——脚本只改写存量格式）。无 schema 迁移（`user_id` 已 UNIQUE）；基线已先行更新；tool007 冻结哈希再登记 | 中 |
 | **C3** | 全 app `uuid.uuid4()` 生成点 → 雪花。**实测 52 处**（原估「约 23 处仓储级」严重偏低：生成点跨 models/application/services/repositories/api，不止仓储层）。前缀裁决：**去掉**（与 `user_id` 一致）；测试侧格式断言同步改（`startswith("act_")` → `isdigit()`、`len == 32` → `isdigit()`）；`collector` 内存 trace key 一并收敛 | 低 |
-| **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键）+ `messages` / `emotion_history` 两张 int 自增表改雪花（`BigInteger().with_variant(Integer, "sqlite")` + 显式 `autoincrement=False`，防 BIGSERIAL 渲染坑）。迁移内回填发号用**保留机号 1023** 的独立 Sonyflake 实例，不与应用实例撞号 | 中 |
+| **D（已完成）** | §6.2 五张例外表拆分（迁移 `0005`：conversations 加 `session_id` 业务键、feishu 两台账表重建为「雪花 id + 业务唯一键」、ledger_categories 加 `seed_key`）+ `messages` / `emotion_history` 两张 int 自增表改雪花（`BigInteger().with_variant(Integer, "sqlite")` + 显式 `autoincrement=False`，防 BIGSERIAL 渲染坑；PG 侧同批清理 serial 默认与序列）。迁移内回填发号用**保留机号 1023** 的独立 Sonyflake 实例，不与应用实例撞号。**坑**：SQLite 下 rename 旧表不改其索引名，新表同名索引会撞名——建索引必须放在 `drop_table` 旧表**之后**（round-trip 升降级两条路径都要）。
+**会话句柄分叉坑（重要）**：存量代码多处把 `conversation.id`（主键）当 session 句柄回传
+（`autonomy_engine` 的 action/decision 构造、`goal/execution.py`、`executor.ensure`）——
+主键即会话串的时代无害；D 之后会 fork 出「session_id=旧主键」的第二行会话。
+修复：`get_or_create_conversation` 与 `save_message` 等统一走「session_id 优先 + 主键回退」解析；
+引擎/执行器侧一律改传 `conversation.session_id or conversation.id`。
+**教训**：主键-业务键拆分类改造，必须全量审计「把主键再当业务键回传」的回流点。 | 中 |
 
 > **C1 的一处例外**：`ledger_categories` 的**种子** id 保留确定性（`cat_seed_{user_id}_{原始名}`），未随 C1 改雪花。
 > 原因：该 id 承担**跨重命名的稳定身份**——用户把「餐饮」改成「吃饭」后重跑播种，不能把原分类复活
@@ -312,6 +319,20 @@ id: Mapped[int] = mapped_column(
 3. bump `tests/support/schema_pins.py` 的 `MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`。
 4. **先更新 `docs/current-system-architecture-baseline.md`，再动代码。**
 
+### 6.5.1 B2 复审（2026-10-03，A/B1/C1/C2/C3/D 全部落地后）
+
+原否决依据逐条以**落地后的新事实**复核：
+
+| 维度 | 原判断 | 复审结论 |
+|---|---|---|
+| 存储 / 索引收益 | 可忽略 | **不变**（无新证据） |
+| 对外契约 | 两方案一致（都必须字符串出 JSON） | **不变**；且阶段 D 已实测：`messages.id` 翻雪花后出参须改 `MessageItemOut.id: str` + `before_id` 游标改字符串——**这正是 B2 若全局翻转会放大 N 倍的序列化改造**，仅两表就涉及 API 契约与前端游标 |
+| 测试字面量成本 584 处 | 翻转即碎 | **未变化**——C2/D 采用「存量行保留旧 id、新行雪花」后，38 个身份列的历史非数字值依旧存在，翻 BIGINT 仍需删库重建或映射表全量改写，与 B1 自愈路径的矛盾依旧成立 |
+| carve-out（C/D 重建的主键无历史数据可就地 BIGINT） | 预留可能性 | **未触发收益**：conversations/messages 等的引用列承载历史数据且牵连 FK 连锁；feishu 两表新 `id` 列为与全库 VARCHAR 雪花口径一致也未就地 BIGINT |
+| 迁移实现成本 | 未量化 | **新增反证**：D 仅翻两张自增表就实测踩到 PG serial 序列清理 + SQLite `with_variant`/显式 id 种子（测试侧「NULL identity key」FlushError）等成本；全量 38 列同类成本按表数放大 |
+
+**结论：维持否决，B2 保持取消。** 重议触发条件（登记）：出现「ID 必须为数字」的强外部约束（第三方对接 / 监管 / 数据仓库口径），届时仍应**先在应用边界做校验层**（成本 1 处），列类型翻转是最后手段；届时的坑位清单见上方 B2 否决记录。
+
 ### 6.6 令牌失效：本次改造不触发
 
 令牌是无状态 HMAC，载荷 `f"{user_id}.{device_id}.{exp}"`（`api/v1/auth.py:81`）。
@@ -331,10 +352,10 @@ id: Mapped[int] = mapped_column(
 
 > 调试台面端点（`/debug/*`、`/state`、action）`user_id` 省略时取 token 身份，**可显式传入覆盖** —— 调试面无多用户隔离（P2）
 
-三个必须同时做的动作：
-1. 调试面加**环境门禁**（仅 `dev` / 白名单 IP）。
-2. 加测试：产品端点传入 `user_id` 参数时必须被忽略（`require_user` 优先）。
-3. 对外接口**不把裸 ID 当业务引用**（客户端引用用户一律用 token 内身份）。若必须暴露，加一层不透明映射。
+三个必须同时做的动作（**2026-10-03 已全部落地**）：
+1. 调试面加**环境门禁**：`/debug/*`、`/state`、action、world 五个路由统一挂 `deps.debug_surface_gate`，`DEBUG_SURFACE_ENFORCED=true`（默认 `false`；**生产部署侧必须显式设置**，登记见 §4 L3）时统一 404 防探测。字段不叫 `*_enabled`——冻结开关基线（PLA-018 AC6）禁止新增该命名，按 `foreground_gateway_enforced` 先例取策略位名。白名单 IP 留作运维侧加固，未实现。
+2. 加测试：`tests/e2e/test_debug_surface_gate.py`——门禁 404 + 产品端点（`/memories`）传入 `user_id` 参数被忽略（`require_user` 优先，钉测）。
+3. 对外接口不把裸 ID 当业务引用：产品端点身份一律来自 token；客户端引用会话用 `session_id` 业务键（阶段 D 拆分后）而非主键。
 
 ---
 
@@ -351,8 +372,14 @@ id: Mapped[int] = mapped_column(
 9. 产品端点传入 `user_id` 参数被忽略；调试面非 `dev` 返回 404/403。
 10. 全部 ID 以字符串出现在 JSON 响应中（前端 JS 精度安全）。
 
-**B1 已达标**：1 / 2（新代码）/ 5 / 7 / 8 / 10。
-**阶段 C / D 达标**：6（迁移脚本幂等）/ 9（调试面门禁，见 §7）。
+**B1 已达标**：1 / 5 / 7 / 8 / 10。
+**C3（2026-10-03 复核）达标 2**：全 app（`app/` 下）已无任何 `uuid.uuid4()` 调用点（实测 52 处全部收敛，含内存 key）。
+**C2 / D（2026-10-03）达标 3 / 9**：
+- 口径 3 审计：全 app 110 处 `order_by` 中，`id` 仅作为时间列（created_at / occurred_at / updated_at 等）的**同值 tie-breaker** 出现，无任何「仅按 id 排序」的业务时序用途，也无裸 SQL `ORDER BY ... id` 命中。
+- 口径 9：调试面门禁 + 产品端点忽略显式 `user_id` 已落地（见 §7），钉测 `tests/e2e/test_debug_surface_gate.py`。
+- 口径 4：B2 取消后的口径为「§6.2 五张表已拆分为雪花 ID + 业务唯一键」（迁移 `0005` 落地，`conversations` 存量行 id 按裁决保留旧值）。
+- 口径 6：D 的数据改写全部内嵌 Alembic `0005`（版本链保证单次执行，语句带 `WHERE ... IS NULL` 守卫可安全重放）；独立脚本 `migrate_owner_id_to_email.py` 的 dry-run 默认 / `--apply` 幂等语义不变。
+- **登记（2026-10-03）**：`tests/e2e/test_debug_state_history.py::test_state_reflects_turn_and_respects_limit` 为顺序型 flake（依赖后台 state_update 任务时序 + 用例间 DB 残留；单跑稳定通过，与 ID 改造改动面无交集），与既有耗时 flake 同类登记。
 
 ---
 
@@ -387,6 +414,6 @@ id: Mapped[int] = mapped_column(
 | 回拨防护 | L1 库 + L2 水位校验 + L3 部署约定 + L4 唯一约束 | **L1/L2 已落地**，L3 待运维确认 |
 | 对外类型 | ID 以**字符串**出 JSON（JS 精度安全） | **已落地**（B1 保持 `str`） |
 | 列类型 | **保持 `VARCHAR`**；不做 `BIGINT` 翻转 | **已定**（2026-10-03 评估后取消 B2，依据见 §6.5） |
-| **已否决：B2 列类型翻转** | `VARCHAR → BIGINT` + Python 类型翻转。**否决理由**：实测收益只剩「DB 类型层强制 ID 为数字」，而成本为 584 处测试字面量（180 文件）+ 删库重建（与 B1 自愈路径矛盾）。**替代**：需要强约束时加在应用边界。**保留价值**：两个实现坑（单列主键渲染成 `BIGSERIAL` 需显式 `autoincrement=False`；`loop_runs.user_id` 是 `Mapped[str \| None]` 会漏改）已记入 §6.5，供未来重启时复用 | 已否决 |
+| **已否决：B2 列类型翻转（2026-10-03 复审维持）** | `VARCHAR → BIGINT` + Python 类型翻转。**否决理由**：实测收益只剩「DB 类型层强制 ID 为数字」，而成本为 584 处测试字面量（180 文件）+ 删库重建（与 B1 自愈路径矛盾）。**替代**：需要强约束时加在应用边界。**保留价值**：两个实现坑（单列主键渲染成 `BIGSERIAL` 需显式 `autoincrement=False`；`loop_runs.user_id` 是 `Mapped[str \| None]` 会漏改）已记入 §6.5，供未来重启时复用 | 已否决 |
 | **已否决：自增 → 雪花** | 上一版方案（前期 BIGINT 自增、后期切雪花）。**否决理由**：既然终局是雪花，自增只换来 dev 可读性，却要多处理「5 张表例外 + 约 10 处插入前预知 ID 的重构 + 一次后期迁移」；而单机下雪花的运维成本与自增几乎相同。**保留价值**：其「SQLite `with_variant`」「5 张表例外清单」「`ids.py` 抽象层先行」三条结论已并入 §4/§6。 | 已否决 |
 | **已否决：ULID** | `usr_<ulid>` 字符串方案。**否决理由**：用户选择整数 ID；且需全量改值为 String 语义，而整数路线与既有 `messages` 一致。 | 已否决 |
