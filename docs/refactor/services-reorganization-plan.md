@@ -433,7 +433,8 @@ app/services/
 - ✅ **`evaluation/context.py`（834）→ `evaluation/context/` 包**（`639f3b0`）：`slices.py`（切片数据类 + 常量 + `_clip`）/ `collectors.py`（收集器）/ `digest.py`（digest 组装与截断），`__init__` 全量再导出，全部消费面（`from ...context import X` 形态）零改动。拆分前审计确认：无任何 monkeypatch 依赖 `context.<X>` 包属性 → 再导出安全。
 - ✅ **`reflection/evidence.py`（1856）→ `reflection/evidence/` 包**（`75e0d22`，首轮回滚后带守卫适配重做）：`windows.py`（882 行，纯窗构造 + 门槛数学，零 IO）/ `collectors.py`（911 行，DB 采集 + trace 记录 + 聚合编排）；AST 调用图做纯/IO 精确分类（引用 SessionLocal/仓储/trace 助手的符号传递闭包 → collectors，其余 → windows，含 8 个 AnnAssign 常量），`__init__` 显式全量再导出 153 个名字（含私有名与仓储模块引用）。**首轮回滚的原因（plan010/011 分节级源码语义守卫族 10+ 断言）本轮逐守卫完成语义适配**：分节标记源码扫描改为 `plan010_support.plan_section_source()` AST 按符号抽段（44 个 PLAN-010 符号跨 windows/collectors 两文件拼接，语义等价「计划通道源码段」）；`__file__` 整文件读取改包内 `*.py` glob 拼接（plan011/ledger_insight/tool009 三处）；conftest 与 growth_loop 自建打桩清单的 `reflection_evidence` 绑定改指 `collectors`（唯一 DB 触点，防 §十三 打桩静默失效）；`_human_messages_after` / `_aggregate` 两处补丁目标改指子模块。
 - ⏸ **`planning/observer.py`（863）：审计完成后判定不拆**（2026-09-30 第二批）。补丁缝审计结论：模块属性补丁仅 4 处、零 SessionLocal、零源码路径串——耦合面本身干净；**真正障碍是 v25 的 planning 包「扁平文件清单纪律」**：`planning_modules()` / `PLANNING_PACKAGE_MODULES` / `rglob("*.py") + path.name` 精确清单断言分布在 **14 个测试文件**（plan001/002/004/005/006/007/008/009/010 的 static_scan、scope_markers、boundary 等），observer 包化会引入 `observer/__init__.py`、`observer/core.py`、`observer/broadcast.py` 三个新条目与重名 `__init__.py`，需把全部清单从「文件名」升级为「相对包路径」语义。适配 churn（14 文件）超过拆分收益（863 行 → 两块），且 AST 闭包分析证实 PlanObserver.settle 与广播函数双向调用（core ↔ broadcast 无法单向切分，PlanObserver 须与广播同侧，语义别扭）。**可维护性替代**：文件内已有 `# ---` 分节注释体例，后续维护靠分节导航。
-- ⏸ **`tool/ext_api.py`(1507) / `planning/decompose.py`(963) 待排期**：与 observer 同属 planning/tool 守卫体系（decompose 在 plan001_scope_markers 的 11 项清单 + plan004 清单；ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（清单语义从文件名改为相对包路径，一次性解除全部 planning 子包化的守卫障碍）—— **该前置已完成（`b9c2aaf`，见 §15.3）**，之后 decompose 可复用 evidence 全套方法论；ext_api 另需 tool 域钉测审计。
+- ✅ **`planning/decompose.py`(963) → `planning/decompose/` 包**（2026-10-03，见 §15.4）。
+- ⏸ **`tool/ext_api.py`(1507) 待排期**：与 observer 同属 planning/tool 守卫体系（ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（清单语义从文件名改为相对包路径）—— **该前置已完成（`b9c2aaf`，见 §15.3）**；ext_api 另需 tool 域钉测审计（含 `logger="app.services.tool.ext_api"` 的 caplog 断言与大量测试引用的私有名）。
 
 ⚠️ **端口快照残留第二形态（本轮新发现，比 §15.1 第一形态更隐蔽）**：经**模块属性链**打到端口对象的补丁（如 `monkeypatch.setattr(plan_context.world_engine, "build_context", fake)`，其中 `plan_context.world_engine` 已是端口）——undo 时 monkeypatch 把「getattr 的快照」（即真实函数）**永久写进端口字典**，此后端口 `__getattr__` 被字典短路：①后续对实现模块的补丁全部失效（跨测试污染，`test_plan008_context` 文件内 TestWorldBriefBudget 污染 TestNineWorldFacts / TestAssemblyZeroWrite 即此因）；②形式上看不出「打的是端口」，审计极易漏。**修法与铁律同前**：补丁目标一律打实现模块（`app.application.world_engine.X`），端口读穿天然生效。
 
@@ -456,6 +457,32 @@ app/services/
 | `tool/ext_api.py` | 1507 | 不受本专项影响，仍待 tool 域钉测审计 |
 
 即：**本专项是一次性投入，解除的是「清单语义」这一共性障碍**；`decompose` 的剩余适配可复用 `reflection/evidence` 的 `*.py` glob 拼接手法（§15.2 已记录该手法）。
+
+---
+
+### 15.4 `planning/decompose.py` 包化（2026-10-03，债② 3/5）
+
+`planning/decompose.py`（963 行）→ `planning/decompose/` 包，四文件分工：
+
+| 文件 | 内容 |
+|---|---|
+| `__init__.py` | 契约文档 + 公开面与内部名再导出（`__all__` 保持原 21 项，不含 `_` 前缀名） |
+| `constants.py` | 理由码 / 预算键 / `PlanStepSpec` 别名 / `_reason` / `_budget_int` |
+| `validator.py` | `PlanValidator` 三闸 + 形状 / 绑定 / 预算判定 + `_task_granularity` |
+| `decomposer.py` | `TaskDecomposer` 四阶段 + `DecompositionResult` + 绑定 / 派生 / 判据助手 |
+
+**纯移动**：函数体逐字节未改（仅拆分与 import 调整）。测试引用的内部名（`_bind_tools` / `_parse_structure` / `_complete_criteria` / `_plan_budget_limits` / `_task_granularity` / `_binding_enabled` / `_ON_FAILURE_BLOCKING` / `ACTION_TOOL_MAP` / `ToolSelector`）全部经 `__init__` 再导出，**零调用点改动**。
+
+**守卫适配**（复用 §15.2 evidence 方法论）：
+
+- `_plan_scan.py` 新增 `source_files()`；`code_tokens` / `code_text` / `tree` / `string_literals` / `sort_key_sources` 全部支持**包目录**聚合（`code_text` 按文件以换行拼接，避免跨文件拼出伪片段）；单文件口径不变。
+- 四处 `Path(module.__file__)` 改 `.parent`：`test_plan004_static_scan` / `test_plan006_static_scan` / `test_plan011_contract` / `test_plan004_flags`（后者本地 `_imported_modules` 同步支持目录）。
+- 五处包清单收编四个新条目：`test_plan001_scope_markers` / `test_plan002_static_scan` / `test_plan005_static_scan` / `test_plan006_static_scan` / `test_plan008_static_scan`。
+- **打桩目标**：`plan004_support` 与 `test_plan004_decompose` 的 monkeypatch 由包 `decompose.get_tool_registry` 改为**实现模块** `decompose.decomposer.get_tool_registry`（沿用 §15.1 铁律：打桩一律打实现模块）。
+- `test_plan006_static_scan` 的「表面投影未重实现」正控断言改对**包整体** `code_text`（原按单文件 `decompose.py`）。
+- `v40/test_ledger_budget.py::test_planning_math_unchanged` 由「读四文件」改为「三文件 + decompose 包内全部 `*.py`」。
+
+**验证**：`tests/v25` **1320 passed / 3 failed**（三条 = 既有 `planning prompt` 摘要红，见 §15.2 附注）；全量 **16 failed / 7322 passed / 2 skipped**，失败集与基线**同数**（差异项经隔离复跑确认为 xdist 抖动：`e2e/debug_state_history`、`v8/world_performance`、`v30/foreground_cutover`）→ **零新增失败**。
 
 ---
 
