@@ -12,7 +12,8 @@ import '../../../design_system/orb/orb.dart';
 import '../data/life_repository.dart';
 
 /// B4 #life：生活工具箱 —— Hero（日期 / 问候 / Orb）+ AI 生活小结 + 模块宫格（3 列）。
-/// 长按拖动重排，第一格即底部导航的「动态」位；摘要与趋势只用真实数据，无数据源按红线 11 明示未接入。
+/// 长按拖动重排，第一格即底部导航的「动态」位；摘要与趋势只用真实数据，
+/// 无真实结论时 trend 行给未接入说明或引导文案（红线 11），保证六卡同构不显空。
 class LifePage extends ConsumerStatefulWidget {
   const LifePage({super.key, this.repository});
 
@@ -110,7 +111,7 @@ class _LifePageState extends ConsumerState<LifePage> {
     return DateTime(anchor.year, anchor.month, anchor.day) == day;
   }
 
-  static const _unavailable = '暂时取不到，点下方重试';
+  static const _unavailable = '暂时取不到';
 
   String get _ledgerSummary {
     if (_ledgerFailed) return _unavailable;
@@ -141,10 +142,10 @@ class _LifePageState extends ConsumerState<LifePage> {
   }
 
   String _albumSummaryText(AlbumSummary? summary) {
-    if (!(summary?.authorized ?? false)) return '仅本机 · 需授权';
+    if (!(summary?.authorized ?? false)) return '仅本机·需授权';
     final count = summary?.totalCount;
     if (count == null || count == 0) return '仅本机';
-    return '$count 张 · 仅本机';
+    return '$count 张·仅本机';
   }
 
   bool get _anyFailed => _tasksFailed || _ledgerFailed || _carFailed;
@@ -183,35 +184,65 @@ class _LifePageState extends ConsumerState<LifePage> {
     return head.contains('限行') ? '$head · 已提醒' : '$head限行 · 已提醒';
   }
 
-  // 环比、AI 归类、健康评分客户端都拿不到 —— 按红线 11 明示未接入，不编造结论。
-  String? get _ledgerTrend {
-    if (_ledgerFailed) return null;
-    final expense = _expenseText;
-    if (expense == null) return null;
-    return (double.tryParse(expense) ?? 0) <= 0 ? null : '环比尚未接入';
-  }
+  // 环比、AI 归类、健康评分客户端都拿不到 —— 未接入说明是关于功能的事实，任何数据态都成立（红线 11）。
+  _TileTrend get _ledgerTrend => const _TileTrend('环比尚未接入');
 
-  String? get _memoTrend {
-    if (_tasksFailed || _tasks == null || _memoCount == 0) return null;
-    return '主题归类尚未接入';
-  }
+  _TileTrend get _memoTrend => const _TileTrend('主题归类尚未接入');
 
-  String? get _scheduleTrend {
-    if (_tasksFailed) return null;
+  _TileTrend get _scheduleTrend {
     final first = _firstTodayTask;
-    if (first == null) return null;
-    final at = first.dueDateTime ?? first.remindDateTime;
-    return at == null ? first.title : '${_hhmm(at)} ${first.title}';
+    if (first != null) {
+      final at = first.dueDateTime ?? first.remindDateTime;
+      return _TileTrend(
+        at == null ? first.title : '${_hhmm(at)} ${first.title}',
+        color: context.colors.aiBlue,
+      );
+    }
+    final next = _nextFutureTask;
+    if (next != null) {
+      final at = next.dueDateTime ?? next.remindDateTime;
+      if (at != null) {
+        return _TileTrend(
+          '${at.month}/${at.day} ${next.title}',
+          color: context.colors.aiBlue,
+        );
+      }
+    }
+    return const _TileTrend('建一个，替你排');
   }
 
-  String? get _carTrend {
-    if (_carFailed) return null;
-    final detail = _carSummary?.restrictionDetail;
-    return detail == null ? null : _restrictionTrend(detail);
+  /// 今天没有待办时显示最近一条未来日程（真实数据，不编日期）。
+  LifeTaskItem? get _nextFutureTask {
+    final now = DateTime.now();
+    final endOfToday = DateTime(now.year, now.month, now.day + 1);
+    LifeTaskItem? soonest;
+    DateTime? soonestAt;
+    for (final task in _tasks ?? const <LifeTaskItem>[]) {
+      if (task.kind == 'memo') continue;
+      final at = task.dueDateTime ?? task.remindDateTime;
+      if (at == null || !at.isBefore(endOfToday)) continue;
+      if (soonestAt != null && !at.isBefore(soonestAt)) continue;
+      soonest = task;
+      soonestAt = at;
+    }
+    return soonest;
   }
 
-  String? _albumTrend(AlbumSummary? summary) =>
-      (summary?.authorized ?? false) ? '整理建议尚未接入' : null;
+  /// 限行数据取不到 / 没有限行时都给引导，trend 行任何状态下都在。
+  _TileTrend get _carTrend {
+    final car = _carSummary;
+    final detail = car?.restrictionDetail;
+    if (detail != null) {
+      return _TileTrend(_restrictionTrend(detail), color: context.colors.warm);
+    }
+    if (car != null && !car.isEmpty) return const _TileTrend('还没有限行提醒');
+    return const _TileTrend('记一笔，替你盯着');
+  }
+
+  /// 未授权时引导授权（对齐健康三宫格「引导授权、不留白」），授权后明示整理未接入。
+  _TileTrend _albumTrend(AlbumSummary? summary) => (summary?.authorized ?? false)
+      ? const _TileTrend('整理建议尚未接入')
+      : const _TileTrend('授权后统计张数');
 
   String _lifeSummary(AlbumSummary? albumSummary) {
     final parts = <String>[];
@@ -250,32 +281,34 @@ class _LifePageState extends ConsumerState<LifePage> {
 
   _ModuleTile _tileFor(LifeModule module, AlbumSummary? albumSummary) {
     final colors = context.colors;
+    final scheduleTrend = _scheduleTrend;
+    final carTrend = _carTrend;
     return switch (module) {
       LifeModule.ledger => _ModuleTile(
           module: module,
           summary: _ledgerSummary,
-          trend: _ledgerTrend,
+          trend: _ledgerTrend.text,
           tileBg: colors.tileMoney,
           tileFg: colors.money,
         ),
       LifeModule.memo => _ModuleTile(
           module: module,
           summary: _memoSummary,
-          trend: _memoTrend,
+          trend: _memoTrend.text,
           tileBg: colors.tileAi,
           tileFg: colors.aiPrimary,
         ),
       LifeModule.schedule => _ModuleTile(
           module: module,
           summary: _scheduleSummary,
-          trend: _scheduleTrend,
-          trendColor: colors.aiBlue,
+          trend: scheduleTrend.text,
+          trendColor: scheduleTrend.color,
           tileBg: colors.tileInfo,
           tileFg: colors.aiBlue,
         ),
       LifeModule.health => _ModuleTile(
           module: module,
-          summary: '趋势参考 · 非诊断',
+          summary: '趋势参考·非诊断',
           trend: '尚未接入健康数据',
           tileBg: colors.tileHeart,
           tileFg: colors.heartFg,
@@ -283,15 +316,15 @@ class _LifePageState extends ConsumerState<LifePage> {
       LifeModule.car => _ModuleTile(
           module: module,
           summary: _carSummaryText,
-          trend: _carTrend,
-          trendColor: colors.warm,
+          trend: carTrend.text,
+          trendColor: carTrend.color,
           tileBg: colors.tileInfo,
           tileFg: colors.aiBlue,
         ),
       LifeModule.album => _ModuleTile(
           module: module,
           summary: _albumSummaryText(albumSummary),
-          trend: _albumTrend(albumSummary),
+          trend: _albumTrend(albumSummary).text,
           tileBg: colors.tileWarm,
           tileFg: colors.warm,
         ),
@@ -403,6 +436,14 @@ class _ModuleTile {
   final Color? trendColor;
 }
 
+/// 宫格卡第三行（A18 trend）：真实结论 / 提醒带语义色，未接入与引导文案色为 null（ink3）。
+class _TileTrend {
+  const _TileTrend(this.text, {this.color});
+
+  final String text;
+  final Color? color;
+}
+
 /// Hero：本地日期 + 时段问候（有称呼才带名字）+ 副标题，右侧 Orb 是 AI 存在标记。
 class _LifeHero extends StatelessWidget {
   const _LifeHero({
@@ -471,8 +512,9 @@ class _ReorderableModuleGridState extends State<_ReorderableModuleGrid> {
   static const _columns = 3;
   static const _gap = 11.0;
 
-  /// 容纳「图标 + 名称 + 两行摘要 + 一行 trend」，真机与环境字体下都不溢出。
-  static const _tileHeight = 156.0;
+  /// 内容行高已定版（标题 1.65 / 摘要与 trend 1.4、摘要单行），最坏
+  /// 「图标 + 名称 + 单行摘要 + trend」≈139，144 贴合内容不溢出。
+  static const _tileHeight = 144.0;
   static const _moveDuration = Duration(milliseconds: 240);
   static const _liftDuration = Duration(milliseconds: 180);
   static const _liftScale = 1.05;

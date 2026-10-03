@@ -28,9 +28,7 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
-  final _scroll = ScrollController();
   final _input = TextEditingController();
-  bool _stickToBottom = true;
 
   @override
   void initState() {
@@ -39,29 +37,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (initial != null && initial.isNotEmpty) {
       _input.text = initial;
     }
-    _scroll.addListener(_onScroll);
-  }
-
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final atBottom =
-        _scroll.position.pixels >= _scroll.position.maxScrollExtent - 24;
-    _stickToBottom = atBottom;
   }
 
   @override
   void dispose() {
-    _scroll.dispose();
     _input.dispose();
     super.dispose();
-  }
-
-  void _maybeJumpToBottom() {
-    if (!_stickToBottom || !_scroll.hasClients) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.jumpTo(_scroll.position.maxScrollExtent);
-    });
   }
 
   void _openModeSheet() {
@@ -92,7 +73,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final state = ref.watch(chatPageStateProvider);
-    _maybeJumpToBottom();
 
     return Scaffold(
       backgroundColor: colors.canvas,
@@ -166,32 +146,33 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (state.messages.isEmpty && state.streamingText.isEmpty) {
       return const EmptyState(message: '和亚丝娜说句话吧');
     }
+    // reverse：offset 0 恒为最新消息——进页、流式、markdown 沉降都天然贴底，
+    // 不需要任何跳底补偿；children 按视觉自下而上排。
     return ListView(
-      controller: _scroll,
+      reverse: true,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       children: [
-        for (final m in state.messages)
-          MessageBubble(
-            text: m.content,
-            isUser: m.role == 'human',
-            enableMarkdown: m.role != 'human',
+        if (state.error != null && state.messages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 30, top: 8, right: 18),
+            child: _InlineStreamError(
+              message: state.error is String
+                  ? state.error! as String
+                  : StateCopy.streamInterrupted,
+              onRetry: state.lastUserText == null
+                  ? null
+                  : () => ref
+                      .read(chatPageStateProvider.notifier)
+                      .send(state.lastUserText!),
+            ),
           ),
-        if (state.toolSteps.isNotEmpty)
-          ProcCard(
-            title: '正在为你记账',
-            steps: [
-              for (final s in state.toolSteps)
-                ProcStep(
-                  label: s.label,
-                  status: s.status,
-                  detail: s.detail,
-                  target: s.target,
-                ),
-            ],
-          ),
-        if (state.streamingText.isNotEmpty)
-          MessageBubble.streaming(
-            text: state.streamingText,
+        if (state.awaitingReply || state.streaming)
+          const Padding(
+            padding: EdgeInsets.only(left: 30, top: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TypingIndicator(),
+            ),
           ),
         if (_showSuggestions(state))
           Padding(
@@ -210,27 +191,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ],
             ),
           ),
-        if (state.awaitingReply || state.streaming)
-          const Padding(
-            padding: EdgeInsets.only(left: 30, top: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TypingIndicator(),
-            ),
+        if (state.streamingText.isNotEmpty)
+          MessageBubble.streaming(
+            text: state.streamingText,
           ),
-        if (state.error != null && state.messages.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(left: 30, top: 8, right: 18),
-            child: _InlineStreamError(
-              message: state.error is String
-                  ? state.error! as String
-                  : StateCopy.streamInterrupted,
-              onRetry: state.lastUserText == null
-                  ? null
-                  : () => ref
-                      .read(chatPageStateProvider.notifier)
-                      .send(state.lastUserText!),
-            ),
+        if (state.toolSteps.isNotEmpty)
+          ProcCard(
+            title: '正在为你记账',
+            steps: [
+              for (final s in state.toolSteps)
+                ProcStep(
+                  label: s.label,
+                  status: s.status,
+                  detail: s.detail,
+                  target: s.target,
+                ),
+            ],
+          ),
+        for (final m in state.messages.reversed)
+          MessageBubble(
+            text: m.content,
+            isUser: m.role == 'human',
+            enableMarkdown: m.role != 'human',
           ),
         const SizedBox(height: 12),
       ],

@@ -137,6 +137,34 @@ void main() {
     await tester.pump();
     expect(find.text('查看行程'), findsNothing);
   });
+
+  testWidgets('chat page lands on the latest message after history loads',
+      (tester) async {
+    // 回归：消息列表 reverse:true，offset 0 恒为最新消息——历史到达、流式、
+    // markdown 沉降都天然贴底（旧的 postFrame jumpTo 追不上内容高度变化）。
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatPageStateProvider.overrideWith(_DelayedHistoryNotifier.new),
+        ],
+        child: MaterialApp(theme: buildAppTheme(), home: const ChatPage()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump();
+    final position = tester.state<ScrollableState>(
+      find.ancestor(
+        of: find.text('回复 11'),
+        matching: find.byType(Scrollable),
+      ).first,
+    ).position;
+    expect(position.pixels, lessThan(1),
+        reason: '进入对话页应停在最下面一条消息（reverse 列表 offset 0 = 底部）');
+  });
 }
 
 class _FixedNotifier extends ChatPageNotifier {
@@ -144,4 +172,23 @@ class _FixedNotifier extends ChatPageNotifier {
   final ChatPageState _s;
   @override
   ChatPageState build() => _s;
+}
+
+/// 模拟历史加载：首帧骨架屏（消息列表还没挂 controller），微任务后消息到达。
+class _DelayedHistoryNotifier extends ChatPageNotifier {
+  @override
+  ChatPageState build() {
+    Future.microtask(() {
+      state = ChatPageState(
+        loading: false,
+        messages: [
+          for (var i = 0; i < 12; i++) ...[
+            ChatMessageItem(id: 'u$i', role: 'human', content: '用户消息 $i'),
+            ChatMessageItem(id: 'a$i', role: 'ai', content: '回复 $i'),
+          ],
+        ],
+      );
+    });
+    return const ChatPageState(loading: true);
+  }
 }

@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../tokens/tokens.dart';
 import 'sparkle.dart';
 
-AppColors _c(BuildContext context) =>
-    Theme.of(context).extension<AppColors>()!;
+AppColors _c(BuildContext context) => Theme.of(context).extension<AppColors>()!;
 AppTypography _t(BuildContext context) =>
     Theme.of(context).extension<AppTypography>()!;
 AppRadii _r(BuildContext context) => Theme.of(context).extension<AppRadii>()!;
@@ -36,8 +35,10 @@ class ModeChip extends StatelessWidget {
         children: [
           SparkleIcon(size: 11, color: colors.aiPrimary),
           const SizedBox(width: 5),
-          Text(label,
-              style: type.label.copyWith(color: colors.aiPrimary, fontSize: 11.5)),
+          Text(
+            label,
+            style: type.label.copyWith(color: colors.aiPrimary, fontSize: 11.5),
+          ),
         ],
       ),
     );
@@ -66,9 +67,13 @@ class MemHint extends StatelessWidget {
           SparkleIcon(size: 14, color: colors.aiPrimary),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text,
-                style: type.caption
-                    .copyWith(color: colors.aiPrimary, fontSize: 12)),
+            child: Text(
+              text,
+              style: type.caption.copyWith(
+                color: colors.aiPrimary,
+                fontSize: 12,
+              ),
+            ),
           ),
         ],
       ),
@@ -121,11 +126,7 @@ class ChipButton extends StatelessWidget {
 
 /// A8 输入丸
 class AskPill extends StatelessWidget {
-  const AskPill({
-    super.key,
-    this.hint = '问问亚丝娜，或直接说「午饭 35 元」…',
-    this.onSend,
-  });
+  const AskPill({super.key, this.hint = '问问亚丝娜，或直接说「午饭 35 元」…', this.onSend});
 
   final String hint;
   final VoidCallback? onSend;
@@ -159,7 +160,11 @@ class AskPill extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: _g(context).ai,
               ),
-              child: Icon(AppIcons.arrowUp, size: 17, color: colors.onDeepPrimary),
+              child: Icon(
+                AppIcons.arrowUp,
+                size: 17,
+                color: colors.onDeepPrimary,
+              ),
             ),
           ),
         ],
@@ -170,11 +175,7 @@ class AskPill extends StatelessWidget {
 
 /// A17 快速捕获条
 class CaptureBar extends StatelessWidget {
-  const CaptureBar({
-    super.key,
-    this.hint = '「记一下，下个月准备去旅行」…',
-    this.onTap,
-  });
+  const CaptureBar({super.key, this.hint = '「记一下，下个月准备去旅行」…', this.onTap});
 
   final String hint;
   final VoidCallback? onTap;
@@ -199,7 +200,9 @@ class CaptureBar extends StatelessWidget {
           children: [
             SparkleIcon(size: 17, color: colors.aiPrimary),
             const SizedBox(width: 10),
-            Expanded(child: Text(hint, style: type.body.copyWith(color: colors.ink3))),
+            Expanded(
+              child: Text(hint, style: type.body.copyWith(color: colors.ink3)),
+            ),
           ],
         ),
       ),
@@ -263,8 +266,9 @@ class ModuleCard extends StatelessWidget {
                     borderRadius: radii.rMd,
                     boxShadow: elevation.card,
                   ),
+            // 顶部起排、间距固定：图标 / 标题 / 摘要在 6 张卡里位置一致，
+            // 不随 trend 行有无而漂移（spaceEvenly 会按内容行数重分配空隙）。
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Container(
                   width: 42,
@@ -283,7 +287,7 @@ class ModuleCard extends StatelessWidget {
                               : (tileFg ?? colors.aiPrimary),
                         ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 9),
                 Text(
                   title,
                   style: type.body.copyWith(
@@ -291,9 +295,15 @@ class ModuleCard extends StatelessWidget {
                     color: soon ? colors.ink3 : colors.ink,
                   ),
                 ),
+                const SizedBox(height: 3),
+                // 行高钉 1.4 + 摘要单行省略：卡内内容高度确定，卡高才能压实到贴合内容，
+                // 不随设备字体度量漂移（摘要文案必须 ≤ 单行，长文案会在 390 宽下省略）。
                 Text(
                   summary,
-                  style: type.tabLabel.copyWith(color: colors.ink3),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      type.tabLabel.copyWith(color: colors.ink3, height: 1.4),
                   textAlign: TextAlign.center,
                 ),
                 if (trend != null) ...[
@@ -306,6 +316,7 @@ class ModuleCard extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: trendColor ?? colors.ink3,
+                      height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -318,8 +329,7 @@ class ModuleCard extends StatelessWidget {
               top: 8,
               right: 8,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
+                padding: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
                 decoration: BoxDecoration(
                   color: colors.tileAi,
                   borderRadius: radii.rFull,
@@ -368,9 +378,13 @@ class CategoryBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(label,
-                  style: type.body
-                      .copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              Text(
+                label,
+                style: type.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
               const Spacer(),
               Text(amountLabel, style: type.numeric(type.sub)),
             ],
@@ -456,7 +470,10 @@ class MemoRow extends StatelessWidget {
               width: 8,
               height: 8,
               margin: const EdgeInsets.only(top: 7),
-              decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dotColor,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

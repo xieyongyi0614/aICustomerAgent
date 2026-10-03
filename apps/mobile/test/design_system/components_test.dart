@@ -112,6 +112,25 @@ void main() {
     expect(find.byType(AppToggle), findsOneWidget);
   });
 
+  testWidgets('mode selector hugs content in bounded height', (tester) async {
+    // 回归：选项 Column 缺 mainAxisSize.min 时，会在有界松约束（modal bottom
+    // sheet 的 9/16 高度上限）里膨胀，把整块选择器连同抽屉撑成半屏。
+    await tester.pumpWidget(wrap(
+      SizedBox(
+        height: 300,
+        child: Center(
+          child: ModeSelector(
+            value: RoleMode.defaultMode,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(tester.getSize(find.byType(ModeSelector)).height, lessThan(120),
+        reason: '三档选择器应贴合内容高度，不随可用高度膨胀');
+  });
+
   test('components dart has no Color(0x outside tokens', () {
     // 由 layer_guards 全局扫描覆盖
   });

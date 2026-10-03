@@ -64,6 +64,9 @@ class ModeSelector extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
+                    // 必须收口：max 会在有界松约束（如 modal bottom sheet）里
+                    // 膨胀到可用高度上限，把整块选择器撑成半屏。
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         mode.label,

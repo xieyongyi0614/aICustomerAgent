@@ -18,6 +18,13 @@ class _AuthorizedAlbumNotifier extends AlbumSummaryNotifier {
       const AlbumSummary(authorized: true, totalCount: 2847);
 }
 
+class _NoTasksRepository extends _FakeLifeRepository {
+  _NoTasksRepository() : super(carMinor: 0);
+
+  @override
+  Future<List<LifeTaskItem>> listOpenTasks() async => const [];
+}
+
 class _FakeLifeRepository extends LifeRepository {
   _FakeLifeRepository({
     this.carMinor = 61200,
@@ -117,9 +124,11 @@ void main() {
     final repo = _FakeLifeRepository(carFails: true);
     await _pumpPage(tester, repo);
 
-    expect(find.text('暂时取不到，点下方重试'), findsOneWidget);
+    expect(find.text('暂时取不到'), findsOneWidget);
     expect(find.text('本月 ¥612.00'), findsOneWidget);
     expect(find.text('1 条备忘'), findsOneWidget);
+    expect(_card(tester, '车辆').trend, '记一笔，替你盯着',
+        reason: '取数失败 trend 行仍在，给引导不空行');
   });
 
   testWidgets('test_life_page_car_card_navigates_to_car', (tester) async {
@@ -148,7 +157,7 @@ void main() {
     expect(_card(tester, '备忘录').summary, '1 条备忘');
     expect(_card(tester, '日程').summary, '今日 2 项');
     expect(_card(tester, '相册').onTap, isNotNull, reason: 'APP-040：相册卡可点入 /album');
-    expect(_card(tester, '相册').summary, '仅本机 · 需授权',
+    expect(_card(tester, '相册').summary, '仅本机·需授权',
         reason: '无 provider 更新时呈诚实授权引导态');
   });
 
@@ -159,7 +168,7 @@ void main() {
     expect(_card(tester, '记账').summary, '本月 ¥612.00');
     expect(_card(tester, '备忘录').summary, '1 条备忘');
     expect(_card(tester, '日程').summary, '今日 2 项');
-    expect(_card(tester, '健康').summary, '趋势参考 · 非诊断');
+    expect(_card(tester, '健康').summary, '趋势参考·非诊断');
   });
 
   testWidgets('test_life_page_task_failure_degrades_only_its_cards',
@@ -167,8 +176,10 @@ void main() {
     final repo = _FakeLifeRepository(tasksFail: true);
     await _pumpPage(tester, repo);
 
-    expect(_card(tester, '备忘录').summary, '暂时取不到，点下方重试');
-    expect(_card(tester, '日程').summary, '暂时取不到，点下方重试');
+    expect(_card(tester, '备忘录').summary, '暂时取不到');
+    expect(_card(tester, '日程').summary, '暂时取不到');
+    expect(_card(tester, '日程').trend, '建一个，替你排',
+        reason: '取数失败 trend 行仍在，给引导不空行');
     expect(_card(tester, '车辆').summary, '本月 ¥612');
     expect(_card(tester, '记账').summary, '本月 ¥612.00');
   });
@@ -277,8 +288,22 @@ void main() {
     expect(_card(tester, '记账').trend, '环比尚未接入');
     expect(_card(tester, '备忘录').trend, '主题归类尚未接入');
     expect(_card(tester, '健康').trend, '尚未接入健康数据');
-    expect(_card(tester, '车辆').trend, isNull,
-        reason: '没有限行提醒时不出这一行，不写示例日期');
+    expect(_card(tester, '车辆').trend, '还没有限行提醒',
+        reason: '没有限行数据时如实说没有，不编示例日期');
+  });
+
+  testWidgets('test_life_page_trend_row_always_present_with_honest_fallback',
+      (tester) async {
+    final repo = _NoTasksRepository();
+    await _pumpPage(tester, repo);
+
+    // trend 行每卡必有一行（六卡同构不显空）；无真实数据时走引导 / 未接入诚实文案。
+    expect(_card(tester, '日程').trend, '建一个，替你排',
+        reason: '没有待办时引导去日程页，不编造条目');
+    expect(_card(tester, '车辆').trend, '记一笔，替你盯着',
+        reason: '红线 11：无养车数据给引导文案，不编造结论');
+    expect(_card(tester, '相册').trend, '授权后统计张数',
+        reason: '未授权时引导授权，不留白');
   });
 
   testWidgets('test_life_page_album_trend_keeps_local_only_claim',
@@ -298,7 +323,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(_card(tester, '相册').summary, '2847 张 · 仅本机');
+    expect(_card(tester, '相册').summary, '2847 张·仅本机');
     expect(_card(tester, '相册').trend, '整理建议尚未接入',
         reason: '红线 9：相册口径带「仅本机」；红线 11：整理建议未接入就说未接入');
   });
