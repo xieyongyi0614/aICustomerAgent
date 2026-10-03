@@ -112,5 +112,5 @@ def test_api_layer_has_no_repositories_import():
 
 
 def test_existing_debug_routes_unchanged(client):
-    response = client.get("/api/v1/debug/state")
+    response = client.get("/api/v1/state")
     assert response.status_code in (200, 400, 404, 422)

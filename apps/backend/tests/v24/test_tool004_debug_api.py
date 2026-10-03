@@ -229,7 +229,7 @@ async def test_surface_endpoint_defaults_run_kind_and_lists_reasons(tools_on):
 @pytest.mark.asyncio
 async def test_e11_surface_endpoint_honours_explicit_run_kind(tools_on, monkeypatch):
     registry = _custom_channel_registry()
-    monkeypatch.setattr("app.api.v1.debug.get_tool_registry", lambda: registry)
+    monkeypatch.setattr("app.api.v1.debug.tools.get_tool_registry", lambda: registry)
     payload = (
         await _get("/debug/tools/surface", run_kind=RUN_KIND_AUTONOMOUS_TICK)
     ).json()

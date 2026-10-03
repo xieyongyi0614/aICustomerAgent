@@ -306,7 +306,7 @@ class TestQ10FrontendIsNotImplemented:
         assert hits == []
 
     def test_backend_debug_surface_is_the_only_plan_observability_face(self):
-        from app.api.v1 import debug as debug_api
+        from app.api.v1.debug import plans as debug_api
 
         assert FRONTEND_ROOT.is_dir()
         assert FRONTEND_ROOT.joinpath("src", "features", "world-sim").is_dir()

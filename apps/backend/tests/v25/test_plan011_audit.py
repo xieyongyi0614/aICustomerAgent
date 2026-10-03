@@ -11,7 +11,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.api.v1 import debug as debug_api
+from app.api.v1.debug import plans as debug_api
 from app.models.goal import GoalPlanRecord
 from app.models.observability import DecisionKind, DecisionRecord
 from app.models.plan import (

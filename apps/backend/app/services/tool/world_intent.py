@@ -8,7 +8,7 @@
 `MovementResolver` 在下一维护步消费；**不得为意图新建表**（TOOL-007 §3 反模式红线）。
 
 未接线必须在调试端点可见（`status: not_wired`），防止"看着有其实没有"（§4.2 纪律）：
-`status()` 直接供 `/debug/tools` 的 `world_intent` 段投影（见 `api/v1/debug.py`）。
+`status()` 直接供 `/debug/tools` 的 `world_intent` 段投影（见 `api/v1/debug/tools.py`）。
 """
 
 from __future__ import annotations

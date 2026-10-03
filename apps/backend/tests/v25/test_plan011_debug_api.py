@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.api.v1 import debug as debug_api
+from app.api.v1.debug import plans as debug_api
+from app.api.v1.debug import tools as debug_tools
 from app.api.v1.schemas import (
     PlanContextOut,
     PlanDetailOut,
@@ -640,7 +641,7 @@ class TestToolPanelIsUnchanged:
     def test_tool_panel_paths_are_untouched(self):
         paths = {
             route.path
-            for route in debug_api.debug_router.routes
+            for route in debug_tools.tools_router.routes
             if route.path.startswith("/debug/tools")
         }
         assert paths == {
@@ -676,7 +677,7 @@ class TestToolPanelIsUnchanged:
     def test_plan_routes_do_not_shadow_tool_routes(self):
         plan_routes = [
             route.path
-            for route in debug_api.debug_router.routes
+            for route in debug_api.plans_router.routes
             if route.path.startswith(support.PLAN_ROUTER_BASE)
         ]
         assert sorted(plan_routes) == sorted(support.PLAN_ROUTER_PATHS)

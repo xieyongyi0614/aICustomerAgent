@@ -28,6 +28,7 @@ _PRODUCT_ENDPOINTS = [
     ("delete", "/api/v1/life/data", {"params": {"confirm": "true"}}),
     ("get", "/api/v1/ledger/summary", None),
     ("get", "/api/v1/proactive/pending", None),
+    ("get", "/api/v1/llm/profiles", None),
 ]
 
 
@@ -79,6 +80,13 @@ def test_product_endpoints_require_token(real_auth, method, path, kwargs):
 _DEBUG_ENDPOINTS = [
     ("get", "/api/v1/state", None),
     ("get", "/api/v1/debug/world", None),
+    ("get", "/api/v1/debug/tools", None),
+    ("get", "/api/v1/debug/memory/dbg-cutover/attribution", None),
+    ("get", "/api/v1/debug/traces", None),
+    ("get", "/api/v1/debug/relationship/state", None),
+    ("get", "/api/v1/debug/plans", None),
+    ("get", "/api/v1/debug/actions", None),
+    ("get", "/api/v1/debug/action-execution/actions", None),
 ]
 
 

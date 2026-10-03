@@ -152,7 +152,7 @@ class TestLegacyMigration:
 
 class TestTimelineNarrativeLink:
     def test_event_and_milestone_linked_to_memory(self, _offline_repos):
-        from app.api.v1.debug import get_relationship_timeline
+        from app.api.v1.debug.relationship import get_relationship_timeline
 
         user_id = "u-link"
         event = relationship_event_repository.create_event(

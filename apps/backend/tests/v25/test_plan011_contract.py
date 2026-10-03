@@ -23,7 +23,7 @@ import tokenize
 from pathlib import Path
 
 from tests.support.schema_pins import MIGRATION_HEAD
-from app.api.v1 import debug as debug_api
+from app.api.v1.debug import plans as debug_api
 from app.core.db import Base
 from app.repositories import goal_repository
 from app.services.planning import (
@@ -632,7 +632,7 @@ class TestDebugSurfaceDiscipline:
     def test_every_plan_endpoint_is_a_read_only_get(self):
         plan_routes = [
             route
-            for route in debug_api.debug_router.routes
+            for route in debug_api.plans_router.routes
             if route.path.startswith("/debug/plans")
         ]
         assert len(plan_routes) == 6
@@ -669,11 +669,11 @@ class TestDebugSurfaceDiscipline:
             assert token not in code, token
 
     def test_debug_module_defines_no_orm_table(self):
-        source = DEBUG_PATH.read_text(encoding="utf-8")
-        code = _code_text(source)
-        assert "mapped_column" not in code
-        assert "SessionLocal" not in code
-        assert "app.core.db" not in "".join(scan.imported_modules(DEBUG_PATH))
+        for path in sorted(Path(debug_api.__file__).parent.glob("*.py")):
+            code = _code_text(path.read_text(encoding="utf-8"))
+            assert "mapped_column" not in code, path
+            assert "SessionLocal" not in code, path
+            assert "app.core.db" not in "".join(scan.imported_modules(path)), path
 
     def test_projection_tables_are_the_four_existing_ones(self):
         tables = set(Base.metadata.tables)

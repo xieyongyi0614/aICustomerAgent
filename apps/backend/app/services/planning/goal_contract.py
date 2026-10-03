@@ -139,7 +139,7 @@ Task Detail（PLAN-011 §6.1）在计划面九函数之上冻结**三个只读�
   `list_layered*` 等既有旁路调用**仍不在白名单**（越界断言未放松）。
 - 同任务的**审计投影**（`PlanAdvance` / 修订链 → `decision_records`）复用既有
   `DecisionKind.GOAL_LIFECYCLE` + 差异化 `decision`，**不新增 kind**（新增需改 CHECK = 需迁移）。
-- 计划调试端点落既有 `app/api/v1/debug.py` 的 `debug_router`，**不在本包新增模块**
+- 计划调试端点落既有调试面 `app/api/v1/debug/plans.py`，**不在本包新增模块**
   （包模块清单仍为 11 个文件，负向断言未放松）。
 """
 
