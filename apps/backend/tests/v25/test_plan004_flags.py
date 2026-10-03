@@ -191,7 +191,7 @@ class TestZeroMigrationAndZeroWrite:
         assert goal_repository.get_latest_plan(goal.id) is None
 
     def test_decompose_module_has_no_repository_dependency(self):
-        imported = _imported_modules(Path(decompose_mod.__file__))
+        imported = _imported_modules(Path(decompose_mod.__file__).parent)
         assert not [
             module
             for module in imported
@@ -203,10 +203,16 @@ class TestZeroMigrationAndZeroWrite:
 def _imported_modules(path: Path) -> set[str]:
     import ast
 
+    files = (
+        sorted(p for p in path.rglob("*.py") if "__pycache__" not in p.parts)
+        if path.is_dir()
+        else [path]
+    )
     modules: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            modules.add(node.module)
+    for source_file in files:
+        for node in ast.walk(ast.parse(source_file.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                modules.add(node.module)
     return modules

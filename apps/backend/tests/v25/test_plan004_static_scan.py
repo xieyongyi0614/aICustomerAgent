@@ -15,7 +15,7 @@ from app.services.planning import engine as plan_engine
 
 from . import _plan_scan as scan
 
-DECOMPOSE_PATH = Path(decompose_mod.__file__)
+DECOMPOSE_PATH = Path(decompose_mod.__file__).parent
 ENGINE_PATH = Path(plan_engine.__file__)
 
 FORBIDDEN_MODULE_PREFIXES = (
@@ -67,7 +67,7 @@ FROZEN_INTERFACE_FUNCTIONS = (
 
 def test_decompose_module_is_discovered_by_the_package_scan():
     names = scan.planning_module_paths()
-    assert "decompose.py" in names
+    assert "decompose/__init__.py" in names
     assert "app.services.planning.decompose" in scan.module_names()
 
 

@@ -209,10 +209,17 @@ def test_over_budget_feeds_plan_observer(setup):
 
 
 def test_planning_math_unchanged():
-    for name in ("engine.py", "decompose.py", "observer.py", "revision.py"):
-        source = (BACKEND / "app/services/planning" / name).read_text(encoding="utf-8")
-        assert "budget.py" not in source
-        assert "upsert_budget" not in source
+    planning_dir = BACKEND / "app/services/planning"
+    targets = [
+        planning_dir / "engine.py",
+        planning_dir / "observer.py",
+        planning_dir / "revision.py",
+    ]
+    targets.extend(sorted((planning_dir / "decompose").rglob("*.py")))
+    for path in targets:
+        source = path.read_text(encoding="utf-8")
+        assert "budget.py" not in source, path.name
+        assert "upsert_budget" not in source, path.name
 
 
 def test_plan_write_surface_single(setup):

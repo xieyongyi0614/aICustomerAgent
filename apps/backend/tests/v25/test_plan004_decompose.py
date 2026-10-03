@@ -386,7 +386,9 @@ class TestBindingFailurePath:
 
     def test_registry_unavailable_marks_every_step(self, monkeypatch):
         """§6.6：`registry` 为 `None` 且绑定生效 → 全部步骤记 `capability_binding_missing`。"""
-        monkeypatch.setattr(decompose_mod, "get_tool_registry", lambda: None)
+        from app.services.planning.decompose import decomposer as decompose_impl
+
+        monkeypatch.setattr(decompose_impl, "get_tool_registry", lambda: None)
         result = decompose_mod.TaskDecomposer().decompose(
             proposal(step(1), step(2)),
             make_goal(),

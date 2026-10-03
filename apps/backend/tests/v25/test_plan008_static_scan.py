@@ -295,7 +295,10 @@ class TestZeroMigration:
         assert names == [
             "__init__.py",
             "context.py",
-            "decompose.py",
+            "decompose/__init__.py",
+            "decompose/constants.py",
+            "decompose/decomposer.py",
+            "decompose/validator.py",
             "engine.py",
             "executor_bridge.py",
             "goal_contract.py",

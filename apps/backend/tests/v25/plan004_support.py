@@ -132,7 +132,7 @@ def decompose(
     """拆解入口快捷式：缺省注入内置注册表与合成工具面（一能力多工具可判）。
 
     「注册表不可得」（工具系统总闸 off）的单列用例不走本入口：直接构造
-    `TaskDecomposer()` 并 monkeypatch `decompose.get_tool_registry` 返回 `None`。
+    `TaskDecomposer()` 并 monkeypatch 实现模块 `decompose.decomposer.get_tool_registry` 返回 `None`。
     """
     decomposer = decompose_mod.TaskDecomposer(
         registry=registry if registry is not None else builtin_registry(),

@@ -36,7 +36,10 @@ ENGINE_PATH = Path(engine_mod.__file__)
 PLANNING_PACKAGE_MODULES = (
     "__init__.py",
     "context.py",
-    "decompose.py",
+    "decompose/__init__.py",
+    "decompose/constants.py",
+    "decompose/decomposer.py",
+    "decompose/validator.py",
     "engine.py",
     "executor_bridge.py",
     "goal_contract.py",
@@ -230,17 +233,20 @@ class TestNoSelfMadeToolRules:
             assert offenders == [], (path.name, offenders)
 
     def test_the_surface_projection_policy_is_never_reimplemented(self):
+        from app.services.planning import decompose as decompose_mod
+
         for path in PLANNING_MODULES:
             source = scan.code_text(path)
             assert "should_exclude" not in source, path.name
             assert "SURFACE_LIMIT_REASON" not in source, path.name
-            assert "TOOL_ID_PATTERN.fullmatch" in source or path.name != "decompose.py"
+        decompose_source = scan.code_text(Path(decompose_mod.__file__).parent)
+        assert "TOOL_ID_PATTERN.fullmatch" in decompose_source
 
     def test_tool_selection_delegates_to_the_existing_selector(self):
         from app.services.planning import decompose as decompose_mod
 
         assert decompose_mod.ToolSelector is not None
-        decompose_path = Path(decompose_mod.__file__)
+        decompose_path = Path(decompose_mod.__file__).parent
         assert "select_with_reason" in scan.code_text(decompose_path)
         assert "SELECTION_REASON_" not in scan.code_text(decompose_path)
 

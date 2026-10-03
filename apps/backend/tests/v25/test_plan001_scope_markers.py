@@ -201,7 +201,7 @@ PLAN_010_LANDED_MODULES = ("revision_listener.py",)
 
 PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
 
-PLAN_004_LANDED_MODULES = ("decompose.py",)
+PLAN_004_LANDED_MODULES = ("decompose",)
 
 PLAN_009_LANDED_MODULES = ("memory_policy.py",)
 """PLAN-009 落地：计划终态记忆边界表模块（§4.1.1 本任务**新建**该模块）。"""
@@ -497,7 +497,10 @@ def test_planning_package_holds_only_landed_modules():
     assert modules == [
         "__init__.py",
         "context.py",
-        "decompose.py",
+        "decompose/__init__.py",
+        "decompose/constants.py",
+        "decompose/decomposer.py",
+        "decompose/validator.py",
         "engine.py",
         "executor_bridge.py",
         "goal_contract.py",

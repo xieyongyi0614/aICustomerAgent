@@ -78,22 +78,50 @@ def module_name(path: Path) -> str:
     return ".".join(parts)
 
 
+def source_files(path: Path) -> list[Path]:
+    """扫描目标归一：模块文件 → 自身；包目录 → 包内全部 `*.py`（排序，排除 `__pycache__`）。
+
+    拆包后（如 `planning/decompose/`）守卫以**包目录**为扫描目标，聚合口径与单文件一致。
+    """
+    if path.is_dir():
+        return sorted(
+            p for p in path.rglob("*.py") if "__pycache__" not in p.parts
+        )
+    return [path]
+
+
 def module_names() -> list[str]:
     return [module_name(path) for path in planning_modules()]
 
 
 def code_tokens(path: Path) -> list[tokenize.TokenInfo]:
-    source = path.read_text(encoding="utf-8")
-    return [
-        token
-        for token in tokenize.generate_tokens(StringIO(source).readline)
-        if token.type not in (tokenize.COMMENT, tokenize.STRING)
-    ]
+    tokens: list[tokenize.TokenInfo] = []
+    for source_file in source_files(path):
+        source = source_file.read_text(encoding="utf-8")
+        tokens.extend(
+            token
+            for token in tokenize.generate_tokens(StringIO(source).readline)
+            if token.type not in (tokenize.COMMENT, tokenize.STRING)
+        )
+    return tokens
 
 
 def code_text(path: Path) -> str:
-    """紧凑拼接的可执行文本（无分隔符，使 `session.execute` 这类点号片段可匹配）。"""
-    return "".join(token.string for token in code_tokens(path))
+    """紧凑拼接的可执行文本（单文件内无分隔符，使 `session.execute` 这类点号片段可匹配）。
+
+    包目录按文件拼接、文件之间以换行分隔：既保留单文件内的点号匹配，又避免跨文件边界
+    拼出伪片段（如 `dict[str,tuple[str,...]]`）。
+    """
+    return "\n".join(
+        "".join(
+            token.string
+            for token in tokenize.generate_tokens(
+                StringIO(source_file.read_text(encoding="utf-8")).readline
+            )
+            if token.type not in (tokenize.COMMENT, tokenize.STRING)
+        )
+        for source_file in source_files(path)
+    )
 
 
 def code_lines(path: Path) -> list[tuple[int, str]]:
@@ -106,7 +134,15 @@ def code_lines(path: Path) -> list[tuple[int, str]]:
 
 
 def tree(path: Path) -> ast.Module:
-    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    """单文件 → 该文件 AST；包目录 → 各文件 body 拼接的合成 Module（供 `ast.walk` 系断言）。"""
+    if not path.is_dir():
+        return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    body: list[ast.stmt] = []
+    for source_file in source_files(path):
+        body.extend(
+            ast.parse(source_file.read_text(encoding="utf-8"), filename=str(source_file)).body
+        )
+    return ast.Module(body=body, type_ignores=[])
 
 
 def imported_modules(path: Path) -> set[str]:
@@ -156,15 +192,18 @@ def function_definitions(path: Path) -> list[str]:
 
 def string_literals(path: Path) -> set[str]:
     """非文档字符串的字面量（文档字符串与代码注释同口径排除）。"""
-    module = tree(path)
-    docstrings = _docstring_node_ids(module)
-    return {
-        node.value
-        for node in ast.walk(module)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and id(node) not in docstrings
-    }
+    literals: set[str] = set()
+    for source_file in source_files(path):
+        module = ast.parse(source_file.read_text(encoding="utf-8"))
+        docstrings = _docstring_node_ids(module)
+        literals |= {
+            node.value
+            for node in ast.walk(module)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+        }
+    return literals
 
 
 def _docstring_node_ids(module: ast.Module) -> set[int]:
@@ -219,16 +258,17 @@ def simple_call_names(path: Path) -> set[str]:
 
 def sort_key_sources(path: Path) -> list[str]:
     """`sorted(..., key=...)` / `list.sort(key=...)` 的 key 表达式源码。"""
-    source = path.read_text(encoding="utf-8")
     keys: list[str] = []
-    for node in call_nodes(path):
-        is_sort = (
-            isinstance(node.func, ast.Name)
-            and node.func.id == "sorted"
-        ) or (isinstance(node.func, ast.Attribute) and node.func.attr == "sort")
-        if not is_sort:
-            continue
-        for keyword in node.keywords:
-            if keyword.arg == "key":
-                keys.append(ast.get_source_segment(source, keyword.value) or "")
+    for source_file in source_files(path):
+        source = source_file.read_text(encoding="utf-8")
+        for node in call_nodes(source_file):
+            is_sort = (
+                isinstance(node.func, ast.Name)
+                and node.func.id == "sorted"
+            ) or (isinstance(node.func, ast.Attribute) and node.func.attr == "sort")
+            if not is_sort:
+                continue
+            for keyword in node.keywords:
+                if keyword.arg == "key":
+                    keys.append(ast.get_source_segment(source, keyword.value) or "")
     return keys

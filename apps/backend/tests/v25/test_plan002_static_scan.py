@@ -192,7 +192,10 @@ def test_plan_002_adds_no_module_to_the_planning_package():
     assert names == [
         "__init__.py",
         "context.py",
-        "decompose.py",
+        "decompose/__init__.py",
+        "decompose/constants.py",
+        "decompose/decomposer.py",
+        "decompose/validator.py",
         "engine.py",
         "executor_bridge.py",
         "goal_contract.py",

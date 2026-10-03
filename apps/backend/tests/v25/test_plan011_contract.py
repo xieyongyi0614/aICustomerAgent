@@ -41,7 +41,7 @@ from . import _plan_scan as scan
 
 ENGINE_PATH = Path(plan_engine.__file__)
 CONTEXT_PATH = Path(plan_context.__file__)
-DECOMPOSE_PATH = Path(plan_decompose.__file__)
+DECOMPOSE_PATH = Path(plan_decompose.__file__).parent
 SCHEDULER_PATH = Path(plan_scheduler.__file__)
 BRIDGE_PATH = Path(plan_bridge.__file__)
 OBSERVER_PATH = Path(plan_observer.__file__)
@@ -52,7 +52,7 @@ DEBUG_PATH = Path(debug_api.__file__)
 PURE_MODULES = {
     "scheduler.py": SCHEDULER_PATH,
     "revision.py": REVISION_PATH,
-    "decompose.py": DECOMPOSE_PATH,
+    "decompose/": DECOMPOSE_PATH,
 }
 
 FORBIDDEN_IO_PREFIXES = (
