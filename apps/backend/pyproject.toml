@@ -36,7 +36,7 @@ dev = [
 source = ["app"]
 omit = [
   "app/main.py",
-  "app/core/db.py",
+  "app/core/db/*",
   "app/models/*",
   "app/migrations/*",
   "app/character/*",
