@@ -434,7 +434,7 @@ app/services/
 - ✅ **`reflection/evidence.py`（1856）→ `reflection/evidence/` 包**（`75e0d22`，首轮回滚后带守卫适配重做）：`windows.py`（882 行，纯窗构造 + 门槛数学，零 IO）/ `collectors.py`（911 行，DB 采集 + trace 记录 + 聚合编排）；AST 调用图做纯/IO 精确分类（引用 SessionLocal/仓储/trace 助手的符号传递闭包 → collectors，其余 → windows，含 8 个 AnnAssign 常量），`__init__` 显式全量再导出 153 个名字（含私有名与仓储模块引用）。**首轮回滚的原因（plan010/011 分节级源码语义守卫族 10+ 断言）本轮逐守卫完成语义适配**：分节标记源码扫描改为 `plan010_support.plan_section_source()` AST 按符号抽段（44 个 PLAN-010 符号跨 windows/collectors 两文件拼接，语义等价「计划通道源码段」）；`__file__` 整文件读取改包内 `*.py` glob 拼接（plan011/ledger_insight/tool009 三处）；conftest 与 growth_loop 自建打桩清单的 `reflection_evidence` 绑定改指 `collectors`（唯一 DB 触点，防 §十三 打桩静默失效）；`_human_messages_after` / `_aggregate` 两处补丁目标改指子模块。
 - ⏸ **`planning/observer.py`（863）：审计完成后判定不拆**（2026-09-30 第二批）。补丁缝审计结论：模块属性补丁仅 4 处、零 SessionLocal、零源码路径串——耦合面本身干净；**真正障碍是 v25 的 planning 包「扁平文件清单纪律」**：`planning_modules()` / `PLANNING_PACKAGE_MODULES` / `rglob("*.py") + path.name` 精确清单断言分布在 **14 个测试文件**（plan001/002/004/005/006/007/008/009/010 的 static_scan、scope_markers、boundary 等），observer 包化会引入 `observer/__init__.py`、`observer/core.py`、`observer/broadcast.py` 三个新条目与重名 `__init__.py`，需把全部清单从「文件名」升级为「相对包路径」语义。适配 churn（14 文件）超过拆分收益（863 行 → 两块），且 AST 闭包分析证实 PlanObserver.settle 与广播函数双向调用（core ↔ broadcast 无法单向切分，PlanObserver 须与广播同侧，语义别扭）。**可维护性替代**：文件内已有 `# ---` 分节注释体例，后续维护靠分节导航。
 - ✅ **`planning/decompose.py`(963) → `planning/decompose/` 包**（2026-10-03，见 §15.4）。
-- ⏸ **`tool/ext_api.py`(1507) 待排期**：与 observer 同属 planning/tool 守卫体系（ext_api 有 tool 域钉测面）。**前置条件 = 先做「v25 清单守卫体系升级」专项**（清单语义从文件名改为相对包路径）—— **该前置已完成（`b9c2aaf`，见 §15.3）**；ext_api 另需 tool 域钉测审计（含 `logger="app.services.tool.ext_api"` 的 caplog 断言与大量测试引用的私有名）。
+- ✅ **`tool/ext_api.py`(1507) → `tool/ext_api/` 包**（2026-10-03，见 §15.5）。
 
 ⚠️ **端口快照残留第二形态（本轮新发现，比 §15.1 第一形态更隐蔽）**：经**模块属性链**打到端口对象的补丁（如 `monkeypatch.setattr(plan_context.world_engine, "build_context", fake)`，其中 `plan_context.world_engine` 已是端口）——undo 时 monkeypatch 把「getattr 的快照」（即真实函数）**永久写进端口字典**，此后端口 `__getattr__` 被字典短路：①后续对实现模块的补丁全部失效（跨测试污染，`test_plan008_context` 文件内 TestWorldBriefBudget 污染 TestNineWorldFacts / TestAssemblyZeroWrite 即此因）；②形式上看不出「打的是端口」，审计极易漏。**修法与铁律同前**：补丁目标一律打实现模块（`app.application.world_engine.X`），端口读穿天然生效。
 
@@ -483,6 +483,36 @@ app/services/
 - `v40/test_ledger_budget.py::test_planning_math_unchanged` 由「读四文件」改为「三文件 + decompose 包内全部 `*.py`」。
 
 **验证**：`tests/v25` **1320 passed / 3 failed**（三条 = 既有 `planning prompt` 摘要红，见 §15.2 附注）；全量 **16 failed / 7322 passed / 2 skipped**，失败集与基线**同数**（差异项经隔离复跑确认为 xdist 抖动：`e2e/debug_state_history`、`v8/world_performance`、`v30/foreground_cutover`）→ **零新增失败**。
+
+---
+
+### 15.5 `tool/ext_api.py` 包化（2026-10-03，债② 4/5 —— 债② 收官）
+
+`tool/ext_api.py`（1507 行）→ `tool/ext_api/` 包，四文件分工：
+
+| 文件 | 内容 |
+|---|---|
+| `__init__.py` | 原 docstring（加「现为包」说明）+ 全部公有及测试可见私有名（`_MISSING` / `_resolve_expression`）的显式再导出 |
+| `schema.py` | 常量、清单模型（`LoadReport` / `ExternalApiManifest` / `ManifestIndex`）、全部 `_check_*` / `_require_*` 校验、`parse_manifest` / `definition_for` / `ToolManifestLoader` |
+| `handlers.py` | HTTP 传输（`HttpResponse` / `HttpTransport` / `UrllibTransport` / `_decode_http_response` / `_scrub`）、响应映射（`_resolve_expression` / `map_observations` / `render_params` …）、`ExternalApiCapability` |
+| `registry.py` | 模块级单例与 7 个 getter/setter |
+
+**纯移动**：112 个顶层定义逐个 AST 比对，**仅 `logger` 一处差异**（见下）；函数 / 类体逐字节未改。
+
+**logger 名是契约**：原 `logging.getLogger(__name__)` 拆包后会变成 `...ext_api.<submodule>`，而 `tests/v24/test_tool011_ext_api.py:146,246` 用 `caplog.at_level(logger="app.services.tool.ext_api")` 断言 → 三个子模块统一 `logging.getLogger("app.services.tool.ext_api")`（字面量，非 `__name__`）。
+
+**包内依赖无环**：`schema ← handlers ← registry` 单向——`schema` 对 registry / handlers 的 3 处反向引用改为**函数内延迟 import**（沿用 §十① 惯例），`registry` 的 handlers 导入提至模块顶部；四个入口分别直接导入均验证通过。
+
+**守卫适配**：
+
+- `tests/v24/test_tool011_security.py`：新增 `_package_sources()`，`NEW_MODULES` 与环境变量 / yaml 守卫扫描整包。
+- `tests/v24/test_tool012_bans.py:381`：凭据守卫改读包内全部 `*.py` 聚合文本。
+- `tests/v25/test_plan006_static_scan.py`：`TOOL_LAYER_FILES` 经 `_package_layer_files()` 展开包内文件。
+- **打桩目标**：`tests/v24/test_tool011_manifests.py` 的 `monkeypatch` 由包 `ext_api.<x>` 改为**实现模块** `ext_api.schema.<x>`（沿用 §15.1 铁律）。
+
+**验证**：`tests/v24 + v25 + unit` **4338 passed / 9 failed**（9 条 = 既有红）；全量 **15 failed / 7338 passed / 2 skipped**，失败集 ⊆ 基线既存集（差异项为既有抖动）→ **零新增失败**。
+
+**债② 收官**：5 个目标文件中 4 个已拆（`evaluation/context`、`reflection/evidence`、`planning/decompose`、`tool/ext_api`），`planning/observer.py` 经审计判定**不拆**（§15.2）。
 
 ---
 
