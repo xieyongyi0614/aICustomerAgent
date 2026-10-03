@@ -74,10 +74,11 @@ SQUASHED_MIGRATION_FILE = "0001_squashed_full_schema.py"
 INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0002_briefing_preferences.py",
     "0003_car_domain.py",
+    "0004_channel_identity_bindings.py",
 )
 
 SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
-SCHEMA_COLUMNS_DIGEST_BASELINE = "45eef10a675e4794"
+SCHEMA_COLUMNS_DIGEST_BASELINE = "3631831cc3c8c1d5"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",
@@ -929,6 +930,13 @@ def schema_columns_digest(exclude_tables: tuple[str, ...] = ()) -> str:
     这样「基线未漂移」仍可被证明：`schema_columns_digest()` == `SCHEMA_COLUMNS_DIGEST`
     且 `schema_columns_digest(SCHEMA_ADDED_TABLES_VS_BASELINE)` ==
     `SCHEMA_COLUMNS_DIGEST_BASELINE`。直接改基线摘要常量会让断言变成谎，故不采用。
+
+    **例外（2026-10-03，ADR-16）**：`SCHEMA_COLUMNS_DIGEST_BASELINE` 由
+    `45eef10a675e4794` 更新为 `3631831cc3c8c1d5`。这是**唯一一次**对基线表列定义的
+    有意演进——迁移 `0004` 把基线表 `channel_identities.session_id` 放开为可空
+    （该表成为全通道统一凭据绑定表后，邮箱绑定行无会话概念，NOT NULL 是原飞书专用
+    设计的残留）。此处更新是**登记该演进**，不是用它掩盖未登记漂移：新增表仍走
+    `SCHEMA_ADDED_TABLES_VS_BASELINE`，其余基线表列定义仍受本摘要保护。
     """
     from app.core.db import Base
 

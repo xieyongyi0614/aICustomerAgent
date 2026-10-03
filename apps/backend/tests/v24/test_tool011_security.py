@@ -34,6 +34,7 @@ EXPECTED_TASK_GLOBALS = frozenset(
         "_job_worker_task",
         "_life_loop_task",
         "_agent_evolution_task",
+        "_ids_watermark_task",
     }
 )
 """vXX_ 开关删除后：`_autonomy_task` / `_world_maintenance_task` /
@@ -41,9 +42,12 @@ EXPECTED_TASK_GLOBALS = frozenset(
 （life_loop 为唯一周期入口），故常驻 task 数由 8 降至 5。
 
 2026-09-29 memory 域清理：v1 `memory_service.run_memory_reclaim_loop` 常驻循环移除
-（`memories.expires_at` 已无任何写入者，该循环恒扫 0 行），常驻 task 数由 5 降至 4。"""
+（`memories.expires_at` 已无任何写入者，该循环恒扫 0 行），常驻 task 数由 5 降至 4。
 
-EXPECTED_CREATE_TASK_COUNT = 4
+2026-10-03 ADR-16（雪花 ID）：新增 `_ids_watermark_task`（周期落盘发号水位，供跨重启
+时钟回拨校验），常驻 task 数由 4 升至 5。该循环是**发号正确性必需**，非兜底轮询。"""
+
+EXPECTED_CREATE_TASK_COUNT = 5
 
 
 def _tree(path: Path) -> ast.Module:

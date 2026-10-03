@@ -19,6 +19,7 @@ from app.core.db import (
 )
 from tests.support.schema_pins import (
     MIGRATION_HEAD,
+    MIGRATION_HEAD_PARENT,
     SCHEMA_COLUMNS_DIGEST,
     SCHEMA_TABLE_COUNT,
     schema_columns_digest,
@@ -54,12 +55,12 @@ def test_schema_columns_digest_matches_pin():
     assert schema_columns_digest() == SCHEMA_COLUMNS_DIGEST
 
 
-def test_migration_chain_head_is_still_0003():
+def test_migration_chain_head_matches_pin():
     script = ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini")))
-    assert script.get_heads() == [MIGRATION_HEAD] == ["0003"]
-    revision = script.get_revision("0003")
+    assert script.get_heads() == [MIGRATION_HEAD]
+    revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
-    assert revision.down_revision == "0002"
+    assert revision.down_revision == MIGRATION_HEAD_PARENT
 
 
 def test_car_migration_declares_upgrade_and_downgrade_for_all_tables():
