@@ -24,7 +24,10 @@
 `tests/unit/test_ids.py`（22 项）；**身份域改用雪花**——`user_service` 改为凭据绑定驱动、
 `channel.resolve()` 补建 `users` 行、`channel_identities` 成为全通道统一绑定表（迁移 `0004`）、
 架构基线已同步（ADR-16）。
-**未完成（B2）**：列类型翻转 `VARCHAR → BIGINT` + Python 侧类型标注与契约翻转（见 §6，须单独评审）。
+**已完成（C1）**：`car_*` / `ledger_accounts` / `ledger_categories` / `life_tasks` 的 **9 处内嵌 `user_id`
+主键全部收敛为雪花**（P0-4 主体，见 §5.3）。
+**已取消（B2）**：列类型翻转 `VARCHAR → BIGINT`，评估后决定不做（见 §6.5）。
+**待办（C2/C3、D）**：`worlds.id` 与其余约 23 处 `uuid4` 仓储主键、5 张例外表拆分（见 §6.5）。
 
 ---
 
@@ -174,6 +177,30 @@ IDS_CLOCK_ROLLBACK_TOLERANCE_MS=0
 
 验证结果：`tests/unit` 1551 项、`tests/e2e` 179 项全绿。
 
+### 5.3 实体主键去内嵌 user_id（C1，P0-4 主体）
+
+| 文件 | 改动 |
+|---|---|
+| `app/core/ids.py` | 新增 `new_id_str()`：`VARCHAR` 列与 API 出参用的字符串出口 |
+| `app/repositories/car_repository.py` | `_new_id(prefix, user_id)` → `_new_id()`（无参）；`car_profiles.id` / `car_loans.id` / `car_service_records.id` / `car_mileage_logs.id` 共 4 处改雪花；移除不再使用的 `from uuid import uuid4` |
+| `app/repositories/ledger_repository.py` | `ledger_accounts.id`（含 `cash_default` 种子账户）/ `ledger_categories.id` 共 3 处改雪花 |
+| `app/repositories/life_task_repository.py` | `life_tasks.id` 改雪花 |
+| `tests/v24/tool011_security.py` | `EXPECTED_TASK_GLOBALS` / `EXPECTED_CREATE_TASK_COUNT` 登记新增的 `_ids_watermark_task`（4→5），附理由 |
+| `tests/v24/tool012_support.py` | `INCREMENTAL_MIGRATION_FILES` 补 `0004`；`SCHEMA_COLUMNS_DIGEST_BASELINE` 更新并登记为**基线表的有意演进**（迁移 `0004` 放开 `channel_identities.session_id` 可空） |
+| `tests/v51/test_car_schema.py` | `test_migration_chain_head_is_still_0003` → `test_migration_chain_head_matches_pin`，改走 `MIGRATION_HEAD` / `MIGRATION_HEAD_PARENT` 常量（去掉过期版本字面量） |
+
+**验证**：全量 `pytest tests` = **7312 passed / 15 failed**，其中 15 项与 pre-B1 基线（17 项）**同类**，均为既有失败
+（含 3 个按耗时预算的 flaky 用例，逐次运行有出入）。**本次改动零新增失败。**
+
+> ⚠️ **回归口径教训（重要）**：本仓 `pyproject.toml` 的 `testpaths = ["tests"]`（7329 项），
+> 而 `tests/v*`（约 5100 项）**不在** `tests/unit|integration|e2e` 这三个**目录**之内。
+> `tests/conftest.py::pytest_collection_modifyitems` 的自动打标规则里，未命中 unit/integration
+> 目录且无 `db_session_factory` / `asgi_transport` 的用例会落到 **`integration` marker** ——
+> 所以正确的层级命令是**按 marker** 的 `pytest -m integration`，而**不是按路径**的
+> `pytest tests/unit tests/integration tests/e2e`。
+> B1 提交时误用了后者，漏掉 4 个回归（`v24` tool011/tool012、`v51` car_schema），后于 C1 一并修复。
+> **改 DB / 迁移 / 跨模块时一律用 `pytest -m integration`；阶段完成用 `pytest`。**
+
 ---
 
 ## 6. 剩余迁移（表结构）
@@ -227,8 +254,16 @@ id: Mapped[int] = mapped_column(
 | **A（已完成）** | 发号模块 + 配置 + 接线 + 单测 | 零 |
 | **B1（已完成）** | 身份域改用雪花：`user_service` 绑定驱动、`channel.resolve()` 补建 `users` 行、`channel_identities` 统一绑定表、迁移 `0004`、基线 ADR-16 | 低（`user_id` 的 Python/API 类型未变 → **无 token 失效**） |
 | **B2（评估后不做）** | 列类型翻转 `VARCHAR → BIGINT` + Python 类型翻转。**结论：收益不抵成本**，详见下方 |
-| **C** | 其余 45 张表**自身** `id` 列迁移（与 `user_id` 列是不同列），同步改 §6.3 隐式引用列；`car_profile_{user_id}` / `task_{user_id}_{ms}` 等内嵌 user_id 的主键收敛为纯雪花 | 中 |
+| **C1（已完成）** | **P0-4 主体**：`car_*`（4 处）/ `ledger_accounts`（2 处）/ `ledger_categories`（1 处）/ `life_tasks`（1 处）共 **9 处内嵌 `user_id` 的主键**收敛为雪花；`ids.new_id_str()` 为 `VARCHAR` 列/API 提供字符串出口 | 低（**测试侧零字面量依赖**，已实测） |
+| **C2** | `worlds.id`：`home:{user_id}` → 雪花。**需先解决 `world_id_for(user_id)` 的语义**：它现为纯函数、被 3 个读路径调用（`memory/sources`、`relationship/shared`、`world_engine`），改查库会引入 `None` 语义（世界可能尚未建立）；另需处理 38 处测试 `home:` 字面量 | 中 |
+| **C3** | 其余约 23 处仓储级 `uuid4` 主键 → 雪花（`app/repositories/*.py`）。实测测试侧仅 **4 处**格式断言需改（`len(event.id) == 36`、3 处 `startswith("act_")`）；需同步决定是否保留类型前缀（本方案倾向**去掉前缀**，与 `user_id` 一致） | 低 |
 | **D** | §6.2 五张例外表拆分（雪花 ID + 业务唯一键） | 中 |
+
+> **C1 的一处例外**：`ledger_categories` 的**种子** id 保留确定性（`cat_seed_{user_id}_{原始名}`），未随 C1 改雪花。
+> 原因：该 id 承担**跨重命名的稳定身份**——用户把「餐饮」改成「吃饭」后重跑播种，不能把原分类复活
+> （`tests/v40/test_ledger_repository.py::test_seed_does_not_overwrite_user_renamed_category` 即此契约）。
+> 直接换成随机雪花会破坏它；正确解法是引入 `seed_key` 列（雪花 id + 业务唯一键），归入阶段 D。
+> 该处已加代码注释说明，避免后人误改。
 
 #### B2 为什么不做（2026-10-03 评估，含实测）
 

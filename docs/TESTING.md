@@ -46,6 +46,16 @@ Marker 由 `tests/conftest.py::pytest_collection_modifyitems` **自动打标**�
 | E2E | `pytest -m e2e` | 全链路回归 |
 | Full | `pytest` | **禁止作为日常默认动作**，仅阶段完成 / PR / 发布 / CI |
 
+> ⚠️ **层级命令一律按 marker，不要按目录切片。** `tests/v*`（约 5100 项，占全量 70%）是历史版本
+> 目录，**不在** `tests/unit|integration|e2e` 之内。按 `tests/conftest.py::pytest_collection_modifyitems`
+> 的自动打标规则，未命中这两个目录且无 `db_session_factory` / `asgi_transport` 的用例会落到
+> **`integration` marker** —— 因此：
+>
+> - ✅ `pytest -m integration` —— 覆盖 `tests/v*`，改 DB / 迁移 / 跨模块时的正确层级命令
+> - ❌ `pytest tests/unit tests/integration tests/e2e` —— **只覆盖约 30%**，会静默漏掉 `tests/v*`
+>   的全部回归（2026-10-03 雪花 ID 改造即因此漏掉 4 个回归，见
+>   `docs/refactor/identity-and-id-scheme.md` §5.3）
+
 > Fast Test 即 `-m "(unit or api) and not slow"`。**多个 `-m` 连用只有最后一个生效**（如 `-m "unit or api" -m "not slow"` 实际等价于只写 `-m "not slow"`，会放进全部 integration），必须写进单个表达式。
 > 全量默认已启用 `pytest-xdist`（`-n auto --dist loadgroup`，见 pyproject addopts），并行安全：每测试独立内存 SQLite、无共享外部状态、无 Redis；需要真实 PostgreSQL 的迁移测试文件用 `xdist_group("migration")` 钉入同一 worker 顺序执行，避免并发升降级同一 `asuna_test` 库互踩。
 
