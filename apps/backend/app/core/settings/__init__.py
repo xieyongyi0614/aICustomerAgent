@@ -22,6 +22,7 @@ from app.core.settings.evaluation import EvaluationSettings
 from app.core.settings.email import EmailSettings
 from app.core.settings.feishu import FeishuSettings
 from app.core.settings.goal import GoalSettings
+from app.core.settings.ids import IdsSettings
 from app.core.settings.ledger import LedgerSettings
 from app.core.settings.life import LifeSettings
 from app.core.settings.life_loop import LifeLoopSettings
@@ -71,6 +72,7 @@ class Settings(
     ToolSettings,
     PlanSettings,
     WeatherSettings,
+    IdsSettings,
     BaseSettings,
 ):
     model_config = DOMAIN_MODEL_CONFIG

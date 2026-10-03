@@ -17,6 +17,7 @@ dependencies = [
   "redis>=5.2.1",
   "sqlalchemy>=2.0.52",
   "uvicorn>=0.52.3",
+  "sonyflake>=2.0.3",
 ]
 
 [dependency-groups]

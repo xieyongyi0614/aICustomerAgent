@@ -12,6 +12,7 @@ from app.application import agent_evolution_worker
 from app.channels.feishu import delivery
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core import redis_client
+from app.core import ids as id_service
 from app.core.settings import get_settings
 from app.services.delivery import outbound as proactive_delivery
 from app.services.tool import channel_tools
@@ -36,6 +37,7 @@ _observability_cleanup_task: asyncio.Task | None = None
 _job_worker_task: asyncio.Task | None = None
 _life_loop_task: asyncio.Task | None = None
 _agent_evolution_task: asyncio.Task | None = None
+_ids_watermark_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
@@ -43,6 +45,7 @@ async def lifespan(application: FastAPI):
     global _observability_cleanup_task
     global _job_worker_task
     global _life_loop_task, _agent_evolution_task
+    global _ids_watermark_task
     from app.services.action import port as action_port
     from app.services.autonomy import port as autonomy_port
     from app.services.memory import job_worker
@@ -66,6 +69,8 @@ async def lifespan(application: FastAPI):
             logging.getLogger(__name__).warning(
                 "Redis 连接失败，邮箱验证码登录将不可用"
             )
+    await id_service.startup_guard()
+    _ids_watermark_task = asyncio.create_task(id_service.run_high_water_flusher())
     observability.set_main_loop(asyncio.get_running_loop())
     _job_worker_task = asyncio.create_task(run_job_worker_loop())
     register_goal_runtime()
@@ -133,6 +138,7 @@ async def lifespan(application: FastAPI):
         _job_worker_task,
         _life_loop_task,
         _agent_evolution_task,
+        _ids_watermark_task,
     ):
         if task is not None:
             task.cancel()
@@ -143,6 +149,8 @@ async def lifespan(application: FastAPI):
     _observability_cleanup_task = None
     _job_worker_task = None
     _life_loop_task = None
+    _ids_watermark_task = None
+    await id_service.flush_high_water()
     await redis_client.close_redis()
 
 
