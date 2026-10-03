@@ -1,8 +1,8 @@
 """雪花 ID 唯一发号入口。
 
 生成逻辑全部委托 sonyflake（禁止自研位运算）；本模块只负责 epoch / 位分配 / machine_id
-装配、跨重启时钟回拨防护、同步与异步两个出口。回拨防护设计见
-`docs/refactor/identity-and-id-scheme.md`。
+装配、跨重启时钟回拨防护、同步与异步两个出口。回拨防护设计见架构基线
+ADR-16（`docs/current-system-architecture-baseline.md`）。
 """
 
 from __future__ import annotations
