@@ -18,7 +18,7 @@ def test_ai_narrative_first_home():
     )
     assert "今日 AI 总结" in repo
     ai = src.index("AiCard(")
-    data = src.index("今日状态")
+    data = src.index("今日任务")
     assert ai < data
 
 
@@ -34,11 +34,3 @@ def test_memory_visible_has_usage_receipt_slot():
     assert "usageReceipts" in src
     assert "usageNote" in src
     assert "来源：" in src
-
-
-def test_no_hardcoded_money_in_mobile_non_tokens():
-    # 分层守卫已在 Flutter 侧覆盖硬编码色值；此处钉住健康免责常驻
-    consent = Path(
-        "../mobile/lib/features/health/presentation/health_consent_page.dart"
-    ).read_text(encoding="utf-8")
-    assert "非医疗建议" in consent

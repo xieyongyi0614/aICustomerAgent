@@ -306,13 +306,6 @@ class _LifePageState extends ConsumerState<LifePage> {
           tileBg: colors.tileInfo,
           tileFg: colors.aiBlue,
         ),
-      LifeModule.health => _ModuleTile(
-          module: module,
-          summary: '趋势参考·非诊断',
-          trend: '尚未接入健康数据',
-          tileBg: colors.tileHeart,
-          tileFg: colors.heartFg,
-        ),
       LifeModule.car => _ModuleTile(
           module: module,
           summary: _carSummaryText,

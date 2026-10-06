@@ -9,8 +9,8 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('test_life_module_registry_lists_six_modules', () {
-    expect(LifeModule.values.length, 6);
+  test('test_life_module_registry_lists_five_modules', () {
+    expect(LifeModule.values.length, 5);
     expect(defaultLifeModule, LifeModule.ledger);
     for (final module in LifeModule.values) {
       expect(module.label, isNotEmpty);
@@ -42,7 +42,6 @@ void main() {
       LifeModule.ledger,
       LifeModule.memo,
       LifeModule.schedule,
-      LifeModule.health,
       LifeModule.album,
     ];
     expect(decodeLifeModuleOrder(encodeLifeModuleOrder(order)), order);
@@ -51,7 +50,7 @@ void main() {
   test('test_move_to_reorders_and_persists', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    await container.read(lifeModuleOrderProvider.notifier).moveTo(4, 0);
+    await container.read(lifeModuleOrderProvider.notifier).moveTo(3, 0);
     expect(container.read(lifeModuleOrderProvider).first, LifeModule.car);
     expect(container.read(dynamicModuleProvider), LifeModule.car);
 
@@ -70,7 +69,6 @@ void main() {
       LifeModule.memo,
       LifeModule.schedule,
       LifeModule.ledger,
-      LifeModule.health,
       LifeModule.car,
       LifeModule.album,
     ]);

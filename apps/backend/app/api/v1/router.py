@@ -8,7 +8,6 @@ from app.api.v1 import (
     chat,
     debug,
     governance,
-    health,
     history,
     home,
     insights,
@@ -43,4 +42,3 @@ api_router.include_router(home.home_router)
 api_router.include_router(briefing.briefing_router)
 api_router.include_router(car.car_router)
 api_router.include_router(auth.auth_router)
-api_router.include_router(health.health_router)

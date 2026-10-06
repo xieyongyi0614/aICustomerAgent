@@ -35,23 +35,6 @@ class InsightBlock(BaseModel):
     action_label: str | None = None
 
 
-class MetricCell(BaseModel):
-    label: str
-    value: str
-    unit: str | None = None
-    note: str | None = None
-
-    # 指标 sparkline 序列（DA-26 健康域接入前恒为空，端上空序列不渲染）。
-    spark: list[float] = []
-
-
-class HealthGrid(BaseModel):
-    authorized: bool
-    cells: list[MetricCell] = []
-    source: str | None = None
-    empty_hint: str | None = None
-
-
 class TaskItem(BaseModel):
     id: str
     title: str
@@ -74,7 +57,6 @@ class HomeSummary(BaseModel):
     greeting: GreetingBlock
     hero: HeroBlock
     insight: InsightBlock
-    health: HealthGrid
     tasks: list[TaskItem]
     tasks_hint: str
     spend: SpendBlock | None = None
@@ -184,10 +166,6 @@ def home_summary(user_id: str = Depends(require_user)):
             mode_chip=mode_chip_for(user_id),
         ),
         insight=insight_block_for(user_id),
-        health=HealthGrid(
-            authorized=False,
-            empty_hint="连接手环后，这里会显示睡眠、心率和步数",
-        ),
         tasks=tasks,
         tasks_hint=f"{len(tasks)} 项 · AI 已排序" if tasks else "",
         spend=spend,

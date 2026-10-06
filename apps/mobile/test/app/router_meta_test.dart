@@ -23,19 +23,16 @@ void main() {
       '/album/detail',
       '/album/photo',
       '/album/ai',
-      '/health',
       '/memory',
       '/profile',
       '/briefing',
       '/profile/privacy',
-      '/health/consent',
-      '/health/probe',
       '/login',
       '/verify',
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 27);
+    expect(chromeByPath.length, 24);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
@@ -56,8 +53,6 @@ void main() {
       '/chat/ledger',
       '/briefing',
       '/profile/privacy',
-      '/health/consent',
-      '/health/probe',
       '/chat',
       '/login',
       '/verify',
@@ -65,7 +60,6 @@ void main() {
       expect(chromeForLocation(p).hideTabBar, isTrue, reason: p);
     }
     expect(chromeForLocation('/home').hideTabBar, isFalse);
-    expect(chromeForLocation('/health').hideTabBar, isFalse);
   });
 
   test('test_briefing_status_bar_light', () {
@@ -94,9 +88,6 @@ void main() {
       '/album/detail',
       '/album/photo',
       '/album/ai',
-      '/health',
-      '/health/consent',
-      '/health/probe',
     ]) {
       expect(ShellTab.forLocation(p), ShellTab.life, reason: p);
     }

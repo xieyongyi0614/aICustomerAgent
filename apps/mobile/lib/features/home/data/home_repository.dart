@@ -36,24 +36,6 @@ class HomeSpend {
   final List<double> weekBars;
 }
 
-class HomeHealthMetric {
-  const HomeHealthMetric({
-    required this.label,
-    required this.value,
-    this.unit,
-    this.note,
-    this.sparkValues = const <double>[],
-  });
-
-  final String label;
-  final String value;
-  final String? unit;
-  final String? note;
-
-  /// 指标 sparkline 序列；空序列 = 后端未下发，不渲染。
-  final List<double> sparkValues;
-}
-
 class HomeSummaryData {
   const HomeSummaryData({
     required this.dateLabel,
@@ -64,10 +46,6 @@ class HomeSummaryData {
     required this.insightTitle,
     required this.insightNarrative,
     this.insightAction,
-    required this.healthAuthorized,
-    this.healthEmptyHint,
-    this.healthSource,
-    this.healthMetrics = const <HomeHealthMetric>[],
     required this.tasks,
     required this.tasksHint,
     this.spend,
@@ -81,12 +59,6 @@ class HomeSummaryData {
   final String insightTitle;
   final String insightNarrative;
   final String? insightAction;
-  final bool healthAuthorized;
-  final String? healthEmptyHint;
-
-  /// 设备名（如「小米手环 9 Pro」）；后端未接入时缺省，端上不得编造。
-  final String? healthSource;
-  final List<HomeHealthMetric> healthMetrics;
   final List<HomeTaskItem> tasks;
   final String tasksHint;
   final HomeSpend? spend;
@@ -104,7 +76,6 @@ class HomeRepository {
     final greeting = data['greeting'] as Map? ?? const {};
     final hero = data['hero'] as Map? ?? const {};
     final insight = data['insight'] as Map? ?? const {};
-    final health = data['health'] as Map? ?? const {};
     final spend = data['spend'] as Map?;
     final tasksRaw = (data['tasks'] as List?) ?? const [];
     return HomeSummaryData(
@@ -116,23 +87,6 @@ class HomeRepository {
       insightTitle: insight['title'] as String? ?? '今日 AI 总结',
       insightNarrative: insight['narrative'] as String? ?? '',
       insightAction: insight['action_label'] as String?,
-      healthAuthorized: health['authorized'] as bool? ?? false,
-      healthEmptyHint: health['empty_hint'] as String?,
-      healthSource: health['source'] as String?,
-      healthMetrics: [
-        for (final cell in (health['cells'] as List?) ?? const [])
-          if (cell is Map)
-            HomeHealthMetric(
-              label: cell['label'] as String? ?? '',
-              value: cell['value'] as String? ?? '',
-              unit: cell['unit'] as String?,
-              note: cell['note'] as String?,
-              sparkValues: [
-                for (final v in (cell['spark'] as List?) ?? const <dynamic>[])
-                  if (v is num) v.toDouble(),
-              ],
-            ),
-      ],
       tasks: [
         for (final t in tasksRaw)
           HomeTaskItem(

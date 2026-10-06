@@ -18,9 +18,6 @@ import '../../features/car/presentation/car_page.dart';
 import '../../features/car/presentation/car_profile_page.dart';
 import '../../features/chat/presentation/chat_ledger_page.dart';
 import '../../features/chat/presentation/chat_page.dart';
-import '../../features/health/presentation/health_consent_page.dart';
-import '../../features/health/presentation/health_page.dart';
-import '../../features/health/presentation/health_probe_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/ledger/presentation/ledger_add_page.dart';
 import '../../features/ledger/presentation/ledger_auto_page.dart';
@@ -59,7 +56,6 @@ const chromeByPath = <String, RouteChrome>{
   // 记忆是「我的 · 记忆管理」子页（B7：此页无 Tab 栏）
   '/memory': chromeImmersive,
   '/profile': chromeHome,
-  '/health': chromeHome,
   '/login': chromeImmersive,
   '/verify': chromeImmersive,
   '/ledger': chromeImmersive,
@@ -79,8 +75,6 @@ const chromeByPath = <String, RouteChrome>{
   '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
-  '/health/consent': chromeImmersive,
-  '/health/probe': chromeImmersive,
 };
 
 RouteChrome chromeForLocation(String location) {
@@ -96,7 +90,7 @@ enum ShellTab {
   chat(path: '/chat'),
   life(
     path: '/life',
-    owns: ['/ledger', '/memo', '/schedule', '/car', '/album', '/health'],
+    owns: ['/ledger', '/memo', '/schedule', '/car', '/album'],
   ),
   profile(path: '/profile', owns: ['/memory']);
 
@@ -180,12 +174,6 @@ final appRouter = GoRouter(
           path: '/profile/privacy',
           builder: (_, _) => const ProfilePrivacyPage(),
         ),
-        GoRoute(path: '/health', builder: (_, _) => const HealthPage()),
-        GoRoute(
-          path: '/health/consent',
-          builder: (_, _) => const HealthConsentPage(),
-        ),
-        GoRoute(path: '/health/probe', builder: (_, _) => const HealthProbePage()),
         GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
         GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(path: '/ledger/auto', builder: (_, _) => const LedgerAutoPage()),

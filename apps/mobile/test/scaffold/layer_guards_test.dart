@@ -37,7 +37,6 @@ void main() {
       'car',
       'album',
       'memory',
-      'health',
       'briefing',
       'profile',
     ]) {

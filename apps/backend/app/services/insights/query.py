@@ -57,8 +57,6 @@ def list_insights(
     limit: int = 10,
 ) -> list[InsightItem]:
     """按冻结规则派生 domain；无洞察返空列表。"""
-    if domain == "health":
-        return []
     effective = domain or "home"
     with SessionLocal() as session:
         rows = (

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../design_system/components/cards.dart';
 import '../../../design_system/components/rows.dart';
 
-/// 隐私与授权：导出 / 清空 / 健康单独同意。清空需二次确认。
+/// 隐私与授权：导出 / 清空。清空需二次确认。
 class ProfilePrivacyPage extends StatelessWidget {
   const ProfilePrivacyPage({super.key});
 
@@ -22,12 +21,6 @@ class ProfilePrivacyPage extends StatelessWidget {
         children: [
           SettingGroup(
             children: [
-              SettingRow(
-                title: '健康数据',
-                subtitle: '单独同意 · 用于趋势参考，非医疗建议',
-                icon: AppIcons.heart,
-                onTap: () => context.go('/health/consent'),
-              ),
               SettingRow(
                 title: '导出我的数据',
                 subtitle: '生成一份完整备份',

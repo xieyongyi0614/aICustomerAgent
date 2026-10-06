@@ -8,7 +8,6 @@ enum LifeModule {
   ledger('ledger', '记账', AppIcons.wallet, '/ledger'),
   memo('memo', '备忘录', AppIcons.fileText, '/memo'),
   schedule('schedule', '日程', AppIcons.calendar, '/schedule'),
-  health('health', '健康', AppIcons.heart, '/health'),
   car('car', '车辆', AppIcons.car, '/car'),
   album('album', '相册', AppIcons.image, '/album');
 

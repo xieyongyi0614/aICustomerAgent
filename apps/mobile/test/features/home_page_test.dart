@@ -5,10 +5,7 @@ import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/features/home/data/home_repository.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
 
-HomeSummaryData _summary({
-  bool healthAuthorized = false,
-  List<HomeHealthMetric> metrics = const [],
-}) => HomeSummaryData(
+HomeSummaryData _summary() => const HomeSummaryData(
       dateLabel: '今天',
       greeting: '早上好',
       headline: '今天也交给我吧',
@@ -17,12 +14,9 @@ HomeSummaryData _summary({
       insightTitle: '今日 AI 总结',
       insightNarrative: '上午适合专注。',
       insightAction: '查看完整早间简报 →',
-      healthAuthorized: healthAuthorized,
-      healthEmptyHint: '连接手环后，这里会显示睡眠、心率和步数',
-      healthMetrics: metrics,
-      tasks: const [],
+      tasks: [],
       tasksHint: '0 项',
-      spend: const HomeSpend(
+      spend: HomeSpend(
         amountLabel: '¥0',
         budgetLabel: '/ 今日预算 ¥200',
         progress: 0,
@@ -40,13 +34,13 @@ void main() {
     );
     await tester.pump();
     final ai = find.text('今日 AI 总结');
-    final status = find.text('今日状态');
+    final tasks = find.text('今日任务');
     expect(ai, findsOneWidget);
-    expect(status, findsOneWidget);
-    expect(tester.getTopLeft(ai).dy, lessThan(tester.getTopLeft(status).dy));
+    expect(tasks, findsOneWidget);
+    expect(tester.getTopLeft(ai).dy, lessThan(tester.getTopLeft(tasks).dy));
   });
 
-  testWidgets('health empty branch has no fake numbers', (tester) async {
+  testWidgets('home never renders health section', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
@@ -54,46 +48,9 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('还没有健康数据'), findsOneWidget);
-    expect(find.text('7h12m'), findsNothing);
-    expect(find.text('去授权健康数据'), findsOneWidget);
-  });
-
-  testWidgets('health data branch renders only API-provided metrics', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: HomePage(
-          healthAuthorized: true,
-          debugSummary: _summary(
-            healthAuthorized: true,
-            metrics: const [
-              HomeHealthMetric(label: '睡眠', value: '7h12m', note: '来自 Health Connect'),
-            ],
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    expect(find.text('7h12m'), findsOneWidget);
+    expect(find.text('今日状态'), findsNothing);
     expect(find.text('还没有健康数据'), findsNothing);
-  });
-
-  testWidgets('authorized without synced metrics shows honest empty state', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: HomePage(
-          healthAuthorized: true,
-          debugSummary: _summary(healthAuthorized: true),
-        ),
-      ),
-    );
-    await tester.pump();
-    expect(find.text('已连接设备，今天的健康数据还没同步过来'), findsOneWidget);
-    expect(find.text('7h12m'), findsNothing);
-    expect(find.text('62'), findsNothing);
-    expect(find.text('6,234'), findsNothing);
+    expect(find.text('去授权健康数据'), findsNothing);
   });
 
   testWidgets('spend week bars render only when backend provides them',
@@ -123,7 +80,6 @@ void main() {
       modeChip: '',
       insightTitle: '今日 AI 总结',
       insightNarrative: '',
-      healthAuthorized: false,
       tasks: const [],
       tasksHint: '',
       spend: const HomeSpend(

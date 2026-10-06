@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/album/presentation/album_page.dart';
 import '../../features/car/presentation/car_page.dart';
-import '../../features/health/presentation/health_page.dart';
 import '../../features/ledger/presentation/ledger_page.dart';
 import '../../features/life/presentation/memo_page.dart';
 import '../../features/life/presentation/schedule_page.dart';
@@ -21,7 +20,6 @@ class DynamicTabPage extends ConsumerWidget {
       LifeModule.ledger => const LedgerPage(showBackLink: false),
       LifeModule.memo => const MemoPage(showBackLink: false),
       LifeModule.schedule => const SchedulePage(showBackLink: false),
-      LifeModule.health => const HealthPage(),
       LifeModule.car => const CarPage(showBackLink: false),
       LifeModule.album => const AlbumPage(showBackLink: false),
     };

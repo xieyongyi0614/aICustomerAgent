@@ -10,9 +10,7 @@ import '../data/home_repository.dart';
 
 /// B1 #home 十一段：先结论 → 后数据 → 再行动。
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key, this.healthAuthorized = false, this.debugSummary});
-
-  final bool healthAuthorized;
+  const HomePage({super.key, this.debugSummary});
 
   /// 测试注入；生产路径为 null，走 /home/summary。
   final HomeSummaryData? debugSummary;
@@ -98,7 +96,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
     final d = _data!;
-    final healthAuthorized = d.healthAuthorized || widget.healthAuthorized;
     return Scaffold(
       backgroundColor: colors.canvas,
       body: SafeArea(
@@ -132,18 +129,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              _SectionTitle(
-                title: '今日状态',
-                hint: healthAuthorized ? d.healthSource : null,
-              ),
-              const SizedBox(height: 10),
-              if (healthAuthorized && d.healthMetrics.isNotEmpty)
-                _HealthGrid(metrics: d.healthMetrics)
-              else if (healthAuthorized)
-                const _HealthSyncingEmpty()
-              else
-                _HealthAuthEmpty(hint: d.healthEmptyHint),
               const SizedBox(height: 24),
               _SectionTitle(title: '今日任务', hint: d.tasksHint),
               const SizedBox(height: 6),
@@ -310,77 +295,3 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _HealthGrid extends StatelessWidget {
-  const _HealthGrid({required this.metrics});
-
-  final List<HomeHealthMetric> metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < metrics.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(
-            child: MetricCard(
-              label: metrics[i].label,
-              value: metrics[i].value,
-              unit: metrics[i].unit,
-              note: metrics[i].note,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// 已授权但当日还没有同步到数据：诚实空态，不出任何数值。
-class _HealthSyncingEmpty extends StatelessWidget {
-  const _HealthSyncingEmpty();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final type = context.typography;
-    return AppCard(
-      child: Text(
-        '已连接设备，今天的健康数据还没同步过来',
-        textAlign: TextAlign.center,
-        style: type.body.copyWith(color: colors.ink2),
-      ),
-    );
-  }
-}
-
-/// 空态 + 引导授权：零数值、零留白（决策 D1）。
-class _HealthAuthEmpty extends StatelessWidget {
-  const _HealthAuthEmpty({this.hint});
-
-  final String? hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final type = context.typography;
-    return AppCard(
-      child: Column(
-        children: [
-          Text('还没有健康数据',
-              style: type.rowTitle.copyWith(color: colors.ink)),
-          const SizedBox(height: 8),
-          Text(
-            hint ?? '连接手环后，这里会显示睡眠、心率和步数',
-            textAlign: TextAlign.center,
-            style: type.body.copyWith(color: colors.ink2),
-          ),
-          const SizedBox(height: 14),
-          ChipButton(
-            label: '去授权健康数据',
-            onTap: () => context.go('/health/consent'),
-          ),
-        ],
-      ),
-    );
-  }
-}

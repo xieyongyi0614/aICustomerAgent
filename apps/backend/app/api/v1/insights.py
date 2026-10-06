@@ -48,7 +48,7 @@ class InsightListResponse(BaseModel):
 
 @insights_router.get("", response_model=InsightListResponse)
 def list_insights(
-    domain: Literal["ledger", "health", "home"] | None = Query(default=None),
+    domain: Literal["ledger", "home"] | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
     user_id: str = Depends(require_user),
 ):

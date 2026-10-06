@@ -287,32 +287,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             SettingGroup(
               children: [
                 SettingRow(
-                  title: '设备连接',
-                  subtitle: '健康数据实时同步',
-                  icon: AppIcons.watch,
-                  iconBg: colors.tileHealth,
-                  iconColor: colors.health,
-                  trailing: Icon(
-                    AppIcons.chevronRight,
-                    size: 16,
-                    color: colors.ink3,
-                  ),
-                  onTap: () => context.go('/health'),
-                ),
-                SettingRow(
-                  title: '数据授权',
-                  subtitle: '单独同意 · 可随时关闭',
-                  icon: AppIcons.shield,
-                  iconBg: colors.tileInfo,
-                  iconColor: colors.aiBlue,
-                  trailing: Icon(
-                    AppIcons.chevronRight,
-                    size: 16,
-                    color: colors.ink3,
-                  ),
-                  onTap: () => context.go('/health/consent'),
-                ),
-                SettingRow(
                   title: '记忆管理',
                   subtitle: _memoryCount == null
                       ? '查看、编辑、遗忘'
@@ -325,7 +299,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     size: 16,
                     color: colors.ink3,
                   ),
-                  onTap: () => context.go('/memory'),
+                  onTap: () => context.push('/memory'),
                 ),
                 SettingRow(
                   title: '隐私设置',
@@ -338,7 +312,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     size: 16,
                     color: colors.ink3,
                   ),
-                  onTap: () => context.go('/profile/privacy'),
+                  onTap: () => context.push('/profile/privacy'),
                   showDivider: false,
                 ),
               ],

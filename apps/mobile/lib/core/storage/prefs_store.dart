@@ -12,7 +12,6 @@ class PrefsStore {
   static const keyLastEmail = 'profile.last_email';
   static const keyLoginSeen = 'profile.login_seen';
   static const keyFirstUsedAt = 'profile.first_used_at';
-  static const keyHealthConsentGranted = 'health.consent_granted';
   static const keyModuleOrder = 'life.module_order';
 
   static const allKeys = [
@@ -23,7 +22,6 @@ class PrefsStore {
     keyNickname,
     keyLastEmail,
     keyLoginSeen,
-    keyHealthConsentGranted,
     keyModuleOrder,
   ];
 
@@ -64,12 +62,6 @@ class PrefsStore {
   }
 
   String? firstUsedAt() => _prefs.getString(keyFirstUsedAt);
-
-  /// APP-025 单独同意：健康数据授权的端侧同意记录（Q9 裁决）。
-  bool healthConsentGranted() =>
-      _prefs.getBool(keyHealthConsentGranted) ?? false;
-  Future<void> setHealthConsentGranted(bool granted) =>
-      _prefs.setBool(keyHealthConsentGranted, granted);
 
   String? moduleOrder() => _prefs.getString(keyModuleOrder);
   Future<void> setModuleOrder(String order) =>
