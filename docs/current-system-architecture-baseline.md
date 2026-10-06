@@ -407,6 +407,23 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | Run 台账 | `loop_runs` | Agent Runtime 唯一写面 |
 | 决策审计 | `decision_records` | 候选/胜者/理由可审计 |
 
+### 6.4 时间口径（UTC-aware，2026-10-06）
+
+**全库时间统一为「带时区的 UTC（aware UTC）」**。历史口径为朴素本地墙钟（naive local）+ 5 个错标 `timestamptz` 列，二者混用会导致 `naive/aware` 运算抛错与静默 8 小时错算；本次统一由 `docs/refactor/datetime-normalization-plan.md` 收官批完成。
+
+| 维度 | 规则 | 落点 |
+|---|---|---|
+| 取当前时间 | 唯一取时口 `app/core/timeutil.py::now()`（aware UTC）；自治周期内改用 `core/clock.py::logical_now()` | 全仓无裸 `datetime.now()` |
+| 列类型 | 一律 `app/core/db/base.py::UtcDateTime`（`TypeDecorator`：PG → `timestamptz`，SQLite 结果侧补 UTC）；**禁止 `DateTime(timezone=True)`** | 全库 134 个时间列 |
+| 边界输入 | DB 读回 / 外部第三方 naive 值经 `timeutil.ensure_aware()` 归一（naive 按部署本地 `Asia/Shanghai` 解释） | 通道契约 / 工具入参 / 跨域读取 |
+| 本地日期语义 | 「本地日期 / 小时 / 周几」（quiet hours、daily plan、自然月账单）显式经 `timeutil.local()` / `local_naive()` 换算，不得对 aware 值直接取 `.date()` / `.hour` | world / ledger / car / prompts 等 |
+| 边界输出 | `timeutil.to_iso()`（带偏移 ISO） | HTTP 响应 |
+| DB 会话时区 | `engine.py` 建引擎时固定 `timezone=UTC`（`SESSION_TIMEZONE`）；`docker-compose.yml` postgres 设 `TZ`/`PGTZ=UTC` | 行为不依赖服务器默认时区 |
+
+**迁移链**：`0006`（memory）、`0007`（conversation + identity）、`0008`（car / character / goal / world / autonomy / action / planning / ledger / reflection / relationship / runtime / development 全部剩余域）。历史朴素列按 `Asia/Shanghai` 解释为真实瞬间；5 个旧错标 `timestamptz` 列（`memories.last_reinforced_at` / `last_decayed_at` / `forgotten_at`、`conversations.mode_entered_at`、`insights.invalidated_at`）先按 UTC 取回墙钟、再重建瞬间。**Schema 头 = `0008`**。
+
+**防回归护栏**：`tests/unit/test_datetime_discipline.py`（模型列恒 `UtcDateTime` / 无裸 `DateTime(timezone=True)` / `app/` 内无裸 `datetime.now()` / PG 会话时区钉 UTC）与 `tests/unit/test_timeutil.py`（归一三态）。
+
 ---
 
 ## 7. Configuration Architecture
@@ -507,6 +524,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 16. **ID 体系改用雪花 ID（2026-10-03）**：原 `user_id` 是**凭据的派生值**（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`），导致四类结构性问题：①改绑邮箱即换人（旧行数据成孤儿）；②跨通道无法归一（`channel_identities.internal_user_id` 自身即派生串，映射表退化为自映射，同一人飞书 + 邮箱 = 两套记忆/关系/账本）；③ID 可由邮箱反推，间接泄露「某邮箱已注册」；④业务主键内嵌 `user_id`（`car_profile_{user_id}` / `task_{user_id}_{ms}` / `worlds.id = home:{user_id}`），每次身份口径变化都要全库级联改写（`scripts/migrate_owner_id_to_email.py` 即此代价的实证）。**裁决**：全仓 ID 统一由**雪花 ID** 生成，**禁止自研位运算，采用 `sonyflake` 2.0.3**（`_elapsed_time` 单调只增不减，时钟回拨时 ID 时间不回退、序列耗尽则借位到未来并等待真实时间追上；`aiologic.Lock` 同步/异步通用）。**参数**：epoch `2026-01-01T00:00:00Z`（**一次性决策，有数据后不可改**）、`bits_sequence=12` / `bits_machine_id=10` → `time_bits=41`（库计算）、`time_unit=1ms`；容量 4096 ID/毫秒/机器、1024 机器，**可用至 2095-09-07**。唯一发号入口 = `app/core/ids.py`（`new_id()` / `new_id_async()`），配置域 = `core/settings/ids.py`（`IDS_EPOCH_DATE` / `IDS_MACHINE_ID` / `IDS_HIGH_WATER_*` / `IDS_CLOCK_ROLLBACK_TOLERANCE_MS`）。**时钟回拨防护四层**：L1 进程内 = 库的单调逻辑时钟；L2 跨重启 = 内存水位（由 `decompose().time` 反解**逻辑**时间，非墙钟）每 5s + 关停时写入 Redis（key 按 `machine_id` 隔离），启动 `startup_guard()` 读回，`now < 水位 - tolerance` 则抛 `ClockRollbackError` **拒绝启动**（Redis 不可用时降级跳过 + 告警，不阻塞启动）；L3 部署约定 = 必须启 NTP 且只允许 slew 禁止 `ntpdate` 跳变、禁虚拟机快照回滚、**多实例 `IDS_MACHINE_ID` 必须互异且同一 id 不得同时被两实例使用**、监控「水位 > 墙钟」；L4 兜底 = DB 主键唯一约束，**禁止**冲突时静默重试。**执行分两步，B2 已评估后取消**：**B1（本次已落地）** = 发号模块 + 配置 + 接线 + 单测，并让身份域改用雪花（`user_id` 的 Python/API 类型**保持 `str`**，值为雪花十进制串，故 `users.id` 与 37 张 `user_id` 列仍是 `VARCHAR`）；**B2（2026-10-03 评估后主动取消）** = 列类型翻转 `VARCHAR → BIGINT`——实测收益只剩「DB 类型层强制 ID 为数字」，成本为 584 处测试字面量（180 文件）+ 删库重建，且与 B1 的自愈路径矛盾，故**保留 `VARCHAR`**；需要强约束时改在应用边界校验（详见 §9）。**ID 出 JSON 必须为字符串**（JS 精度，硬约束）。原决策台账 `docs/refactor/identity-and-id-scheme.md`（库选型对比、B2 否决证据链、实现坑复盘）已于 2026-10-03 归档移除，全文可从 git 历史取回；**遗留部署/运维项**：生产 `.env` 设 `DEBUG_SURFACE_ENFORCED=true` 与 `IDS_*` 五键（模板见 `.env.example`）、L3 运维确认（时钟自动同步 / 禁快照回滚 / 多实例机号分配 / 水位监控）、存量含 `default-user` 的旧库升级时按需执行 `scripts/migrate_owner_id_to_email.py`（本库已归并完成，脚本幂等 noop）。
 **C1（2026-10-03 已落地）** = 收敛内嵌 `user_id` 的实体主键（P0-4 主体）：`car_profiles` / `car_loans` / `car_service_records` / `car_mileage_logs` / `ledger_accounts` / `ledger_categories` / `life_tasks` 共 9 处改雪花，`car_repository._new_id()` 去掉 `prefix`/`user_id` 参数。**一处例外**：`ledger_categories` 种子 id 保留 `cat_seed_{user_id}_{原始名}` —— 它承担**跨重命名的稳定身份**（用户改名后重跑播种不得复活原分类），换随机雪花会破坏该契约；正确解法（`seed_key` 列）归入阶段 D。**C3（2026-10-03 已落地）** = 全 app `uuid.uuid4()` 生成点 52 处收敛 `ids.new_id_str()`（实测生成点大头在 models pydantic 默认值与应用服务层，非仓储层；前缀裁决：**去掉**，request_id/act id 等均为雪花数字串）。**C2（2026-10-03 已落地）** = `worlds.id` 新世界发雪花、存量行保留 `home:{user_id}`（零数据迁移、零子表重映射），`world_id_for` 纯函数退役为 `find_world_id` 查库（世界未建立返回 `None`，三个读路径空返回语义不变），仓储 get/ensure 全部按 `user_id` 查找。**待办**：D（五张例外表拆分 + `messages`/`emotion_history` 两张自增表收敛）。
 17. **调试面治理（2026-10-03）**：72 端点盘点与收口。①`api/v1/debug.py`（1269 行单体混 7 路径族）拆为 `api/v1/debug/` 五域子包：`tools`(14) / `attribution`(6) / `observability`(15) / `relationship`(3) / `plans`(6)，`__init__` 聚合 `debug_router`，统一 `tags=["debug"]`；OpenAPI 形状零变化（72 操作校验）。②52 个裸端点补 router 级 `require_user`（debug 五子包 + `action` + `action_execution`；`/llm/profiles` 同批收口，因生产 enforced 时会被门禁 404 打断前端选择器而**不挂** `debug_surface_gate`），调试面全部 72 端点要求 token 身份；`user_id` 显式覆盖语义保留（IDENT-009 / ADR-13 ③）。③部署钉死 `DEBUG_SURFACE_ENFORCED=true` 维持 ADR-16 遗留清单，同时是「雪花 ID 可枚举性」（§9）缓解措施的「调试面环境门禁」半边。④v50 `_DEBUG_ENDPOINTS` 401 纪律清单扩至 9 端点，`/llm/profiles` 并入产品端点清单；零消费 10 端点决议保留（world 手动通道 = 显式运维通道，plans 详查端点待 PLAN 域规划确认）。
+18. **时间口径统一 UTC-aware（2026-10-06）**：全库时间列改 `timestamptz`（ORM 侧 `UtcDateTime` `TypeDecorator`，SQLite 结果侧补 UTC）、取时点一律经 `timeutil.now()`、本地日期语义显式 `timeutil.local()`、DB 会话时区钉 `UTC`（`engine.py` + `docker-compose.yml`）；替代此前「朴素本地墙钟 + 5 个错标 `timestamptz`」混用口径（`docs/refactor/datetime-normalization-plan.md`）。静态护栏见 `tests/unit/test_datetime_discipline.py`。
 
 ---
 
