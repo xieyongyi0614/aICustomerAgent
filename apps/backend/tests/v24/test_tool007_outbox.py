@@ -43,7 +43,6 @@ def _tool_path_env(override_settings, monkeypatch):
     monkeypatch.setattr(tool_registry, "_registry", None)
     override_settings(
         action_outbox_enabled="true",
-        observability_persist_enabled="false",
     )
     yield
     monkeypatch.setattr(tool_registry, "_registry", None)

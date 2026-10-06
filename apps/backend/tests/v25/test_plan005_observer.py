@@ -42,8 +42,7 @@ TOOL_STEP = {
 @pytest.fixture
 def observation_on(override_settings):
     """观测用例的既有 Flag 组合（本任务零新增 Flag：门控全用既有自治闸与 PLAN-002 子闸）。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 def _ctx(*, now=V25_NOW, goal_id=None):

@@ -88,7 +88,6 @@ def _seed_decision_record(action_id: str) -> None:
 
 
 def test_expired_pending_writes_decision_outcome(db_session_factory, override_settings):
-    override_settings(observability_persist_enabled="true")
     action = _seed_delivered(delivered_at=NOW - timedelta(hours=25))
     _seed_decision_record(action.id)
 
@@ -107,7 +106,7 @@ async def test_failed_send_outcome_recorded(
     db_session_factory, fake_llm, monkeypatch, override_settings
 ):
     override_settings(
-        observability_persist_enabled="true", autonomy_max_retries=1
+         autonomy_max_retries=1
     )
     conversation_repository.get_or_create_conversation("s1", USER)
     conversation_service.save_turn("s1", "我去忙了", "好的，去吧")

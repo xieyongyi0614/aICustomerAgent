@@ -66,26 +66,21 @@ async def generate(
             build_proactive_messages(goal_description, intention, recent_context)
         )
         chain = prompt | model.bind(max_tokens=get_settings().answer_max_tokens)
-        capture = get_settings().observability_persist_enabled
-        handler = UsageCallbackHandler() if capture else None
+        handler = UsageCallbackHandler()
 
         if prompt_capture.enabled():
             prompt_capture.capture_prompt_snapshot(
                 CallSite.PROACTIVE, prompt.format_messages(), model
             )
         try:
-            message = await chain.ainvoke(
-                {}, config={"callbacks": [handler]} if capture else None
-            )
+            message = await chain.ainvoke({}, config={"callbacks": [handler]})
         except Exception as exc:
-            if capture:
-                _record_call(
-                    trace, model, handler, started, started_at,
-                    LLM_CALL_ERROR, exc.__class__.__name__,
-                )
+            _record_call(
+                trace, model, handler, started, started_at,
+                LLM_CALL_ERROR, exc.__class__.__name__,
+            )
             raise
-        if capture:
-            _record_call(trace, model, handler, started, started_at, LLM_CALL_OK, None)
+        _record_call(trace, model, handler, started, started_at, LLM_CALL_OK, None)
         text = getattr(message, "content", message)
         validated = _validate_text(str(text))
         if trace is not None:

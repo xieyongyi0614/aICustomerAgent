@@ -16,11 +16,6 @@ def action_on(override_settings):
     yield
 
 
-def test_detector_gate_off_returns_none(override_settings):
-    override_settings(action_detector_enabled=False)
-    assert detect_action_intent("提醒我开会", now=NOW) is None
-
-
 def test_no_action_message(action_on):
     assert detect_action_intent("今天心情不错", now=NOW) is None
 

@@ -212,9 +212,6 @@ def process_milestones(
     ctx: MilestoneContext, state: RelationshipState
 ) -> tuple[RelationshipState, list[MilestoneRecord]]:
     """检测 + 落库 + bonus 应用（独立小事务；检测异常跳过当轮，下轮补检）。"""
-    settings = get_settings()
-    if not settings.rel_milestone_enabled:
-        return state, []
     try:
         existing = relationship_milestone_repository.existing_keys(ctx.user_id)
     except Exception:

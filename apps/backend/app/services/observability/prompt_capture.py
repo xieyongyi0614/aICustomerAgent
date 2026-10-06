@@ -37,11 +37,7 @@ _REDACT_PREVIEW_CHARS = 200
 
 
 def enabled() -> bool:
-    settings = get_settings()
-    return (
-        settings.observability_persist_enabled
-        and settings.observability_prompt_capture_mode != "disabled"
-    )
+    return get_settings().observability_prompt_capture_mode != "disabled"
 
 
 def _role_of(message) -> str:

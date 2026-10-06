@@ -42,8 +42,6 @@ logger = logging.getLogger(__name__)
 
 
 def should_sample(request_id: str, settings) -> bool:
-    if not settings.evaluation_llm_judge_enabled:
-        return False
     rate = settings.evaluation_llm_judge_sample_rate
     if rate >= 1.0:
         return True
@@ -180,9 +178,6 @@ def finalize_report(
 def run_turn_evaluation(ctx) -> None:
     """post_process 第 7 步（锁内）：收集 + 规则；judge 采样命中时派发锁外任务。"""
     settings = get_settings()
-    if not settings.evaluation_enabled:
-        _record(ctx, 0.0, "skipped")
-        return
     started = time.perf_counter()
     try:
         context = collect_turn_context(ctx)
@@ -267,10 +262,6 @@ def _record(ctx, duration_ms: float, status: str, **extra) -> None:
 
 def schedule_proactive_evaluation(action, llm=None) -> None:
     """executor delivered 后 fire-and-forget（autonomy-evaluation.md §1，写锁外）。"""
-    settings = get_settings()
-    if not settings.evaluation_enabled or not settings.evaluation_autonomy_enabled:
-        return
-
     if not observability.spawn_background(_evaluate_proactive(action, llm)):
         asyncio.run(_evaluate_proactive(action, llm))
 

@@ -46,12 +46,3 @@ def test_active_object_claims_are_fine():
 
 def test_missing_world_slice_disables_rule():
     assert WORLD_CONSISTENCY.evaluate(_ctx("冰箱里有西瓜哦", world=None)) is None
-
-
-def test_rule_disabled_by_settings(monkeypatch):
-    monkeypatch.setenv("EVALUATION_WORLD_CONSISTENCY_ENABLED", "false")
-    from app.core.settings import get_settings
-
-    get_settings.cache_clear()
-    assert WORLD_CONSISTENCY.evaluate(_ctx("冰箱里有西瓜哦")) is None
-    get_settings.cache_clear()

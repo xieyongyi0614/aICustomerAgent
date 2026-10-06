@@ -122,8 +122,7 @@ def tools_on(monkeypatch, override_settings):
         feishu_app_id="plan6-app",
         feishu_app_secret="plan6-secret",
         feishu_verification_token="plan6-token",
-        feishu_encrypt_key="plan6-encrypt",
-        observability_persist_enabled="false")
+        feishu_encrypt_key="plan6-encrypt",)
     return True
 
 
@@ -132,8 +131,7 @@ def planning_gates_on(monkeypatch, override_settings):
     """规划期闸门用例的开关面（编排常开 + 工具总闸 on，世界/记忆/反思关闭）。"""
     reset_tool_registry(monkeypatch)
     override_settings(
-        plan_tool_required="true",
-        observability_persist_enabled="false")
+        plan_tool_required="true",)
     return True
 
 
@@ -148,8 +146,6 @@ def action_chain_on(monkeypatch, override_settings):
     override_settings(
         action_max_active_per_user="5",
         plan_tool_required="true",
-        action_memory_policy_enabled="false",
-        observability_persist_enabled="false",
         action_outbox_enabled="false")
     return True
 

@@ -84,7 +84,6 @@ def test_wait_on_cooldown_keeps_candidate_for_next_round():
 def test_act_full_chain_enqueues_outbox_and_records_decision(
     db_session_factory, fake_llm, override_settings
 ):
-    override_settings(observability_persist_enabled="true")
     _setup(db_session_factory)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
     delivered_ids = asyncio.run(
@@ -110,7 +109,6 @@ def test_act_full_chain_enqueues_outbox_and_records_decision(
 def test_wait_decision_recorded_without_enqueue(
     db_session_factory, override_settings
 ):
-    override_settings(observability_persist_enabled="true")
     _setup(db_session_factory)
     seed = ProactiveAction(
         id="auto004-wait-seed",

@@ -64,7 +64,6 @@ async def _run_many(llm, session_id, rounds=20):
 
 @pytest.mark.asyncio
 async def test_hot_path_has_no_direct_io(db_session_factory, fake_llm, override_settings, monkeypatch):
-    override_settings(observability_persist_enabled=True)
 
     def _explode(*_args, **_kwargs):
         raise RuntimeError("观测层禁止在热路径同步写库")
@@ -80,12 +79,10 @@ async def test_hot_path_has_no_direct_io(db_session_factory, fake_llm, override_
 
 @pytest.mark.asyncio
 async def test_observability_overhead_within_budget(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=False)
     llm_off = fake_llm(response=["好耶"], structured_responses=_structured())
     avg_off = await _run_many(llm_off, "s-v78-perf-off")
 
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm_on = fake_llm(response=["好耶"], structured_responses=_structured())
@@ -96,25 +93,12 @@ async def test_observability_overhead_within_budget(db_session_factory, fake_llm
 
 
 @pytest.mark.asyncio
-async def test_persist_disabled_matches_v75_behavior(db_session_factory, fake_llm):
-    llm = fake_llm(response=["好耶"], structured_responses=_structured())
-    events = await _run_turn(llm, "s-v78-perf-state")
-    turn_id = events[-1]["turn_id"]
-    await asyncio.sleep(0.3)
-    assert trace_repository.get_by_turn(turn_id) is None
-    assert llm_call_repository.search(limit=500) == []
-    assert prompt_snapshot_repository.get_by_turn(turn_id) == []
-
-
-@pytest.mark.asyncio
 async def test_capture_does_not_change_sent_prompt_bytes(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=False)
     llm_off = fake_llm(response=["好耶"], structured_responses=_structured())
     await _run_turn(llm_off, "s-v78-perf-bytes-off", user_id="u-bytes-off")
     digest_off = _answer_prompt_digest(llm_off)
 
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm_on = fake_llm(response=["好耶"], structured_responses=_structured())

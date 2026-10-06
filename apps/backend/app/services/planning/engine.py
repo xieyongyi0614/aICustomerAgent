@@ -297,7 +297,6 @@ class PlanningEngine:
         `evidence_refs`，落 `decision_records.input_snapshot`，属 PLAN-011）。两者 `id` /
         `version` / `status` 同源，可交叉校验。
         """
-        settings = get_settings()
         record = GoalPlanRecord(
             goal_id=draft.goal.id,
             version=draft.attempts + 1,
@@ -306,11 +305,7 @@ class PlanningEngine:
             created_at=draft.now,
             updated_at=draft.now,
             trigger=draft.trigger,
-            context_digest=(
-                context_digest(draft.ctx)
-                if settings.plan_context_digest_enabled
-                else None
-            ),
+            context_digest=context_digest(draft.ctx),
             evidence_refs=tuple(draft.ctx.evidence_refs),
         )
         stored = goal_repository.create_plan(record)

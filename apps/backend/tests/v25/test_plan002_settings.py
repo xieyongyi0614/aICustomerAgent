@@ -3,8 +3,9 @@
 默认值逐条写死（Task Detail §4.5.1 / §4.5.2），源码与表的任何差异即失败。
 
 语义反转（v25 去门控）：原 13 个 Flag 中 11 个已随 `vXX_` 开关体系删除，编排恒常开；
-保留的 `plan_tool_required` / `plan_context_digest_enabled` 是默认 ON 的策略位，
-不再是「激活计划编排」的闸门。本模块按此口径显式更新（范围标记纪律）。
+`plan_context_digest_enabled` 已于批次 2 固化常开并删除（计划落库恒写 digest），
+保留的 `plan_tool_required` 是默认 ON 的策略位，不再是「激活计划编排」的闸门。
+本模块按此口径显式更新（范围标记纪律）。
 """
 
 import pytest
@@ -15,7 +16,6 @@ from app.core.settings.plan import PlanSettings
 
 V25_FLAG_DEFAULTS = {
     "plan_tool_required": True,
-    "plan_context_digest_enabled": True,
 }
 
 V25_PARAM_DEFAULTS = {
@@ -32,7 +32,6 @@ V25_PARAM_DEFAULTS = {
     "plan_replan_min_confidence": 0.7,
     "plan_reflection_min_samples": 3,
     "plan_memory_importance_floor": 0.6,
-    "plan_context_digest_enabled": True,
 }
 
 POSITIVE_PARAM_CONSTRAINTS = (
@@ -63,12 +62,12 @@ CONSTRAINED_PARAMS = (
     + UNIT_INTERVAL_PARAM_CONSTRAINTS
 )
 
-UNCONSTRAINED_PARAMS = ("plan_llm_profile", "plan_context_digest_enabled")
+UNCONSTRAINED_PARAMS = ("plan_llm_profile",)
 
 
-def test_u6_plan_settings_declares_two_policy_flags_and_fourteen_params():
-    assert len(V25_FLAG_DEFAULTS) == 2
-    assert len(V25_PARAM_DEFAULTS) == 14
+def test_u6_plan_settings_declares_one_policy_flag_and_thirteen_params():
+    assert len(V25_FLAG_DEFAULTS) == 1
+    assert len(V25_PARAM_DEFAULTS) == 13
     declared = set(PlanSettings.model_fields)
     assert declared == set(V25_FLAG_DEFAULTS) | set(V25_PARAM_DEFAULTS)
 
@@ -99,10 +98,9 @@ def test_u6_flag_defaults_match_the_flag_table():
         assert getattr(settings, flag) is expected, flag
 
 
-def test_u6_both_policy_flags_default_on():
+def test_u6_policy_flag_defaults_on():
     assert all(V25_FLAG_DEFAULTS.values())
     assert V25_FLAG_DEFAULTS["plan_tool_required"] is True
-    assert V25_FLAG_DEFAULTS["plan_context_digest_enabled"] is True
 
 
 def test_u6_param_defaults_match_the_param_table():
@@ -175,10 +173,10 @@ def test_i1_plan_settings_is_merged_into_the_global_settings():
     assert settings.plan_max_steps == 5
 
 
-def test_i1_the_fifteen_v25_fields_are_readable_from_the_global_settings():
+def test_i1_the_fourteen_v25_fields_are_readable_from_the_global_settings():
     settings = get_settings()
     names = sorted(PlanSettings.model_fields)
-    assert len(names) == 15
+    assert len(names) == 14
     assert set(names) == set(V25_FLAG_DEFAULTS) | set(V25_PARAM_DEFAULTS)
 
 

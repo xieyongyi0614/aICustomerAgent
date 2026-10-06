@@ -65,7 +65,6 @@ def _all_traces():
 
 @pytest.mark.asyncio
 async def test_turn_trace_persisted_with_full_steps(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = await _run_turn(llm)
     assert events[-1]["kind"] == "done"
@@ -96,7 +95,6 @@ async def test_turn_trace_persisted_with_full_steps(db_session_factory, fake_llm
 
 @pytest.mark.asyncio
 async def test_turn_trace_backfills_emotion_event(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = await _run_turn(llm, session_suffix="-events")
     turn_id = events[-1]["turn_id"]
@@ -108,7 +106,6 @@ async def test_turn_trace_backfills_emotion_event(db_session_factory, fake_llm, 
 @pytest.mark.asyncio
 async def test_trace_sample_rate_zero_skips_persist(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_trace_sample_rate=0,
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
@@ -123,7 +120,6 @@ async def test_error_turn_always_persisted_despite_zero_sampling(
     db_session_factory, fake_llm, override_settings
 ):
     override_settings(
-        observability_persist_enabled=True,
         observability_trace_sample_rate=0,
     )
     llm = fake_llm(raise_exc=RuntimeError("boom"), structured_responses=_structured())
@@ -138,10 +134,10 @@ async def test_error_turn_always_persisted_despite_zero_sampling(
 
 
 @pytest.mark.asyncio
-async def test_persist_disabled_keeps_v75_behavior(db_session_factory, fake_llm):
+async def test_trace_recorded_unconditionally(db_session_factory, fake_llm):
+    """批次 2 固化后 trace 落库无总闸（`observability_persist_enabled` 已删）。"""
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = await _run_turn(llm, session_suffix="-off")
     turn_id = events[-1]["turn_id"]
     await asyncio.sleep(0.3)
-    assert trace_repository.get_by_turn(turn_id) is None
-    assert observability.background_tasks == set()
+    assert trace_repository.get_by_turn(turn_id) is not None

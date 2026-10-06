@@ -11,7 +11,6 @@ from app.models.action import ACTION_TYPES
 class ActionSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    action_detector_enabled: bool = True
     # V2.6.1 裁决：多步未交付；保持 1（多步 Flag 从未接线，已随死开关删除）。
     action_plan_max_steps: int = 1
     action_plan_expires_minutes: int = 5
@@ -25,7 +24,6 @@ class ActionSettings(BaseSettings):
     action_maintenance_interval_seconds: int = 60
     chat_rate_limit_per_minute: int = 30
     action_context_char_budget: int = 400
-    action_memory_policy_enabled: bool = True
     action_memory_policy_json: str = (
         '{"create_reminder": {"deposit": true, "memory_type": "important_event",'
         ' "importance": 0.7, "source": "user_derived"},'

@@ -113,13 +113,10 @@ async def astream(
             section_budget=prompt_capture.section_budget_from_messages(formatted),
         )
 
-    capture = get_settings().observability_persist_enabled
-    handler = UsageCallbackHandler() if capture else None
+    handler = UsageCallbackHandler()
     first_token_ms = None
     try:
-        async for chunk in chain.astream(
-            {}, config={"callbacks": [handler]} if capture else None
-        ):
+        async for chunk in chain.astream({}, config={"callbacks": [handler]}):
             usage = getattr(chunk, "usage_metadata", None)
             if usage and trace is not None:
                 trace.add_token_usage(
@@ -134,13 +131,11 @@ async def astream(
                     first_token_ms = (time.perf_counter() - started) * 1000
                 yield text
     except Exception as exc:
-        if capture:
-            _record_answer_call(
-                llm, trace, handler, started, started_at, first_token_ms,
-                LLM_CALL_ERROR, exc.__class__.__name__,
-            )
-        raise
-    if capture:
         _record_answer_call(
-            llm, trace, handler, started, started_at, first_token_ms, LLM_CALL_OK, None
+            llm, trace, handler, started, started_at, first_token_ms,
+            LLM_CALL_ERROR, exc.__class__.__name__,
         )
+        raise
+    _record_answer_call(
+        llm, trace, handler, started, started_at, first_token_ms, LLM_CALL_OK, None
+    )

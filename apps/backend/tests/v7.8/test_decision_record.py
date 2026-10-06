@@ -47,7 +47,6 @@ async def _await_until(predicate, timeout: float = 10.0):
 
 @pytest.mark.asyncio
 async def test_act_decision_recorded_with_outcome(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     _backdate_messages(minutes=40)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
@@ -84,7 +83,6 @@ async def test_act_decision_recorded_with_outcome(db_session_factory, fake_llm, 
 
 @pytest.mark.asyncio
 async def test_deny_decision_recorded_on_quiet_hours(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     _backdate_messages(minutes=40)
     llm = fake_llm(response=["在吗"])
@@ -116,7 +114,6 @@ async def test_deny_decision_recorded_on_quiet_hours(db_session_factory, fake_ll
 
 @pytest.mark.asyncio
 async def test_no_trigger_no_record(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     _backdate_messages(minutes=10)
     llm = fake_llm(response=["好耶"])
@@ -133,7 +130,8 @@ async def test_no_trigger_no_record(db_session_factory, fake_llm, override_setti
 
 
 @pytest.mark.asyncio
-async def test_persist_disabled_records_nothing(db_session_factory, fake_llm):
+async def test_persist_records_unconditionally(db_session_factory, fake_llm):
+    """批次 2 固化后观测落库无总闸（`observability_persist_enabled` 已删）：自治 tick 必留决策行。"""
     _setup(db_session_factory)
     _backdate_messages(minutes=40)
     llm = fake_llm(response=["忙完了吗？"])
@@ -145,8 +143,7 @@ async def test_persist_disabled_records_nothing(db_session_factory, fake_llm):
         )
         assert len(delivered_ids) == 1
         await asyncio.sleep(0.3)
-        assert decision_repository.search(user_id=USER) == []
-        assert observability.background_tasks == set()
+        assert decision_repository.search(user_id=USER) != []
     finally:
         llm_factory.reset_llm()
         reset_user_write_locks()

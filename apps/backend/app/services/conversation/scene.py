@@ -31,8 +31,6 @@ def _idle_gap_text(state: SceneState, now: datetime) -> str:
 
 
 def _stale_directive(state: SceneState, now: datetime) -> str | None:
-    if not get_settings().scene_idle_reset_enabled:
-        return None
     if state.last_active_at is None:
         return None
     gap = _idle_gap_text(state, now)
@@ -51,7 +49,7 @@ def _pending_directive(pending: PendingAction, verb: str) -> str:
 
 
 def _is_idle_expired(state: SceneState, now: datetime) -> bool:
-    if not get_settings().scene_idle_reset_enabled or state.last_active_at is None:
+    if state.last_active_at is None:
         return False
     idle_hours = (
         now - timeutil.ensure_aware(state.last_active_at)

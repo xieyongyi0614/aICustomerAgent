@@ -51,7 +51,6 @@ async def wait_report(timeout: float = 2.0):
 
 @pytest.fixture
 def enable_evaluation(monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     from app.core.settings import get_settings
 
     get_settings.cache_clear()
@@ -130,7 +129,8 @@ async def test_evaluation_failure_does_not_break_send_path(
     assert delivered.status == "delivered"
 
 
-async def test_disabled_skips_evaluation(db_session_factory, fake_llm):
+async def test_evaluation_always_scheduled(db_session_factory, fake_llm):
+    """批次 2 固化后自治评估无总闸（`evaluation_enabled` 已删）：投递即评。"""
     action = make_action()
     proactive_repository.enqueue(
         action.model_copy(update={"status": "candidate", "payload_text": None})
@@ -143,4 +143,4 @@ async def test_disabled_skips_evaluation(db_session_factory, fake_llm):
         payload_text=action.payload_text,
     )
     schedule_proactive_evaluation(delivered, make_judge_llm(fake_llm))
-    assert await wait_report(timeout=0.4) is None
+    assert await wait_report(timeout=2.0) is not None

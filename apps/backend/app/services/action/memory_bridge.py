@@ -91,9 +91,6 @@ def deliver(record: ActionRecord, user_id: str, character_id: str = "asuna") -> 
     政策总开关 off → 不投递。任何异常只 log，**不回滚工具执行**（V9 既有纪律）。
     投递不落库：候选经 v2 评估转正后可见（评估由 post_process 第 5 步与收尾步承担）。
     """
-    settings = get_settings()
-    if not settings.action_memory_policy_enabled:
-        return None
     try:
         if tool_memory_policy.has_memory_effect(record):
             return None

@@ -505,15 +505,6 @@ def test_extraction_and_tool_delivery_are_parallel(
     assert memory_count(USER) == 1
 
 
-def test_delivery_blocked_when_action_memory_switch_off(
-    db_session_factory, tool_memory_on, override_settings
-):
-    """E9：工具记忆子闸 on 但 `action_memory_policy_enabled` off → 不投递。"""
-    override_settings(action_memory_policy_enabled=False, memory_importance_threshold=0.5)
-    assert memory_bridge.deliver(_tool_record("builtin.reminder.cancel", CANCEL_PARAMS), USER) is None
-    assert candidate_count(USER) == 0
-
-
 # --- 冻结面：零迁移 / 零表改动 / 零 diff --------------------------------------
 
 

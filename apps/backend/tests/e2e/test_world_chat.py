@@ -63,7 +63,6 @@ async def test_world_section_reaches_prompt_and_persists(
 ):
     override_settings(
         roleplay_prompt_mode="full",
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
@@ -111,7 +110,6 @@ async def test_world_prompt_carries_world_section(
 ):
     override_settings(
         roleplay_prompt_mode="full",
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())

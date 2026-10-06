@@ -189,83 +189,57 @@ async def apply_and_save(
             user_id, now, events=recent_events
         )
         before = state.relationship_state
-        if settings.rel_evolution_enabled:
-            window = relationship_signal.EvidenceWindow.rebuild_from_events(
-                recent_events[: settings.rel_signal_evidence_window]
+        window = relationship_signal.EvidenceWindow.rebuild_from_events(
+            recent_events[: settings.rel_signal_evidence_window]
+        )
+        signal = relationship_signal.analyze_interaction(
+            user_input, analysis, ai_reply
+        )
+        repeats_by_kind: dict[tuple[str, str], int] = {}
+        if signal is not None:
+            repeats_by_kind[(signal.kind, signal.quality)] = window.count(
+                signal.kind, signal.quality
             )
-            signal = relationship_signal.analyze_interaction(
-                user_input, analysis, ai_reply
-            )
-            repeats_by_kind: dict[tuple[str, str], int] = {}
-            if signal is not None:
-                repeats_by_kind[(signal.kind, signal.quality)] = window.count(
-                    signal.kind, signal.quality
-                )
-                signal = relationship_signal.observe(window, signal)
-                event_type, magnitude = relationship_signal.map_signal_to_event(signal)
-                confidence, cause = signal.salience, signal.cause
-            else:
-                event_type, magnitude, confidence, cause = (
-                    _resolve_relationship_event(analysis)
-                )
-            new_relationship, outcome = relationship_evolution.evolve(
-                before,
-                event_type,
-                magnitude,
-                analysis.behavior.behavior,
-                signal,
-                repeats_by_kind,
-                day_positive,
-                day_negative,
-                now,
-                session_id=session_id,
-                user_id=user_id,
-                cause=cause,
-                confidence=confidence,
-                window=window.snapshot(),
-            )
-            if outcome.event is not None:
-                pending_events.append(outcome.event)
-            _reputation_audits[user_id] = {
-                "before": before,
-                "after": new_relationship,
-                "applied": outcome.applied_delta,
-                "truncated": outcome.truncated,
-                "day_positive": day_positive,
-                "day_negative": day_negative,
-                "events": list(pending_events),
-                "signal_present": signal is not None,
-                "signal_kind": signal.kind if signal is not None else "",
-                "event_type": event_type,
-                "comfort_drift": outcome.comfort_drift_applied,
-                "version_before": outcome.version_before,
-                "version_after": outcome.version_after,
-            }
+            signal = relationship_signal.observe(window, signal)
+            event_type, magnitude = relationship_signal.map_signal_to_event(signal)
+            confidence, cause = signal.salience, signal.cause
         else:
             event_type, magnitude, confidence, cause = (
                 _resolve_relationship_event(analysis)
             )
-            new_relationship, applied = state_engine.apply_relationship_v5(
-                state.relationship_state,
-                event_type,
-                magnitude,
-                analysis.behavior.behavior,
-                day_positive,
-                day_negative,
-            )
-            if event_type != "none":
-                pending_events.append(
-                    RelationshipEvent(
-                        user_id=user_id,
-                        session_id=session_id,
-                        type=event_type,
-                        magnitude=magnitude,
-                        impact=applied,
-                        confidence=confidence,
-                        cause=cause,
-                        created_at=now,
-                    )
-                )
+        new_relationship, outcome = relationship_evolution.evolve(
+            before,
+            event_type,
+            magnitude,
+            analysis.behavior.behavior,
+            signal,
+            repeats_by_kind,
+            day_positive,
+            day_negative,
+            now,
+            session_id=session_id,
+            user_id=user_id,
+            cause=cause,
+            confidence=confidence,
+            window=window.snapshot(),
+        )
+        if outcome.event is not None:
+            pending_events.append(outcome.event)
+        _reputation_audits[user_id] = {
+            "before": before,
+            "after": new_relationship,
+            "applied": outcome.applied_delta,
+            "truncated": outcome.truncated,
+            "day_positive": day_positive,
+            "day_negative": day_negative,
+            "events": list(pending_events),
+            "signal_present": signal is not None,
+            "signal_kind": signal.kind if signal is not None else "",
+            "event_type": event_type,
+            "comfort_drift": outcome.comfort_drift_applied,
+            "version_before": outcome.version_before,
+            "version_after": outcome.version_after,
+        }
         if trace is not None:
             trace.record(
                 "relationship_event",

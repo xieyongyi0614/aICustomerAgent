@@ -68,8 +68,7 @@ GOAL_WRITE_FACE = (
 @pytest.fixture
 def planning_on(override_settings):
     """PLAN-003 装配面：编排常开（总闸与上下文子闸已删），四源恒装配；世界/观测面钉死。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 @pytest.fixture

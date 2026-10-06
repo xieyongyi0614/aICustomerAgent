@@ -1,7 +1,7 @@
 """V9 ActionIntentDetector（planner.md §1）。
 
 确定性检出：词表 + 参数抽取的纯函数，零新增 LLM 调用。
-门控 action_detector_enabled；任何异常返回 None（宁缺毋滥）。
+任何异常返回 None（宁缺毋滥，即"宁可不识别"）；检出无门控。
 词表属角色资产（app/character/asuna/action.py），检出逻辑在此。
 """
 
@@ -21,7 +21,6 @@ from app.character.asuna.action import (
     REQUIRED_PARAMS,
     SELF_IMPERATIVE_TRIGGERS,
 )
-from app.core.settings import get_settings
 from app.models.action import ActionIntent, make_dedupe_key
 from app.models.ledger import LedgerAmountError, to_minor
 from app.services.action.time_parse import parse_time_phrase
@@ -283,9 +282,6 @@ def detect_action_intent(
     now: datetime | None = None,
 ) -> ActionIntent | None:
     """确定性检出入口（H-A1）；异常降级 None。"""
-    settings = get_settings()
-    if not settings.action_detector_enabled:
-        return None
     try:
         return _detect(content, timeutil.ensure_aware(now) or timeutil.now())
     except Exception:

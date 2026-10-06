@@ -76,15 +76,6 @@ def test_d5_salience_modulation():
     assert abs(high.trust - 0.056) < 1e-9
 
 
-def test_dynamics_disabled_returns_base():
-    base = RelationshipDelta(trust=0.02)
-    dynamics, flags = revo.apply_dynamics(
-        base, _state(), {("gratitude", "positive"): 3}, _signal(), enabled=False
-    )
-    assert flags == {}
-    assert dynamics.trust == 0.02
-
-
 def test_rate_limit_turn_cap():
     limited, truncated = revo.rate_limit(
         _state(), RelationshipDelta(trust=0.5), RelationshipDelta(),

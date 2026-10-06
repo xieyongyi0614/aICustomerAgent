@@ -369,8 +369,7 @@ class TestDecomposeFeedsTheEngine:
     @pytest.fixture
     def planning_on(self, override_settings):
         """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
-        override_settings(
-            observability_persist_enabled="false")
+        override_settings()
 
     def _context(self, goal) -> PlanContext:
         from app.core.settings import get_settings

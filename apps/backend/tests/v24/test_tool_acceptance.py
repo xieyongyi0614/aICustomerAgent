@@ -986,7 +986,6 @@ def test_g_memory_policy_rejection_prevents_write(
     db_session_factory, override_settings, monkeypatch
 ):
     """政策拒收的候选被丢弃 → memories 表零写入。"""
-    override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
         monkeypatch,
         {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},

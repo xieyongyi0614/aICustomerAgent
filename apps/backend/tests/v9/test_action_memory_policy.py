@@ -71,14 +71,12 @@ def test_failed_important_delegation_deposits():
 
 
 def test_remember_fact_succeeded_no_double(override_settings, db_session_factory):
-    override_settings(action_memory_policy_enabled=True)
     rec = _record("remember_fact", "succeeded", fact="我喜欢猫")
     # 边界表有 remember_fact 行，但能力已写入记忆本体 → 候选跳过（防双写）
     assert memory_ingest.ingest_from_action_record(rec) is None
 
 
 def test_boundary_deposit_creates_candidate(override_settings, db_session_factory):
-    override_settings(action_memory_policy_enabled=True)
     rec = _reminder(content="提醒吃药")
     row = memory_ingest.ingest_from_action_record(rec)
     assert row is not None
@@ -88,7 +86,6 @@ def test_boundary_deposit_creates_candidate(override_settings, db_session_factor
 
 
 def test_idempotent_when_effect_registered(override_settings, db_session_factory):
-    override_settings(action_memory_policy_enabled=True)
     rec = _reminder(content="提醒吃药")
     rec.result = {
         "status": "succeeded",

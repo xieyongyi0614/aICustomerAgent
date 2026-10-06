@@ -334,7 +334,6 @@ async def test_step_nine_with_surface_flag_on_feeds_capabilities_and_audits(
     monkeypatch, override_settings, _no_action_engine, v24_tool_env
 ):
     v24_tool_env(TOOL_SYSTEM_ENABLED=True, TOOL_SURFACE_ENABLED=True)
-    override_settings(observability_persist_enabled=True)
 
     registry = builtin_registry()
     monkeypatch.setattr(

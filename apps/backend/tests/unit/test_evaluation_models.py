@@ -127,13 +127,11 @@ def test_evaluation_report_construction():
 
 
 def test_settings_evaluation_defaults(monkeypatch):
-    monkeypatch.delenv("EVALUATION_ENABLED", raising=False)
     monkeypatch.delenv("EVALUATION_LLM_JUDGE_SAMPLE_RATE", raising=False)
     monkeypatch.delenv("EVALUATION_MAX_DIGEST_CHARS", raising=False)
     get_settings.cache_clear()
     try:
         settings = get_settings()
-        assert settings.evaluation_enabled is True
         assert settings.evaluation_llm_judge_sample_rate == 1.0
         assert settings.evaluation_penalty_critical == 0.4
         assert settings.evaluation_max_digest_chars == 2000
@@ -147,11 +145,9 @@ def test_settings_evaluation_defaults(monkeypatch):
 
 
 def test_settings_evaluation_overrides(monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "false")
     monkeypatch.setenv("EVALUATION_FAIL_SCORE", "0.5")
     monkeypatch.setenv("EVALUATION_LLM_JUDGE_SAMPLE_RATE", "0.5")
     settings = Settings()
-    assert settings.evaluation_enabled is False
     assert settings.evaluation_fail_score == 0.5
     assert settings.evaluation_llm_judge_sample_rate == 0.5
 

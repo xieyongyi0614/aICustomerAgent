@@ -463,8 +463,7 @@ def code_text(path) -> str:
 
 def plan_reflection_env(override_settings):
     """计划反思通道的基线环境（通道已随开关体系删除转常开，只钉世界与观测面）。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 @pytest.fixture

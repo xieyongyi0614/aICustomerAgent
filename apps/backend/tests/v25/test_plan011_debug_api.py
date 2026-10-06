@@ -54,8 +54,7 @@ pytestmark = pytest.mark.api
 @pytest.fixture
 def plan_panel_on(override_settings, monkeypatch):
     monkeypatch.setattr(tool_registry_module, "_registry", None)
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
     life_loop_budget.reset_cache()
     return True
 

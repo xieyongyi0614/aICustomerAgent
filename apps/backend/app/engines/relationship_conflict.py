@@ -119,8 +119,6 @@ def evaluate_conflict(
 ) -> ConflictOutcome:
     """冲突状态机迁移（非法迁移拒绝 = 原样返回）。"""
     settings = get_settings()
-    if not settings.rel_conflict_enabled:
-        return ConflictOutcome(state=state, record=record)
     current = record.status if record is not None else "none"
     has_conflict_event = any(
         event.type in ("conflict", "boundary_violation") for event in turn_events

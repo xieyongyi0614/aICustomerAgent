@@ -33,8 +33,7 @@ class TestScenarioASingleGoal:
     async def test_multi_step_goal_produces_a_validated_plan_with_bindings(
         self, db_session_factory, override_settings, make_goal, stub_planning_llm
     ):
-        override_settings(
-            observability_persist_enabled="false")
+        override_settings()
         steps = [
             {
                 "index": 1,

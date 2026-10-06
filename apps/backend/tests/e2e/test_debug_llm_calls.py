@@ -49,7 +49,6 @@ async def _await_until(predicate, timeout: float = 10.0):
 
 @pytest.mark.asyncio
 async def test_debug_llm_calls_endpoints(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = []
     async for event in agent_service.stream_chat("s-v78-llm-e2e", "default-user", "今天怎么样", llm=llm):

@@ -122,10 +122,9 @@ async def lifespan(application: FastAPI):
         len(report.loaded),
         len(report.skipped),
     )
-    if get_settings().observability_persist_enabled:
-        _observability_cleanup_task = asyncio.create_task(
-            observability.run_retention_loop()
-        )
+    _observability_cleanup_task = asyncio.create_task(
+        observability.run_retention_loop()
+    )
     _agent_evolution_task = asyncio.create_task(
         agent_evolution_worker.run_agent_evolution_worker()
     )

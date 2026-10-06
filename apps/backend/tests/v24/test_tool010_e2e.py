@@ -118,9 +118,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
-    # 时间口径统一（2026-10-05，0006~0008）：`timeutil.now()` → `timeutil.now()`（aware UTC）
-    # —— 非 TOOL-010 改脏。原值 bcb7b63c。
-    "app/application/post_process.py": "91e31d92fea03ff46c787cb141ce372c490815544176df1a66fde143bb2455a1",
+    # 开关固化声明（2026-10-06，批次 2）：`observability_persist_enabled` 总闸删除后
+    # `_persist_tool_decision` 守卫收窄 —— 非 TOOL-010 改脏。原值 91e31d92（再前值 bcb7b63c）。
+    "app/application/post_process.py": "83222b5bf4b5282143b501e87e033499ecfe6865a54881a8d12d2311a2e1d12f",
     # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
     # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
     # 原值 36ea3798（再冻结：world_available 赋值去掉恒真 getattr；再前值 6ea39eaf，

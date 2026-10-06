@@ -564,8 +564,7 @@ def test_s4_autonomy_tick_three_ledgers_aligned(
 
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        AUTONOMY_ACTION_ENABLED="true",
-        OBSERVABILITY_PERSIST_ENABLED="true")
+        AUTONOMY_ACTION_ENABLED="true")
     support.apply_flag_env(monkeypatch, {"TOOL_SYSTEM_ENABLED": True})
     seed_tick_fixture()
     world_engine.ensure_world("u-tool006")
@@ -712,7 +711,6 @@ def test_s6_read_only_tool_deposits_nothing(
     db_session_factory, override_settings, monkeypatch
 ):
     """读类工具零沉淀：`world.env.query` 不产生记忆行。"""
-    override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
         monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
@@ -731,7 +729,7 @@ def test_s6_important_result_deposits_candidate(
     db_session_factory, override_settings, monkeypatch
 ):
     """重要结果沉淀：`builtin.reminder.cancel` 成功 → v2 候选投 1 行（通道收敛第 3 批）。"""
-    override_settings(ACTION_MEMORY_POLICY_ENABLED="true", memory_importance_threshold=0.5)
+    override_settings(memory_importance_threshold=0.5)
     support.apply_flag_env(
         monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
@@ -751,7 +749,6 @@ def test_s6_untrusted_source_rejected_by_policy(
     db_session_factory, override_settings, monkeypatch
 ):
     """R1 拒收：来源 ai_inferred 的候选（外发类工具）不入库。"""
-    override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
         monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )
@@ -770,7 +767,6 @@ def test_s6_idempotent_redelivery_is_skipped(
     db_session_factory, override_settings, monkeypatch
 ):
     """幂等：已登记 memory 效果的行动不重复投递。"""
-    override_settings(ACTION_MEMORY_POLICY_ENABLED="true")
     support.apply_flag_env(
         monkeypatch, {**MASTER_ON, "TOOL_MEMORY_ENABLED": True}
     )

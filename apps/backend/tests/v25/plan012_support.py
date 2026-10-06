@@ -86,17 +86,14 @@ INTERVIEW_STEPS: tuple[dict, ...] = (
 
 FULL_CHAIN_ENVS = {
     "PLAN_TOOL_REQUIRED": "true",
-    "OBSERVABILITY_PERSIST_ENABLED": "false",
 }
 
 V25_FLAG_NAMES: tuple[str, ...] = (
     "plan_tool_required",
-    "plan_context_digest_enabled",
 )
 
 V25_DEFAULTS: dict[str, bool] = {
     "plan_tool_required": True,
-    "plan_context_digest_enabled": True,
 }
 
 GATE_IDS: tuple[str, ...] = (

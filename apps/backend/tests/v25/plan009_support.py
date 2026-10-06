@@ -433,8 +433,6 @@ def planning_memory_on(override_settings):
     """PLAN-009 记忆面：编排与记忆子闸已随开关体系删除转常开；执行面保持开启（夹具确定）。"""
     override_settings(
         plan_tool_required="true",
-        action_memory_policy_enabled="true",
         action_relationship_enabled="false",
-        action_outbox_enabled="false",
-        observability_persist_enabled="false")
+        action_outbox_enabled="false",)
     return True

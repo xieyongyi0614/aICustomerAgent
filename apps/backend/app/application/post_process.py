@@ -631,7 +631,7 @@ def _audit_winner(audit: dict) -> str | None:
 
 def _persist_tool_decision(ctx: PostProcessContext, surface, audit: dict | None) -> None:
     """工具候选审计落既有 `decision_records`（kind 复用既有值域，零迁移）。"""
-    if audit is None or not get_settings().observability_persist_enabled:
+    if audit is None:
         return
     from app.application.observability import on_decision
     from app.models.observability import DecisionKind, DecisionRecord

@@ -42,7 +42,6 @@ async def _await_until(predicate, timeout: float = 10.0):
 @pytest.mark.asyncio
 async def test_proactive_trace_persisted_on_delivery(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     _setup(db_session_factory)
@@ -86,7 +85,6 @@ def _proactive_llm_calls():
 
 @pytest.mark.asyncio
 async def test_deny_tick_persists_autonomy_trace(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     llm = fake_llm(response=["在吗"])
     llm_factory.set_llm(llm)

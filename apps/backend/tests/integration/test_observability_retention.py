@@ -82,7 +82,6 @@ def _row_count(row_cls, repo_module):
 
 
 def test_prune_all_keeps_fresh_and_removes_expired(db_session_factory, override_settings):
-    override_settings(observability_persist_enabled=True)
     _seed_old_and_fresh(db_session_factory)
 
     pruned = observability.prune_all()

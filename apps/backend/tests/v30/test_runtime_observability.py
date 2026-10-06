@@ -386,7 +386,6 @@ class TestCorrelationChain:
         self, db_session_factory, override_settings, monkeypatch
     ):
         override_settings(
-            observability_persist_enabled="true",
             observability_trace_sample_rate="1.0",
         )
         trace = TurnTraceSession(user_id="u-corr", turn_id="t-corr")
@@ -411,7 +410,6 @@ class TestCorrelationChain:
         self, db_session_factory, override_settings, monkeypatch
     ):
         override_settings(
-            observability_persist_enabled="true",
             observability_trace_sample_rate="1.0",
         )
         trace = TurnTraceSession(user_id="u-none", turn_id="t-none")
@@ -477,7 +475,6 @@ class TestReplayBundle:
     ):
         # 采样仍生效：rate=0 时即使绑定了 correlation_id 也不落库
         override_settings(
-            observability_persist_enabled="true",
             observability_trace_sample_rate="0.0",
         )
         trace = TurnTraceSession(user_id="u-samp", turn_id="t-samp")

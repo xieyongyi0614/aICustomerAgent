@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.schemas import ProactiveActionOut, ProactivePendingOut
-from app.core.settings import get_settings
 from app.repositories import decision_repository, proactive_repository
 
 logger = logging.getLogger(__name__)
@@ -21,11 +20,10 @@ def pending(user_id: str = Depends(require_user)):
     expired_ids: list[str] = []
     actions = proactive_repository.list_pending(user_id, expired_out=expired_ids)
     for action_id in expired_ids:
-        if get_settings().observability_persist_enabled:
-            try:
-                decision_repository.mark_outcome(action_id, "expired")
-            except Exception:
-                logger.exception("决策结果回写失败：%s", action_id)
+        try:
+            decision_repository.mark_outcome(action_id, "expired")
+        except Exception:
+            logger.exception("决策结果回写失败：%s", action_id)
     return ProactivePendingOut(
         actions=[
             ProactiveActionOut(
@@ -51,9 +49,8 @@ def ack(action_id: str, _user_id: str = Depends(require_user)):
     updated = proactive_repository.transition(
         action_id, "acked", acked_at=timeutil.now()
     )
-    if get_settings().observability_persist_enabled:
-        try:
-            decision_repository.mark_outcome(action_id, "acked")
-        except Exception:
-            logger.exception("决策结果回写失败：%s", action_id)
+    try:
+        decision_repository.mark_outcome(action_id, "acked")
+    except Exception:
+        logger.exception("决策结果回写失败：%s", action_id)
     return {"id": action_id, "status": updated.status if updated else "acked"}

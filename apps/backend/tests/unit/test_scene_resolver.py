@@ -114,14 +114,6 @@ def test_recent_activity_keeps_scene_alive():
     assert directive is not None and "先完成待完成动作" in directive
 
 
-def test_idle_reset_disabled_keeps_scene_alive(override_settings):
-    override_settings(scene_idle_reset_enabled=False)
-    state = _stale_state(PendingAction(action="煮面", created_at_turn=1))
-    new_state, directive = scene_service.resolve("continue_scene", state, 4)
-    assert new_state.pending_action.status == "pending"
-    assert directive is not None and "先完成待完成动作" in directive
-
-
 def test_state_without_last_active_at_is_never_stale():
     state = _state(PendingAction(action="切西瓜", created_at_turn=1))
     new_state, directive = scene_service.resolve("continue_scene", state, 4)

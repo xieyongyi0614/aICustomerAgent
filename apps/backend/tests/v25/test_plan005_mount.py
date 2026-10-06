@@ -50,8 +50,7 @@ FACT_KEYS = {
 @pytest.fixture
 def advance_on(override_settings):
     life_loop_budget.reset_cache()
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 @pytest.fixture

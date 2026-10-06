@@ -59,10 +59,7 @@ def test_comfort_path_adjusts_prompt_and_relationship(db_session_factory, fake_l
     assert state.energy == pytest.approx(0.9 - 0.05 - 0.05 - 0.05)
 
 
-def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake_llm, override_settings):
-    override_settings(
-        rel_evolution_enabled=False, rel_milestone_enabled=False, rel_conflict_enabled=False
-    )
+def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake_llm):
     llm = fake_llm(
         response=["好耶"],
         structured_responses=_structured(
@@ -88,7 +85,9 @@ def test_celebrate_path_restores_energy_and_keeps_stage(db_session_factory, fake
     assert state.energy == pytest.approx(0.9 - 0.05 + 0.10)
     relationship = relationship_repository.get_relationship(USER)
     assert relationship.stage == "friend"
-    assert relationship.intimacy == pytest.approx(0.3 + 0.02 + 0.02)
+    # 批次 2 固化后关系演化恒开（原用例以 rel_evolution_enabled=False 走 V5 平直增量 0.02×2）；
+    # 现走 V8.5 动力学（D1 重复衰减 / D2 饱和），取值由引擎产生，动力学数学由 tests/v8.5 覆盖。
+    assert relationship.intimacy == pytest.approx(0.3382, abs=1e-6)
 
 
 def test_stage_upgrade_after_share_goal_turns(
@@ -97,9 +96,6 @@ def test_stage_upgrade_after_share_goal_turns(
     override_settings(
         stage_close_intimacy=0.3,
         stage_close_trust=0.3,
-        rel_evolution_enabled=False,
-        rel_milestone_enabled=False,
-        rel_conflict_enabled=False,
     )
     llm = fake_llm(
         response=["嗯"],
@@ -121,8 +117,10 @@ def test_stage_upgrade_after_share_goal_turns(
             )
     relationship = relationship_repository.get_relationship(USER)
     assert relationship.stage == "close_friend"
-    assert relationship.trust == pytest.approx(0.35 + 0.05 * 2)
-    assert relationship.intimacy == pytest.approx(0.3 + 0.03 * 2)
+    # 批次 2 固化后关系演化恒开（原用例以 rel_evolution_enabled=False 走 V5 平直增量）；
+    # 现走 V8.5 动力学，取值由引擎产生，动力学数学由 tests/v8.5 覆盖。
+    assert relationship.trust == pytest.approx(0.436118, abs=1e-6)
+    assert relationship.intimacy == pytest.approx(0.3540862413, abs=1e-6)
 
 
 def test_full_degradation_uses_default_analysis(

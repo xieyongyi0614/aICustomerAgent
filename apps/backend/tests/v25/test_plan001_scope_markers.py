@@ -140,7 +140,6 @@ from app.services.planning import goal_contract
 
 PLAN_002_SETTINGS_FLAGS = (
     "plan_tool_required",
-    "plan_context_digest_enabled",
 )
 
 PLAN_002_SETTINGS_PARAMS = (
@@ -157,7 +156,6 @@ PLAN_002_SETTINGS_PARAMS = (
     "plan_replan_min_confidence",
     "plan_reflection_min_samples",
     "plan_memory_importance_floor",
-    "plan_context_digest_enabled",
 )
 
 PLAN_002_FLAG_CONTRACT_ASSERTIONS = (
@@ -263,10 +261,9 @@ def test_plan_002_settings_are_embedded_and_the_policy_bits_default_on():
     settings = get_settings()
     declared = set(PlanSettings.model_fields)
     assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
-    assert len(PLAN_002_SETTINGS_FLAGS) == 2
-    assert len(PLAN_002_SETTINGS_PARAMS) == 14
+    assert len(PLAN_002_SETTINGS_FLAGS) == 1
+    assert len(PLAN_002_SETTINGS_PARAMS) == 13
     assert settings.plan_tool_required is True
-    assert settings.plan_context_digest_enabled is True
     assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
 
 

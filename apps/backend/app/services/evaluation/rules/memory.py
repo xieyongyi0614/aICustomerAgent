@@ -89,9 +89,6 @@ class WorldConsistencyRule(EvaluationRule):
     dimension = EvaluationDimension.MEMORY
 
     def evaluate(self, ctx: EvaluationContext) -> Issue | None:
-        settings = get_settings()
-        if not getattr(settings, "evaluation_world_consistency_enabled", True):
-            return None
         world = ctx.world
         if not world:
             return None

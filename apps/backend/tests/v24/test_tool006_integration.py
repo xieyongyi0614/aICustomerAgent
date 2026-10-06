@@ -146,9 +146,6 @@ async def test_tick_passes_surface_capabilities_into_pipeline(
     db_session_factory, fake_llm, monkeypatch, override_settings, v24_tool_env
 ):
     """断层 B7 关闭：自治 tick 的工具面首次进入决策管线候选（审计可见）。"""
-    override_settings(
-        OBSERVABILITY_PERSIST_ENABLED="true",
-    )
     v24_tool_env()
     captured = _spy_pipeline(monkeypatch)
     seed_tick_fixture()
@@ -204,8 +201,7 @@ async def test_autonomy_decision_to_world_write_through_outbox(
     Update World State（唯一合法路径：effects(world) → outbox → world_engine）。"""
     override_settings(
         ACTION_OUTBOX_ENABLED="true",
-        AUTONOMY_ACTION_ENABLED="true",
-        OBSERVABILITY_PERSIST_ENABLED="true")
+        AUTONOMY_ACTION_ENABLED="true")
     v24_tool_env()
     seed_tick_fixture()
     _ensure_world(USER)

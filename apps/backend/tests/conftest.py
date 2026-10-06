@@ -14,8 +14,6 @@ os.environ.pop("http_proxy", None)
 os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("https_proxy", None)
 os.environ.setdefault("OPENAI_API_KEY", "test")
-os.environ.setdefault("EVALUATION_ENABLED", "false")
-os.environ.setdefault("OBSERVABILITY_PERSIST_ENABLED", "false")
 # 世界/lifespan 循环的 DB 访问已由 autouse _offline_repos 落到内存 SQLite，无需再关闭 world。
 os.environ.setdefault(
     "LLM_PROFILES_JSON",
@@ -472,7 +470,6 @@ def override_settings(monkeypatch):
         "state_history_limit": "STATE_HISTORY_LIMIT",
             "stage_hysteresis": "STAGE_HYSTERESIS",
             "roleplay_prompt_mode": "ROLEPLAY_PROMPT_MODE",
-            "observability_persist_enabled": "OBSERVABILITY_PERSIST_ENABLED",
             "observability_trace_sample_rate": "OBSERVABILITY_TRACE_SAMPLE_RATE",
             "observability_prompt_capture_mode": "OBSERVABILITY_PROMPT_CAPTURE_MODE",
             "observability_prompt_sample_rate": "OBSERVABILITY_PROMPT_SAMPLE_RATE",
@@ -484,17 +481,13 @@ def override_settings(monkeypatch):
             "observability_prompt_retention_days": "OBSERVABILITY_PROMPT_RETENTION_DAYS",
             "observability_decision_retention_days": "OBSERVABILITY_DECISION_RETENTION_DAYS",
             "observability_llm_call_retention_days": "OBSERVABILITY_LLM_CALL_RETENTION_DAYS",
-            "evaluation_enabled": "EVALUATION_ENABLED",
             "evaluation_llm_judge_sample_rate": "EVALUATION_LLM_JUDGE_SAMPLE_RATE",
-            "rel_evolution_enabled": "REL_EVOLUTION_ENABLED",
             "rel_repetition_decay": "REL_REPETITION_DECAY",
             "rel_trust_negative_amp": "REL_TRUST_NEGATIVE_AMP",
             "rel_comfort_drift": "REL_COMFORT_DRIFT",
             "rel_comfort_baseline_json": "REL_COMFORT_BASELINE_JSON",
             "rel_milestone_delta_cap": "REL_MILESTONE_DELTA_CAP",
             "rel_signal_evidence_window": "REL_SIGNAL_EVIDENCE_WINDOW",
-            "rel_milestone_enabled": "REL_MILESTONE_ENABLED",
-            "rel_conflict_enabled": "REL_CONFLICT_ENABLED",
             "rel_conflict_cold_hours": "REL_CONFLICT_COLD_HOURS",
             "rel_conflict_max_cold_days": "REL_CONFLICT_MAX_COLD_DAYS",
             "rel_conflict_recover_positive": "REL_CONFLICT_RECOVER_POSITIVE",
@@ -505,7 +498,6 @@ def override_settings(monkeypatch):
             "world_sim_rate": "WORLD_SIM_RATE",
             "world_context_char_budget": "WORLD_CONTEXT_CHAR_BUDGET",
             "world_event_grace_hours": "WORLD_EVENT_GRACE_HOURS",
-            "action_detector_enabled": "ACTION_DETECTOR_ENABLED",
             "action_plan_max_steps": "ACTION_PLAN_MAX_STEPS",
             "action_plan_expires_minutes": "ACTION_PLAN_EXPIRES_MINUTES",
             "action_max_active_per_user": "ACTION_MAX_ACTIVE_PER_USER",
@@ -515,7 +507,6 @@ def override_settings(monkeypatch):
             "action_retry_backoff_seconds": "ACTION_RETRY_BACKOFF_SECONDS",
             "action_maintenance_interval_seconds": "ACTION_MAINTENANCE_INTERVAL_SECONDS",
             "action_context_char_budget": "ACTION_CONTEXT_CHAR_BUDGET",
-            "action_memory_policy_enabled": "ACTION_MEMORY_POLICY_ENABLED",
             "action_memory_policy_json": "ACTION_MEMORY_POLICY_JSON",
             "action_relationship_enabled": "ACTION_RELATIONSHIP_ENABLED",
             "action_record_retention_days": "ACTION_RECORD_RETENTION_DAYS",

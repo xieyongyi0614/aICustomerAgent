@@ -45,9 +45,7 @@ def test_debug_proactive_correlation_bundle(
 
     monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
-        evaluation_enabled=True,
         evaluation_llm_judge_sample_rate=0,
     )
     _setup(db_session_factory)

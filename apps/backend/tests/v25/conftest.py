@@ -34,8 +34,7 @@ def _pin_v25_planning_env(monkeypatch):
 @pytest.fixture
 def autonomy_on(override_settings):
     """需要既有 AUT-002 / AUT-003 通路时显式开闸（开的是 V2.0.0 既有 Flag，非本任务新增）。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
     return True
 
 

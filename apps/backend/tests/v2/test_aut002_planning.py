@@ -49,8 +49,7 @@ VALID_SUB_GOALS = [
 
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
     monkeypatch.setattr(
         planning,
         "_ask_llm_with_retry",

@@ -32,7 +32,6 @@ def _setup(db_session_factory, session_id="s1"):
 
 
 def test_debug_decisions_endpoint(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
     llm_factory.set_llm(llm)

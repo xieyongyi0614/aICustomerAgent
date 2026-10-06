@@ -97,8 +97,7 @@ class TestImportanceFloorParameter:
     ):
         probe = support.install_delivery_probe(monkeypatch)
         override_settings(
-            plan_memory_importance_floor="0.9",
-            observability_persist_enabled="false")
+            plan_memory_importance_floor="0.9",)
         goal = make_goal(description=support.FAILED_DESCRIPTION)
         plan = support.plan(goal_id=goal.id)
         outcome = "failed" if event_kind == "plan_failed" else "abandoned"

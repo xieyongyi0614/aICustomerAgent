@@ -6,8 +6,8 @@
 1. **复用既有写面**：目标 / 计划经 `goal_repository` 既有函数落库；审计行经
    `observer` 的两条公共写入面（`record_plan_advance` / `record_plan_revision`）落
    `decision_records`，**不手写行对象**（否则投影对照失去意义）。
-2. **审计落库经既有仓储**：`observability.on_decision` 是进程内的采集入口（受
-   `observability_persist_enabled` 异步门控），用例一律把它接到
+2. **审计落库经既有仓储**：`observability.on_decision` 是进程内的采集入口（持久化
+   已固化常开，无开关），用例一律把它接到
    `decision_repository.save`，使「写入面 → 行 → 投影」三段在内存 SQLite 上闭环。
 3. **只读探针不改语义**：`ReadOnlySession` 只在会话级拦截写方法（记录为调用名），
    读路径原样透传——被探测对象仍是既有实现。

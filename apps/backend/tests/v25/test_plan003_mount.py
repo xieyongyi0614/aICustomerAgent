@@ -72,8 +72,7 @@ PLAN_FACE_SIGNATURES = (
 def planning_on(override_settings):
     """编排常开（总闸与子闸已随开关体系删除），只钉世界与观测面。"""
     life_loop_budget.reset_cache()
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 def _claim_planning_job(goal_id: str, trigger: str = goal_planning.TRIGGER_CREATED) -> None:

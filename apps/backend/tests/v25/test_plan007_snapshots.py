@@ -473,8 +473,8 @@ class TestZeroMigration:
     def test_no_new_v25_setting_is_introduced(self):
         declared = set(PlanSettings.model_fields)
         assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
-        assert len(PLAN_002_SETTINGS_FLAGS) == 2
-        assert len(PLAN_002_SETTINGS_PARAMS) == 14
+        assert len(PLAN_002_SETTINGS_FLAGS) == 1
+        assert len(PLAN_002_SETTINGS_PARAMS) == 13
         assert "plan_autonomy_enabled" not in declared
 
 

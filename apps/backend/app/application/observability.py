@@ -260,8 +260,6 @@ def on_turn_finished(
     drain_background: bool = True,
 ) -> None:
     """turn 收尾挂载点（H1）：调度 write-behind 持久化，热路径零 IO。"""
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(
         _flush_turn_trace(
             trace,
@@ -279,8 +277,6 @@ def on_turn_finished(
 
 def on_turn_error(trace, user_id: str, session_id: str) -> None:
     """失败运行必存（runtime-trace.md §5）：不采样，直接调度落库。"""
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(
         _flush_error_trace(
             trace, user_id, session_id, correlation_id=current_correlation_id.get()
@@ -392,8 +388,6 @@ def record_llm_call(record: LlmCallRecord) -> None:
 
 
 def submit_llm_call(record: LlmCallRecord) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_save_llm_call(record))
 
 
@@ -414,8 +408,6 @@ def record_prompt_snapshot(snapshot) -> None:
 
 
 def submit_prompt_snapshot(snapshot) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_save_prompt_snapshot(snapshot))
 
 
@@ -435,8 +427,6 @@ async def _save_prompt_snapshot(snapshot) -> None:
 
 def on_decision(record: DecisionRecord) -> None:
     """决策记录入口：单行落库同步写，避免 write-behind 在短生命周期 loop 上丢失。"""
-    if not get_settings().observability_persist_enabled:
-        return
     try:
         decision_repository.save(record)
     except Exception:
@@ -452,8 +442,6 @@ def record_turn_decisions(
     pipeline_audit（V2.1.0 AGENT-004）：统一决策管线的候选清单/六维得分/逐闸结果，
     随 TURN_INTENTION 行落 decision_records.candidates（异步，不占热路径）。
     """
-    if not get_settings().observability_persist_enabled:
-        return
     try:
         max_chars = get_settings().observability_step_extra_max_chars
         request_id = trace.request_id
@@ -534,8 +522,6 @@ def record_turn_decisions(
 
 
 def mark_decision_outcome(action_id: str, outcome: str) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_mark_decision_outcome(action_id, outcome))
 
 

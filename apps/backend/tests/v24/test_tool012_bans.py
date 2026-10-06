@@ -170,7 +170,6 @@ def test_ban_no_second_memory_write_channel(monkeypatch):
         monkeypatch,
         {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
-    monkeypatch.setenv("ACTION_MEMORY_POLICY_ENABLED", "true")
     get_settings.cache_clear()
 
     from app.repositories import memory_repository
@@ -201,7 +200,6 @@ def test_ban_no_second_memory_rejected_candidate_writes_nothing(monkeypatch):
         monkeypatch,
         {"TOOL_SYSTEM_ENABLED": True, "TOOL_MEMORY_ENABLED": True},
     )
-    monkeypatch.setenv("ACTION_MEMORY_POLICY_ENABLED", "true")
     get_settings.cache_clear()
 
     from app.repositories import memory_repository

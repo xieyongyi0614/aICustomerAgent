@@ -17,16 +17,14 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 class EvaluationSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    evaluation_enabled: bool = True
     # 按维策略闸：一维一闸，对应 EvaluationDimension；默认 True，关闭=规则静音
     evaluation_persona_enabled: bool = True
     evaluation_emotion_enabled: bool = True
     evaluation_memory_enabled: bool = True
     evaluation_behavior_enabled: bool = True
-    # 双重职责：autonomy 维规则闸 + schedule_proactive_evaluation 整段短路
+    # autonomy 维规则闸（批次 2 已移除其旧的「schedule_proactive_evaluation 整段短路」用途）
     evaluation_autonomy_enabled: bool = True
     evaluation_goal_enabled: bool = True
-    evaluation_llm_judge_enabled: bool = True
     evaluation_llm_judge_sample_rate: float = 1.0
     evaluation_judge_profile: str = ""
     evaluation_penalty_critical: float = 0.4
@@ -48,8 +46,6 @@ class EvaluationSettings(BaseSettings):
     evaluation_memory_support_min_overlap: float = 0.2
     evaluation_proactive_reply_window_hours: int = 24
     evaluation_retention_days: int = 30
-    # 规则级子闸（非维度闸）：只关 WorldConsistencyRule，仍受 evaluation_memory_enabled 罩住
-    evaluation_world_consistency_enabled: bool = True
     evaluation_reflection_enabled: bool = True
     evaluation_relationship_enabled: bool = True
     evaluation_action_enabled: bool = True

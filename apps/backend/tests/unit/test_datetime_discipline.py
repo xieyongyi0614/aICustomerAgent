@@ -1,4 +1,4 @@
-"""时间口径防回归护栏（`docs/refactor/datetime-normalization-plan.md` §5.7）。
+"""时间口径防回归护栏（时间口径统一收官批 §5.7；基线见 §6.4）。
 
 三条断言：
 1. 全库模型时间列一律 `UtcDateTime`（Postgres → `timestamptz`、SQLite 补 UTC）；

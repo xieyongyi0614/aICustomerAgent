@@ -13,7 +13,6 @@ class PipelineSettings(BaseSettings):
     context_total_char_budget: int = 12000
     state_history_limit: int = 20
     scene_pending_max_turns: int = 5
-    scene_idle_reset_enabled: bool = True
     scene_idle_reset_hours: float = 6.0
 
     mode_switch_min_confidence: float = 0.7

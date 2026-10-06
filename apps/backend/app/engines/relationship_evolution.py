@@ -109,15 +109,12 @@ def apply_dynamics(
     state: RelationshipState,
     repeats_by_kind: dict[tuple[str, str], int],
     signal: InteractionSignal | None,
-    enabled: bool = True,
 ) -> tuple[RelationshipDelta, dict[str, bool]]:
     """D1~D5 动力学修饰（顺序固定：D1→D2→D3→D5；D4=comfort 豁免 D1/D2）。
 
     负向不递减不钝化；comfort 不参与 D1/D2；familiarity 不参与 D2。
     """
     flags: dict[str, bool] = {}
-    if not enabled:
-        return base.model_copy(), flags
     settings = get_settings()
     decay = settings.rel_repetition_decay
     amp = settings.rel_trust_negative_amp
@@ -212,7 +209,6 @@ def evolve(
         state,
         repeats_by_kind,
         signal,
-        get_settings().rel_evolution_enabled,
     )
     limited, truncated = rate_limit(
         state, dynamics, behavior_delta, day_positive, day_negative

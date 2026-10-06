@@ -50,9 +50,7 @@ async def _await_until(predicate, timeout: float = 10.0):
 @pytest.mark.asyncio
 async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
-        evaluation_enabled=True,
         evaluation_llm_judge_sample_rate=0,
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
@@ -100,7 +98,6 @@ async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_se
 async def test_chat_response_carries_request_id_header(
     db_session_factory, fake_llm, llm_override, override_settings
 ):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     llm_override(llm)
     transport = ASGITransport(app=app)

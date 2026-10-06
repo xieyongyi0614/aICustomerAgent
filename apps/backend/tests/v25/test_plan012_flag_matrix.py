@@ -34,7 +34,7 @@ class TestFlagDefaults:
         settings = get_settings()
         for name, expected in support.V25_DEFAULTS.items():
             assert getattr(settings, name) is expected, name
-        assert len(support.V25_FLAG_NAMES) == 2
+        assert len(support.V25_FLAG_NAMES) == 1
 
     def test_parameter_defaults_match_architecture(self):
         settings = get_settings()

@@ -43,7 +43,6 @@ async def _wait_report(turn_id: str, timeout: float = 2.0):
 
 
 async def test_debug_evaluation_endpoints(db_session_factory, fake_llm, monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     get_settings.cache_clear()
     try:
         llm = fake_llm(response="今天也不错哦。*微笑*", structured_responses=_structured())

@@ -50,7 +50,6 @@ async def _await_until(predicate, timeout: float = 10.0):
 
 @pytest.mark.asyncio
 async def test_debug_trace_endpoints_with_db_fallback(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         missing = await client.get("/api/v1/debug/turns/no-such/trace")
@@ -84,7 +83,6 @@ async def test_debug_trace_endpoints_with_db_fallback(db_session_factory, fake_l
 @pytest.mark.asyncio
 async def test_lru_evicted_turn_falls_back_to_db(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         trace_capacity=1,
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())

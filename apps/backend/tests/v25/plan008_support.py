@@ -278,8 +278,7 @@ def planning_world_on(override_settings):
     override_settings(
         plan_tool_required="true",
         action_relationship_enabled="false",
-        action_outbox_enabled="false",
-        observability_persist_enabled="false")
+        action_outbox_enabled="false",)
     return True
 
 

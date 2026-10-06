@@ -26,15 +26,13 @@ from .conftest import V25_NOW, V25_USER
 @pytest.fixture
 def plan_path_on(override_settings):
     """执行链锚点（历史名保留）：子闸已删，只钉行动与世界面。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 @pytest.fixture
 def execution_on(override_settings):
     """行动面开启（执行桥即唯一执行路径，无 flag 分派）。"""
-    override_settings(
-        observability_persist_enabled="false")
+    override_settings()
 
 
 class TestExecutionBridgeIsMounted:
