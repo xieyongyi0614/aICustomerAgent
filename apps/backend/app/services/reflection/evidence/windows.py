@@ -1,6 +1,6 @@
 """Reflection 证据窗构造与门槛数学（纯函数，零 IO）。
 
-由 `evidence.py` 拆分归位（services-reorganization-plan §十②，2026-09-30）：
+由 `evidence.py` 拆分归位（巨型文件包化，2026-09-30）：
 窗体/数据类/门槛判定在此，聚合采集（DB/trace）见 `collectors`。
 """
 

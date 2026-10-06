@@ -1,7 +1,7 @@
 """Reflection 证据聚合包（memory / tool / plan 三族证据的窗构造与采集）。
 
 由 `evidence.py`（1856 行，纯只读聚合、零落库，故无 persistence 切片）拆分
-归位（services-reorganization-plan §十②，2026-09-30）：纯窗构造与门槛数学在
+归位（巨型文件包化，2026-09-30）：纯窗构造与门槛数学在
 `windows`，DB/trace 采集与聚合编排在 `collectors`。本 `__init__` 全量再导出
 （含私有名与仓储模块引用，保持 `evidence.<X>` 属性访问与补丁链可用）；conftest
 的 SessionLocal 打桩目标为 `collectors`（唯一 DB 触点）。

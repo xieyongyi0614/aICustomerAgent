@@ -63,7 +63,7 @@
 **横切与集成**
 
 - `docs/integrations/feishu/` — 飞书通道：`architecture.md`（本域唯一架构依据）+ `tasks.md`（FEISHU-001~007）+ `task-details/` + `acceptance-report-v1.0.md` + `review-v1.1.md`
-- `docs/refactor/` — 横切重构：`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）、`services-reorganization-plan.md`（services 领域化归类方案 + 实际执行结果台账；**services 顶层散落模块已按领域收进子包、纯函数模块收口 `app/engines/`，新代码勿再建顶层散落 services 模块**）
+- `docs/refactor/` — 横切重构：`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）。**services 顶层散落模块已按领域收进子包、纯函数模块收口 `app/engines/`，新代码勿再建顶层散落 services 模块**（架构依据 = 基线 ADR-15；原归位台账已于收官后删除，全文可从 git 历史取回）
 - `docs/TESTING.md` — 测试规范（marker、执行级别、AI Coding 测试规则）
 
 ## 全局约定

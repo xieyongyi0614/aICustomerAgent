@@ -5,7 +5,7 @@
 （Task Detail §3.3 职责边界）。**零 LLM、零写库、零迁移**：只产出内存态
 `DecompositionResult`，落库由 PLAN-003 经 `goal_repository` 计划面函数完成（单一写面）。
 
-包内分工（2026-10-03 由单文件 `decompose.py` 拆包，`services-reorganization-plan.md` §15.2 债②）：
+包内分工（2026-10-03 由单文件 `decompose.py` 拆包，巨型文件包化）：
 
 | 文件 | 内容 |
 |---|---|

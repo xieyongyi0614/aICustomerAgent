@@ -1,8 +1,7 @@
 """V7.5 评估上下文包：切片 / 收集器 / digest。
 
-由 `evaluation_context.py`（834 行）拆分归位（services-reorganization-plan
-§十②，2026-09-30）；本 `__init__` 全量再导出，既有 `from ...context import X`
-消费面零改动。
+由 `evaluation_context.py`（834 行）拆分归位（巨型文件包化，2026-09-30）；
+本 `__init__` 全量再导出，既有 `from ...context import X` 消费面零改动。
 """
 
 from app.services.evaluation.context.digest import (
