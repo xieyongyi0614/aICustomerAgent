@@ -17,6 +17,7 @@ tripped 且 now - tripped_at >= 冷却 → 半开：解除熔断，consecutive_f
 from collections.abc import Callable
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.tool import ToolHealth
 from app.services.tool.registry import ToolRegistry
@@ -34,7 +35,7 @@ class ToolHealthTracker:
     ) -> None:
         self._registry = registry
         self._settings = settings if settings is not None else get_settings()
-        self._clock = clock or datetime.now
+        self._clock = clock or timeutil.now
         self._tripped_at: dict[str, datetime] = {}
 
     @property
@@ -77,9 +78,11 @@ class ToolHealthTracker:
         record = self._registry.health(tool_id).get(tool_id)
         if record is None or not record.tripped:
             return
+        now = timeutil.ensure_aware(now) or now
         tripped_at = self._tripped_at.get(tool_id)
         if tripped_at is None:
             self._tripped_at[tool_id] = now
             return
+        tripped_at = timeutil.ensure_aware(tripped_at) or tripped_at
         if (now - tripped_at).total_seconds() >= self.cooldown_seconds:
             self._registry.clear_tripped(tool_id)

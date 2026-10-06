@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import UserMemory
@@ -96,9 +97,8 @@ def _cosine(left: list[float], right: list[float]) -> float:
 
 def _recency(memory: UserMemory, now: datetime) -> float:
     settings = get_settings()
-    reference = memory.last_accessed_at or memory.created_at
-    if reference.tzinfo is not None:
-        reference = reference.replace(tzinfo=None)
+    reference = timeutil.ensure_aware(memory.last_accessed_at or memory.created_at)
+    now = timeutil.ensure_aware(now)
     days = max((now - reference).total_seconds() / 86400, 0.0)
     return 0.5 ** (days / settings.memory_recency_half_life_days)
 
@@ -161,9 +161,9 @@ def _contradicts_cooldown_ids(user_id: str, now: datetime) -> set[str]:
             counterpart = session.get(Memory, counterpart_id)
             if counterpart is None or counterpart.status == STATUS_ACTIVE:
                 continue
-            resolved_at = counterpart.updated_at or counterpart.created_at
-            if resolved_at.tzinfo is not None:
-                resolved_at = resolved_at.replace(tzinfo=None)
+            resolved_at = timeutil.ensure_aware(
+                counterpart.updated_at or counterpart.created_at
+            )
             if resolved_at >= cutoff:
                 survivor = (
                     link.memory_id
@@ -272,7 +272,7 @@ def retrieve(
     started = time.perf_counter()
     settings = get_settings()
     limit = top_k or settings.memory_top_k
-    now = datetime.now()
+    now = timeutil.now()
     query_text = (query or "").strip()
 
     pool = _candidate_pool(user_id, character_id)

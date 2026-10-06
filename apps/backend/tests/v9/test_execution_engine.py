@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application.action_engine import execute_plan, new_record
 from app.models.action import (
     ActionIntent,
@@ -48,7 +49,7 @@ async def test_execute_plan_single_success(db_session_factory, override_settings
         intent=intent,
         steps=[ActionStep(index=0, capability="memory", action="save", params={"fact": "喜欢柠檬"})],
     )
-    ctx = ExecutionContext(user_id="exe-user", character_id="asuna", record_id=record.id, now=datetime.now(), settings=_gs())
+    ctx = ExecutionContext(user_id="exe-user", character_id="asuna", record_id=record.id, now=timeutil.now(), settings=_gs())
     result = await execute_plan(record, plan, ctx)
     assert result.status in ("succeeded", "failed", "partial")
     assert record.steps

@@ -4,7 +4,7 @@
 （与 v1 dedupe_key 同形）。重检型触发（inactivity/action_due）经
 register_and_claim 在单事务内完成「登记+领取+上一轮交接补记」；一次性
 followup 走 register + claim_due_followups 领取。所有迁移比较基于调用方
-注入的 now（禁散落 datetime.now()）。
+注入的 now（禁散落 timeutil.now()）。
 """
 
 import logging
@@ -13,6 +13,7 @@ from typing import Sequence
 
 from sqlalchemy import or_
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import SessionLocal, TriggerRegistryRow
 
@@ -28,7 +29,7 @@ TERMINAL_STATUSES = ("done", "cancelled")
 
 
 def _now(now: datetime | None) -> datetime:
-    return now or datetime.now()
+    return timeutil.ensure_aware(now) or timeutil.now()
 
 
 def get(trigger_key: str) -> TriggerRegistryRow | None:

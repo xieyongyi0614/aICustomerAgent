@@ -7,6 +7,7 @@
 import asyncio
 from datetime import datetime
 
+from app.core import timeutil
 from app.application import world_engine
 from app.core.db import MemoryCandidateRow
 from app.models.world import EventStatus
@@ -92,7 +93,7 @@ def test_v2_ingest_first_bypass_later_converges_to_single_memory(db_session_fact
     assert event is not None
     event.status = EventStatus.COMPLETED
     event.completed_at = datetime(2026, 9, 30, 12, 0, 0)
-    event.updated_at = datetime.now()
+    event.updated_at = timeutil.now()
     world_repository.save_event(event)
 
     row = memory_ingest.ingest_from_world_event(event, "default-user")

@@ -14,6 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, EvidenceLinkRow, InsightRow, Memory, ReflectionRunRow
 from app.main import app
 from app.services.reflection import attribution as reflection_attribution
@@ -255,7 +256,7 @@ def _newest_insight(session_factory, user):
 
 def test_reflection_runs_endpoint(env):
     session_factory, _stub = env
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             ReflectionRunRow(
@@ -279,7 +280,7 @@ def test_debug_api_endpoints(env, _offline_repos):
     import app.services.reflection.attribution as attribution_module
     import app.api.v1.debug as debug_module
 
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -307,7 +308,7 @@ def test_debug_api_endpoints(env, _offline_repos):
 def test_offline_scenarios_gate(env):
     session_factory, stub = env
     results = reflection_evaluation.run_scenarios(
-        session_factory, stub, judge_llm=PassJudgeStub(), now=datetime.now()
+        session_factory, stub, judge_llm=PassJudgeStub(), now=timeutil.now()
     )
     report = reflection_evaluation.compute_metrics(results)
     assert report["gate_passed"], report["failed_scenarios"]
@@ -327,7 +328,7 @@ def test_offline_scenarios_gate(env):
 def test_noise_scenarios_zero_llm(env):
     session_factory, stub = env
     results = reflection_evaluation.run_scenarios(
-        session_factory, stub, judge_llm=PassJudgeStub(), now=datetime.now()
+        session_factory, stub, judge_llm=PassJudgeStub(), now=timeutil.now()
     )
     noise = [
         r

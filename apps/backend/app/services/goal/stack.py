@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.goal import GOAL_TIER, GoalRecord
 from app.repositories import goal_repository
@@ -62,7 +63,7 @@ def evaluate_stack(
     """栈裁决。retire_overdue_enabled=False 为只读模式（前台 Run 用，铁律 4：
     长期化写入只发生在后台）。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     if retire_overdue_enabled:
         retire_overdue(user_id, now, settings)
     goals = goal_repository.list_layered_active(user_id)
@@ -121,7 +122,7 @@ def run_goal_stack_stage(user_id: str, run, now: datetime | None = None) -> dict
     Goal Rebalance 建议在此（supply 审核侧，后台唯一写入时机）消费：
     Evolution Engine 只产建议，退役经既有 finish_goal 出口，不新增写路径。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     stack = evaluate_stack(user_id, now)
     run.data["goal_stack"] = stack.as_summary()
     retired = _apply_evolution_rebalance(user_id, now)

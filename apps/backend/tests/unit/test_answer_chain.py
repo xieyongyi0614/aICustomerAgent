@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core import llm_factory
 from app.character.asuna import BEHAVIOR_INSTRUCTIONS
 from app.chains import answer_chain
@@ -68,7 +69,7 @@ async def test_prompt_includes_dynamic_sections(fake_llm):
         memories=[UserMemory(
             id="m1", user_id="u", character_id="asuna", type="user_preference",
             content="用户喜欢寿司", importance=0.8, confidence=0.9, source="user_stated",
-            created_at=datetime.now(), updated_at=datetime.now(),
+            created_at=timeutil.now(), updated_at=timeutil.now(),
         )],
         current_input="现在输入",
     )

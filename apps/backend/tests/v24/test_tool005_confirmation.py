@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core import timeutil
 from app.character.asuna.tool import (
     CONFIRM_APPROVE_LEXICON,
     CONFIRM_DENY_LEXICON,
@@ -120,7 +121,7 @@ def _unbind_channel(user_id: str = USER_ID, db_session_factory=None) -> None:
 
 
 def test_request_registers_pending_row(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     request = _register(service, now)
     assert request is not None
@@ -150,11 +151,11 @@ def test_request_returns_none_when_registration_fails(monkeypatch):
 
     monkeypatch.setattr(trigger_repository, "register", _boom)
     service = ConfirmationService(_settings())
-    assert _register(service, datetime.now()) is None
+    assert _register(service, timeutil.now()) is None
 
 
 def test_request_is_idempotent_per_dedupe_key():
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     first = _register(service, now)
     second = _register(service, now)
@@ -166,7 +167,7 @@ def test_request_is_idempotent_per_dedupe_key():
 
 
 def test_resolve_approve_grants_scope_and_rejects_illegal_migration():
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     request = _register(service, now)
 
@@ -186,7 +187,7 @@ def test_resolve_approve_grants_scope_and_rejects_illegal_migration():
 
 
 def test_resolve_deny_marks_terminal_and_allows_new_request_e6():
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     request = _register(service, now)
 
@@ -204,7 +205,7 @@ def test_resolve_deny_marks_terminal_and_allows_new_request_e6():
 
 def test_resolve_after_ttl_returns_expired_e5():
     service = ConfirmationService(_settings())
-    stale = datetime.now() - timedelta(hours=48)
+    stale = timeutil.now() - timedelta(hours=48)
     request = _register(service, stale)
 
     outcome = service.resolve(request.request_id, approved=True)
@@ -222,7 +223,7 @@ def test_resolve_unknown_request_returns_not_found():
 
 def test_pending_orders_newest_first_e7_e13():
     service = ConfirmationService(_settings())
-    base = datetime.now()
+    base = timeutil.now()
     older = _register(service, base - timedelta(hours=2), content="旧消息")
     newer = _register(service, base, content="新消息")
     pending = service.pending(USER_ID, base)
@@ -237,7 +238,7 @@ def test_pending_orders_newest_first_e7_e13():
 
 def test_expire_due_cleans_only_expired_requests():
     service = ConfirmationService(_settings())
-    now = datetime.now()
+    now = timeutil.now()
     expired_request = _register(service, now - timedelta(hours=48))
     live_request = _register(service, now, content="现在的消息")
 
@@ -252,7 +253,7 @@ def test_expire_due_cleans_only_expired_requests():
 
 def test_expire_due_cleans_expired_grant_rows():
     """到期授权行落终态：避免被 `has_due` 长期误计为到期待办触发。"""
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings()
     service = ConfirmationService(settings)
     grant_id = service.grant_scope(USER_ID, SENSITIVE_TOOL_ID, ("self",))
@@ -275,7 +276,7 @@ def test_has_due_excludes_confirmation_and_grant_rows():
     """确认行与授权行不再被计入"到期待办触发"（污染窗口 = TTL 到期到 `expire_due` 之间）。"""
     from app.services.tool.confirmation import non_todo_payload_kinds
 
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings()
     service = ConfirmationService(settings)
 
@@ -310,7 +311,7 @@ def test_has_due_keeps_real_action_due_rows_with_exclusion():
     """排除生效时，真正的 `action_due` 待办行（payload 无 `kind` 键）仍被计入。"""
     from app.services.tool.confirmation import non_todo_payload_kinds
 
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings()
     service = ConfirmationService(settings)
     request = _register(service, now - timedelta(hours=48))
@@ -337,7 +338,7 @@ def test_has_due_keeps_real_action_due_rows_with_exclusion():
 
 def test_has_due_default_arguments_keep_v9_shape():
     """不传 `exclude_payload_kinds`：到期的确认行照旧被计入（默认口径与 V9 逐字节一致）。"""
-    now = datetime.now()
+    now = timeutil.now()
     request = _register(ConfirmationService(_settings()), now - timedelta(hours=48))
     assert request is not None
     for kwargs in ({}, {"exclude_payload_kinds": None}, {"exclude_payload_kinds": ()}):
@@ -356,7 +357,7 @@ def test_has_due_default_arguments_keep_v9_shape():
 
 
 def test_ttl_reuse_true_keeps_grant_within_window():
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings(tool_confirm_ttl_reuse=True)
     service = ConfirmationService(settings)
     request = _register(service, now, settings=settings)
@@ -377,7 +378,7 @@ def test_ttl_reuse_true_keeps_grant_within_window():
 
 
 def test_ttl_reuse_false_grants_only_current_round():
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings(tool_confirm_ttl_reuse=False)
     service = ConfirmationService(settings)
     request = _register(service, now, settings=settings)
@@ -399,7 +400,7 @@ def test_ttl_reuse_false_grants_only_current_round():
 
 
 def test_revoke_takes_effect_on_next_decision():
-    now = datetime.now()
+    now = timeutil.now()
     settings = _settings()
     service = ConfirmationService(settings)
     service.grant_scope(USER_ID, SENSITIVE_TOOL_ID, ("self",))
@@ -424,7 +425,7 @@ def test_revoke_removes_session_grant_only():
 
 
 def test_channel_binding_implies_base_scope_then_unbind_loses_it(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     assert service.channel_bound(USER_ID) is False
     assert service.grant_records(USER_ID, now) == []
@@ -450,7 +451,7 @@ def test_grant_scope_failure_returns_none(monkeypatch):
 
 
 def test_revoke_request_marks_pending_request_denied():
-    now = datetime.now()
+    now = timeutil.now()
     service = ConfirmationService(_settings())
     request = _register(service, now)
     assert service.revoke_request(request.request_id) is True
@@ -468,7 +469,7 @@ def test_confirmation_key_is_scoped_by_dedupe_key():
 
 def _pending_list(count: int = 1):
     service = ConfirmationService(_settings())
-    now = datetime.now()
+    now = timeutil.now()
     return [
         _register(service, now + timedelta(minutes=index), content=f"消息{index}")
         for index in range(count)
@@ -576,7 +577,7 @@ async def test_debug_permission_revoke_unknown_returns_404(permission_on):
 @pytest.mark.asyncio
 async def test_debug_confirmations_list_and_revoke(permission_on):
     service = get_confirmation_service()
-    request = _register(service, datetime.now())
+    request = _register(service, timeutil.now())
 
     listed = await _get("/debug/tools/confirmations", user_id=USER_ID)
     assert listed.status_code == 200
@@ -608,7 +609,7 @@ async def test_debug_confirmation_revoke_unknown_returns_404(permission_on):
 async def test_debug_confirmations_deny_decision_not_reached(permission_on):
     """否定路径：请求转 denied，不落授权（工具不执行由集成用例断言零外部调用）。"""
     service = get_confirmation_service()
-    request = _register(service, datetime.now())
+    request = _register(service, timeutil.now())
     outcome = service.resolve(request.request_id, approved=False)
     assert outcome.status == STATUS_DENIED
     assert service.has_grant(USER_ID, CHANNEL_TOOL_ID, CHANNEL_TOOL_SCOPE) is False

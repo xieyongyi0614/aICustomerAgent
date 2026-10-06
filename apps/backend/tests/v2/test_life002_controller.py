@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import life_loop
 from app.character.asuna import PERSISTENT_GOALS
 from app.models.goal import GoalRecord
@@ -20,7 +21,7 @@ from app.repositories import (
 )
 from app.services.autonomy import trigger as trigger_evaluator
 
-NOW = datetime(2026, 9, 7, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 7, 12, 0, 0))
 USER = "life-loop-user"
 SESSION = "ll-s1"
 

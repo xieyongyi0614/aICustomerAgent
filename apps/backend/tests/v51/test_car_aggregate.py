@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.models.ledger import LedgerEntryDraft
 from app.repositories import car_repository, ledger_repository
 from app.services.car import aggregate as car_aggregate
@@ -15,8 +16,8 @@ from app.services.ledger import service as ledger_service
 
 pytestmark = pytest.mark.unit
 
-NOW = datetime(2026, 9, 30, 12, 0, 0)
-PREVIOUS_MONTH = datetime(2026, 8, 15, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 30, 12, 0, 0))
+PREVIOUS_MONTH = timeutil.ensure_aware(datetime(2026, 8, 15, 12, 0, 0))
 USER = "car-aggregate-user"
 
 
@@ -218,9 +219,9 @@ def test_aggregate_ignores_income_and_reversed_entries(db_session_factory):
 
 
 def test_recent_records_merges_ledger_and_mileage_rows(db_session_factory):
-    charge_at = datetime(2026, 9, 20, 9, 0, 0)
-    first_mileage_at = datetime(2026, 9, 21, 9, 0, 0)
-    second_mileage_at = datetime(2026, 9, 25, 9, 0, 0)
+    charge_at = timeutil.ensure_aware(datetime(2026, 9, 20, 9, 0, 0))
+    first_mileage_at = timeutil.ensure_aware(datetime(2026, 9, 21, 9, 0, 0))
+    second_mileage_at = timeutil.ensure_aware(datetime(2026, 9, 25, 9, 0, 0))
     car_entries.record_car_expense(
         USER,
         kind="charge",
@@ -269,7 +270,7 @@ def test_recent_records_respects_limit(db_session_factory):
             USER,
             kind="charge",
             amount_minor=1000 + index,
-            occurred_at=datetime(2026, 9, 20 + index, 9, 0, 0),
+            occurred_at=timeutil.ensure_aware(datetime(2026, 9, 20 + index, 9, 0, 0)),
             idempotency_key=f"agg-key-limit-{index}",
             now=NOW,
         )
@@ -277,7 +278,7 @@ def test_recent_records_respects_limit(db_session_factory):
     records = car_aggregate.car_recent_records(USER, limit=2)
 
     assert len(records) == 2
-    assert records[0].occurred_at == datetime(2026, 9, 22, 9, 0, 0)
+    assert records[0].occurred_at == timeutil.ensure_aware(datetime(2026, 9, 22, 9, 0, 0))
 
 
 def test_recent_records_exclude_other_categories(db_session_factory):

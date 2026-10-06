@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import outbox_consumer
 from app.core.settings import get_settings
 from app.models.world import EventSource
@@ -25,7 +26,7 @@ def bridge_flags(monkeypatch):
 def _seed_goal(user_id: str, description: str = "整理书架"):
     from app.models.goal import GoalRecord
 
-    now = datetime.now()
+    now = timeutil.now()
     record = GoalRecord(
         user_id=user_id,
         type="user_care",

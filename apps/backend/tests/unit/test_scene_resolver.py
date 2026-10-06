@@ -1,3 +1,4 @@
+from app.core import timeutil
 from app.models.scene import PendingAction, SceneState
 from app.services.conversation import scene as scene_service
 
@@ -91,7 +92,7 @@ def _stale_state(pending=None, hours_ago=30.0):
         location="厨房",
         current_activity="煮面",
         pending_action=pending,
-        last_active_at=datetime.now() - timedelta(hours=hours_ago),
+        last_active_at=timeutil.now() - timedelta(hours=hours_ago),
     )
 
 

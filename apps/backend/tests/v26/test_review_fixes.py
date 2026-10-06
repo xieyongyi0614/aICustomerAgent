@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import ActionResult, ActionIntent, transition_action
 from app.repositories import action_repository
@@ -20,7 +21,7 @@ class TestActionScheduleConsumption:
 
     def test_scheduler_self_gate_is_gone(self):
         """原「双闸 off 自门控 skipped」的前提随开关删除退役：空载时正常跑完（done）。"""
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert result["status"] == "done"
         assert result["claimed"] == 0
 

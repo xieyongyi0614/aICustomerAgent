@@ -1,3 +1,4 @@
+from app.core import timeutil
 from app.core.db import CharacterStateRow, RelationshipStateRow
 from app.models.character_state import CharacterState
 from app.models.relationship import RelationshipState
@@ -20,7 +21,7 @@ class TestCharacterStateRepository:
     def test_v5_emotion_fields_roundtrip(self, db_session_factory):
         from datetime import datetime
 
-        event_at = datetime(2026, 8, 29, 12, 0, 0)
+        event_at = timeutil.ensure_aware(datetime(2026, 8, 29, 12, 0, 0))
         saved = character_state_repository.upsert_state(
             "user-v5",
             CharacterState(

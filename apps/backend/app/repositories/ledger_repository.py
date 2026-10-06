@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import (
     LedgerAccountRow,
@@ -22,7 +23,7 @@ def create_account(
     currency: str = "CNY",
     now: datetime | None = None,
 ) -> LedgerAccountRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = LedgerAccountRow(
             id=ids.new_id_str(),
@@ -62,7 +63,7 @@ def list_accounts(user_id: str, *, include_archived: bool = False):
 def ensure_default_account(
     user_id: str, *, now: datetime | None = None
 ) -> tuple[LedgerAccountRow, bool]:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         existing = (
             session.query(LedgerAccountRow)
@@ -115,7 +116,7 @@ def create_category(
     is_seed: bool = False,
     now: datetime | None = None,
 ) -> LedgerCategoryRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = LedgerCategoryRow(
             id=ids.new_id_str(),
@@ -189,7 +190,7 @@ def ensure_seed_categories(user_id: str, *, seed_tree, now: datetime | None = No
     「吃饭」后重跑播种，按 (user_id, seed_key) 命中已有行，不复活原分类。id 一律雪花
     （ADR-16 阶段 D 收敛）。
     """
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     created = 0
     by_name = {row.name: row for row in list_categories(user_id)}
     seeded = {
@@ -229,7 +230,7 @@ def ensure_seed_categories(user_id: str, *, seed_tree, now: datetime | None = No
 def create_entry(
     draft: LedgerEntryDraft, *, idempotency_key: str, now: datetime | None = None
 ) -> tuple[LedgerEntryRow, bool]:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         existing = (
             session.query(LedgerEntryRow)

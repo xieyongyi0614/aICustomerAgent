@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import or_
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, SessionLocal
 from app.core.settings import get_settings
 from app.repositories import background_job_repository
@@ -69,7 +70,7 @@ async def run_job_worker_loop() -> None:
 
 def run_job_tick(trace=None) -> dict:
     started = time.perf_counter()
-    now = datetime.now()
+    now = timeutil.now()
     stats = {
         "enqueued": 1 if _enqueue_due_decay(now) else 0,
         "recovered": _recover_zombies(now),

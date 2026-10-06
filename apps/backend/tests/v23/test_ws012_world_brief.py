@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.core.settings import get_settings
 from app.models.world import TimeContext, WorldTimeMode
@@ -33,7 +34,7 @@ def _time_ctx(now: datetime) -> TimeContext:
 
 
 def _situation(user_id: str) -> UserSituation:
-    now = datetime.now()
+    now = timeutil.now()
     return UserSituation(
         id=repo.new_situation_id(),
         user_id=user_id,

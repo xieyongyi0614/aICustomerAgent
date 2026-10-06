@@ -18,6 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time as dt_time
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.autonomy import (
     PROACTIVE_INTENTION_MAP,
@@ -121,7 +122,7 @@ def in_quiet_hours(now: datetime, start: str, end: str) -> bool:
     start_time, end_time = _parse_hhmm(start), _parse_hhmm(end)
     if start_time is None or end_time is None or start_time == end_time:
         return False
-    current = now.time()
+    current = timeutil.local_naive(now).time()
     if start_time > end_time:
         return current >= start_time or current < end_time
     return start_time <= current < end_time
@@ -146,7 +147,9 @@ def _cooldown_passed(snapshot: PolicySnapshot, config, now: datetime) -> bool:
     if snapshot.last_proactive_at is None:
         return True
     interval = effective_interval_minutes(snapshot, config)
-    elapsed_minutes = (now - snapshot.last_proactive_at).total_seconds() / 60
+    elapsed_minutes = (
+        timeutil.ensure_aware(now) - timeutil.ensure_aware(snapshot.last_proactive_at)
+    ).total_seconds() / 60
     return elapsed_minutes >= interval
 
 
@@ -341,7 +344,7 @@ def evaluate(
     signal: TriggerSignal, snapshot: PolicySnapshot, config=None, now: datetime | None = None
 ) -> AutonomyVerdict:
     config = config or get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
 
     def _verdict(decision: str, reason: str) -> AutonomyVerdict:
         return AutonomyVerdict(decision=decision, reason=reason[:60], trigger=signal)

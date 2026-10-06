@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime.contracts import (
     EVENT_ACTION_COMPLETED,
@@ -240,7 +241,7 @@ async def act(
         now
         or getattr(run, "started_at", None)
         or getattr(session_context, "started_at", None)
-        or datetime.now()
+        or timeutil.now()
     )
     session_id = getattr(session_context, "session_id", None)
     user_id = getattr(run, "user_id", None) or session_id

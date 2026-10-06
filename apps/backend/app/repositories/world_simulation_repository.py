@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from sqlalchemy import select, update
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import (
     DailyPlanRow,
@@ -75,7 +76,7 @@ def _to_situation(row: UserSituationRow) -> UserSituation:
 
 
 def save_plan(plan: DailyPlan) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(DailyPlanRow, plan.id)
         if row is None:
@@ -111,7 +112,7 @@ def replace_day_plans(plans: list[DailyPlan]) -> int:
         return 0
     user_id = plans[0].user_id
     plan_date = plans[0].plan_date
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         session.execute(
             update(DailyPlanRow)
@@ -155,7 +156,7 @@ def supersede_open_plans(user_id: str, plan_date: date) -> int:
                 DailyPlanRow.plan_date == plan_date,
                 DailyPlanRow.status.in_([s.value for s in OPEN_PLAN_STATUSES]),
             )
-            .values(status=DailyPlanStatus.SUPERSEDED.value, updated_at=datetime.now())
+            .values(status=DailyPlanStatus.SUPERSEDED.value, updated_at=timeutil.now())
         )
         session.commit()
         return int(result.rowcount or 0)
@@ -202,7 +203,7 @@ def prune_plans_before(user_id: str, cutoff: date) -> int:
 
 
 def save_situation(situation: UserSituation) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(UserSituationRow, situation.id)
         if row is None:
@@ -296,7 +297,9 @@ def commit_time_advance(
         if row is None:
             return False
         current_anchor = row.sim_last_advanced_at
-        if current_anchor is not None and sim_last_advanced_at <= current_anchor:
+        if current_anchor is not None and timeutil.ensure_aware(
+            sim_last_advanced_at
+        ) <= current_anchor:
             logger.debug(
                 "时间推进锚点未前移，跳过写入：world=%s current=%s incoming=%s",
                 world_id,
@@ -367,5 +370,5 @@ def clear_day_cycle_observation(world_id: str) -> None:
         if environment.pop(DAY_CYCLE_OBSERVATION_KEY, None) is None:
             return
         row.environment = environment
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()

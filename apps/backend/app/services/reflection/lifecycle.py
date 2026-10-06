@@ -15,6 +15,7 @@ import logging
 import time
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import Insight
@@ -64,7 +65,7 @@ def invalidate_insight(
         raise ValueError("invalidated_reason 必填")
     if source not in INVALIDATION_SOURCES:
         raise ValueError(f"非法失效来源: {source}")
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(InsightRow, insight_id)
         if row is None:
@@ -125,7 +126,7 @@ def supersede_insight(old_id: str, new_id: str, reason: str = "", trace=None) ->
             return False
         old_row.status = transition(old_row.status, EVENT_SUPERSEDE)
         old_row.superseded_by = new_id
-        old_row.updated_at = datetime.now()
+        old_row.updated_at = timeutil.now()
         session.commit()
         notify_invalidation_listeners(
             old_row.user_id,

@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna.relationship_lexicon import RECOVERY_LEXICON
 from app.core.settings import get_settings
 from app.models.relationship import (
@@ -252,7 +253,7 @@ def decay_tension(
     reference = state.last_interaction_at
     if reference is None:
         return outcome
-    days = (now.date() - reference.date()).days
+    days = (timeutil.local(now).date() - timeutil.local(reference).date()).days
     if days <= 0 or state.tension <= 0:
         return outcome
     decay = min(settings.rel_tension_daily_decay * days, state.tension)

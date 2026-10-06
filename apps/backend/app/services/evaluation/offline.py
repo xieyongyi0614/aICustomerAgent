@@ -8,6 +8,7 @@ subject=offline_batch 单行（overall 为 NULL），聚合派生不建表。
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.evaluation import (
     EvaluationMeta,
@@ -241,7 +242,7 @@ def _proactive_outcome_stats(user_id: str, settings) -> dict:
     """观察窗结果统计（仅离线）：24h 内无 ack 无回复记 LOW_OUTCOME 直方图信号。"""
     try:
         history = proactive_repository.list_delivered_history(user_id, limit=50)
-        now = datetime.now()
+        now = timeutil.now()
         window = timedelta(hours=settings.evaluation_proactive_reply_window_hours)
         delivered = 0
         acked = 0
@@ -279,7 +280,7 @@ def _persist_run(session_id: str, user_id: str, aggregate: dict) -> None:
             issues=[],
             context_digest=aggregate,
             meta=EvaluationMeta(context_fidelity="reconstructed", judge_used=False),
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
         evaluation_repository.save(report)
     except Exception:

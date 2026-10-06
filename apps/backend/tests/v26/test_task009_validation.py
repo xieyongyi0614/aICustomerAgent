@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.core.settings import Settings, SettingsError, get_settings
 from app.models.action import (
     ACTION_EXECUTION_MAP,
@@ -122,7 +123,7 @@ class TestFlagMatrix:
     def test_schedule_step_always_runs(self):
         import asyncio
 
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert result["status"] == "done"
 
 
@@ -281,7 +282,7 @@ class TestOutstandingQuestions:
         action = manager.create(user_id="u_q2", action_type="create_reminder", params={"content": "c"})
         item = scheduler.schedule(action, when="cron")
         assert item.when_type == "cron"
-        assert item.scheduled_at > datetime.now()
+        assert item.scheduled_at > timeutil.now()
 
     def test_q4_external_reserved(self):
         from app.services.action.executor import ActionExecutor

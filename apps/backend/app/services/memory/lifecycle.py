@@ -17,11 +17,11 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import or_
 
+from app.core import ids, timeutil
 from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory import types as memory_types
 from app.engines.memory_conflict import _lcs_length, same_topic
-from app.core import ids
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ def flush_reinforce_buffer(trace=None) -> list[str]:
 
 def _apply_reinforce(memory_ids: list[str], trace=None) -> list[str]:
     started = time.perf_counter()
-    now = datetime.now()
+    now = timeutil.now()
     boost = get_settings().memory_reinforce_boost
     updated_ids: list[str] = []
     with SessionLocal() as session:
@@ -161,7 +161,7 @@ def _forget_reference(row: Memory) -> datetime:
 
 def run_decay_cycle(now: datetime | None = None, trace=None) -> dict:
     """周期入口：衰减批 + decayed 超期遗忘 + forgotten 物理清。MEM-009 调度。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     stats = {"decayed": 0, "auto_forgotten": 0, "purged": 0}
     stats["decayed"] = _decay_batch(now, trace=trace)
     stats["auto_forgotten"] = _forget_stale_decayed(now, trace=trace)
@@ -205,6 +205,7 @@ def _decay_batch(now: datetime, trace=None) -> int:
 
 def _forget_stale_decayed(now: datetime, trace=None) -> int:
     started = time.perf_counter()
+    now = timeutil.ensure_aware(now)
     retention_days = get_settings().memory_forget_retention_days
     threshold = now - timedelta(days=retention_days)
     forgotten = 0
@@ -231,7 +232,7 @@ def _forget_stale_decayed(now: datetime, trace=None) -> int:
 
 def purge_expired_forgotten(now: datetime | None = None, trace=None) -> int:
     """软删保留期（memory_forget_retention_days）届满的 forgotten 行物理删除。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     started = time.perf_counter()
     threshold = now - timedelta(days=get_settings().memory_forget_retention_days)
     with SessionLocal() as session:
@@ -266,7 +267,7 @@ def purge_expired_forgotten(now: datetime | None = None, trace=None) -> int:
 def on_promoted(memory_id: str, relation: str | None = None, trace=None) -> None:
     """新转正记忆的冲突检测：同主题 supersede/merge 记链；negate 保守并存。"""
     started = time.perf_counter()
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(Memory, memory_id)
         if row is None or row.status != STATUS_ACTIVE or not (row.content or "").strip():
@@ -349,7 +350,7 @@ def _create_link(session, memory_id: str, related_memory_id: str, relation: str)
             memory_id=memory_id,
             related_memory_id=related_memory_id,
             relation=relation,
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
     )
 
@@ -357,7 +358,7 @@ def _create_link(session, memory_id: str, related_memory_id: str, relation: str)
 def explicit_forget(memory_id: str, trace=None) -> bool:
     """显式遗忘单条：状态机迁移 forgotten + 清向量（同事务）；已 forgotten 幂等。"""
     started = time.perf_counter()
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(Memory, memory_id)
         if row is None:

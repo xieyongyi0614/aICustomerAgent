@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.development import (
@@ -106,7 +107,7 @@ def upsert_modulation(
     started = time.perf_counter()
     if not 0.0 <= strength <= 1.0:
         raise ValueError(f"strength 越界: {strength}")
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     reason_created = change_reason or REASON_COMPILED
     reason_arbitrated = change_reason or REASON_ARBITRATED
     reason_lost = change_reason or REASON_ARBITRATED_LOST
@@ -191,7 +192,7 @@ def retire_modulation(
 ) -> bool:
     """active→retired（调制撤除无继任）；无 active 行幂等 no-op 返回 False。"""
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         active = (
             session.query(DevelopmentStateRow)

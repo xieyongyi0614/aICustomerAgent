@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.models.ledger import LedgerEntryDraft
@@ -19,7 +20,7 @@ from app.services.ledger.service import ensure_user_bootstrap, record_entry
 from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 9, 22, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 22, 12, 0, 0))
 USER = "api-user"
 
 
@@ -66,7 +67,7 @@ def test_summary_returns_both_minor_and_text(client, setup):
 def test_summary_matches_aggregation_service(client, setup):
     body = client.get("/api/v1/ledger/summary").json()
     data = query_service.summary(
-        USER, period=query_service.Period.month(datetime.now()), now=datetime.now()
+        USER, period=query_service.Period.month(timeutil.now()), now=timeutil.now()
     )
     # TestClient 以 owner 身份请求，与 USER 常量可能不同；只比对形状与类型
     assert isinstance(body["expense_minor"], int)
@@ -216,6 +217,7 @@ def test_api_layer_imports_services_only():
     allowed_prefixes = (
         "app.services",
         "app.core.settings",
+        "app.core.timeutil",
         "app.models",
         "app.api",
         "fastapi",

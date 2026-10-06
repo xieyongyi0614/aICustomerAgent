@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.action import ActionRecord
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.models.plan import PLAN_STEP_DEDUPE_KEY_TEMPLATE
@@ -29,7 +30,7 @@ from app.services.reflection import triggers
 
 from . import _plan_scan as scan
 
-NOW = datetime(2026, 9, 16, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 16, 12, 0, 0))
 USER = "plan10-user"
 OTHER_USER = "plan10-other-user"
 CHARACTER = "asuna"

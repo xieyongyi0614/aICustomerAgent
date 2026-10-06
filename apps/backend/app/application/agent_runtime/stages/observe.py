@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application import world_engine
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime import state as state_manager
@@ -318,7 +319,7 @@ def observe(
     `run_id` 用于 `ObservationRecorded` 的 Run 归属（默认回落 `session_context.run_id`）；
     `now` 由调用方对齐 `run.started_at`（裁决 D3）。
     """
-    observed_at = now or getattr(session_context, "started_at", None) or datetime.now()
+    observed_at = now or getattr(session_context, "started_at", None) or timeutil.now()
     kind = _kind_of(runtime_input, session_context)
     source = _source_of(runtime_input, session_context)
     degradations: list[ObservationDegradation] = []

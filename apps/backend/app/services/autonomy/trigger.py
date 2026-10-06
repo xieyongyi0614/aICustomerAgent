@@ -8,6 +8,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.autonomy import TriggerSignal
 from app.repositories import trigger_registry_repository, world_repository
@@ -34,7 +35,7 @@ _followup_lock = threading.Lock()
 def register_followup(
     user_id: str, due_at: datetime, summary: str, dedupe_key: str | None = None
 ) -> str:
-    key = dedupe_key or f"followup:{user_id}:{summary[:20]}:{due_at.date().isoformat()}"
+    key = dedupe_key or f"followup:{user_id}:{summary[:20]}:{timeutil.local(due_at).date().isoformat()}"
     with _followup_lock:
         _followup_registry[key] = {
             "user_id": user_id,
@@ -179,7 +180,7 @@ def mark_action_reported(user_id: str, event_id: str) -> None:
         world = world_repository.get_world(user_id)
         if world is None:
             return
-        now = datetime.now()
+        now = timeutil.now()
         for event in world_repository.list_events(
             world.world_id, statuses=["active"], limit=50
         ):
@@ -208,7 +209,7 @@ def evaluate_inactivity(
     config=None,
 ) -> TriggerSignal | None:
     config = config or get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     seen_keys = seen_keys or set()
 
     if tail.last_message_at is None:
@@ -216,11 +217,13 @@ def evaluate_inactivity(
     if (
         tail.last_message_role == "human"
         and tail.last_user_message_at is not None
-        and (now - tail.last_user_message_at).total_seconds() / 60
+        and (now - timeutil.ensure_aware(tail.last_user_message_at)).total_seconds() / 60
         < config.autonomy_min_user_reply_gap_minutes
     ):
         return None
-    idle_minutes = (now - tail.last_message_at).total_seconds() / 60
+    idle_minutes = (
+        now - timeutil.ensure_aware(tail.last_message_at)
+    ).total_seconds() / 60
     if idle_minutes < config.autonomy_inactivity_minutes:
         return None
     if episode_attempts >= config.autonomy_max_attempts_per_episode:

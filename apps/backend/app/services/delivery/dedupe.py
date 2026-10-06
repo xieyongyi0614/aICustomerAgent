@@ -17,6 +17,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.repositories import feishu_dedupe_ledger_repository
 
@@ -37,7 +38,7 @@ def reset_dedupe_service_state() -> None:
 def claim(event_id: str) -> bool:
     """返回 True 表示本次为**首次**受理（可继续处理）。存储异常时放行（fail-open）。"""
     ttl = get_settings().feishu_dedupe_ttl_seconds
-    now = datetime.now()
+    now = timeutil.now()
     try:
         claimed = feishu_dedupe_ledger_repository.claim(
             event_id, now, now - timedelta(seconds=ttl)

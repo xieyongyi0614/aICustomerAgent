@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import SessionLocal, UserRow
 
 
@@ -27,7 +28,7 @@ def create(
     display_name: str | None = None,
     now: datetime | None = None,
 ) -> UserRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = UserRow(
             id=user_id,
@@ -52,7 +53,7 @@ def create_with_email(
     now: datetime | None = None,
 ) -> UserRow:
     normalized = email.strip().lower()
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = UserRow(
             id=user_id,

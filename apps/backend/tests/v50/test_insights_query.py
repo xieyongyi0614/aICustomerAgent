@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import EvidenceLinkRow, InsightRow, Memory
 from app.services.insights import query as insights_query
 from app.services.insights.query import headline_of, list_insights
@@ -24,7 +25,7 @@ def test_list_insights_empty_is_ok(db_session_factory):
 
 
 def test_list_insights_home_maps_user_scope(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     with insights_query.SessionLocal() as session:
         session.add(
             InsightRow(
@@ -47,7 +48,7 @@ def test_list_insights_home_maps_user_scope(db_session_factory):
 
 
 def test_list_insights_ledger_requires_behavior_pattern_evidence(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     with insights_query.SessionLocal() as session:
         session.add(
             Memory(

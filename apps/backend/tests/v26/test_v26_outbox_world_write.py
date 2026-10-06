@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import outbox_consumer, world_engine
 from app.repositories import action_repository, outbox_repository, world_repository
 from app.services.action import manager
@@ -11,7 +12,7 @@ from app.services.action import manager
 
 
 def _due_at(hours: int = 3) -> str:
-    return (datetime.now() + timedelta(hours=hours)).isoformat()
+    return (timeutil.now() + timedelta(hours=hours)).isoformat()
 
 
 class TestOutboxWorldWrite:

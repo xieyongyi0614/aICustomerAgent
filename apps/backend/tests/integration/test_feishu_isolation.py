@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app.core import timeutil
 from app.channels.base import InboundMessage
 from app.channels.feishu import adapter
 from app.channels.feishu import client as feishu_client
@@ -43,7 +44,7 @@ def _inbound(text, open_id, reply_ref):
         channel="feishu",
         external_user_id=open_id,
         text=text,
-        received_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        received_at=timeutil.ensure_aware(datetime(2026, 1, 1, tzinfo=timezone.utc)),
         reply_ref=reply_ref,
         metadata={},
     )

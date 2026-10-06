@@ -365,7 +365,7 @@ class TestProduceActionShapeIsUnchanged:
 
     def test_it_still_uses_the_existing_dedupe_template(self):
         source = ENGINE_PATH.read_text(encoding="utf-8")
-        assert 'dedupe_key=f"autonomy:{action_type}:{now.date().isoformat()}"' in source
+        assert 'dedupe_key=f"autonomy:{action_type}:{timeutil.local(now).date().isoformat()}"' in source
 
     def test_the_engine_inventory_gained_exactly_the_assembly_helpers(self):
         assert _function_inventory(ENGINE_PATH) == ENGINE_FUNCTION_INVENTORY

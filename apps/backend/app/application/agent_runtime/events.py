@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application.agent_runtime.contracts import (
     EVENT_RUN_CLOSED,
     EVENT_RUN_OPENED,
@@ -103,7 +104,7 @@ def emit_run_opened(run_id: str, session_id: str | None, trace=None) -> int:
             event_type=EVENT_RUN_OPENED,
             run_id=run_id,
             session_id=session_id,
-            occurred_at=datetime.now(),
+            occurred_at=timeutil.now(),
         ),
         trace,
     )
@@ -127,7 +128,7 @@ def emit_stage_completed(
             event_type=EVENT_STAGE_COMPLETED,
             run_id=run_id,
             session_id=session_id,
-            occurred_at=datetime.now(),
+            occurred_at=timeutil.now(),
             payload=body,
             correlation_id=correlation_id,
         ),
@@ -143,7 +144,7 @@ def emit_run_closed(
             event_type=EVENT_RUN_CLOSED,
             run_id=run_id,
             session_id=session_id,
-            occurred_at=datetime.now(),
+            occurred_at=timeutil.now(),
             payload={"status": status},
         ),
         trace,

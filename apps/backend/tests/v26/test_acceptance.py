@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi import HTTPException
 
+from app.core import timeutil
 from app.api.v1 import action_execution as debug_api
 from app.core.settings import get_settings
 from app.models.action import ActionResult, ActionIntent, transition_action
@@ -120,11 +121,11 @@ class TestSystemFlowAcceptance:
             params={"content": "调度验收", "due_at": "明早"},
         )
         scheduler.schedule(
-            action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1)
+            action, when="delay", scheduled_at=timeutil.now() - timedelta(minutes=1)
         )
-        due = scheduler.due_actions(datetime.now())
+        due = scheduler.due_actions(timeutil.now())
         assert any(a.id == action.id for a in due)
-        head = scheduler.next_action(datetime.now())
+        head = scheduler.next_action(timeutil.now())
         assert head is not None
 
     def test_planning_bridge_dispatch(self, monkeypatch):
@@ -270,7 +271,7 @@ class TestRegressionCheck:
             assert flag not in Settings.model_fields, flag
 
     def test_schedule_step_always_runs(self):
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert result["status"] == "done"
         assert result["claimed"] == 0
 

@@ -52,7 +52,7 @@ V23_PRODUCE_SOURCE = (
     "logger.info(\"自治产行动日额度已满：%s\", user_id) return False "
     "intent = ActionIntent( action_type=action_type, confidence=\"confident\", "
     "params=_params_for_autonomy_action(action_type, now), "
-    "dedupe_key=f\"autonomy:{action_type}:{now.date().isoformat()}\", ) "
+    "dedupe_key=f\"autonomy:{action_type}:{timeutil.local(now).date().isoformat()}\", ) "
     "record = await run_action_planning( user_id, intent, session_id=session_id, source=\"autonomy\" ) "
     "return record is not None"
 )

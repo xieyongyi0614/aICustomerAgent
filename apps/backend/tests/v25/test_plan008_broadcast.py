@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import outbox_consumer
 from app.application.agent_runtime.trigger_router import evaluate_event_escalation
 from app.core.settings import get_settings
@@ -86,7 +87,7 @@ class TestTerminalBroadcast:
         assert [op["op"] for op in rows[0].payload["world_ops"]] == ["create_event"]
         assert _goal_events(goal.user_id) == []
 
-        stats = outbox_consumer.consume_pending(now=datetime.now())
+        stats = outbox_consumer.consume_pending(now=timeutil.now())
         assert stats["consumed"] == 1
         events = _goal_events(goal.user_id)
         assert len(events) == 1
@@ -114,7 +115,7 @@ class TestTerminalBroadcast:
         assert [item["goal_id"] for item in result["abandoned"]] == [goal.id]
         assert goal_repository.get_goal(goal.id).status == "abandoned"
 
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         events = _goal_events(goal.user_id)
         assert len(events) == 1
         assert events[0]["payload"]["outcome"] == "abandoned"
@@ -134,7 +135,7 @@ class TestTerminalBroadcast:
         assert [row.idempotency_key for row in _broadcast_rows()] == [
             f"{BROADCAST_PREFIX}{goal.id}"
         ]
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         events = _goal_events(goal.user_id)
         assert events[0]["payload"]["outcome"] == "abandoned"
 
@@ -145,7 +146,7 @@ class TestTerminalBroadcast:
         plan = make_plan(goal.id)
         OBSERVER.settle(goal, plan, _advance(goal, plan, "completed"))
         assert observer_mod.broadcast_goal_terminal(goal, "completed") is False
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         assert len(_goal_events(goal.user_id)) == 1
 
     def test_existing_write_faces_still_broadcast_on_their_own_paths(
@@ -177,7 +178,7 @@ class TestNoBroadcastNegatives:
         assert settlement.transitioned is True
         assert goal_repository.get_goal(goal.id).status == "failed"
         assert observer_mod.broadcast_goal_terminal(goal, "failed") is False
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         assert _goal_events(goal.user_id) == []
 
     @pytest.mark.parametrize(
@@ -193,7 +194,7 @@ class TestNoBroadcastNegatives:
             goal, plan, _advance(goal, plan, decision, reason="plan_step_advanced")
         )
         assert settlement.transitioned is False
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         assert _goal_events(goal.user_id) == []
 
     def test_already_settled_goal_is_not_broadcast_by_the_planning_layer(

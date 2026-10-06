@@ -7,6 +7,7 @@ V9 零直写 RelationshipState：信号经既有 apply_relationship_v5（三层�
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna.action import ACTION_RELATIONSHIP_MAP
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
@@ -50,7 +51,7 @@ def deliver_action_signal(record: ActionRecord, user_id: str) -> dict | None:
         events = relationship_event_repository.list_events(user_id, limit=500)
         if _same_turn_dialog_user_help(record, events):
             return None
-        now = datetime.now()
+        now = timeutil.now()
         relationship = relationship_repository.get_relationship(user_id)
         day_positive, day_negative = _day_impact_totals(user_id, now, events=events)
         new_relationship, applied = state_engine.apply_relationship_v5(

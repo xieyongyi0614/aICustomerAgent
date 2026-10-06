@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.models.world import WEEKDAY_CN, TimeContext, WorldTimeMode, part_of_day
 from app.repositories import world_repository, world_simulation_repository
 
@@ -26,17 +27,17 @@ class TimeMarkerDraft:
 
 
 def _is_weekend(now: datetime) -> bool:
-    return now.weekday() >= 5
+    return timeutil.local(now).weekday() >= 5
 
 
 def _day_start_draft(now: datetime) -> TimeMarkerDraft:
     return TimeMarkerDraft(
-        key=f"time:day_start:{now.date().isoformat()}",
+        key=f"time:day_start:{timeutil.local(now).date().isoformat()}",
         title="新的一天开始了",
         importance="normal",
         payload={
-            "date": now.date().isoformat(),
-            "weekday": WEEKDAY_CN[now.weekday()],
+            "date": timeutil.local(now).date().isoformat(),
+            "weekday": WEEKDAY_CN[timeutil.local(now).weekday()],
             "is_weekend": _is_weekend(now),
         },
     )
@@ -81,8 +82,8 @@ def compute_due_markers(
     if prev is None:
         drafts.append(_day_start_draft(curr.now))
         return drafts
-    prev_day = prev.now.date()
-    curr_day = curr.now.date()
+    prev_day = timeutil.local(prev.now).date()
+    curr_day = timeutil.local(curr.now).date()
     if curr_day != prev_day:
         drafts.append(_day_close_draft(prev_day))
         drafts.append(_day_start_draft(curr.now))
@@ -145,7 +146,7 @@ def _load_prev_context(world_id: str) -> TimeContext | None:
         time_mode = WorldTimeMode.REAL_SYNC
     return TimeContext(
         now=parsed,
-        weekday=WEEKDAY_CN[parsed.weekday()],
+        weekday=WEEKDAY_CN[timeutil.local(parsed).weekday()],
         part_of_day=part,
         time_mode=time_mode,
     )

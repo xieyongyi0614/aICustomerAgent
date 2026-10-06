@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import world_engine
 from app.repositories import action_repository, trigger_registry_repository
 from app.repositories.trigger_registry_repository import TERMINAL_STATUSES
@@ -25,11 +26,11 @@ def _schedule_due(user_id: str, content: str = "早上学习"):
         action_type="create_reminder",
         params={
             "content": content,
-            "due_at": (datetime.now() + timedelta(hours=1)).isoformat(),
+            "due_at": (timeutil.now() + timedelta(hours=1)).isoformat(),
         },
     )
     item = scheduler.schedule(
-        action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1)
+        action, when="delay", scheduled_at=timeutil.now() - timedelta(minutes=1)
     )
     return action, item
 
@@ -38,7 +39,7 @@ class TestScheduleExecution:
     def test_due_schedule_executes_and_closes(self, monkeypatch):
         _enabled(monkeypatch)
         action, _ = _schedule_due("u_t3_exec")
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert result["status"] == "done"
         assert result["claimed"] >= 1
         assert result["executed"] >= 1
@@ -53,7 +54,7 @@ class TestScheduleExecution:
     def test_trigger_done_after_execute(self, monkeypatch):
         _enabled(monkeypatch)
         action, _ = _schedule_due("u_t3_trig")
-        asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         row = trigger_registry_repository.get(f"action_schedule:{action.id}")
         assert row is not None
         assert row.status == "done"
@@ -61,9 +62,9 @@ class TestScheduleExecution:
     def test_second_tick_does_not_revive_trigger(self, monkeypatch):
         _enabled(monkeypatch)
         action, _ = _schedule_due("u_t3_norevive")
-        first = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        first = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert first["executed"] >= 1
-        second = asyncio.run(scheduler.step_action_schedule(datetime.now() + timedelta(seconds=1)))
+        second = asyncio.run(scheduler.step_action_schedule(timeutil.now() + timedelta(seconds=1)))
         assert second["executed"] == 0
         row = trigger_registry_repository.get(f"action_schedule:{action.id}")
         assert row is not None
@@ -73,7 +74,7 @@ class TestScheduleExecution:
             user_id="u_t3_norevive",
             trigger_type="action_due",
             trigger_key=f"action_schedule:{action.id}",
-            due_at=datetime.now(),
+            due_at=timeutil.now(),
             payload={"kind": "action_schedule", "action_id": action.id},
         )
         assert status in TERMINAL_STATUSES
@@ -84,12 +85,12 @@ class TestScheduleExecution:
         action = manager.create(
             user_id="u_t3_future",
             action_type="create_reminder",
-            params={"content": "未到期", "due_at": (datetime.now() + timedelta(hours=2)).isoformat()},
+            params={"content": "未到期", "due_at": (timeutil.now() + timedelta(hours=2)).isoformat()},
         )
         scheduler.schedule(
-            action, when="delay", scheduled_at=datetime.now() + timedelta(hours=1)
+            action, when="delay", scheduled_at=timeutil.now() + timedelta(hours=1)
         )
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         assert result["executed"] == 0
         loaded = action_repository.get_record(action.id)
         assert loaded is not None
@@ -104,7 +105,7 @@ class TestScheduleExecution:
         loaded = action_repository.get_record(action.id)
         loaded.status = "succeeded"
         action_repository.save_record(loaded)
-        result = asyncio.run(scheduler.step_action_schedule(datetime.now()))
+        result = asyncio.run(scheduler.step_action_schedule(timeutil.now()))
         schedule = action_repository.get_schedule(action.id)
         assert schedule is not None
         assert schedule.status == "executed"
@@ -117,7 +118,7 @@ class TestScheduleExecution:
         action, item = _schedule_due("u_t3_e2e", content="明早学习")
         assert item.status == "scheduled"
         assert action_repository.get_record(action.id).status == "planned"
-        stats = asyncio.run(scheduler.step_action_schedule(datetime.now() + timedelta(minutes=2)))
+        stats = asyncio.run(scheduler.step_action_schedule(timeutil.now() + timedelta(minutes=2)))
         assert stats["executed"] >= 1
         loaded = action_repository.get_record(action.id)
         assert loaded is not None
@@ -132,9 +133,9 @@ class TestClaimSchedule:
         action = manager.create(
             user_id="u_t3_cas",
             action_type="create_reminder",
-            params={"content": "CAS", "due_at": (datetime.now() + timedelta(hours=1)).isoformat()},
+            params={"content": "CAS", "due_at": (timeutil.now() + timedelta(hours=1)).isoformat()},
         )
-        scheduler.schedule(action, when="delay", scheduled_at=datetime.now() - timedelta(minutes=1))
+        scheduler.schedule(action, when="delay", scheduled_at=timeutil.now() - timedelta(minutes=1))
         claimed = action_repository.claim_due_schedule(action.id)
         assert claimed is not None
         assert claimed.status == "due"

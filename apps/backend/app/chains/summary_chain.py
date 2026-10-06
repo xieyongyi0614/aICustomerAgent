@@ -3,6 +3,7 @@ from datetime import datetime
 
 from langchain_core.prompts import ChatPromptTemplate
 
+from app.core import timeutil
 from app.core.llm_factory import get_llm
 from app.core.settings import get_settings
 from app.models.observability import LLM_CALL_ERROR, LLM_CALL_OK, CallSite
@@ -46,7 +47,7 @@ async def summarize(old_summary: str, new_messages: str, llm=None) -> str:
     capture = get_settings().observability_persist_enabled
     handler = UsageCallbackHandler() if capture else None
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
 
     if prompt_capture.enabled():
         prompt_capture.capture_prompt_snapshot(

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Any
 
+from app.core import timeutil
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
 from app.engines.autonomy import in_quiet_hours
@@ -71,7 +72,7 @@ def _category_line(summary_obj) -> str:
 
 def _render_daily(user_id: str, *, now: datetime) -> DigestPayload | None:
     period = Period.custom(
-        now.replace(hour=0, minute=0, second=0, microsecond=0),
+        timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0),
         now.replace(hour=23, minute=59, second=59, microsecond=999999),
         label="day",
     )
@@ -80,7 +81,7 @@ def _render_daily(user_id: str, *, now: datetime) -> DigestPayload | None:
         return None
     entries = list_entries(user_id, period=period, limit=5)
     lines = [
-        f"【日结】{now.date().isoformat()}",
+        f"【日结】{timeutil.local(now).date().isoformat()}",
         f"支出 {format_minor(data.expense_minor)}｜收入 {format_minor(data.income_minor)}｜净 {format_minor(data.net_minor)}",
         f"类目 {_category_line(data)}",
         f"条目 {data.entry_count}｜冲正 {data.reversal_count}",
@@ -97,7 +98,7 @@ def _render_daily(user_id: str, *, now: datetime) -> DigestPayload | None:
     return DigestPayload(
         kind="daily",
         period=period,
-        title=f"日结 {now.date().isoformat()}",
+        title=f"日结 {timeutil.local(now).date().isoformat()}",
         body=body,
         dedupe_key=dedupe_key("daily", period),
         summary=data,
@@ -116,7 +117,7 @@ def _render_weekly(user_id: str, *, now: datetime) -> DigestPayload | None:
         if item.expense_minor
     ) or "（无）"
     lines = [
-        f"【周报】{period.since.date().isoformat()} 起",
+        f"【周报】{timeutil.local(period.since).date().isoformat()} 起",
         f"支出 {format_minor(data.expense_minor)}｜收入 {format_minor(data.income_minor)}｜净 {format_minor(data.net_minor)}",
         f"类目 top {top_text}",
         f"条目 {data.entry_count}｜冲正 {data.reversal_count}",
@@ -129,7 +130,7 @@ def _render_weekly(user_id: str, *, now: datetime) -> DigestPayload | None:
     return DigestPayload(
         kind="weekly",
         period=period,
-        title=f"周报 {period.since.date().isoformat()}",
+        title=f"周报 {timeutil.local(period.since).date().isoformat()}",
         body=body,
         dedupe_key=dedupe_key("weekly", period),
         summary=data,
@@ -154,7 +155,7 @@ def should_send(payload: DigestPayload, *, now: datetime, settings=None) -> bool
     if payload.kind == "weekly":
         if weekday_token and now.strftime("%a").upper()[:3] != weekday_token[:3]:
             return False
-        if weekday_token == "" and now.weekday() != 6:
+        if weekday_token == "" and timeutil.local(now).weekday() != 6:
             return False
         if now.time() < send_at:
             return False
@@ -224,7 +225,7 @@ def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
     from app.core.settings import get_settings as _get_settings
     from app.repositories import user_repository
 
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     cfg = _get_settings()
     users = [row.id for row in user_repository.list_all(limit=50)]
     sent = 0
@@ -233,7 +234,7 @@ def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
         weekday_token, send_at = parse_send_time(cfg.ledger_digest_send_time)
         daily_payload = build_daily_digest(user_id, now=timestamp, settings=cfg)
         weekly_payload = None
-        if (not weekday_token and timestamp.weekday() == 6) or (
+        if (not weekday_token and timeutil.local(timestamp).weekday() == 6) or (
             weekday_token and timestamp.strftime("%a").upper()[:3] == weekday_token[:3]
         ):
             weekly_payload = build_weekly_digest(user_id, now=timestamp, settings=cfg)

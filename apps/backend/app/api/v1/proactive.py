@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.schemas import ProactiveActionOut, ProactivePendingOut
 from app.core.settings import get_settings
@@ -48,7 +49,7 @@ def ack(action_id: str, _user_id: str = Depends(require_user)):
     if action.status != "delivered":
         raise HTTPException(status_code=409, detail=f"action status is {action.status}")
     updated = proactive_repository.transition(
-        action_id, "acked", acked_at=datetime.now()
+        action_id, "acked", acked_at=timeutil.now()
     )
     if get_settings().observability_persist_enabled:
         try:

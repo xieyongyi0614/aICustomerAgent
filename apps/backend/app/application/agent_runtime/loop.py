@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application import agent_state_assembler
 from app.core import clock as logical_clock
 from app.application.agent_runtime import controller, events as event_bus, profiles
@@ -254,7 +255,7 @@ class AgentLoop:
         self.user_id = user_id
         self.run_context = run
         self.llm = llm
-        self.now = now or datetime.now()
+        self.now = timeutil.ensure_aware(now) or timeutil.now()
         self.trace = trace
         self.stages = resolve_stages(spec)
         self.runtime_input: RuntimeInput | None = None
@@ -623,7 +624,7 @@ class AgentLoop:
                 self._status,
                 self._steps,
                 budget_state=budget_account,
-                now=datetime.now(),
+                now=timeutil.now(),
                 trace_ref=getattr(self.trace, "request_id", None),
             )
             event_bus.emit_run_closed(

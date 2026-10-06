@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application.agent_runtime import controller
 from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.controller import open_run, run_stage_async
@@ -512,10 +513,10 @@ class TestLedgerCloseGuard:
             user_id="u-race",
             kind="chat",
             reason="m5-race",
-            now=datetime.now() - timedelta(hours=2),
+            now=timeutil.now() - timedelta(hours=2),
         )
         candidates = loop_run_repository.list_running_started_before(
-            datetime.now() - timedelta(minutes=30)
+            timeutil.now() - timedelta(minutes=30)
         )
         assert any(row.id == run.id for row in candidates)
 
@@ -578,7 +579,7 @@ class TestNoPrivateServiceApi:
                 call_limit=10,
                 token_limit=1000,
                 reason="test",
-                checked_at=datetime.now(),
+                checked_at=timeutil.now(),
             )
 
         assert life_loop_budget.is_degraded_verdict(_verdict("degraded"))
@@ -609,7 +610,7 @@ class TestLlmCallAttribution:
     def test_count_by_request_is_trace_scoped(self, db_session_factory):
         from app.repositories import llm_call_repository
 
-        now = datetime.now()
+        now = timeutil.now()
         self._call("llm-a1", "trace-a", now)
         self._call("llm-a2", "trace-a", now)
         self._call("llm-b1", "trace-b", now)
@@ -621,7 +622,7 @@ class TestLlmCallAttribution:
         # （`save` 以落库时刻写 created_at，故窗口取宽区间）
         assert (
             llm_call_repository.count_calls_between(
-                now - timedelta(minutes=1), datetime.now() + timedelta(minutes=1)
+                now - timedelta(minutes=1), timeutil.now() + timedelta(minutes=1)
             )
             == 3
         )
@@ -630,7 +631,7 @@ class TestLlmCallAttribution:
         from app.application.agent_runtime import controller
         from app.repositories import loop_run_repository
 
-        now = datetime.now()
+        now = timeutil.now()
         run = loop_run_repository.create_run(
             user_id="u-m7", kind="chat", reason="m7", now=now
         )
@@ -666,7 +667,7 @@ class TestDegradedPromotion:
         from app.application.agent_runtime import controller
         from app.repositories import loop_run_repository
 
-        now = datetime.now()
+        now = timeutil.now()
         row = loop_run_repository.create_run(
             user_id="u-m9", kind="chat", reason="m9", now=now
         )
@@ -689,7 +690,7 @@ class TestDegradedPromotion:
     def test_run_degraded_flag_promotes_to_degraded(self):
         from app.application.agent_runtime import controller
 
-        now = datetime.now()
+        now = timeutil.now()
         run = controller.RunContext(
             run_id="r-m9-flag",
             user_id="u-m9",
@@ -704,7 +705,7 @@ class TestDegradedPromotion:
     def test_clean_done_stays_done(self):
         from app.application.agent_runtime import controller
 
-        now = datetime.now()
+        now = timeutil.now()
         run = controller.RunContext(
             run_id="r-m9-ok",
             user_id="u-m9",
@@ -732,7 +733,7 @@ class TestDegradedPromotion:
             run_kind="autonomous_tick",
             trigger_type="schedule",
             reason="m9",
-            started_at=datetime.now(),
+            started_at=timeutil.now(),
         )
         loop = AgentLoop(get_profile("autonomous_tick"), user_id="u-m9", run=run)
         loop._status = "done"

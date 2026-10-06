@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import Memory
 from app.core.settings import get_settings
 from app.models.relationship import (
@@ -174,7 +175,7 @@ class TestTimelineNarrativeLink:
             title="第一次袒露心事",
             now=NOW,
         )
-        now = datetime.now()
+        now = timeutil.now()
         with memory_repository.SessionLocal() as session:
             session.add(
                 Memory(

@@ -4,6 +4,7 @@
 窗体/数据类/门槛判定在此，聚合采集（DB/trace）见 `collectors`。
 """
 
+from app.core import timeutil
 from app.character.asuna import evaluation as asuna_evaluation
 from app.core.settings import get_settings
 from app.engines.memory_conflict import _lcs_length, same_topic
@@ -115,11 +116,6 @@ def _topic_similarity(left: str, right: str) -> float:
         return 0.0
     return _lcs_length(left, right) / longer
 
-def _naive(value: datetime | None) -> datetime | None:
-    if value is not None and value.tzinfo is not None:
-        return value.replace(tzinfo=None)
-    return value
-
 def _source_identity(memory_id: str, source_ref) -> str:
     if isinstance(source_ref, dict):
         ref_id = source_ref.get("id")
@@ -129,7 +125,8 @@ def _source_identity(memory_id: str, source_ref) -> str:
 
 def _member_weight(salience: float | None, reference: datetime | None, now: datetime) -> float:
     half_life = get_settings().memory_recency_half_life_days
-    reference = _naive(reference) or now
+    now = timeutil.ensure_aware(now)
+    reference = timeutil.ensure_aware(reference) or now
     days = max((now - reference).total_seconds() / 86400, 0.0)
     recency = 0.5 ** (days / half_life)
     return round((salience if salience is not None else _DEFAULT_SALIENCE) * recency, 6)
@@ -354,7 +351,7 @@ def tool_id_of_evidence_id(evidence_id: str) -> str | None:
     return parts[1] or None
 
 def _record_reference_time(record) -> datetime | None:
-    return _naive(record.executed_at) or _naive(record.updated_at) or _naive(
+    return timeutil.ensure_aware(record.executed_at) or timeutil.ensure_aware(record.updated_at) or timeutil.ensure_aware(
         record.created_at
     )
 
@@ -767,6 +764,7 @@ def _resolve_plan_facts(
     resolver,
 ) -> list[PlanStepFact]:
     """注入式事实（同一批事实供多窗复用）；未注入则按窗口只读投影。"""
+    now = timeutil.ensure_aware(now)
     if facts is not None:
         return facts
     return resolver(user_id, now, window_days)

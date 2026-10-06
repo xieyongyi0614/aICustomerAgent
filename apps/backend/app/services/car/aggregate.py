@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.repositories import car_repository, ledger_repository
 from app.services.ledger import query as ledger_query
 
@@ -73,7 +74,7 @@ def car_category_targets(user_id: str) -> list[CarCategoryTarget]:
 def _period_or_month(
     period: ledger_query.Period | None, now: datetime | None
 ) -> ledger_query.Period:
-    return period or ledger_query.Period.month(now or datetime.now())
+    return period or ledger_query.Period.month(timeutil.ensure_aware(now) or timeutil.now())
 
 
 def car_expense_breakdown(

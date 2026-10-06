@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.api.v1 import auth as auth_api
 from app.core.settings import get_settings
 from app.main import create_app
@@ -45,7 +46,7 @@ def _record(user_id: str, account_id: str, key: str, *, source: str, amount: int
         account_id=account_id,
         amount_minor=amount,
         direction="expense",
-        occurred_at=datetime.now(),
+        occurred_at=timeutil.now(),
         source=source,
         idempotency_key=key,
     )
@@ -53,7 +54,7 @@ def _record(user_id: str, account_id: str, key: str, *, source: str, amount: int
 
 
 def _seed_pending(user_id: str = USER, *, pending_key: str = "pk-stats") -> None:
-    now = datetime.now()
+    now = timeutil.now()
     pending_service.register_pending(
         user_id=user_id,
         session_id=SESSION,

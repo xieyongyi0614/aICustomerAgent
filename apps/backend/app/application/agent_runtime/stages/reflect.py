@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application.agent_runtime.contracts import DEFAULT_CHARACTER_ID
 from app.core.settings import get_settings
 
@@ -166,7 +167,7 @@ async def reflect(
         now
         or getattr(run, "started_at", None)
         or getattr(session_context, "started_at", None)
-        or datetime.now()
+        or timeutil.now()
     )
     if not reflect_enabled():
         _record_trace(trace, status="skipped", reason=REASON_DISABLED)

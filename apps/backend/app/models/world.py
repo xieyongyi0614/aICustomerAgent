@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core import timeutil
 from app.models.observability import bound_extra, bound_text
 from app.models.world_simulation import WorldBrief
 
@@ -73,13 +74,13 @@ WEEKDAY_CN = ("周一", "周二", "周三", "周四", "周五", "周六", "周�
 
 
 def part_of_day(now: datetime) -> str:
-    if 5 <= now.hour < 11:
+    if 5 <= timeutil.local(now).hour < 11:
         return "morning"
-    if 11 <= now.hour < 14:
+    if 11 <= timeutil.local(now).hour < 14:
         return "afternoon"
-    if 14 <= now.hour < 18:
+    if 14 <= timeutil.local(now).hour < 18:
         return "dusk"
-    if 18 <= now.hour < 23:
+    if 18 <= timeutil.local(now).hour < 23:
         return "evening"
     return "late_night"
 

@@ -10,6 +10,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.chains.answer_chain import answer_max_tokens
 from app.core.db import DevelopmentStateRow
 from app.models.behavior_strategy import BehaviorDirective
@@ -35,7 +36,7 @@ class StubTrace:
 def _seed_modulation(
     session_factory, key, value, *, strength=0.8, insight_id="ins-w1", kind="preference"
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentStateRow(
@@ -181,7 +182,7 @@ def test_resolve_applies_overlay_to_directive(db_session_factory, override_setti
 def test_goal_weights_flip_selection(db_session_factory):
     from app.models.goal import GoalRecord
 
-    now = datetime.now()
+    now = timeutil.now()
     companion = GoalRecord(
         user_id=USER,
         type="user_care",

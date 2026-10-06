@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.settings import get_settings
 
+SESSION_TIMEZONE = "UTC"
+
 
 def create_engine_from_url(url: str | None = None):
     database_url = url or get_settings().database_url
@@ -13,9 +15,9 @@ def create_engine_from_url(url: str | None = None):
     if not database_url.startswith("postgresql"):
         raise ValueError(f"不支持的数据库 URL：{database_url}")
     settings = get_settings()
-    connect_args: dict = {}
+    session_options = [f"-c timezone={SESSION_TIMEZONE}"]
     if settings.db_statement_timeout_ms > 0:
-        connect_args["options"] = (
+        session_options.append(
             f"-c statement_timeout={settings.db_statement_timeout_ms}"
         )
     return create_engine(
@@ -24,7 +26,7 @@ def create_engine_from_url(url: str | None = None):
         max_overflow=settings.db_max_overflow,
         pool_recycle=settings.db_pool_recycle,
         pool_pre_ping=settings.db_pool_pre_ping,
-        connect_args=connect_args,
+        connect_args={"options": " ".join(session_options)},
     )
 
 

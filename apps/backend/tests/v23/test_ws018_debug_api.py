@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core import timeutil
 from app.api.v1.schemas import WorldSimulationOut
 from app.application import world_engine
 from app.main import app
@@ -42,7 +43,7 @@ def _seed_world(user: str) -> None:
         status="completed",
         idempotency_key=f"weather:{user}:2026-09-14",
     )
-    now = datetime.now()
+    now = timeutil.now()
     world_simulation_repository.save_plan(
         DailyPlan(
             id=world_simulation_repository.new_plan_id(),
@@ -107,7 +108,7 @@ async def test_plan_endpoint_and_date_validation(db_session_factory):
     assert resp.status_code == 200
     body = resp.json()
     assert body["enabled"] is True
-    assert body["date"] == datetime.now().date().isoformat()
+    assert body["date"] == timeutil.now().date().isoformat()
     rows = [b for b in body["blocks"] if b["activity"] == "晨间整理"]
     assert rows and rows[0]["variability_source"]
 
@@ -120,7 +121,7 @@ async def test_plan_endpoint_and_date_validation(db_session_factory):
 async def test_situations_endpoint_include_expired(db_session_factory):
     user = "ws018-sit"
     _seed_world(user)
-    now = datetime.now()
+    now = timeutil.now()
     world_simulation_repository.save_situation(
         UserSituation(
             id=world_simulation_repository.new_situation_id(),
@@ -160,7 +161,7 @@ async def test_tick_runs_maintenance(db_session_factory):
     assert body["result"]["advanced_minutes"] >= 0
     assert body["result"]["errors"] == []
     assert body["result"]["plan_summary"] is not None
-    assert body["result"]["plan_summary"]["date"] == datetime.now().date().isoformat()
+    assert body["result"]["plan_summary"]["date"] == timeutil.now().date().isoformat()
 
 
 @pytest.mark.asyncio
@@ -176,4 +177,4 @@ async def test_readonly_endpoints_do_not_mutate(db_session_factory):
 
     after = len(world_repository.list_events(world.world_id, limit=100))
     assert before == after
-    assert len(world_engine.build_debug_plan(user, datetime.now().date())) == 1
+    assert len(world_engine.build_debug_plan(user, timeutil.now().date())) == 1

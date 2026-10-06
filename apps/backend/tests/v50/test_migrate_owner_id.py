@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import UserRow
 def world_id_for(user_id: str) -> str:
     """存量世界行主键格式；本脚本只改写 legacy 行（ADR-16 C2 后新世界为雪花）。"""
@@ -40,7 +41,7 @@ def env():
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     UserRow.__table__.create(engine)
-    now = datetime.now()
+    now = timeutil.now()
     with engine.begin() as conn:
         for ddl in _CASCADE_DDL:
             conn.execute(text(ddl))
@@ -161,7 +162,7 @@ def test_user_without_email_is_refused(env):
 def test_existing_target_row_is_refused(env):
     engine, factory = env
     target = legacy_email_user_id(EMAIL)
-    now = datetime.now()
+    now = timeutil.now()
     with factory() as session:
         session.add(
             UserRow(

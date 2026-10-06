@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.models.observability import CallSite, PromptSnapshot
 from app.services.observability.prompt_capture import diff_prompt_snapshots
 
@@ -12,7 +13,7 @@ def _snapshot(snapshot_id="s1", call_site=CallSite.ANSWER, model="fake-a", secti
         model=model,
         messages=messages or [{"role": "system", "content": "hi"}],
         section_budget=section_budget,
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
 
 

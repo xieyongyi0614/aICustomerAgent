@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, MemoryCandidateRow
 from app.models.memory import MemoryCandidate, MemoryExtraction
 from app.services.memory import ingest
@@ -276,7 +277,7 @@ def _action_record(id, action_type, status, params=None):
 
     return ActionRecord(
         id=id, user_id="u1", character_id="asuna", action_type=action_type,
-        params=params or {}, status=status, created_at=datetime.datetime.now(),
+        params=params or {}, status=status, created_at=timeutil.now(),
     )
 
 
@@ -286,7 +287,7 @@ def _world_event(id, status, title, importance, user_id):
     return WorldEvent(
         id=id, world_id=f"home:{user_id}", type="reminder",
         title=title, importance=importance, status=status,
-        created_at=datetime.datetime.now(), updated_at=datetime.datetime.now(),
+        created_at=timeutil.now(), updated_at=timeutil.now(),
     )
 
 
@@ -299,5 +300,5 @@ def _relationship_event(id, user_id, type, cause=""):
         impact=RelationshipDelta(intimacy=0.03, trust=0.02, familiarity=0.01,
                                  tension=-0.01, respect=0.0, comfort=0.0),
         confidence=0.9, source="conversation", cause=cause,
-        created_at=datetime.datetime.now(),
+        created_at=timeutil.now(),
     )

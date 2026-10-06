@@ -18,6 +18,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.core import timeutil
 from app.chains.structured import build_structured_chain
 from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
@@ -185,7 +186,7 @@ def materialize(
 ) -> dict:
     """候选去重落库并触发规划；long_term 每 (layer, domain) 活跃唯一。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     active_layered = goal_repository.list_layered_active(user_id)
     long_term_keys = {
         (goal.layer, goal.domain) for goal in active_layered if goal.layer == "long_term"
@@ -463,7 +464,7 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         return {"status": "llm_failed", "error": exc.__class__.__name__}
 
     version = attempts + 1
-    now = datetime.now()
+    now = timeutil.now()
     plan = goal_repository.create_plan(
         GoalPlanRecord(
             goal_id=goal_id,
@@ -495,7 +496,7 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
 
 
 def _create_rejection(goal_id: str, attempts: int, reason: str) -> GoalPlanRecord | None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         return goal_repository.create_plan(
             GoalPlanRecord(

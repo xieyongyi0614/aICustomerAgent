@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.autonomy import ProactiveAction
 from app.models.evaluation_judge import ProactiveJudgeResult
 from app.repositories import evaluation_repository, proactive_repository
@@ -21,7 +22,7 @@ def make_judge_llm(fake_llm):
 
 
 def make_action(delivered_at: datetime | None = None) -> ProactiveAction:
-    now = datetime.now()
+    now = timeutil.now()
     return ProactiveAction(
         id=ACTION_ID,
         user_id="default-user",
@@ -39,8 +40,8 @@ def make_action(delivered_at: datetime | None = None) -> ProactiveAction:
 
 
 async def wait_report(timeout: float = 2.0):
-    deadline = datetime.now() + timedelta(seconds=timeout)
-    while datetime.now() < deadline:
+    deadline = timeutil.now() + timedelta(seconds=timeout)
+    while timeutil.now() < deadline:
         report = evaluation_repository.get_by_subject("proactive_action", ACTION_ID)
         if report is not None:
             return report
@@ -83,7 +84,7 @@ async def test_proactive_evaluation_saves_report(db_session_factory, fake_llm, e
 async def test_proactive_evaluation_quiet_hours_issue(
     db_session_factory, fake_llm, enable_evaluation
 ):
-    late_evening = datetime.now().replace(hour=23, minute=30, second=0)
+    late_evening = timeutil.now().replace(hour=23, minute=30, second=0)
     action = make_action(delivered_at=late_evening)
     proactive_repository.enqueue(
         action.model_copy(update={"status": "candidate", "payload_text": None})

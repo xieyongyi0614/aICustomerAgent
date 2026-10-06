@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.car import CarReminder
 
@@ -49,6 +50,7 @@ class ServiceDue:
 
 
 def add_months(value: datetime, months: int) -> datetime:
+    value = timeutil.local(value)
     month_index = value.month - 1 + months
     year = value.year + month_index // 12
     month = month_index % 12 + 1
@@ -63,6 +65,8 @@ def add_months(value: datetime, months: int) -> datetime:
 def age_text(purchased_at: datetime | None, now: datetime) -> str | None:
     if purchased_at is None:
         return None
+    purchased_at = timeutil.local(purchased_at)
+    now = timeutil.local(now)
     months = (now.year - purchased_at.year) * 12 + (now.month - purchased_at.month)
     if now.day < purchased_at.day:
         months -= 1
@@ -86,6 +90,8 @@ def service_due(
     now: datetime,
 ) -> ServiceDue | None:
     candidates: list[ServiceDue] = []
+    now = timeutil.ensure_aware(now)
+    anchor_at = timeutil.ensure_aware(anchor_at)
     if interval_km:
         due_km = anchor_km + interval_km
         remaining_km = due_km - odometer_km
@@ -102,7 +108,9 @@ def service_due(
     if interval_months:
         due_at = add_months(anchor_at, interval_months)
         total_days = max(1, (due_at - anchor_at).days)
-        remaining_days = (due_at - now).days
+        remaining_days = (
+        timeutil.ensure_aware(due_at) - timeutil.ensure_aware(now)
+    ).days
         candidates.append(
             ServiceDue(
                 basis="time",
@@ -200,12 +208,14 @@ def _due_reminder(
 ) -> CarReminder | None:
     if due_at is None:
         return None
-    remaining_days = (due_at - now).days
+    remaining_days = (
+        timeutil.ensure_aware(due_at) - timeutil.ensure_aware(now)
+    ).days
     level = "soon" if remaining_days <= days_before else "normal"
     return CarReminder(
         kind=kind,
         title=title,
-        detail=f"{due_at:%Y-%m-%d} 到期{suffix}",
+        detail=f"{timeutil.local(due_at):%Y-%m-%d} 到期{suffix}",
         due_at=due_at,
         level=level,
     )
@@ -217,10 +227,10 @@ def _restriction_reminder(profile, now: datetime) -> CarReminder | None:
     city = str(profile.restriction_city or "").strip()
     if not city or weekday is None or not digits:
         return None
-    days_ahead = (weekday - now.weekday()) % 7
+    days_ahead = (weekday - timeutil.local(now).weekday()) % 7
     if days_ahead == 0:
         days_ahead = 7
-    due_at = (now + timedelta(days=days_ahead)).replace(
+    due_at = (timeutil.local(now) + timedelta(days=days_ahead)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     detail = f"{city} · 尾号 {digits} 限行"
@@ -240,7 +250,7 @@ def derive(
     now: datetime | None = None,
     settings=None,
 ) -> ReminderBundle:
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     resolved = settings or get_settings()
     reminders: list[CarReminder] = []
     if profile is not None:

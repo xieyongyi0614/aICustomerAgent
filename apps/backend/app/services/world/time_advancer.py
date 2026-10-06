@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.world import World, WorldTimeMode
 from app.repositories import world_repository, world_simulation_repository
@@ -57,7 +58,7 @@ def advance_world_time(user_id: str, now: datetime | None = None) -> TimeAdvance
         world = world_repository.ensure_world(user_id)
         if world is None:
             return None
-        current = now or datetime.now()
+        current = timeutil.ensure_aware(now) or timeutil.now()
         if world.time_mode is WorldTimeMode.SIMULATED:
             return _advance_simulated(world, current)
         world_simulation_repository.commit_time_advance(world.world_id, world.sim_time, current)

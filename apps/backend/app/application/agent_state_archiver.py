@@ -8,6 +8,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.agent_state import AgentStateSnapshot
 from app.repositories import agent_state_snapshot_repository as snapshot_repo
@@ -25,12 +26,12 @@ def archive_if_significant(
     now: datetime | None = None,
 ) -> bool:
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     last = snapshot_repo.latest(user_id, character_id)
     if last is not None and not _interval_ok(last.created_at, now, settings):
         return False
     changed = last is None or _content_changed(last, snapshot)
-    fallback_due = last is None or last.created_at.date() < now.date()
+    fallback_due = last is None or timeutil.local(last.created_at).date() < timeutil.local(now).date()
     if not changed and not fallback_due:
         return False
     if changed:

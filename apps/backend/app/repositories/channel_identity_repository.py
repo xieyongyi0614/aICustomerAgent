@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core.db import ChannelIdentityRow, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def get_or_create(
     existing = find(channel, external_id)
     if existing is not None:
         return existing, False
-    now = datetime.now()
+    now = timeutil.now()
     row = ChannelIdentityRow(
         channel=channel,
         external_id=external_id,
@@ -90,7 +91,7 @@ def update_identity(
             row.session_id = session_id
         if display_name is not None:
             row.display_name = display_name
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.expunge(row)
         return row

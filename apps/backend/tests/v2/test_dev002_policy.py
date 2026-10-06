@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, DevelopmentStateRow, InsightRow
 from app.models.reflection import Insight, InsightDraft, ReflectionProposal
 from app.services.development import aggregate
@@ -215,7 +216,7 @@ def _seed_cluster_memory(session_factory, memory_id, *, created_at, content):
 
     from app.core.db import Memory
 
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -240,7 +241,7 @@ def _seed_cluster_memory(session_factory, memory_id, *, created_at, content):
 
 
 def _seed_fatigue(session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     for i in range(5):
         _seed_cluster_memory(
             session_factory,
@@ -253,7 +254,7 @@ def _seed_fatigue(session_factory):
 def _seed_run(session_factory, run_id):
     from app.core.db import ReflectionRunRow
 
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             ReflectionRunRow(

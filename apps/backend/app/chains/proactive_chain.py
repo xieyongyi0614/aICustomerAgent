@@ -9,6 +9,7 @@ from datetime import datetime
 
 from langchain_core.prompts import ChatPromptTemplate
 
+from app.core import timeutil
 from app.core.llm_factory import get_llm
 from app.core.settings import get_settings
 from app.models.observability import LLM_CALL_ERROR, LLM_CALL_OK, CallSite
@@ -58,7 +59,7 @@ async def generate(
     trace=None,
 ) -> str | None:
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
     try:
         model = llm if llm is not None else get_llm()
         prompt = ChatPromptTemplate.from_messages(

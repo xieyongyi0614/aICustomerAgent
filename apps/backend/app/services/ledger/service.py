@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna.ledger_categories import SEED_CATEGORY_TREE
 from app.core.db import LedgerEntryRow
 from app.models.ledger import LedgerEntryDraft
@@ -130,7 +131,7 @@ def resolve_account_id(user_id: str, account_id: str | None = None) -> str:
 def ensure_user_bootstrap(
     user_id: str, *, now: datetime | None = None
 ) -> BootstrapReport:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     _account, account_created = ledger_repository.ensure_default_account(
         user_id, now=timestamp
     )

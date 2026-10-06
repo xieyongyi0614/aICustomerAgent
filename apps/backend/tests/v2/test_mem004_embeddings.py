@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core import llm_factory
 from app.core.db import Base, BackgroundJobRow, Memory as MemoryRow
 from app.core.settings import get_settings
@@ -80,8 +81,8 @@ def _memory(id, content, status="active", embedding=None):
                 importance=0.6,
                 status=status,
                 embedding=embedding,
-                created_at=datetime.datetime.now(),
-                updated_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
         )
         session.commit()
@@ -274,7 +275,7 @@ def _pending_candidate(id, content, source="user_stated"):
         salience=0.8,
         status="pending",
         visibility="private",
-        created_at=datetime.datetime.now(),
+        created_at=timeutil.now(),
     )
 
 

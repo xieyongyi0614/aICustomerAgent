@@ -7,6 +7,7 @@
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
 from app.engines import behavior as behavior_engine
@@ -67,13 +68,13 @@ def collect_life_loop_slice(
     from datetime import timedelta
 
 
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
     cutoff = now - timedelta(hours=window_hours)
     stale_cutoff = now - timedelta(
         seconds=2 * settings.job_running_timeout
     )
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
 
     runs = []
     for run in loop_run_repository.list_recent(user_id=user_id, limit=200):
@@ -194,7 +195,7 @@ def collect_goal_slice(
                 )
             )
     try:
-        cutoff = (now or datetime.now()) - timedelta(hours=window_hours)
+        cutoff = (timeutil.ensure_aware(now) or timeutil.now()) - timedelta(hours=window_hours)
         for record in decision_repository.search(
             user_id=user_id, kind="goal_lifecycle", since=cutoff, limit=500
         ):

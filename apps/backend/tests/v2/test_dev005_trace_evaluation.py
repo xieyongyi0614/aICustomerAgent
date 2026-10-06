@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow
 from app.main import app
 from app.services.development import aggregate
@@ -42,7 +43,7 @@ def _seed_state(
     status="active",
     kind="preference",
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentStateRow(
@@ -63,7 +64,7 @@ def _seed_state(
 
 
 def _seed_change(session_factory, change_id, state_id, *, insight_id="ins-5"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentChangeRow(
@@ -222,7 +223,7 @@ def test_build_db_report_counts(db_session_factory, override_settings):
     override_settings()
     from app.core.db import InsightRow
 
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             InsightRow(

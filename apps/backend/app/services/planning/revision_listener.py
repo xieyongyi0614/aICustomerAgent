@@ -57,6 +57,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.goal import LAYER_VALUES
 from app.models.plan import PlanRevision
@@ -330,7 +331,7 @@ def plan_revision_record(
         to_version=int(plan.version) + 1,
         reason=reason,
         trigger_source=reason,
-        at=at or datetime.now(),
+        at=at or timeutil.now(),
         evidence_refs=refs,
         kept_steps=plan_revision.PlanRevisionPolicy.kept_steps(plan),
     )

@@ -18,6 +18,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.repositories import briefing_preference_repository
 from app.services.briefing import weather
@@ -97,7 +98,7 @@ async def _compose_evening(
         orb_note=_ORB_FALLBACKS[_EVENING],
         cards=(_unfinished_card(open_count),),
         cta=_CTAS[_EVENING],
-        generated_at=datetime.now().isoformat(timespec="seconds"),
+        generated_at=timeutil.now().isoformat(timespec="seconds"),
     )
 
 
@@ -118,7 +119,7 @@ async def _compose_morning(
         orb_note=_morning_orb_note(snapshot),
         cards=(_weather_card(snapshot), _morning_task_card(open_count)),
         cta=_CTAS[_MORNING],
-        generated_at=datetime.now().isoformat(timespec="seconds"),
+        generated_at=timeutil.now().isoformat(timespec="seconds"),
     )
 
 

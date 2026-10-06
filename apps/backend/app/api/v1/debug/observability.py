@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.v1.auth import require_user
 from app.api.v1.deps import debug_surface_gate
+from app.core import timeutil
 from app.models.evaluation import EvaluationSubjectKind
 from app.repositories import (
     conversation_repository,
@@ -63,7 +64,7 @@ def list_llm_calls(
     limit: int = 100,
 ):
     since = (
-        datetime.now() - timedelta(hours=window_hours) if window_hours is not None else None
+        timeutil.now() - timedelta(hours=window_hours) if window_hours is not None else None
     )
     records = llm_call_repository.search(
         request_id=request_id,
@@ -78,7 +79,7 @@ def list_llm_calls(
 
 @observability_router.get("/debug/llm-calls/summary")
 def summary_llm_calls(window_hours: float = 24):
-    since = datetime.now() - timedelta(hours=window_hours)
+    since = timeutil.now() - timedelta(hours=window_hours)
     records = llm_call_repository.list_since(since)
     return summarize_llm_records(records, window_hours).model_dump(mode="json")
 
@@ -110,7 +111,8 @@ def get_prompt_snapshot(snapshot_id: str):
 
 @observability_router.get("/debug/metrics")
 def get_metrics(window_hours: float = 24, user_id: str | None = None):
-    since = datetime.now() - timedelta(hours=max(window_hours, 0.001))
+    window = timedelta(hours=max(window_hours, 0.001))
+    since = timeutil.now() - window
     traces = [
         trace
         for trace in trace_repository.list_since(since)
@@ -144,7 +146,7 @@ def list_decisions(
     limit: int = 50,
 ):
     since = (
-        datetime.now() - timedelta(hours=window_hours) if window_hours is not None else None
+        timeutil.now() - timedelta(hours=window_hours) if window_hours is not None else None
     )
     records = decision_repository.search(
         user_id=user_id,
@@ -232,7 +234,7 @@ def search_evaluations(
     limit: int = 20,
     include: str | None = None,
 ):
-    since = datetime.now() - timedelta(hours=max(window_hours, 0.001))
+    since = timeutil.now() - timedelta(hours=max(window_hours, 0.001))
     reports = evaluation_repository.list_since(since, verdict=verdict)
 
     def _match(report) -> bool:

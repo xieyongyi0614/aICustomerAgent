@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import LifeTaskRow, SessionLocal
 
@@ -18,7 +19,7 @@ def create_task(
     due_date: str | None = None,
     now: datetime | None = None,
 ) -> LifeTaskRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     row = LifeTaskRow(
         id=ids.new_id_str(),
         user_id=user_id,
@@ -67,7 +68,7 @@ def update_task(task_id: str, **fields) -> LifeTaskRow | None:
         for key, value in fields.items():
             if value is not None and hasattr(row, key):
                 setattr(row, key, value)
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         session.expunge(row)
@@ -75,11 +76,11 @@ def update_task(task_id: str, **fields) -> LifeTaskRow | None:
 
 
 def set_status(task_id: str, status: str) -> LifeTaskRow | None:
-    return update_task(task_id, status=status, completed_at=datetime.now() if status == "done" else None)
+    return update_task(task_id, status=status, completed_at=timeutil.now() if status == "done" else None)
 
 
 def list_due_reminders(user_id: str, now: datetime | None = None):
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         rows = (
             session.query(LifeTaskRow)

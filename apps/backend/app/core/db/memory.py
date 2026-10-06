@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     JSON,
@@ -14,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base, VectorType
+from app.core.db.base import Base, UtcDateTime, VectorType
 
 
 class Memory(Base):
@@ -38,21 +37,21 @@ class Memory(Base):
         String, nullable=False, default="active", server_default="active"
     )
     superseded_by: Mapped[str | None] = mapped_column(String, nullable=True)
-    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     embedding: Mapped[object | None] = mapped_column(VectorType, nullable=True)
     salience: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_reinforced_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
     last_decayed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
     forgotten_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
     merge_chain: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     source_ref: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -95,7 +94,7 @@ class MemoryCandidateRow(Base):
     )
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     visibility: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -114,7 +113,7 @@ class MemoryLinkRow(Base):
     memory_id: Mapped[str] = mapped_column(String, nullable=False)
     related_memory_id: Mapped[str] = mapped_column(String, nullable=False)
     relation: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

@@ -69,6 +69,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.services.world import engine_port as world_engine
 from app.core.agent_run_types import RUN_KIND_AUTONOMOUS_TICK, RunContext
 from app.character.asuna.scene_profiles import scene_profile_for
@@ -282,7 +283,7 @@ class PlanContextAssembler:
     ) -> PlanContext | PlanUnavailable:
         """装配 `PlanContext`；硬依赖缺失返回 `PlanUnavailable`（调用方跳过本轮规划）。"""
         settings = get_settings()
-        moment = now or datetime.now()
+        moment = timeutil.ensure_aware(now) or timeutil.now()
         resolved_goal = goal_repository.get_goal(goal.id)
         if resolved_goal is None:
             return PlanUnavailable(PLAN_UNAVAILABLE_GOAL_MISSING)

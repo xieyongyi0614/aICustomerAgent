@@ -11,6 +11,7 @@ Flag 关闭时零写入、零 LLM。
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.repositories import agent_metric_repository, conversation_repository
 from app.services.evaluation import agent as agent_evaluation
@@ -26,8 +27,8 @@ def run_evolution_tick(now: datetime | None = None) -> dict:
     指标快照按窗口幂等（同一窗口已落行则跳过，避免覆盖当日趋势基线）；
     人格编译与 Goal Rebalance 由引擎自身的周级限速兜底，可安全高频调用。
     """
-    now = now or datetime.now()
-    window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    now = timeutil.ensure_aware(now) or timeutil.now()
+    window_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     stats = {"users": 0, "snapshots": 0, "personality": 0, "rebalance": 0}
     for user_id in conversation_repository.list_user_ids():
         stats["users"] += 1

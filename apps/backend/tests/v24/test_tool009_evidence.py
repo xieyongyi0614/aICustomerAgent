@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.character.asuna import evaluation as asuna_evaluation
 from app.services.memory import sources as memory_sources
 from app.services.reflection import evidence as reflection_evidence
@@ -25,7 +26,7 @@ from tests.v24.tool009_support import (
     seed_tool_series,
 )
 
-NOW = datetime(2026, 9, 14, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0, 0))
 
 WINDOW_USAGE = asuna_evaluation.TOOL_WINDOW_USAGE_EFFECT
 WINDOW_RATE = asuna_evaluation.TOOL_WINDOW_ACTION_SUCCESS_RATE

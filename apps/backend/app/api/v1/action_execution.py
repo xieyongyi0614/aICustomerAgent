@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.deps import debug_surface_gate
 from app.repositories import action_repository
@@ -38,14 +39,14 @@ def get_execution_action(action_id: str):
 
 @action_execution_router.get("/debug/action-execution/schedules")
 def list_execution_schedules(now: datetime | None = None, limit: int = 50):
-    when = now or datetime.now()
+    when = timeutil.ensure_aware(now) or timeutil.now()
     schedules = action_repository.list_due_schedules(when, limit=max(1, min(limit, 200)))
     return [s.model_dump(mode="json") for s in schedules]
 
 
 @action_execution_router.get("/debug/action-execution/metrics")
 def execution_metrics(window_hours: float = 24):
-    since = datetime.now() - timedelta(hours=window_hours)
+    since = timeutil.now() - timedelta(hours=window_hours)
     statuses = ("created", "planned", "executing", "succeeded", "failed", "cancelled")
     buckets: dict[str, int] = {}
     total = 0

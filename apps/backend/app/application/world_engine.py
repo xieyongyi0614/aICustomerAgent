@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.character.asuna.world import (
     DEFAULT_HOUSEHOLD,
     HOME_LOCATIONS,
@@ -87,7 +88,7 @@ def move_object(user_id: str, object_id: str, location_id: str) -> WorldObject |
         if obj is None or obj.status is not ObjectStatus.ACTIVE:
             return None
         obj.location_id = location_id
-        obj.last_action_at = datetime.now()
+        obj.last_action_at = timeutil.now()
         world_repository.save_object(obj)
         return obj
     except Exception:
@@ -118,7 +119,7 @@ def apply_object_action(
             obj.quantity = round(max(0.0, obj.quantity - amount), 2)
         if obj.quantity <= 0:
             obj.status = ObjectStatus.DESTROYED
-        obj.last_action_at = datetime.now()
+        obj.last_action_at = timeutil.now()
         world_repository.save_object(obj)
         return obj
     except Exception:
@@ -237,8 +238,8 @@ def _restore_consumed(user_id: str, consumed: list[dict]) -> None:
         if obj is None:
             continue
         obj.quantity = round(obj.quantity + float(entry["consumed"]), 2)
-        obj.last_action_at = datetime.now()
-        obj.updated_at = datetime.now()
+        obj.last_action_at = timeutil.now()
+        obj.updated_at = timeutil.now()
         world_repository.save_object(obj)
 
 
@@ -267,8 +268,8 @@ def consume_object(
         obj.quantity = remaining
         if remaining == 0:
             obj.state = "empty"
-        obj.last_action_at = datetime.now()
-        obj.updated_at = datetime.now()
+        obj.last_action_at = timeutil.now()
+        obj.updated_at = timeutil.now()
         world_repository.save_object(obj)
         return ConsumeResult(ok=True, object=obj, previous_quantity=previous)
     except Exception:
@@ -342,7 +343,7 @@ def seed_default_household(user_id: str) -> int:
             )
             if obj is not None:
                 obj.state = "available"
-                obj.last_action_at = datetime.now()
+                obj.last_action_at = timeutil.now()
                 world_repository.save_object(obj)
                 created += 1
         return created
@@ -357,7 +358,7 @@ def expire_due_objects(user_id: str, now: datetime | None = None) -> int:
         world = get_world(user_id)
         if world is None:
             return 0
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         expired = 0
         for obj in world_repository.list_objects(world.world_id):
             expiry_at = obj.properties.get("expiry_at")
@@ -484,7 +485,7 @@ def create_object(
         ):
             logger.warning("世界实体数达上限，拒绝新建：%s", user_id)
             return None
-        now = datetime.now()
+        now = timeutil.now()
         obj = WorldObject(
             id=world_repository.new_object_id(),
             world_id=world.world_id,
@@ -520,7 +521,7 @@ def set_environment(user_id: str, updated_by: str = "manual", **fields) -> World
             return None
         updates = {key: value for key, value in fields.items() if value is not None}
         updates["updated_by"] = updated_by
-        updates["updated_at"] = datetime.now()
+        updates["updated_at"] = timeutil.now()
         world.environment = world.environment.model_copy(update=updates)
         world_repository.save_world(world)
         return world
@@ -550,7 +551,7 @@ def snapshot(user_id: str, label: str | None = None) -> StateSnapshot | None:
         world = ensure_world(user_id)
         if world is None:
             return None
-        now = datetime.now()
+        now = timeutil.now()
         state = {
             "sim_time": world.sim_time.isoformat() if world.sim_time else None,
             "current_location": world.current_location,
@@ -666,7 +667,7 @@ def record_character_action_event(
                 if event.payload.get("dedupe_key") == dedupe_key:
                     return event
 
-        now = datetime.now()
+        now = timeutil.now()
         event = WorldEvent(
             id=world_repository.new_event_id(),
             world_id=world.world_id,
@@ -791,7 +792,7 @@ def create_event(
         ):
             _record_event_quota_drop(event_type, user_id)
             return None
-        now = datetime.now()
+        now = timeutil.now()
         event = WorldEvent(
             id=world_repository.new_event_id(),
             world_id=world.world_id,
@@ -848,7 +849,7 @@ def _transition_events_by_type(
         world = get_world(user_id)
         if world is None:
             return []
-        now = datetime.now()
+        now = timeutil.now()
         changed: list[WorldEvent] = []
         for event in world_repository.list_events(
             world.world_id, statuses=["scheduled", "active"]
@@ -885,7 +886,7 @@ def trigger_due_events(user_id: str, now: datetime | None = None) -> int:
         world = get_world(user_id)
         if world is None:
             return 0
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         triggered = 0
         for event in world_repository.list_due_events(world.world_id, now):
             event.status = EventStatus.ACTIVE
@@ -906,7 +907,7 @@ def expire_stale_events(user_id: str, now: datetime | None = None) -> int:
         if world is None:
             return 0
         settings = get_settings()
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         grace = timedelta(hours=settings.world_event_grace_hours)
         expired = 0
         for event in world_repository.list_events(world.world_id, statuses=["active"]):
@@ -1006,7 +1007,7 @@ def run_turn_update(user_id: str, message: str, trace=None) -> int:
                     update={
                         "lighting": suggestion,
                         "updated_by": "system",
-                        "updated_at": datetime.now(),
+                        "updated_at": timeutil.now(),
                     }
                 )
                 applied += 1
@@ -1110,9 +1111,9 @@ def _attach_world_brief(user_id: str, world, time_ctx, context, settings):
         from app.services.world import user_situation as situation_service
         from app.services.world import world_brief as brief_service
 
-        minutes = time_ctx.now.hour * 60 + time_ctx.now.minute
+        minutes = timeutil.local(time_ctx.now).hour * 60 + time_ctx.now.minute
         plans = daily_plan_service.get_day_plan(
-            user_id, time_ctx.now.date()
+            user_id, timeutil.local(time_ctx.now).date()
         )
         active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
         block = active[0] if active else None
@@ -1138,8 +1139,8 @@ def _attach_world_impacts(user_id: str, facts: dict, now) -> dict:
         from app.services.world import daily_plan, event_impact, user_situation
 
         context: dict = {"part_of_day": facts.get("part_of_day")}
-        minutes = now.hour * 60 + now.minute
-        block = daily_plan.get_current_block(user_id, now.date(), minutes)
+        minutes = timeutil.local(now).hour * 60 + now.minute
+        block = daily_plan.get_current_block(user_id, timeutil.local(now).date(), minutes)
         context["current_block"] = (
             {
                 "activity": block.activity,
@@ -1267,7 +1268,7 @@ def _rank_drafts(drafts: list[dict]) -> list[dict]:
 def _digest_idempotency_key(user_id: str, drafts: list[dict]) -> str:
     """world_digest 幂等键：由被折叠内容的幂等键集合确定性派生。
 
-    不用 datetime.now()：秒级时间戳在同一秒内多次 tick 会碰撞，且时钟回拨
+    不用 timeutil.now()：秒级时间戳在同一秒内多次 tick 会碰撞，且时钟回拨
     会产生重复摘要。派生键保证"同一批被折叠事件 → 同一摘要键"。
     """
     keys = sorted(str(d.get("idempotency_key") or "") for d in drafts)
@@ -1320,13 +1321,13 @@ def _run_simulation_substeps(user_id: str, now: datetime) -> None:
     world = get_world(user_id)
     if world is not None:
         world_now = _default_provider.now(world)
-        plans = daily_plan.ensure_day_plan(user_id, world_now.date(), world_now)
+        plans = daily_plan.ensure_day_plan(user_id, timeutil.local(world_now).date(), world_now)
         if plans:
             daily_plan.advance_daily_plan(user_id, world_now)
         else:
             logger.info("当日计划缺失且构建失败（user=%s）", user_id)
         if _day_rolled_over(marker_keys):
-            daily_plan.prune_expired_plans(user_id, world_now.date())
+            daily_plan.prune_expired_plans(user_id, timeutil.local(world_now).date())
 
 
 def _day_rolled_over(marker_keys: list[str]) -> bool:
@@ -1348,7 +1349,7 @@ def run_simulation_maintenance(user_id: str | None = None, now: datetime | None 
     for world in worlds:
         if world is None:
             continue
-        step_now = now or datetime.now()
+        step_now = timeutil.ensure_aware(now) or timeutil.now()
         result = advance_world_time(world.user_id, step_now)
         if result is not None:
             results.append(result)
@@ -1386,7 +1387,7 @@ def build_debug_simulation(user_id: str) -> dict | None:
         from app.models.world_simulation import DailyPlanStatus
         from app.services.world import daily_plan as daily_plan_service
 
-        plans = daily_plan_service.get_day_plan(user_id, time_ctx.now.date())
+        plans = daily_plan_service.get_day_plan(user_id, timeutil.local(time_ctx.now).date())
         active = [p for p in plans if p.status == DailyPlanStatus.ACTIVE]
         block = active[0] if active else None
     except Exception:
@@ -1508,9 +1509,9 @@ def run_debug_tick(user_id: str) -> dict:
         world = get_world(user_id)
         if world is not None:
             now = _default_provider.now(world)
-            plans = daily_plan_service.get_day_plan(user_id, now.date())
+            plans = daily_plan_service.get_day_plan(user_id, timeutil.local(now).date())
             plan_summary = {
-                "date": now.date().isoformat(),
+                "date": timeutil.local(now).date().isoformat(),
                 "total": len(plans),
                 "active": sum(1 for p in plans if p.status.value == "active"),
                 "completed": sum(1 for p in plans if p.status.value == "completed"),

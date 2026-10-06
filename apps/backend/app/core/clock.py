@@ -9,6 +9,7 @@
 
 import contextvars
 from datetime import datetime
+from app.core import timeutil
 
 _logical_now: contextvars.ContextVar[datetime | None] = contextvars.ContextVar(
     "logical_now", default=None
@@ -27,4 +28,4 @@ def unbind(token: contextvars.Token) -> None:
 def logical_now() -> datetime:
     """当前逻辑时间：已绑定周期则为其 `now`，否则为真实本地时间。"""
     bound = _logical_now.get()
-    return datetime.now() if bound is None else bound
+    return timeutil.now() if bound is None else bound

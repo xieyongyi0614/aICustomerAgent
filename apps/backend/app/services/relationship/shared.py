@@ -9,6 +9,7 @@ world_events 双人参与项）归并为时间序共同经历：账本行是事�
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.relationship import SharedExperience
 from app.repositories import (
@@ -50,7 +51,7 @@ def _ledger_entries(user_id: str) -> list[SharedExperience]:
                 entry_id=event.id,
                 kind="relationship_event",
                 title=_title(event.cause, "一次互动"),
-                occurred_at=event.created_at,
+                occurred_at=timeutil.ensure_aware(event.created_at),
                 source_ref={"table": "relationship_events", "id": event.id},
                 salience=event.confidence,
             )
@@ -75,7 +76,7 @@ def _memory_entries(
             entry_id=row.id,
             kind=row.type,
             title=_title(row.content, "一段相处"),
-            occurred_at=row.created_at,
+            occurred_at=timeutil.ensure_aware(row.created_at),
             source_ref={
                 "table": ref.get("table") or "memories",
                 "id": ref.get("id") or row.id,
@@ -106,7 +107,9 @@ def _world_entries(user_id: str) -> list[SharedExperience]:
                 entry_id=event.id,
                 kind="world_event",
                 title=_title(event.title, "一段共同经历"),
-                occurred_at=event.completed_at or event.created_at or datetime.min,
+                occurred_at=timeutil.ensure_aware(
+                    event.completed_at or event.created_at or datetime.min
+                ),
                 source_ref={"table": "world_events", "id": event.id},
                 salience=0.8 if importance == "high" else 0.6,
             )

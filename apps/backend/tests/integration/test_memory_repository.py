@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.memory import UserMemory
 from app.repositories import memory_repository as repo
 
@@ -84,7 +85,7 @@ class TestCreateMemory:
             )
 
     def test_expires_at_persisted(self, db_session_factory):
-        expires = datetime.now() + timedelta(days=1)
+        expires = timeutil.now() + timedelta(days=1)
         memory = repo.create_memory(
             user_id="u1",
             character_id="asuna",

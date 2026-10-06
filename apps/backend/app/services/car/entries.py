@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.models.car import (
     CAR_EXPENSE_KINDS,
     CAR_MILEAGE_KIND,
@@ -89,7 +90,7 @@ def record_car_expense(
         raise CarEntryError(
             f"idempotency_key 至少 {MIN_IDEMPOTENCY_KEY_LENGTH} 位"
         )
-    timestamp = occurred_at or now or datetime.now()
+    timestamp = occurred_at or timeutil.ensure_aware(now) or timeutil.now()
     if kind == CAR_MILEAGE_KIND and odometer_km is None:
         raise CarEntryError("里程记录必须带 odometer_km")
     if kind != CAR_MILEAGE_KIND and (amount_minor is None or amount_minor <= 0):

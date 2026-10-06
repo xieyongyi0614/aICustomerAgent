@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -16,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class LedgerAccountRow(Base):
@@ -32,8 +31,8 @@ class LedgerAccountRow(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active", server_default="active"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id", "name", name="uq_ledger_accounts_user_name"),
@@ -62,8 +61,8 @@ class LedgerCategoryRow(Base):
     is_seed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
@@ -102,7 +101,7 @@ class LedgerEntryRow(Base):
         String(3), nullable=False, default="CNY", server_default="CNY"
     )
     direction: Mapped[str] = mapped_column(String, nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     merchant: Mapped[str | None] = mapped_column(String, nullable=True)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False)
@@ -111,7 +110,7 @@ class LedgerEntryRow(Base):
     reversal_of: Mapped[str | None] = mapped_column(
         String, ForeignKey("ledger_entries.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -147,11 +146,11 @@ class LifeTaskRow(Base):
     tag: Mapped[str | None] = mapped_column(String, nullable=True)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
     order_reason: Mapped[str | None] = mapped_column(String, nullable=True)
-    remind_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    remind_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     due_date: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     __table_args__ = (
         CheckConstraint("kind IN ('task', 'memo')", name="ck_life_tasks_kind"),

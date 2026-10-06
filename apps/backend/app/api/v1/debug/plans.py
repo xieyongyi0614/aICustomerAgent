@@ -6,6 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.debug.tools import _tool_registry
 from app.api.v1.deps import debug_surface_gate
@@ -333,7 +334,7 @@ async def get_plan_context(user_id: str, goal_id: str):
         raise HTTPException(status_code=404, detail="目标不存在")
     try:
         assembled = await plan_context.PlanContextAssembler().assemble(
-            goal, run=None, now=datetime.now()
+            goal, run=None, now=timeutil.now()
         )
     except Exception:
         logger.exception("计划上下文装配失败，返回降级结构：%s", goal_id)
@@ -359,7 +360,7 @@ def list_plan_revisions(goal_id: str):
 def list_pending_plans(user_id: str):
     """待推进步骤（含 `off_surface` / 冷却中 / 前置失败原因）：每个被阻塞的活跃计划一行。"""
     settings = get_settings()
-    now = datetime.now()
+    now = timeutil.now()
     ctx = _schedule_context(user_id, settings, now)
     pending: list[PlanPendingRowOut] = []
     for goal, plan in goal_repository.list_active_plans(user_id):
@@ -385,7 +386,7 @@ def list_pending_plans(user_id: str):
 def list_plan_steps(plan_id: str):
     """步骤视图：绑定（`tool_id` / `binding_reason`）与 `blocked_reason` 逐条可读。"""
     plan, goal = _load_plan(plan_id)
-    ctx = _schedule_context(goal.user_id, get_settings(), datetime.now())
+    ctx = _schedule_context(goal.user_id, get_settings(), timeutil.now())
     return PlanStepsOut(steps=_plan_step_rows(plan, ctx))
 
 
@@ -393,7 +394,7 @@ def list_plan_steps(plan_id: str):
 def get_plan(plan_id: str):
     """单计划详情：本体 + 步骤 + 绑定 + 判据 + 推进历史（`decision_records` 投影）。"""
     plan, goal = _load_plan(plan_id)
-    ctx = _schedule_context(goal.user_id, get_settings(), datetime.now())
+    ctx = _schedule_context(goal.user_id, get_settings(), timeutil.now())
     return PlanDetailOut(
         plan=_plan_summary(plan).model_dump(mode="json"),
         steps=_plan_step_rows(plan, ctx),

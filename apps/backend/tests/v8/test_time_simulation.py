@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import world_engine
 from app.models.world import EventStatus, ObjectStatus
 from app.repositories import world_repository
@@ -15,7 +16,7 @@ def test_time_advance_drives_event_and_expiry(db_session_factory, override_setti
         event_type="interview",
         title="用户的面试",
         importance="high",
-        due_at=datetime.now() + timedelta(hours=2),
+        due_at=timeutil.now() + timedelta(hours=2),
         source="manual",
     )
     world_engine.create_object(
@@ -23,7 +24,7 @@ def test_time_advance_drives_event_and_expiry(db_session_factory, override_setti
         name="西瓜",
         category="food",
         location_id="home.living_room",
-        expiry_at=(datetime.now() + timedelta(hours=1)).isoformat(),
+        expiry_at=(timeutil.now() + timedelta(hours=1)).isoformat(),
     )
 
     world_engine.advance_time("default-user", timedelta(days=2))

@@ -11,6 +11,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
 from app.repositories import goal_repository
@@ -196,7 +197,7 @@ def _low_relevance_signals(goal, facts: dict, min_days: int) -> tuple[bool, bool
         if _description_bigrams(goal.description) & _description_bigrams(content):
             signal_memory = False
             break
-    window_start = facts.get("now", datetime.now()) - timedelta(days=min_days)
+    window_start = facts.get("now", timeutil.now()) - timedelta(days=min_days)
     signal_action = not any(
         record.get("created_at") is not None
         and record.get("created_at") >= window_start
@@ -215,9 +216,13 @@ def check_abandonment(user_id: str, facts: dict, now: datetime) -> dict:
             continue
         progress_at = _last_progress_at(goal, facts)
         if progress_at is None:
-            no_progress_days = (now - goal.created_at).days
+            no_progress_days = (
+                timeutil.ensure_aware(now) - timeutil.ensure_aware(goal.created_at)
+            ).days
         else:
-            no_progress_days = (now - progress_at).days
+            no_progress_days = (
+                timeutil.ensure_aware(now) - timeutil.ensure_aware(progress_at)
+            ).days
         if no_progress_days < min_days:
             continue
         signal_memory, signal_action = _low_relevance_signals(goal, facts, min_days)

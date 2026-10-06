@@ -11,7 +11,7 @@ from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-from app.core import ids
+from app.core import ids, timeutil
 
 
 class TraceKind(StrEnum):
@@ -174,7 +174,7 @@ class DecisionRecord(BaseModel):
     confidence: float | None = None
     outcome: str | None = None
     candidates: dict[str, Any] | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 class PromptSnapshot(BaseModel):
@@ -187,7 +187,7 @@ class PromptSnapshot(BaseModel):
     messages: list[dict[str, Any]] = []
     section_budget: dict[str, Any] | None = None
     truncated: bool = False
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 class LlmCallRecord(BaseModel):
@@ -206,7 +206,7 @@ class LlmCallRecord(BaseModel):
     cost_estimate: float | None = None
     error_kind: str | None = None
     started_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 def estimate_cost(
@@ -291,7 +291,7 @@ class BusinessMetrics(BaseModel):
 
 class MetricReport(BaseModel):
     window_hours: float
-    generated_at: datetime = Field(default_factory=datetime.now)
+    generated_at: datetime = Field(default_factory=timeutil.now)
     pipeline: PipelineMetrics = PipelineMetrics()
     llm: LlmMetrics = LlmMetrics()
     quality: QualityMetrics = QualityMetrics()

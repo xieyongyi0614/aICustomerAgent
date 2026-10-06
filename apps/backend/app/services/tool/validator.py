@@ -24,6 +24,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.models.tool import ToolDefinition, ToolParameter, ValidationReport
 from app.services.tool.context import ToolContext
 
@@ -298,16 +299,16 @@ def _ctx_world_locations(ctx: ToolContext | None) -> Any:
 
 
 def _comparable(left: datetime, right: datetime) -> tuple[datetime, datetime]:
-    """时区对齐：一侧带 tz 时先换算到本地墙钟再取 naive，避免 naive/aware 比较抛错。
+    """时区对齐：两侧统一经 `timeutil.ensure_aware` 归一到 aware UTC 后再比较；naive 一侧
+    按部署本地时区（GMT+8）解释。
 
     直接 `replace(tzinfo=None)` 会丢掉偏移量：UTC-aware 的 `due_at` 会被当成同一串
     本地时间，在 GMT+8 下凭空少 8 小时，把"半小时后"的提醒判成 `not_future`。
     """
-    if (left.tzinfo is None) == (right.tzinfo is None):
-        return left, right
-    if left.tzinfo is not None:
-        return left.astimezone().replace(tzinfo=None), right
-    return left, right.astimezone().replace(tzinfo=None)
+    return (
+        timeutil.ensure_aware(left) or left,
+        timeutil.ensure_aware(right) or right,
+    )
 
 
 def _as_texts(values: Any) -> set[str]:

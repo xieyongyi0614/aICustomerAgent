@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     Integer,
@@ -15,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class RuntimeTraceRow(Base):
@@ -29,14 +28,14 @@ class RuntimeTraceRow(Base):
     action_id: Mapped[str | None] = mapped_column(String, nullable=True)
     correlation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     duration_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     token_usage: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     model_name: Mapped[str | None] = mapped_column(String, nullable=True)
     meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -62,7 +61,7 @@ class PromptSnapshotRow(Base):
     messages: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     section_budget: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         Index("idx_prompt_snapshots_turn", "turn_id"),
@@ -88,8 +87,8 @@ class LlmCallRecordRow(Base):
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
     error_kind: Mapped[str | None] = mapped_column(String, nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -118,7 +117,7 @@ class DecisionRecordRow(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     outcome: Mapped[str | None] = mapped_column(String, nullable=True)
     candidates: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -140,7 +139,7 @@ class AgentStateSnapshotRow(Base):
     character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
     snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         Index("idx_agent_state_snapshots_user_created", "user_id", "created_at"),
@@ -153,11 +152,11 @@ class AgentMetricSnapshotRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
-    window_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    window_end: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    window_start: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    window_end: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     metrics: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     trend: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
@@ -186,7 +185,7 @@ class EvaluationReportRow(Base):
     issues: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     context_digest: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

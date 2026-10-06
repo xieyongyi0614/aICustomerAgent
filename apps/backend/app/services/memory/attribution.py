@@ -5,6 +5,7 @@
 no_data，不报错；只读旁路，不写任何业务状态。
 """
 
+from app.core import timeutil
 from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
 from app.repositories import trace_repository
 
@@ -150,7 +151,7 @@ def _collect_steps(
 ) -> list[dict]:
     from datetime import datetime, timedelta
 
-    cutoff = datetime.now() - timedelta(days=7)
+    cutoff = timeutil.now() - timedelta(days=7)
     traces = trace_repository.list_since(cutoff, limit=2000)
     steps: list[dict] = []
     for trace in traces:

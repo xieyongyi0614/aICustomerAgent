@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     Integer,
@@ -13,7 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class CarProfileRow(Base):
@@ -25,16 +24,16 @@ class CarProfileRow(Base):
     plate: Mapped[str | None] = mapped_column(String, nullable=True)
     trim_note: Mapped[str | None] = mapped_column(String, nullable=True)
     battery_kwh: Mapped[float | None] = mapped_column(Float, nullable=True)
-    purchased_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    purchased_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     odometer_km: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
-    insurance_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    insurance_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     insurance_note: Mapped[str | None] = mapped_column(String, nullable=True)
     insurance_annual_minor: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
-    inspection_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    inspection_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     inspection_note: Mapped[str | None] = mapped_column(String, nullable=True)
     charger_power_kw: Mapped[float | None] = mapped_column(Float, nullable=True)
     charger_note: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -45,8 +44,8 @@ class CarProfileRow(Base):
     restriction_city: Mapped[str | None] = mapped_column(String, nullable=True)
     restriction_digits: Mapped[str | None] = mapped_column(String, nullable=True)
     restriction_weekday: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_car_profiles_user"),
@@ -85,10 +84,10 @@ class CarLoanRow(Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     total_periods: Mapped[int] = mapped_column(Integer, nullable=False)
-    next_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    settled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    settled_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_car_loans_user"),
@@ -109,13 +108,13 @@ class CarServiceRecordRow(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     place: Mapped[str | None] = mapped_column(String, nullable=True)
     odometer_km: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     amount_minor: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    next_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     next_due_km: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ledger_entry_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -137,10 +136,10 @@ class CarMileageLogRow(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     odometer_km: Mapped[int] = mapped_column(Integer, nullable=False)
     delta_km: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint("odometer_km >= 0", name="ck_car_mileage_logs_odometer_km"),

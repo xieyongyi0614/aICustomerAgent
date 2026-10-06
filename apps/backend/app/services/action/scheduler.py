@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Sequence
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import Action, ActionSchedule
 from app.repositories import action_repository, trigger_registry_repository
@@ -18,7 +19,7 @@ CRON_DEFAULT_STEP_MINUTES = 1440
 
 
 def _now() -> datetime:
-    return datetime.now()
+    return timeutil.now()
 
 
 def _resolve_scheduled_at(

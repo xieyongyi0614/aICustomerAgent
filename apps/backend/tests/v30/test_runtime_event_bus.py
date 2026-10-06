@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application.agent_runtime import events
 from app.application.agent_runtime.contracts import (
     EVENT_RUN_CLOSED,
@@ -39,7 +40,7 @@ def _event(event_type: str = EVENT_RUN_OPENED, run_id: str = "r1", correlation_i
         event_type=event_type,
         run_id=run_id,
         session_id="s1",
-        occurred_at=datetime.now(),
+        occurred_at=timeutil.now(),
         correlation_id=correlation_id,
     )
 

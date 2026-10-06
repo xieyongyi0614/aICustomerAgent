@@ -3,6 +3,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.chains import state_update_chain, turn_analysis_chain
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState
@@ -62,7 +63,7 @@ def _day_impact_totals(
         logger.exception("当日事件账本读取失败，日上限按零已用处理")
         return positive, negative
     for event in events:
-        if event.created_at.date() != now.date():
+        if timeutil.local(event.created_at).date() != timeutil.local(now).date():
             continue
         for dim in RELATIONSHIP_DIMENSIONS_V85:
             value = getattr(event.impact, dim)
@@ -112,7 +113,7 @@ def load_snapshot(user_id: str, limit: int) -> StateSnapshotData:
 def load_states(user_id: str) -> tuple[CharacterState, RelationshipState]:
     character = character_state_repository.get_state(user_id)
     relationship = relationship_repository.get_relationship(user_id)
-    now = datetime.now()
+    now = timeutil.now()
     recovered = state_engine.apply_idle_recovery(character, now)
     decayed = state_engine.apply_emotion_decay(recovered, now)
     if decayed != recovered:
@@ -148,7 +149,7 @@ async def apply_and_save(
     llm=None,
     trace=None,
 ) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     started = time.perf_counter()
     decision = await state_update_chain.update(
         state, analysis, user_input, ai_reply, llm=llm

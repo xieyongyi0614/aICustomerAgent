@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, Memory, ReflectionRunRow
 from app.services.memory import job_worker as memory_job_worker
 from app.services.memory import lifecycle as memory_lifecycle
@@ -37,7 +38,7 @@ def _seed_cluster_memory(
     content="用户说最近加班很累",
     user_id=USER,
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -62,7 +63,7 @@ def _seed_cluster_memory(
 
 
 def _seed_passing_evidence(session_factory, *, count=5):
-    now = datetime.now()
+    now = timeutil.now()
     for i in range(count):
         _seed_cluster_memory(
             session_factory,
@@ -107,7 +108,7 @@ def reflection_on(override_settings):
 
 
 def test_no_evidence_day_skips_with_zero_llm(db_session_factory, reflection_on):
-    now = datetime.now()
+    now = timeutil.now()
     result = triggers.trigger_for_user(USER, CHARACTER, now=now)
     assert result == "skipped"
     runs = _runs(db_session_factory)
@@ -177,7 +178,7 @@ def test_quota_occupying_statuses_only(db_session_factory, reflection_on, monkey
     ]
     for index, (run_status, expected) in enumerate(cases):
         user = f"u-quota-{index}"
-        now = datetime.now()
+        now = timeutil.now()
         for i in range(5):
             _seed_cluster_memory(
                 db_session_factory,
@@ -247,7 +248,7 @@ def test_scheduled_tick_before_schedule_hour_idle(db_session_factory, reflection
 
 
 def test_scheduled_tick_skipped_day_writes_one_row(db_session_factory, reflection_on):
-    now = datetime.now().replace(hour=5, minute=0, second=0, microsecond=0)
+    now = timeutil.now().replace(hour=5, minute=0, second=0, microsecond=0)
     _seed_cluster_memory(db_session_factory, "mem-sparse", created_at=now - timedelta(days=1))
     assert triggers.run_reflection_trigger_tick(now=now) == 1
     runs = _runs(db_session_factory)
@@ -296,7 +297,7 @@ def test_trace_records_trigger_decision(db_session_factory, reflection_on):
 
 
 def test_day_bucket_key_format():
-    now = datetime(2026, 9, 6, 5, 0, 0)
+    now = timeutil.ensure_aware(datetime(2026, 9, 6, 5, 0, 0))
     assert triggers._day_bucket_key("u-1", now) == "reflect:u-1:2026-09-06"
 
 
@@ -315,7 +316,7 @@ def test_tick_hook_wiring_and_isolation(monkeypatch):
 
 
 def test_flush_returns_memory_ids(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_cluster_memory(db_session_factory, "m-flush", created_at=now)
     memory_lifecycle.record_reinforce("m-flush")
     flushed = memory_lifecycle.flush_reinforce_buffer()

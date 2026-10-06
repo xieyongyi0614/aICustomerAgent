@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.core import timeutil
 from app.application import agent_evolution_worker, agent_state_context
 from app.application.agent_runtime.models import RunContext
 from app.character.asuna import evolution as persona_evolution
@@ -30,7 +31,7 @@ from app.engines import decision as decision_pipeline
 from app.services.development import evolution
 from app.services.goal import stack as goal_stack
 
-NOW = datetime(2026, 9, 13, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 13, 12, 0, 0))
 USER = "review-fix-user"
 OTHER = "review-fix-other"
 

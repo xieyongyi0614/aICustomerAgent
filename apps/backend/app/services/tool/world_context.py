@@ -41,6 +41,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.services.world import engine_port as world_engine
 from app.character.asuna.scene_profiles import scene_profile_for
 from app.character.asuna.world import WORLD_LOCATION_REGISTRY
@@ -263,7 +264,7 @@ class WorldContextBuilder:
         moment = getattr(time_ctx, "now", None) or now
         try:
             block = daily_plan.get_current_block(
-                user_id, moment.date(), moment.hour * 60 + moment.minute
+                user_id, timeutil.local(moment).date(), timeutil.local(moment).hour * 60 + moment.minute
             )
             return _block_dict(block)
         except Exception as exc:
@@ -300,7 +301,7 @@ def build_tool_context(
 ) -> ToolContext:
     """总闸已开的调用方入口：预读八段并注入 `ToolContext`（失败逐段降级，不抛出）。"""
     resolved_settings = settings if settings is not None else ctx.settings
-    moment = now if now is not None else (ctx.now or datetime.now())
+    moment = now if now is not None else (timeutil.ensure_aware(ctx.now) or timeutil.now())
     facts = WorldContextBuilder(resolved_settings).build(
         ctx.user_id, now=moment, settings=resolved_settings
     )

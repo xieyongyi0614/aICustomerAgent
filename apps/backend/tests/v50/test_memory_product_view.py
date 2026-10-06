@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import Memory, RuntimeTraceRow
 from app.repositories import memory_repository, trace_repository
 from app.services.memory import product_view
@@ -15,7 +16,7 @@ pytestmark = pytest.mark.unit
 
 
 def _memory(**overrides) -> Memory:
-    now = overrides.pop("now", datetime.now())
+    now = overrides.pop("now", timeutil.now())
     values = {
         "id": "m1",
         "user_id": "u1",
@@ -59,13 +60,13 @@ def _trace(
         user_id="u1",
         turn_id=turn_id,
         status="complete",
-        started_at=started_at or datetime.now(),
+        started_at=started_at or timeutil.now(),
         duration_ms=1.0,
         steps=[{"name": product_view.RECEIPT_TRACE_STEP, "extra": extra}],
         events=[],
         token_usage={},
         meta={},
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
 
 
@@ -125,7 +126,7 @@ def test_groups_always_four_in_order_even_when_empty(db_session_factory):
 def test_only_active_rows_are_visible(db_session_factory):
     _seed(
         _memory(id="a", status="active"),
-        _memory(id="f", status="forgotten", forgotten_at=datetime.now()),
+        _memory(id="f", status="forgotten", forgotten_at=timeutil.now()),
         _memory(id="d", status="decayed"),
         _memory(id="s", status="superseded"),
         _memory(id="i", status="invalidated"),
@@ -157,8 +158,8 @@ def test_legacy_type_normalized_in_payload(db_session_factory):
 
 def test_added_this_week_counts_only_current_week(db_session_factory):
     _seed(
-        _memory(id="fresh", created_at=datetime.now()),
-        _memory(id="old", created_at=datetime.now() - timedelta(days=30)),
+        _memory(id="fresh", created_at=timeutil.now()),
+        _memory(id="old", created_at=timeutil.now() - timedelta(days=30)),
     )
     assert product_view.list_product_memories("u1").added_this_week == 1
 
@@ -200,7 +201,7 @@ def test_last_updated_is_updated_at(db_session_factory):
     stamp = datetime(2026, 9, 1, 8, 30)
     _seed(_memory(id="a", updated_at=stamp))
     item = product_view.list_product_memories("u1").groups[0].items[0]
-    assert item.last_updated == stamp.isoformat()
+    assert item.last_updated == timeutil.ensure_aware(stamp).isoformat()
 
 
 # --- 用途回执（§4.1.5） ---
@@ -237,14 +238,14 @@ def test_receipt_keeps_only_newest_per_kind(db_session_factory):
             trace_id="tr-old",
             kind="turn",
             returned=["m1"],
-            started_at=datetime.now() - timedelta(days=2),
+            started_at=timeutil.now() - timedelta(days=2),
             turn_id="old",
         ),
         _trace(
             trace_id="tr-new",
             kind="turn",
             returned=["m1"],
-            started_at=datetime.now(),
+            started_at=timeutil.now(),
             turn_id="new",
         ),
     )
@@ -291,7 +292,7 @@ def test_edit_updates_content_and_keeps_provenance(db_session_factory):
 
 
 def test_edit_rejects_non_active_row(db_session_factory):
-    _seed(_memory(id="m1", status="forgotten", forgotten_at=datetime.now()))
+    _seed(_memory(id="m1", status="forgotten", forgotten_at=timeutil.now()))
     with pytest.raises(product_view.MemoryNotFoundError):
         product_view.edit_memory("m1", "u1", content="x")
 

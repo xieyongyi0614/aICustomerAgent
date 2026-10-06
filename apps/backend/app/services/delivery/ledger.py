@@ -17,6 +17,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.repositories import feishu_delivery_ledger_repository
 
@@ -49,7 +50,7 @@ def idempotency_ttl_seconds() -> int:
 
 def _claim_sync(key: str) -> bool:
     ttl = idempotency_ttl_seconds()
-    now = datetime.now()
+    now = timeutil.now()
     try:
         claimed = feishu_delivery_ledger_repository.claim(
             key, now, now - timedelta(seconds=ttl)

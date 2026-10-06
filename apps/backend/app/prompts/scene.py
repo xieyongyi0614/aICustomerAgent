@@ -1,5 +1,4 @@
-from datetime import datetime
-
+from app.core import timeutil
 from app.models.scene import SceneContext, SceneState
 from app.models.world import WEEKDAY_CN
 
@@ -48,10 +47,13 @@ def build_scene_section(state: SceneState) -> str | None:
         return None
     lines = ["【当前场景】"]
     if state.last_active_at is not None:
-        now = datetime.now()
+        now = timeutil.local_now()
+        started = timeutil.ensure_aware(state.last_active_at).astimezone(
+            timeutil.LOCAL_TZ
+        )
         lines.append(
-            f"现在时间：{now:%Y-%m-%d %H:%M}（星期{WEEKDAY_CN[now.weekday()]}）；"
-            f"本场景开始于{state.last_active_at:%Y-%m-%d %H:%M}"
+            f"现在时间：{now:%Y-%m-%d %H:%M}（星期{WEEKDAY_CN[timeutil.local(now).weekday()]}）；"
+            f"本场景开始于{started:%Y-%m-%d %H:%M}"
         )
     if state.location is not None:
         lines.append(f"地点：{state.location}")

@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.models.memory import MemoryType, UserMemory
@@ -53,7 +54,7 @@ def _candidate(id, content, proposed_type, source="user_stated"):
         salience=0.8,
         status="pending",
         visibility="private",
-        created_at=datetime.datetime.now(),
+        created_at=timeutil.now(),
     )
     with memory_repository.SessionLocal() as session:
         session.add(row)
@@ -129,8 +130,8 @@ class TestPromotionNormalization:
                         type="goal",
                         importance=0.5,
                         status="active",
-                        created_at=datetime.datetime.now(),
-                        updated_at=datetime.datetime.now(),
+                        created_at=timeutil.now(),
+                        updated_at=timeutil.now(),
                     )
                 )
                 session.commit()
@@ -144,8 +145,8 @@ class TestPromotionNormalization:
                 type=memory_type,
                 content="内容",
                 importance=0.5,
-                created_at=datetime.datetime.now(),
-                updated_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
             assert memory.type == memory_type
 
@@ -163,8 +164,8 @@ class TestRetrieverAffinityAliases:
             type="important_event",
             content="内容",
             importance=0.5,
-            created_at=datetime.datetime.now(),
-            updated_at=datetime.datetime.now(),
+            created_at=timeutil.now(),
+            updated_at=timeutil.now(),
         )
         assert retriever._affinity_score(memory, {"experience"}) == 1.0
 

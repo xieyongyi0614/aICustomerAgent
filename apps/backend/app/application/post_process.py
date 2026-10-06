@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -231,7 +232,7 @@ def _register_followups(user_id: str, rows) -> None:
     的会话候选行；due = 最近一次 18:00（已过则顺延次日），消费端 `poll_due_followup`
     与登记表写入均为既有通道。
     """
-    now = datetime.now()
+    now = timeutil.now()
     for row in rows:
         keyword = trigger_evaluator.find_followup_event(row.content or "")
         if keyword is None:
@@ -565,7 +566,7 @@ def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
         from app.services.tool.surface import ToolSurfaceResolver
 
         registry = get_tool_registry()
-        now = datetime.now()
+        now = timeutil.now()
         surface = ToolSurfaceResolver(registry, settings).resolve(
             RUN_KIND_FOREGROUND_CHAT,
             ToolContext(
@@ -660,7 +661,7 @@ async def run_ledger_extraction(ctx: PostProcessContext) -> None:
         extraction = extract_ledger(
             ctx.user_input,
             message_id=ctx.session_id,
-            now=datetime.now(),
+            now=timeutil.now(),
             llm=ctx.llm,
         )
         decision = classify_extraction(
@@ -687,7 +688,7 @@ async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
         from app.services.ledger.confirmation import should_confirm
         from app.services.ledger.pending import expire_if_due, register_pending
 
-        now = datetime.now()
+        now = timeutil.now()
         expire_if_due(ctx.session_id, now=now)
         from app.chains.ledger_extraction_chain import extract_ledger
 

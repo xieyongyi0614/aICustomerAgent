@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date
 
+from app.core import timeutil
 from app.repositories import world_repository, world_simulation_repository
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def run_catch_up(user_id: str, now=None) -> dict:
         from app.models.world import WorldTimeMode
 
         ctx = world_engine._default_provider.context(world)
-        today = ctx.now.date()
+        today = timeutil.local(ctx.now).date()
         last_covered = _latest_covered_day(world.world_id, today)
         settings = world_engine.get_settings()
         plan = compute_catch_up_plan(last_covered, today, settings.catch_up_max_days)

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.tool import (
     PermissionProfile,
@@ -521,7 +522,7 @@ def test_s3_denied_request_marks_cancelled_and_never_grants(
     support.apply_flag_env(monkeypatch, PERMISSION_ON)
     settings = get_settings()
     service = _confirmation_service(settings)
-    now = datetime.now()
+    now = timeutil.now()
     request = service.request(
         invocation(SENSITIVE_TOOL_ID, {"content": "明天开会"}),
         _confirm_decision(),

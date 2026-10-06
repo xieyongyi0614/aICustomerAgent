@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import RelationshipMilestoneRow, SessionLocal
 from app.models.relationship import MilestoneRecord, RelationshipDelta
@@ -106,7 +107,7 @@ def create_milestone(
             applied_bonus=(applied_bonus or RelationshipDelta()).model_dump(),
             unlocks=list(unlocks),
             meta=meta,
-            created_at=now or datetime.now(),
+            created_at=timeutil.ensure_aware(now) or timeutil.now(),
         )
         session.add(row)
         session.commit()

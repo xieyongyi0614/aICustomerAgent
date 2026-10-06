@@ -38,6 +38,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable
 
+from app.core import timeutil
 from app.character.asuna.tool import (
     CONFIRM_PROMPT_DEFAULT,
     CONFIRM_PROMPT_FALLBACK,
@@ -471,7 +472,7 @@ def _step_default_deny(
 
 
 def _snapshot_now(snapshot: PermissionSnapshot) -> datetime:
-    return snapshot.now or datetime.now()
+    return timeutil.ensure_aware(snapshot.now) or timeutil.now()
 
 
 _PERMISSION_STEPS: tuple[

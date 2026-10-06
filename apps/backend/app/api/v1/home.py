@@ -7,6 +7,7 @@ from datetime import datetime, time, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.services.conversation import history as history_service
 from app.services.observability.analytics import track_event
@@ -81,7 +82,9 @@ class HomeSummary(BaseModel):
 
 
 def _day_start() -> datetime:
-    return datetime.combine(datetime.now().date(), time.min)
+    return datetime.combine(
+        timeutil.local_now().date(), time.min, tzinfo=timeutil.LOCAL_TZ
+    )
 
 
 def _day_end() -> datetime:
@@ -96,7 +99,7 @@ _MODE_LABELS = {
 
 
 def greeting_for(moment: datetime) -> str:
-    hour = moment.hour
+    hour = timeutil.local(moment).hour
     if hour < 5:
         return "夜深了"
     if hour < 11:
@@ -174,7 +177,7 @@ def home_summary(user_id: str = Depends(require_user)):
             conclusion="今天还没有记账 —— 亚丝娜",
         )
     return HomeSummary(
-        greeting=GreetingBlock(date_label="今天", greeting=greeting_for(datetime.now())),
+        greeting=GreetingBlock(date_label="今天", greeting=greeting_for(timeutil.now())),
         hero=HeroBlock(
             headline="今天也交给我吧",
             sub="亚丝娜已为你整理好今天的一切",

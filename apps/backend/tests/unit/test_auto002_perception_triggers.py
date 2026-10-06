@@ -7,10 +7,11 @@ context 承载；TriggerType 枚举不扩展（world_change 等属 G7 未来版�
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.autonomy import TriggerSignal
 from app.services.autonomy import trigger as trigger_evaluator
 
-NOW = datetime(2026, 9, 7, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 7, 12, 0, 0))
 
 
 def _tail(role: str = "ai") -> trigger_evaluator.SessionTail:

@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import Settings, get_settings
 from app.repositories import llm_call_repository
 
@@ -62,8 +63,8 @@ def check_daily_budget(
 ) -> BudgetState:
     """当日用量聚合 → ok|degraded；结果按日缓存 life_loop_budget_cache_seconds。"""
     settings = settings or get_settings()
-    now = now or datetime.now()
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    now = timeutil.ensure_aware(now) or timeutil.now()
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     cached = _CACHE.get(day_start.date())
     if (
         cached is not None

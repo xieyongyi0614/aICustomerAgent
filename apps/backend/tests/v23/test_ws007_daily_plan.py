@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.character.asuna.routine import ROUTINE_TEMPLATES, ROUTINE_VERSION
 from app.core.settings import get_settings
 from app.models.world_simulation import (
@@ -29,7 +30,7 @@ def sim_mode(monkeypatch):
 
 
 def _situation(user_id: str, dimension: SituationDimension, intensity: int = 4):
-    now = datetime.now()
+    now = timeutil.now()
     return UserSituation(
         id=repo.new_situation_id(),
         user_id=user_id,

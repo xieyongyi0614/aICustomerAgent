@@ -10,6 +10,7 @@ CAS pending→consumed；记忆候选由 P1 摄取补扫按 (source_table, sourc
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.repositories import outbox_repository, world_repository
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 def consume_pending(limit: int = 50, now: datetime | None = None) -> dict:
     """消费到期待处理行；返回批统计（scanned/consumed/retried/dead_lettered）。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     rows = outbox_repository.list_pending(now=now, limit=limit)
     stats = {
         "scanned": len(rows),

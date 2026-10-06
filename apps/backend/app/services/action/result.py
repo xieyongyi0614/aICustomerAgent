@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.models.action import (
     ActionEffect,
     ActionResult,
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
-    return datetime.now()
+    return timeutil.now()
 
 
 def make_result_id() -> str:

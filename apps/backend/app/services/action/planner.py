@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
+from app.core import timeutil
 from app.models.action import (
     ActionIntent,
     ActionPlan,
@@ -55,7 +56,7 @@ class GateSnapshot:
     world_available: bool = False
     active_object_names: list[str] = field(default_factory=list)
     active_reminder_titles: list[str] = field(default_factory=list)
-    now: datetime = field(default_factory=datetime.now)
+    now: datetime = field(default_factory=timeutil.now)
     run_kind: str = DEFAULT_RUN_KIND
     tool_context: ToolContext | None = None
     tool_surface: ToolSurface | None = None

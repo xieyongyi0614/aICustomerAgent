@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Index,
     Integer,
     JSON,
@@ -14,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class ProactiveActionRow(Base):
@@ -35,13 +34,13 @@ class ProactiveActionRow(Base):
     payload_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_retry_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    delivered_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     message_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    acked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    acked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -83,11 +82,11 @@ class ActionRecordRow(Base):
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
-    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_retry_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    executed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -111,11 +110,11 @@ class ActionScheduleRow(Base):
         String, nullable=False, unique=True, index=True
     )
     when_type: Mapped[str] = mapped_column(String, nullable=False)
-    scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    scheduled_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     status: Mapped[str] = mapped_column(String, nullable=False, default="scheduled")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -146,10 +145,10 @@ class BackgroundJobRow(Base):
         String, nullable=False, default="pending", server_default="pending"
     )
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    run_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -173,14 +172,14 @@ class TriggerRegistryRow(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="pending", server_default="pending"
     )
-    due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    due_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
-    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cooldown_until: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -209,10 +208,10 @@ class OutboxEventRow(Base):
         String, nullable=False, default="pending", server_default="pending"
     )
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_retry_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -243,9 +242,9 @@ class LoopRunRow(Base):
     llm_call_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     token_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     budget_state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

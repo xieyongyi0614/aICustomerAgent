@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.timeutil import now as _now
 from app.api.v1.auth import require_user
 from app.services.ledger import budget as budget_service
 from app.services.ledger import category as category_service
@@ -253,7 +254,7 @@ def get_summary(
     user_id: str = Depends(require_user),
 ):
     current = user_id
-    now = datetime.now()
+    now = _now()
     if period == "custom":
         if since is None or until is None:
             raise HTTPException(status_code=400, detail="custom 期间需要 since 与 until")
@@ -355,7 +356,7 @@ def create_entry(
         category_id=body.category_id,
         amount_minor=body.amount_minor,
         direction=body.direction,
-        occurred_at=body.occurred_at or datetime.now(),
+        occurred_at=body.occurred_at or _now(),
         merchant=body.merchant,
         note=body.note,
         source="manual",
@@ -417,7 +418,7 @@ def list_categories(user_id: str = Depends(require_user)):
 
 @ledger_router.get("/budgets", response_model=list[BudgetResponse])
 def list_budgets(user_id: str = Depends(require_user)):
-    checks = budget_service.check_all_budgets(user_id, now=datetime.now())
+    checks = budget_service.check_all_budgets(user_id, now=_now())
     out = []
     for check in checks:
         limit_minor, limit_text = _money(check.budget.limit_minor)
@@ -455,8 +456,8 @@ def upsert_budget(
         goal_id="",
         currency=body.currency,
     )
-    saved = budget_service.upsert_budget(spec, now=datetime.now())
-    check = budget_service.check_budget(user_id, saved, now=datetime.now())
+    saved = budget_service.upsert_budget(spec, now=_now())
+    check = budget_service.check_budget(user_id, saved, now=_now())
     limit_minor, limit_text = _money(saved.limit_minor)
     consumed_minor, consumed_text = _money(check.consumed_minor)
     return BudgetResponse(
@@ -565,7 +566,7 @@ def get_auto_summary(
     period: Literal["month", "week"] = Query(default="month"),
     user_id: str = Depends(require_user),
 ):
-    now = datetime.now()
+    now = _now()
     window = (
         query_service.Period.week(now)
         if period == "week"
@@ -604,7 +605,7 @@ def list_learned_rules(user_id: str = Depends(require_user)):
         for rule in category_service.list_learned_rules(user_id)
     ]
     return LearnedRulesResponse(
-        generated_at=datetime.now().isoformat(),
+        generated_at=_now().isoformat(),
         total=len(items),
         items=items,
     )
@@ -617,7 +618,7 @@ def classify_preview(
     user_id: str = Depends(require_user),
 ):
     result = category_service.classify_preview(
-        user_id, note, kind=kind, now=datetime.now()
+        user_id, note, kind=kind, now=_now()
     )
     is_fallback = result.reason in category_service.FALLBACK_REASONS
     return ClassifyPreviewResponse(

@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
@@ -33,7 +34,7 @@ def _clean_state():
 
 
 def _memory(id, content, type="user_preference", status="active", user_id="u1", embedding="[0.1]", salience=0.7):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             MemoryRow(

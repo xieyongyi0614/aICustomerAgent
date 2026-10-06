@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application.action_engine import run_action_planning, new_record
 from app.models.action import ActionIntent
 from app.services.action.planner import (
@@ -39,9 +40,9 @@ async def test_action_planning_records_created(override_settings, db_session_fac
 def test_duplicate_gate_rejects(override_settings, db_session_factory):
     override_settings()
     gsaf = get_settings()
-    snapshot = GateSnapshot(settings=gsaf, registry=get_capability_registry(), now=datetime.now())
+    snapshot = GateSnapshot(settings=gsaf, registry=get_capability_registry(), now=timeutil.now())
     snapshot.records = [
-        {"dedupe_key": "abc123", "status": "succeeded", "created_at": datetime.now()}
+        {"dedupe_key": "abc123", "status": "succeeded", "created_at": timeutil.now()}
     ]
     snapshot.active_count = 0
     snapshot.world_available = True
@@ -54,7 +55,7 @@ def test_duplicate_gate_rejects(override_settings, db_session_factory):
 
 def test_ambiguous_params_gate_rejects(override_settings, db_session_factory):
     override_settings()
-    snapshot = GateSnapshot(settings=get_settings(), registry=get_capability_registry(), now=datetime.now())
+    snapshot = GateSnapshot(settings=get_settings(), registry=get_capability_registry(), now=timeutil.now())
     intent = ActionIntent(
         action_type="create_reminder",
         confidence="ambiguous",
@@ -68,10 +69,10 @@ def test_ambiguous_params_gate_rejects(override_settings, db_session_factory):
 
 def test_assemble_plan_single_step(db_session_factory):
     settings = get_settings()
-    snapshot = GateSnapshot(settings=settings, registry=get_capability_registry(), now=datetime.now())
+    snapshot = GateSnapshot(settings=settings, registry=get_capability_registry(), now=timeutil.now())
     intent = _intent(content="吃早餐", due_at="08:00")
     intent.dedupe_key = "key-1"
-    plan = assemble_plan(intent, snapshot, datetime.now())
+    plan = assemble_plan(intent, snapshot, timeutil.now())
     assert plan is not None
     assert plan.steps
     assert plan.steps[0].capability == "reminder"
@@ -84,7 +85,7 @@ async def test_action_planning_e2e_makes_world_event(override_settings, db_sessi
     from app.application import world_engine
 
     override_settings()
-    due = (datetime.now() + timedelta(hours=1)).isoformat()
+    due = (timeutil.now() + timedelta(hours=1)).isoformat()
     record = await run_action_planning(USER, _intent(content="吃药", due_at=due))
     assert record is not None
     if record.status == "cancelled":

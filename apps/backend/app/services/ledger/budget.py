@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.repositories import goal_repository
 from app.services.ledger.query import Period, summary
 
@@ -94,7 +95,7 @@ def list_budgets(user_id: str, *, period: str | None = None) -> list[BudgetSpec]
 
 def upsert_budget(spec: BudgetSpec, *, now: datetime | None = None) -> BudgetSpec:
     """写入只经 goal_repository 计划面；同 scope+period+category 幂等更新。"""
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     existing = next(
         (
             item
@@ -152,7 +153,7 @@ def _period_for(period_name: str, now: datetime) -> Period:
 def check_budget(
     user_id: str, spec: BudgetSpec, *, now: datetime | None = None
 ) -> BudgetCheck:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     period = _period_for(spec.period, timestamp)
     data = summary(user_id, period=period, now=timestamp, compare_previous=False)
     if spec.scope == "category" and spec.category_id:

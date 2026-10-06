@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application import world_engine
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime import state as state_manager
@@ -293,7 +294,7 @@ async def reason(
         now
         or getattr(run, "started_at", None)
         or getattr(session_context, "started_at", None)
-        or datetime.now()
+        or timeutil.now()
     )
     trigger_kind = getattr(observation, "kind", None) or (
         runtime_input.kind if runtime_input is not None else None

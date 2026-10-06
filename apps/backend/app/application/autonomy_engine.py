@@ -24,6 +24,7 @@ import time
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.application import observability, world_engine
 from app.models.autonomy import ProactiveAction, TriggerSignal
@@ -326,7 +327,7 @@ def _collect_plan_facts(user_id: str, now: datetime | None = None) -> dict:
         if pair is None:
             return {}
         goal, plan = pair
-        moment = now or datetime.now()
+        moment = timeutil.ensure_aware(now) or timeutil.now()
         current = plan_scheduler.PlanScheduler.current_step(plan)
         facts = {
             "active_goal_id": goal.id,
@@ -352,7 +353,9 @@ def _params_for_autonomy_action(action_type: str, now: datetime) -> dict:
 
 
 def _autonomy_action_today(user_id: str, now: datetime) -> int:
-    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = timeutil.ensure_aware(now).astimezone(timeutil.LOCAL_TZ).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     records = action_repository.list_records(user_id, limit=200)
     return sum(
         1
@@ -381,7 +384,7 @@ async def _produce_autonomy_action(
         action_type=action_type,
         confidence="confident",
         params=_params_for_autonomy_action(action_type, now),
-        dedupe_key=f"autonomy:{action_type}:{now.date().isoformat()}",
+        dedupe_key=f"autonomy:{action_type}:{timeutil.local(now).date().isoformat()}",
     )
     record = await run_action_planning(
         user_id, intent, session_id=session_id, source="autonomy"
@@ -412,7 +415,7 @@ def _snapshot_for(
     ]
     late_night_start = get_settings().goal_late_night_start
     late_night_end = get_settings().goal_late_night_end
-    late_night = now.hour >= late_night_start or now.hour < late_night_end
+    late_night = timeutil.local(now).hour >= late_night_start or timeutil.local(now).hour < late_night_end
     selected = goal_service.select(
         goals,
         tension=relationship.tension,
@@ -776,7 +779,7 @@ async def _process_user(user_id: str, llm, now: datetime) -> str | None:
 
 
 async def tick(user_ids: list[str] | None = None, llm=None, now: datetime | None = None) -> list[str]:
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     users = user_ids or conversation_repository.list_user_ids()
     delivered_ids: list[str] = []
     for user_id in users:

@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import world_engine
 from app.application.autonomy_engine import _autonomy_action_today
 from app.character.asuna.action import ACTION_RELATIONSHIP_MAP
@@ -13,7 +14,7 @@ from app.services.action import manager, relationship_bridge
 
 
 def _due_at(hours: int = 2) -> str:
-    return (datetime.now() + timedelta(hours=hours)).isoformat()
+    return (timeutil.now() + timedelta(hours=hours)).isoformat()
 
 
 class TestRelationshipMapCoverage:
@@ -68,7 +69,7 @@ class TestRelationshipMapCoverage:
 class TestAutonomyQuotaCountsPlan:
     def test_plan_source_counts_toward_daily_limit(self, override_settings):
         override_settings()
-        now = datetime.now()
+        now = timeutil.now()
         user_id = "u_t7_quota"
         world_engine.ensure_world(user_id)
         action = manager.create(
@@ -87,7 +88,7 @@ class TestAutonomyQuotaCountsPlan:
 
     def test_conversation_source_not_counted(self, override_settings):
         override_settings()
-        now = datetime.now()
+        now = timeutil.now()
         user_id = "u_t7_conv"
         world_engine.ensure_world(user_id)
         action = manager.create(
@@ -138,4 +139,4 @@ class TestPlanBridgeSourceAndDelivery:
         ]
         assert action_events, "plan 成功必须投递 user_care 关系信号"
 
-        assert _autonomy_action_today(user_id, datetime.now()) >= 1
+        assert _autonomy_action_today(user_id, timeutil.now()) >= 1

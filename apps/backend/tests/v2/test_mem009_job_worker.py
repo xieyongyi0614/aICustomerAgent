@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, BackgroundJobRow, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.repositories import background_job_repository, memory_repository
@@ -50,9 +51,9 @@ def _enqueue(job_type="memory_decay", key="k1", payload=None, status="pending",
                 payload=payload or {},
                 status=status,
                 attempts=attempts,
-                run_at=run_at or datetime.datetime.now(),
+                run_at=run_at or timeutil.now(),
                 idempotency_key=key,
-                created_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
             )
         )
         session.commit()
@@ -89,7 +90,7 @@ class TestStateMachine:
             job_worker._JOB_HANDLERS, "memory_decay", lambda: executed.append(1)
         )
         _enqueue(key="k1")
-        done, retried, failed = job_worker._claim_and_execute(datetime.datetime.now())
+        done, retried, failed = job_worker._claim_and_execute(timeutil.now())
         assert (done, retried, failed) == (1, 0, 0)
         assert executed == [1]
         assert _job("k1").status == "done"
@@ -104,7 +105,7 @@ class TestStateMachine:
 
         monkeypatch.setitem(job_worker._JOB_HANDLERS, "memory_decay", _boom)
         _enqueue(key="k1")
-        now = datetime.datetime.now()
+        now = timeutil.now()
         done, retried, failed = job_worker._claim_and_execute(now)
         assert (done, retried, failed) == (0, 1, 0)
         job = _job("k1")
@@ -121,7 +122,7 @@ class TestStateMachine:
             raise RuntimeError("always")
 
         monkeypatch.setitem(job_worker._JOB_HANDLERS, "memory_decay", _boom)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _enqueue(key="k1")
         for _ in range(5):
             with job_worker.SessionLocal() as session:
@@ -138,15 +139,15 @@ class TestStateMachine:
     def test_unknown_job_type_fails_via_retry(self, job_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "job_retry_backoff_seconds", 0)
         _enqueue(job_type="mystery", key="k1")
-        job_worker._claim_and_execute(datetime.datetime.now())
+        job_worker._claim_and_execute(timeutil.now())
         job = _job("k1")
         assert job.status == "pending"
         assert "未知 job_type" in job.last_error
 
     def test_future_run_at_not_claimed(self, job_db):
-        future = datetime.datetime.now() + datetime.timedelta(hours=1)
+        future = timeutil.now() + datetime.timedelta(hours=1)
         _enqueue(key="k1", run_at=future)
-        done, retried, failed = job_worker._claim_and_execute(datetime.datetime.now())
+        done, retried, failed = job_worker._claim_and_execute(timeutil.now())
         assert (done, retried, failed) == (0, 0, 0)
         assert _job("k1").status == "pending"
 
@@ -159,12 +160,12 @@ class TestZombieRecovery:
         monkeypatch.setitem(
             job_worker._JOB_HANDLERS, "memory_decay", lambda: executed.append(1)
         )
-        stale = datetime.datetime.now() - datetime.timedelta(seconds=700)
+        stale = timeutil.now() - datetime.timedelta(seconds=700)
         _enqueue(key="k1", status="running", run_at=stale)
-        recovered = job_worker._recover_zombies(datetime.datetime.now())
+        recovered = job_worker._recover_zombies(timeutil.now())
         assert recovered == 1
         assert _job("k1").status == "pending"
-        done, _, _ = job_worker._claim_and_execute(datetime.datetime.now())
+        done, _, _ = job_worker._claim_and_execute(timeutil.now())
         assert done == 1
         assert _job("k1").status == "done"
         assert executed == [1]
@@ -172,16 +173,16 @@ class TestZombieRecovery:
     def test_zombie_attempts_respect_max(self, job_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "job_max_attempts", 5)
         monkeypatch.setattr(get_settings(), "job_running_timeout", 600)
-        stale = datetime.datetime.now() - datetime.timedelta(seconds=700)
+        stale = timeutil.now() - datetime.timedelta(seconds=700)
         _enqueue(key="k1", status="running", run_at=stale, attempts=4)
-        job_worker._recover_zombies(datetime.datetime.now())
+        job_worker._recover_zombies(timeutil.now())
         job = _job("k1")
         assert job.status == "failed"
         assert job.last_error == "zombie_recovered_max_attempts"
 
     def test_fresh_running_not_recovered(self, job_db):
-        _enqueue(key="k1", status="running", run_at=datetime.datetime.now())
-        assert job_worker._recover_zombies(datetime.datetime.now()) == 0
+        _enqueue(key="k1", status="running", run_at=timeutil.now())
+        assert job_worker._recover_zombies(timeutil.now()) == 0
         assert _job("k1").status == "running"
 
 
@@ -190,7 +191,7 @@ class TestKillRecovery:
         """kill -9 演练模拟：job 认领后进程死亡（running 遗留）→ 重启回收 → 幂等重跑。"""
         monkeypatch.setattr(get_settings(), "job_running_timeout", 600)
         monkeypatch.setattr(get_settings(), "job_retry_backoff_seconds", 0)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         with job_worker.SessionLocal() as session:
             session.add(
                 MemoryRow(
@@ -203,7 +204,7 @@ class TestKillRecovery:
             session.commit()
 
         def _crashing_decay():
-            job_worker._recover_zombies(datetime.datetime.now())
+            job_worker._recover_zombies(timeutil.now())
             raise RuntimeError("process killed mid-run")
 
         monkeypatch.setitem(job_worker._JOB_HANDLERS, "memory_decay", _crashing_decay)
@@ -214,16 +215,16 @@ class TestKillRecovery:
         monkeypatch.setitem(
             job_worker._JOB_HANDLERS, "memory_decay", lifecycle.run_decay_cycle
         )
-        stale = datetime.datetime.now() - datetime.timedelta(seconds=700)
+        stale = timeutil.now() - datetime.timedelta(seconds=700)
         with job_worker.SessionLocal() as session:
             row = session.get(BackgroundJobRow, "job-k1")
             row.status = "running"
             row.run_at = stale
             session.commit()
 
-        recovered = job_worker._recover_zombies(datetime.datetime.now())
+        recovered = job_worker._recover_zombies(timeutil.now())
         assert recovered == 1
-        done, _, _ = job_worker._claim_and_execute(datetime.datetime.now())
+        done, _, _ = job_worker._claim_and_execute(timeutil.now())
         assert done == 1
         assert _job("k1").status == "done"
         with job_worker.SessionLocal() as session:
@@ -233,7 +234,7 @@ class TestKillRecovery:
 
 class TestHandlerIntegration:
     def test_embedding_backfill_handler(self, job_db, monkeypatch):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         with job_worker.SessionLocal() as session:
             session.add(
                 MemoryRow(
@@ -246,11 +247,11 @@ class TestHandlerIntegration:
             session.commit()
         monkeypatch.setattr(embeddings, "get_embedding_client", lambda: None)
         _enqueue(job_type="embedding_backfill", key="e1")
-        job_worker._claim_and_execute(datetime.datetime.now())
+        job_worker._claim_and_execute(timeutil.now())
         assert _job("e1").status == "done"
 
     def test_reinforce_and_embedding_flush_in_tick(self, job_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         with job_worker.SessionLocal() as session:
             session.add(
                 MemoryRow(

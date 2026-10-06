@@ -6,7 +6,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     Float,
     Index,
     Integer,
@@ -17,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class WorldRow(Base):
@@ -27,14 +26,14 @@ class WorldRow(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False, default="home", server_default="home")
     time_mode: Mapped[str] = mapped_column(String, nullable=False, default="real_sync", server_default="real_sync")
-    sim_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    sim_last_advanced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sim_time: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    sim_last_advanced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     sim_rate: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, server_default="1")
     current_location: Mapped[str] = mapped_column(String, nullable=False)
     environment: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     notes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     owner_type: Mapped[str | None] = mapped_column(String, nullable=True)
     owner_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
@@ -62,9 +61,9 @@ class WorldEntityRow(Base):
     consumable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
     properties: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default="active", server_default="active")
-    last_action_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_action_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -89,14 +88,14 @@ class WorldEventRow(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     importance: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(String, nullable=False, default="user_mention", server_default="user_mention")
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -130,7 +129,7 @@ class WorldSnapshotRow(Base):
     world_id: Mapped[str] = mapped_column(String, nullable=False)
     label: Mapped[str | None] = mapped_column(String, nullable=True)
     state: Mapped[dict] = mapped_column(JSON, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         Index("idx_world_snapshots_world_time", "world_id", "created_at"),
@@ -153,8 +152,8 @@ class DailyPlanRow(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="planned", server_default="planned")
     routine_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     note: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -193,9 +192,9 @@ class UserSituationRow(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="active", server_default="active")
     source: Mapped[str] = mapped_column(String, nullable=False, default="conversation_pattern", server_default="conversation_pattern")
     evidence: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    detected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    valid_until: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

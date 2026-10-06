@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.observability import CallSite
 from app.services.life import budget as life_loop_budget
@@ -100,7 +101,7 @@ def acquire(
     """
     spec = get_capability(capability)
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     if life_loop_budget.is_degraded(now=now):
         if spec.budget_type == "foreground" and not settings.foreground_gateway_enforced:
             if account:

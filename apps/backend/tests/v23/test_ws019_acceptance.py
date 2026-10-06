@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.core import llm_factory
 from app.core.settings import get_settings
@@ -98,7 +99,7 @@ def test_flow_daily_progression(db_session_factory, flag_env):
     flag_env()
     user = "ws019-flow-daily"
     world = world_repository.ensure_world(user)
-    now = datetime.now()
+    now = timeutil.now()
 
     result = world_engine.run_simulation_maintenance(user, now=now)
     assert result is not None
@@ -145,7 +146,7 @@ def test_flow_foreground_brief_assembly(db_session_factory, flag_env):
     flag_env()
     user = "ws019-flow-brief"
     world = world_repository.ensure_world(user)
-    now = datetime.now()
+    now = timeutil.now()
     world_simulation_repository.save_situation(
         user_situation.UserSituation(
             id=world_simulation_repository.new_situation_id(),
@@ -171,7 +172,7 @@ def test_flow_long_offline_catch_up(db_session_factory, flag_env):
     flag_env()
     user = "ws019-flow-catchup"
     world = world_repository.ensure_world(user)
-    today = datetime.now().date()
+    today = timeutil.now().date()
 
     plan = catch_up.compute_catch_up_plan(
         last_covered=today - timedelta(days=15),

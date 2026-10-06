@@ -9,6 +9,7 @@ from datetime import datetime
 from sqlalchemy import and_ as sa_and_, or_ as sa_or_
 from sqlalchemy.orm import Session as _Session  # noqa: F401
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import (
     WorldEntityRow,
@@ -104,7 +105,7 @@ def ensure_world(user_id: str) -> World:
     with SessionLocal() as session:
         row = session.query(WorldRow).filter(WorldRow.user_id == user_id).first()
         if row is None:
-            now = datetime.now()
+            now = timeutil.now()
             row = WorldRow(
                 id=ids.new_id_str(),
                 user_id=user_id,
@@ -155,7 +156,7 @@ def list_worlds_by_owner(
 
 
 def save_world(world: World) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldRow, world.world_id)
         if row is None:
@@ -172,7 +173,7 @@ def save_world(world: World) -> None:
 
 
 def save_object(obj: WorldObject) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldEntityRow, obj.id)
         if row is None:
@@ -240,7 +241,7 @@ def count_active_objects(world_id: str) -> int:
 
 
 def save_event(event: WorldEvent) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldEventRow, event.id)
         if row is None:
@@ -325,7 +326,7 @@ def count_active_events(world_id: str) -> int:
 
 
 def save_snapshot(snapshot: StateSnapshot) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         session.add(
             WorldSnapshotRow(
@@ -447,8 +448,8 @@ def replace_entities(world_id: str, objects: list[WorldObject]) -> None:
                     properties=obj.properties,
                     status=obj.status.value,
                     last_action_at=obj.last_action_at,
-                    created_at=obj.created_at or datetime.now(),
-                    updated_at=obj.updated_at or datetime.now(),
+                    created_at=obj.created_at or timeutil.now(),
+                    updated_at=obj.updated_at or timeutil.now(),
                 )
             )
         session.commit()
@@ -471,8 +472,8 @@ def replace_events(world_id: str, events: list[WorldEvent]) -> None:
                     completed_at=event.completed_at,
                     payload=event.payload,
                     source=event.source.value,
-                    created_at=event.created_at or datetime.now(),
-                    updated_at=event.updated_at or datetime.now(),
+                    created_at=event.created_at or timeutil.now(),
+                    updated_at=event.updated_at or timeutil.now(),
                 )
             )
         session.commit()

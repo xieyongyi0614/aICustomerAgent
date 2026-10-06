@@ -7,6 +7,7 @@ retention 惰性清理在 save 路径顺带执行。
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import EvaluationReportRow, SessionLocal
 from app.core.settings import get_settings
@@ -55,7 +56,7 @@ def _from_model(report: EvaluationReport) -> EvaluationReportRow:
 
 
 def save(report: EvaluationReport) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         session.add(_from_model(report))
         session.commit()

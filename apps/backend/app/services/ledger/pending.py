@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.core import timeutil
 from app.models.action import ActionIntent, ActionRecord, ActionSchedule
 from app.models.ledger import (
     LedgerAmountError,
@@ -48,7 +49,7 @@ def register_pending(
     now: datetime | None = None,
 ) -> ActionRecord | None:
     """登记待确认：ActionRecord 载荷 + scene_state 指针 + action_schedules 到期。"""
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     existing_state = scene_state_repository.get_scene_state(session_id)
     existing = existing_state.pending_action
     if existing is not None and existing.status == "pending" and existing.action.startswith(
@@ -146,12 +147,12 @@ def expire_if_due(
     session_id: str, *, now: datetime | None = None
 ) -> bool:
     """到期未确认：清除登记，不产生账目。返回是否已失效。"""
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     loaded = load_pending(session_id)
     if loaded is None:
         return False
     request, _extraction, record = loaded
-    if request.expires_at > timestamp:
+    if timeutil.ensure_aware(request.expires_at) > timestamp:
         return False
     clear_pending(session_id, status="cancelled")
     record.status = "cancelled"
@@ -278,7 +279,7 @@ def _to_item(record: ActionRecord, request: ConfirmationRequest, extraction: Led
 def list_pending(
     user_id: str, *, now: datetime | None = None, limit: int = 50
 ) -> PendingList:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     records = action_repository.list_records(
         user_id, status="planned", limit=max(limit, PENDING_SCAN_MAX)
     )
@@ -300,7 +301,7 @@ def list_pending(
         if not _pointer_is_live(session_id, record.id):
             continue
         request, extraction = payload
-        if request.expires_at <= timestamp:
+        if timeutil.ensure_aware(request.expires_at) <= timestamp:
             continue
         items.append(_to_item(record, request, extraction))
         if len(items) >= limit:
@@ -311,7 +312,7 @@ def list_pending(
 
 
 def _locate(user_id: str, pending_key: str, *, now: datetime | None = None) -> _Located | None:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     since = timestamp - timedelta(hours=CONFIRM_TTL_HOURS)
     for record in action_repository.list_by_dedupe(user_id, pending_key, since):
         if not _is_pending_record(record):
@@ -369,7 +370,7 @@ def confirm_pending(
 ) -> ConfirmOutcome:
     from app.services.ledger import service as ledger_service
 
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     located = _locate(user_id, pending_key, now=timestamp)
     if located is None:
         raise PendingNotFoundError(pending_key)
@@ -441,7 +442,7 @@ def _learn_alias(
 def ignore_pending(
     user_id: str, pending_key: str, *, now: datetime | None = None
 ) -> str:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     located = _locate(user_id, pending_key, now=timestamp)
     if located is None or located.consumed:
         raise PendingNotFoundError(pending_key)

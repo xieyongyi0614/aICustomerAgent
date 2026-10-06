@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Mapping
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.car import CarReminder
 from app.repositories import car_repository
@@ -256,7 +257,7 @@ def _reminder_bundle(user_id: str, profile, now: datetime):
 
 
 def overview(user_id: str, *, now: datetime | None = None) -> CarOverview:
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     degraded: list[str] = []
     profile = car_repository.get_profile(user_id)
     try:
@@ -305,7 +306,7 @@ def overview(user_id: str, *, now: datetime | None = None) -> CarOverview:
 def profile_detail(
     user_id: str, *, now: datetime | None = None, limit: int = 50
 ) -> CarProfileView:
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     profile = car_repository.get_profile(user_id)
     bundle = _reminder_bundle(user_id, profile, moment)
     return CarProfileView(
@@ -321,7 +322,7 @@ def profile_detail(
 def list_services(
     user_id: str, *, limit: int = 50, now: datetime | None = None
 ) -> tuple[int, tuple[CarServiceRowView, ...]]:
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     profile = car_repository.get_profile(user_id)
     bundle = _reminder_bundle(user_id, profile, moment)
     total = len(car_repository.list_service_records(user_id))
@@ -336,7 +337,7 @@ def update_profile(
     loan_values: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> None:
-    moment = now or datetime.now()
+    moment = timeutil.ensure_aware(now) or timeutil.now()
     if loan_values:
         current = car_repository.get_loan(user_id)
         merged = {

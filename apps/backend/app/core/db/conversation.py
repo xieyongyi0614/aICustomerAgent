@@ -6,7 +6,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -17,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class Conversation(Base):
@@ -30,10 +29,10 @@ class Conversation(Base):
         String(16), nullable=False, default="default", server_default="default"
     )
     mode_entered_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -60,7 +59,7 @@ class Message(Base):
     is_proactive: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint("role IN ('human', 'ai')", name="ck_messages_role"),
@@ -75,8 +74,8 @@ class ConversationSummary(Base):
         String, ForeignKey("conversations.id"), primary_key=True
     )
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
 
 class SceneStateRow(Base):
@@ -91,5 +90,5 @@ class SceneStateRow(Base):
     completed_actions: Mapped[list] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)

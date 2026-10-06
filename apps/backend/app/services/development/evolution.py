@@ -20,7 +20,7 @@ from app.core.db import (
     SessionLocal,
 )
 from app.core.settings import get_settings
-from app.core import ids
+from app.core import ids, timeutil
 from app.repositories import goal_repository, personality_state_repository
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ _REBALANCE_MAX_PRIORITY = 2
 def compile_personality(user_id: str, now: datetime | None = None) -> list[dict]:
     """窗口到期轴的编译：证据收集 → 漂移提案 → 限速/边界 → 写入 + 审计。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     window_days = max(settings.evolution_window_days, 1)
     window_start = now - timedelta(days=window_days)
     insights = _recent_active_insights(user_id, window_start)
@@ -60,7 +60,7 @@ def compile_personality(user_id: str, now: datetime | None = None) -> list[dict]
 
 def rollback_personality_for_insight(insight_id: str, now: datetime | None = None) -> int:
     """按 Insight 逆放人格漂移：恢复 current 并写 rolled_back 审计行。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     reverted = 0
     with SessionLocal() as session:
         rows = (
@@ -106,7 +106,7 @@ def propose_rebalance(user_id: str, now: datetime | None = None) -> list[dict]:
     （整程），否则建议永远不可达（硬超时先退役，活跃集里已无该目标）。
     """
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     proposals: list[dict] = []
     for goal in goal_repository.list_layered_active(user_id):
         if goal.layer not in ("medium", "short_term"):
@@ -247,7 +247,12 @@ def ledger(user_id: str, limit: int = 50) -> list[dict]:
                     "source_ref": memory.superseded_by,
                 }
             )
-    return sorted(entries, key=lambda e: e["occurred_at"] or datetime.min, reverse=True)
+    return sorted(
+        entries,
+        key=lambda e: timeutil.ensure_aware(e["occurred_at"])
+        or timeutil.ensure_aware(datetime.min),
+        reverse=True,
+    )
 
 
 def _recent_active_insights(user_id: str, window_start: datetime) -> list:

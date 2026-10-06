@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.services.car import aggregate as car_aggregate
@@ -18,9 +19,9 @@ from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
 USER = TEST_USER_ID
-NOW = datetime(2026, 9, 30, 12, 0, 0)
-CHARGE_AT = datetime(2026, 9, 28, 9, 0, 0)
-SERVICE_AT = datetime(2026, 9, 29, 9, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 30, 12, 0, 0))
+CHARGE_AT = timeutil.ensure_aware(datetime(2026, 9, 28, 9, 0, 0))
+SERVICE_AT = timeutil.ensure_aware(datetime(2026, 9, 29, 9, 0, 0))
 
 
 class _FixedClock(datetime):

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.repositories import character_state_repository
 from app.engines import state as state_engine
 from app.services.conversation import state as state_service
@@ -79,7 +80,7 @@ class TestFloorReset:
 
 class TestReadingSideDecay:
     def test_load_states_decays_and_persists(self, db_session_factory):
-        event_at = datetime.now() - timedelta(hours=1)
+        event_at = timeutil.now() - timedelta(hours=1)
         character_state_repository.upsert_state(
             "u1",
             CharacterState(mood="happy", intensity=0.55, cause="夸奖", last_event_at=event_at),

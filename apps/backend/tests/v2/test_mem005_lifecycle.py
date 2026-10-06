@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
@@ -47,7 +48,7 @@ def _memory(
     merge_chain=None,
     created_at=None,
 ):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with lifecycle.SessionLocal() as session:
         session.add(
             MemoryRow(
@@ -139,7 +140,7 @@ class TestDecay:
     def test_decay_formula(self, life_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.03}')
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "内容", type="user_preference", salience=0.8,
                 last_reinforced_at=now - datetime.timedelta(days=10))
         lifecycle.run_decay_cycle(now=now)
@@ -151,7 +152,7 @@ class TestDecay:
     def test_same_day_rerun_idempotent(self, life_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.5}')
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "内容", salience=0.8,
                 last_reinforced_at=now - datetime.timedelta(days=5))
         lifecycle.run_decay_cycle(now=now)
@@ -163,7 +164,7 @@ class TestDecay:
         monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 1.0}')
         monkeypatch.setattr(get_settings(), "memory_salience_floor", 0.1)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "内容", salience=0.3,
                 last_reinforced_at=now - datetime.timedelta(days=5))
         lifecycle.run_decay_cycle(now=now)
@@ -171,7 +172,7 @@ class TestDecay:
         assert _row("m1").status == "decayed"
 
     def test_decayed_forget_after_retention(self, life_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "旧记忆", status="decayed", salience=0.1,
                 last_reinforced_at=now - datetime.timedelta(days=40))
         _memory("m2", "新记忆", status="decayed", salience=0.1,
@@ -187,7 +188,7 @@ class TestDecay:
         monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 1.0}')
         monkeypatch.setattr(get_settings(), "memory_salience_floor", 0.1)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "低显著度", salience=0.15,
                 last_reinforced_at=now - datetime.timedelta(days=30))
         lifecycle.run_decay_cycle(now=now)
@@ -198,7 +199,7 @@ class TestDecay:
     def test_row_exception_isolated(self, life_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
                             '{"user_preference": 0.01}')
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "正常", last_reinforced_at=now - datetime.timedelta(days=3))
 
         original = lifecycle.decay_lambda_for
@@ -215,7 +216,7 @@ class TestDecay:
 
 class TestReinforce:
     def test_buffer_flush_bumps_active(self, life_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "内容", salience=0.5, last_reinforced_at=now)
         lifecycle.record_reinforce("m1")
         lifecycle.record_reinforce("m1")
@@ -235,7 +236,7 @@ class TestReinforce:
         assert row.salience == pytest.approx(0.2)
 
     def test_reinforce_skips_forgotten(self, life_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "内容", status="forgotten", forgotten_at=now,
                 last_reinforced_at=now)
         lifecycle.record_reinforce("m1")
@@ -347,7 +348,7 @@ class TestExplicitForget:
 
 class TestPurge:
     def test_purge_after_retention_with_links(self, life_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         stale = now - datetime.timedelta(
             days=get_settings().memory_forget_retention_days + 1
         )
@@ -370,11 +371,93 @@ class TestPurge:
         assert _row("other").status == "active"
 
     def test_purge_idempotent(self, life_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         stale = now - datetime.timedelta(days=40)
         _memory("gone", "过期", status="forgotten", forgotten_at=stale)
         assert lifecycle.purge_expired_forgotten(now) == 1
         assert lifecycle.purge_expired_forgotten(now) == 0
+
+
+class TestReferenceTimezoneNormalization:
+    """memory 域时间列统一 UTC-aware：引用保持 aware，与 aware now 直接可算（回归守卫）。"""
+
+    def _row_obj(self, **overrides):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        fields = dict(
+            id="m1",
+            user_id="u1",
+            character_id="asuna",
+            content="内容",
+            type="user_preference",
+            importance=0.6,
+            status="active",
+            salience=0.5,
+            created_at=now,
+            updated_at=now,
+        )
+        fields.update(overrides)
+        return MemoryRow(**fields)
+
+    def test_decay_reference_keeps_aware(self):
+        aware = datetime.datetime.now(datetime.timezone.utc)
+        row = self._row_obj(last_decayed_at=aware)
+        ref = lifecycle._decay_reference(row)
+        assert ref.tzinfo is not None
+        assert ref == aware
+
+    def test_decay_reference_falls_back_to_created_at(self):
+        row = self._row_obj()
+        assert lifecycle._decay_reference(row) == row.created_at
+
+    def test_forget_reference_keeps_aware(self):
+        aware = datetime.datetime.now(datetime.timezone.utc)
+        row = self._row_obj(last_reinforced_at=aware)
+        ref = lifecycle._forget_reference(row)
+        assert ref.tzinfo is not None
+        assert ref == aware
+
+    def test_decay_batch_tolerates_aware_reference(self, monkeypatch):
+        """行引用为 aware UTC 时衰减正常计算，不得抛错。"""
+        monkeypatch.setattr(get_settings(), "memory_decay_lambda_json",
+                            '{"user_preference": 0.03}')
+        now = datetime.datetime.now(datetime.timezone.utc)
+        row = self._row_obj(salience=0.8)
+        row.created_at = now - datetime.timedelta(days=10)
+
+        class _FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def order_by(self, *args, **kwargs):
+                return self
+
+            def limit(self, *args, **kwargs):
+                return self
+
+            def all(self):
+                return [row]
+
+            def delete(self, *args, **kwargs):
+                return 0
+
+        class _FakeSession:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def query(self, *args, **kwargs):
+                return _FakeQuery()
+
+            def commit(self):
+                pass
+
+        monkeypatch.setattr(lifecycle, "SessionLocal", _FakeSession)
+        stats = lifecycle.run_decay_cycle(now=now)
+        assert stats["decayed"] == 0
+        assert row.salience == pytest.approx(0.8 * math.exp(-0.03 * 10))
+        assert row.last_decayed_at is not None
 
 
 class TestEvaluatorIntegration:
@@ -405,7 +488,7 @@ class TestEvaluatorIntegration:
             salience=0.8,
             status="pending",
             visibility="private",
-            created_at=datetime.datetime.now(),
+            created_at=timeutil.now(),
         )
         with evaluator.SessionLocal() as session:
             session.add(row)

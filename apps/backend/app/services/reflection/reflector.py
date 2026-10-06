@@ -18,6 +18,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.clock import bind as _bind_logical_clock
 from app.core.clock import logical_now, unbind as _unbind_logical_clock
 from app.chains.structured import build_structured_chain
@@ -84,7 +85,7 @@ def run_queued_reflections(now: datetime | None = None, trace=None) -> int:
     与认领/回收用**同一**时间口径（reflector 与行动域 H.11.2 ③ 同源修法——周期内
     一切时间口径一致）。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     _recover_timed_out_runs(now)
     executed = 0
     token = _bind_logical_clock(now)

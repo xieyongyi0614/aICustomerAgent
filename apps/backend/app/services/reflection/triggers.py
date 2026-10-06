@@ -24,6 +24,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import Memory, ReflectionRunRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import (
@@ -97,7 +98,7 @@ def trigger_for_user(
     `channel` 只切换证据源与幂等键：门槛 / 额度 / 入队顺序与判定逻辑两通道完全一致。
     """
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
     windows: list = []
     package: reflection_evidence.ToolEvidencePackage | None = None
@@ -267,7 +268,7 @@ def observe_tool_evidence(
     """
     settings = get_settings()
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     topic = f"{tool_id}|{failure_kind or ''}"
     bucket = _tool_buckets.setdefault(user_id, {}).get(topic)
     if bucket is None:
@@ -342,7 +343,7 @@ def observe_tool_evidence_from_records(
     只读投影（不经工具注册表 / 健康度）；失败证据（含 timeout）才计数。
     返回本次真正触发入队的次数。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     facts = reflection_evidence.tool_fact_projection(
         user_id, now=now, window_days=window_days
     )
@@ -370,7 +371,7 @@ def observe_reinforce(user_id: str, memory_ids: list[str], trace=None) -> None:
     if not memory_ids:
         return
     started = time.perf_counter()
-    now = datetime.now()
+    now = timeutil.now()
     settings = get_settings()
     contents = _memory_contents(memory_ids)
     buckets = _topic_buckets.setdefault(user_id, {})
@@ -413,9 +414,9 @@ def observe_reinforce(user_id: str, memory_ids: list[str], trace=None) -> None:
 
 def run_reflection_trigger_tick(now: datetime | None = None) -> int:
     """周期触发入口：job_worker tick 挂靠；每用户每日一次判定（Flag OFF 空转）。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
-    if now.hour < settings.reflection_schedule_hour:
+    if timeutil.local(now).hour < settings.reflection_schedule_hour:
         return 0
     judged = 0
     for user_id in _users_with_memories():
@@ -464,7 +465,7 @@ def _tool_evidence_summary(
     kinds = reflection_evidence.order_tool_window_kinds(
         [window.window_kind for window in package.windows]
     )
-    rotated = _rotate(kinds, now.date().toordinal())
+    rotated = _rotate(kinds, timeutil.local(now).date().toordinal())
     return {
         "channel": CHANNEL_TOOL,
         "passing": package.passing,
@@ -528,7 +529,7 @@ def _memory_contents(memory_ids: list[str]) -> dict[str, str]:
 
 
 def _quota_used(user_id: str, now: datetime) -> bool:
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     with SessionLocal() as session:
         return (
             session.query(ReflectionRunRow.id)
@@ -547,7 +548,7 @@ def _scheduled_already_handled(user_id: str, now: datetime) -> bool:
     """周期路每日一次：日桶 job 或当日任一 run 行（含 skipped）已存在即视为已处理。"""
     if background_job_repository.has_job(_day_bucket_key(user_id, now)):
         return True
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     with SessionLocal() as session:
         return (
             session.query(ReflectionRunRow.id)

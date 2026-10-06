@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import action_engine
 from app.core.settings import get_settings
 from app.models.action import ActionResult, ActionRecord
@@ -16,7 +17,7 @@ def _record(
     attempt: int = 1,
     action_type: str = "create_reminder",
 ) -> ActionRecord:
-    now = datetime.now()
+    now = timeutil.now()
     return ActionRecord(
         id=action_repository.new_record_id(),
         user_id=user_id,
@@ -35,15 +36,15 @@ def _record(
 
 class TestStaleExecutingRecovery:
     def test_repository_list_stale_executing(self):
-        stale_at = datetime.now() - timedelta(hours=2)
-        fresh_at = datetime.now()
+        stale_at = timeutil.now() - timedelta(hours=2)
+        fresh_at = timeutil.now()
         stale = action_repository.save_record(
             _record("u_rec_a", "executing", updated_at=stale_at)
         )
         fresh = action_repository.save_record(
             _record("u_rec_b", "executing", updated_at=fresh_at)
         )
-        cutoff = datetime.now() - timedelta(minutes=30)
+        cutoff = timeutil.now() - timedelta(minutes=30)
         found_ids = {r.id for r in action_repository.list_stale_executing(cutoff, limit=50)}
         assert stale.id in found_ids
         assert fresh.id not in found_ids
@@ -51,7 +52,7 @@ class TestStaleExecutingRecovery:
     def test_recover_stale_executing_to_failed(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
-        stale_at = datetime.now() - timedelta(hours=1)
+        stale_at = timeutil.now() - timedelta(hours=1)
         record = action_repository.save_record(
             _record("u_rec_c", "executing", updated_at=stale_at, attempt=1)
         )
@@ -74,7 +75,7 @@ class TestStaleExecutingRecovery:
     def test_expire_planned_includes_recovery(self, monkeypatch):
         settings = get_settings()
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
-        stale_at = datetime.now() - timedelta(hours=1)
+        stale_at = timeutil.now() - timedelta(hours=1)
         record = action_repository.save_record(
             _record("u_rec_f", "executing", updated_at=stale_at)
         )
@@ -99,7 +100,7 @@ class TestPartialTerminalMapping:
         settings = get_settings()
         monkeypatch.setattr(settings, "action_executing_timeout_minutes", 30)
         user_id = "u_rec_count"
-        stale_at = datetime.now() - timedelta(hours=1)
+        stale_at = timeutil.now() - timedelta(hours=1)
         record = action_repository.save_record(
             _record(user_id, "executing", updated_at=stale_at)
         )

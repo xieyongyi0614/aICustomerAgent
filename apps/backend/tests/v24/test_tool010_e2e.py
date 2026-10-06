@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.channels.base import SendResult
 from app.models.action import ActionIntent
 from app.models.tool import PermissionProfile, ToolDefinition, ToolSchema
@@ -90,7 +91,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补
     # `花费 / 付款 / 买 / 充值 / 交了 / 缴了` —— 非 TOOL-010 改脏。原值 2da514d9。
     "app/character/asuna/action.py": "0269c402790461de1923aa55c58195f05f68b3bb675be2eac5353f7bc50698e0",
-    "app/services/action/planner.py": "41288337f0fc712dd64db0d52d90f7f13abbc0dd934fba6bb78c1d6398bedc99",
+    # 时间口径声明（2026-10-06）：`GateSnapshot.now` 默认值 `datetime.now` → `timeutil.now`
+    # （naive/aware 混算修复）—— 非 TOOL-010 改脏。原值 41288337。
+    "app/services/action/planner.py": "95be6179adf985bcceb143550decee9fa04e77724fe0e8add1c1a61b0068fab3",
     # services 归位声明（2026-09-30，批次 1~4）：`llm_budget_gate` → `life/gate`、
     # `state_engine` / `goal_alignment` → `engines/*`、领域包归位导入路径变更；
     # 批次 4 文件由 `services/decision_pipeline.py` 归位至 `engines/decision.py`，
@@ -105,14 +108,19 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 原值 4aec8e65、ea741a87、9054ce0d。
     # 反向依赖清理声明（2026-09-30）：`active_generations` 下沉 `core/runtime_state` 导入路径变更。
     # ID 体系收敛声明（2026-10-03，C3）：`uuid4()` 默认主键改 `ids.new_id_str()`（ADR-16）—— 非 TOOL-010 改脏。
-    "app/application/chat_pipeline.py": "6571ef69580e4179140dd4d65fdd19e2039f843b80f0d19ff948c943320dbdec",
+    # memory 域时间口径迁移（2026-10-05，0006/0007）：`timeutil.now()` 改走 `timeutil`
+    # （aware UTC），`_select_goal` 深夜判定改 `timeutil.local_now()` —— 非 TOOL-010 改脏。
+    # 原值 6571ef69。
+    "app/application/chat_pipeline.py": "e119d89bcf45675891cf5815d498dbb520193d3e864e2c2ead436f9e836d940d",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
     # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
-    "app/application/post_process.py": "bcb7b63c718390cb6d57e26e9b04493e3df37b59b0e7e7619b7f79d6ccf09e25",  # 前值 f2a25b66（反向依赖清理：get_user_write_lock 下沉 core/runtime_state）、8aa2b63f（批次 4）、6778abc4（批次 3）；再前值 8920af98、378bdd6a、30125e6e、2040a4df、c1702717
+    # 时间口径统一（2026-10-05，0006~0008）：`timeutil.now()` → `timeutil.now()`（aware UTC）
+    # —— 非 TOOL-010 改脏。原值 bcb7b63c。
+    "app/application/post_process.py": "91e31d92fea03ff46c787cb141ce372c490815544176df1a66fde143bb2455a1",
     # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
     # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
     # 原值 36ea3798（再冻结：world_available 赋值去掉恒真 getattr；再前值 6ea39eaf，

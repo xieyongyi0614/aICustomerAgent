@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import delete, select
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import RelationshipSnapshotRow, SessionLocal
 from app.core.settings import get_settings
@@ -61,7 +62,7 @@ def create_snapshot(
     trigger: str = "manual",
     now: datetime | None = None,
 ) -> RelationshipSnapshot:
-    created_at = now or datetime.now()
+    created_at = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = RelationshipSnapshotRow(
             id=ids.new_id_str(),

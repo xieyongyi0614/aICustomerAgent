@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core.db import DailyPlanRow, UserSituationRow, WorldEventRow
 from app.models.world import EventImportance, EventSource, EventStatus, WorldEvent
 from app.models.world_simulation import (
@@ -42,7 +43,7 @@ def _plan(user_id: str = "ws002-user", seq: int = 0, **overrides) -> DailyPlan:
 
 
 def _situation(user_id: str = "ws002-user", **overrides) -> UserSituation:
-    now = datetime(2026, 9, 14, 20, 0)
+    now = timeutil.ensure_aware(datetime(2026, 9, 14, 20, 0))
     values = dict(
         id=repo.new_situation_id(),
         user_id=user_id,
@@ -113,8 +114,8 @@ def test_invalid_part_of_day_rejected(db_session_factory):
                     end_minutes=10,
                     activity="阅读",
                     location_id="home.living_room",
-                    created_at=datetime(2026, 9, 14, 6, 0),
-                    updated_at=datetime(2026, 9, 14, 6, 0),
+                    created_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
+                    updated_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
                 )
             )
             session.commit()
@@ -149,12 +150,12 @@ def test_superseded_active_situation_single_row(db_session_factory):
 
 def test_expire_stale_situations(db_session_factory):
     user = "ws002-expire"
-    stale = _situation(user, valid_until=datetime(2026, 9, 13, 0, 0))
-    fresh = _situation(user, valid_until=datetime(2026, 9, 20, 0, 0))
+    stale = _situation(user, valid_until=timeutil.ensure_aware(datetime(2026, 9, 13, 0, 0)))
+    fresh = _situation(user, valid_until=timeutil.ensure_aware(datetime(2026, 9, 20, 0, 0)))
     no_expiry = _situation(user, valid_until=None)
     for item in (stale, fresh, no_expiry):
         repo.save_situation(item)
-    expired = repo.expire_stale_situations(user, datetime(2026, 9, 14, 12, 0))
+    expired = repo.expire_stale_situations(user, timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0)))
     assert [s.id for s in expired] == [stale.id]
     assert repo.get_situation(user, stale.id).status == SituationStatus.EXPIRED
     assert repo.get_situation(user, fresh.id).status == SituationStatus.ACTIVE
@@ -171,8 +172,8 @@ def test_invalid_intensity_rejected(db_session_factory):
                     dimension="health",
                     summary="用户感冒了",
                     intensity=6,
-                    detected_at=datetime(2026, 9, 14, 8, 0),
-                    updated_at=datetime(2026, 9, 14, 8, 0),
+                    detected_at=timeutil.ensure_aware(datetime(2026, 9, 14, 8, 0)),
+                    updated_at=timeutil.ensure_aware(datetime(2026, 9, 14, 8, 0)),
                 )
             )
             session.commit()
@@ -195,7 +196,7 @@ def test_idempotency_key_unique_when_present(db_session_factory):
             payload={"date": "2026-09-14"},
             source=EventSource.TIME,
             idempotency_key=key,
-            created_at=datetime(2026, 9, 14, 6, 0),
+            created_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
         )
 
     world_repository.save_event(_event("time:day_start:2026-09-14", "evt_a"))
@@ -212,8 +213,8 @@ def test_idempotency_key_unique_when_present(db_session_factory):
 
 def test_commit_time_advance_updates_anchor(db_session_factory):
     world = world_repository.ensure_world("ws002-anchor")
-    anchor = datetime(2026, 9, 14, 12, 0)
-    sim_time = datetime(2026, 9, 14, 13, 0)
+    anchor = timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0))
+    sim_time = timeutil.ensure_aware(datetime(2026, 9, 14, 13, 0))
     assert repo.commit_time_advance(world.world_id, sim_time, anchor)
     stored = world_repository.get_world("ws002-anchor")
     assert stored.sim_time == sim_time
@@ -236,8 +237,8 @@ def test_invalid_plan_status_rejected(db_session_factory):
                     activity="阅读",
                     location_id="home.living_room",
                     status="done",
-                    created_at=datetime(2026, 9, 14, 6, 0),
-                    updated_at=datetime(2026, 9, 14, 6, 0),
+                    created_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
+                    updated_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
                 )
             )
             session.commit()

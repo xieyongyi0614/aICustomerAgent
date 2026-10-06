@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.models.action import ActionSchema, CapabilityResult
 from app.models.ledger import LedgerEntryDraft
 from app.services.action.registry import ExecutionContext
@@ -164,7 +165,7 @@ class LedgerCapability:
             return _failed("; ".join(errors)[:80])
         settings = ctx.settings
         currency = str(params.get("currency") or getattr(settings, "ledger_default_currency", "CNY"))
-        occurred_at = _parse_occurred_at(params.get("occurred_at") or (ctx.now or datetime.now()))
+        occurred_at = _parse_occurred_at(params.get("occurred_at") or (timeutil.ensure_aware(ctx.now) or timeutil.now()))
         draft = LedgerEntryDraft(
             user_id=ctx.user_id,
             account_id=_account_id_for(ctx, params),
@@ -201,7 +202,7 @@ class LedgerCapability:
         period_name = str(params.get("period") or "month")
         if period_name not in LEDGER_PERIODS:
             return _failed("非法 period")
-        anchor = ctx.now or datetime.now()
+        anchor = timeutil.ensure_aware(ctx.now) or timeutil.now()
         period = Period.month(anchor) if period_name == "month" else Period.week(anchor)
         data = summary(ctx.user_id, period=period, now=ctx.now)
         return CapabilityResult(

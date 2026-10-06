@@ -6,6 +6,7 @@ AGENT-005 接管后新增编译写入；本阶段除种子外任何写路径不�
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import PersonalityStateRow, SessionLocal
 
@@ -33,7 +34,7 @@ def seed_if_absent(
     missing = [axis for axis in axes if axis not in existing]
     if not missing:
         return False
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         for axis in missing:
             spec = axes[axis]

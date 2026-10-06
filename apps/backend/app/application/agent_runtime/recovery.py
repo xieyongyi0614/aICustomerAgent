@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application.agent_runtime.contracts import SessionContext
 from app.application.agent_runtime.session import resume_session
 from app.core.settings import get_settings
@@ -25,7 +26,7 @@ ORPHAN_STEP = {
 
 
 def _now(now: datetime | None) -> datetime:
-    return now or datetime.now()
+    return timeutil.ensure_aware(now) or timeutil.now()
 
 
 def _timeout_minutes(timeout_minutes: int | None) -> int:

@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import action_engine, world_engine
 from app.application.autonomy_engine import collect_facts
 from app.models.action import ActionEffect, ActionResult
@@ -13,7 +14,7 @@ from app.services.reflection import evidence as reflection_evidence
 
 
 def _due_at(hours: int = 2) -> str:
-    return (datetime.now() + timedelta(hours=hours)).isoformat()
+    return (timeutil.now() + timedelta(hours=hours)).isoformat()
 
 
 def _enabled(monkeypatch, **flags):
@@ -97,7 +98,7 @@ class TestReflectionConsumer:
             loaded.steps = [step]
             action_repository.save_record(loaded)
         facts = reflection_evidence._window_facts(
-            "u_fb_ref", datetime.now(), window_days=7
+            "u_fb_ref", timeutil.now(), window_days=7
         )
         assert facts, "带 tool_id 的步骤必须进证据窗"
         # v26 去门控裁决 B：工具路径效果含 memory+world，断言改子集语义。
@@ -125,7 +126,7 @@ class TestPlanningConsumer:
             tool_id = ""
             observation_keys = []
 
-        outcome = _normalize(Step(), loaded, datetime.now())
+        outcome = _normalize(Step(), loaded, timeutil.now())
         assert outcome.status == "succeeded"
         assert outcome.action_id == loaded.id
         assert outcome.attempt >= 1

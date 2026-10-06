@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application import autonomy_bridge
 from app.application.agent_runtime import (
     contracts,
@@ -130,7 +131,7 @@ class TestDeliveryCoordination:
             "coordinate_delivery",
             lambda *a, **k: delivered.append(1),
         )
-        now = datetime.now()
+        now = timeutil.now()
         action = ProactiveAction(
             id="act-quiet",
             user_id=USER,
@@ -144,7 +145,7 @@ class TestDeliveryCoordination:
             updated_at=now,
         )
         reason = proactive_executor._recheck_failed_reason(
-            action, USER, "s1", datetime.now()
+            action, USER, "s1", timeutil.now()
         )
         assert reason == "quiet_hours"
         assert delivered == []

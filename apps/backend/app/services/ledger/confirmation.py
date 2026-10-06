@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.ledger import LedgerExtraction, to_minor
 
@@ -66,7 +67,7 @@ def should_confirm(
     top_categories: tuple[str, ...] = (),
 ) -> ConfirmationRequest | None:
     cfg = settings if settings is not None else get_settings()
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     expires_at = timestamp + timedelta(hours=CONFIRM_TTL_HOURS)
     amount_minor: int | None = None
     if candidate.amount_value:
@@ -125,7 +126,9 @@ def request_from_mapping(payload: Mapping[str, Any]) -> ConfirmationRequest:
         question=str(payload.get("question") or ""),
         candidates=candidates,
         pending_key=str(payload.get("pending_key") or ""),
-        expires_at=datetime.fromisoformat(str(payload["expires_at"])),
+        expires_at=timeutil.ensure_aware(
+            datetime.fromisoformat(str(payload["expires_at"]))
+        ),
         amount_minor=payload.get("amount_minor"),
         source_ref=str(payload.get("source_ref") or ""),
     )

@@ -9,6 +9,7 @@ Action/World 表查询。调整全确定性：顺序跳步 / 触发重规划（A
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.goal import SubGoalSpec
 from app.repositories import goal_repository
@@ -162,7 +163,9 @@ def advance_goal(goal, plan, facts: dict, now: datetime) -> dict:
 
     active_start = plan.updated_at or plan.created_at
     max_hours = settings.autonomy_goal_max_active_hours
-    if active_start is not None and now - active_start > timedelta(hours=max_hours):
+    if active_start is not None and timeutil.ensure_aware(now) - active_start > timedelta(
+        hours=max_hours
+    ):
         record = goal_repository.fail_goal(goal.id, REASON_PERIOD_EXCEEDED)
         _record_lifecycle(record or goal, "failed", REASON_PERIOD_EXCEEDED, goal.id)
         detail["outcome"] = "failed"

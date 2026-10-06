@@ -9,6 +9,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core import timeutil
 from app.models.world import part_of_day
 from app.repositories import world_repository
 
@@ -85,7 +86,7 @@ def apply(
                 to_location=target_location_id,
                 skipped_reason="same_location",
             )
-        current_time = now or datetime.now()
+        current_time = timeutil.ensure_aware(now) or timeutil.now()
         if source == SOURCE_SCHEDULE and _narrative_move_in_current_part(
             world.world_id, current_time
         ):
@@ -119,7 +120,7 @@ def apply(
                 "reason": reason,
                 "moved_at": current_time.isoformat(),
             },
-            idempotency_key=f"location:{current_time.date().isoformat()}:{part_of_day(current_time)}:{target_location_id}",
+            idempotency_key=f"location:{timeutil.local(current_time).date().isoformat()}:{part_of_day(current_time)}:{target_location_id}",
         )
         return MoveResult(
             applied=True,

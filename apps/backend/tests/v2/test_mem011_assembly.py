@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.repositories import memory_repository
@@ -35,7 +36,7 @@ def _clean_buffer():
 
 
 def _memory(id, content, importance=0.7, last_accessed_at=None, user_id="u1"):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             memory_repository.Memory(
@@ -56,7 +57,7 @@ def _memory(id, content, importance=0.7, last_accessed_at=None, user_id="u1"):
 
 
 def _ranked(*contents, importance=0.7):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     items = []
     for index, content in enumerate(contents):
         memory = memory_repository.UserMemory(
@@ -90,7 +91,7 @@ class TestRetrievalBudget:
 
     def test_over_budget_truncated_by_freshness(self, asm_db, monkeypatch):
         monkeypatch.setattr(get_settings(), "memory_retrieval_budget", 15)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         stale = now - datetime.timedelta(days=10)
         _memory("m-fresh", "新鲜的长记忆内容排在前面", last_accessed_at=now)
         _memory("m-stale", "陈旧的短记忆", last_accessed_at=stale)
@@ -103,8 +104,8 @@ class TestRetrievalBudget:
         assert [m.id for m in selected] == ["m-fresh"]
         assert dropped == 1
     def test_freshness_ordering_beats_score_order(self, asm_db):
-        now = datetime.datetime.now()
-        old = datetime.datetime.now() - datetime.timedelta(days=5)
+        now = timeutil.now()
+        old = timeutil.now() - datetime.timedelta(days=5)
         high_score_old = memory_repository.UserMemory(
             id="m-old", user_id="u1", character_id="asuna", type="user_fact",
             content="高分但旧", importance=0.9, created_at=now, updated_at=now,

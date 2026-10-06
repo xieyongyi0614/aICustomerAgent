@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.application import autonomy_engine
 from app.application.post_process import reset_user_write_locks
 from app.character.asuna import PERSISTENT_GOALS
@@ -25,7 +26,7 @@ from app.services.autonomy import executor as proactive_executor
 from app.services.observability.collector import TurnTraceSession
 from tests.conftest import wait_until
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 USER = "default-user"
 
 

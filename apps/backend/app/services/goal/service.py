@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna import PERSISTENT_GOALS
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState
@@ -110,7 +111,7 @@ def _create_goal(
     source: str,
     priority: int,
 ) -> GoalRecord:
-    now = datetime.now()
+    now = timeutil.now()
     record = GoalRecord(
         user_id=user_id,
         type=goal_type,

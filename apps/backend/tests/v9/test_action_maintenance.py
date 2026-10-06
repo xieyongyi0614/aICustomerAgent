@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application.action_engine import (
     collect_facts,
     _expire_planned,
@@ -35,8 +36,8 @@ def _verdict():
             user_id="m-user",
             type="conversation_inactivity",
             dedupe_key="d1",
-            detected_at=datetime.now(),
-            last_user_message_at=datetime.now(),
+            detected_at=timeutil.now(),
+            last_user_message_at=timeutil.now(),
         ),
     )
 
@@ -46,7 +47,7 @@ async def test_expire_planned_scheduled_old(override_settings, db_session_factor
     override_settings()
     record = new_record(_intent(), "m-user", session_id="s1")
     record.status = "planned"
-    record.scheduled_at = datetime.now() - timedelta(days=3)
+    record.scheduled_at = timeutil.now() - timedelta(days=3)
     action_repository.save_record(record)
     _expire_planned()
     got = action_repository.get_record(record.id)
@@ -59,7 +60,7 @@ async def test_expire_planned_recent_kept(override_settings, db_session_factory)
     override_settings()
     record = new_record(_intent(), "m-user", session_id="s1")
     record.status = "planned"
-    record.scheduled_at = datetime.now()
+    record.scheduled_at = timeutil.now()
     action_repository.save_record(record)
     _expire_planned()
     assert action_repository.get_record(record.id).status == "planned"

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import AgentStateSnapshotRow, SessionLocal
 
@@ -53,7 +54,7 @@ def save(
     character_id: str = "asuna",
     now: datetime | None = None,
 ) -> AgentStateSnapshotRow:
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     row = AgentStateSnapshotRow(
         id=ids.new_id_str(),
         run_id=run_id,
@@ -70,7 +71,7 @@ def save(
 
 
 def cleanup_expired(retention_days: int, now: datetime | None = None) -> int:
-    cutoff = (now or datetime.now()) - timedelta(days=max(retention_days, 0))
+    cutoff = (timeutil.ensure_aware(now) or timeutil.now()) - timedelta(days=max(retention_days, 0))
     with SessionLocal() as session:
         deleted = (
             session.query(AgentStateSnapshotRow)

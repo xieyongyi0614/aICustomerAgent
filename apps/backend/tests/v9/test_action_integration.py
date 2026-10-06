@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application.action_engine import integrate_result, run_action_planning, new_record
 from app.core.settings import get_settings
 from app.models.action import ActionIntent, ActionResult, ActionEffect
@@ -23,7 +24,7 @@ async def test_world_event_created_via_action(override_settings, db_session_fact
     from app.application import world_engine
 
     override_settings()
-    due = (datetime.now() + timedelta(hours=1)).isoformat()
+    due = (timeutil.now() + timedelta(hours=1)).isoformat()
     record = await run_action_planning("int-user-1", _intent(content="复诊", due_at=due), session_id="s1")
     assert record is not None
     if record.status == "succeeded":
@@ -46,7 +47,7 @@ async def test_remember_fact_writes_memory(override_settings, db_session_factory
 @pytest.mark.asyncio
 async def test_action_context_renders_within_budget(override_settings, db_session_factory):
     override_settings()
-    due = datetime.now().isoformat()
+    due = timeutil.now().isoformat()
     await run_action_planning("int-user-3", _intent(content="吃药", due_at=due), session_id="s1")
     ctx: ActionContext | None = build_action_context("int-user-3")
     if ctx is None:

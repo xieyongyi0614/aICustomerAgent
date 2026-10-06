@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.application import autonomy_engine
 from app.application.post_process import reset_user_write_locks
 from app.character.asuna import PERSISTENT_GOALS
@@ -17,7 +18,7 @@ from app.repositories import conversation_repository, goal_repository, trace_rep
 from app.services.conversation import service as conversation_service
 from tests.conftest import wait_until
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 USER = "default-user"
 
 

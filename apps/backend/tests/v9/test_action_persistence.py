@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application.action_engine import new_record, run_action_planning
 from app.models.action import ActionIntent
 from app.repositories import action_repository
@@ -34,7 +35,7 @@ def test_dedupe_key_location(db_session_factory):
     record = new_record(intent, "persist-user-2", session_id=None)
     action_repository.save_record(record)
     records = action_repository.list_by_dedupe(
-        "persist-user-2", "dedupe-1", since=datetime.now() - timedelta(hours=24)
+        "persist-user-2", "dedupe-1", since=timeutil.now() - timedelta(hours=24)
     )
     assert any(r.id == record.id for r in records)
 
@@ -42,7 +43,7 @@ def test_dedupe_key_location(db_session_factory):
 def test_retention_cleanup_removes_old(db_session_factory):
     intent = _intent(content="old")
     record = new_record(intent, "persist-user-3", session_id=None)
-    record.created_at = datetime.now() - timedelta(days=400)
+    record.created_at = timeutil.now() - timedelta(days=400)
     action_repository.save_record(record)
     action_repository.retain_cleanup()
     assert action_repository.get_record(record.id) is None

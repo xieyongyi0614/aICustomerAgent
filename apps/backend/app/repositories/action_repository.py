@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import ActionRecordRow, ActionScheduleRow, OutboxEventRow, SessionLocal
 from app.core.settings import get_settings
@@ -84,7 +85,7 @@ def _record_upsert(row: ActionRecordRow, record: ActionRecord, now: datetime) ->
 
 
 def save_record(record: ActionRecord) -> ActionRecord:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(ActionRecordRow, record.id)
         if row is None:
@@ -223,7 +224,7 @@ def recent_records(user_id: str, limit: int = 20) -> list[ActionRecord]:
 
 def retain_cleanup() -> int:
     retention_days = get_settings().action_record_retention_days
-    cutoff = datetime.now() - timedelta(days=retention_days)
+    cutoff = timeutil.now() - timedelta(days=retention_days)
     removed = 0
     with SessionLocal() as session:
         for row in session.scalars(select(ActionRecordRow).where(ActionRecordRow.created_at < cutoff)):
@@ -242,7 +243,7 @@ def save_record_with_outbox(
 
     幂等键 = action_id；同键重放（IntegrityError）按已登记处理不报错。
     """
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(ActionRecordRow, record.id)
         if row is None:
@@ -296,7 +297,7 @@ def save_record_with_outbox(
 
 
 def save_schedule(schedule: ActionSchedule) -> ActionSchedule:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(ActionScheduleRow, schedule.id)
         if row is None:
@@ -356,7 +357,7 @@ def mark_schedule_cancelled(action_id: str) -> ActionSchedule | None:
 
 def claim_due_schedule(action_id: str, now: datetime | None = None) -> ActionSchedule | None:
     """CAS：scheduled/due → due（消费端原子认领）。非可认领态返回 None。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = session.scalars(
             select(ActionScheduleRow).where(ActionScheduleRow.action_id == action_id)
@@ -371,7 +372,7 @@ def claim_due_schedule(action_id: str, now: datetime | None = None) -> ActionSch
 
 
 def _mark_schedule_status(action_id: str, status: str) -> ActionSchedule | None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.scalars(
             select(ActionScheduleRow).where(ActionScheduleRow.action_id == action_id)

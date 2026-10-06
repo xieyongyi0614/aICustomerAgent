@@ -18,7 +18,7 @@ from app.chains import (
     turn_analysis_chain,
 )
 from app.core.logutils import content_preview
-from app.core import ids
+from app.core import ids, timeutil
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -85,8 +85,8 @@ def _router_candidate(result) -> tuple[str, float]:
 
 
 def _idle_seconds_since(moment: datetime) -> float:
-    now = datetime.now(moment.tzinfo) if moment.tzinfo is not None else datetime.now()
-    return max((now - moment).total_seconds(), 0.0)
+    now = timeutil.now()
+    return max((now - timeutil.ensure_aware(moment)).total_seconds(), 0.0)
 
 
 def _stabilize_mode(role_mode_result, state, session_id: str) -> mode_service.ModeDecision:
@@ -166,10 +166,10 @@ def _select_goal(
 ) -> SelectedGoal:
     try:
         settings = get_settings()
-        now = datetime.now()
+        now = timeutil.local_now()
         late_night = (
-            now.hour >= settings.goal_late_night_start
-            or now.hour < settings.goal_late_night_end
+            timeutil.local(now).hour >= settings.goal_late_night_start
+            or timeutil.local(now).hour < settings.goal_late_night_end
         )
         goals_for_select = list(state.goals)
         if state.layered_goals:
@@ -361,7 +361,7 @@ def _ephemeral_run_context(user_id: str, session_id: str | None) -> RunContext:
         run_kind=RUN_KIND_FOREGROUND_CHAT,
         trigger_type=TRIGGER_CHANNEL_MESSAGE,
         reason="user_message",
-        started_at=datetime.now(),
+        started_at=timeutil.now(),
     )
 
 
@@ -588,13 +588,13 @@ async def run_chat_pipeline(
                 selected_goal,
                 state,
                 turn,
-                datetime.now(),
+                timeutil.now(),
                 scene_pending=_is_pending(resolved_state),
             )
             if validated_intention.degraded:
                 trace.mark_status("intention", "degraded")
             decision_audit = _run_foreground_decision(
-                run_ctx, user_id, validated_intention, selected_goal, datetime.now()
+                run_ctx, user_id, validated_intention, selected_goal, timeutil.now()
             )
             current_goal = (
                 {

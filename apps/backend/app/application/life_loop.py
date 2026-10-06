@@ -17,6 +17,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.application import (
     agent_runtime,
@@ -77,7 +78,7 @@ async def run_life_loop_worker(tick_seconds: int | None = None, llm=None) -> Non
 async def run_life_loop_tick(llm=None, now: datetime | None = None) -> dict:
     """单周期：工作发现（纯 SQL/规则，0 LLM）→ 用户周期 → 维护步骤。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     stats: dict = {"user_cycles": 0, "maintenance": 0, "aborted": 0, "idle": False}
     work_users = await asyncio.to_thread(_collect_work_users, now)
     maintenance_pending = await asyncio.to_thread(_maintenance_pending, settings)
@@ -157,6 +158,7 @@ def _goal_work_due(user_id: str, now: datetime) -> bool:
 def _inactivity_eligible(user_id: str, now: datetime) -> bool:
     """闲置触发的廉价前置判定（完整守卫在 evaluate_inactivity 内复检）。"""
     settings = get_settings()
+    now = timeutil.ensure_aware(now)
     conversation = conversation_repository.get_latest_for_user(user_id)
     if conversation is None:
         return False
@@ -164,20 +166,22 @@ def _inactivity_eligible(user_id: str, now: datetime) -> bool:
     last = messages[-1] if messages else None
     if last is None or last.created_at is None:
         return False
-    if (now - last.created_at).total_seconds() / 60 < settings.autonomy_inactivity_minutes:
+    last_at = timeutil.ensure_aware(last.created_at)
+    if (now - last_at).total_seconds() / 60 < settings.autonomy_inactivity_minutes:
         return False
     last_user = next((m for m in reversed(messages) if m.role == "human"), None)
     if last_user is None or last_user.created_at is None:
         return False
+    last_user_at = timeutil.ensure_aware(last_user.created_at)
     if (
         last.role == "human"
-        and (now - last_user.created_at).total_seconds() / 60
+        and (now - last_user_at).total_seconds() / 60
         < settings.autonomy_min_user_reply_gap_minutes
     ):
         return False
     try:
         _, attempts = proactive_repository.aggregate_episode(
-            user_id, episode_start=last_user.created_at
+            user_id, episode_start=last_user_at
         )
     except Exception:
         logger.exception("episode 尝试数读取失败，按 0 处理")

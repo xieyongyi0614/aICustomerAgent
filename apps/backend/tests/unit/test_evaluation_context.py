@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application.post_process import PostProcessContext
 from app.models.behavior_strategy import (
     ActionBudget,
@@ -42,7 +43,7 @@ def stub_repos(monkeypatch):
 
 
 def make_memory(content: str = "用户喜欢寿司", memory_id: str = "m1") -> UserMemory:
-    now = datetime.now()
+    now = timeutil.now()
     return UserMemory(
         id=memory_id,
         user_id="default-user",

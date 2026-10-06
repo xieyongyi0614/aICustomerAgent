@@ -5,6 +5,7 @@
 
 import logging
 
+from app.core import timeutil
 from app.models.world import TimeContext, World
 from app.models.world_simulation import UserSituation, WorldBrief
 
@@ -34,7 +35,7 @@ def _time_line(time_ctx: TimeContext, weather: str | None) -> str:
     part = PART_OF_DAY_CN.get(time_ctx.part_of_day, "")
     date_text = time_ctx.now.strftime("%m-%d")
     weather_text = WEATHER_CN.get(weather or "", "")
-    segments = [date_text, WEEKDAY_CN[time_ctx.now.weekday()], part, clock]
+    segments = [date_text, WEEKDAY_CN[timeutil.local(time_ctx.now).weekday()], part, clock]
     if weather_text:
         segments.append(weather_text)
     return " ".join(s for s in segments if s)

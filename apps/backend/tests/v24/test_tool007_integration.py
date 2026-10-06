@@ -41,8 +41,11 @@ FROZEN_SOURCES: dict[str, str] = {
     # 原值 f0ba90cb。
     # C2 声明（2026-10-03，ADR-16）：`world_id_for` 纯函数退役改查库（`find_world_id`，
     # 世界未建立返回 None，读路径空返回语义不变）—— 非 TOOL-007 改脏。原值 3d462118。
-    "app/application/world_engine.py": "648469b80829839981342278fa282439f568ec31c15ac22b22d0dea191ddefcb",
-    "app/application/outbox_consumer.py": "f6de9c06247820c39b9db9b41f07216c7764c037ff961030662a297ea0ec2dc1",
+    # 时间口径统一（2026-10-05，0006~0008）：`datetime.now()` → `timeutil.now()`（aware UTC）
+    # —— 非 TOOL-007 改脏。原值 648469b8。
+    "app/application/world_engine.py": "cf74e817921eb28a955d3a3ec56e118f03e83eec6a4713d4bfe75f5a5fdb4471",
+    # 同上。原值 f6de9c06。
+    "app/application/outbox_consumer.py": "3b39824bea81e6c12bfa6bf2c49ce6436b7c3b45e0f4076db9cec2ac41c48109",
 }
 """V2.4.0 TOOL-007 冻结摘要：世界模拟与 outbox 消费路径**零 diff**（改则本测试失败）。
 

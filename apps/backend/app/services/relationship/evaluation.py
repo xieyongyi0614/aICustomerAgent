@@ -7,6 +7,7 @@
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import (
     InsightRow,
     Memory,
@@ -132,7 +133,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
             "pass": bool(total) and score >= spec["threshold"],
         }
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": timeutil.now().isoformat(timespec="seconds"),
         "metrics": metrics,
         "gate_passed": all(m["pass"] for m in metrics.values()),
         "failed_scenarios": [
@@ -297,7 +298,7 @@ def _run_conflict_resolution_narrative(now: datetime) -> dict:
     _seed_event(
         "ev-settle", user, "冲突解决", now, event_type="none", source="system"
     )
-    now_db = datetime.now()
+    now_db = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             memory_repository.Memory(
@@ -342,7 +343,7 @@ def _run_conflict_resolution_narrative(now: datetime) -> dict:
 def _run_shared_experience_reconciliation(now: datetime) -> dict:
     user = "rel-eval-shared"
     _seed_event("ev-1", user, "一起看了日出", now)
-    now_db = datetime.now()
+    now_db = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             memory_repository.Memory(

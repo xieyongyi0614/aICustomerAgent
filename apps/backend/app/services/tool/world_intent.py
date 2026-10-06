@@ -18,6 +18,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.core import timeutil
 from app.services.tool.context import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class WorldIntent(BaseModel):
     intent_type: str
     reason: str = Field(default="", max_length=REASON_MAX_CHARS)
     target: str | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
     def brief(self) -> dict:
         return {

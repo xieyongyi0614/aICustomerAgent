@@ -6,6 +6,7 @@
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import BriefingPreferenceRow, SessionLocal
 
 
@@ -33,6 +34,6 @@ def upsert(
         row.city = city
         row.latitude = latitude
         row.longitude = longitude
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         return row

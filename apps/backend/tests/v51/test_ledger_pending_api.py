@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.models.action import ActionRecord
@@ -48,7 +49,7 @@ def _request(
         question="这笔金额较大，要记吗？",
         candidates=(),
         pending_key=pending_key,
-        expires_at=datetime.now() + expires_in,
+        expires_at=timeutil.now() + expires_in,
         amount_minor=amount_minor,
         source_ref=source_ref,
     )
@@ -125,8 +126,8 @@ def test_list_pending_skips_malformed_payload_and_counts_degraded(
             params={"confirmation": request_to_mapping(_request("pk-malformed"))},
             status="planned",
             gate_reason="pending_confirmation",
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=timeutil.now(),
+            updated_at=timeutil.now(),
         )
     )
     response = client.get("/api/v1/ledger/pending")

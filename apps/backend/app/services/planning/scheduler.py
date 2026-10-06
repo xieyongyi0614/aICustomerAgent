@@ -43,6 +43,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 
+from app.core import timeutil
 from app.models.goal import (
     ON_FAILURE_MODE_VALUES,
     OnFailureMode,
@@ -317,7 +318,9 @@ def _in_cooldown(spec: PlanStepSpec, ctx) -> bool:
     minutes = _cooldown_minutes(ctx)
     if now is None or minutes is None or spec.last_attempt_at is None:
         return False
-    return (now - spec.last_attempt_at) < timedelta(minutes=minutes)
+    return (
+        timeutil.ensure_aware(now) - timeutil.ensure_aware(spec.last_attempt_at)
+    ) < timedelta(minutes=minutes)
 
 
 def _cooldown_minutes(ctx) -> int | None:

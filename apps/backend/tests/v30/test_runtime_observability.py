@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application import observability
 from app.application.agent_runtime import debug_view as debug_view_module
 from app.application.agent_runtime import execution_history
@@ -78,7 +79,7 @@ def _trace_row(
     action_id: str | None = None,
     age_days: int = 0,
 ) -> None:
-    created = datetime.now() - timedelta(days=age_days)
+    created = timeutil.now() - timedelta(days=age_days)
     with db_session_factory() as session:
         session.add(
             RuntimeTraceRow(
@@ -106,7 +107,7 @@ def _trace_row(
 def _action(
     record_id: str, *, run_id: str | None, user_id: str, session_id: str | None = None
 ) -> ActionRecord:
-    now = datetime.now()
+    now = timeutil.now()
     return action_repository.save_record(
         ActionRecord(
             id=record_id,
@@ -153,7 +154,7 @@ def _decision(
         confidence=0.9,
         outcome=None,
         candidates=None,
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
     decision_repository.save(record)
     return record
@@ -272,7 +273,7 @@ class TestDebugView:
         assert debug_view_module.debug_view("missing-run") is None
 
     def test_by_session_returns_ordered_runs(self, db_session_factory):
-        base = datetime.now() - timedelta(hours=2)
+        base = timeutil.now() - timedelta(hours=2)
         created: list[str] = []
         for offset in (30, 0, 15):
             row = loop_run_repository.create_run(
@@ -453,7 +454,7 @@ class TestReplayBundle:
             snapshot={"id": "snap-replay"},
             version=1,
             run_id=run.id,
-            now=datetime.now(),
+            now=timeutil.now(),
         )
         loop_run_repository.finish_run(run.id, status="done")
 
@@ -506,7 +507,7 @@ class TestReplayBundle:
             age_days=0,
         )
 
-        deleted = trace_repository.prune_before(datetime.now() - timedelta(days=1))
+        deleted = trace_repository.prune_before(timeutil.now() - timedelta(days=1))
 
         assert deleted == 1
         assert trace_repository.get_by_trace_id("tr-ret-old") is None

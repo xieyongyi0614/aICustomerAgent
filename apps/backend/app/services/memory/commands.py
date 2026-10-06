@@ -17,7 +17,7 @@ from app.core.settings import get_settings
 from app.services.memory import evaluator as memory_evaluator
 from app.services.memory import lifecycle as memory_lifecycle
 from app.engines.memory_conflict import _lcs_length, same_topic
-from app.core import ids
+from app.core import ids, timeutil
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +222,7 @@ def _create_command_candidate(user_id: str, *, action: str, object_text: str):
             salience=1.0,
             status=STATUS_PENDING,
             visibility="private",
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
         session.add(row)
         session.commit()

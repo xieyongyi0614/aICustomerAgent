@@ -2,12 +2,13 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.action import ActionRecord
 from app.repositories import action_repository
 
 
 def _record(user_id="u1", action_type="create_reminder", status="created", dedupe="k1", id=None) -> ActionRecord:
-    now = datetime.now()
+    now = timeutil.now()
     return ActionRecord(
         id=id or action_repository.new_record_id(),
         user_id=user_id,
@@ -55,7 +56,7 @@ def test_list_by_status_and_user():
 def test_list_by_dedupe_and_count_active():
     action_repository.save_record(_record(dedupe="dup", status="created"))
     action_repository.save_record(_record(dedupe="dup", status="succeeded"))
-    now = datetime.now()
+    now = timeutil.now()
     dup = action_repository.list_by_dedupe("u1", "dup", now - timedelta(days=1))
     assert len(dup) == 2
     active = action_repository.count_active("u1")
@@ -63,7 +64,7 @@ def test_list_by_dedupe_and_count_active():
 
 
 def test_list_retryable():
-    now = datetime.now()
+    now = timeutil.now()
     rec = _record(status="executing")
     rec.next_retry_at = now - timedelta(seconds=5)
     action_repository.save_record(rec)
@@ -74,7 +75,7 @@ def test_list_retryable():
 
 def test_retain_cleanup():
     old = _record(dedupe="kold")
-    old.created_at = datetime.now() - timedelta(days=365)
+    old.created_at = timeutil.now() - timedelta(days=365)
     action_repository.save_record(old)
     fresh = _record(dedupe="knew")
     action_repository.save_record(fresh)

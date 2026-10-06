@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import SettingsError, get_settings
 from app.models.world import (
     EventImportance,
@@ -99,7 +100,7 @@ def test_time_context_day_line():
 def test_world_context_defaults():
     context = WorldContext(
         time=TimeContext(
-            now=datetime.now(), weekday="周一", part_of_day="morning", time_mode=WorldTimeMode.REAL_SYNC
+            now=timeutil.now(), weekday="周一", part_of_day="morning", time_mode=WorldTimeMode.REAL_SYNC
         ),
         location={
             "current": "home.living_room",

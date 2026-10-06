@@ -14,6 +14,7 @@ from datetime import datetime
 import threading
 from typing import Any
 
+from app.core import timeutil
 from app.application import agent_state_assembler
 from app.application.agent_runtime.contracts import (
     DEFAULT_CHARACTER_ID,
@@ -88,7 +89,7 @@ def _ledger_source(
     latest_fn: Callable[[str], datetime | None],
 ) -> Callable[[str, str, datetime | None], StateVersion]:
     def _build(user_id: str, _character_id: str, now: datetime | None) -> StateVersion:
-        observed_at = now or datetime.now()
+        observed_at = timeutil.ensure_aware(now) or timeutil.now()
         try:
             count = count_fn(user_id)
             latest_at = latest_fn(user_id)
@@ -103,7 +104,7 @@ def _snapshot_source(
     domain: str,
 ) -> Callable[[str, str, datetime | None], StateVersion]:
     def _build(user_id: str, character_id: str, now: datetime | None) -> StateVersion:
-        observed_at = now or datetime.now()
+        observed_at = timeutil.ensure_aware(now) or timeutil.now()
         try:
             row = domain_ledger.latest_state_snapshot(user_id, character_id)
         except Exception:
@@ -157,7 +158,7 @@ def version(
 ) -> StateVersion:
     source = DOMAIN_SOURCES.get(domain)
     if source is None:
-        return StateVersion(domain, None, "unavailable", None, now or datetime.now())
+        return StateVersion(domain, None, "unavailable", None, timeutil.ensure_aware(now) or timeutil.now())
     return source(user_id, character_id, now)
 
 
@@ -229,7 +230,7 @@ def reconcile(
         conflicts.append(conflict)
         resolved[domain] = final
     return ReconcileReport(
-        time_point=now or datetime.now(),
+        time_point=timeutil.ensure_aware(now) or timeutil.now(),
         snapshot_version=agent_state.snapshot_version,
         conflicts=tuple(conflicts),
         resolved=resolved,
@@ -248,7 +249,7 @@ def activate(
     cached = run.data.get("runtime_state")
     if cached is not None:
         return cached
-    time_point = run.started_at or now or datetime.now()
+    time_point = run.started_at or timeutil.ensure_aware(now) or timeutil.now()
     agent_state = snapshot(user_id, character_id, now=time_point)
     versions = {
         domain: version(domain, user_id, character_id, now=time_point)

@@ -9,6 +9,7 @@ import logging
 import re
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna.action import (
     ACTION_LEXICON_PRIORITY,
     ACTION_TRIGGER_LEXICON,
@@ -286,7 +287,7 @@ def detect_action_intent(
     if not settings.action_detector_enabled:
         return None
     try:
-        return _detect(content, now or datetime.now())
+        return _detect(content, timeutil.ensure_aware(now) or timeutil.now())
     except Exception:
         logger.exception("行动检出异常，降级为 None")
         return None

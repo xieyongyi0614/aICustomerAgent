@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core.db import ActionScheduleRow, ActionRecordRow
 from app.models.action import ActionEffect, ActionRecord, ActionResult, ActionSchedule
 from app.repositories import action_repository
@@ -19,7 +20,7 @@ def _record(
     source="conversation",
     priority=100,
 ) -> ActionRecord:
-    now = datetime.now()
+    now = timeutil.now()
     return ActionRecord(
         id=action_repository.new_record_id(),
         user_id=user_id,
@@ -36,7 +37,7 @@ def _record(
 
 
 def _schedule(action_id: str, when_type="delay", status="scheduled", offset_minutes=30) -> ActionSchedule:
-    now = datetime.now()
+    now = timeutil.now()
     return ActionSchedule(
         id=action_repository.new_schedule_id(),
         action_id=action_id,
@@ -109,7 +110,7 @@ class TestScheduleRepository:
     def test_save_get_roundtrip(self):
         action_repository.save_record(_record(dedupe="a1"))
         record = action_repository.list_by_dedupe(
-            "u1", "a1", datetime.now() - timedelta(days=1)
+            "u1", "a1", timeutil.now() - timedelta(days=1)
         )[0]
         schedule = action_repository.save_schedule(_schedule(record.id))
         loaded = action_repository.get_schedule(record.id)
@@ -123,7 +124,7 @@ class TestScheduleRepository:
     def test_duplicate_action_id_rejected(self):
         action_repository.save_record(_record(dedupe="a2"))
         record = action_repository.list_by_dedupe(
-            "u1", "a2", datetime.now() - timedelta(days=1)
+            "u1", "a2", timeutil.now() - timedelta(days=1)
         )[0]
         action_repository.save_schedule(_schedule(record.id))
         with pytest.raises(IntegrityError):
@@ -132,12 +133,12 @@ class TestScheduleRepository:
                     id=action_repository.new_schedule_id(),
                     action_id=record.id,
                     when_type="delay",
-                    scheduled_at=datetime.now(),
+                    scheduled_at=timeutil.now(),
                 )
             )
 
     def test_list_due_schedules(self):
-        now = datetime.now()
+        now = timeutil.now()
         for i, offset in enumerate((-10, 60)):
             action_repository.save_record(_record(dedupe=f"d{i}"))
             record = action_repository.list_by_dedupe(
@@ -153,7 +154,7 @@ class TestScheduleRepository:
     def test_mark_executed_and_cancelled(self):
         action_repository.save_record(_record(dedupe="m1"))
         record = action_repository.list_by_dedupe(
-            "u1", "m1", datetime.now() - timedelta(days=1)
+            "u1", "m1", timeutil.now() - timedelta(days=1)
         )[0]
         action_repository.save_schedule(_schedule(record.id))
         executed = action_repository.mark_schedule_executed(record.id)
@@ -162,7 +163,7 @@ class TestScheduleRepository:
 
         action_repository.save_record(_record(dedupe="m2"))
         record2 = action_repository.list_by_dedupe(
-            "u1", "m2", datetime.now() - timedelta(days=1)
+            "u1", "m2", timeutil.now() - timedelta(days=1)
         )[0]
         action_repository.save_schedule(_schedule(record2.id))
         cancelled = action_repository.mark_schedule_cancelled(record2.id)
@@ -172,14 +173,14 @@ class TestScheduleRepository:
     def test_immediate_cron_types(self):
         action_repository.save_record(_record(dedupe="w1"))
         record = action_repository.list_by_dedupe(
-            "u1", "w1", datetime.now() - timedelta(days=1)
+            "u1", "w1", timeutil.now() - timedelta(days=1)
         )[0]
         action_repository.save_schedule(_schedule(record.id, when_type="immediate", offset_minutes=0))
         assert action_repository.get_schedule(record.id).when_type == "immediate"
 
         action_repository.save_record(_record(dedupe="w2"))
         record2 = action_repository.list_by_dedupe(
-            "u1", "w2", datetime.now() - timedelta(days=1)
+            "u1", "w2", timeutil.now() - timedelta(days=1)
         )[0]
         action_repository.save_schedule(_schedule(record2.id, when_type="cron"))
         assert action_repository.get_schedule(record2.id).when_type == "cron"
@@ -190,7 +191,7 @@ class TestScheduleRepository:
                 id="sch_x",
                 action_id="act_x",
                 when_type="weekly",
-                scheduled_at=datetime.now(),
+                scheduled_at=timeutil.now(),
             )
 
 

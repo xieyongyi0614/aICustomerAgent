@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.evaluation import EvaluationDimension, IssueCode
 from app.models.goal import GoalPlanRecord, SubGoalSpec
@@ -17,7 +18,7 @@ from app.services.evaluation.context import collect_goal_slice
 from app.services.evaluation.rules import run_rules
 from app.services.evaluation.rules.goal import RULES
 
-NOW = datetime(2026, 9, 8, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 8, 12, 0, 0))
 USER = "aut5-user"
 
 

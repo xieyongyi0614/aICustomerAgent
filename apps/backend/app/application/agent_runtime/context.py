@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.application import world_engine
 from app.application.agent_runtime import state as state_manager
 from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
@@ -240,7 +241,7 @@ async def assemble(
         if cached is not None:
             return cached
 
-    time_point = now or getattr(run, "started_at", None) or datetime.now()
+    time_point = now or getattr(run, "started_at", None) or timeutil.now()
     degradations: list[ContextDegradation] = []
 
     user_id = _resolve_user_id(session_context, run)

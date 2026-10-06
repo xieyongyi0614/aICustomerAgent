@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.application.autonomy_engine import (
     _autonomy_action_today,
@@ -19,7 +20,7 @@ from app.models.world import EventStatus
 from app.repositories import action_repository, world_repository
 from app.services.autonomy import trigger as trigger_evaluator
 
-NOW = datetime(2026, 9, 3, 14, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 3, 14, 0, 0))
 USER = "auto-action-user"
 
 

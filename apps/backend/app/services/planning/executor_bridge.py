@@ -60,6 +60,7 @@ import json
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.agent_run_types import RUN_KIND_AUTONOMOUS_TICK
 from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
@@ -389,7 +390,7 @@ def _surface_context(user_id: str, ctx, at: datetime, settings) -> ToolContext:
 
 
 def _moment(ctx) -> datetime:
-    return getattr(ctx, "now", None) or datetime.now()
+    return getattr(ctx, "now", None) or timeutil.now()
 
 
 def _step_max_attempts(explicit: int | None, settings) -> int:

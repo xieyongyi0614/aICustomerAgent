@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import RelationshipEventRow, RelationshipStateRow, SessionLocal
 from app.models.relationship import RelationshipEvent, RelationshipState
 
@@ -47,7 +48,7 @@ def get_relationship(user_id: str) -> RelationshipState:
 def upsert_relationship(
     user_id: str, relationship: RelationshipState
 ) -> RelationshipState:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(RelationshipStateRow, user_id)
         if row is None:
@@ -63,7 +64,7 @@ def commit_relationship_update(
     user_id: str, relationship: RelationshipState, events: list[RelationshipEvent]
 ) -> RelationshipState:
     """状态与事件账本同事务落库，避免部分成功导致的对账漂移。"""
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(RelationshipStateRow, user_id)
         if row is None:

@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
@@ -49,7 +50,7 @@ def _memory(
     last_accessed_at=None,
     created_at=None,
 ):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             MemoryRow(
@@ -86,14 +87,14 @@ def _rejected_candidate(id, content, user_id="u1", created_at=None):
                 source_id=f"src-{id}",
                 status="rejected",
                 reason="low_score:0.10",
-                created_at=created_at or datetime.datetime.now(),
+                created_at=created_at or timeutil.now(),
             )
         )
         session.commit()
 
 
 def _contradicts_pair(survivor_id, dead_id, dead_updated_at=None):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     _memory(survivor_id, f"{survivor_id} 内容")
     _memory(dead_id, f"{dead_id} 内容", status="superseded")
     with retriever.SessionLocal() as session:
@@ -127,7 +128,7 @@ class TestScoring:
         assert retriever._cosine([1.0], [1.0, 2.0]) == 0.0
 
     def test_structured_components(self):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         memory = memory_repository.UserMemory(
             id="m1", user_id="u1", character_id="asuna", type="user_preference",
             content="内容", importance=0.9, created_at=now, updated_at=now,
@@ -136,7 +137,7 @@ class TestScoring:
         assert score == pytest.approx((1.0 + 0.9 + 0.6) / 3.0)
 
     def test_recency_half_life(self):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         memory = memory_repository.UserMemory(
             id="m1", user_id="u1", character_id="asuna", type="user_fact",
             content="内容", importance=0.5, created_at=now, updated_at=now,
@@ -156,7 +157,7 @@ class TestScoring:
         monkeypatch.setattr(get_settings(), "memory_weight_semantic", 0.5)
         monkeypatch.setattr(get_settings(), "memory_weight_structured", 0.3)
         monkeypatch.setattr(get_settings(), "memory_weight_affinity", 0.2)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _memory("m1", "用户喜欢吃西瓜", embedding=json.dumps([1.0, 0.0]), created_at=now)
         _embed_stub(monkeypatch, {"我喜欢吃水果": [1.0, 0.0]})
         result = retriever.retrieve("u1", "我喜欢吃水果", top_k=5)
@@ -229,19 +230,19 @@ class TestFilters:
         _memory("m1", "用户喜欢吃香菜")
         _rejected_candidate(
             "rc1", "用户喜欢吃香菜",
-            created_at=datetime.datetime.now() - datetime.timedelta(hours=25),
+            created_at=timeutil.now() - datetime.timedelta(hours=25),
         )
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == ["m1"]
 
     def test_contradicts_cooldown_survivor_filtered(self, retrieve_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _contradicts_pair("survivor", "dead", dead_updated_at=now)
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == []
 
     def test_contradicts_beyond_cooldown_survivor_visible(self, retrieve_db):
-        stale = datetime.datetime.now() - datetime.timedelta(hours=25)
+        stale = timeutil.now() - datetime.timedelta(hours=25)
         _contradicts_pair("survivor", "dead", dead_updated_at=stale)
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == ["survivor"]

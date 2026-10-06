@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.core.settings._shared import SettingsError
 from app.models.action import ActionSchema
@@ -400,7 +401,7 @@ class ToolRegistry:
         window.append(ok)
         if len(window) > TOOL_HEALTH_WINDOW_SIZE:
             del window[: len(window) - TOOL_HEALTH_WINDOW_SIZE]
-        now = datetime.now()
+        now = timeutil.now()
         if ok:
             record.consecutive_failures = 0
             record.last_success_at = now

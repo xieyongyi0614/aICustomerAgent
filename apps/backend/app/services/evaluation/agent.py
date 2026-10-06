@@ -8,6 +8,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.repositories import (
     action_repository,
@@ -31,8 +32,8 @@ METRIC_NAMES = (
 
 def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
     settings = get_settings()
-    now = now or datetime.now()
-    window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    now = timeutil.ensure_aware(now) or timeutil.now()
+    window_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     metrics = _compute_metrics(user_id, now)
     history = [
         row
@@ -50,7 +51,7 @@ def run_daily_snapshot(user_id: str, now: datetime | None = None) -> dict:
 
 
 def _compute_metrics(user_id: str, now: datetime) -> dict:
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     metrics: dict = {name: None for name in METRIC_NAMES}
 
     metrics["action_quality"] = _action_quality(user_id, day_start, now)

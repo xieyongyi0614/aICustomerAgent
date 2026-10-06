@@ -12,6 +12,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import (
     DevelopmentChangeRow,
     DevelopmentStateRow,
@@ -116,7 +117,7 @@ def collect_slice(user_id: str) -> DevelopmentSlice | None:
 
 def run_scenarios(session_factory, now=None) -> list[dict]:
     """注入式场景 runner：调用方负责 SessionLocal 环境与确定性数据（0 LLM）。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     return [
         _run_compile_idempotent(session_factory, now),
         _run_cap_saturation(session_factory, now),
@@ -144,7 +145,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
             "pass": bool(total) and score >= spec["threshold"],
         }
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": timeutil.now().isoformat(timespec="seconds"),
         "metrics": metrics,
         "gate_passed": all(m["pass"] for m in metrics.values()),
         "failed_scenarios": [
@@ -454,7 +455,7 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
     → 反思强化（confidence 提升）→ 调制演进；周期 3：用户反驳 → 失效 → 回退基线。
     每周期执行归因链审计（memory→evidence→insight→changes→state）。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     user_id = user_id or f"eval-{SCENARIO_GROWTH_LOOP}"
     settings = get_settings()
     failures: list[str] = []

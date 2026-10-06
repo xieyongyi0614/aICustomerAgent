@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import action_engine
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
 from app.models.action import ActionIntent, make_dedupe_key
@@ -606,7 +607,7 @@ class TestAuthorisationAndValidationLayers:
         await action_engine.run_action_planning(USER, _send_intent(), source="autonomy")
         request = get_confirmation_service().pending(USER)[0]
 
-        stale = datetime.now() - timedelta(hours=48)
+        stale = timeutil.now() - timedelta(hours=48)
         row = trigger_repository.get(request.request_id)
         payload = dict(row.payload)
         payload["expires_at"] = stale.isoformat()
@@ -643,8 +644,8 @@ class TestAuthorisationAndValidationLayers:
                 action_type="remember_fact",
                 status="planned",
                 dedupe_key="plan6:existing:1:1",
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
         )
 

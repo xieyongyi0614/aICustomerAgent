@@ -10,6 +10,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.models.goal import GoalPlanRecord
 from app.repositories import (
     background_job_repository,
@@ -199,7 +200,7 @@ class TestEnqueueAndGate:
     def test_attempt_cap_rejects_fourth_request_without_llm(self, aut_on, monkeypatch):
         goal = _make_goal()
         for version in range(1, 4):
-            now = datetime.now()
+            now = timeutil.now()
             goal_repository.create_plan(
                 GoalPlanRecord(
                     goal_id=goal.id,

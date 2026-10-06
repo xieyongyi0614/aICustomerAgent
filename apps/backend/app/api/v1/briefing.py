@@ -13,6 +13,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.core.settings import get_settings
 from app.repositories import briefing_preference_repository
@@ -89,7 +90,7 @@ async def get_briefing(
             for card in draft.cards
         ],
         cta=draft.cta,
-        generated_at=draft.generated_at or datetime.now().isoformat(timespec="seconds"),
+        generated_at=draft.generated_at or timeutil.now().isoformat(timespec="seconds"),
     )
 
 

@@ -8,6 +8,7 @@ import logging
 import random
 from datetime import date
 
+from app.core import timeutil
 from app.character.asuna.calendar import season_of
 from app.character.asuna.world import WORLD_WEATHER_VALUES
 
@@ -108,7 +109,7 @@ def evolve_daily_weather(user_id: str) -> str | None:
         if world is None:
             return None
         ctx = world_engine._default_provider.context(world)
-        day = ctx.now.date()
+        day = timeutil.local(ctx.now).date()
         key = f"weather:{day.isoformat()}"
         if key in world_simulation_repository.get_latest_idempotency_keys(
             world.world_id, [key]

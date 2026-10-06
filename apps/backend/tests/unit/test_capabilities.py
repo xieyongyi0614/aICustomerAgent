@@ -4,12 +4,13 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.repositories import memory_repository, world_repository
 from app.services.action.capabilities import register_builtin
 from app.services.action.registry import CapabilityRegistry, ExecutionContext
 
-NOW = datetime(2026, 9, 3, 14, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 3, 14, 0, 0))
 USER = "u-action"
 
 

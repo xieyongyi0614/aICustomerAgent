@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Mapping
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import (
     CarLoanRow,
@@ -77,7 +78,7 @@ def upsert_profile(
     unknown = set(values) - PROFILE_FIELDS
     if unknown:
         raise ValueError(f"未知档案字段: {sorted(unknown)}")
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = (
             session.query(CarProfileRow)
@@ -121,7 +122,7 @@ def upsert_loan(
     unknown = set(values) - LOAN_FIELDS
     if unknown:
         raise ValueError(f"未知车贷字段: {sorted(unknown)}")
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = (
             session.query(CarLoanRow).filter(CarLoanRow.user_id == user_id).first()
@@ -150,7 +151,7 @@ def create_service_record(
     *,
     now: datetime | None = None,
 ) -> CarServiceRecordRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = CarServiceRecordRow(
             id=_new_id(),
@@ -199,7 +200,7 @@ def create_mileage_log(
     *,
     now: datetime | None = None,
 ) -> CarMileageLogRow:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = CarMileageLogRow(
             id=_new_id(),

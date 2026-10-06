@@ -5,6 +5,7 @@ from datetime import datetime
 from httpx import ASGITransport, AsyncClient
 import pytest
 
+from app.core import timeutil
 from app.main import app
 from app.models.autonomy import ProactiveAction
 from app.models.evaluation import (
@@ -60,13 +61,13 @@ def _seed():
                 )
             },
             verdict="warn",
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
     )
     conversation_repository.get_or_create_conversation("s-metrics", "default-user")
     conversation_repository.save_message("s-metrics", "human", "hi")
     conversation_repository.save_message("s-metrics", "ai", "hello")
-    now = datetime.now()
+    now = timeutil.now()
     proactive_repository.enqueue(
         ProactiveAction(
             id="m-action-1",

@@ -8,6 +8,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import action_engine
 from app.application.action_engine import execute_plan, integrate_result, new_record
 from app.models.action import (
@@ -100,7 +101,7 @@ async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch
     record = new_record(intent, "rec-user", session_id=None)
     ctx = ExecutionContext(
         user_id="rec-user", character_id="asuna", record_id=record.id,
-        now=datetime.now(), settings=ctx_settings(),
+        now=timeutil.now(), settings=ctx_settings(),
     )
     result = await execute_plan(record, _plan(intent, "flaky"), ctx)
     assert result.status == "failed"
@@ -109,7 +110,7 @@ async def test_transient_retry_schedules_backoff(db_session_factory, monkeypatch
     base = ctx.settings.action_retry_backoff_seconds
     expected = base * (2 ** (record.attempt - 1))
     assert record.next_retry_at is not None
-    assert abs((record.next_retry_at - datetime.now()).total_seconds() - expected) < 2
+    assert abs((record.next_retry_at - timeutil.now()).total_seconds() - expected) < 2
 
 
 @pytest.mark.asyncio
@@ -127,7 +128,7 @@ async def test_transient_exceeded_attempts_terminal(db_session_factory, monkeypa
     record.attempt = 2  # 已达上限
     ctx = ExecutionContext(
         user_id="rec-user-2", character_id="asuna", record_id=record.id,
-        now=datetime.now(), settings=ctx_settings(),
+        now=timeutil.now(), settings=ctx_settings(),
     )
     result = await execute_plan(record, _plan(intent, "flaky"), ctx)
     assert result.status == "failed"
@@ -145,7 +146,7 @@ async def test_permanent_no_retry_fails(db_session_factory, monkeypatch, overrid
     record = new_record(intent, "rec-user-3", session_id=None)
     ctx = ExecutionContext(
         user_id="rec-user-3", character_id="asuna", record_id=record.id,
-        now=datetime.now(), settings=ctx_settings(),
+        now=timeutil.now(), settings=ctx_settings(),
     )
     result = await execute_plan(record, _plan(intent, "perma"), ctx)
     assert result.status == "failed"

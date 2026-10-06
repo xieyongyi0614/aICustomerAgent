@@ -18,6 +18,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import Memory as MemoryRow
 from app.core.db import SessionLocal
 from app.repositories import memory_repository, trace_repository
@@ -207,7 +208,7 @@ def source_count_of(extra: dict) -> int:
 
 
 def _week_start(now: datetime) -> datetime:
-    return (now - timedelta(days=now.weekday())).replace(
+    return (now - timedelta(days=timeutil.local(now).weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
 
@@ -239,7 +240,7 @@ def receipts_for(
         return index, False
     candidates = set(memory_ids)
     try:
-        cutoff = datetime.now() - timedelta(days=RECEIPT_WINDOW_DAYS)
+        cutoff = timeutil.now() - timedelta(days=RECEIPT_WINDOW_DAYS)
         traces = trace_repository.list_since(cutoff, limit=RECEIPT_TRACE_LIMIT)
     except Exception:
         logger.exception("用途回执派生失败，按区块级降级返回空回执")
@@ -296,7 +297,7 @@ def list_product_memories(user_id: str, limit: int = 200) -> ProductMemoryList:
     rows = memory_repository.list_active(user_id, CHARACTER_ID, limit=limit)
     facts = row_facts([row.id for row in rows])
     receipts, degraded = receipts_for(user_id, [row.id for row in rows])
-    week_start = _week_start(datetime.now())
+    week_start = _week_start(timeutil.local_now())
 
     buckets: dict[str, list[ProductMemoryItem]] = {kind: [] for kind in GROUP_ORDER}
     for row in rows:
@@ -312,7 +313,7 @@ def list_product_memories(user_id: str, limit: int = 200) -> ProductMemoryList:
         1 for row in rows if row.created_at and row.created_at >= week_start
     )
     return ProductMemoryList(
-        generated_at=datetime.now().isoformat(),
+        generated_at=timeutil.to_iso(timeutil.now()),
         total=total,
         added_this_week=added_this_week,
         groups=groups,
@@ -367,4 +368,4 @@ def forget_memory_for_user(memory_id: str, user_id: str, trace=None) -> str:
         return first_forgotten_at.isoformat()
 
     refreshed = row_facts([memory_id]).get(memory_id, {}).get("forgotten_at")
-    return (refreshed or datetime.now()).isoformat()
+    return timeutil.to_iso(refreshed) or timeutil.to_iso(timeutil.now())

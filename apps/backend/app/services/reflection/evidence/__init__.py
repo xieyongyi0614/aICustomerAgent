@@ -55,7 +55,6 @@ from app.services.reflection.evidence.collectors import (
     _is_revoke,
     _lcs_length,
     _member_weight,
-    _naive,
     _observations_digest,
     _parse_vector,
     _plan_action_facts,

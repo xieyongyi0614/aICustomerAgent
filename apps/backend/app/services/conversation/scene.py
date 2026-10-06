@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 
 from app.chains import scene_update_chain
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.scene import (
     COMPLETED_ACTIONS_WINDOW,
@@ -16,7 +17,7 @@ _FIELD_MAX_LENGTH = 50
 
 
 def _idle_gap_text(state: SceneState, now: datetime) -> str:
-    reference = state.last_active_at
+    reference = timeutil.ensure_aware(state.last_active_at)
     if reference is None:
         return "一段时间"
     delta = now - reference
@@ -52,7 +53,9 @@ def _pending_directive(pending: PendingAction, verb: str) -> str:
 def _is_idle_expired(state: SceneState, now: datetime) -> bool:
     if not get_settings().scene_idle_reset_enabled or state.last_active_at is None:
         return False
-    idle_hours = (now - state.last_active_at).total_seconds() / 3600
+    idle_hours = (
+        now - timeutil.ensure_aware(state.last_active_at)
+    ).total_seconds() / 3600
     return idle_hours >= get_settings().scene_idle_reset_hours
 
 
@@ -63,7 +66,7 @@ def resolve(
     pending_max_turns: int | None = None,
     now: datetime | None = None,
 ) -> tuple[SceneState, str | None]:
-    current_now = now or datetime.now()
+    current_now = timeutil.ensure_aware(now) or timeutil.now()
     directives: list[str] = []
     pending = state.pending_action
     if _is_idle_expired(state, current_now):
@@ -117,7 +120,7 @@ def apply_new_pending(
         action=action,
         status="pending",
         created_at_turn=current_turn,
-        created_at=now or datetime.now(),
+        created_at=timeutil.ensure_aware(now) or timeutil.now(),
     )
     return state.model_copy(update={"pending_action": new_pending})
 

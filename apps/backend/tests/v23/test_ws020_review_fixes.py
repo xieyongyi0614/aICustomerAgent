@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.core.settings import get_settings
 from app.models.world import WorldEvent
@@ -41,7 +42,7 @@ def _plan(user: str, seq: int = 0, plan_date: date = date(2026, 9, 14)) -> Daily
         status=DailyPlanStatus.PLANNED,
         routine_version=1,
         note=None,
-        created_at=datetime(2026, 9, 14, 6, 0),
+        created_at=timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0)),
     )
 
 
@@ -81,7 +82,7 @@ def test_maintenance_prunes_on_day_rollover(db_session_factory, monkeypatch):
         user = "ws020-rollover"
         world = world_repository.ensure_world(user)
         repo.save_plan(_plan(user, plan_date=date(2026, 1, 1)))
-        anchor = datetime(2026, 9, 14, 9, 0)
+        anchor = timeutil.ensure_aware(datetime(2026, 9, 14, 9, 0))
         repo.commit_time_advance(world.world_id, anchor, anchor)
 
         world_engine.run_simulation_maintenance(user, now=anchor)
@@ -97,8 +98,8 @@ def test_maintenance_prunes_on_day_rollover(db_session_factory, monkeypatch):
 def test_commit_time_advance_rejects_earlier_anchor(db_session_factory):
     user = "ws020-anchor"
     world = world_repository.ensure_world(user)
-    later = datetime(2026, 9, 14, 12, 0)
-    earlier = datetime(2026, 9, 14, 10, 0)
+    later = timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0))
+    earlier = timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0))
 
     assert repo.commit_time_advance(world.world_id, later, later) is True
     assert repo.commit_time_advance(world.world_id, earlier, earlier) is False
@@ -113,14 +114,14 @@ def test_commit_time_advance_advances_monotonically(db_session_factory):
     world = world_repository.ensure_world(user)
 
     assert repo.commit_time_advance(
-        world.world_id, datetime(2026, 9, 14, 10, 0), datetime(2026, 9, 14, 10, 0)
+        world.world_id, timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0)), timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0))
     )
     assert repo.commit_time_advance(
-        world.world_id, datetime(2026, 9, 14, 11, 0), datetime(2026, 9, 14, 11, 0)
+        world.world_id, timeutil.ensure_aware(datetime(2026, 9, 14, 11, 0)), timeutil.ensure_aware(datetime(2026, 9, 14, 11, 0))
     )
 
     stored = world_repository.get_world(user)
-    assert stored.sim_last_advanced_at == datetime(2026, 9, 14, 11, 0)
+    assert stored.sim_last_advanced_at == timeutil.ensure_aware(datetime(2026, 9, 14, 11, 0))
 
 
 # --- M5：时间标记豁免配额 + 丢弃可观测 ---------------------------------------
@@ -178,7 +179,7 @@ def test_event_quota_drop_is_observable(db_session_factory, monkeypatch):
 
 
 def _fill_quota(world_id: str, event_type: str) -> None:
-    now = datetime(2026, 9, 14, 6, 0)
+    now = timeutil.ensure_aware(datetime(2026, 9, 14, 6, 0))
     world_repository.save_event(
         WorldEvent(
             id=world_repository.new_event_id(),
@@ -208,8 +209,8 @@ def test_day_cycle_observation_survives_process_state_loss(
         world = world_repository.ensure_world(user)
         repo.commit_time_advance(
             world.world_id,
-            datetime(2026, 9, 14, 10, 0),
-            datetime(2026, 9, 14, 10, 0),
+            timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0)),
+            timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0)),
         )
         day_cycle.reset_observation(user)
 
@@ -221,8 +222,8 @@ def test_day_cycle_observation_survives_process_state_loss(
 
         repo.commit_time_advance(
             world.world_id,
-            datetime(2026, 9, 14, 15, 0),
-            datetime(2026, 9, 14, 15, 0),
+            timeutil.ensure_aware(datetime(2026, 9, 14, 15, 0)),
+            timeutil.ensure_aware(datetime(2026, 9, 14, 15, 0)),
         )
         emitted = day_cycle.emit_time_markers(user)
         assert emitted == ["time:part:2026-09-14:dusk"]
@@ -235,7 +236,7 @@ def test_day_cycle_observation_cleared_on_reset(db_session_factory):
     world = world_repository.ensure_world(user)
     repo.save_day_cycle_observation(
         world.world_id,
-        observed_at=datetime(2026, 9, 14, 10, 0),
+        observed_at=timeutil.ensure_aware(datetime(2026, 9, 14, 10, 0)),
         part_of_day="morning",
         time_mode="real_sync",
     )

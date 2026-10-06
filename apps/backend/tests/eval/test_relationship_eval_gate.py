@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.services.relationship import evaluation
 
@@ -35,7 +36,7 @@ def test_relationship_eval_gate(db_session_factory, rel_eval_flags):
         assert report["metrics"][metric_id]["pass"] is True, metric_id
 
     REPORT_DIR.mkdir(exist_ok=True)
-    report_path = REPORT_DIR / f"rel-{datetime.now():%Y%m%d}.json"
+    report_path = REPORT_DIR / f"rel-{timeutil.now():%Y%m%d}.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",

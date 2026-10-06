@@ -34,6 +34,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import ActionStep, CapabilityResult
 from app.models.tool import (
@@ -384,7 +385,7 @@ class ToolExecutor:
 
 
 def _now(ctx: ToolContext | ExecutionContext) -> datetime:
-    return getattr(ctx, "now", None) or datetime.now()
+    return getattr(ctx, "now", None) or timeutil.now()
 
 
 def _with_dedupe_key(ctx: ToolContext | ExecutionContext, dedupe_key: str):

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.repositories import world_repository
 from app.services.tool import world_context as world_context_module
@@ -546,6 +547,6 @@ def test_current_block_uses_passed_now_when_world_clock_unavailable(db_session_f
     seed_world()
     seed_plan(start_minutes=0, end_minutes=1439, status="planned", activity="整日")
     block = WorldContextBuilder(world_settings()).build(
-        USER, now=datetime(2026, 9, 14, 23, 30, 0), settings=world_settings()
+        USER, now=timeutil.ensure_aware(datetime(2026, 9, 14, 23, 30, 0)), settings=world_settings()
     )["world"]["current_block"]
     assert block is not None and block["activity"] == "整日"

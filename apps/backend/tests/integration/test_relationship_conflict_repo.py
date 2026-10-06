@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.relationship import ConflictRecord
 from app.repositories import relationship_conflict_repository as repo
 
-NOW = datetime(2026, 8, 31, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 31, 12, 0, 0))
 
 
 def _record(status="conflict", **overrides) -> ConflictRecord:

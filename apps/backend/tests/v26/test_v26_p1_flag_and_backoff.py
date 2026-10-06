@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import Settings, get_settings
 from app.models.action import ActionResult
 from app.repositories import action_repository
@@ -51,7 +52,7 @@ class TestExecuteBackoffGuard:
         )
         record = action_repository.get_record(action.id)
         record.status = "executing"
-        record.next_retry_at = datetime.now() + timedelta(minutes=5)
+        record.next_retry_at = timeutil.now() + timedelta(minutes=5)
         action_repository.save_record(record)
 
         result = asyncio.run(manager.execute(action.id))
@@ -70,12 +71,12 @@ class TestExecuteBackoffGuard:
             action_type="create_reminder",
             params={
                 "content": "过期退避",
-                "due_at": (datetime.now() + timedelta(hours=1)).isoformat(),
+                "due_at": (timeutil.now() + timedelta(hours=1)).isoformat(),
             },
         )
         record = action_repository.get_record(action.id)
         record.status = "planned"
-        record.next_retry_at = datetime.now() - timedelta(seconds=1)
+        record.next_retry_at = timeutil.now() - timedelta(seconds=1)
         action_repository.save_record(record)
 
         result = asyncio.run(manager.execute(action.id))

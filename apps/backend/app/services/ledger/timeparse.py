@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import re
+from app.core import timeutil
 
 _NOON = ("中午", "午饭", "午餐")
 _MORNING = ("早上", "上午", "今早", "早晨")
@@ -31,7 +32,7 @@ def resolve_occurred_at(
     text = hint.strip()
     base = world_time
     if base.tzinfo is None:
-        base = base.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        base = base.replace(tzinfo=timeutil.now().astimezone().tzinfo)
 
     day_offset = 0
     if any(token in text for token in _YESTERDAY):
@@ -55,7 +56,7 @@ def resolve_occurred_at(
         match = _WEEKDAY_RE.search(text)
         if match:
             target = _WEEKDAY_MAP[match.group("day")]
-            current = base.weekday()
+            current = timeutil.local(base).weekday()
             delta = current - target
             if "上周" in text:
                 delta += 7

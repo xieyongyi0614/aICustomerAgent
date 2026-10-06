@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.services.insights import query as insights_query
 
@@ -76,5 +77,5 @@ def list_insights(
             for i in items
         ],
         domain=domain or "home",
-        generated_at=datetime.now().isoformat(),
+        generated_at=timeutil.now().isoformat(),
     )

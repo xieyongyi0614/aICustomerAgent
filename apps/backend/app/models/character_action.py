@@ -10,7 +10,7 @@ from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
-from app.core import ids
+from app.core import ids, timeutil
 
 ActionType = Literal["CREATE", "MOVE", "CONSUME"]
 
@@ -151,7 +151,7 @@ class WorldAction(BaseModel):
     status: WorldActionStatus = WorldActionStatus.CANDIDATE
     dedupe_key: str = ""
     turn_ref: TurnRef
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
     @model_validator(mode="after")
     def validate_action(self):

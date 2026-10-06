@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.deps import debug_surface_gate
 from app.api.v1.schemas import (
@@ -150,7 +151,7 @@ def get_tool_surface(run_kind: str | None = None, user_id: str | None = None):
         resolved_kind,
         ToolContext(
             user_id=user_id or "",
-            now=datetime.now(),
+            now=timeutil.now(),
             settings=settings,
             run_kind=resolved_kind,
         ),
@@ -179,7 +180,7 @@ def list_tool_executions(user_id: str, limit: int = 50):
 def list_tool_permissions(user_id: str):
     """有效授权清单（持久层 + 进程层 + 通道级隐含）；总闸 off → `{"enabled": false}`。"""
     service = get_confirmation_service(get_settings())
-    grants = service.grant_records(user_id, datetime.now())
+    grants = service.grant_records(user_id, timeutil.now())
     return ToolPermissionsOut(
         enabled=True,
         user_id=user_id,

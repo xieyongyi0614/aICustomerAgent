@@ -5,6 +5,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from app.core import timeutil
 from app.core.db import Base
 
 pytestmark = pytest.mark.xdist_group("migration")
@@ -173,7 +174,7 @@ def test_sqlite_candidate_unique_and_job_state(tmp_path):
 
     import datetime
 
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with engine.begin() as connection:
         connection.execute(
             text(

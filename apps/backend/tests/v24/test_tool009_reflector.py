@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.character.asuna import evaluation as asuna_evaluation
 from app.core.db import BackgroundJobRow, InsightRow, Memory, ReflectionRunRow
 from app.core.settings import get_settings
@@ -30,7 +31,7 @@ from tests.v24.tool009_support import (
     tool_record,
 )
 
-NOW = datetime(2026, 9, 14, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0, 0))
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 WINDOW_USAGE = asuna_evaluation.TOOL_WINDOW_USAGE_EFFECT
@@ -88,7 +89,7 @@ def _queued_run_id(session_factory) -> str:
 def _execute_queued(session_factory, llm, proposal) -> str:
     run_id = _queued_run_id(session_factory)
     llm.proposals = [proposal]
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     outcome = reflector.execute_run(run_id)
     return outcome
 
@@ -308,7 +309,7 @@ def test_insight_is_not_auto_revoked_when_tool_succeeds_later(
     )
     triggers.trigger_for_user(USER, now=NOW + timedelta(hours=3), channel=triggers.CHANNEL_TOOL)
     for run_id in [run.id for run in _runs(db_session_factory) if run.status == "queued"]:
-        reflector._claim_run(run_id, datetime.now())
+        reflector._claim_run(run_id, timeutil.now())
         reflector.execute_run(run_id)
     insight = _insights(db_session_factory)[0]
     assert insight.id == insight_id
@@ -450,7 +451,7 @@ def _seed_cluster_memory(session_factory, memory_id, *, created_at, content):
                 source_ref={"table": "conversation", "id": f"conv:u:s:{memory_id}"},
                 visibility="private",
                 created_at=created_at,
-                updated_at=datetime.now(),
+                updated_at=timeutil.now(),
             )
         )
         session.commit()

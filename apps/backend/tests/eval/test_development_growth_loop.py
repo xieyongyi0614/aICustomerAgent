@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import (
     Base,
     DevelopmentStateRow,
@@ -150,7 +151,7 @@ def growth_env(monkeypatch):
 
 
 def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
-    now = datetime.now()
+    now = timeutil.now()
     result = evaluation.run_growth_loop(growth_env["session"], now=now)
     assert result["failures"] == [], result["failures"]
     assert result["stats"]["cycles"] == 3
@@ -163,7 +164,7 @@ def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
     assert report["metrics"]["E-DEV-04"]["pass"] is True
 
     REPORT_DIR.mkdir(exist_ok=True)
-    report_path = REPORT_DIR / f"dev-growth-{datetime.now():%Y%m%d}.json"
+    report_path = REPORT_DIR / f"dev-growth-{timeutil.now():%Y%m%d}.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
@@ -172,7 +173,7 @@ def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
 
 
 def test_growth_loop_amplitude_evolves_with_new_evidence(growth_env):
-    now = datetime.now()
+    now = timeutil.now()
     result = evaluation.run_growth_loop(growth_env["session"], now=now)
     assert result["failures"] == []
     insight_ids = result["stats"]["insight_ids"]
@@ -195,7 +196,7 @@ def test_growth_loop_amplitude_evolves_with_new_evidence(growth_env):
 
 
 def test_growth_loop_cycle2_experience_ingested_via_p1(growth_env):
-    now = datetime.now()
+    now = timeutil.now()
     evaluation.run_growth_loop(growth_env["session"], now=now)
     with growth_env["session"]() as session:
         contents = [

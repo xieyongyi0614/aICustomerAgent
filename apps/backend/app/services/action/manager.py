@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import (
     Action,
@@ -30,7 +31,7 @@ CANCELLABLE_STATUSES = ("created", "planned")
 
 
 def _now() -> datetime:
-    return datetime.now()
+    return timeutil.now()
 
 
 def _record_to_action(record: ActionRecord) -> Action:

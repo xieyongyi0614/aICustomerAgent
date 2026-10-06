@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import AgentMetricSnapshotRow, SessionLocal
 
@@ -29,7 +30,7 @@ def save(
     now: datetime | None = None,
 ) -> AgentMetricSnapshotRow:
     """按 (user, character, window_start) upsert：同窗口重复执行不落第二行。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = (
             session.query(AgentMetricSnapshotRow)

@@ -5,6 +5,7 @@
 """
 
 from app.character.asuna import evaluation as asuna_evaluation
+from app.core import timeutil
 from app.core.db import Memory, Message
 from app.core.settings import get_settings
 from app.engines.memory_conflict import _lcs_length, same_topic
@@ -57,7 +58,6 @@ from app.services.reflection.evidence.windows import (
     _followups_for,
     _is_revoke,
     _member_weight,
-    _naive,
     _observations_digest,
     _parse_vector,
     _record_reference_time,
@@ -120,8 +120,8 @@ def _row_facts(memory_ids: list[str]) -> dict[str, dict]:
                 "visibility": visibility,
                 "source": source,
                 "source_ref": source_ref,
-                "last_reinforced_at": _naive(last_reinforced_at),
-                "created_at": _naive(created_at),
+                "last_reinforced_at": timeutil.ensure_aware(last_reinforced_at),
+                "created_at": timeutil.ensure_aware(created_at),
             }
     return facts
 
@@ -138,7 +138,7 @@ def aggregate_evidence_windows(
     的一条路径（零豁免、零旁路）。
     """
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     try:
         result = _aggregate(user_id, character_id, now)
     except Exception as exc:
@@ -218,9 +218,11 @@ def _pool(user_id: str, character_id: str, now: datetime) -> list[dict]:
         content = (memory.content or "").strip()
         if not content or memory.superseded_by is not None:
             continue
-        reference = _naive(fact.get("last_reinforced_at")) or _naive(
-            fact.get("created_at")
-        ) or _naive(memory.created_at)
+        reference = timeutil.ensure_aware(
+            fact.get("last_reinforced_at")
+        ) or timeutil.ensure_aware(fact.get("created_at")) or timeutil.ensure_aware(
+            memory.created_at
+        )
         if reference < window_start:
             continue
         candidates.append(
@@ -233,7 +235,8 @@ def _pool(user_id: str, character_id: str, now: datetime) -> list[dict]:
                 "source": fact.get("source") or memory.source,
                 "source_identity": _source_identity(memory.id, fact.get("source_ref")),
                 "reference": reference,
-                "created_at": _naive(fact.get("created_at")) or memory.created_at,
+                "created_at": timeutil.ensure_aware(fact.get("created_at"))
+                or timeutil.ensure_aware(memory.created_at),
             }
         )
     return candidates
@@ -448,7 +451,7 @@ def aggregate_tool_evidence(
 ) -> ToolEvidencePackage:
     """工具效能证据包：三窗聚合 → 逐组门槛 → 达门槛窗口（纯读、零 LLM）。"""
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     try:
         facts = _window_facts(user_id, now, window_days)
         tool_windows = aggregate_tool_windows(
@@ -506,13 +509,14 @@ def _window_facts(
     user_id: str, now: datetime, window_days: int
 ) -> list[ToolExecutionFact]:
     """窗口内工具执行事实（`action_records` 终态投影，超出时间窗的丢弃）。"""
+    now = timeutil.ensure_aware(now)
     records = memory_sources.fetch_action_records(
         user_id, limit=TOOL_EVIDENCE_RECORD_SCAN_LIMIT
     )
     start = now - timedelta(days=window_days)
     facts: list[ToolExecutionFact] = []
     for record in records:
-        reference = _record_reference_time(record)
+        reference = timeutil.ensure_aware(_record_reference_time(record))
         if reference is None or reference < start or reference > now:
             continue
         for index, step in enumerate(record.steps or []):
@@ -582,7 +586,7 @@ def _human_messages_after(
                 .all()
             )
             messages[session_id] = [
-                (_naive(created_at), content or "") for created_at, content in rows
+                (timeutil.ensure_aware(created_at), content or "") for created_at, content in rows
             ]
     return messages
 
@@ -772,7 +776,7 @@ def aggregate_plan_evidence(
     或跨度不足）→ 该组不成窗，故不产 Insight：调用链上不存在「证据不足仍调 LLM」的路径。
     """
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
     try:
         structure_facts, action_facts = _plan_facts(user_id, now, window_days)
@@ -837,13 +841,14 @@ def _plan_structure_facts(
     读取面只有既有两个函数：`list_active_plans`（活跃目标 × 活跃计划）与
     `list_plans`（该目标的版本链）；超出时间窗的步按窗口纪律丢弃。
     """
+    now = timeutil.ensure_aware(now)
     start = now - timedelta(days=window_days)
     facts: list[PlanStepFact] = []
     for goal, _plan in goal_repository.list_active_plans(user_id):
         for plan in goal_repository.list_plans(goal.id):
-            reference = _naive(plan.updated_at) or _naive(plan.created_at)
+            reference = timeutil.ensure_aware(plan.updated_at) or timeutil.ensure_aware(plan.created_at)
             for spec in plan.sub_goals:
-                observed = _naive(spec.last_observed_at) or reference
+                observed = timeutil.ensure_aware(spec.last_observed_at) or reference
                 if observed is None or observed < start or observed > now:
                     continue
                 facts.append(
@@ -873,6 +878,7 @@ def _plan_action_facts(
     记录恒为单步记录（执行桥一次一 intent），故证据 id 即记录级 `dedupe_key`——
     与 `PLAN_STEP_DEDUPE_KEY_TEMPLATE` 同源，零硬编码。
     """
+    now = timeutil.ensure_aware(now)
     records = action_repository.list_records(
         user_id, limit=TOOL_EVIDENCE_RECORD_SCAN_LIMIT
     )
@@ -882,7 +888,7 @@ def _plan_action_facts(
         parsed = plan_evidence_id_of(str(record.dedupe_key or ""))
         if parsed is None:
             continue
-        reference = _record_reference_time(record)
+        reference = timeutil.ensure_aware(_record_reference_time(record))
         if reference is None or reference < start or reference > now:
             continue
         step = (record.steps or [{}])[0]

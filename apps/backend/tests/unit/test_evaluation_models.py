@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.core.settings import Settings, SettingsError, get_settings
 from app.models.evaluation import (
     DEFAULT_SEVERITY,
@@ -117,7 +118,7 @@ def test_evaluation_report_construction():
         verdict="pass",
         issues=[],
         meta=EvaluationMeta(judge_used=True, model_name="fake"),
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
     assert report.verdict == "pass"
     payload = json.loads(report.model_dump_json())

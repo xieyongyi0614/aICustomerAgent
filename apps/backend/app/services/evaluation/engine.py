@@ -10,6 +10,7 @@ import logging
 import time
 from datetime import datetime
 
+from app.core import timeutil
 from app.chains import evaluation_judge_chain
 from app.core.settings import get_settings
 from app.models.evaluation import (
@@ -171,7 +172,7 @@ def finalize_report(
             duration_ms=round(duration_ms, 2),
             request_id=context.request_id or None,
         ),
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
     return report
 

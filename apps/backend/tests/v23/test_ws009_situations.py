@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.application import post_process
 from app.core.settings import get_settings
 from app.models.world_simulation import SituationDimension, SituationStatus
@@ -53,7 +54,7 @@ def test_health_detection_with_high_importance(db_session_factory, detect_flags)
     assert situation.dimension == SituationDimension.HEALTH
     assert situation.intensity >= 4
     assert situation.evidence["quote"].startswith("我感冒了")
-    assert situation.valid_until > datetime.now()
+    assert situation.valid_until > timeutil.now()
     events = [e for e in _events(user) if e.type == "user_condition"]
     assert events and events[0].importance.value == "high"
     assert events[0].payload["kind"] == "detected"
@@ -84,7 +85,7 @@ def test_same_dimension_supersedes(db_session_factory, detect_flags):
 def test_dismissal_emits_ended(db_session_factory, detect_flags):
     user = "ws009-dismiss"
     situation = user_situation.detect_from_message(user, "我感冒了")
-    dismissed = user_situation.dismiss_matching(user, "我好了，没事了", datetime.now())
+    dismissed = user_situation.dismiss_matching(user, "我好了，没事了", timeutil.now())
     assert situation.id in dismissed
     assert repo.get_situation(user, situation.id).status == SituationStatus.DISMISSED
     events = [e for e in _events(user) if e.type == "user_condition"]
@@ -96,7 +97,7 @@ def test_expire_and_notify(db_session_factory, detect_flags):
     user = "ws009-expire"
     situation = user_situation.detect_from_message(user, "我感冒了")
     stale = user_situation.detect_from_message(user, "最近压力大")
-    expired = user_situation.expire_and_notify(user, datetime.now() + timedelta(hours=72))
+    expired = user_situation.expire_and_notify(user, timeutil.now() + timedelta(hours=72))
     assert {s.id for s in expired} == {situation.id, stale.id}
     events = [e for e in _events(user) if e.type == "user_condition"]
     assert sum(1 for e in events if e.payload["kind"] == "ended") == 2

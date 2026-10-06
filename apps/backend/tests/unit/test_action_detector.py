@@ -4,9 +4,10 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.services.action.detector import detect_action_intent
 
-NOW = datetime(2026, 9, 3, 14, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 3, 14, 0, 0))
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def test_create_reminder_confident(action_on):
     assert intent.action_type == "create_reminder"
     assert intent.confidence == "confident"
     assert intent.params["content"] == "开会"
-    assert datetime.fromisoformat(intent.params["due_at"]) == datetime(2026, 9, 4, 8, 0)
+    assert datetime.fromisoformat(intent.params["due_at"]) == timeutil.ensure_aware(datetime(2026, 9, 4, 8, 0))
 
 
 def test_create_reminder_ambiguous_without_due(action_on):

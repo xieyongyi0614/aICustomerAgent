@@ -8,6 +8,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import OutboxEventRow, SessionLocal
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _now(now: datetime | None) -> datetime:
-    return now or datetime.now()
+    return timeutil.ensure_aware(now) or timeutil.now()
 
 
 def get(idempotency_key: str) -> OutboxEventRow | None:

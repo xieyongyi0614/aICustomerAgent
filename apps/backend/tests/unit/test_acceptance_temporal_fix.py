@@ -5,6 +5,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.memory import UserMemory
 from app.models.world import EventImportance, EventSource, EventStatus, WorldEvent
 from app.prompts.scene import build_scene_section
@@ -36,7 +37,7 @@ def test_relative_time_label_buckets():
 
 
 def test_time_anchor_appended_and_fresh_memories_untouched():
-    now = datetime.now()
+    now = timeutil.now()
     fresh = _memory("用户喜欢西瓜", now - timedelta(minutes=10))
     assert _with_time_anchor(fresh, now).content == "用户喜欢西瓜"
     old = _memory("用户喜欢西瓜", now - timedelta(days=3))

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
 from app.models.ledger import LedgerEntryDraft
@@ -18,7 +19,7 @@ from app.services.ledger.query import Period, summary
 from app.services.ledger.service import ensure_user_bootstrap, record_entry
 
 BACKEND = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 9, 22, 21, 35, 0)  # 周二 21:35
+NOW = timeutil.ensure_aware(datetime(2026, 9, 22, 21, 35, 0))  # 周二 21:35
 USER = "digest-user"
 
 

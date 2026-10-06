@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
@@ -67,17 +68,15 @@ def _select_retrieval_segment(ranked) -> tuple[list, int, int]:
 
 
 def _freshness(memory) -> tuple:
-    reference = memory.last_accessed_at or memory.created_at
+    reference = timeutil.ensure_aware(memory.last_accessed_at or memory.created_at)
     if reference is None:
-        return (datetime.min, 0.0)
-    if reference.tzinfo is not None:
-        reference = reference.replace(tzinfo=None)
+        return (datetime.min.replace(tzinfo=timezone.utc), 0.0)
     return (reference, memory.importance)
 
 
 def _relative_time_label(reference: datetime, now: datetime) -> str | None:
-    if reference.tzinfo is not None:
-        reference = reference.replace(tzinfo=None)
+    reference = timeutil.ensure_aware(reference)
+    now = timeutil.ensure_aware(now)
     hours = (now - reference).total_seconds() / 3600
     if hours < 1:
         return None
@@ -253,7 +252,7 @@ def _build_sync(
     try:
         ranked = memory_retriever.retrieve(user_id, current_input, trace=trace)
         selected, retrieval_used, dropped = _select_retrieval_segment(ranked)
-        memories = [_with_time_anchor(m, datetime.now()) for m in selected]
+        memories = [_with_time_anchor(m, timeutil.now()) for m in selected]
         insights, insight_payload = _load_context_insights(
             user_id, retrieval_used, trace=trace
         )

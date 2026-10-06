@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core import timeutil
 from app.core import llm_factory
 from app.core.db import Base, Conversation, Message, create_engine_from_url
 from app.main import app
@@ -176,7 +177,7 @@ def test_sqlite_to_postgres_migration_script(postgres_url, tmp_path):
         source_url, connect_args={"check_same_thread": False}
     )
     Base.metadata.create_all(source_engine)
-    now = datetime.now()
+    now = timeutil.now()
     with Session(source_engine) as session:
         session.add(
             Conversation(

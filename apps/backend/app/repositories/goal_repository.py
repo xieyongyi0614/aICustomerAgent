@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import GoalPlanRow, GoalRow, SessionLocal
 from app.models.goal import (
@@ -92,7 +93,7 @@ def _to_plan_record(row: GoalPlanRow) -> GoalPlanRecord:
 def seed_goals(
     user_id: str, seeds: list[GoalSeed], character_id: str = "asuna"
 ) -> int:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         existing = (
             session.query(GoalRow)
@@ -175,7 +176,7 @@ def finish_goal(
         row.status = status
         if failure_reason is not None:
             row.failure_reason = failure_reason
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_record(row)
@@ -206,7 +207,7 @@ def reactivate_goal(goal_id: str) -> GoalRecord | None:
         if "active" not in goal_transitions(row.layer, row.status):
             raise ValueError(f"非法状态转换：{row.status} → active")
         row.status = "active"
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_record(row)
@@ -229,7 +230,7 @@ def set_status(
         row.status = target
         if arbitration_state is not None:
             row.arbitration_state = arbitration_state
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_record(row)
@@ -290,7 +291,7 @@ def update_plan_progress(plan_id: str, sub_goals: list[SubGoalSpec]) -> GoalPlan
         if row is None:
             return None
         row.sub_goals = [item.model_dump(mode="json") for item in sub_goals]
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_plan_record(row)
@@ -328,7 +329,7 @@ def create_hierarchical_goal(
                 raise ValueError("v1 目标不可作父级")
             if not validate_parent_layer(parent.layer, layer):
                 raise ValueError(f"父层倒挂：{parent.layer!r} 不可作 {layer!r} 的父级")
-        now = datetime.now()
+        now = timeutil.now()
         row = GoalRow(
             id=ids.new_id_str(),
             user_id=user_id,
@@ -489,7 +490,7 @@ def set_plan_status(plan_id: str, status: str) -> GoalPlanRecord | None:
         if row is None:
             return None
         row.status = status
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_plan_record(row)
@@ -502,7 +503,7 @@ def set_plan_rejection(plan_id: str, reason: str) -> GoalPlanRecord | None:
             return None
         row.status = "rejected"
         row.rejection_reason = reason
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_plan_record(row)

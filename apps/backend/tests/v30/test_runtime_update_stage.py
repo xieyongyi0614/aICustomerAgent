@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime.contracts import (
     EVENT_MEMORY_UPDATED,
@@ -451,7 +452,7 @@ class TestEvents:
             run_kind=RUN_KIND_AUTONOMOUS_TICK,
             trigger_type="schedule",
             reason="t",
-            started_at=datetime.now(),
+            started_at=timeutil.now(),
         )
         _run_update(action_outcome=_action_outcome(), run=run)
 

@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.deps import debug_surface_gate
 from app.engines import relationship_evolution
@@ -32,7 +33,7 @@ def get_relationship_state(user_id: str):
 
     state = relationship_repository.get_relationship(user_id)
     unlocks = relationship_milestone_repository.list_unlocks(user_id)
-    now = datetime.now()
+    now = timeutil.now()
     distance = distance_index(state, now)
     return {
         "user_id": user_id,
@@ -142,7 +143,7 @@ def rollback_relationship(user_id: str, target_version: int):
             detail=f"target_version 早于最早关键帧 {earliest}",
         )
     current = relationship_repository.get_relationship(user_id)
-    now = datetime.now()
+    now = timeutil.now()
     try:
         relationship_snapshot_repository.create_snapshot(
             user_id,

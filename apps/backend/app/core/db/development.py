@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     JSON,
@@ -14,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class DevelopmentStateRow(Base):
@@ -33,8 +32,8 @@ class DevelopmentStateRow(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active", server_default="active"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -72,7 +71,7 @@ class DevelopmentChangeRow(Base):
     after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     insight_id: Mapped[str] = mapped_column(String, nullable=False)
     reason: Mapped[str] = mapped_column(String, nullable=False, default="compiled", server_default="compiled")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

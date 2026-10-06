@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
+from app.core import timeutil
 from app.application import world_engine
 from app.models.action import ActionResult, CapabilityResult
 from app.repositories import action_repository
@@ -28,7 +29,7 @@ REQUIRED_RESULT_KEYS = {
 
 
 def _due_at(hours: int = 2) -> str:
-    return (datetime.now() + timedelta(hours=hours)).isoformat()
+    return (timeutil.now() + timedelta(hours=hours)).isoformat()
 
 
 class TestProjectionFunctions:

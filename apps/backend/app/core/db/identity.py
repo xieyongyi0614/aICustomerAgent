@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     PrimaryKeyConstraint,
@@ -13,7 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class UserRow(Base):
@@ -25,8 +24,8 @@ class UserRow(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active", server_default="active"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -56,8 +55,8 @@ class ChannelIdentityRow(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active", server_default="active"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         PrimaryKeyConstraint("channel", "external_id"),
@@ -74,7 +73,7 @@ class FeishuDedupeLedgerRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     event_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    received_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (Index("idx_feishu_dedupe_ledger_received_at", "received_at"),)
 
@@ -84,7 +83,7 @@ class FeishuDeliveryRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    delivered_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    delivered_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (Index("idx_feishu_deliveries_delivered_at", "delivered_at"),)
 
@@ -98,4 +97,4 @@ class BriefingPreferenceRow(Base):
     city: Mapped[str | None] = mapped_column(String, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)

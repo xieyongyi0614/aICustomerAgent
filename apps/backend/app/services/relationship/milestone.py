@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.relationship import (
     MilestoneRecord,
@@ -46,7 +47,7 @@ class MilestoneContext:
     character_intensity: float = 0.0
     conflict_transition: str = ""
     first_interaction_month: str = ""
-    now: datetime = field(default_factory=datetime.now)
+    now: datetime = field(default_factory=timeutil.now)
 
 
 @dataclass(frozen=True)

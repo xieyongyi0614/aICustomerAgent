@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.repositories import goal_repository
 from app.services.goal import execution as goal_execution
@@ -218,7 +219,7 @@ class TestAdvanceGoal:
         override_settings(autonomy_subgoal_failure_threshold="1")
         goal = _goal()
         for version in range(1, 3):
-            now = datetime.now()
+            now = timeutil.now()
             goal_repository.create_plan(
                 GoalPlanRecord(
                     goal_id=goal.id,
@@ -260,7 +261,7 @@ class TestFailureReplanReactivation:
             autonomy_planning_max_attempts="2",
         )
         goal = _goal()
-        now = datetime.now()
+        now = timeutil.now()
         goal_repository.create_plan(
             GoalPlanRecord(
                 goal_id=goal.id,

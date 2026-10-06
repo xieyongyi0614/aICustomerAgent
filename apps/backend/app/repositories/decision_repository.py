@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import DecisionRecordRow, SessionLocal
 from app.core.settings import get_settings
@@ -55,7 +56,7 @@ def _from_model(record: DecisionRecord, created_at: datetime) -> DecisionRecordR
 
 
 def save(record: DecisionRecord) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(record, now))

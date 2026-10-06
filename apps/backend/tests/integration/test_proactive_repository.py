@@ -2,10 +2,11 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.autonomy import ProactiveAction
 from app.repositories import proactive_repository as repo
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 
 
 def _action(**overrides) -> ProactiveAction:

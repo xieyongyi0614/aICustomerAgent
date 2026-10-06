@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.channels.base import ChannelErrorKind, OutboundMessage, SendResult
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.channels.feishu.outbound import split_text
@@ -560,7 +561,7 @@ def test_confirm_gate_requires_first_time_confirmation():
 
 
 def test_confirm_gate_allows_within_ttl_grant():
-    now = datetime.now()
+    now = timeutil.now()
     _gate, _definition, decision = _channel_decision(
         grants=[grant(CHANNEL_TOOL_ID, CHANNEL_SCOPE_TUPLE, expires_at=now + timedelta(hours=1))],
         now=now,
@@ -570,7 +571,7 @@ def test_confirm_gate_allows_within_ttl_grant():
 
 
 def test_confirm_gate_requires_confirmation_after_ttl():
-    now = datetime.now()
+    now = timeutil.now()
     _gate, _definition, decision = _channel_decision(
         grants=[grant(CHANNEL_TOOL_ID, CHANNEL_SCOPE_TUPLE, expires_at=now - timedelta(seconds=1))],
         now=now,

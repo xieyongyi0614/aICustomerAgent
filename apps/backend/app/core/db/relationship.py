@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     Integer,
@@ -16,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class RelationshipStateRow(Base):
@@ -43,13 +42,13 @@ class RelationshipStateRow(Base):
         Boolean, nullable=False, default=False, server_default=false()
     )
     last_interaction_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True
+        UtcDateTime, nullable=True
     )
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -88,7 +87,7 @@ class RelationshipEventRow(Base):
         String, nullable=False, default="conversation", server_default="conversation"
     )
     cause: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -117,12 +116,12 @@ class RelationshipConflictRow(Base):
     character_id: Mapped[str] = mapped_column(String, nullable=False, default="asuna")
     status: Mapped[str] = mapped_column(String, nullable=False)
     trigger_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    last_negative_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    recovery_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    last_negative_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    recovery_started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     resolution: Mapped[str] = mapped_column(String, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -145,7 +144,7 @@ class RelationshipMilestoneRow(Base):
     applied_bonus: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     unlocks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
@@ -175,7 +174,7 @@ class RelationshipSnapshotRow(Base):
     trigger: Mapped[str] = mapped_column(
         String, nullable=False, default="manual", server_default="manual"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(

@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.api.v1 import memory as memory_api
 from app.api.v1.schemas import MemoryEditIn
 from app.core.db import Memory
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.unit
 
 
 def _memory(**overrides) -> Memory:
-    now = overrides.pop("now", datetime.now())
+    now = overrides.pop("now", timeutil.now())
     values = {
         "id": "m1",
         "user_id": "u1",
@@ -121,7 +122,7 @@ def test_patch_maps_missing_to_404(db_session_factory):
 
 
 def test_patch_non_active_returns_404_not_403(db_session_factory):
-    _seed(_memory(id="m1", status="forgotten", forgotten_at=datetime.now()))
+    _seed(_memory(id="m1", status="forgotten", forgotten_at=timeutil.now()))
     with pytest.raises(HTTPException) as exc:
         memory_api.update_item(
             memory_id="m1", body=MemoryEditIn(content="x"), user_id="u1"

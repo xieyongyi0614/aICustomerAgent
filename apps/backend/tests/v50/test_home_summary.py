@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.api.v1 import home as home_api
 from app.repositories import ledger_repository
 from app.services.conversation import history as history_service
@@ -76,7 +77,7 @@ def test_insight_is_empty_without_produced_insights(db_session_factory):
 
 
 def test_insight_maps_produced_row(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     with insights_query.SessionLocal() as session:
         session.add(
             insights_query.InsightRow(
@@ -122,7 +123,7 @@ def test_home_api_keeps_zero_repositories_dependency():
 
 
 def _seed_expense(user_id: str, amount_minor: int, *, days_ago: int) -> None:
-    occurred = datetime.now() - timedelta(days=days_ago)
+    occurred = timeutil.now() - timedelta(days=days_ago)
     ledger_repository.create_entry(
         ledger_repository.LedgerEntryDraft(
             user_id=user_id,
@@ -152,7 +153,7 @@ def test_daily_expense_series_buckets_by_local_day():
 
 def test_daily_expense_series_reversal_clamps_negative_day():
     user_id = "u-home-bars-reversal"
-    now = datetime.now()
+    now = timeutil.now()
     row, _ = ledger_repository.create_entry(
         ledger_repository.LedgerEntryDraft(
             user_id=user_id,

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Mapping
 
+from app.core import timeutil
 from app.services.ledger.query import Period, list_entries, summary, top_categories
 
 LATE_NIGHT_HOUR = 22
@@ -26,7 +27,7 @@ class SpendingFeatures:
 def project_features(
     user_id: str, *, now: datetime | None = None, period: Period | None = None
 ) -> SpendingFeatures | None:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     window = period or Period.month(timestamp)
     data = summary(user_id, period=window, now=timestamp, compare_previous=False)
     if data.entry_count <= 0:
@@ -43,9 +44,9 @@ def project_features(
             int(item.amount_minor)
         )
         category_count[item.category_id] = category_count.get(item.category_id, 0) + 1
-        if item.occurred_at.hour >= LATE_NIGHT_HOUR or item.occurred_at.hour < 5:
+        if timeutil.local(item.occurred_at).hour >= LATE_NIGHT_HOUR or timeutil.local(item.occurred_at).hour < 5:
             late += 1
-        if item.occurred_at.weekday() >= 5:
+        if timeutil.local(item.occurred_at).weekday() >= 5:
             weekend += 1
         else:
             weekday += 1

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import timeutil
 from app.api.v1.auth import require_user
 from app.api.v1.deps import debug_surface_gate
 from app.models.action import transition_action
@@ -27,7 +28,7 @@ def list_actions(
     limit: int = 50,
 ):
     since = (
-        datetime.now() - timedelta(hours=window_hours) if window_hours is not None else None
+        timeutil.now() - timedelta(hours=window_hours) if window_hours is not None else None
     )
     records = action_repository.list_records(user_id or "", status=status, limit=max(1, min(limit, 200)))
     if action_type is not None:
@@ -74,8 +75,8 @@ def retry_action(record_id: str):
         next_status = "executing"
     record.status = next_status
     record.attempt += 1
-    record.next_retry_at = datetime.now() + timedelta(seconds=5)
-    record.updated_at = datetime.now()
+    record.next_retry_at = timeutil.now() + timedelta(seconds=5)
+    record.updated_at = timeutil.now()
     action_repository.save_record(record)
     return {"id": record.id, "status": record.status, "attempt": record.attempt}
 
@@ -92,6 +93,6 @@ def cancel_action(record_id: str):
         raise HTTPException(status_code=409, detail=f"action status={record.status} 不可取消")
     record.status = next_status
     record.gate_reason = "cancelled_by_user"
-    record.updated_at = datetime.now()
+    record.updated_at = timeutil.now()
     action_repository.save_record(record)
     return {"id": record.id, "status": record.status}

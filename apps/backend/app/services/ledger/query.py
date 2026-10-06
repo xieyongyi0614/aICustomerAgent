@@ -17,6 +17,7 @@ from datetime import datetime, time, timedelta
 from typing import Any, Literal, Sequence
 from zoneinfo import ZoneInfo
 
+from app.core import timeutil
 from app.models.ledger import to_major
 from app.repositories import ledger_repository
 
@@ -100,7 +101,7 @@ class LedgerEntryView:
 def _localize(value: datetime, tz: ZoneInfo | None) -> datetime:
     if value.tzinfo is not None:
         return value
-    return value.replace(tzinfo=tz or datetime.now().astimezone().tzinfo)
+    return value.replace(tzinfo=tz or timeutil.now().astimezone().tzinfo)
 
 
 def _net_by_key(
@@ -118,7 +119,9 @@ def _net_by_key(
 
 
 def _previous_equal_length(period: Period) -> Period:
-    span = period.until - period.since
+    since = timeutil.ensure_aware(period.since)
+    until = timeutil.ensure_aware(period.until)
+    span = until - since
     return Period(
         since=period.since - span,
         until=period.since,
@@ -193,16 +196,16 @@ def daily_expense_series(
     """近 N 天每日净支出（分，旧→新），口径同 `sum_signed_minor`：冲正按
     方向回冲（冲收入 = 回冲支出）；窗口内单次查询后按 `occurred_at` 当地日分桶，
     冲正落在其发生的当日，净额为负的日截 0（仅影响展示，不影响求和口径）。"""
-    anchor = now or datetime.now()
-    first_day = anchor.date() - timedelta(days=days - 1)
+    anchor = timeutil.ensure_aware(now) or timeutil.now()
+    first_day = timeutil.local(anchor).date() - timedelta(days=days - 1)
     rows = ledger_repository.list_entries(
         user_id,
         since=datetime.combine(first_day, time.min),
-        until=datetime.combine(anchor.date() + timedelta(days=1), time.min),
+        until=datetime.combine(timeutil.local(anchor).date() + timedelta(days=1), time.min),
     )
     buckets = [0] * days
     for row in rows:
-        offset = (row.occurred_at.date() - first_day).days
+        offset = (timeutil.local(row.occurred_at).date() - first_day).days
         if offset < 0 or offset >= days:
             continue
         amount = int(row.amount_minor)

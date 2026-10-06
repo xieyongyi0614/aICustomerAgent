@@ -48,7 +48,7 @@ PLAN_FACE_FUNCTIONS = (
 )
 
 FROZEN_PLAN_FACE_DIGEST = (
-    "836a352c9e8587c469fdbe6904c1a483559fb9f1d4f5f8fe8e7238e77b7eea99"
+    "8fa144173105988146615bcf4772ef238a22d0fd094491fda5561b51ef59a61a"
 )
 """既有九函数的源码摘要（PLAN-011 冻结值）：任何字节改动都会使本断言失败。
 

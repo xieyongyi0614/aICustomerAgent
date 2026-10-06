@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.api.v1.debug import plans as debug_api
 from app.api.v1.debug import tools as debug_tools
 from app.api.v1.schemas import (
@@ -238,7 +239,7 @@ class TestPlanStepsEndpoint:
                 support.step_spec(
                     1,
                     tool_id=None,
-                    last_attempt_at=datetime.now(),
+                    last_attempt_at=timeutil.now(),
                     binding_reason="fallback",
                 )
             ],
@@ -385,7 +386,7 @@ class TestPlanPendingEndpoint:
             goal.id,
             1,
             "active",
-            [support.step_spec(1, last_attempt_at=datetime.now())],
+            [support.step_spec(1, last_attempt_at=timeutil.now())],
         )
 
         body = (await support.plan_get(support.plan_url("/pending"), user_id=support.USER)).json()
@@ -530,7 +531,7 @@ class TestOutputModelContracts:
             cooldown.id,
             1,
             "active",
-            [support.step_spec(1, last_attempt_at=datetime.now())],
+            [support.step_spec(1, last_attempt_at=timeutil.now())],
         )
         off_surface = make_goal(user_id=support.USER, description="值域-无面")
         _plan(

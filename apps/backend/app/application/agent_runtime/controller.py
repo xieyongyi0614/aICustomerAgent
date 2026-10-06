@@ -10,6 +10,7 @@ import logging
 import time
 from datetime import datetime
 
+from app.core import timeutil
 from app.application.agent_runtime import profiles, trigger_router
 from app.application import agent_state_assembler
 from app.application.agent_state_assembler import run_state_snapshot_stage
@@ -48,7 +49,7 @@ def open_run(
     `session_id` 仅在 `runtime_session_tracking_enabled` 开启时写入（裁决 D4）；
     关闭时列恒为 NULL，读路径始终兼容 NULL。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     kind = "chat" if run_kind == RUN_KIND_FOREGROUND_CHAT else "autonomy"
     tracked_session_id = (
         session_id if get_settings().runtime_session_tracking_enabled else None
@@ -147,7 +148,7 @@ def close_run(
     （M-7），未给出时沿用时间窗口径（与 `life_loop` 一致，近似）。
     steps=None（前台整链包裹，无逐阶段记账）时保留台账既有 steps。
     """
-    finished = now or datetime.now()
+    finished = timeutil.ensure_aware(now) or timeutil.now()
     if budget_state is None:
         budget_state = life_loop_budget.check_daily_budget(now=finished).as_dict()
     try:
@@ -199,7 +200,7 @@ def _safe_close_run(
 ) -> None:
     """关账兜底：关账自身异常不得掩盖上游异常（取消 / 段失败）。"""
     try:
-        close_run(run, status, steps, budget_state=budget_state, now=datetime.now())
+        close_run(run, status, steps, budget_state=budget_state, now=timeutil.now())
     except Exception:  # noqa: BLE001
         logger.exception("agent run 关账失败：%s", run.run_id)
 
@@ -270,7 +271,7 @@ async def _legacy_run_autonomous_cycle(
     """
     from app.application.post_process import get_user_write_lock
 
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     clock_token = logical_clock.bind(now)
     settings = get_settings()
     if trigger_type is None or reason is None:
@@ -348,7 +349,7 @@ async def _run_autonomous_cycle_via_loop(
     """AgentLoop 驱动的自治周期：阶段本体仍经既有 runners，只换执行形状。"""
     from app.application.agent_runtime.loop import AgentLoop, snapshot_stage_runners
 
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
     if trigger_type is None or reason is None:
         trigger_type, reason = trigger_router.classify_background_trigger(user_id, now)
@@ -433,7 +434,7 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
     settings = get_settings()
     if not settings.agent_event_escalation_types:
         return 0
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     escalated = 0
     for row in outbox_service.list_pending(now=now, limit=20):
         if not trigger_router.evaluate_event_escalation(row.event_type):

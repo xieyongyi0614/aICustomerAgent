@@ -14,6 +14,7 @@ import logging
 import time
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import Insight
@@ -103,9 +104,9 @@ def process_insight(insight_id: str, trace=None) -> bool:
             "source": "insight",
             "insight_id": insight_id,
             "matched_rule": milestone_key,
-            "matched_at": datetime.now().isoformat(timespec="seconds"),
+            "matched_at": timeutil.now().isoformat(timespec="seconds"),
         },
-        now=datetime.now(),
+        now=timeutil.now(),
     )
     if record is None:
         _trace(trace, started, insight_id=insight_id, reason="already_exists")
@@ -171,8 +172,8 @@ def _match_whitelist(statement: str) -> str | None:
 
 def _daily_cap_available(user_id: str) -> bool:
     settings = get_settings()
-    now = datetime.now()
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    now = timeutil.now()
+    day_start = timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0)
     count = relationship_milestone_repository.count_keys_since(
         user_id, NARRATIVE_MILESTONE_PREFIX, day_start
     )

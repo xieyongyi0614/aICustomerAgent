@@ -8,6 +8,7 @@ import logging
 import random
 from datetime import date, datetime, timedelta
 
+from app.core import timeutil
 from app.character.asuna.calendar import holiday_of
 from app.character.asuna.routine import ROUTINE_VERSION, routine_template
 from app.core.settings import get_settings
@@ -124,7 +125,7 @@ def _jitter(block: dict, rng: random.Random, variability: DailyPlanVariability) 
 
 def build_daily_plan(user_id: str, day: date, now: datetime | None = None) -> list[DailyPlan]:
     """具象化当日计划：种子随机 + 用户影响；单事务 supersede 旧行并写入新行。"""
-    current = now or datetime.now()
+    current = timeutil.ensure_aware(now) or timeutil.now()
     template = routine_template(day_type_of(day))
     rng = random.Random(f"{user_id}|{day.isoformat()}|{ROUTINE_VERSION}")
     situations = _active_situations(user_id)
@@ -264,8 +265,8 @@ def advance_daily_plan(user_id: str, now: datetime) -> dict:
     world = world_repository.get_world(user_id)
     if world is None:
         return {"completed": [], "skipped": [], "activated": None, "moved": False}
-    day = now.date()
-    minutes = now.hour * 60 + now.minute
+    day = timeutil.local(now).date()
+    minutes = timeutil.local(now).hour * 60 + now.minute
     plans = get_day_plan(user_id, day)
     summary = {"completed": [], "skipped": [], "activated": None, "moved": False}
 

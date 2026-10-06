@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import EvidenceLinkRow, InsightRow, Memory, ReflectionRunRow
 from app.models.reflection import InsightDraft, ReflectionProposal
 from app.services.reflection import reflector
@@ -55,7 +56,7 @@ class ScriptedLLM:
 
 
 def _seed_cluster_memory(session_factory, memory_id, *, created_at, content, source="user_stated"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -80,7 +81,7 @@ def _seed_cluster_memory(session_factory, memory_id, *, created_at, content, sou
 
 
 def _seed_fatigue(session_factory, *, count=5):
-    now = datetime.now()
+    now = timeutil.now()
     for i in range(count):
         _seed_cluster_memory(
             session_factory,
@@ -92,7 +93,7 @@ def _seed_fatigue(session_factory, *, count=5):
 
 
 def _seed_run(session_factory, run_id, *, status="queued", user=USER):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             ReflectionRunRow(
@@ -242,7 +243,7 @@ def test_end_to_end_creates_insight_with_evidence_links(
 ):
     now = _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-e2e")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     result = reflector.execute_run(run_id)
     assert result == "done"
@@ -275,7 +276,7 @@ def test_end_to_end_creates_insight_with_evidence_links(
 def test_same_run_reexecution_is_idempotent(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-idem")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     assert reflector.execute_run(run_id) == "done"
     _patch_llm.proposals = [_proposal(statement="重复结论")]
@@ -289,7 +290,7 @@ def test_same_run_reexecution_is_idempotent(db_session_factory, reflection_on, _
 def test_llm_double_failure_marks_run_failed(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-fail")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.errors = [RuntimeError("500"), RuntimeError("500")]
     result = reflector.execute_run(run_id)
     assert result == "failed"
@@ -306,7 +307,7 @@ def test_all_drafts_rejected_completes_without_insights(
 ):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-rej")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [
         ReflectionProposal(
             insights=[
@@ -330,7 +331,7 @@ def test_all_drafts_rejected_completes_without_insights(
 
 def test_claim_is_conditional_update(db_session_factory, reflection_on):
     _seed_run(db_session_factory, "run-claim", status="queued")
-    now = datetime.now()
+    now = timeutil.now()
     assert reflector._claim_run("run-claim", now) is True
     assert reflector._claim_run("run-claim", now) is False
     assert _run_row(db_session_factory, "run-claim").status == "running"
@@ -338,23 +339,23 @@ def test_claim_is_conditional_update(db_session_factory, reflection_on):
 
 def test_timeout_recovery_requeues_running(db_session_factory, reflection_on):
     _seed_run(db_session_factory, "run-zombie", status="running")
-    stale = datetime.now() - timedelta(
+    stale = timeutil.now() - timedelta(
         minutes=reflector.get_settings().reflection_run_timeout_minutes + 1
     )
     with db_session_factory() as session:
         row = session.get(ReflectionRunRow, "run-zombie")
         row.updated_at = stale
         session.commit()
-    assert reflector._recover_timed_out_runs(datetime.now()) == 1
+    assert reflector._recover_timed_out_runs(timeutil.now()) == 1
     assert _run_row(db_session_factory, "run-zombie").status == "queued"
-    assert reflector._recover_timed_out_runs(datetime.now()) == 0
+    assert reflector._recover_timed_out_runs(timeutil.now()) == 0
 
 
 def test_new_reflection_supersedes_conflicting_old_insight(
     db_session_factory, reflection_on, _patch_llm
 ):
     _seed_fatigue(db_session_factory)
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             InsightRow(
@@ -373,7 +374,7 @@ def test_new_reflection_supersedes_conflicting_old_insight(
         )
         session.commit()
     run_id = _seed_run(db_session_factory, "run-sup")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     assert reflector.execute_run(run_id) == "done"
     insights = {row.id: row for row in _insights(db_session_factory)}
@@ -398,7 +399,7 @@ def test_run_queued_reflections_processes_all(db_session_factory, reflection_on,
 def test_trace_records_calibration(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-trace")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     trace = StubTrace()
     reflector.execute_run(run_id, trace=trace)
@@ -427,7 +428,7 @@ def _window(coherence=0.9):
 def _provided(count=5):
     from app.models.reflection import EvidenceMember
 
-    now = datetime.now()
+    now = timeutil.now()
     return [
         EvidenceMember(
             memory_id=f"mem-ev-{i}",

@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from app.core import timeutil
 from app.core.db import WorldRow
 from app.repositories import world_repository
 from app.engines.character import DEFAULT_CHARACTER_ID
@@ -20,7 +21,7 @@ def _seed_world(
     owner_type: str | None,
     owner_id: str | None,
 ) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             WorldRow(

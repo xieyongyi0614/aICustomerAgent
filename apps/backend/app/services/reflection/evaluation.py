@@ -16,6 +16,7 @@ TOOL-009 §5 Step 3：追加工具效能场景 `run_tool_scenario(...)`（注入
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import (
     EvidenceLinkRow,
     InsightRow,
@@ -77,7 +78,7 @@ NOISE_CONTENTS = [
 
 def run_scenarios(session_factory, reflector_stub, judge_llm=None, now=None) -> list[dict]:
     """注入式场景 runner：调用方负责 SessionLocal 环境与 stub；逐场景返回执行结果。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     results = [
         _run_pressure_scenario(session_factory, reflector_stub, judge_llm, now),
         _run_counter_evidence_scenario(session_factory, reflector_stub, now),
@@ -106,7 +107,7 @@ def _seed_memory(session_factory, memory_id, content, *, created_at, user_id, so
                 source_ref={"table": "conversation", "id": f"conv:{user_id}:{memory_id}"},
                 visibility="private",
                 created_at=created_at,
-                updated_at=datetime.now(),
+                updated_at=timeutil.now(),
             )
         )
         session.commit()
@@ -281,7 +282,7 @@ def run_tool_scenario(
     按 run 裁决的窗口名取资产声明的 Insight 类型/scope 产出 stub 提案 → 执行 run →
     产物类型与窗口一致、证据链指向 `tool:` 命名空间的工具证据。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     scenario_id = SCENARIO_TOOL_EFFECTIVENESS
     user_id = f"eval-{scenario_id}"
     failures: list[str] = []
@@ -402,7 +403,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
             "pass": bool(total) and score >= spec["threshold"],
         }
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": timeutil.now().isoformat(timespec="seconds"),
         "metrics": metrics,
         "gate_passed": all(m["pass"] for m in metrics.values()),
         "failed_scenarios": [

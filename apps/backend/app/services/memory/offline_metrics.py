@@ -7,6 +7,8 @@ E-MEM-01~06 的门槛判定与报告聚合（evaluation.md §指标与门槛）�
 
 from datetime import datetime
 
+from app.core import timeutil
+
 GATE_THRESHOLDS = {
     "E-MEM-01": {"metric": "Memory Precision", "threshold": 0.9},
     "E-MEM-02": {"metric": "冲突处理正确率", "threshold": 1.0},
@@ -75,7 +77,7 @@ def build_report(scenario_results: list[dict], context_violations: list[str]) ->
         kind_counts[result["kind"]] = kind_counts.get(result["kind"], 0) + 1
 
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": timeutil.now().isoformat(timespec="seconds"),
         "mode": "flag-on-shadow",
         "coverage": {
             "scenario_count": len(scenario_results),

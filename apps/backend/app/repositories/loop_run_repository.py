@@ -7,6 +7,7 @@ finish 落终态与汇总。全部写入单事务、幂等键为 run_id 本身�
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import LoopRunRow, SessionLocal
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _now(now: datetime | None) -> datetime:
-    return now or datetime.now()
+    return timeutil.ensure_aware(now) or timeutil.now()
 
 
 def get(run_id: str) -> LoopRunRow | None:

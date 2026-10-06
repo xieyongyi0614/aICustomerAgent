@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Literal, Mapping
+from app.core import timeutil
 
 DomainExportHandler = Callable[[str], Mapping[str, Any]]
 DomainDeleteHandler = Callable[[str], int]
@@ -100,7 +101,7 @@ logger = logging.getLogger(__name__)
 
 
 def delete_user_data(user_id: str, *, now: datetime | None = None) -> DeletionReport:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     per_domain: dict[str, int] = {}
     failed: list[str] = []
     for handlers in all_handlers():
@@ -124,7 +125,7 @@ def export_user_data(
     fmt: Literal["json", "csv"] = "json",
     now: datetime | None = None,
 ) -> ExportBundle:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     domains: dict[str, Mapping[str, Any]] = {}
     for handlers in all_handlers():
         domains[handlers.name] = dict(handlers.export(user_id))

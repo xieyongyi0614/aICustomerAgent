@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.core import timeutil
 from app.core.db import (
     ActionRecordRow,
     Conversation,
@@ -121,7 +122,7 @@ def tool_record(
     observations: dict | None = None,
 ) -> ActionRecordRow:
     """`action_records` 行：`steps[].result` 携带 ToolResult 契约（TOOL-003 写入面）。"""
-    at = observed_at or datetime.now()
+    at = observed_at or timeutil.now()
     return ActionRecordRow(
         id=record_id,
         user_id=user_id,
@@ -172,7 +173,7 @@ def seed_tool_series(
     target_record_id: str | None = None,
 ) -> list[ActionRecordRow]:
     """等间隔铺 `count` 条同类工具执行（默认跨 24h 以上，满足时间跨度门槛）。"""
-    now = now or datetime.now()
+    now = now or timeutil.now()
     records = []
     for index in range(count):
         at = now - timedelta(hours=step_hours * (count - index))
@@ -244,7 +245,7 @@ def seed_insight(
     created_at: datetime | None = None,
 ) -> str:
     """Insight + 工具证据链（`evidence_links.memory_id` 用 `tool:<tool_id>:...` 命名空间）。"""
-    at = created_at or datetime.now()
+    at = created_at or timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -309,7 +310,7 @@ def memory_window(
         EvidenceMember(
             memory_id=f"mem009-{index}",
             content=f"{topic}（第 {index + 1} 次）",
-            created_at=datetime(2026, 9, 1, 9, 0, 0) + timedelta(hours=index * 12),
+            created_at=timeutil.ensure_aware(datetime(2026, 9, 1, 9, 0, 0)) + timedelta(hours=index * 12),
             source="user_stated",
             source_ref=f"conv:u:s:mem009-{index}",
             salience=0.8,
@@ -366,7 +367,7 @@ def tool_evidence_window(
         WindowStats,
     )
 
-    at = now or datetime(2026, 9, 14, 12, 0, 0)
+    at = now or timeutil.ensure_aware(datetime(2026, 9, 14, 12, 0, 0))
     members = [
         EvidenceMember(
             memory_id=f"tool:{group_key}:act-fake-{index}:0",

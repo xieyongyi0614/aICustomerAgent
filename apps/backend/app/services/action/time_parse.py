@@ -7,6 +7,7 @@
 
 import re
 from datetime import datetime, timedelta
+from app.core import timeutil
 
 _CN_DIGITS = {"零": 0, "一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
 _WEEKDAY_CN = {"周一": 0, "周二": 1, "周三": 2, "周四": 3, "周五": 4, "周六": 5, "周日": 6, "星期一": 0, "星期二": 1, "星期三": 2, "星期四": 3, "星期五": 4, "星期六": 5, "星期日": 6, "星期天": 6}
@@ -87,6 +88,7 @@ def parse_time_phrase(text: str, now: datetime) -> datetime | None:
     """时间短语 → due_at；无时间语义返回 None。"""
     if not text:
         return None
+    now = timeutil.local(now)
 
     hours_before = _HOURS_BEFORE_PATTERN.search(text)
     if hours_before:
@@ -125,7 +127,7 @@ def parse_time_phrase(text: str, now: datetime) -> datetime | None:
 
     for keyword, weekday in _WEEKDAY_CN.items():
         if keyword in text:
-            days_ahead = (weekday - now.weekday()) % 7
+            days_ahead = (weekday - timeutil.local(now).weekday()) % 7
             if days_ahead == 0:
                 days_ahead = 7
             base = (now + timedelta(days=days_ahead)).replace(hour=10, minute=0, second=0, microsecond=0)
@@ -140,7 +142,7 @@ def parse_time_phrase(text: str, now: datetime) -> datetime | None:
         return base
 
     if _has_clock(text):
-        clock = _apply_clock(now.replace(hour=0, minute=0, second=0, microsecond=0), text)
+        clock = _apply_clock(timeutil.local(now).replace(hour=0, minute=0, second=0, microsecond=0), text)
         if clock.hour != 0 or "零点" in text:
             return clock
 

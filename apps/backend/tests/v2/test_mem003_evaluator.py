@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.models.memory import EvaluationVerdict
@@ -79,7 +80,7 @@ def _candidate(
         salience=salience,
         status=status,
         visibility=visibility,
-        created_at=created_at or datetime.datetime.now(),
+        created_at=created_at or timeutil.now(),
     )
     with evaluator.SessionLocal() as session:
         session.add(row)
@@ -150,8 +151,8 @@ def _active_memory(content, id="m0", user_id="u1"):
                 type="user_preference",
                 importance=0.6,
                 status="active",
-                created_at=datetime.datetime.now(),
-                updated_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
         )
         session.commit()
@@ -494,7 +495,7 @@ class TestEvaluatePending:
     async def test_oldest_first_ordering(self, eval_db, enabled, monkeypatch):
         _weights(monkeypatch, source=1.0, novelty=0, affinity=0, salience=0)
         _thresholds(monkeypatch)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _candidate(
             "c-late", "早的事件", proposed_type="user_fact", created_at=now
         )

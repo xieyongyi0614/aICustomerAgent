@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.services.ledger import category as category_service
 from app.services.ledger import pending as pending_service
 from app.services.ledger import query as query_service
@@ -47,7 +48,7 @@ def _signed(view) -> int:
 def auto_summary(
     user_id: str, *, period: query_service.Period, now: datetime | None = None
 ) -> AutoSummary:
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     entries = [
         view
         for view in query_service.list_entries(user_id, period=period)

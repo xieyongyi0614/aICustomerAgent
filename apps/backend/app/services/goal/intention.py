@@ -7,6 +7,7 @@ Policy 永远输出一个合法 Intention，链失败或候选非法时回退 co
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -34,7 +35,7 @@ _COMFORT_EVENT_TYPES = ("criticized", "worrying_news")
 
 def _is_late_night(now: datetime) -> bool:
     settings = get_settings()
-    return now.hour >= settings.goal_late_night_start or now.hour < settings.goal_late_night_end
+    return timeutil.local(now).hour >= settings.goal_late_night_start or timeutil.local(now).hour < settings.goal_late_night_end
 
 
 def _express_affection_valid(state: ConversationState, analysis, now: datetime) -> bool:

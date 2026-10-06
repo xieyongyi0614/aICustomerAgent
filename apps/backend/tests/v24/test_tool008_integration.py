@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application import action_engine, world_engine
 from app.core.db import Base
 from app.models.action import ActionResult
@@ -47,7 +48,10 @@ FROZEN_SOURCES: dict[str, str] = {
     "app/engines/memory_policy.py": "416f27a9699834fc9e10cf0e6bd90841894cc5685705e3ec6aa9f54ab39603d5",
     # 雪花 ID 声明（2026-10-03，ADR-16 C3）：记忆 id 生成由 `str(uuid4())` 改为雪花
     # —— 非 TOOL-008 改脏。原值 9d65bc16。
-    "app/repositories/memory_repository.py": "eb001f3ebdf6544e8aefd16a19beac876ebeaebbfb18bf6bb364f71cef252f3e",
+    # memory 域时间口径迁移（2026-10-05，0006）：`timeutil.now()` 改走
+    # `timeutil.now()`（aware UTC），列改 UtcDateTime —— 非 TOOL-008 改脏。
+    # 原值 eb001f3e。
+    "app/repositories/memory_repository.py": "d959dabcd36448a92271330ee343e4d352dd4f6445bf9670d62ddfb5326bfdca",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`
@@ -55,7 +59,9 @@ FROZEN_SOURCES: dict[str, str] = {
     "app/models/memory.py": "3d9419eb68a23f856ced8fb0db9c88088a3124735c8164b8e07788bf3d38de47",
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：`materialize_event_memory` 直写分支
     # 改为经 memory.ingest.create_candidate 投 v2 候选（评估转正），边界表构造不变 —— 非 TOOL-008 改脏。
-    "app/services/world/memory_bridge.py": "952f4bfcb0a4ce652d7cb95ce8bd972c6b6cc45e46232286d561288595e57410",
+    # 时间口径统一（2026-10-05，0006~0008）：`timeutil.now()` → `timeutil.now()`（aware UTC）
+    # —— 非 TOOL-008 改脏。原值 952f4bfc。
+    "app/services/world/memory_bridge.py": "cd32a6a1c420bedb107e9d98230617ed2240e03c112d38240548aebe42130939",
     # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补
     # `花费 / 付款 / 买 / 充值 / 交了 / 缴了` —— 非 TOOL-008 改脏。原值 2da514d9。
     "app/character/asuna/action.py": "0269c402790461de1923aa55c58195f05f68b3bb675be2eac5353f7bc50698e0",

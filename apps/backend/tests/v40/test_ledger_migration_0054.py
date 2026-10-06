@@ -14,6 +14,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core.db import (
     Base,
     LedgerAccountRow,
@@ -31,7 +32,7 @@ BACKEND = Path(__file__).resolve().parents[2]
 
 
 def _account(db, *, user_id="u1", name="现金"):
-    now = datetime.now()
+    now = timeutil.now()
     row = LedgerAccountRow(
         id=f"acc-{user_id}-{name}",
         user_id=user_id,
@@ -49,7 +50,7 @@ def _account(db, *, user_id="u1", name="现金"):
 
 
 def _entry(db, *, key="k1", amount=2000, direction="expense", reversal_of=None):
-    now = datetime.now()
+    now = timeutil.now()
     row = LedgerEntryRow(
         id=f"ent-{key}",
         user_id="u1",
@@ -133,7 +134,7 @@ def test_idempotency_key_unique(db_session_factory):
 def test_positive_amount_check_enforced(db_session_factory):
     _account(db_session_factory)
     for amount in (0, -5):
-        now = datetime.now()
+        now = timeutil.now()
         with db_session_factory() as session:
             session.add(
                 LedgerEntryRow(
@@ -156,7 +157,7 @@ def test_positive_amount_check_enforced(db_session_factory):
 
 def test_direction_check_enforced(db_session_factory):
     _account(db_session_factory)
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             LedgerEntryRow(
@@ -183,7 +184,7 @@ def test_reversal_fk_enforced(db_session_factory):
     assert "ledger_entries.id" in targets
     assert "ledger_accounts.id" in targets
     _account(db_session_factory)
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.execute(__import__("sqlalchemy").text("PRAGMA foreign_keys = ON"))
         session.add(

@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     Index,
     Integer,
     JSON,
@@ -14,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class GoalRow(Base):
@@ -35,8 +34,8 @@ class GoalRow(Base):
     source: Mapped[str] = mapped_column(String, nullable=False)
     created_turn: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     expires_at_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     parent_goal_id: Mapped[str | None] = mapped_column(String, nullable=True)
     layer: Mapped[str | None] = mapped_column(String, nullable=True)
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -88,8 +87,8 @@ class GoalPlanRow(Base):
     )
     sub_goals: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("goal_id", "version", name="uq_goal_plans_goal_version"),

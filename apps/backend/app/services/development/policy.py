@@ -17,6 +17,7 @@ import json
 import logging
 import time
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.development import ModulationProposal
@@ -70,7 +71,7 @@ def arbitration_comparator(proposal: dict, existing) -> bool:
     existing_time = _insight_created_at(existing.source_insight_id)
     if proposal_time is None or existing_time is None:
         return False
-    return proposal_time > existing_time
+    return timeutil.ensure_aware(proposal_time) > timeutil.ensure_aware(existing_time)
 
 
 def apply_proposals(

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.application.agent_runtime import events as event_bus
 from app.application.agent_runtime import outbound as outbound_gateway
 from app.application.agent_runtime.contracts import (
@@ -42,7 +43,7 @@ def emit_proactive_triggered(
             event_type=EVENT_PROACTIVE_TRIGGERED,
             run_id=run_id,
             session_id=None,
-            occurred_at=datetime.now(),
+            occurred_at=timeutil.now(),
             correlation_id=proactive_correlation_id(dedupe_key),
             payload={
                 "dedupe_key": dedupe_key,
@@ -70,7 +71,7 @@ def emit_proactive_delivered(
             event_type=EVENT_PROACTIVE_DELIVERED,
             run_id=run_id,
             session_id=None,
-            occurred_at=datetime.now(),
+            occurred_at=timeutil.now(),
             correlation_id=proactive_correlation_id(dedupe_key),
             payload={
                 "dedupe_key": dedupe_key,

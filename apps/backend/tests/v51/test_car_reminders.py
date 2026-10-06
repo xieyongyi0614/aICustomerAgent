@@ -7,18 +7,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings.car import CarSettings
 from app.services.car import reminders as car_reminders
 
 pytestmark = pytest.mark.unit
 
-NOW = datetime(2026, 9, 30, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 30, 12, 0, 0))
 SETTINGS = CarSettings()
 
 
 def _profile(**overrides) -> SimpleNamespace:
     payload = {
-        "purchased_at": datetime(2025, 10, 1, 0, 0, 0),
+        "purchased_at": timeutil.ensure_aware(datetime(2025, 10, 1, 0, 0, 0)),
         "odometer_km": 12480,
         "service_interval_km": 10000,
         "service_interval_months": 12,
@@ -43,33 +44,33 @@ def test_car_settings_are_parameter_not_toggle():
 
 
 def test_add_months_clamps_day_overflow():
-    assert car_reminders.add_months(datetime(2026, 1, 31), 1) == datetime(2026, 2, 28)
-    assert car_reminders.add_months(datetime(2026, 9, 30), 12) == datetime(2027, 9, 30)
+    assert car_reminders.add_months(timeutil.ensure_aware(datetime(2026, 1, 31)), 1) == timeutil.ensure_aware(datetime(2026, 2, 28))
+    assert car_reminders.add_months(timeutil.ensure_aware(datetime(2026, 9, 30)), 12) == timeutil.ensure_aware(datetime(2027, 9, 30))
 
 
 def test_age_text_reports_years_and_months():
-    assert car_reminders.age_text(datetime(2024, 6, 15), NOW) == "2 年 3 个月"
+    assert car_reminders.age_text(timeutil.ensure_aware(datetime(2024, 6, 15)), NOW) == "2 年 3 个月"
     assert car_reminders.age_text(None, NOW) is None
 
 
 def test_car_reminders_service_prefers_time_when_time_ratio_is_smaller():
     bundle = car_reminders.derive(
         profile=_profile(),
-        last_service=_last_service(5000, datetime(2025, 10, 1, 0, 0, 0)),
+        last_service=_last_service(5000, timeutil.ensure_aware(datetime(2025, 10, 1, 0, 0, 0))),
         now=NOW,
         settings=SETTINGS,
     )
 
     service = next(item for item in bundle.reminders if item.kind == "service")
     assert service.due_km is None
-    assert service.due_at == datetime(2026, 10, 1, 0, 0, 0)
+    assert service.due_at == timeutil.ensure_aware(datetime(2026, 10, 1, 0, 0, 0))
     assert service.level == "soon"
 
 
 def test_car_reminders_service_uses_km_and_days_whichever_first():
     bundle = car_reminders.derive(
         profile=_profile(odometer_km=21900),
-        last_service=_last_service(12000, datetime(2026, 9, 1, 0, 0, 0)),
+        last_service=_last_service(12000, timeutil.ensure_aware(datetime(2026, 9, 1, 0, 0, 0))),
         now=NOW,
         settings=SETTINGS,
     )
@@ -84,7 +85,7 @@ def test_car_reminders_service_uses_km_and_days_whichever_first():
 def test_car_reminders_service_normal_when_far_from_both():
     bundle = car_reminders.derive(
         profile=_profile(odometer_km=11000),
-        last_service=_last_service(12000, datetime(2026, 9, 1, 0, 0, 0)),
+        last_service=_last_service(12000, timeutil.ensure_aware(datetime(2026, 9, 1, 0, 0, 0))),
         now=NOW,
         settings=SETTINGS,
     )
@@ -106,12 +107,12 @@ def test_car_reminders_service_absent_without_interval():
 
 def test_car_reminders_insurance_level_follows_lead_days():
     soon = car_reminders.derive(
-        profile=_profile(insurance_due_at=datetime(2026, 11, 1)),
+        profile=_profile(insurance_due_at=timeutil.ensure_aware(datetime(2026, 11, 1))),
         now=NOW,
         settings=SETTINGS,
     )
     far = car_reminders.derive(
-        profile=_profile(insurance_due_at=datetime(2027, 6, 1)),
+        profile=_profile(insurance_due_at=timeutil.ensure_aware(datetime(2027, 6, 1))),
         now=NOW,
         settings=SETTINGS,
     )
@@ -127,7 +128,7 @@ def test_car_reminders_insurance_level_follows_lead_days():
 
 def test_car_reminders_inspection_absent_without_due_date():
     bundle = car_reminders.derive(
-        profile=_profile(insurance_due_at=datetime(2026, 11, 1)),
+        profile=_profile(insurance_due_at=timeutil.ensure_aware(datetime(2026, 11, 1))),
         now=NOW,
         settings=SETTINGS,
     )
@@ -170,7 +171,7 @@ def test_car_reminders_restriction_uses_user_configuration():
         item for item in bundle.reminders if item.kind == "restriction"
     )
     assert restriction.detail == "上海 · 尾号 4 和 9 限行"
-    assert restriction.due_at == datetime(2026, 10, 7, 0, 0, 0)
+    assert restriction.due_at == timeutil.ensure_aware(datetime(2026, 10, 7, 0, 0, 0))
     assert bundle.restriction_configured is True
     assert bundle.guide is None
 

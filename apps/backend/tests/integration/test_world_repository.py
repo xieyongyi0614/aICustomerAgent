@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.world import (
     EventImportance,
     EventSource,
@@ -24,7 +25,7 @@ def _object(object_id="watermelon_001", location="home.kitchen.fridge", status="
         state="whole",
         quantity=1.0,
         status=object_status(status),
-        last_action_at=datetime.now(),
+        last_action_at=timeutil.now(),
     )
 
 
@@ -79,7 +80,7 @@ def test_object_save_get_and_location_query(db_session_factory):
 
 def test_event_save_list_and_due_query(db_session_factory):
     world_repository.ensure_world(USER)
-    now = datetime.now()
+    now = timeutil.now()
     world_repository.save_event(_event("evt_due", due_at=now - timedelta(hours=1)))
     world_repository.save_event(_event("evt_future", status="scheduled", due_at=now + timedelta(days=1)))
     world_repository.save_event(_event("evt_done", status="completed"))
@@ -102,7 +103,7 @@ def test_snapshot_save_and_list(db_session_factory):
         world_id=world_repository.ensure_world(USER).world_id,
         label="before_dinner",
         state={"entities": []},
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
     world_repository.save_snapshot(snapshot)
     rows = world_repository.list_snapshots(world_repository.ensure_world(USER).world_id)

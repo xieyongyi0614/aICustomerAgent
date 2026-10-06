@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     JSON,
@@ -16,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class InsightRow(Base):
@@ -35,10 +34,10 @@ class InsightRow(Base):
         String, nullable=False, default="active", server_default="active"
     )
     run_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     invalidated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UtcDateTime, nullable=True
     )
     invalidated_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     superseded_by: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -85,8 +84,8 @@ class ReflectionRunRow(Base):
     )
     insight_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -109,7 +108,7 @@ class EvidenceLinkRow(Base):
     insight_id: Mapped[str] = mapped_column(String, nullable=False)
     memory_id: Mapped[str] = mapped_column(String, nullable=False)
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("insight_id", "memory_id", name="uq_evidence_links_insight_memory"),

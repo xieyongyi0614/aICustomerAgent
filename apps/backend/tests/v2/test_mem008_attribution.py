@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.main import app
@@ -30,7 +31,7 @@ def attr_db(monkeypatch):
 
 
 def _promote(candidate_id="c1", content="用户喜欢吃辣", source_ref=None):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     ref = source_ref or {"table": "conversation", "id": "conv:u1:s1:0"}
     row = MemoryCandidateRow(
         id=candidate_id,
@@ -141,8 +142,8 @@ class TestMemoryAttribution:
             importance=0.6,
             status="active",
             salience=0.6,
-            created_at=datetime.datetime.now(),
-            updated_at=datetime.datetime.now(),
+            created_at=timeutil.now(),
+            updated_at=timeutil.now(),
         )
         with memory_repository.SessionLocal() as session:
             session.add(old)
@@ -197,7 +198,7 @@ class TestCandidateAttribution:
             return EvaluationVerdict(approve=False, reason="无长期价值")
 
         monkeypatch.setattr(evaluator, "_ask_llm", _reject)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         row = MemoryCandidateRow(
             id="cx",
             user_id="u1",

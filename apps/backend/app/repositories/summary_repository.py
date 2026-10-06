@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import ConversationSummary, SessionLocal
 
 
@@ -11,7 +12,7 @@ def get_summary(conv_id: str) -> ConversationSummary | None:
 def upsert_summary(conv_id: str, summary: str) -> ConversationSummary:
     if not summary:
         raise ValueError("摘要不能为空")
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(ConversationSummary, conv_id)
         if row is None:

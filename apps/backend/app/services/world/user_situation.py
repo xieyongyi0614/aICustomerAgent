@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.world import EventImportance
 from app.models.world_simulation import (
@@ -141,7 +142,7 @@ def detect_from_message(
     try:
         if not text:
             return None
-        current = now or datetime.now()
+        current = timeutil.ensure_aware(now) or timeutil.now()
         dismissed = dismiss_matching(user_id, text, current)
         pattern = _match_dimension(text)
         if pattern is None:
@@ -190,7 +191,7 @@ def dismiss_matching(user_id: str, text: str, now: datetime) -> list[str]:
 
 def expire_and_notify(user_id: str, now: datetime | None = None) -> list[UserSituation]:
     """到期过期（world_simulation 维护步调用）；结束事件供记忆分流。"""
-    current = now or datetime.now()
+    current = timeutil.ensure_aware(now) or timeutil.now()
     expired = world_simulation_repository.expire_stale_situations(user_id, current)
     for situation in expired:
         _emit_condition_event(user_id, situation, "ended")
@@ -240,7 +241,7 @@ def llm_assist_detect(
         if not result.dimension or result.dimension not in valid_values:
             return None
         dimension = SituationDimension(result.dimension)
-        current = now or datetime.now()
+        current = timeutil.ensure_aware(now) or timeutil.now()
         settings = get_settings()
         intensity = max(1, min(5, result.intensity or 3))
         situation = UserSituation(

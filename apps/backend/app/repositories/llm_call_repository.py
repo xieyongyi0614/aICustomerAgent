@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
+from app.core import timeutil
 from app.core.db import LlmCallRecordRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import CallSite, LlmCallRecord, estimate_cost
@@ -68,7 +69,7 @@ def _finalize_cost(record: LlmCallRecord) -> LlmCallRecord:
 
 def save(record: LlmCallRecord) -> None:
     record = _finalize_cost(record)
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(record, now))

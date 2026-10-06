@@ -61,6 +61,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import ACTION_TYPES
 from app.models.goal import GoalPlanRecord, GoalRecord, SubGoalSpec, validate_sub_goals
@@ -235,7 +236,7 @@ class PlanningEngine:
             ctx=ctx,
             trigger=trigger,
             attempts=goal_repository.count_plans(goal.id),
-            now=datetime.now(),
+            now=timeutil.now(),
         )
         _record_run_step(
             ctx, PLAN_STEP_ASSEMBLE, {"degraded": list(ctx.degraded), "goal_id": goal.id}

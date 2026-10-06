@@ -33,6 +33,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import outbox_consumer, world_engine
 from app.models.action import ActionRecord
 from app.models.plan import PlanContext
@@ -207,7 +208,7 @@ class TestDeferredWorldWritePath:
         assert row is not None and row.status == "pending"
         assert row.idempotency_key == outcome.action_id
 
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         after_consume = support.table_counts(db_session_factory)
         assert after_consume["world_events"] == before["world_events"] + 1
 
@@ -221,9 +222,9 @@ class TestDeferredWorldWritePath:
             capability="create_reminder",
             params={"content": "复查", "due_at": REMINDER_DUE_AT},
         )
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         assert world_event_titles(USER) == ["复查"]
-        assert outbox_consumer.consume_pending(now=datetime.now())["consumed"] == 0
+        assert outbox_consumer.consume_pending(now=timeutil.now())["consumed"] == 0
         assert world_event_titles(USER) == ["复查"]
 
     @pytest.mark.asyncio
@@ -239,7 +240,7 @@ class TestDeferredWorldWritePath:
             capability="create_reminder",
             params={"content": "复查", "due_at": REMINDER_DUE_AT},
         )
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         assert world_event_titles(USER) == ["复查"]
 
         with outbox_repository.SessionLocal() as session:
@@ -247,7 +248,7 @@ class TestDeferredWorldWritePath:
                 OutboxEventRow.idempotency_key == outcome.action_id
             ).update({"status": "pending", "attempts": 0})
             session.commit()
-        stats = outbox_consumer.consume_pending(now=datetime.now())
+        stats = outbox_consumer.consume_pending(now=timeutil.now())
         assert stats["consumed"] == 1
         assert world_event_titles(USER) == ["复查"]
 
@@ -283,7 +284,7 @@ class TestDeferredWorldWritePath:
         second_record = outbox_repository.get(second[2].action_id)
         if second_record is not None:
             assert second_record.payload["world_ops"] == []
-        assert outbox_consumer.consume_pending(now=datetime.now())["consumed"] == 1
+        assert outbox_consumer.consume_pending(now=timeutil.now())["consumed"] == 1
         assert world_event_titles(USER) == ["复查"]
 
     @pytest.mark.asyncio
@@ -328,7 +329,7 @@ class TestRelationshipChannel:
         assert outcome.status == "succeeded"
         assert relationship_event_repository.count_events(USER) == 0
 
-        outbox_consumer.consume_pending(now=datetime.now())
+        outbox_consumer.consume_pending(now=timeutil.now())
         events = relationship_event_repository.list_events(USER, limit=10)
         assert [event.type for event in events] == ["user_care"]
         assert events[0].cause.startswith("行动 create_reminder")

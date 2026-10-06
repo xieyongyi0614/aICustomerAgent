@@ -6,6 +6,8 @@ services:
       POSTGRES_USER: asuna
       POSTGRES_PASSWORD: asuna
       POSTGRES_DB: asuna
+      TZ: UTC
+      PGTZ: UTC
     ports:
       - "127.0.0.1:5432:5432" # 本地开发直连；仅绑定回环地址
     volumes:

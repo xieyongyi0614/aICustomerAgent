@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.application.agent_runtime import execution_history, recovery
 from app.application.agent_runtime.controller import close_run, open_foreground_run
 from app.core.db import (
@@ -67,7 +68,7 @@ def _timed_out_run(user_id: str = "u-orphan", *, session_id: str | None = None, 
         user_id=user_id,
         kind="chat",
         reason="orphan-test",
-        now=datetime.now() - timedelta(hours=2),
+        now=timeutil.now() - timedelta(hours=2),
         session_id=session_id,
     )
     if steps:
@@ -81,12 +82,12 @@ def _fresh_run(user_id: str = "u-fresh"):
         user_id=user_id,
         kind="chat",
         reason="fresh-test",
-        now=datetime.now(),
+        now=timeutil.now(),
     )
 
 
 def _action(record_id: str, *, run_id: str | None, user_id: str, session_id: str | None = None):
-    now = datetime.now()
+    now = timeutil.now()
     return action_repository.save_record(
         ActionRecord(
             id=record_id,
@@ -131,14 +132,14 @@ def _decision(record_id: str, *, user_id: str, action_id: str | None, request_id
         confidence=0.9,
         outcome=None,
         candidates=None,
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
     decision_repository.save(record)
     return record
 
 
 def _trace(db_session_factory, trace_id: str, *, user_id: str, correlation_id: str | None, action_id: str | None = None):
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             RuntimeTraceRow(
@@ -164,7 +165,7 @@ def _trace(db_session_factory, trace_id: str, *, user_id: str, correlation_id: s
 
 
 def _development_change(db_session_factory, change_id: str, *, user_id: str):
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         state = DevelopmentStateRow(
             id=f"dev-{change_id}",
@@ -216,7 +217,7 @@ def _relationship_event(event_id: str, *, user_id: str, session_id: str):
             confidence=0.8,
             source="conversation",
             cause="test",
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
     )
 
@@ -227,7 +228,7 @@ def _snapshot(snapshot_id: str, *, user_id: str, run_id: str | None):
         snapshot={"id": snapshot_id},
         version=1,
         run_id=run_id,
-        now=datetime.now(),
+        now=timeutil.now(),
     )
 
 

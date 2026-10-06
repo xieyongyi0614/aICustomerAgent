@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from app.services.observability import port as observability
 from app.services.autonomy import port as autonomy_bridge
 from app.core.runtime_state import get_user_write_lock
+from app.core import timeutil
 from app.channels.base import ChannelErrorKind, SendResult
 from app.chains import proactive_chain
 from app.core.settings import get_settings
@@ -54,10 +55,11 @@ def _recheck_failed_reason(
     recent = conversation_repository.get_recent_messages(session_id, limit=1)
     if recent:
         last = recent[-1]
+        last_at = timeutil.ensure_aware(last.created_at)
         if (
             last.role == "human"
-            and last.created_at is not None
-            and (now - last.created_at).total_seconds() / 60
+            and last_at is not None
+            and (now - last_at).total_seconds() / 60
             < settings.autonomy_min_user_reply_gap_minutes
         ):
             return "user_active"
@@ -200,7 +202,7 @@ async def execute(
     now: datetime | None = None,
 ) -> ProactiveAction | None:
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
 
     lock = get_user_write_lock(action.user_id)
     async with lock:

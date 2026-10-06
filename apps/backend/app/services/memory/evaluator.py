@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.chains.structured import build_structured_chain
+from app.core import timeutil
 from app.core.db import Memory, MemoryCandidateRow, SessionLocal
 from app.core.llm_factory import get_llm
 from app.core.settings import SettingsError, get_settings
@@ -226,7 +227,7 @@ def _promotion_salience(row: MemoryCandidateRow) -> float:
 def _promote(
     candidate: MemoryCandidateRow, *, final_type: str, salience: float, reason: str
 ) -> str:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(MemoryCandidateRow, candidate.id)
         if row is None or row.status != "pending":

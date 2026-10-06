@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+from app.core import timeutil
 from app.models.action import ActionIntent, make_dedupe_key
 from app.models.tool import PermissionProfile, ToolDefinition, ToolSchema
 from app.services.tool.permission import PermissionSnapshot
@@ -272,11 +273,11 @@ def notification_capability(behavior=None) -> StubCapability:
 
 
 def expired_now() -> datetime:
-    return datetime.now() - timedelta(hours=48)
+    return timeutil.now() - timedelta(hours=48)
 
 
 def future_now() -> datetime:
-    return datetime.now()
+    return timeutil.now()
 
 
 __all__ = [

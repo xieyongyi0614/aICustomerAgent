@@ -4,6 +4,7 @@ from typing import AsyncIterator
 
 from langchain_core.runnables import Runnable
 
+from app.core import timeutil
 from app.core.llm_factory import get_llm
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
@@ -92,7 +93,7 @@ async def astream(
     style_ctx=None,
 ) -> AsyncIterator[str]:
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
     prompt = PromptBuilder.build(
         mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx, style_ctx
     )

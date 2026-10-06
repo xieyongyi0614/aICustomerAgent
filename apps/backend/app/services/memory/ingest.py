@@ -14,7 +14,7 @@ from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
 from app.services.action.memory_bridge import has_memory_effect, to_memory_candidates
 from app.services.relationship.milestone import MILESTONES
-from app.core import ids
+from app.core import ids, timeutil
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def create_candidate(
     created_at: datetime | None = None,
 ) -> MemoryCandidateRow:
     """幂等投递唯一入口：跨域旁路（世界/行动/账本）统一经此投 v2 候选，禁止直写 memories。"""
-    created_at = created_at or datetime.now()
+    created_at = created_at or timeutil.now()
     source_ref: dict = {"table": source_table, "id": source_id}
     if source_ref_extra:
         source_ref.update(source_ref_extra)
@@ -230,7 +230,7 @@ def _completed_event_content(event) -> str:
     精确重复会被评估器判为 `duplicate_exact` 拒绝，从而不再出现「富描述被裸标题顶掉」。
     """
 
-    moment = event.completed_at or event.due_at or datetime.now()
+    moment = event.completed_at or event.due_at or timeutil.local_now()
     return f"用户在{moment.strftime('%m月%d日')}完成了{event.title}"
 
 

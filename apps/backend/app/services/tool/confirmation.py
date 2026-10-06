@@ -23,6 +23,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.core import timeutil
 from app.character.asuna.tool import (
     CONFIRM_APPROVE_LEXICON,
     CONFIRM_DENY_LEXICON,
@@ -152,7 +153,7 @@ class ConfirmationRequest:
         return self.status == STATUS_PENDING
 
     def expired_at(self, now: datetime) -> bool:
-        return self.expires_at <= now
+        return timeutil.ensure_aware(self.expires_at) <= timeutil.ensure_aware(now)
 
     def invocation(self) -> ToolInvocation:
         """还原原调用意图（参数与幂等键原样复用，防参数漂移）。"""
@@ -317,7 +318,7 @@ class ConfirmationService:
         `now` 为调用方注入时钟（与 `grant_scope` / `expire_due` / `revoke` 同款）：
         缺省取墙钟，生产行为不变；跨 TTL 判定的调用方（含测试）应显式注入。
         """
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         request = self.get(request_id)
         if request is None:
             return ConfirmationOutcome(STATUS_NOT_FOUND, None, reason="request_not_found")
@@ -361,7 +362,7 @@ class ConfirmationService:
 
     def pending(self, user_id: str, now: datetime | None = None) -> list[ConfirmationRequest]:
         """未决且未过期的确认请求，按 `created_at` 倒序（E7：命中最近一条）。"""
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         requests = [
             request
             for request in self._requests(user_id)
@@ -389,7 +390,7 @@ class ConfirmationService:
         - 到期授权行 → `cancelled`（授权本就按 `expires_at` 严格判定失效，落终态只为
           不污染 `has_due` 的待办口径）。
         """
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         expired = 0
         for row in self._scan_rows():
             payload = dict(getattr(row, "payload", None) or {})
@@ -436,7 +437,7 @@ class ConfirmationService:
         now: datetime | None = None,
     ) -> str | None:
         """落授权：`tool_confirm_ttl_reuse=True` 落 TTL 持久授权，False 只放行当次。"""
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         resolved_persistent = (
             self.confirm_ttl_reuse() if persistent is None else bool(persistent)
         )
@@ -487,7 +488,7 @@ class ConfirmationService:
         *,
         now: datetime | None = None,
     ) -> bool:
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         for record in self.grant_records(user_id, now):
             record_tool_id = record["tool_id"]
             if record_tool_id not in ("", WILDCARD) and record_tool_id != tool_id:
@@ -498,7 +499,7 @@ class ConfirmationService:
 
     def grant_records(self, user_id: str, now: datetime | None = None) -> list[dict[str, Any]]:
         """有效授权清单（含通道级隐含授权）：持久层 + 进程层 + 通道绑定。"""
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         records: list[dict[str, Any]] = []
         for (grant_user, _tool_id), grant in sorted(_SESSION_GRANTS.items()):
             if grant_user != user_id:
@@ -538,7 +539,7 @@ class ConfirmationService:
 
     def revoke(self, user_id: str, tool_id: str, now: datetime | None = None) -> int:
         """撤销授权（工具级 / 范围级 / 会话级；通道级随解绑失效）：返回撤销条数。"""
-        now = now or datetime.now()
+        now = timeutil.ensure_aware(now) or timeutil.now()
         revoked = 0
         for key, grant in list(_SESSION_GRANTS.items()):
             if key[0] != user_id:
@@ -753,7 +754,7 @@ def _as_datetime(value: Any) -> datetime | None:
 
 
 def _ctx_now(ctx: Any) -> datetime:
-    return getattr(ctx, "now", None) or datetime.now()
+    return getattr(ctx, "now", None) or timeutil.now()
 
 
 def _fallback_dedupe_key(inv: ToolInvocation) -> str:

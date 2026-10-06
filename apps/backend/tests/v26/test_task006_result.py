@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.models.action import (
     ActionEffect,
     ActionResult,
@@ -26,7 +27,7 @@ class TestResultContract:
             output={"world_event_id": "evt_1"},
             metadata={"usage": {"duration_ms": 1}},
             observations={"world_event_id": "evt_1"},
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
         restored = ActionResult.model_validate(result.model_dump())
         assert restored.id == "res_1"

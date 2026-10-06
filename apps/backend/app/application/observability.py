@@ -8,6 +8,7 @@ import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.observability import (
     DecisionKind,
@@ -60,7 +61,7 @@ def reset_correlation_id(token) -> None:
 
 def prune_all() -> int:
     """保留策略统一清理（persistence.md §3）：按各自 TTL prune 四张观测表。"""
-    now = datetime.now()
+    now = timeutil.now()
     settings = get_settings()
     total = 0
     total += trace_repository.prune_before(

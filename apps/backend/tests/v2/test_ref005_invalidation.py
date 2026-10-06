@@ -13,6 +13,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import InsightRow, Memory
 from app.services.reflection import lifecycle
 
@@ -60,7 +61,7 @@ def _seed_insight(
     type_="pattern",
     user_id=USER,
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -81,7 +82,7 @@ def _seed_insight(
 
 
 def _seed_negated_memory(session_factory, memory_id, content, *, relation="negate"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(

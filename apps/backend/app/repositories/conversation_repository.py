@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.core import ids
+from app.core import ids, timeutil
 from app.core.db import Conversation, Message, SessionLocal
 
 
@@ -8,7 +8,7 @@ def get_or_create_conversation(session_id: str, user_id: str) -> Conversation:
     with SessionLocal() as session:
         conversation = _resolve_conversation(session, session_id)
         if conversation is None:
-            now = datetime.now()
+            now = timeutil.now()
             conversation = Conversation(
                 id=ids.new_id_str(),
                 session_id=session_id,
@@ -62,7 +62,7 @@ def save_message(
             role=role,
             content=content,
             is_proactive=is_proactive,
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
         session.add(message)
         session.commit()
@@ -142,7 +142,7 @@ def touch_conversation(conv_id: str) -> None:
     with SessionLocal() as session:
         conversation = _resolve_conversation(session, conv_id)
         if conversation is not None:
-            conversation.updated_at = datetime.now()
+            conversation.updated_at = timeutil.now()
             session.commit()
 
 
@@ -150,7 +150,7 @@ def update_mode(conv_id: str, mode: str) -> None:
     with SessionLocal() as session:
         conversation = _resolve_conversation(session, conv_id)
         if conversation is not None:
-            now = datetime.now()
+            now = timeutil.now()
             conversation.mode = mode
             conversation.mode_entered_at = now
             conversation.updated_at = now

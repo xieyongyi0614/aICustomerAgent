@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.character_state import CharacterState
 from app.models.memory import UserMemory
@@ -32,7 +33,7 @@ def make_state(memories) -> ConversationState:
 
 
 def make_memory(content=MEMORY_CONTENT):
-    now = datetime.now()
+    now = timeutil.now()
     return UserMemory(
         id="m1",
         user_id="u1",

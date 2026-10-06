@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.core import timeutil
 from app.application.agent_runtime.contracts import DEFAULT_CHARACTER_ID
 from app.repositories import loop_run_repository
 from app.services.ledger import domain as domain_ledger
@@ -56,7 +57,7 @@ def latest_snapshot_anchor(
 def _history_window(
     started_at: datetime, finished_at: datetime | None
 ) -> tuple[datetime, datetime]:
-    ended = finished_at or datetime.now()
+    ended = finished_at or timeutil.now()
     if ended < started_at:
         ended = started_at
     return started_at, ended + timedelta(seconds=1)
@@ -127,7 +128,7 @@ def history_for_run(run_id: str) -> ExecutionHistory | None:
     run = loop_run_repository.get(run_id)
     if run is None:
         return None
-    started_at = run.started_at or datetime.now()
+    started_at = run.started_at or timeutil.now()
     window = _history_window(started_at, run.finished_at)
     action_records = domain_ledger.list_actions_by_run_id(run_id)
     action_ids = [record.id for record in action_records]

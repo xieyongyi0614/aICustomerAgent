@@ -12,6 +12,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from app.core import timeutil
 from app.services.development import aggregate
 
 pytestmark = pytest.mark.xdist_group("migration")
@@ -170,7 +171,7 @@ def sqlite_round_trip(tmp_path_factory):
 
 
 def _seed_round_trip_rows(url):
-    now = datetime.now().isoformat(sep=" ")
+    now = timeutil.now().isoformat(sep=" ")
     engine = create_engine(url)
     with engine.begin() as connection:
         connection.execute(

@@ -25,6 +25,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.services.goal import service as goal_service
 from app.services.planning import scheduler as plan_scheduler
 
@@ -170,7 +171,7 @@ async def plan(
         now
         or getattr(run, "started_at", None)
         or getattr(session_context, "started_at", None)
-        or datetime.now()
+        or timeutil.now()
     )
     goal_id = getattr(intention, "goal_id", None)
     if not plan_enabled(spec):

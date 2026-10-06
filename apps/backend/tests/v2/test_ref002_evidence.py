@@ -8,6 +8,7 @@
 import json
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import Memory
 from app.services.memory import lifecycle as memory_lifecycle
 from app.services.reflection import evidence
@@ -42,7 +43,7 @@ def _seed_memory(
     last_reinforced_at=None,
     type_="user_fact",
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -81,7 +82,7 @@ def _seed_fatigue_cluster(session_factory, *, now, hours_spread=True, count=5):
 
 
 def test_five_same_topic_memories_cluster_and_pass(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     windows = evidence.aggregate_evidence_windows(USER, CHARACTER, now=now)
     passing = [w for w in windows if w.passes_gate]
@@ -95,7 +96,7 @@ def test_five_same_topic_memories_cluster_and_pass(db_session_factory):
 
 
 def test_isolated_single_memory_never_passes_gate(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_memory(
         db_session_factory,
         "mem-solo",
@@ -109,7 +110,7 @@ def test_isolated_single_memory_never_passes_gate(db_session_factory):
 
 
 def test_same_hour_cluster_fails_span_gate(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now, hours_spread=False)
     windows = evidence.aggregate_evidence_windows(USER, CHARACTER, now=now)
     assert windows, "应产出簇（成员数/来源达标）"
@@ -118,7 +119,7 @@ def test_same_hour_cluster_fails_span_gate(db_session_factory):
 
 
 def test_hypothetical_and_out_of_window_excluded(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     _seed_memory(
         db_session_factory,
@@ -145,7 +146,7 @@ def test_hypothetical_and_out_of_window_excluded(db_session_factory):
 
 
 def test_embedding_null_degrades_to_keyword_path(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     base = "用户喜欢在周末爬山"
     for i in range(4):
         _seed_memory(
@@ -164,7 +165,7 @@ def test_embedding_null_degrades_to_keyword_path(db_session_factory):
 
 
 def test_mixed_pools_form_separate_clusters(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     _seed_memory(
         db_session_factory,
@@ -181,7 +182,7 @@ def test_mixed_pools_form_separate_clusters(db_session_factory):
 
 
 def test_reinforced_stale_memory_enters_window(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     _seed_memory(
         db_session_factory,
@@ -199,7 +200,7 @@ def test_reinforced_stale_memory_enters_window(db_session_factory):
 
 
 def test_aggregate_is_idempotent(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     first = evidence.aggregate_evidence_windows(USER, CHARACTER, now=now)
     second = evidence.aggregate_evidence_windows(USER, CHARACTER, now=now)
@@ -222,7 +223,7 @@ def _serialize(windows):
 
 
 def test_aggregate_error_returns_empty_with_trace(db_session_factory, monkeypatch):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
 
     def _boom(*args, **kwargs):
@@ -237,7 +238,7 @@ def test_aggregate_error_returns_empty_with_trace(db_session_factory, monkeypatc
 
 
 def test_trace_records_pool_clusters_and_gate(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now)
     trace = StubTrace()
     evidence.aggregate_evidence_windows(USER, CHARACTER, now=now, trace=trace)
@@ -260,7 +261,7 @@ def test_passes_gate_three_gates_independent():
     from app.models.reflection import EvidenceMember, EvidenceWindow, WindowStats
 
     settings = get_settings()
-    now = datetime.now()
+    now = timeutil.now()
 
     def _window(**stats):
         return EvidenceWindow(
@@ -291,7 +292,7 @@ def test_passes_gate_three_gates_independent():
 
 
 def test_member_weight_recency_half_life(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     fresh = evidence._member_weight(0.8, now - timedelta(days=1), now)
     stale = evidence._member_weight(0.8, now - timedelta(days=30), now)
     assert fresh > stale
@@ -299,7 +300,7 @@ def test_member_weight_recency_half_life(db_session_factory):
 
 
 def test_reinforce_signal_source_type_mix_recorded(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_fatigue_cluster(db_session_factory, now=now, count=2)
     _seed_memory(
         db_session_factory,
@@ -316,7 +317,7 @@ def test_reinforce_signal_source_type_mix_recorded(db_session_factory):
 
 def test_malformed_vector_falls_back_to_keyword_path(db_session_factory):
     """单条向量解析失败（坏 JSON）→ 该行语义路缺席，关键词路照常聚类。"""
-    now = datetime.now()
+    now = timeutil.now()
     base = "用户说最近加班很累"
     for i in range(4):
         _seed_memory(

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 
+from app.core import timeutil
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
 from app.engines.autonomy import in_quiet_hours
@@ -73,7 +74,7 @@ def _draft(
 
 def evaluate_alerts(user_id: str, *, now: datetime | None = None, settings=None) -> list[AlertDraft]:
     cfg = settings if settings is not None else get_settings()
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     drafts: list[AlertDraft] = []
     period_start = _period_start_month(timestamp)
     month = Period.month(timestamp)
@@ -123,7 +124,9 @@ def evaluate_alerts(user_id: str, *, now: datetime | None = None, settings=None)
                 )
             )
 
-    day_start = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = timeutil.local(timestamp).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     day_data = summary(
         user_id,
         period=Period.custom(day_start, timestamp, label="day"),
@@ -252,7 +255,7 @@ def deliver_alert(draft: AlertDraft, *, now: datetime, user_id: str) -> SendResu
 def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
     from app.repositories import user_repository
 
-    timestamp = now or datetime.now()
+    timestamp = timeutil.ensure_aware(now) or timeutil.now()
     users = [row.id for row in user_repository.list_all(limit=50)]
     sent = 0
     skipped = 0

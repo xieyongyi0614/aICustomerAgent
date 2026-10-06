@@ -10,8 +10,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-MIGRATION_HEAD = "0005"
-MIGRATION_HEAD_PARENT = "0004"
+MIGRATION_HEAD = "0008"
+MIGRATION_HEAD_PARENT = "0007"
 BASELINE_MIGRATION_REVISION = "0001"
 SCHEMA_TABLE_COUNT = 55
 SCHEMA_COLUMNS_DIGEST = "720e6995b95cfc22"

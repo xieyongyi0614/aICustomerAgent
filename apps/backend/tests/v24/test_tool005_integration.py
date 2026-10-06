@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.application import action_engine, post_process
 from app.core.db import TriggerRegistryRow
 from app.core.settings import get_settings
@@ -390,7 +391,7 @@ async def test_approved_round_lands_grant_and_allows_second_call(
     assert grant.scope == ("self",)
 
     gate = ToolPermissionGate(settings)
-    snapshot = gate.build_snapshot(USER, datetime.now(), settings)
+    snapshot = gate.build_snapshot(USER, timeutil.now(), settings)
     decision = gate.evaluate(sensitive_definition(), invocation(SENSITIVE_TOOL_ID), snapshot)
     assert decision.decision == DECISION_ALLOW
     assert decision.reason == "grant_matched"
@@ -399,7 +400,7 @@ async def test_approved_round_lands_grant_and_allows_second_call(
 
 def _grant_for(service: ConfirmationService, request_id: str):
     request = service.get(request_id)
-    for record in service.grant_records(USER, datetime.now()):
+    for record in service.grant_records(USER, timeutil.now()):
         if record["tool_id"] == request.tool_id and record["source"] == "user_confirm":
             return SimpleNamespace(
                 scope=tuple(record["scope"]), expires_at=record["expires_at"]
@@ -451,7 +452,7 @@ async def test_expired_request_is_not_executed_e5(
 
 
 def _age_request(request_id: str, db_session_factory) -> None:
-    stale = datetime.now() - timedelta(hours=48)
+    stale = timeutil.now() - timedelta(hours=48)
     row = trigger_repository.get(request_id)
     payload = dict(row.payload)
     payload["expires_at"] = stale.isoformat()
@@ -493,7 +494,7 @@ def test_expire_planned_hook_cleans_due_confirmations(
     _enable(override_settings)
     service = ConfirmationService(get_settings())
     stale_ctx = ToolContext(
-        user_id=USER, now=datetime.now() - timedelta(hours=48), settings=get_settings()
+        user_id=USER, now=timeutil.now() - timedelta(hours=48), settings=get_settings()
     )
     request = service.request(
         invocation(SENSITIVE_TOOL_ID, {"content": CONTENT}),

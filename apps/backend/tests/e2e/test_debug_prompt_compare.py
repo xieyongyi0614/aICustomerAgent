@@ -5,6 +5,7 @@ from datetime import datetime
 from httpx import ASGITransport, AsyncClient
 import pytest
 
+from app.core import timeutil
 from app.main import app
 from app.repositories import prompt_snapshot_repository
 from app.models.observability import CallSite, PromptSnapshot
@@ -19,7 +20,7 @@ def _save(snapshot_id, content_len):
             model="fake",
             messages=[{"role": "system", "content": "x" * content_len}],
             section_budget={"total": content_len, "budget": 12000},
-            created_at=datetime.now(),
+            created_at=timeutil.now(),
         )
     )
 

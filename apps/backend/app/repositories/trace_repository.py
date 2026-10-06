@@ -6,6 +6,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import RuntimeTraceRow, SessionLocal
 from app.core.settings import get_settings
@@ -56,7 +57,7 @@ def _from_model(trace: RuntimeTrace, created_at: datetime) -> RuntimeTraceRow:
 
 
 def save(trace: RuntimeTrace) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(trace, now))

@@ -8,6 +8,7 @@ memory.ingest.create_candidate 投 v2 候选（通道收敛第 3 批，禁止直
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.world import EventImportance, EventStatus, WorldEvent
 from app.repositories import world_repository
@@ -33,9 +34,9 @@ def to_memory_candidates(event: WorldEvent) -> list[dict]:
     threshold = float(thresholds.get(event.importance.value, 0.0))
     if threshold <= 0.0:
         return []
-    moment = event.completed_at or event.due_at or datetime.now()
+    moment = event.completed_at or event.due_at or timeutil.now()
     if event.status is EventStatus.EXPIRED:
-        started = event.started_at or event.due_at or datetime.now()
+        started = event.started_at or event.due_at or timeutil.now()
         return [
             {
                 "content": (
@@ -87,7 +88,7 @@ def materialize_event_memory(event: WorldEvent, user_id: str, character_id: str 
         payload = dict(event.payload)
         payload["memory_materialized"] = True
         event.payload = payload
-        event.updated_at = datetime.now()
+        event.updated_at = timeutil.now()
         world_repository.save_event(event)
         return invested
     except Exception:

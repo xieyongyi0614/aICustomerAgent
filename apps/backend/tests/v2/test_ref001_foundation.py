@@ -10,6 +10,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from app.core import timeutil
 from app.services.reflection import lifecycle
 
 pytestmark = pytest.mark.xdist_group("migration")
@@ -29,7 +30,7 @@ def _seed_insight(
     from app.core.db import InsightRow
     from datetime import datetime
 
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -181,7 +182,7 @@ def sqlite_round_trip(tmp_path_factory):
 def _seed_round_trip_rows(url):
     from datetime import datetime
 
-    now = datetime.now().isoformat(sep=" ")
+    now = timeutil.now().isoformat(sep=" ")
     engine = create_engine(url)
     with engine.begin() as connection:
         connection.execute(

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.services.life import budget as life_loop_budget
 
@@ -37,7 +38,7 @@ def preview_budget(
 ) -> BudgetGrant:
     """四问中的「是否/多少预算」预检（account=False 语义）：只问不记账。"""
     settings = get_settings()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     if life_loop_budget.is_degraded(now=now):
         if budget_type == "foreground" and not settings.foreground_gateway_enforced:
             return BudgetGrant(True, True, "quota_circuit_open_soft")

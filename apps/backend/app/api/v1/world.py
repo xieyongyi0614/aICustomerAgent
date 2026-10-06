@@ -8,6 +8,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.core import timeutil
 from app.api.v1.deps import debug_surface_gate
 from pydantic import BaseModel
 
@@ -266,7 +267,7 @@ def get_world_plan(
     if world_engine.get_world(user) is None:
         raise HTTPException(status_code=404, detail="世界不可用")
     try:
-        day = date.fromisoformat(date_str) if date_str else datetime.now().date()
+        day = date.fromisoformat(date_str) if date_str else timeutil.local_now().date()
     except ValueError:
         raise HTTPException(status_code=422, detail="date 参数格式应为 YYYY-MM-DD")
     blocks = world_engine.build_debug_plan(user, day)

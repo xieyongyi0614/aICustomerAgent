@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+from app.core import timeutil
 from app.application.agent_runtime import state
 from app.application.agent_runtime.contracts import (
     EVENT_STATE_VERSION_BUMPED,
@@ -26,7 +27,7 @@ FORBIDDEN_IMPORTS = (
 )
 FORBIDDEN_WRITE_TOKENS = ("session.add", ".commit(", "INSERT ", "UPDATE ", "DELETE ")
 
-NOW = datetime(2026, 9, 21, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 21, 12, 0, 0))
 
 
 def _imported_modules(path: Path) -> set[str]:
@@ -280,7 +281,7 @@ class TestVersionSemanticsAndObservedCache:
                     confidence=0.9,
                     outcome=None,
                     candidates=None,
-                    created_at=datetime.now(),
+                    created_at=timeutil.now(),
                 )
             )
 
@@ -347,5 +348,5 @@ def _opened(run_id: str):
         event_type="RunOpened",
         run_id=run_id,
         session_id=None,
-        occurred_at=datetime.now(),
+        occurred_at=timeutil.now(),
     )

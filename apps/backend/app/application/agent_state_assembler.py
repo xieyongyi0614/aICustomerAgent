@@ -7,6 +7,7 @@
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna import evolution
 from app.core.settings import get_settings
 from app.models.agent_state import (
@@ -32,7 +33,7 @@ _IN_PROGRESS_ACTION_STATUSES = ("created", "planned", "executing")
 
 
 def assemble(user_id: str, character_id: str = "asuna", now: datetime | None = None) -> AgentStateSnapshot:
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     settings = get_settings()
 
     character, relationship = _load_states(user_id)

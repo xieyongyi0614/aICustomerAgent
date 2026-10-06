@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
-    DateTime,
     Float,
     Index,
     Integer,
@@ -15,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db.base import Base
+from app.core.db.base import Base, UtcDateTime
 
 
 class CharacterStateRow(Base):
@@ -32,9 +31,9 @@ class CharacterStateRow(Base):
     cause: Mapped[str] = mapped_column(
         String, nullable=False, default="", server_default=""
     )
-    last_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_event_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -61,7 +60,7 @@ class EmotionHistoryRow(Base):
     mood_after: Mapped[str] = mapped_column(String, nullable=False)
     energy_after: Mapped[float] = mapped_column(Float, nullable=False)
     stage_after: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         Index("idx_emotion_history_user", "user_id", "created_at"),
@@ -81,8 +80,8 @@ class PersonalityStateRow(Base):
     bound_max: Mapped[float] = mapped_column(Float, nullable=False)
     source_insight_id: Mapped[str | None] = mapped_column(String, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(

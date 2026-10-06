@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.action import (
     Action,
@@ -22,7 +23,7 @@ EFFECT_CHANNELS = ("world", "memory", "relationship", "note")
 
 
 def _now() -> datetime:
-    return datetime.now()
+    return timeutil.now()
 
 
 def create_from_plan_intent(

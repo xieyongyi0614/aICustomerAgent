@@ -86,6 +86,7 @@ from datetime import datetime, timedelta
 
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.services.observability import port as observability
 from app.services.world import engine_port as world_engine
 from app.core.settings import get_settings
@@ -689,7 +690,7 @@ def _records(user_id: str) -> list:
 
 def _action_results(records: list, now: datetime, settings) -> list[dict]:
     """动作观察窗投影（既有语义）：`status` 取步级 `steps[].status`，缺步骤回退记录级。"""
-    window_start = now - timedelta(
+    window_start = timeutil.ensure_aware(now) - timedelta(
         minutes=settings.autonomy_observation_window_minutes
     )
     return [
@@ -705,7 +706,7 @@ def _action_results(records: list, now: datetime, settings) -> list[dict]:
 
 def _action_history(records: list, now: datetime, settings) -> list[dict]:
     """放弃判据的历史窗投影（既有语义，字段集不变）。"""
-    history_start = now - timedelta(
+    history_start = timeutil.ensure_aware(now) - timedelta(
         days=settings.autonomy_abandon_min_progress_days
     )
     return [
@@ -763,7 +764,7 @@ def _memory_facts(settings, user_id: str) -> tuple[dict, list]:
 
 def _ctx_now(ctx) -> datetime:
     value = getattr(ctx, "now", None)
-    return value if isinstance(value, datetime) else datetime.now()
+    return value if isinstance(value, datetime) else timeutil.now()
 
 
 def _ctx_goal_id(ctx) -> str | None:

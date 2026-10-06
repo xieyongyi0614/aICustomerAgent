@@ -8,6 +8,7 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core import timeutil
 from app.core import ids
 from app.core.db import BackgroundJobRow, SessionLocal
 
@@ -21,7 +22,7 @@ def enqueue_job(
     run_at: datetime | None = None,
     last_error: str | None = None,
 ) -> bool:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         existing = (
             session.query(BackgroundJobRow)
