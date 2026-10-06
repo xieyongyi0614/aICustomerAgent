@@ -76,9 +76,7 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0003_car_domain.py",
     "0004_channel_identity_bindings.py",
     "0005_id_scheme_split.py",
-    "0006_memory_utc_timestamps.py",
-    "0007_conversation_identity_utc_timestamps.py",
-    "0008_all_domains_utc_timestamps.py",
+    "0006_all_domains_utc_timestamps.py",
 )
 
 SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
