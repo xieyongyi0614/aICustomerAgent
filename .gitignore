@@ -13,6 +13,9 @@ apps/backend/tests/eval/reports/mem-*.json
 apps/backend/tests/eval/reports/dev-growth-*.json
 apps/backend/tests/eval/reports/rel-*.json
 
+# 测试报告产物（pytest --junitxml，本地跑测生成）
+apps/backend/junit.xml
+
 # 本地临时与日志
 apps/backend/.tmp/
 *.log
