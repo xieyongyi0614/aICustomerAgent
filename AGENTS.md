@@ -57,13 +57,11 @@
 - `docs/version/v1.0.0/v8/` — V8 World State System（含 V8-015 World Consistency 评估规则）
 - `docs/version/v1.0.0/v8.5/` — V8.5 Relationship Evolution System（V5 关系域深化，与 V8 相互独立；V2.0.0 Phase4 落地）
 - `docs/version/v1.0.0/v7.8/` · `v7.5/` · `v7/` · `v6.5/` · `v6/` · `v5/` · `v4/` · `v3/` — 各版本设计 + 任务注册表（已实现）
-- `docs/version/v1.0.0/backend-refactor/` — 后端架构审计与目标架构（`target-architecture.md` 是**分层边界**的权威描述）
 - `docs/version/v1.0.0/v2/01-task-registry.md` · `v1/01-task-registry.md` — 早期版本（已完结）
 
 **横切与集成**
 
 - `docs/integrations/feishu/` — 飞书通道：`architecture.md`（本域唯一架构依据）+ `tasks.md`（FEISHU-001~007）+ `task-details/` + `acceptance-report-v1.0.md` + `review-v1.1.md`
-- `docs/refactor/` — 横切重构：`remaining-flag-audit.md`（**vXX_ 删除后剩余 53 个开关阀门的用处 / 去除后果 / 清理批次**）。**services 顶层散落模块已按领域收进子包、纯函数模块收口 `app/engines/`，新代码勿再建顶层散落 services 模块**（架构依据 = 基线 ADR-15；原归位台账已于收官后删除，全文可从 git 历史取回）
 - `docs/TESTING.md` — 测试规范（marker、执行级别、AI Coding 测试规则）
 
 ## 全局约定

@@ -1,6 +1,6 @@
 # Roleplay V6.5：Character Behavior Refinement
 
-> 状态：**设计完成，待实现**。任务入口 `tasks.md`。前置：V1~V6 + Backend Refactor 全部完成。
+> 状态：**设计完成，待实现**。任务入口 `tasks.md`。前置：V1~V6 全部完成。
 > 设计原则：**Behavior 不生成内容**——行为层只产出约束、策略、预算与方向，最终文本仍由 LLM 生成。
 
 ## 1. V6.5 解决什么问题

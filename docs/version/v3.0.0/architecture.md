@@ -272,7 +272,7 @@ UserMessageReceived → ObservationRecorded → PlanningStarted
 | **进程内同步事件** | Event System（V3.0 新增） | 同进程、同 Run 内模块间的同步通信与生命周期通知（如 `RunOpened` / `StageCompleted`） |
 | **事件订阅路由** | Event System（V3.0 新增） | 把「ActionCompleted → Memory Update → Relationship Update」这类编排订阅显式化 |
 
-**关键裁决**：Event System 是**进程内**的发布/订阅与生命周期通知层，解决 M2 的「模块通信语义缺位」；**跨域、跨进程的可靠投递仍走 Outbox**，不引入 Event Sourcing / 消息队列（延续 V1 backend-refactor「不引入 Event Sourcing」裁决）。
+**关键裁决**：Event System 是**进程内**的发布/订阅与生命周期通知层，解决 M2 的「模块通信语义缺位」；**跨域、跨进程的可靠投递仍走 Outbox**，不引入 Event Sourcing / 消息队列（延续既定「不引入 Event Sourcing」裁决）。
 
 ---
 

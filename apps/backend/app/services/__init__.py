@@ -1,9 +1,7 @@
-"""services 包门面：旧顶层模块名 → 归位后路径的 PEP 562 惰性映射。
+"""services 包门面：旧顶层模块名 → 现行路径的 PEP 562 惰性映射。
 
-services 领域化重组（2026-09-30，见架构基线 ADR-15）后，顶层散落模块已按
-领域收进子包，纯函数模块收口 `app/engines/`。本门面只做
-旧名惰性兼容（`from app.services import <旧名>` 仍可用），不急切导入任何业务
-模块；新代码一律 import 真实路径。
+本门面只做旧名惰性兼容（`from app.services import <旧名>` 仍可用），不急切
+导入任何业务模块；新代码一律 import 真实路径。
 """
 
 from importlib import import_module

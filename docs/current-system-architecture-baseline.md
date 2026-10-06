@@ -63,9 +63,7 @@ API / Application     （api/v1/ HTTP 表现层；application/ 编排层：chat_
    ↓
 Agent Runtime         （application/agent_runtime/：Run Controller、Profile Registry、Trigger Router、LLM Gateway、Models）
    ↓
-Domain Services       （services/：领域服务，按领域子包组织（goal/ relationship/ conversation/ evaluation/ delivery/ …）+ 门面；chains/：LangChain LLM 链）
-   ↓
-Pure Engines          （engines/：纯函数引擎，无 IO / 无 LLM / 无 DB；application 与 services 均可直接调用）
+Domain Services       （services/：领域服务 + 门面；chains/：LangChain LLM 链）
    ↓
 Repositories          （repositories/：每张表一个仓储，唯一 DB 访问面）
    ↓
@@ -74,15 +72,14 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 
 ### 2.2 分层职责与依赖方向
 
-分层单向依赖，禁止反向引用（权威边界见 `docs/version/v1.0.0/backend-refactor/target-architecture.md`）：
+分层单向依赖，禁止反向引用：
 
 | 层 | 职责 | 允许依赖 | 禁止 |
 |---|---|---|---|
 | `api/v1/` | HTTP 表现：schema 校验、流式装配、错误→HTTP 映射 | application、services、schemas | repositories、langchain |
 | `application/` | 编排：只做调度与容错，不做状态计算 | services、chains | 直接 SQL、prompt 文本 |
 | `agent_runtime/` | Run 生命周期唯一管理者：open→执行阶段→close，唯一写面 = loop_runs | services、repositories | 持有业务语义 |
-| `services/` | 领域服务 + 纯函数引擎（无 IO/LLM 的引擎可直接单测） | engines、repositories、chains、core | api |
-| `engines/` | 纯函数引擎：无 IO / 无 LLM / 无 DB，可零 fixture 单测（state / autonomy / decision / behavior / mode / memory_policy 等） | models、core.settings、core.constants、纯数据资产 | repositories、chains、services 业务模块、任何 IO |
+| `services/` | 领域服务 | repositories、chains、core | api |
 | `chains/` | LangChain 链，统一经 `chains/structured.py` 结构化输出 | prompts、models、core.llm_factory | repositories、services |
 | `repositories/` | CRUD/Query，唯一 DB 访问面 | core.db、models | 一切业务判断 |
 | `core/` | 配置（settings/）、DB 引擎与 ORM 模型包（db/）、LLM 工厂（llm_factory.py）、常量 | — | 业务 |
@@ -289,7 +286,7 @@ User Message
 
 `life_loop.py::run_life_loop_worker` 常驻循环，先 sleep 后 tick；`run_life_loop_tick` 先工作发现（0 LLM），再逐用户跑 `agent_runtime.run_autonomous_cycle`（autonomous_tick Profile），最后跑事件预闸与维护步。
 
-**调度路径（V4.0.0 PLA-018 统一）**：`run_autonomous_cycle` **固定经 `AgentLoop`** 驱动自治 tick 的 Profile 段序列，不再按配置分支；`controller._legacy_run_autonomous_cycle` 为**代码级回退位**，仅回滚期可显式调用、**不可由配置触达**。`runtime_autonomous_cycle_enabled` 字段保留但**已无读取点**，待后续批次清理（登记见 `docs/refactor/remaining-flag-audit.md`）。六段认知循环（`agent_runtime/stages/*`）**仍为影子实现**，未接入生产 `run()`。
+**调度路径（V4.0.0 PLA-018 统一）**：`run_autonomous_cycle` **固定经 `AgentLoop`** 驱动自治 tick 的 Profile 段序列，不再按配置分支；`controller._legacy_run_autonomous_cycle` 为**代码级回退位**，仅回滚期可显式调用、**不可由配置触达**。`runtime_autonomous_cycle_enabled` 字段保留但**已无读取点**，待后续批次清理（登记见 §9 技术债表）。六段认知循环（`agent_runtime/stages/*`）**仍为影子实现**，未接入生产 `run()`。
 
 **autonomous_tick Profile 阶段序列**（`profiles.py` 唯一声明处，禁止另开阶段序列）：
 
@@ -407,23 +404,6 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | Run 台账 | `loop_runs` | Agent Runtime 唯一写面 |
 | 决策审计 | `decision_records` | 候选/胜者/理由可审计 |
 
-### 6.4 时间口径（UTC-aware，2026-10-06）
-
-**全库时间统一为「带时区的 UTC（aware UTC）」**。历史口径为朴素本地墙钟（naive local）+ 5 个错标 `timestamptz` 列，二者混用会导致 `naive/aware` 运算抛错与静默 8 小时错算；本次统一由 `docs/refactor/datetime-normalization-plan.md` 收官批完成。
-
-| 维度 | 规则 | 落点 |
-|---|---|---|
-| 取当前时间 | 唯一取时口 `app/core/timeutil.py::now()`（aware UTC）；自治周期内改用 `core/clock.py::logical_now()` | 全仓无裸 `datetime.now()` |
-| 列类型 | 一律 `app/core/db/base.py::UtcDateTime`（`TypeDecorator`：PG → `timestamptz`，SQLite 结果侧补 UTC）；**禁止 `DateTime(timezone=True)`** | 全库 134 个时间列 |
-| 边界输入 | DB 读回 / 外部第三方 naive 值经 `timeutil.ensure_aware()` 归一（naive 按部署本地 `Asia/Shanghai` 解释） | 通道契约 / 工具入参 / 跨域读取 |
-| 本地日期语义 | 「本地日期 / 小时 / 周几」（quiet hours、daily plan、自然月账单）显式经 `timeutil.local()` / `local_naive()` 换算，不得对 aware 值直接取 `.date()` / `.hour` | world / ledger / car / prompts 等 |
-| 边界输出 | `timeutil.to_iso()`（带偏移 ISO） | HTTP 响应 |
-| DB 会话时区 | `engine.py` 建引擎时固定 `timezone=UTC`（`SESSION_TIMEZONE`）；`docker-compose.yml` postgres 设 `TZ`/`PGTZ=UTC` | 行为不依赖服务器默认时区 |
-
-**迁移链**：`0006`（memory）、`0007`（conversation + identity）、`0008`（car / character / goal / world / autonomy / action / planning / ledger / reflection / relationship / runtime / development 全部剩余域）。历史朴素列按 `Asia/Shanghai` 解释为真实瞬间；5 个旧错标 `timestamptz` 列（`memories.last_reinforced_at` / `last_decayed_at` / `forgotten_at`、`conversations.mode_entered_at`、`insights.invalidated_at`）先按 UTC 取回墙钟、再重建瞬间。**Schema 头 = `0008`**。
-
-**防回归护栏**：`tests/unit/test_datetime_discipline.py`（模型列恒 `UtcDateTime` / 无裸 `DateTime(timezone=True)` / `app/` 内无裸 `datetime.now()` / PG 会话时区钉 UTC）与 `tests/unit/test_timeutil.py`（归一三态）。
-
 ---
 
 ## 7. Configuration Architecture
@@ -435,6 +415,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | Environment | pydantic-settings（`.env`，`extra="ignore"`） | 环境变量名 = 字段名全大写，无 alias 层、无 env_prefix |
 | Runtime Config | `Settings` = 25 个领域模块多继承组合的**扁平命名空间** | `core/settings/`：llm/database/pipeline/character/memory/reflection_development/relationship/goal/autonomy/life_loop/autonomy_advanced/agent_runtime/action/action_execution/evaluation/feishu/email/ledger/observability/world/world_simulation/tool/plan/weather/**ids** |
 | Feature Config | 按领域命名的布尔开关 + 调参字段 | 开关语义已从"版本门控"收敛为"策略位/裁决位/调试位" |
+| **字段读取形态** | ① 静态属性访问 `settings.X`；② **动态 f-string** `getattr(settings, f"evaluation_{dimension}_enabled", True)`；③ 测试侧**大写 env 名**（`monkeypatch.setenv("X_ENABLED", ...)`） | 审计 / 清理 settings 字段必须**同时**检索 3 种形态，只查字段名会把活开关误判为「零读取点」；形态 ② 的 `getattr(..., True)` 兜底使字段缺失时**静默退化为「永远开启」**。误判实例与复现命令见 §9 技术债表 |
 | LLM Profiles | `llm_profiles.json`（`LLM_PROFILES_FILE`）或 `LLM_PROFILES_JSON`（内联优先） | 多模型 profile，消息级切换（body `profile_id` > header `X-LLM-Profile` > query） |
 
 ### 7.2 已移除项（确认）
@@ -442,7 +423,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 - **Version Gate 体系**：`core/settings/enablement.py` 已删除（版本桶常量 `V25_SUB_FLAGS` 等随文件移除）。
 - **`vXX_` 版本变量**：带 `vXX_` 前缀 **0**（settings 字段总数 2026-09-28 实测 **423**；200 字段去前缀 + 死开关/未接线字段删除 + 各批 ON 转常开）。
 - **启动期未知 env 键告警**：`unknown_versioned_env_keys()` 已删除（2026-09-28，连带 `app/main.py` lifespan 的告警循环与 3 条自测）。删除时全仓 `V<数字>_` 键为 0、函数返回 `[]`，故**零行为变化**；代价是**生产启动边界不再有「env 键 ↔ settings 字段」一致性检查**（`tests/conftest.py::set_known_env` 只在测试进程生效），部署侧死键将完全静默。
-- **世界域四闸**：`world_enabled`（总闸，曾 11 处读取）与 `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled` 已删除（2026-09-28，固化常开，世界域不可再配置旁路）。TOOL-007 的 `world["world_enabled"]` 键保留为**装配标记**（「已装配 vs 未装配」数据契约，非配置开关）。记录见 `docs/refactor/remaining-flag-audit.md` 附录 E.7 / E.8。
+- **世界域四闸**：`world_enabled`（总闸，曾 11 处读取）与 `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled` 已删除（2026-09-28，固化常开，世界域不可再配置旁路）。TOOL-007 的 `world["world_enabled"]` 键保留为**装配标记**（「已装配 vs 未装配」数据契约，非配置开关）。
 - **剩余策略位**：仍有少数按领域命名的布尔开关作为策略/裁决保留（如 `action_outbox_enabled`、`foreground_gateway_enforced`，以及 tool/plan/action 域的调试与策略子闸），语义非版本门控。2026-10-02 新增 `roleplay_prompt_mode`（`full`（默认）/ `off`，模式串口径同 `inventory_grounding_mode`，不引入 `*_enabled` 字段）：**只控制回答链 prompt 是否注入演绎段**（人设 / 情绪 / 角色状态 / 关系 / 世界 / 场景 / 行为 / 风格），`off` 仅保留功能上下文（记忆 / 认知 / 目标 / 意图 / 行动段 / 摘要 / 历史）；世界与角色**引擎照常运行**，世界域「不可配置旁路」裁决与 `world_enabled` 已删除的结论不受影响。
 
 ---
@@ -486,10 +467,11 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | 问题 | 影响 | 优先级 |
 |-|-|-|
 | `services/agent_service.py` 是"兼容壳"，编排已迁 `chat_pipeline` 但壳仍保留供 api/测试依赖 | 双入口符号残留，新同学易误入旧路径 | P2 |
-| `services/` 巨型文件尚未拆完：`tool/ext_api.py`(1507) / `planning/decompose.py`(963) / `planning/observer.py`(864)，次一级 `tool/confirmation.py`(771) / `grounding/inventory_guard.py`(768) / `planning/context.py`(742) / `development/evaluation.py`(708)（`evaluation/context.py` 与 `reflection/evidence.py` 已于 2026-09-30 包化） | 单文件承担多职责，阅读与改动半径变大；`observer` 经补丁缝 + AST 调用图审计判定**不拆**（广播与 settle 双向调用，改用文件内分节导航） | P3 |
 | **ORM 模型已按领域包化**（2026-10-03，`core/db.py` → `core/db/`：`base`/`engine` + 13 个领域子模块，`app/core/db/__init__.py` 显式 re-export 全部符号，217 处 `from app.core.db import …` 零改动；门面 import 全部子模块保证 `Base.metadata` 完整供 autogenerate）；`app/models/` 仍为 Pydantic 领域模型 | 新增表先选领域子模块落位；`Memory` 与 `*Row` 命名不统一仍是历史遗留 | 已收口 |
 | **迁移链头钉测已收口**（2026-09-29 全链折叠为单迁移 `0001`，ADR-14）：钉测单点 `tests/support/schema_pins.py`（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`），v24 取证常量单点 `tool012_support.py`；新增迁移只需 bump 钉文件 | 残余：`v24`/`v25`/`v26`/`v30`/`v40` 部分测试文件名仍带历史版本号字面量（如 `test_runtime_migration_0052.py`），语义已泛化为最终态断言，待未来顺手改名 | P2 |
-| `foreground_gateway_enforced` / `action_outbox_enabled` 两个门控未收敛（前者缺 `light_llm_profile` 裁决保留，后者 outbox 灰度暂留） | 配置面仍有两处门控语义残留 | P2 |
+| `foreground_gateway_enforced` / `action_outbox_enabled` **不是「未收敛的门控」**（2026-10-06 校正）：前者是**成本策略位**（硬拒绝 vs 软降级，两值皆为合法运行态，**应保留**）；后者是**特殊裁决项**（关闭会破坏 `deferred_world_op → outbox → world_engine` 唯一写面纪律，须走架构裁决而非普通门控清理，当前默认 `False`、8 处读取） | 分类口径已校正；`action_outbox_enabled` 尚待架构裁决 | P2 |
+| **开关清理批次未开工**：批次 2（B 类应急关断位择机固化，现存 **13** 个默认 ON 门控）与批次 3（C 类预留位逐项决策，现存 **12** 个默认 OFF 字段 + 4 个 csv 集合闸） | 门控长期保留会掩盖「能力已常开」的事实；**批次 2 的前置 = 真实模型人工回归**（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 / V2.1.0~V2.6.1），未执行前不得开工；批次 3 需先决策：六段方案 A 是否推进、飞书多实例部署是否需要、自治动作与关系信号是否启用 | P2 |
+| `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` 已转常开（无配置读取点），字段与代码级回退位仍在 | 「常开」语义需靠代码阅读确认；清理前须确认代码级回退位（`_drive_foreground_linear` / `_legacy_run_autonomous_cycle`）仍可显式调用 | P3 |
 | 调试台面端点（`/debug/*`、`/state`、action、action-execution、world、`/llm/profiles`）**一律要求 token 身份**（router 级 `require_user`，2026-10-03 ADR-17；此前 52 端点裸奔仅靠 flag 兜底），`user_id` 显式传入可覆盖（IDENT-009 既有语义）——**已无魔法默认值**；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离；生产侧同时钉死 `DEBUG_SURFACE_ENFORCED=true`（ADR-16 遗留项） | 调试面无多用户隔离；产品面已隔离 | P2 |
 | **身份 ID 列保持 `VARCHAR`**（ADR-16，2026-10-03 **评估后主动取消翻转**）：`users.id` 与 37 张表的 `user_id` 存**雪花 ID 的十进制串**，不做 `BIGINT` 列翻转。已实测收益只剩「DB 类型层强制 ID 为数字」，成本为 **584 处**测试字面量（**180 个文件**，191 个不同字面量）+ 删库重建（与 B1「存量用户下次登录自动回填绑定」的自愈路径矛盾）；而存储差异在 `users` 规模下 **< 2KB**、对外契约（字符串出 JSON）两种方案完全一致 | 需强约束时改在**应用边界**校验（成本 1 处）；列类型与 Python 类型均为字符串，语义一致 | P3 |
 | **雪花 ID 可枚举性**（ADR-16，2026-10-03）：`user_id` 由不可枚举的 `email-<sha256[:16]>` 变为**高位含时间戳、按时间递增**的雪花 ID，攻击者可推算「某时刻注册的用户 ID 落在某区间」 | 与上一行「调试面无多用户隔离」叠加后，同一缺陷的**严重度上升一档**；需配套：调试面环境门禁 + 「产品端点忽略显式 `user_id` 参数」测试 | P2 |
@@ -520,11 +502,9 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 12. **邮箱验证码登录（Redis + EmailSender 端口，2026-09-27）**：验证码是短命一次性状态，存 Redis（GETDEL 单次消费 / SETNX 冷却 / INCR 频控），不建 PG 表；发件走 `EmailSender` 协议（MVP = SMTP 163），换云厂商只加实现类；任意邮箱校验通过即 find-or-create 用户行（多用户就绪，display_name 取邮箱前缀），令牌沿用无状态 HMAC 体系（原 `/auth/pair` 设备配对链路已随邮箱登录退役）。
 13. **用户身份收口（token 唯一身份源，2026-09-27；默认用户概念整体退役 2026-09-28）**：产品端点（移动端实际调用面：chat / history / ledger / governance / proactive + 既有生活域六 router）的 `user_id` 一律经 `require_user` 从 Bearer token 解析，**不再回落 `default_user`**（V4.0.0「缺失回落 default_user 与现状逐字节一致」兼容裁决废止）。**IDENT-009（2026-09-28）：默认用户概念不再存在**——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。具体：①删 `settings.default_user` 字段与 `DEFAULT_USER` env 键；②删启动播种 `ensure_default_user()` / `upsert_default()`（空库冷启动不再造幽灵行）；③`/debug/*` 与 `/state`（共 20 个端点）的回落值由魔法 id 改为 **token 身份**（`user_id` 省略即取 `require_user`，显式传入可覆盖）；④删 `users.is_default` 列与唯一索引（迁移 `0058`；该列此前是纯装饰，全仓无查询用它）与 `UserContext.is_default`；⑤删一次性归并脚本 `adopt_owner_identity.py` 与 `resolve_user` 死代码。历史 owner 行的 id 迁移由 `scripts/migrate_owner_id_to_email.py` 承担（幂等 / 默认 dry-run，级联 `user_id` + `worlds.id` + `world_id`；**执行后所有已签发 token 失效**）。V4.0.0 任务册 §14 为本次登记。
 14. **迁移链折叠为单迁移（2026-09-29）**：`migrations/versions/` 由 0001~0058（58 个增量）折叠为单一基线迁移 `0001_squashed_full_schema.py`（revision `0001`、`down_revision = None`），由 `Base.metadata` autogenerate 生成并人工校正（PG 分支保留 pgvector 扩展可用性守卫与 `idx_memories_embedding_hnsw` HNSW 索引；布尔默认值修正为 `sa.false()`；补回 0026 兜底约束；`VectorType` 以迁移内本地副本声明，不依赖 `app.core.db`，基线迁移自包含）。**前提**：项目处开发期、库可整库重建，无线上存量数据需保留；**旧库（≤`0058`）与新链不兼容，必须删库重跑 `alembic upgrade head`**。**顺带修正三处模型/迁移漂移**：①`character_goals.ck_character_goals_domain` 值域补 `budget`（旧链漏更，迁移库上写 budget 域目标会违约）；②`action_records.ix_action_records_user_id` 由 UNIQUE 改普通索引（对齐模型；旧链 0047 误建唯一索引）；③`uq_development_state_active_key` 部分唯一索引与 `ck_development_changes_subject` CHECK 补回 ORM 模型（此前仅存在于迁移、测试建表路径缺失）。迁移头钉测保持 `tests/support/schema_pins.py` 单点（折叠时 `MIGRATION_HEAD="0001"`，**现值 `"0002"`**——随 `0002_briefing_preferences` 入链同步）；v24 取证常量同步改写（`SQUASHED_MIGRATION_FILE` 等）。此后结构变更加 `0002+` 增量迁移，禁止再折叠除非再次整库重建。
-15. **services 目录领域化重组（2026-09-30）**：裁决「领域优先 + 引擎收口 + 统一去后缀」——①49 个顶层散落单文件模块按业务领域收进领域子包（goal / relationship / conversation / evaluation / delivery / autonomy 等），`goal_planning` 不并入 `planning/`（Goal 写面与 Planning 白名单分域）；②无 IO / 无 LLM / 无 DB 的纯函数模块收口 `app/engines/`（**独立层，与 services 平级**，落地 `target-architecture.md` §2 目标态），依赖规则 = 只允许 models / core.settings / core.constants / 纯数据资产，禁止 repositories / chains / services 业务模块 / 任何 IO；③文件名去 `_service` / `_engine` 等后缀（已有子包内文件不改名）；④`services/__init__.py` 落 PEP 562 惰性门面；⑤`governance/` 6→2、`analytics/` `tasks/` 命名空间包并入相邻领域包。**债清偿两阶段**：⑥**`services → application` 反向依赖清零**（2026-09-30）——改「服务侧端口模块 + PEP 562 `__getattr__` 代理」形态（组合根 = `main.py` lifespan + `tests/conftest.py`），纯工具下沉 `core/`（`core/clock.py` 时钟、`core/runtime_state.py` 写锁 / 运行态），`memory/job_worker` 改 job handler 注册表；唯一豁免 = `agent_service.py` 兼容壳本体（随壳退役消失）。**打桩铁律：一律打实现模块（如 `app.application.world_engine.X`），不打端口**——端口 `__getattr__` 与 monkeypatch 组合会把 getattr 快照永久写进端口字典而遮蔽代理。⑦**巨型文件包化 2/5**：`evaluation/context.py` → `evaluation/context/`、`reflection/evidence.py` → `reflection/evidence/`（`{windows,collectors}`，`__init__` 全量再导出以保消费面零改动）；`planning/observer.py` 审计后判定不拆（原归位台账已于收官后删除，全文可从 git 历史取回）。
 16. **ID 体系改用雪花 ID（2026-10-03）**：原 `user_id` 是**凭据的派生值**（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`），导致四类结构性问题：①改绑邮箱即换人（旧行数据成孤儿）；②跨通道无法归一（`channel_identities.internal_user_id` 自身即派生串，映射表退化为自映射，同一人飞书 + 邮箱 = 两套记忆/关系/账本）；③ID 可由邮箱反推，间接泄露「某邮箱已注册」；④业务主键内嵌 `user_id`（`car_profile_{user_id}` / `task_{user_id}_{ms}` / `worlds.id = home:{user_id}`），每次身份口径变化都要全库级联改写（`scripts/migrate_owner_id_to_email.py` 即此代价的实证）。**裁决**：全仓 ID 统一由**雪花 ID** 生成，**禁止自研位运算，采用 `sonyflake` 2.0.3**（`_elapsed_time` 单调只增不减，时钟回拨时 ID 时间不回退、序列耗尽则借位到未来并等待真实时间追上；`aiologic.Lock` 同步/异步通用）。**参数**：epoch `2026-01-01T00:00:00Z`（**一次性决策，有数据后不可改**）、`bits_sequence=12` / `bits_machine_id=10` → `time_bits=41`（库计算）、`time_unit=1ms`；容量 4096 ID/毫秒/机器、1024 机器，**可用至 2095-09-07**。唯一发号入口 = `app/core/ids.py`（`new_id()` / `new_id_async()`），配置域 = `core/settings/ids.py`（`IDS_EPOCH_DATE` / `IDS_MACHINE_ID` / `IDS_HIGH_WATER_*` / `IDS_CLOCK_ROLLBACK_TOLERANCE_MS`）。**时钟回拨防护四层**：L1 进程内 = 库的单调逻辑时钟；L2 跨重启 = 内存水位（由 `decompose().time` 反解**逻辑**时间，非墙钟）每 5s + 关停时写入 Redis（key 按 `machine_id` 隔离），启动 `startup_guard()` 读回，`now < 水位 - tolerance` 则抛 `ClockRollbackError` **拒绝启动**（Redis 不可用时降级跳过 + 告警，不阻塞启动）；L3 部署约定 = 必须启 NTP 且只允许 slew 禁止 `ntpdate` 跳变、禁虚拟机快照回滚、**多实例 `IDS_MACHINE_ID` 必须互异且同一 id 不得同时被两实例使用**、监控「水位 > 墙钟」；L4 兜底 = DB 主键唯一约束，**禁止**冲突时静默重试。**执行分两步，B2 已评估后取消**：**B1（本次已落地）** = 发号模块 + 配置 + 接线 + 单测，并让身份域改用雪花（`user_id` 的 Python/API 类型**保持 `str`**，值为雪花十进制串，故 `users.id` 与 37 张 `user_id` 列仍是 `VARCHAR`）；**B2（2026-10-03 评估后主动取消）** = 列类型翻转 `VARCHAR → BIGINT`——实测收益只剩「DB 类型层强制 ID 为数字」，成本为 584 处测试字面量（180 文件）+ 删库重建，且与 B1 的自愈路径矛盾，故**保留 `VARCHAR`**；需要强约束时改在应用边界校验（详见 §9）。**ID 出 JSON 必须为字符串**（JS 精度，硬约束）。原决策台账 `docs/refactor/identity-and-id-scheme.md`（库选型对比、B2 否决证据链、实现坑复盘）已于 2026-10-03 归档移除，全文可从 git 历史取回；**遗留部署/运维项**：生产 `.env` 设 `DEBUG_SURFACE_ENFORCED=true` 与 `IDS_*` 五键（模板见 `.env.example`）、L3 运维确认（时钟自动同步 / 禁快照回滚 / 多实例机号分配 / 水位监控）、存量含 `default-user` 的旧库升级时按需执行 `scripts/migrate_owner_id_to_email.py`（本库已归并完成，脚本幂等 noop）。
 **C1（2026-10-03 已落地）** = 收敛内嵌 `user_id` 的实体主键（P0-4 主体）：`car_profiles` / `car_loans` / `car_service_records` / `car_mileage_logs` / `ledger_accounts` / `ledger_categories` / `life_tasks` 共 9 处改雪花，`car_repository._new_id()` 去掉 `prefix`/`user_id` 参数。**一处例外**：`ledger_categories` 种子 id 保留 `cat_seed_{user_id}_{原始名}` —— 它承担**跨重命名的稳定身份**（用户改名后重跑播种不得复活原分类），换随机雪花会破坏该契约；正确解法（`seed_key` 列）归入阶段 D。**C3（2026-10-03 已落地）** = 全 app `uuid.uuid4()` 生成点 52 处收敛 `ids.new_id_str()`（实测生成点大头在 models pydantic 默认值与应用服务层，非仓储层；前缀裁决：**去掉**，request_id/act id 等均为雪花数字串）。**C2（2026-10-03 已落地）** = `worlds.id` 新世界发雪花、存量行保留 `home:{user_id}`（零数据迁移、零子表重映射），`world_id_for` 纯函数退役为 `find_world_id` 查库（世界未建立返回 `None`，三个读路径空返回语义不变），仓储 get/ensure 全部按 `user_id` 查找。**待办**：D（五张例外表拆分 + `messages`/`emotion_history` 两张自增表收敛）。
 17. **调试面治理（2026-10-03）**：72 端点盘点与收口。①`api/v1/debug.py`（1269 行单体混 7 路径族）拆为 `api/v1/debug/` 五域子包：`tools`(14) / `attribution`(6) / `observability`(15) / `relationship`(3) / `plans`(6)，`__init__` 聚合 `debug_router`，统一 `tags=["debug"]`；OpenAPI 形状零变化（72 操作校验）。②52 个裸端点补 router 级 `require_user`（debug 五子包 + `action` + `action_execution`；`/llm/profiles` 同批收口，因生产 enforced 时会被门禁 404 打断前端选择器而**不挂** `debug_surface_gate`），调试面全部 72 端点要求 token 身份；`user_id` 显式覆盖语义保留（IDENT-009 / ADR-13 ③）。③部署钉死 `DEBUG_SURFACE_ENFORCED=true` 维持 ADR-16 遗留清单，同时是「雪花 ID 可枚举性」（§9）缓解措施的「调试面环境门禁」半边。④v50 `_DEBUG_ENDPOINTS` 401 纪律清单扩至 9 端点，`/llm/profiles` 并入产品端点清单；零消费 10 端点决议保留（world 手动通道 = 显式运维通道，plans 详查端点待 PLAN 域规划确认）。
-18. **时间口径统一 UTC-aware（2026-10-06）**：全库时间列改 `timestamptz`（ORM 侧 `UtcDateTime` `TypeDecorator`，SQLite 结果侧补 UTC）、取时点一律经 `timeutil.now()`、本地日期语义显式 `timeutil.local()`、DB 会话时区钉 `UTC`（`engine.py` + `docker-compose.yml`）；替代此前「朴素本地墙钟 + 5 个错标 `timestamptz`」混用口径（`docs/refactor/datetime-normalization-plan.md`）。静态护栏见 `tests/unit/test_datetime_discipline.py`。
 
 ---
 

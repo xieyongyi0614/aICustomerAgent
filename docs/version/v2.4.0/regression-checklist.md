@@ -9,7 +9,7 @@
 > 行动域经裁决 B 采用「工具绑定优先路由」——凡能解析出工具绑定的动作（含 internal 类）
 > 一律经工具五段（权限→确认→校验→调用→归一）执行。本清单按收官后语义编写，
 > 历史文档中的「总闸 / 子闸 / 启用链」表述视为 V2.4.0 设计期坐标。
-> **后续补充（2026-09-19 起）**：基闸 `action_enabled`（H.15）与 `world_enabled`（`remaining-flag-audit.md` E.8）
+> **后续补充（2026-09-19 起）**：基闸 `action_enabled`（H.15）与 `world_enabled`（退役记录见基线 §9 技术债表）
 > 亦已退役、字段删除，本文不再要求配置这两项；`feishu_enabled` 作为环境耦合位保留。
 
 ---
@@ -19,7 +19,7 @@
 | 项 | 说明 |
 |---|---|
 | Flag 状态 | 无需配置（工具系统常开，`v24_*` Flag 已随开关体系删除；遗留 env 键会被启动告警或静默忽略） |
-| 基闸要求 | **无需配置**：原基闸 `ACTION_ENABLED`（行动域总闸）与 `WORLD_ENABLED`（世界宿主）均已退役、字段删除（退役记录见 `remaining-flag-audit.md`），动作引擎与世界域无条件常开 |
+| 基闸要求 | **无需配置**：原基闸 `ACTION_ENABLED`（行动域总闸）与 `WORLD_ENABLED`（世界宿主）均已退役、字段删除（退役记录见基线 §9 技术债表），动作引擎与世界域无条件常开 |
 | 通道工具 | 飞书通道工具（`channel.feishu.send`）需要 `FEISHU_ENABLED=true` + APP_ID/APP_SECRET/VERIFICATION_TOKEN（`feishu_enabled` 为环境耦合位，保留） |
 | 内置工具 | `register_builtin_tools` 启动自动注册：`builtin.reminder.*` / `builtin.memory.save` / `builtin.search.query` / `world.env.query` / `world.object.*` / `builtin.notification.send`（sensitive）/ `channel.feishu.send`（sensitive，随通道启用） |
 | 调试端点 | `GET /api/v1/debug/tools/*`（清单 / 面投影 / 权限快照）与 `GET /api/v1/debug/action-execution/*`（actions / schedules / metrics）**恒可见**（无 404 门控） |

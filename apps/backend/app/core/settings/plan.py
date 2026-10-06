@@ -4,10 +4,10 @@
 不复存在，原「总闸 off ⇒ 走 V2.4.0 原路径」的退化分支整体消失（`goal_planning` /
 `goal_observation` / `goal_execution` 改为恒走计划编排路径）。
 
-保留两个**策略位**（默认 ON、已去版本前缀、零门控污染）：
-`plan_tool_required`（要求工具面可用时步骤必须绑定工具；off 允许无面规划）与
-`plan_context_digest_enabled`（计划上下文摘要）。二者都不是「激活计划编排」的开关，
-而是编排启用后的行为修饰位。
+保留**策略位** `plan_tool_required`（默认 ON、已去版本前缀、零门控污染）：要求工具面可用时
+步骤必须绑定工具，off 允许无面规划——它不是「激活计划编排」的开关，而是编排启用后的行为
+修饰位。`plan_context_digest_enabled` 已按批次 2 固化常开并删字段（计划落库恒写
+`context_digest`）。
 """
 
 from pydantic import model_validator
@@ -16,7 +16,7 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 
 
 class PlanSettings(BaseSettings):
-    """2 个 `plan_*` 策略位 + 14 个参数（默认值即 architecture.md §7.10 两张表）。"""
+    """1 个 `plan_*` 策略位 + 14 个参数（默认值即 architecture.md §7.10 两张表）。"""
 
     model_config = DOMAIN_MODEL_CONFIG
 
@@ -35,7 +35,6 @@ class PlanSettings(BaseSettings):
     plan_replan_min_confidence: float = 0.7
     plan_reflection_min_samples: int = 3
     plan_memory_importance_floor: float = 0.6
-    plan_context_digest_enabled: bool = True
 
     @model_validator(mode="after")
     def validate_plan_config(self):

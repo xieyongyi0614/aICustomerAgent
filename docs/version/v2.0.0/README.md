@@ -8,7 +8,7 @@
 
 ## 1. v2.0.0 背景
 
-v1.0.0 经过 V1～V9 九个迭代加一次 backend-refactor，已经把「角色能理解、能思考、能决定、能行动、能产生世界事件」做完了。但它本质上仍然是一个**单次交互存在**：角色每轮对话重新组装一次上下文，回答完即遗忘大半；关系、目标、情绪全部由阈值规则驱动，角色不会因为经历而成长，不会反思，也不会在用户不说话时持续生活。
+v1.0.0 经过 V1～V9 九个迭代，已经把「角色能理解、能思考、能决定、能行动、能产生世界事件」做完了。但它本质上仍然是一个**单次交互存在**：角色每轮对话重新组装一次上下文，回答完即遗忘大半；关系、目标、情绪全部由阈值规则驱动，角色不会因为经历而成长，不会反思，也不会在用户不说话时持续生活。
 
 v2.0.0 的目标只有一句话：
 
@@ -36,7 +36,7 @@ Experience → Memory → Reflection → Development → Goal
 | 向量库 / Embedding | **完全没有**（`grep embedding/vector/pgvector/cosine` 零命中） |
 | 后台设施 | **纯单进程 asyncio**：`main.py` lifespan 起 5 个常驻循环（memory reclaim / autonomy worker 60s tick / observability retention / world maintenance / action retry）。无队列、无 Redis、无 APScheduler |
 | LLM | OpenAI 兼容单通道（`llm_factory`，profile 默认 longcat），无多模型分层、无缓存 |
-| 编排层 | `application/`（chat_pipeline 前台 + post_process 后台 + engines），backend-refactor 已落地 |
+| 编排层 | `application/`（chat_pipeline 前台 + post_process 后台 + engines） |
 
 ### 2.2 聊天主链路（每轮真实发生的事）
 

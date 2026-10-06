@@ -39,7 +39,7 @@
 | `app/core/settings/__init__.py` | `Settings(...)` 多继承组合 16 个领域基类 + `get_settings()`（`@lru_cache`） | **修改**：加 1 个 import + 在基类列表追加 `FeishuSettings` |
 | `app/core/llm_factory.py` | **既有懒构造范式**：模块级 `_llm_cache: dict`、首次使用时构造、`set_llm()` / `reset_llm()` 作为测试接缝 | **照此模式**实现 client 单例与 token 缓存（见「Data Model」） |
 | `app/application/post_process.py` | 既有锁范式：模块级 `_user_write_locks: dict[str, asyncio.Lock]` + `get_user_write_lock()` + `reset_user_write_locks()` | 单飞锁沿用「模块级 + reset 接缝」风格；**但注意 `asyncio.Lock` 的事件循环绑定问题**（见「Implementation Constraints」） |
-| `app/core/errors.py` | **不存在**（`target-architecture.md` §4 曾建议新建，实际未落地） | **不创建**；错误类型放 `channels/feishu/errors.py`（Layer 内聚，不污染 core） |
+| `app/core/errors.py` | **不存在**（早期架构设计曾建议新建，实际未落地） | **不创建**；错误类型放 `channels/feishu/errors.py`（Layer 内聚，不污染 core） |
 | `app/channels/`、任何 `feishu` 相关代码 | **完全不存在**（全库无 `feishu` / `Feishu` / `app.channels` 命中） | 全新包 |
 | `pyproject.toml` | `httpx>=0.28.1` 在 **[dependency-groups].dev**，不在 `[project].dependencies`；`cryptography` 尚未进入 runtime 依赖 | 本 Task 仅限 `uv add cryptography`（Risk #1 = 方案 A）；**不迁移 httpx**（见下方「依赖决策」） |
 | `Dockerfile` | 生产镜像执行 `uv sync --frozen --no-dev` | 确认：dev 组依赖在生产**不存在** |

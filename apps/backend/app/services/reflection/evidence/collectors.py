@@ -1,6 +1,5 @@
 """Reflection 证据聚合采集（只读 DB / trace 记录 / 聚合编排）。
 
-由 `evidence.py` 拆分归位（巨型文件包化，2026-09-30）；
 窗构造与门槛数学见 `windows`（单向依赖 collectors → windows）。
 """
 

@@ -9,7 +9,7 @@
 > `time_advance_enabled` / `daily_life_enabled` / `event_detection_enabled` / `scene_expansion_enabled` /
 > `world_llm_assist_enabled` / `debug_tick_enabled`）已随批次 4 固化常开并删除（`habit_time_enabled`
 > 更早于第 0 步删除）；世界模拟**恒常开**，主闸 `world_enabled` 亦已于 2026-09-28 退役
-> （`remaining-flag-audit.md` E.8）。本清单按收官后语义编写；下文「总闸 / 子闸 / 启用链 / Flag 关」
+> （退役记录见基线 §9 技术债表）。本清单按收官后语义编写；下文「总闸 / 子闸 / 启用链 / Flag 关」
 > 表述视为 V2.3.0 设计期坐标，不再对应可配置项。回退方式 = `git revert`（无 env 回退路径）。
 
 ---

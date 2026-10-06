@@ -1,6 +1,6 @@
 # docs 文档导航
 
-项目文档按版本归档。当前处于 **V1.0.0 封版**，所有版本文档、前端文档、后端架构重构文档统一收在 `version/v1.0.0/` 下。
+项目文档按版本归档。当前处于 **V1.0.0 封版**，所有版本文档与前端文档统一收在 `version/v1.0.0/` 下。
 
 ## 版本 v1.0.0（`version/v1.0.0/`）
 
@@ -8,7 +8,6 @@
 |---|---|
 | `v1/` ~ `v9/` | 各能力版本设计 / 任务注册表 / 回归清单 |
 | `frontend/` | 前端调试控制台架构 / 任务 / 部署 |
-| `backend-refactor/` | 后端架构审计与目标架构（REF-001~013） |
 
 ### 版本文档（`version/v1.0.0/v*/`）
 
@@ -38,7 +37,6 @@
 | `TESTING.md` | 后端测试规范（marker、执行级别） |
 | `chat-message-link-analysis.md` | `POST /chat/message` 全链路技术分析 |
 | `household-inventory-review.md` | Household Inventory 对话审查报告（叙事与世界状态脱节分析） |
-| `PR-feat-v3-to-main.md` / `-lite.md` | feat/v3 → main 合并 PR 描述 |
 
 ## 归档（`docs/_archive/`）
 

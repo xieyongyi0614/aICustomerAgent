@@ -11,7 +11,7 @@
   **首次删除记录（2026-09-28）**：`inventory_grounding_enabled` / `character_action_sync_enabled` /
   `world_interpreter_enabled` / `world_memory_bridge_enabled` / `world_household_autoseed_enabled` /
   `world_enabled` 六个开关删除并固化常开，本基线随之收缩 6 项——这是自冻结以来**唯一一次**集合
-  变更（同日单批），见 `docs/refactor/remaining-flag-audit.md` 附录 E。删除同样需显式登记。
+  变更（同日单批）。删除同样需显式登记。
 - `V40_SETTINGS_FIELDS`（字段名 → 归属 Task）：V4.0 新增的**参数类**字段登记处。
   新增 `*_enabled` 字段一律违规，不在此登记。
 """
@@ -20,8 +20,6 @@ from __future__ import annotations
 
 V30_ENABLED_FLAGS: frozenset[str] = frozenset(
     {
-        "action_detector_enabled",
-        "action_memory_policy_enabled",
         "action_outbox_enabled",
         "action_relationship_enabled",
         "autonomy_action_enabled",
@@ -30,23 +28,15 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "evaluation_behavior_enabled",
         "evaluation_development_enabled",
         "evaluation_emotion_enabled",
-        "evaluation_enabled",
         "evaluation_goal_enabled",
-        "evaluation_llm_judge_enabled",
         "evaluation_memory_enabled",
         "evaluation_persona_enabled",
         "evaluation_reflection_enabled",
         "evaluation_relationship_enabled",
-        "evaluation_world_consistency_enabled",
         "feishu_dedupe_persistent_enabled",
         "feishu_enabled",
         "feishu_ingress_sharded_routing_enabled",
         "feishu_router_enabled",
-        "observability_persist_enabled",
-        "plan_context_digest_enabled",
-        "rel_conflict_enabled",
-        "rel_evolution_enabled",
-        "rel_milestone_enabled",
         "runtime_autonomous_cycle_enabled",
         "runtime_context_freeze_enabled",
         "runtime_event_bus_enabled",
@@ -56,7 +46,6 @@ V30_ENABLED_FLAGS: frozenset[str] = frozenset(
         "runtime_session_tracking_enabled",
         "runtime_six_stage_loop_enabled",
         "runtime_state_versioning_enabled",
-        "scene_idle_reset_enabled",
     }
 )
 

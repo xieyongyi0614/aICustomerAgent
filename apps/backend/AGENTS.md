@@ -13,7 +13,7 @@ uv run uvicorn app.main:app --reload --port 8020   # 启动服务
 
 ## 任务入口
 
-- **架构类问题先查** `docs/current-system-architecture-baseline.md`（当前系统唯一可信架构基线，描述已实现的真实系统）；**分层与边界的权威描述**见 `docs/version/v1.0.0/backend-refactor/target-architecture.md`。
+- **架构类问题先查** `docs/current-system-architecture-baseline.md`（当前系统唯一可信架构基线，描述已实现的真实系统；**分层与边界的权威描述**以其 §2 为准）。
 - 开发前读对应版本的 `tasks.md` 确认 Task 及其 Scope / 依赖：当前版本 `docs/version/v2.6.1/tasks.md`，各版本设计文档在 `docs/version/<版本>/`。
 - 飞书通道相关改动另见 `docs/integrations/feishu/architecture.md`（本域唯一架构依据）+ `review-v1.1.md`（已知缺陷与多实例硬前置）。
 
@@ -26,13 +26,12 @@ channels（通道层：base.py 契约 + feishu/ 适配器）
    ↓
 api → application（编排） → services → repositories → core
          ├── agent_runtime（Run 生命周期唯一管理者）┘
-         ├── chains（LLM 链）┘
-         └── engines（纯函数）┘
+         └── chains（LLM 链）┘
 ```
 
 - `application/` 只做调度与容错（编排管线、post_process 步骤注册），不做状态计算；新增能力以注册新步骤 / 新 context 段的方式接入。
 - `agent_runtime/`（`application/agent_runtime/`）是 Run 生命周期的唯一管理者：`open → 执行阶段 → close`，**唯一写面 = `loop_runs`**；三种 Run Profile（`foreground_chat` / `autonomous_tick` / `event_driven`）在 `profiles.py` **唯一声明**，禁止另开阶段序列。
-- 纯函数引擎（如 `behavior_engine` / `state_engine` / `autonomy_policy`）无 IO、无 LLM，可直接单测。
+- 纯函数引擎（`app/engines/`：如 `behavior.py` / `state.py` / `autonomy.py`）无 IO、无 LLM，可直接单测。
 - `api` 层禁止直接依赖 `repositories` 与 langchain。
 - **通道层边界**：`channels/` 只做「消息归一为 `InboundMessage` + 经 `OutboundMessage` 契约出站」，**不得**包含 Agent / Memory / World 逻辑，也不得 import 任何 Autonomy 模块；核心层（`application` / `services` / `repositories` / `chains` / `core` / `character`）**不得** import `app.channels.<impl>`（如 `app.channels.feishu`），**仅可** import `app.channels.base`（零第三方依赖、零 `app.*` 依赖的契约）。
 - LLM 实例必须来自 `core/llm_factory.get_llm()`（profile 机制），禁止各处新建 `ChatOpenAI`；结构化输出统一走 `chains/structured.py` 的 `build_structured_chain`（主链 + 一层降级），禁止自由解析。

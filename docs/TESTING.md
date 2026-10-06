@@ -79,6 +79,18 @@ AI 修改代码后**不允许直接执行 `pytest`（Full Test）**。默认流�
 | LangGraph / Agent（`app/chains/`、`app/agents/`） | 相关 Unit / Mock 测试；必要时 Integration |
 | 基础设施（`app/core/`：db、settings、deps、llm_factory、middleware） | Fast Test；必要时 Full Test |
 
+### settings 字段改动的验证规则
+
+改动 / 删除 `app/core/settings/` 字段时必须按**三种引用形态**全量检索，缺一即误判：
+
+| 形态 | 示例 | 检索要点 |
+|---|---|---|
+| ① 静态属性访问 | `if not settings.action_detector_enabled: return None` | 蛇形字段名 |
+| ② **大写 env 名** | `monkeypatch.setenv("EVALUATION_BEHAVIOR_ENABLED", "false")`、`os.environ.setdefault(...)` | 字段名**大写形式**（测试侧常用） |
+| ③ **动态 f-string（最易漏）** | `bool(getattr(settings, f"evaluation_{dimension}_enabled", True))` | 按字段名 grep **无法命中**，须搜 `getattr(settings, f"` / `f"[a-z_]*_enabled"` |
+
+形态 ③ 的 `getattr(..., True)` 兜底会让**字段缺失时静默退化为「永远开启」**——不报错、行为不变、能力消失。因此**删字段后必须以测试为最终裁判**（`pytest -m "(unit or api) and not slow"`），并对失败项做基线对照。误判实例与复现命令见基线 §9 技术债表。
+
 ### Full Test 使用时机
 
 仅限：一个完整开发阶段结束、PR、发布前、CI、用户明确要求。执行前如预计耗时较长，先汇报测试规模。

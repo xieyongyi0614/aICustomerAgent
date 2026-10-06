@@ -174,7 +174,7 @@ V4.0 只做**新增领域、注册、调用、读取**。明确不写：
 **既有开关的处置（只许两种，不得新增）**：
 
 1. **置为唯一有效值**——如 PLA-018 把后台统一到 Agent Runtime（`runtime_autonomous_cycle_enabled` 不再是「切换」，而是「统一」）。
-2. **纳入 `remaining-flag-audit.md` 台账**，按既有批次流程清理——V4.0 建议登记 `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` 两个已转常开的字段（**清理动作本身不入 V4.0 交付面**，只登记）。
+2. **登记进基线 §9 技术债表**，按既有批次流程清理——V4.0 建议登记 `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` 两个已转常开的字段（**清理动作本身不入 V4.0 交付面**，只登记）。
 
 **连带影响（本注册表内已同步）**：§4.2 由「灰度与开关开启顺序」改为「能力交付顺序」；§6.2 DoD 第 2 条由「Flag 关闭时逐字节一致」改为「零回归 + 可回滚」；Gate G12 口径同步；各 Task Scope / Expected Output 中的开关引用已移除。
 
@@ -432,7 +432,7 @@ Scope:
 
 - **交付面**：把后台自治**统一到 Agent Runtime 轨道**——`runtime_autonomous_cycle_enabled` **置为唯一有效值**（不再作为「切换」，见 §0.9 / architecture 附 D C-2），`controller.py::run_autonomous_cycle` 的 legacy 分支（`_legacy_run_autonomous_cycle`）**降级为非默认回退位**；`application/life_loop.py` 的 tick 与维护步挂接确认（维护步清单零改动）；`autonomous_tick` Profile 段序列保持 `profiles.py` 唯一声明。
 - **等价性证明**：统一前后，同一次 tick 的**段序列、段本体、预算三道闸、cooldown / idle / storm 判定**逐项等价（对照测试）；**空转 0 LLM / 0 Run** 语义不变。
-- **开关台账登记**：把 `runtime_foreground_loop_enabled` 与 `runtime_autonomous_cycle_enabled` 两个**已转常开**的既有字段登记进 `docs/refactor/remaining-flag-audit.md`，按既有批次流程待清理（**清理动作不在本任务交付面内**，只登记；见 §0.9）。
+- **开关台账登记**：把 `runtime_foreground_loop_enabled` 与 `runtime_autonomous_cycle_enabled` 两个**已转常开**的既有字段登记进基线 §9 技术债表，按既有批次流程待清理（**清理动作不在本任务交付面内**，只登记；见 §0.9）。
 - **文档登记**：`docs/version/v3.0.0/acceptance-report.md` 中「边界不变量 8 PASS」的**口径澄清**（该 PASS 为开关开启的测试态；本任务把生产态补齐）——以勘误或 V4.0 验收报告交叉引用方式登记，不改写历史结论。
 - **顺带勘误**：`acceptance-report.md` §影子矩阵表格遗漏 `runtime_foreground_loop_enabled` / `runtime_six_stage_loop_enabled` 两个字段（代码与 `tests/v30/runtime_support.py` 均为 13 个，登记完整；仅报告表格停留在 11 行）——在 V4.0 验收文档中登记该差异，不修改 V3.0 冻结报告。
 - **Out of Scope**：**不激活六段认知循环**（裁决 R5，`runtime_six_stage_loop_enabled` 保持既有 `False`）；**不新增任何功能开关**（§0.9）；不删除 legacy 分支代码（只降级为非默认，删除留待 flag-removal 批次）；不修 `debug_view` 未接端点（L1）；不修前台 `runtime_input` / `session_context` 未传参（L2）；不新增常驻循环；不改 `profiles.py` 三 Profile 的段序列语义；不引入第三方编排框架。
@@ -1015,7 +1015,7 @@ Expected Output:
 | `debug_view` 接入 debug 端点（V3.0 遗留 L1） | 未排期 | 审计 §3.4；PLA-018 Out of Scope |
 | 前台传参启用 Context 冻结（V3.0 遗留 L2） | 未排期 | 审计 §3.4；`runtime_context_freeze_enabled` 本版保持 `False` |
 | `app/api/**` 反向依赖 `app/repositories` 治理（V3.0 遗留 L3） | 未排期 | 审计 §3.4；本版只承诺「不扩大」 |
-| **既有 `runtime_*` 已转常开开关的清理**（`runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled`） | 未排期（flag-removal 批次） | §0.9；V4.0 只**登记**进 `remaining-flag-audit.md`，**清理动作不入本版交付面** |
+| **既有 `runtime_*` 已转常开开关的清理**（`runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled`） | 未排期（flag-removal 批次） | §0.9；V4.0 只**登记**进基线 §9 技术债表，**清理动作不入本版交付面** |
 | Episodic / Semantic 记忆双通道 | V3.1（**已预留，勿占用**） | v3.0.0 tasks.md §7.3 |
 | 循环内嵌持续反思 | V3.2（**已预留**） | v3.0.0 tasks.md §7.3 |
 | Self Improvement 闭环深化 | V3.3（**已预留**） | v3.0.0 tasks.md §7.3 |
