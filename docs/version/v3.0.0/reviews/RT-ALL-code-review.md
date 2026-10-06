@@ -260,7 +260,7 @@ V3.0 在「包装既有域、不重造器官」这一主线上总体成立：Dec
 - **Location**: `contracts.py:158`；`events.py:106` 等
 - **Problem**: `RuntimeInput.received_at` 强制 tz-aware，但 `SessionContext.started_at` 默认 naive `datetime.now()`，契约内部不一致。
 - **Recommended Fix**: 统一 `datetime.now(timezone.utc)` 或沿用逻辑时钟。
-- **处理结论（2026-10-06，**已关闭**）**：全库时间口径统一为 aware UTC（`docs/refactor/datetime-normalization-plan.md` 收官批），`app/core/timeutil.py::now()` 为唯一取时口；`SessionContext.started_at` / `closed_at`（`session.py`）、`contracts.py` 的 `started_at` 默认值均为 aware UTC，契约内部已一致。静态护栏 `tests/unit/test_datetime_discipline.py` + `tests/unit/test_timeutil.py`；基线登记见 `docs/current-system-architecture-baseline.md` §6.4 / ADR-18。
+- **处理结论（2026-10-06，**已关闭**）**：全库时间口径统一为 aware UTC（2026-10-06 收官批），`app/core/timeutil.py::now()` 为唯一取时口；`SessionContext.started_at` / `closed_at`（`session.py`）、`contracts.py` 的 `started_at` 默认值均为 aware UTC，契约内部已一致。静态护栏 `tests/unit/test_datetime_discipline.py` + `tests/unit/test_timeutil.py`；基线登记见 `docs/current-system-architecture-baseline.md` §6.4 / ADR-18。
 
 ### L-2 `STAGE_TO_PHASE` 将 `state_update`/`state_snapshot` 映射到 reason
 
@@ -298,7 +298,7 @@ V3.0 在「包装既有域、不重造器官」这一主线上总体成立：Dec
 | **High** | H-6 嵌套双 Run + 状态吞没 | 审计不可信；事件升级失败被记成成功 |
 | **High** | H-7 通道层越界 | 新渠道复制粘贴越界；与文档双向约束矛盾 |
 | **Medium** | M-1~M-10 | 域策略渗入 Runtime、竞态、记账失真、私有 API、全局缓存 |
-| **Low** | L-1~L-4 | 时区/命名/文档滞后/契约追加（L-1 已于 2026-10-06 关闭，见 §3 L-1 处理结论） |
+| **Low** | L-1~L-4 | 时区/命名/文档滞后/契约追加（L-1 已于 2026-10-06 关闭，见上述 L-1 处理结论） |
 
 **回归风险（对既有功能）**：Flag 全 off 路径与 Preserve diff（验收报告 G4）表明 **V3.0 自身零回归**；飞书/Web/Memory/Planning/Action/World/Relationship 在关闭开关时行为对齐 V2.6.1。风险集中在开关开启后的运行时正确性（H-1/H-6/C-1），而非静默改写域数学。
 
