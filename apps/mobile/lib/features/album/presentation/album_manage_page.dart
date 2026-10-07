@@ -102,11 +102,16 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     final viewAssetIds = {for (final asset in assets) asset.id};
     final preselectedInView = preselected.intersection(viewAssetIds);
     final thumbnails = <String, ImageProvider?>{};
-    for (final asset in assets) {
-      try {
-        thumbnails[asset.id] = await _repo.source.thumbnailProvider(asset);
-      } catch (_) {
-        thumbnails[asset.id] = null;
+    for (var start = 0; start < assets.length; start += _thumbnailBatch) {
+      final batch = assets.sublist(
+        start,
+        (start + _thumbnailBatch).clamp(0, assets.length),
+      );
+      final loaded = await Future.wait([
+        for (final asset in batch) _thumbnailOf(asset),
+      ]);
+      for (var i = 0; i < batch.length; i++) {
+        thumbnails[batch[i].id] = loaded[i];
       }
     }
 
@@ -123,6 +128,17 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       _selected = {...preselectedInView};
       _loading = false;
     });
+  }
+
+  /// 缩略图按批并发取：逐张串行在数千张时会把主 isolate 卡死。
+  static const _thumbnailBatch = 16;
+
+  Future<ImageProvider?> _thumbnailOf(PhotoAsset asset) async {
+    try {
+      return await _repo.source.thumbnailProvider(asset);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<PhotoAsset>> _collectAssets(int hint) async {
@@ -390,41 +406,54 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       grouped[_kindLabel(section.kind)] = suggestion.assetIds.toSet();
     }
     final claimed = <String>{for (final ids in grouped.values) ...ids};
-    final children = <Widget>[];
+    final slivers = <Widget>[];
     grouped.forEach((label, ids) {
       final assets =
           data.assets.where((asset) => ids.contains(asset.id)).toList();
       if (assets.isEmpty) return;
-      children
-        ..add(_groupLabel('$label · 共 ${assets.length} 张（AI 预选）'))
-        ..add(_grid(data, assets));
+      slivers
+        ..add(_groupLabelSliver('$label · 共 ${assets.length} 张（AI 预选）'))
+        ..add(_gridSliver(data, assets));
     });
     final manual =
         data.assets.where((asset) => !claimed.contains(asset.id)).toList();
     if (manual.isNotEmpty) {
-      children
-        ..add(_groupLabel('手动挑选'))
-        ..add(_grid(data, manual));
+      slivers
+        ..add(_groupLabelSliver('手动挑选'))
+        ..add(_gridSliver(data, manual));
     }
     for (final reason in unsupported) {
-      children
-        ..add(_groupLabel('相似连拍 · 本期未开启'))
-        ..add(Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Text(
-            reason,
-            style: context.typography.caption.copyWith(
-              fontSize: 11.5,
-              color: context.colors.ink3,
+      slivers
+        ..add(_groupLabelSliver('相似连拍 · 本期未开启'))
+        ..add(_sliverOf(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              reason,
+              style: context.typography.caption.copyWith(
+                fontSize: 11.5,
+                color: context.colors.ink3,
+              ),
             ),
           ),
         ));
     }
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
-      children: children,
+    return CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(child: SizedBox(height: 4)),
+        ...slivers,
+        const SliverToBoxAdapter(child: SizedBox(height: 18)),
+      ],
     );
   }
+
+  /// sliver 版网格：外层是唯一滚动体，摆到哪渲染哪（不再 shrinkWrap 全量布局）。
+  Widget _sliverOf(Widget child) => SliverPadding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    sliver: SliverToBoxAdapter(child: child),
+  );
+
+  Widget _groupLabelSliver(String text) => _sliverOf(_groupLabel(text));
 
   Widget _groupLabel(String text) {
     return Padding(
@@ -440,27 +469,27 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     );
   }
 
-  Widget _grid(AlbumManageData data, List<PhotoAsset> assets) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: PhotoTile.gridCrossAxisCount,
-        crossAxisSpacing: PhotoTile.gridSpacing,
-        mainAxisSpacing: PhotoTile.gridSpacing,
-        childAspectRatio: 1,
+  Widget _gridSliver(AlbumManageData data, List<PhotoAsset> assets) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      sliver: SliverGrid.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: PhotoTile.gridCrossAxisCount,
+          crossAxisSpacing: PhotoTile.gridSpacing,
+          mainAxisSpacing: PhotoTile.gridSpacing,
+          childAspectRatio: 1,
+        ),
+        itemCount: assets.length,
+        itemBuilder: (context, index) {
+          final asset = assets[index];
+          return PhotoTile(
+            thumbnail: data.thumbnails[asset.id],
+            selectionMode: true,
+            selected: _selected.contains(asset.id),
+            onToggle: () => _toggle(asset.id),
+          );
+        },
       ),
-      itemCount: assets.length,
-      itemBuilder: (context, index) {
-        final asset = assets[index];
-        return PhotoTile(
-          thumbnail: data.thumbnails[asset.id],
-          selectionMode: true,
-          selected: _selected.contains(asset.id),
-          onToggle: () => _toggle(asset.id),
-        );
-      },
     );
   }
 }
