@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Mapping
@@ -22,6 +23,8 @@ CHARGER_KEY = "charger"
 SERVICE_INTERVAL_KEY = "service_interval"
 
 EMPTY_VALUE_TEXT = "未填写"
+
+logger = logging.getLogger(__name__)
 
 
 class CarProfileValidationError(ValueError):
@@ -254,6 +257,23 @@ def _reminder_bundle(user_id: str, profile, now: datetime):
         now=now,
         settings=get_settings(),
     )
+
+
+def reminders(user_id: str, *, now: datetime | None = None) -> tuple[CarReminder, ...]:
+    """只读面的活跃提醒（简报等聚合用）：无档案或读取失败返回空，调用方省卡。"""
+    try:
+        moment = timeutil.ensure_aware(now) or timeutil.now()
+        profile = car_repository.get_profile(user_id)
+        if profile is None:
+            return ()
+        return _reminder_bundle(user_id, profile, moment).reminders
+    except Exception as error:
+        logger.warning(
+            "车辆提醒读取失败: %s: %s",
+            error.__class__.__name__,
+            error,
+        )
+        return ()
 
 
 def overview(user_id: str, *, now: datetime | None = None) -> CarOverview:

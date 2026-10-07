@@ -16,7 +16,7 @@ def test_ai_narrative_first_home():
     repo = Path("../mobile/lib/features/home/data/home_repository.dart").read_text(
         encoding="utf-8"
     )
-    assert "AI 洞察" in repo
+    assert "今日 AI 总结" in repo
     ai = src.index("AiCard(")
     data = src.index("今日任务")
     assert ai < data

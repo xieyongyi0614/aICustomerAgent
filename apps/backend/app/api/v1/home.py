@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, time, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core import timeutil
 from app.api.v1.auth import require_user
+from app.services.briefing import compose as brief_compose
+from app.services.briefing import weather as brief_weather
 from app.services.conversation import history as history_service
 from app.services.observability.analytics import track_event
 from app.services.insights import query as insights_query
@@ -147,28 +150,77 @@ def mode_chip_for(user_id: str) -> str:
     return _MODE_LABELS.get(getattr(conversation, "mode", None), "")
 
 
-def insight_block_for(user_id: str) -> InsightBlock:
-    """只映射已产出的洞察；无洞察时叙事留空，由客户端出空态，不补默认文案。
+def _baseline_narrative(
+    snapshot: brief_weather.WeatherSnapshot | None, open_task_count: int
+) -> str:
+    """无洞察时的最基础总结：只用结构化真实字段，缺哪项省哪项，全空出空态。"""
+    parts: list[str] = []
+    if snapshot is not None:
+        if snapshot.temp_min_c is not None and snapshot.temp_max_c is not None:
+            parts.append(
+                f"今天{snapshot.condition}，"
+                f"{snapshot.temp_min_c:.0f}°~{snapshot.temp_max_c:.0f}°"
+            )
+        else:
+            parts.append(f"今天{snapshot.condition}，{snapshot.temperature_c:.0f}°")
+    if open_task_count:
+        parts.append(f"有 {open_task_count} 项任务等你")
+    return "；".join(parts) + "。" if parts else ""
 
-    数据源是 reflection 的长期用户洞察（无日期窗口），故标题不用「今日」话术；
-    每日总结由独立任务承接（V5 任务注册表 API-021）。
+
+async def _open_task_count(user_id: str) -> int:
+    try:
+        rows = await asyncio.to_thread(task_service.list_open, user_id)
+    except Exception:
+        return 0
+    return len(rows)
+
+
+async def insight_block_for(
+    user_id: str,
+    open_task_count: int | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> InsightBlock:
+    """只映射已产出的洞察；无洞察时以天气 + 任务数兜底，全程不编造。
+
+    「今日 AI 总结」为产品裁决话术（2026-10-07）；洞察数据源暂是 reflection
+    的长期用户洞察（无日期窗口），每日总结能力由独立任务承接（API-021）。
+    兜底取数走简报同款定位链（偏好城市 > 请求坐标 > 默认北京），逐项省略。
     """
     try:
         items = insights_query.list_insights(user_id, domain="home", limit=1)
     except Exception:
         items = []
-    if not items:
-        return InsightBlock(title="AI 洞察", narrative="")
-    top = items[0]
+    if items:
+        top = items[0]
+        return InsightBlock(
+            title=top.headline or "今日 AI 总结",
+            narrative=top.narrative,
+            action_label="查看完整早间简报 →",
+        )
+    if open_task_count is None:
+        open_task_count = await _open_task_count(user_id)
+    snapshot = await brief_compose.current_weather_for_user(
+        user_id, latitude=latitude, longitude=longitude
+    )
+    narrative = _baseline_narrative(snapshot, open_task_count)
     return InsightBlock(
-        title=top.headline or "AI 洞察",
-        narrative=top.narrative,
-        action_label="查看早间简报 →",
+        title="今日 AI 总结",
+        narrative=narrative,
+        action_label="查看完整早间简报 →" if narrative else None,
     )
 
 
 @home_router.get("/summary", response_model=HomeSummary)
-def home_summary(user_id: str = Depends(require_user)):
+async def home_summary(
+    user_id: str = Depends(require_user),
+    lat: float | None = None,
+    lon: float | None = None,
+):
+    coord_error = brief_compose.check_coord_pair(lat, lon)
+    if coord_error is not None:
+        raise HTTPException(status_code=422, detail=coord_error)
     track_event("home_summary")
     try:
         task_rows = task_service.list_open(user_id)
@@ -223,7 +275,9 @@ def home_summary(user_id: str = Depends(require_user)):
             sub="亚丝娜已为你整理好今天的一切",
             mode_chip=mode_chip_for(user_id),
         ),
-        insight=insight_block_for(user_id),
+        insight=await insight_block_for(
+            user_id, open_task_count=len(task_rows), latitude=lat, longitude=lon
+        ),
         tasks=tasks,
         tasks_hint=f"{len(tasks)} 项 · AI 已排序" if tasks else "",
         spend=spend,

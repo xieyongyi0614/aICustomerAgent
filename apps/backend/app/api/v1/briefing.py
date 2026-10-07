@@ -24,10 +24,6 @@ briefing_router = APIRouter(prefix="/briefing", tags=["briefing"])
 
 _HHMM = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
-_LAT_RANGE = (-90.0, 90.0)
-
-_LON_RANGE = (-180.0, 180.0)
-
 
 class BriefCard(BaseModel):
     title: str
@@ -73,12 +69,9 @@ async def get_briefing(
     lon: float | None = Query(default=None),
     user_id: str = Depends(require_user),
 ):
-    if (lat is None) != (lon is None):
-        raise HTTPException(status_code=422, detail="lat 与 lon 必须成对提供")
-    if lat is not None and not _LAT_RANGE[0] <= lat <= _LAT_RANGE[1]:
-        raise HTTPException(status_code=422, detail="lat 超出合法范围")
-    if lon is not None and not _LON_RANGE[0] <= lon <= _LON_RANGE[1]:
-        raise HTTPException(status_code=422, detail="lon 超出合法范围")
+    coord_error = compose.check_coord_pair(lat, lon)
+    if coord_error is not None:
+        raise HTTPException(status_code=422, detail=coord_error)
     draft = await compose.compose_brief(type, user_id, latitude=lat, longitude=lon)
     return BriefingContent(
         type=draft.type,

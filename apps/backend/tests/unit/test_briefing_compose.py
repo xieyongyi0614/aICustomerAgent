@@ -10,6 +10,8 @@ import pytest
 from app.repositories import briefing_preference_repository
 from app.services.briefing import weather
 from app.services.briefing import compose
+from app.services.car import service as car_service
+from app.services.ledger import query as ledger_query
 from app.services.life import tasks as task_service
 
 
@@ -38,6 +40,25 @@ def _prefs_row(**overrides):
 @pytest.fixture(autouse=True)
 def _no_saved_prefs(monkeypatch):
     monkeypatch.setattr(briefing_preference_repository, "get", lambda user_id: None)
+
+
+def _week_summary(entry_count=0, expense_minor=0, ratio=None):
+    return SimpleNamespace(
+        entry_count=entry_count,
+        expense_minor=expense_minor,
+        compared_to_previous=None
+        if ratio is None
+        else SimpleNamespace(expense_ratio=ratio),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _no_spend_and_car(monkeypatch):
+    """合成单测不碰账本/车辆域：默认无消费、无临期提醒，两卡省略。"""
+    monkeypatch.setattr(
+        ledger_query, "summary", lambda *args, **kwargs: _week_summary()
+    )
+    monkeypatch.setattr(car_service, "reminders", lambda user_id, **kwargs: ())
 
 
 @pytest.fixture
@@ -160,12 +181,19 @@ async def test_task_service_failure_falls_back_to_zero(patch_weather, patch_task
     assert "0 项" in task_card.body
 
 
-async def test_request_coordinates_win_over_prefs_and_env(
-    patch_weather, patch_prefs, override_settings
-):
+async def test_saved_prefs_win_over_request_coordinates(patch_weather, patch_prefs):
     calls = patch_weather(_snapshot())
     patch_prefs(latitude=31.2304, longitude=121.4737)
-    override_settings(weather_latitude=1.0, weather_longitude=2.0)
+
+    await compose.compose_brief(
+        "morning", "u-1", latitude=39.9042, longitude=116.4074
+    )
+
+    assert calls == [(31.2304, 121.4737)]
+
+
+async def test_request_coordinates_win_without_saved_prefs(patch_weather):
+    calls = patch_weather(_snapshot())
 
     await compose.compose_brief(
         "morning", "u-1", latitude=39.9042, longitude=116.4074
@@ -174,37 +202,93 @@ async def test_request_coordinates_win_over_prefs_and_env(
     assert calls == [(39.9042, 116.4074)]
 
 
-async def test_saved_prefs_win_over_env_fallback(
-    patch_weather, patch_prefs, override_settings
-):
+async def test_default_location_is_beijing_without_any_source(patch_weather):
     calls = patch_weather(_snapshot())
-    patch_prefs(latitude=31.2304, longitude=121.4737)
-    override_settings(weather_latitude=1.0, weather_longitude=2.0)
 
     await compose.compose_brief("morning", "u-1")
 
-    assert calls == [(31.2304, 121.4737)]
+    assert calls == [(39.9042, 116.4073)]
 
 
-async def test_env_coordinates_are_last_fallback(patch_weather, override_settings):
-    calls = patch_weather(_snapshot())
-    override_settings(weather_latitude=1.0, weather_longitude=2.0)
-
-    await compose.compose_brief("morning", "u-1")
-
-    assert calls == [(1.0, 2.0)]
-
-
-async def test_no_location_anywhere_degrades_weather_card(patch_weather, monkeypatch):
+async def test_weather_fetch_failure_degrades_card(patch_weather):
     calls = patch_weather(None)
+
+    draft = await compose.compose_brief("morning", "u-1")
+
+    assert calls == [(39.9042, 116.4073)]
+    assert draft.cards[0].title == "天气"
+    assert draft.cards[0].body == "暂无实时数据"
+
+
+async def test_morning_carries_car_then_spend_cards(
+    patch_weather, patch_tasks, monkeypatch
+):
+    patch_weather(_snapshot())
+    patch_tasks(count=2)
     monkeypatch.setattr(
-        compose,
-        "get_settings",
-        lambda: SimpleNamespace(weather_latitude=None, weather_longitude=None),
+        ledger_query,
+        "summary",
+        lambda *args, **kwargs: _week_summary(
+            entry_count=6, expense_minor=9600, ratio=-0.12
+        ),
+    )
+    monkeypatch.setattr(
+        car_service,
+        "reminders",
+        lambda user_id, **kwargs: (
+            SimpleNamespace(
+                kind="service",
+                title="下次保养",
+                detail="还剩 800 km 或 5 天",
+                level="soon",
+            ),
+            SimpleNamespace(
+                kind="insurance",
+                title="车辆保险",
+                detail="2026-10-20 到期，该比价续保了",
+                level="normal",
+            ),
+        ),
+    )
+
+    draft = await compose.compose_brief(
+        "morning", "u-1", latitude=39.9042, longitude=116.4074
+    )
+
+    titles = [card.title for card in draft.cards]
+    assert titles == ["天气", "任务", "车辆", "消费"]
+    assert draft.cards[2].body == "下次保养 还剩 800 km 或 5 天"
+    assert draft.cards[3].body == "近 7 天 ¥96 · 6 笔"
+    assert draft.cards[3].note == "比上周少 12%"
+
+
+async def test_spend_card_omitted_without_entries(patch_weather, patch_tasks):
+    patch_weather(_snapshot())
+    patch_tasks(count=0)
+
+    draft = await compose.compose_brief("morning", "u-1")
+
+    assert [card.title for card in draft.cards] == ["天气", "任务"]
+
+
+async def test_car_card_omitted_without_soon_reminders(
+    patch_weather, patch_tasks, monkeypatch
+):
+    patch_weather(_snapshot())
+    patch_tasks(count=0)
+    monkeypatch.setattr(
+        car_service,
+        "reminders",
+        lambda user_id, **kwargs: (
+            SimpleNamespace(
+                kind="insurance",
+                title="车辆保险",
+                detail="2026-12-01 到期，该比价续保了",
+                level="normal",
+            ),
+        ),
     )
 
     draft = await compose.compose_brief("morning", "u-1")
 
-    assert calls == []
-    assert draft.cards[0].title == "天气"
-    assert draft.cards[0].body == "暂无实时数据"
+    assert [card.title for card in draft.cards] == ["天气", "任务"]

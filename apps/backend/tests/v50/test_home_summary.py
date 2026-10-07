@@ -2,18 +2,33 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
+from fastapi import HTTPException
 
 from app.core import timeutil
 from app.api.v1 import home as home_api
 from app.repositories import ledger_repository
+from app.services.briefing import compose as brief_compose
+from app.services.briefing import weather as brief_weather
 from app.services.conversation import history as history_service
 from app.services.insights import query as insights_query
 from app.services.ledger import query as ledger_query
+from app.services.life import tasks as task_service
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.fixture(autouse=True)
+def _no_weather(monkeypatch):
+    """首页单测不碰真实天气源（开发者 .env 可能配了兜底坐标）。"""
+
+    async def _none(_user_id, latitude=None, longitude=None):
+        return None
+
+    monkeypatch.setattr(brief_compose, "current_weather_for_user", _none)
 
 
 @pytest.mark.parametrize(
@@ -70,11 +85,37 @@ def test_mode_chip_blank_when_history_lookup_raises(db_session_factory, monkeypa
     assert home_api.mode_chip_for("u1") == ""
 
 
-def test_insight_is_empty_without_produced_insights(db_session_factory):
-    block = home_api.insight_block_for("u-none")
-    assert block.title == "AI 洞察"
+def test_insight_empty_without_insights_or_fallback_data(db_session_factory):
+    """无洞察且天气、任务都取不到时不出兜底句，空态交回客户端。"""
+    block = asyncio.run(home_api.insight_block_for("u-none"))
+    assert block.title == "今日 AI 总结"
     assert block.narrative == ""
     assert block.action_label is None
+
+
+def test_insight_falls_back_to_weather_and_tasks(db_session_factory, monkeypatch):
+    async def _snapshot(_user_id, latitude=None, longitude=None):
+        return brief_weather.WeatherSnapshot(
+            temperature_c=18.3,
+            condition="少云",
+            temp_min_c=12.4,
+            temp_max_c=22.1,
+            precipitation_probability=30,
+        )
+
+    monkeypatch.setattr(brief_compose, "current_weather_for_user", _snapshot)
+    block = asyncio.run(
+        home_api.insight_block_for("u-fallback", open_task_count=3)
+    )
+    assert block.title == "今日 AI 总结"
+    assert block.narrative == "今天少云，12°~22°；有 3 项任务等你。"
+    assert block.action_label == "查看完整早间简报 →"
+
+
+def test_insight_fallback_omits_weather_without_snapshot(db_session_factory):
+    block = asyncio.run(home_api.insight_block_for("u-fb", open_task_count=2))
+    assert block.narrative == "有 2 项任务等你。"
+    assert block.action_label == "查看完整早间简报 →"
 
 
 def test_insight_maps_produced_row(db_session_factory):
@@ -95,10 +136,31 @@ def test_insight_maps_produced_row(db_session_factory):
         )
         session.commit()
 
-    block = home_api.insight_block_for("u1")
+    block = asyncio.run(home_api.insight_block_for("u1"))
     assert block.title == "你最近更偏好在家做饭"
     assert block.narrative == "你最近更偏好在家做饭。夜间下单明显减少。"
-    assert block.action_label == "查看早间简报 →"
+    assert block.action_label == "查看完整早间简报 →"
+
+
+def test_summary_forwards_coordinates_to_weather(db_session_factory, monkeypatch):
+    monkeypatch.setattr(history_service, "find_latest_conversation", lambda _uid: None)
+    captured: dict[str, tuple[float, float] | None] = {}
+
+    async def _capture(_user_id, latitude=None, longitude=None):
+        captured["coords"] = (
+            None if latitude is None or longitude is None else (latitude, longitude)
+        )
+        return None
+
+    monkeypatch.setattr(brief_compose, "current_weather_for_user", _capture)
+    asyncio.run(home_api.home_summary(user_id="u-coords", lat=39.9, lon=116.4))
+    assert captured["coords"] == (39.9, 116.4)
+
+
+def test_summary_rejects_unpaired_coordinates():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(home_api.home_summary(user_id="u-coords", lat=39.9))
+    assert exc_info.value.status_code == 422
 
 
 def test_summary_carries_no_fabricated_task_or_insight_claims(
@@ -112,11 +174,22 @@ def test_summary_carries_no_fabricated_task_or_insight_claims(
     monkeypatch.setattr(
         history_service, "find_latest_conversation", lambda _uid: None
     )
-    summary = home_api.home_summary(user_id="u-none")
+    summary = asyncio.run(home_api.home_summary(user_id="u-none"))
     assert summary.tasks == []
     assert summary.tasks_hint == ""
     assert summary.hero.mode_chip == ""
     assert summary.insight.narrative == ""
+
+
+def test_summary_fallback_narrative_counts_open_tasks(
+    db_session_factory, monkeypatch
+):
+    monkeypatch.setattr(history_service, "find_latest_conversation", lambda _uid: None)
+    rows = [{"id": f"t{i}", "title": f"任务{i}"} for i in range(3)]
+    monkeypatch.setattr(task_service, "list_open", lambda _uid: rows)
+    summary = asyncio.run(home_api.home_summary(user_id="u-fb-count"))
+    assert "有 3 项任务等你" in summary.insight.narrative
+    assert summary.tasks_hint == "3 项 · AI 已排序"
 
 
 def test_home_api_keeps_zero_repositories_dependency():
@@ -193,7 +266,7 @@ def test_summary_spend_carries_week_bars_in_yuan(db_session_factory, monkeypatch
     )
     user_id = "u-home-bars-endpoint"
     _seed_expense(user_id, 3500, days_ago=0)
-    summary = home_api.home_summary(user_id=user_id)
+    summary = asyncio.run(home_api.home_summary(user_id=user_id))
     assert summary.spend is not None
     assert len(summary.spend.week_bars) == 7
     assert summary.spend.week_bars[6] == pytest.approx(35.0)
@@ -205,7 +278,7 @@ def test_summary_spend_week_bars_zero_without_entries(
     monkeypatch.setattr(
         history_service, "find_latest_conversation", lambda _uid: None
     )
-    summary = home_api.home_summary(user_id="u-home-bars-none")
+    summary = asyncio.run(home_api.home_summary(user_id="u-home-bars-none"))
     assert summary.spend is not None
     assert summary.spend.week_bars == [0.0] * 7
 
@@ -217,7 +290,7 @@ def test_summary_spend_week_labels_end_with_today(
     monkeypatch.setattr(
         history_service, "find_latest_conversation", lambda _uid: None
     )
-    summary = home_api.home_summary(user_id="u-home-bars-none")
+    summary = asyncio.run(home_api.home_summary(user_id="u-home-bars-none"))
     assert summary.spend is not None
     labels = summary.spend.week_labels
     assert len(labels) == 7
@@ -244,7 +317,7 @@ def test_summary_spend_week_bars_degrade_to_empty_on_error(
         raise RuntimeError("ledger down")
 
     monkeypatch.setattr(ledger_query, "daily_expense_series", _boom)
-    summary = home_api.home_summary(user_id="u-home-bars-error")
+    summary = asyncio.run(home_api.home_summary(user_id="u-home-bars-error"))
     assert summary.spend is not None
     assert summary.spend.week_bars == []
 
@@ -261,7 +334,7 @@ def test_summary_spend_is_weekly_with_real_amount(db_session_factory, monkeypatc
     _seed_expense(user_id, 800, days_ago=3)
     _seed_expense(user_id, 99900, days_ago=9)  # 窗外：不得计入
 
-    spend = home_api.home_summary(user_id=user_id).spend
+    spend = asyncio.run(home_api.home_summary(user_id=user_id)).spend
 
     assert spend is not None
     assert spend.amount_label == "¥248"
@@ -279,7 +352,7 @@ def test_spend_conclusion_reports_week_over_week(db_session_factory, monkeypatch
     _seed_expense(user_id, 10000, days_ago=0)
     _seed_expense(user_id, 20000, days_ago=8)  # 前 7 天
 
-    spend = home_api.home_summary(user_id=user_id).spend
+    spend = asyncio.run(home_api.home_summary(user_id=user_id)).spend
 
     assert spend is not None
     assert spend.conclusion == "近 7 天日均 ¥14，比上周少 50% —— 亚丝娜"
@@ -290,7 +363,7 @@ def test_summary_spend_empty_window_copy(db_session_factory, monkeypatch):
         history_service, "find_latest_conversation", lambda _uid: None
     )
 
-    spend = home_api.home_summary(user_id="u-home-spend-none").spend
+    spend = asyncio.run(home_api.home_summary(user_id="u-home-spend-none")).spend
 
     assert spend is not None
     assert spend.amount_label == "¥0"
