@@ -58,8 +58,6 @@ void main() {
     expect(find.text('亚丝娜'), findsOneWidget);
     expect(find.text('温柔可靠 · 会主动关心你的生活'), findsOneWidget);
     expect(find.text('编辑人格'), findsOneWidget);
-    expect(find.text('设备连接'), findsOneWidget);
-    expect(find.text('数据授权'), findsOneWidget);
     expect(find.text('记忆管理'), findsOneWidget);
     expect(find.text('查看、编辑、遗忘'), findsOneWidget, reason: '计数不可达时诚实回退');
     expect(find.text('隐私设置'), findsOneWidget);

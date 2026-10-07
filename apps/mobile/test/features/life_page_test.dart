@@ -81,7 +81,7 @@ ModuleCard _card(WidgetTester tester, String title) =>
     tester.widget<ModuleCard>(find.widgetWithText(ModuleCard, title));
 
 void main() {
-  testWidgets('test_life_page_module_grid_has_six_modules', (tester) async {
+  testWidgets('test_life_page_module_grid_has_five_modules', (tester) async {
     final repo = _FakeLifeRepository();
     await _pumpPage(tester, repo);
 
@@ -89,15 +89,14 @@ void main() {
       '记账',
       '备忘录',
       '日程',
-      '健康',
       '车辆',
       '相册',
     ]) {
       expect(find.widgetWithText(ModuleCard, title), findsOneWidget, reason: title);
     }
-    // 宫格 6（3×2）；「即将上线」占位区已于 2026-10-03 移除
-    expect(find.byType(ModuleCard), findsNWidgets(6));
-    for (final removed in const ['任务', '日历', '旅行', '记忆']) {
+    // 宫格 5（3×2 少一格）：健康模块随官方 SDK 不可用移除（55031078）
+    expect(find.byType(ModuleCard), findsNWidgets(5));
+    for (final removed in const ['任务', '日历', '旅行', '记忆', '健康']) {
       expect(find.widgetWithText(ModuleCard, removed), findsNothing,
           reason: '$removed 已按 2026-09-30 IA 裁决移出宫格');
     }
@@ -150,7 +149,7 @@ void main() {
     final repo = _FakeLifeRepository();
     await _pumpPage(tester, repo);
 
-    for (final title in const ['记账', '备忘录', '日程', '健康', '车辆', '相册']) {
+    for (final title in const ['记账', '备忘录', '日程', '车辆', '相册']) {
       expect(_card(tester, title).onTap, isNotNull,
           reason: '红线 10：宫格不允许悬空入口（$title 必须有真实页面）');
     }
@@ -168,7 +167,6 @@ void main() {
     expect(_card(tester, '记账').summary, '本月 ¥612.00');
     expect(_card(tester, '备忘录').summary, '1 条备忘');
     expect(_card(tester, '日程').summary, '今日 2 项');
-    expect(_card(tester, '健康').summary, '趋势参考·非诊断');
   });
 
   testWidgets('test_life_page_task_failure_degrades_only_its_cards',
@@ -263,7 +261,7 @@ void main() {
     expect(find.text('查看今日日程'), findsOneWidget);
     expect(find.text('去相册看看'), findsOneWidget);
     expect(find.text('生活模块'), findsOneWidget);
-    expect(find.text('6 个 · 都在帮你跑'), findsOneWidget);
+    expect(find.text('5 个 · 都在帮你跑'), findsOneWidget);
   });
 
   testWidgets('test_life_page_ai_summary_lists_only_real_facts',
@@ -287,7 +285,6 @@ void main() {
         reason: '日程 trend 用今天首条待办，不编造时间');
     expect(_card(tester, '记账').trend, '环比尚未接入');
     expect(_card(tester, '备忘录').trend, '主题归类尚未接入');
-    expect(_card(tester, '健康').trend, '尚未接入健康数据');
     expect(_card(tester, '车辆').trend, '还没有限行提醒',
         reason: '没有限行数据时如实说没有，不编示例日期');
   });
@@ -297,7 +294,7 @@ void main() {
     final repo = _NoTasksRepository();
     await _pumpPage(tester, repo);
 
-    // trend 行每卡必有一行（六卡同构不显空）；无真实数据时走引导 / 未接入诚实文案。
+    // trend 行每卡必有一行（五卡同构不显空）；无真实数据时走引导 / 未接入诚实文案。
     expect(_card(tester, '日程').trend, '建一个，替你排',
         reason: '没有待办时引导去日程页，不编造条目');
     expect(_card(tester, '车辆').trend, '记一笔，替你盯着',

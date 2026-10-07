@@ -22,6 +22,7 @@ class PrefsStore {
     keyNickname,
     keyLastEmail,
     keyLoginSeen,
+    keyFirstUsedAt,
     keyModuleOrder,
   ];
 
