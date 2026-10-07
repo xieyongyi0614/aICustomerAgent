@@ -13,12 +13,19 @@ const _weekdayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 /// 日程 = 日历 + 任务合一（2026-09-30 IA 裁决），复用任务域（`kind=task`）。
 /// 无日期的待办不编造时间，落时间线末位并标「待排」。
 class SchedulePage extends StatefulWidget {
-  const SchedulePage({super.key, this.repository, this.showBackLink = true});
+  const SchedulePage({
+    super.key,
+    this.repository,
+    this.showBackLink = true,
+    this.backLabel = '生活',
+  });
 
   final LifeRepository? repository;
 
   /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
   final bool showBackLink;
+
+  final String backLabel;
 
   @override
   State<SchedulePage> createState() => _SchedulePageState();
@@ -215,6 +222,14 @@ class _SchedulePageState extends State<SchedulePage> {
     await _load();
   }
 
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/life');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -230,8 +245,8 @@ class _SchedulePageState extends State<SchedulePage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
                 child: BackLink(
-                  label: '生活',
-                  onTap: () => context.go('/life'),
+                  label: widget.backLabel,
+                  onTap: _back,
                 ),
               ),
             Expanded(child: _body(context, colors, type)),

@@ -210,6 +210,18 @@ void main() {
     expect(find.text('今天还没有排到事，跟我说一句就好'), findsOneWidget);
   });
 
+  testWidgets('test_schedule_page_back_link_follows_entry_origin',
+      (tester) async {
+    final repo = _FakeLifeRepository();
+    _useTallSurface(tester);
+    await tester.pumpWidget(
+      _host(SchedulePage(repository: repo, backLabel: '首页')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('首页'), findsOneWidget);
+  });
+
   test('test_schedule_page_never_renders_fabricated_schedule_content', () {
     final source = File(
       'lib/features/life/presentation/schedule_page.dart',

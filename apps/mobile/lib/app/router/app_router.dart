@@ -183,7 +183,11 @@ final appRouter = GoRouter(
         GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(path: '/ledger/auto', builder: (_, _) => const LedgerAutoPage()),
         GoRoute(path: '/memo', builder: (_, _) => const MemoPage()),
-        GoRoute(path: '/schedule', builder: (_, _) => const SchedulePage()),
+        GoRoute(
+          path: '/schedule',
+          builder: (_, state) =>
+              SchedulePage(backLabel: state.extra as String? ?? '生活'),
+        ),
         GoRoute(path: '/car', builder: (_, _) => const CarPage()),
         GoRoute(
           path: '/car/add',
