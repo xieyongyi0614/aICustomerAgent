@@ -63,7 +63,9 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
 .ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
 .ai-card .acts{display:flex;gap:8px;margin-top:12px}
-.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title{display:flex;align-items:center;margin:24px 2px 11px}
+.sec-title .ico{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-right:9px;flex:none}
+.sec-title .ico svg{width:15px;height:15px}
 .sec-title h2{font-size:16.5px;font-weight:700}
 .sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
 .count-pill{font-size:12.5px;color:var(--ink2);background:var(--card);border:1px solid var(--line);padding:6px 12px;border-radius:99px;font-weight:600}
@@ -106,7 +108,7 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
       <a class="back" href="30-life.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>生活</a>
       <div class="row" style="margin-bottom:4px">
         <h1 class="pt">备忘录</h1>
-        <span class="count-pill" style="margin-left:auto">12 条 · 3 个主题</span>
+        <span class="count-pill" style="margin-left:auto">11 条 · 3 个主题</span>
       </div>
       <div class="sub" style="margin-bottom:16px">随手说，亚丝娜帮你归好类</div>
 
@@ -117,31 +119,33 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 
       <div class="ai-card">
         <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜整理中</div>
-        <p>12 条备忘我按 3 个主题归好了。另外，「健身房年卡续费」这条——你上周说已经不去了，要帮你删掉吗？</p>
-        <div class="acts"><span class="btn-ai">删掉它</span><span class="btn-ghost">先留着</span></div>
+        <p>这 11 条备忘我收好了，按 3 个主题归好，2 条设了提醒。长按任意一条就能删掉它。</p>
       </div>
 
-      <div class="sec-title"><h2>旅行灵感</h2><span class="hint">3 条</span></div>
+      <div class="sec-title"><span class="ico" style="background:rgba(43,210,232,.13);color:#1FA8BC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><h2>旅行灵感</h2><span class="hint">3 条</span></div>
       <div class="card" style="padding:6px 18px">
-        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">十一去大理，想看洱海日出，住才村码头附近</div><div class="m-s">9/21 对话 · <span class="ai-tag">已关联十一行程规划</span></div></div></div>
-        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">带无人机，记得查大理机场限飞区</div><div class="m-s">9/19 语音</div></div></div>
-        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">老妈想要的鲜花饼牌子：嘉华</div><div class="m-s">9/12 对话</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">十一去大理，想看洱海日出，住才村码头附近</div><div class="m-s">9/21 记录 · <span class="ai-tag">已关联十一行程规划</span></div></div></div>
+        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">带无人机，记得查大理机场限飞区</div><div class="m-s">9/19 记录</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:#1FA8BC"></span><div><div class="m-t">老妈想要的鲜花饼牌子：嘉华</div><div class="m-s">9/12 记录</div></div></div>
       </div>
 
-      <div class="sec-title"><h2>工作</h2><span class="hint">4 条</span></div>
+      <div class="sec-title"><span class="ico" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><h2>工作</h2><span class="hint">4 条</span></div>
       <div class="card" style="padding:6px 18px">
-        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">V4 架构评审前先更新基线文档</div><div class="m-s">9/22 对话 · <span class="ai-tag">已排进今日任务</span></div></div></div>
-        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">季度 OKR 草稿，周五前给 leader</div><div class="m-s">9/18 手动</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">V4 架构评审前先更新基线文档</div><div class="m-s">9/22 记录 · <span class="ai-tag">已排进今日任务</span></div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">季度 OKR 草稿，周五前给 leader</div><div class="m-s">9/18 记录</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">例会前把上周的阻塞项列出来</div><div class="m-s">9/16 记录</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--ai2)"></span><div><div class="m-t">把迁移链的变更点整理成一页清单</div><div class="m-s">9/13 记录 · <span class="ai-tag">已排进今日任务</span></div></div></div>
       </div>
 
-      <div class="sec-title"><h2>生活</h2><span class="hint">5 条</span></div>
+      <div class="sec-title"><span class="ico" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><h2>生活</h2><span class="hint">4 条</span></div>
       <div class="card" style="padding:6px 18px">
-        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">护照明年 3 月到期，提前 2 个月换发</div><div class="m-s">9/20 语音 · <span class="ai-tag">已设 1 月提醒</span></div></div></div>
-        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">洗衣液买无香型，皮肤敏感</div><div class="m-s">9/15 对话</div></div></div>
-        <div class="memo"><span class="m-dot" style="background:#D7D5CD"></span><div><div class="m-t" style="color:var(--ink3);text-decoration:line-through">健身房年卡续费</div><div class="m-s">8/30 手动 · 亚丝娜建议删除</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">护照明年 3 月到期，提前 2 个月换发</div><div class="m-s">9/20 记录 · 到期 3/1 · <span class="ai-tag">已设 1 月提醒</span></div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">洗衣液买无香型，皮肤敏感</div><div class="m-s">9/15 记录</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">洗衣机滤网每月清一次</div><div class="m-s">9/14 记录 · 提醒 10/1 09:00</div></div></div>
+        <div class="memo"><span class="m-dot" style="background:var(--warm)"></span><div><div class="m-t">浴室防滑垫该换了</div><div class="m-s">9/9 记录</div></div></div>
       </div>
 
-      <div class="privacy">备忘只用于帮你整理和提醒，归类的依据你随时可以问亚丝娜；任何一条都可以长按修改或删除，删了就不会再用。</div>
+      <div class="privacy">备忘只用于帮你整理和提醒，归类的依据你随时可以问亚丝娜；任何一条都可以长按删除，删了就不会再用。</div>
     </div>
   </div>
 </div>

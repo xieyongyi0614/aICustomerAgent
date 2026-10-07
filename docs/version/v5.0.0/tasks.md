@@ -622,7 +622,7 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 任务线 | §12~§14 已占用 | V5.1 新增（本节） | 下一可用号 |
 |---|---|---|---|
 | `APP-` | `APP-026` | `APP-027`~`APP-043`（17 个） | `APP-044` |
-| `API-` | `API-011`~`API-014` | `API-015`~`API-020`（6 个） | `API-021` |
+| `API-` | `API-011`~`API-014`、`API-021`（§16） | `API-015`~`API-020`（6 个） | `API-022` |
 | `PLT-` | `PLT-001`~`PLT-006` | `PLT-007`（1 个） | `PLT-008` |
 | `IDENT-` | `IDENT-001`~`IDENT-009`（`010`/`011` 为 P2 留白） | — | `IDENT-012` |
 
@@ -665,3 +665,20 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 跨任务一致性（`hint` 服务端下发 / 相似连拍统一未支持态 / 隐私口径三页逐字一致） | 已统一裁决并在对应 Detail 落条款 |
 
 **须回写清单**（本注册表已就地改 A1 / A8；其余见各 Detail）：`requirements-analysis.md` §6.1 的 `D22` 行（A9）；`.agents/skills/zhaoxi-design-system/references/components.md` 的 B14/B15 相册数值（`traceability.md` §13.5 V1，设计侧）；`design/pages/37-album.html:166` 与 `design/pages/39-car-profile.html:125` 的文案（V3 / V4，设计侧）。
+
+---
+
+## 16. 增量注册：首页每日 AI 总结生成器（`API-021`，2026-10-07 立项，未开工）
+
+> **背景**：2026-10-07 代码审核发现首页 AI 结论卡名不副实：`/home/summary` 的 `insight` 区块数据源是 reflection 的**长期用户洞察**（`insights_query.list_insights(domain="home")` 按置信度排序、**无日期窗口**），既非「今日」也非「总结」；且全系统不存在任何每日总结生成器（briefing 仅有天气 + 任务卡）。同批已做**诚实文案收口**（`home.py` fallback 标题→「AI 洞察」、跳转→「查看早间简报 →」、端上空态→「还没有洞察 —— 亚丝娜还在了解你」）并登记 DEV-05。本任务落地真正的每日总结能力；**落地后首页卡恢复日期话术、DEV-05 回撤**。
+
+| Task ID | 名称 | 交付面（概要） | 状态 |
+|---|---|---|---|
+| `API-021` | 每日总结生成器 + 首页读面升级 | ① 生成器：**昨日**口径汇总（账本支出/笔数/分类 + 任务完成情况，会话记忆可选），确定性拼装、零编造（沿 `briefing/compose.py` 的逐卡降级纪律；LLM 叙事后置）；② 存储：带业务日期的每日总结表（增量迁移按链尾顺延，注册时链尾 `0008`）；③ 读面：`/home/summary` 的 `insight` 区块升级——有昨日总结时下发日期话术标题（如「昨日的总结」）与叙事，无则回落现有洞察 / 空态；④ 端上预期**零改动**（标题与叙事均由服务端下发，同 DEV-03 思路） | 未开工 |
+
+**约束与纪律**：
+
+- 红线 11「诚实未接入」优先于设计稿 1:1：任一数据源缺失逐项省略，不补占位叙事；`design/pages/` 首页原型的示例文案（`principles.md:83`）仍是目标形态，落地时按真实数据源收敛。
+- 生成时机（夜间 life loop 步骤 vs 早间首次请求惰性生成）是 Detail 裁决项，倾向**惰性生成**（无 cron 依赖）；新设置按领域命名，禁 `*_enabled`。
+- 按 D22 原纪律：Task Detail 于**开工前**生成；届时按变更顺序回写 `requirements-analysis.md` 与 `traceability.md` §13（顺序不可颠倒）。
+- 落地后同批处置：`design-alignment-report.md` DEV-05 回撤、`test_design_principles.py` 静态断言与 `components.md` A2 卡标签话术同步。
