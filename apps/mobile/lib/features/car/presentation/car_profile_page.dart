@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/format/money.dart';
 import '../../../design_system/components/components.dart';
 import '../data/car_model_catalog_repository.dart';
 import '../data/car_repository.dart';
@@ -365,7 +366,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
       return '待排期';
     }
     if (row.amountMinor == null) return '免费';
-    return '¥${row.amountText ?? (row.amountMinor! / 100).toStringAsFixed(2)}';
+    return '¥${row.amountText ?? formatMinor(row.amountMinor!)}';
   }
 
   IconData _fileIcon(String key) => switch (key) {

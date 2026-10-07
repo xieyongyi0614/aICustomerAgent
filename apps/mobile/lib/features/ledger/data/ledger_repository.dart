@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/format/money.dart';
 import '../../../core/network/dio_client.dart';
 
 class LedgerCategoryTotal {
@@ -125,9 +126,8 @@ class LedgerPendingData {
   final String? direction;
   final String? merchantHint;
 
-  String get amountText => amountMinor == null
-      ? ''
-      : (amountMinor! / 100).toStringAsFixed(2);
+  String get amountText =>
+      amountMinor == null ? '' : formatMinor(amountMinor!);
 }
 
 class LedgerAutoSummaryData {

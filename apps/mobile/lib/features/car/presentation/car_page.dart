@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/format/money.dart';
 import '../../../design_system/components/components.dart';
 import '../data/car_repository.dart';
 import '../domain/car_models.dart';
@@ -148,7 +149,7 @@ class _CarPageState extends State<CarPage> {
                       child: overview.evMetrics.chargeKwhMonth == null
                           ? MetricCard(
                               label: '本月充电花费',
-                              value: _yuanText(
+                              value: formatYuanWhole(
                                 overview.evMetrics.chargeCostMinorMonth,
                               ),
                               unit: '元',
@@ -287,7 +288,7 @@ class _CarPageState extends State<CarPage> {
                     subtitle: _recordSubtitle(overview.recentRecords[i]),
                     amountLabel: overview.recentRecords[i].isMileage
                         ? '${overview.recentRecords[i].odometerDeltaKm ?? 0} km'
-                        : '-${_minorText(overview.recentRecords[i].netMinor!)}',
+                        : '-${formatMinor(overview.recentRecords[i].netMinor!)}',
                     tileColor: _recordTile(colors, overview.recentRecords[i].kind),
                     iconColor: _recordForeground(
                       colors,
@@ -411,9 +412,7 @@ String? _shortDate(String? iso) {
   return iso.substring(5, 16).replaceFirst('T', ' ');
 }
 
-String _minorText(int minor) => (minor / 100).toStringAsFixed(2);
 
-String _yuanText(int minor) => (minor / 100).round().toString();
 
 String _kwhText(double kwh) =>
     kwh % 1 == 0 ? kwh.toStringAsFixed(0) : kwh.toStringAsFixed(1);

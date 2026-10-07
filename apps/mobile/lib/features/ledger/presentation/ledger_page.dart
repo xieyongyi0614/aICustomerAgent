@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/format/money.dart';
 import '../../../design_system/components/components.dart';
 import '../data/ledger_repository.dart';
 import 'ledger_category_visuals.dart';
@@ -504,8 +505,7 @@ class _LedgerPageState extends State<LedgerPage> {
                 for (final (index, c) in s.byCategory.take(6).indexed)
                   CategoryBar(
                     label: _categoryLabel(c.categoryId),
-                    amountLabel:
-                        '¥${(c.expenseMinor / 100).toStringAsFixed(0)}',
+                    amountLabel: formatYuan(c.expenseMinor),
                     ratio: maxExpense == 0 ? 0 : c.expenseMinor / maxExpense,
                     gradient: _categoryGradient(index),
                   ),

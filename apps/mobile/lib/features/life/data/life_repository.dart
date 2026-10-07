@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/format/money.dart';
 import '../../../core/network/dio_client.dart';
 
 class LifeTaskItem {
@@ -117,7 +118,7 @@ class LifeRepository {
     final data = resp.data ?? const {};
     final minor = data['expense_total_minor'] as int? ?? 0;
     return LifeCarSummary(
-      text: (minor / 100).toStringAsFixed(0),
+      text: formatYuanWhole(minor),
       isEmpty: minor <= 0,
       restrictionDetail: _restrictionDetail(data['reminders'] as List?),
     );

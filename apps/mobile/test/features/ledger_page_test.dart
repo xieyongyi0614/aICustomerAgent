@@ -35,12 +35,12 @@ const _summary = LedgerSummaryData(
   byCategory: [
     LedgerCategoryTotal(
       categoryId: _categoryFoodId,
-      expenseMinor: 12850,
+      expenseMinor: 8000,
       incomeMinor: 0,
     ),
     LedgerCategoryTotal(
       categoryId: _categoryTrafficId,
-      expenseMinor: 8600,
+      expenseMinor: 4850,
       incomeMinor: 0,
     ),
   ],
@@ -477,6 +477,23 @@ void main() {
     final gradients = bars.map((b) => b.gradient).toList();
     expect(gradients[0], isNot(gradients[1]),
         reason: '分类条按语义四色轮转，不是全 money');
+  });
+
+  testWidgets('test_ledger_page_category_bar_amounts_keep_cents',
+      (tester) async {
+    await _openLedger(tester, _FakeLedgerRepository());
+    final bars =
+        tester.widgetList<CategoryBar>(find.byType(CategoryBar)).toList();
+    expect(
+      bars[0].amountLabel,
+      '¥80.00',
+      reason: '分类条金额与服务端 format_minor 同口径：固定 2 位小数',
+    );
+    expect(
+      bars[1].amountLabel,
+      '¥48.50',
+      reason: '有分的必须显示分——曾经四舍五入到整元，¥48.50 会显示成 ¥49',
+    );
   });
 
   testWidgets('test_ledger_page_category_bars_show_names_not_ids',
