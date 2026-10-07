@@ -75,14 +75,18 @@ class _BriefingPageState extends State<BriefingPage> {
       });
       return;
     }
-    final cached = await _repo.cachedBrief(widget.type);
-    if (!mounted) return;
-    if (cached != null) {
-      setState(() {
-        _content = cached;
-        _fromCache = true;
-        _loading = false;
-      });
+    try {
+      final cached = await _repo.cachedBrief(widget.type);
+      if (!mounted) return;
+      if (cached != null) {
+        setState(() {
+          _content = cached;
+          _fromCache = true;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      // 缓存损坏不能让页面停在骨架态：继续走网络刷新，失败由 _refresh 收口。
     }
     await _refresh();
   }
