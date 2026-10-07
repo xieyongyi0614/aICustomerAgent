@@ -103,7 +103,17 @@ class AppCacheDb extends _$AppCacheDb {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (migrator, from, to) => migrator.createAll(),
+        // 分版本逐步迁移：createAll 只能建缺失表，不会给已有表加列——
+        // 每次升 schemaVersion 必须在 switch 里补对应 case，否则老库
+        // 运行时以 no such column 崩溃。
+        onUpgrade: (migrator, from, to) async {
+          for (var version = from + 1; version <= to; version++) {
+            switch (version) {
+              case 2:
+                await migrator.createTable(briefContents);
+            }
+          }
+        },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },

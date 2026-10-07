@@ -47,9 +47,11 @@ CarModelCatalogRepository _catalogRepo() =>
     CarModelCatalogRepository(bundle: _MemoryBundle(_catalogJson));
 
 class _FakeCarRepository extends CarRepository {
-  _FakeCarRepository({this.validationError = false}) : super(dio: Dio());
+  _FakeCarRepository({this.validationError = false, this.withMonthsFile = false})
+      : super(dio: Dio());
 
   bool validationError;
+  bool withMonthsFile;
   int profileCalls = 0;
   int updateCalls = 0;
   String model = '比亚迪 汉 EV';
@@ -58,7 +60,7 @@ class _FakeCarRepository extends CarRepository {
   @override
   Future<CarProfileData> fetchProfile() async {
     profileCalls++;
-    return _profile(model);
+    return _profile(model, withMonthsFile: withMonthsFile);
   }
 
   @override
@@ -71,11 +73,12 @@ class _FakeCarRepository extends CarRepository {
       );
     }
     model = payload['model'] as String? ?? model;
-    return _profile(model);
+    return _profile(model, withMonthsFile: withMonthsFile);
   }
 }
 
-CarProfileData _profile(String model) => CarProfileData(
+CarProfileData _profile(String model, {bool withMonthsFile = false}) =>
+    CarProfileData(
       identity: CarIdentityData(
         model: model,
         plate: '沪 A·D8F2K',
@@ -84,24 +87,30 @@ CarProfileData _profile(String model) => CarProfileData(
         ageText: '2 年 3 个月',
         odometerKm: 12480,
       ),
-      files: const [
-        CarFileData(
+      files: [
+        const CarFileData(
           key: 'insurance',
           label: '车辆保险',
           valueText: '2027-01-15 到期',
         ),
-        CarFileData(key: 'inspection', label: '年检', valueText: '2027 年 04 月'),
-        CarFileData(
+        const CarFileData(key: 'inspection', label: '年检', valueText: '2027 年 04 月'),
+        const CarFileData(
           key: 'charger',
           label: '家用充电桩',
           valueText: '7 kW',
           detail: '家用 7 kW · 谷电',
         ),
-        CarFileData(
+        const CarFileData(
           key: 'service_interval',
           label: '保养周期',
           valueText: '每 10,000 km 或 12 个月',
         ),
+        if (withMonthsFile)
+          const CarFileData(
+            key: 'service_interval_months',
+            label: '保养周期',
+            valueText: '每 12 个月',
+          ),
       ],
       loan: const CarLoanData(
         remainingText: '69300.00',
@@ -233,6 +242,51 @@ void main() {
     expect(find.text(CarRepository.profileValidationMessage), findsOneWidget);
     expect(find.byType(CarProfilePage), findsOneWidget);
     expect(repo.updateCalls, 1);
+  });
+
+  testWidgets('test_car_profile_edit_rejects_non_numeric_locally',
+      (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).at(2), 'abc');
+    await tester.pump();
+    await tester.tap(find.text('保存档案'));
+    await tester.pump();
+
+    expect(find.text('总里程需要填数字'), findsOneWidget);
+    expect(repo.updateCalls, 0);
+  });
+
+  testWidgets('test_car_profile_edit_rejects_negative_odometer',
+      (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).at(2), '-5');
+    await tester.pump();
+    await tester.tap(find.text('保存档案'));
+    await tester.pump();
+
+    expect(find.text('总里程不能为负数'), findsOneWidget);
+    expect(repo.updateCalls, 0);
+  });
+
+  testWidgets('test_car_profile_interval_months_prefills_from_profile',
+      (tester) async {
+    final repo = _FakeCarRepository(withMonthsFile: true);
+    await _pumpPage(tester, repo);
+
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+    final months = tester.widget<TextField>(
+      find.byType(TextField).at(5),
+    );
+    expect(months.controller!.text, '12');
   });
 
   testWidgets('test_car_profile_reloads_after_edit', (tester) async {

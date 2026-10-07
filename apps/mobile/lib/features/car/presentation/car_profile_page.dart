@@ -110,7 +110,8 @@ class _CarProfilePageState extends State<CarProfilePage> {
     _chargerController.text = _numberText(files['charger']?.valueText);
     _intervalKmController.text =
         _numberText(files['service_interval']?.valueText);
-    _intervalMonthsController.text = '';
+    _intervalMonthsController.text =
+        _numberText(files['service_interval_months']?.valueText);
     setState(() {
       _editing = true;
       _editError = null;
@@ -168,7 +169,36 @@ class _CarProfilePageState extends State<CarProfilePage> {
     return payload;
   }
 
+  /// 数值字段逐一校验：非法输入显性报错，绝不静默丢弃（用户以为改了总里程、
+  /// 实际 payload 里根本没带），负数里程/周期也不允许提交。
+  String? _numericIssue() {
+    String? issue;
+    void check(String label, String raw) {
+      if (issue != null) return;
+      final text = raw.trim();
+      if (text.isEmpty) return;
+      final value = num.tryParse(text);
+      if (value == null) {
+        issue = '$label需要填数字';
+        return;
+      }
+      if (value < 0) issue = '$label不能为负数';
+    }
+
+    check('电池容量', _batteryController.text);
+    check('总里程', _odometerController.text);
+    check('充电桩功率', _chargerController.text);
+    check('保养周期里程', _intervalKmController.text);
+    check('保养周期月数', _intervalMonthsController.text);
+    return issue;
+  }
+
   Future<void> _saveEdits() async {
+    final issue = _numericIssue();
+    if (issue != null) {
+      setState(() => _editError = issue);
+      return;
+    }
     setState(() {
       _saving = true;
       _editError = null;

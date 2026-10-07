@@ -27,3 +27,20 @@ String formatYuanWhole(int minor) => _roundToYuan(minor).toString();
 
 int _roundToYuan(int minor) =>
     (minor.abs() + 50) ~/ 100 * (minor.isNegative ? -1 : 1);
+
+/// 录入金额文本 → 整数分；非法输入（含超两位小数）返回 `null`，绝不静默截断。
+///
+/// 全 App 唯一的「显示串 → 落库分」换算入口：展示给用户的数字与 createEntry
+/// 的 `amountMinor` 必须出自同一次解析，两页各自实现 padRight/substring 的
+/// 旧口径会静默截掉第三位小数（审计 P0-5），一律改走这里。
+int? parseAmountMinor(String raw) {
+  final match = _amountShape.firstMatch(raw.trim());
+  if (match == null) return null;
+  final yuan = int.parse(match.group(1)!);
+  final cents = int.parse((match.group(2) ?? '').padRight(2, '0'));
+  return yuan * 100 + cents;
+}
+
+/// `12` / `12.` / `12.3` / `12.34` 合法（尾随点为键盘输入的中间态）；
+/// `12.345`、空串、非数字一律非法。
+final RegExp _amountShape = RegExp(r'^(\d+)(?:\.(\d{0,2}))?$');

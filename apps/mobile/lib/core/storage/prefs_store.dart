@@ -86,4 +86,17 @@ class PrefsStore {
       await _prefs.remove(k);
     }
   }
+
+  /// 一键清空的本地侧（/life/data 成功后调用）：除非凭据偏好外，
+  /// 连同各域写在 SharedPreferences 里的私有键（`album.*` 等）一并清除。
+  static const _businessKeyPrefixes = ['album.'];
+
+  Future<void> clearBusinessData() async {
+    await clearNonCredential();
+    for (final key in _prefs.getKeys()) {
+      if (_businessKeyPrefixes.any(key.startsWith)) {
+        await _prefs.remove(key);
+      }
+    }
+  }
 }

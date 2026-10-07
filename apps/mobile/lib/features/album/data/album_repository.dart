@@ -176,6 +176,7 @@ class PhotoManagerAssetSource implements AlbumAssetSource {
       type: RequestType.common,
       hasAll: true,
     );
+    if (paths.isEmpty) return null;
     if (bucketId == null) {
       return paths.firstWhere((p) => p.isAll, orElse: () => paths.first);
     }

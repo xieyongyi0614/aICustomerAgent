@@ -28,8 +28,8 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   static final RegExp _amountPattern = RegExp(r'\d+(?:\.\d{1,2})?');
 
   late final LedgerRepository _repo = widget.repository ?? LedgerRepository();
-  late final String _idempotencyKey =
-      'ledger-add-${DateTime.now().microsecondsSinceEpoch}';
+  String? _submitKeySource;
+  String? _submitKey;
 
   final _amountController = TextEditingController();
   final _amountFocus = FocusNode();
@@ -89,27 +89,23 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
     }
   }
 
-  int get _amountMinor {
-    final text = _amountController.text.trim();
-    if (text.isEmpty) return 0;
-    final parts = text.split('.');
-    final yuan = int.tryParse(parts.first.isEmpty ? '0' : parts.first) ?? 0;
-    final centsText = parts.length > 1 ? parts[1] : '';
-    final cents = int.tryParse(centsText.padRight(2, '0').substring(0, 2)) ?? 0;
-    return yuan * 100 + cents;
-  }
+  int get _amountMinor => parseAmountMinor(_amountController.text) ?? 0;
 
   int get _sayAmountMinor {
     final matches = _amountPattern.allMatches(_sayController.text);
     if (matches.isEmpty) return 0;
-    final text = matches.last.group(0)!;
-    final dot = text.indexOf('.');
-    final yuan =
-        int.tryParse(dot < 0 ? text : text.substring(0, dot)) ?? 0;
-    final cents = dot < 0
-        ? 0
-        : int.tryParse(text.substring(dot + 1).padRight(2, '0')) ?? 0;
-    return yuan * 100 + cents;
+    return parseAmountMinor(matches.last.group(0)!) ?? 0;
+  }
+
+  /// 幂等键绑定「同一笔提交」：内容不变的失败重试复用同 key（服务端可去重），
+  /// 内容变了或换路径（键盘 ↔ 说给亚丝娜）就是新的一笔，必须换新 key——
+  /// 否则第二笔会被服务端按同 key 静默去重，用户还以为记上了。
+  String _idempotencyKey(String source) {
+    if (_submitKey == null || _submitKeySource != source) {
+      _submitKeySource = source;
+      _submitKey = 'ledger-add-${DateTime.now().microsecondsSinceEpoch}';
+    }
+    return _submitKey!;
   }
 
   void _onDirectionChanged(String value) {
@@ -201,7 +197,10 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
         categoryId: _selectedCategoryId,
         occurredAt: _occurredAt,
         note: _noteController.text.trim(),
-        idempotencyKey: _idempotencyKey,
+        idempotencyKey: _idempotencyKey(
+          '$_amountMinor|$_direction|${_selectedCategoryId ?? ''}'
+          '|${_noteController.text.trim()}|${_occurredAt.toIso8601String()}',
+        ),
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -229,7 +228,10 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
             preview != null && preview.matched ? preview.categoryId : null,
         occurredAt: _occurredAt,
         note: _sayController.text.trim(),
-        idempotencyKey: _idempotencyKey,
+        idempotencyKey: _idempotencyKey(
+          '$_sayAmountMinor|$_direction|${preview?.matched == true ? (preview!.categoryId ?? '') : ''}'
+          '|${_sayController.text.trim()}|${_occurredAt.toIso8601String()}',
+        ),
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);

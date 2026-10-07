@@ -34,7 +34,7 @@ class LocalStores {
   /// 一键清空本地联动（不含令牌删除策略时可先 clearLocalBusiness）
   Future<void> clearLocalBusiness() async {
     await db.wipeAllCaches();
-    await prefs.clearNonCredential();
+    await prefs.clearBusinessData();
   }
 
   Future<void> clearAllIncludingCredentials() async {

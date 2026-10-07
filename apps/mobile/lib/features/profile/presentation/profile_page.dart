@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/state/auth_epoch.dart';
 import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/notify/local_brief_notifier.dart';
@@ -159,6 +160,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     await _auth.signOut();
     final prefs = await PrefsStore.load();
     await prefs.clearIdentity();
+    ref.read(authEpochProvider.notifier).bump();
     if (!mounted) return;
     context.go('/login');
   }

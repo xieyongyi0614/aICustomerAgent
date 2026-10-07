@@ -99,6 +99,8 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     }
     final overrides = await _repo.store.loadOverrides();
     final assets = await _collectAssets(preselected.length);
+    final viewAssetIds = {for (final asset in assets) asset.id};
+    final preselectedInView = preselected.intersection(viewAssetIds);
     final thumbnails = <String, ImageProvider?>{};
     for (final asset in assets) {
       try {
@@ -113,12 +115,12 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       _data = AlbumManageData(
         assets: assets,
         thumbnails: thumbnails,
-        preselectedIds: preselected,
+        preselectedIds: preselectedInView,
         totalCount: snapshots.length,
         sections: result.sections,
       );
       _overrides = overrides;
-      _selected = {...preselected};
+      _selected = {...preselectedInView};
       _loading = false;
     });
   }
@@ -189,8 +191,10 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
       ),
     );
     if (confirmed != true) return;
+    final byId = _assetsById(data);
     for (final id in _selected.toList()) {
-      final asset = data.assets.firstWhere((a) => a.id == id);
+      final asset = byId[id];
+      if (asset == null) continue;
       await _repo.moveToTrash(asset);
     }
     if (!mounted) return;
@@ -204,15 +208,18 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     final target = await showAlbumMovePicker(context, _repo);
     if (target == null || !mounted) return;
     var moved = 0;
+    final byId = _assetsById(data);
+    final selectedCount = _selected.length;
     for (final id in _selected.toList()) {
-      final asset = data.assets.firstWhere((a) => a.id == id);
+      final asset = byId[id];
+      if (asset == null) continue;
       if (await _repo.moveToAlbum(asset, target)) moved++;
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          moved == _selected.length
+          moved == selectedCount
               ? '已移动 $moved 张到「${target.name}」'
               : '移动了 $moved 张，其余这张设备不支持移动',
         ),
@@ -221,6 +228,11 @@ class _AlbumManagePageState extends State<AlbumManagePage> {
     setState(() {});
     unawaited(_begin());
   }
+
+  /// 全库分析结果可能含有本次视口（>2000 截断）之外的预选 id，
+  /// 删除/移动只能按视口内的资产查找，找不到就跳过，绝不 firstWhere 抛异常。
+  Map<String, PhotoAsset> _assetsById(AlbumManageData data) =>
+      {for (final asset in data.assets) asset.id: asset};
 
   void _tagSelected() {
     if (_selected.isEmpty) return;

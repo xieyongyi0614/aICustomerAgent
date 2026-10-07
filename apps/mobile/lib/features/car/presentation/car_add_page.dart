@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/format/money.dart';
 import '../../../design_system/components/components.dart';
 import '../data/car_repository.dart';
 import '../domain/car_models.dart';
@@ -34,8 +35,8 @@ class _CarAddPageState extends State<CarAddPage> {
   static const _aiHint = '充电可以选择谷电时段，我会按真实记录帮你算账，不猜单价。';
 
   late final CarRepository _repo = widget.repository ?? CarRepository();
-  late final String _idempotencyKey =
-      'car-add-${DateTime.now().microsecondsSinceEpoch}';
+  String? _submitKeySource;
+  String? _submitKey;
   late String _kind = widget.initialKind;
 
   /// 进入页面的时刻：表单里的「时间」行如实显示它，表示这笔记在此刻。
@@ -49,6 +50,7 @@ class _CarAddPageState extends State<CarAddPage> {
   final _deltaController = TextEditingController();
 
   int? _profileOdometer;
+  bool _profileLoadFailed = false;
   bool _saving = false;
   bool _saveFailed = false;
   String? _validationMessage;
@@ -76,7 +78,10 @@ class _CarAddPageState extends State<CarAddPage> {
       final profile = await _repo.fetchProfile();
       if (!mounted) return;
       setState(() => _profileOdometer = profile.identity?.odometerKm);
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _profileLoadFailed = true);
+    }
   }
 
   String get _linkageHint => widget.linkageHint ?? carLinkageHintFallback;
@@ -100,7 +105,8 @@ class _CarAddPageState extends State<CarAddPage> {
     if (_isMileage) {
       final delta = int.tryParse(_deltaController.text.trim());
       if (delta == null || delta <= 0) return null;
-      final base = _profileOdometer ?? 0;
+      final base = _profileOdometer;
+      if (base == null) return null;
       return base + delta;
     }
     final text = _odometerController.text.trim();
@@ -108,12 +114,22 @@ class _CarAddPageState extends State<CarAddPage> {
     return int.tryParse(text);
   }
 
+  /// 里程记录的入账值是「折算后的总里程」，baseline 未知就写不出真值；
+  /// 按 `?? 0` 兜底会把 300 km 行程写成总里程 300 km，后续电耗/保养全部失真。
+  String get _mileageBaseMissingMessage => _profileLoadFailed
+      ? '车辆档案没拉到，算不出总里程，请稍后重试或到「我的车」核对'
+      : '「我的车」还没有总里程，先补档案再记里程';
+
   String? _validate() {
     if (!_isMileage && _amountMinor <= 0) return '请填入金额';
     if (_kind == 'charge' && _kwhController.text.trim().isEmpty) {
       return '充电需要填度数';
     }
-    if (_isMileage && (_odometerKm == null)) return '请填本次里程';
+    if (_isMileage) {
+      final delta = int.tryParse(_deltaController.text.trim());
+      if (delta == null || delta <= 0) return '请填本次里程';
+      if (_profileOdometer == null) return _mileageBaseMissingMessage;
+    }
     if (_kind == 'service' && _noteController.text.trim().isEmpty) {
       return '保养需要填项目';
     }
@@ -134,7 +150,11 @@ class _CarAddPageState extends State<CarAddPage> {
     try {
       await _repo.createEntry(
         kind: _kind,
-        idempotencyKey: _idempotencyKey,
+        idempotencyKey: _idempotencyKey(
+          '$_kind|${_isMileage ? null : _amountMinor}'
+          '|${_kwhController.text.trim()}|${_odometerKm ?? _odometerController.text.trim()}'
+          '|${_placeController.text.trim()}|${_noteController.text.trim()}',
+        ),
         amountMinor: _isMileage ? null : _amountMinor,
         note: _composeOutgoingNote(),
         odometerKm: _odometerKm,
@@ -292,6 +312,16 @@ class _CarAddPageState extends State<CarAddPage> {
     );
   }
 
+  /// 幂等键绑定「同一笔提交」：内容不变的失败重试复用同 key，改了类型 /
+  /// 金额 / 里程就是新的一笔——共用 key 会被服务端静默去重。
+  String _idempotencyKey(String source) {
+    if (_submitKey == null || _submitKeySource != source) {
+      _submitKeySource = source;
+      _submitKey = 'car-add-${DateTime.now().microsecondsSinceEpoch}';
+    }
+    return _submitKey!;
+  }
+
   void _onKey(String key) {
     setState(() {
       _validationMessage = null;
@@ -436,11 +466,10 @@ class _CarAddPageState extends State<CarAddPage> {
   }
 
   String get _totalOdometerText {
-    final delta = int.tryParse(_deltaController.text.trim());
-    if (_profileOdometer == null) {
-      return delta == null ? '—' : '$delta km';
-    }
-    return '${_profileOdometer! + (delta ?? 0)} km';
+    final base = _profileOdometer;
+    if (base == null) return '—';
+    final delta = int.tryParse(_deltaController.text.trim()) ?? 0;
+    return '${base + delta} km';
   }
 
   Widget _field(
@@ -567,14 +596,7 @@ class _AmountBuffer {
 
   String get text => _value.isEmpty ? '0.00' : _value;
 
-  int get minor {
-    if (_value.isEmpty) return 0;
-    final parts = _value.split('.');
-    final yuan = int.tryParse(parts.first.isEmpty ? '0' : parts.first) ?? 0;
-    final centsText = parts.length > 1 ? parts[1] : '';
-    final cents = int.tryParse(centsText.padRight(2, '0').substring(0, 2)) ?? 0;
-    return yuan * 100 + cents;
-  }
+  int get minor => parseAmountMinor(_value) ?? 0;
 
   void push(String key) {
     if (key == '.') {
@@ -582,6 +604,8 @@ class _AmountBuffer {
       _value = _value.isEmpty ? '0.' : '$_value.';
       return;
     }
+    final dot = _value.indexOf('.');
+    if (dot >= 0 && _value.length - dot - 1 >= 2) return;
     if (_value.replaceAll('.', '').length >= 8) return;
     if (_value == '0') {
       _value = key;

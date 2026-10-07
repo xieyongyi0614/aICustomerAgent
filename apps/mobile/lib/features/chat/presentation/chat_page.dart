@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/state/auth_epoch.dart';
 import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/analytics/analytics.dart';
@@ -231,6 +232,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
 
   @override
   ChatPageState build() {
+    ref.watch(authEpochProvider);
     ref.onDispose(() {
       _disposed = true;
       _controller?.dispose();
@@ -286,6 +288,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
     Analytics.track('chat_send');
     final repo = _repo ??= ChatStreamRepository();
     final prefs = await PrefsStore.load();
+    if (_disposed) return;
     final userMsg = ChatMessageItem(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
       role: 'human',
@@ -305,6 +308,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
     _controller?.dispose();
     final controller = ChatStreamController(
       onState: (turnState) {
+        if (_disposed) return;
         state = state.copyWith(
           streamingText: turnState.text,
           toolSteps: turnState.toolSteps,
@@ -322,6 +326,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
           unawaited(prefs.setLastConversationId(sessionId));
         },
       ));
+      if (_disposed) return;
       final doneText = controller.state.text;
       if (doneText.isNotEmpty) {
         state = state.copyWith(
@@ -343,7 +348,7 @@ class ChatPageNotifier extends Notifier<ChatPageState> {
         );
       }
     } catch (e) {
-      state = state.copyWith(error: e, streamingText: '');
+      if (!_disposed) state = state.copyWith(error: e, streamingText: '');
     } finally {
       if (!_disposed) state = state.copyWith(awaitingReply: false);
     }

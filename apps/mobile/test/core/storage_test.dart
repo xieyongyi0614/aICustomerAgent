@@ -92,6 +92,47 @@ void main() {
     await db.close();
   });
 
+  /// v1 库（无 brief_contents）打开时走 onUpgrade 1→2：v2 新表建出来、
+  /// v1 老数据原样保留。createAll 时代的空壳迁移会在这里崩（no such column）。
+  test('test_upgrade_v1_to_v2_creates_brief_contents_and_keeps_data',
+      () async {
+    final db = AppCacheDb(NativeDatabase.memory(setup: (raw) {
+      raw.execute(
+          'CREATE TABLE session_messages (conversation_id TEXT NOT NULL, message_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, event_time INTEGER NOT NULL, cached_at INTEGER NOT NULL, PRIMARY KEY (conversation_id, message_id))');
+      raw.execute(
+          'CREATE TABLE memory_items (id TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, content TEXT NOT NULL, source_summary TEXT NULL, last_updated INTEGER NULL, usage_receipts_json TEXT NULL, active INTEGER NOT NULL DEFAULT 1, forgotten INTEGER NOT NULL DEFAULT 0, cached_at INTEGER NOT NULL)');
+      raw.execute(
+          "INSERT INTO memory_items (id, kind, label, content, active, forgotten, cached_at) VALUES ('m1', 'preference', '旅行', '喜欢海边', 1, 0, 1700000000)");
+      raw.execute(
+          'CREATE TABLE ledger_summaries (id TEXT NOT NULL PRIMARY KEY, payload_json TEXT NOT NULL, formatted_amount TEXT NULL, cached_at INTEGER NOT NULL)');
+      raw.execute(
+          'CREATE TABLE ledger_entries (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, formatted_amount TEXT NOT NULL, source TEXT NULL, event_time INTEGER NULL, cached_at INTEGER NOT NULL)');
+      raw.execute(
+          "INSERT INTO ledger_entries (id, title, formatted_amount, cached_at) VALUES ('e1', '拉面', '35.00', 1700000000)");
+      raw.execute(
+          'CREATE TABLE home_summaries (id TEXT NOT NULL PRIMARY KEY, payload_json TEXT NOT NULL, cached_at INTEGER NOT NULL)');
+      raw.execute(
+          'CREATE TABLE retry_ops (id TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, endpoint TEXT NOT NULL, payload_json TEXT NULL, status TEXT NOT NULL, error_kind TEXT NULL, failed_at INTEGER NOT NULL)');
+      raw.execute('PRAGMA user_version = 1');
+    }));
+    final memories = await db.activeMemories();
+    expect(memories.single.id, 'm1');
+    final entries = await db.select(db.ledgerEntries).get();
+    expect(entries.single.title, '拉面');
+    await db.into(db.briefContents).insertOnConflictUpdate(
+          BriefContentsCompanion.insert(
+            id: 'morning',
+            payloadJson: '{}',
+            cachedAt: DateTime.now(),
+          ),
+        );
+    expect(
+      (await db.select(db.briefContents).get()).single.id,
+      'morning',
+    );
+    await db.close();
+  });
+
   test('test_secure_token_store_keys_centralized', () {
     final src = File('lib/core/storage/secure_token_store.dart').readAsStringSync();
     expect(src.contains('zhaoxi.access_token'), isTrue);

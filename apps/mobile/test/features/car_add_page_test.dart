@@ -13,6 +13,7 @@ class _FakeCarRepository extends CarRepository {
   _FakeCarRepository({this.createFails = false}) : super(dio: Dio());
 
   bool createFails;
+  bool profileFails = false;
   Completer<void>? createGate;
   int createCalls = 0;
   final List<String> kinds = [];
@@ -23,12 +24,15 @@ class _FakeCarRepository extends CarRepository {
   final List<String> keys = [];
 
   @override
-  Future<CarProfileData> fetchProfile() async => const CarProfileData(
-        files: [],
-        services: [],
-        reminders: [],
-        identity: CarIdentityData(odometerKm: 12400),
-      );
+  Future<CarProfileData> fetchProfile() async {
+    if (profileFails) throw Exception('profile down');
+    return const CarProfileData(
+      files: [],
+      services: [],
+      reminders: [],
+      identity: CarIdentityData(odometerKm: 12400),
+    );
+  }
 
   @override
   Future<CarEntryResult> createEntry({
@@ -125,6 +129,32 @@ void main() {
     expect(repo.kinds, ['mileage']);
     expect(repo.amounts, [null]);
     expect(repo.odometers, [12480]);
+  });
+
+  testWidgets('test_car_add_mileage_blocked_without_odometer_baseline',
+      (tester) async {
+    final repo = _FakeCarRepository()..profileFails = true;
+    await _pumpPage(tester, repo);
+    await _selectKind(tester, 'mileage');
+    await tester.enterText(find.byType(TextField).first, '80');
+    await tester.pump();
+
+    await _tapSave(tester);
+
+    expect(repo.createCalls, 0, reason: 'baseline 未知不得写入错误总里程');
+    expect(find.textContaining('算不出总里程'), findsOneWidget);
+  });
+
+  testWidgets('test_car_add_keypad_never_enters_third_decimal',
+      (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await _typeAmount(tester, '12.345');
+    await tester.enterText(find.byType(TextField).first, '34.2');
+    await _tapSave(tester);
+
+    expect(find.text('12.34'), findsOneWidget, reason: '显示串必须等于落库值');
+    expect(repo.amounts, [1234]);
   });
 
   testWidgets('test_car_add_form_fields_switch_per_kind', (tester) async {

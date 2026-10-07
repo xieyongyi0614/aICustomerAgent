@@ -31,4 +31,26 @@ void main() {
     expect(formatYuanWhole(0), '0');
     expect(formatYuanWhole(-342050), '-3421');
   });
+
+  test('parseAmountMinor 合法形态全表', () {
+    expect(parseAmountMinor('12'), 1200);
+    expect(parseAmountMinor('0.5'), 50);
+    expect(parseAmountMinor('0.05'), 5);
+    expect(parseAmountMinor('12.34'), 1234);
+    expect(parseAmountMinor(' 12.3 '), 1230);
+    expect(parseAmountMinor('12.'), 1200);
+    expect(parseAmountMinor('12345678'), 1234567800);
+  });
+
+  test('parseAmountMinor 非法输入返回 null，绝不静默截断', () {
+    expect(parseAmountMinor('12.345'), isNull);
+    expect(parseAmountMinor('0.999'), isNull);
+    expect(parseAmountMinor(''), isNull);
+    expect(parseAmountMinor('   '), isNull);
+    expect(parseAmountMinor('abc'), isNull);
+    expect(parseAmountMinor('1,234'), isNull);
+    expect(parseAmountMinor('-5'), isNull);
+    expect(parseAmountMinor('1.2.3'), isNull);
+    expect(parseAmountMinor('.'), isNull);
+  });
 }

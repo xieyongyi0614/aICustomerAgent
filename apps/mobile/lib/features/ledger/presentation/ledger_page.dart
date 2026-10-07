@@ -160,13 +160,14 @@ class _LedgerPageState extends State<LedgerPage> {
     await _load();
   }
 
-  /// 待确认行：先乐观移除，失败则回滚并把失败显性化。
+  /// 待确认行：先乐观移除，失败则把**本条**放回原位并把失败显性化。
   Future<void> _resolve(
     LedgerPendingData item, {
     String? categoryName,
     String? direction,
   }) async {
-    final snapshot = List<LedgerPendingData>.from(_pending);
+    final index =
+        _pending.indexWhere((row) => row.pendingKey == item.pendingKey);
     setState(() {
       _pending = [
         for (final row in _pending)
@@ -183,15 +184,13 @@ class _LedgerPageState extends State<LedgerPage> {
       await _refreshSummary();
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _pending = snapshot;
-        _actionFailed = true;
-      });
+      _restorePending(item, index);
     }
   }
 
   Future<void> _ignore(LedgerPendingData item) async {
-    final snapshot = List<LedgerPendingData>.from(_pending);
+    final index =
+        _pending.indexWhere((row) => row.pendingKey == item.pendingKey);
     setState(() {
       _pending = [
         for (final row in _pending)
@@ -204,11 +203,19 @@ class _LedgerPageState extends State<LedgerPage> {
       await _refreshSummary();
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _pending = snapshot;
-        _actionFailed = true;
-      });
+      _restorePending(item, index);
     }
+  }
+
+  /// 回滚只还原失败的那一条：整体快照还原会把并发时已确认成功的其他条目
+  /// 一并放回，用户再点一次确认就是重复入账（后端已入账、404 或双记）。
+  void _restorePending(LedgerPendingData item, int index) {
+    final restored = [..._pending];
+    restored.insert(index.clamp(0, restored.length), item);
+    setState(() {
+      _pending = restored;
+      _actionFailed = true;
+    });
   }
 
   Future<void> _refreshSummary() async {

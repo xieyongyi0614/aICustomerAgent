@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/cards.dart';
 import '../../../design_system/components/rows.dart';
 
@@ -70,16 +71,36 @@ class ProfilePrivacyPage extends StatelessWidget {
             TextButton(
               onPressed: () async {
                 Navigator.of(ctx).pop();
-                final dio = createDio();
-                try {
-                  await dio.delete('/life/data');
-                } catch (_) {}
+                await _wipe(context);
               },
               child: const Text('确认清空'),
             ),
           ],
         );
       },
+    );
+  }
+
+  /// 承诺「服务端与本地都会删除」就必须两边都做到：服务端失败时停下并明说，
+  /// 成功后清掉本机偏好与各域私有键（album.* 等），不再静默吞错。
+  Future<void> _wipe(BuildContext context) async {
+    final dio = createDio();
+    try {
+      await dio.delete('/life/data');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('服务端清空失败，请检查网络后重试；本地数据还没有删除'),
+        ),
+      );
+      return;
+    }
+    final prefs = await PrefsStore.load();
+    await prefs.clearBusinessData();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已清空服务端与本机数据')),
     );
   }
 }
