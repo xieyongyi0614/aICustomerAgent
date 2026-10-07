@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/storage/prefs_store.dart';
 import '../../core/storage/secure_token_store.dart';
 import '../../design_system/components/app_tab_bar.dart';
+import '../../design_system/components/states/states.dart';
 import '../../features/briefing/presentation/briefing_page.dart';
 import '../../features/album/presentation/album_ai_page.dart';
 import '../../features/album/presentation/album_detail_page.dart';
@@ -31,6 +32,7 @@ import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/profile/presentation/verify_code_page.dart';
 import '../state/dynamic_tab.dart';
+import '../theme/theme_context.dart';
 import 'dynamic_tab_page.dart';
 
 /// 路由元数据：Tab 隐藏与状态栏样式由壳层统一消费，禁止页面内局部 if。
@@ -117,31 +119,43 @@ enum ShellTab {
   }
 }
 
-bool _entryGateChecked = false;
+const _loginPaths = {'/login', '/verify'};
 
-/// 设计稿 ⓪：无令牌且未看过登录页 → 首启落「初见登录页」；先逛逛 / 已配对直进。
-Future<String?> _entryGateRedirect() async {
+/// 设计稿 ⓪：无令牌且未看过登录页 → 落「初见登录页」；先逛逛 / 已登录直进。
+///
+/// 每次导航都按令牌现状判断（不再是一次性闸），令牌被清后立刻回登录页；
+/// 已登录时访问登录页直接回首页。fail-closed：令牌或偏好读取异常一律
+/// 按「无令牌 / 未看过登录页」处理，不放行。
+Future<String?> _sessionRedirect(GoRouterState state) async {
+  final path = state.uri.path;
+  final onLoginPath = _loginPaths.contains(path);
+  if (await _hasToken()) return onLoginPath ? '/home' : null;
+  if (onLoginPath) return null;
+  return await _loginSeen() ? null : '/login';
+}
+
+Future<bool> _hasToken() async {
   try {
     final token = await SecureTokenStore().readAccessToken();
-    if (token != null && token.isNotEmpty) return null;
+    return token != null && token.isNotEmpty;
   } catch (_) {
-    return null;
+    return false;
   }
+}
+
+Future<bool> _loginSeen() async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(PrefsStore.keyLoginSeen) ?? false) return null;
-  } catch (_) {}
-  return '/login';
+    return prefs.getBool(PrefsStore.keyLoginSeen) ?? false;
+  } catch (_) {
+    return false;
+  }
 }
 
 final appRouter = GoRouter(
   initialLocation: '/home',
-  errorBuilder: (context, state) => const HomePage(),
-  redirect: (context, state) async {
-    if (_entryGateChecked) return null;
-    _entryGateChecked = true;
-    return _entryGateRedirect();
-  },
+  errorBuilder: (context, state) => const NotFoundPage(),
+  redirect: (context, state) => _sessionRedirect(state),
   routes: [
     ShellRoute(
       builder: (context, state, child) => _AppShell(
@@ -230,6 +244,25 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+/// 未知路由（含参数错的深链）显式落到这里，不再吞成首页。
+class NotFoundPage extends StatelessWidget {
+  const NotFoundPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.colors.canvas,
+      body: SafeArea(
+        child: EmptyState(
+          message: '这个页面不存在，回首页继续吧',
+          actionLabel: '回首页',
+          onAction: () => context.go('/home'),
+        ),
+      ),
+    );
+  }
+}
 
 class _AppShell extends ConsumerWidget {
   const _AppShell({required this.location, required this.child});
