@@ -132,6 +132,11 @@ void main() {
     expect(accent, isNot(_colors.aiPrimary));
   });
 
+  test('test_ledger_kind_grid_defaults_to_five_columns', () {
+    const grid = LedgerKindGrid(items: []);
+    expect(grid.columns, 5, reason: 'A32 kind：33 记账页一行五个');
+  });
+
   testWidgets('test_ledger_save_button_uses_ink_not_ai_gradient',
       (tester) async {
     await _pump(tester, LedgerSaveButton(label: '保存', onPressed: () {}));

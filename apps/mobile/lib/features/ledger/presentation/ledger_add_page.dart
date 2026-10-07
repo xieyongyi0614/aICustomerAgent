@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/format/money.dart';
 import '../../../design_system/components/components.dart';
 import '../data/ledger_repository.dart';
 
@@ -18,29 +19,35 @@ class LedgerAddPage extends StatefulWidget {
 
 class _LedgerAddPageState extends State<LedgerAddPage> {
   static const _previewDebounce = Duration(milliseconds: 320);
-  static const _gridLimit = 8;
+  static const _gridLimit = 9;
+
+  /// 养车不进宫格：它已有独立车辆模块与 36 养车记页（2026-10-07 裁决）。
+  /// 让位后剩下 9 个顶层分类，其中「其他」就是宫格外的出口——自定义的说法
+  /// 走「选其他 + 写备注」，不另开自定义入口（2026-10-07 裁决）。
+  static const _gridExcluded = {'养车'};
   static final RegExp _amountPattern = RegExp(r'\d+(?:\.\d{1,2})?');
 
   late final LedgerRepository _repo = widget.repository ?? LedgerRepository();
   late final String _idempotencyKey =
       'ledger-add-${DateTime.now().microsecondsSinceEpoch}';
-  late final DateTime _occurredAt = DateTime.now();
 
+  final _amountController = TextEditingController();
+  final _amountFocus = FocusNode();
   final _noteController = TextEditingController();
   final _sayController = TextEditingController();
   final _sayFocus = FocusNode();
   Timer? _debounce;
+
+  DateTime _occurredAt = _nowMinute();
 
   bool _loading = true;
   Object? _error;
   List<LedgerCategoryData> _categories = const [];
   String _mode = 'say';
   String _direction = 'expense';
-  String _amount = '';
   String? _selectedCategoryId;
   LedgerPreviewData? _preview;
   LedgerPreviewData? _sayPreview;
-  bool _noteEditing = false;
   bool _saving = false;
   bool _saveFailed = false;
 
@@ -53,6 +60,8 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _amountController.dispose();
+    _amountFocus.dispose();
     _noteController.dispose();
     _sayController.dispose();
     _sayFocus.dispose();
@@ -81,15 +90,14 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   }
 
   int get _amountMinor {
-    if (_amount.isEmpty) return 0;
-    final parts = _amount.split('.');
+    final text = _amountController.text.trim();
+    if (text.isEmpty) return 0;
+    final parts = text.split('.');
     final yuan = int.tryParse(parts.first.isEmpty ? '0' : parts.first) ?? 0;
     final centsText = parts.length > 1 ? parts[1] : '';
     final cents = int.tryParse(centsText.padRight(2, '0').substring(0, 2)) ?? 0;
     return yuan * 100 + cents;
   }
-
-  String get _amountText => _amount.isEmpty ? '0.00' : _amount;
 
   int get _sayAmountMinor {
     final matches = _amountPattern.allMatches(_sayController.text);
@@ -113,23 +121,22 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
     _loadCategories();
   }
 
-  void _onKey(String key) {
-    if (key == '.') {
-      if (_amount.contains('.')) return;
-      setState(() => _amount = _amount.isEmpty ? '0.' : '$_amount.');
-      return;
-    }
-    if (_amount.replaceAll('.', '').length >= 8) return;
-    if (_amount == '0') {
-      setState(() => _amount = key);
-      return;
-    }
-    setState(() => _amount = '$_amount$key');
+  void _onAmountChanged(String _) {
+    setState(() {});
   }
 
-  void _onBackspace() {
-    if (_amount.isEmpty) return;
-    setState(() => _amount = _amount.substring(0, _amount.length - 1));
+  Future<void> _pickOccurredAt() async {
+    final picked = await showDateTimeWheelSheet(
+      context: context,
+      title: '记账时间',
+      initial: _occurredAt,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _occurredAt = picked);
+  }
+
+  void _onCategorySelected(String key) {
+    setState(() => _selectedCategoryId = _selectedCategoryId == key ? null : key);
   }
 
   void _onNoteChanged(String _) {
@@ -150,13 +157,13 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   }
 
   Future<void> _refreshPreview() async {
-    final note = _noteController.text.trim();
-    if (note.isEmpty) {
+    final hint = _noteController.text.trim();
+    if (hint.isEmpty) {
       if (mounted) setState(() => _preview = null);
       return;
     }
     try {
-      final preview = await _repo.classifyPreview(note, kind: _direction);
+      final preview = await _repo.classifyPreview(hint, kind: _direction);
       if (!mounted) return;
       setState(() => _preview = preview);
     } catch (_) {
@@ -316,7 +323,7 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
     return [
       LedgerParseRowData(
         label: '金额',
-        value: minor > 0 ? '¥${(minor / 100).toStringAsFixed(2)}' : '没听到金额',
+        value: minor > 0 ? formatYuan(minor) : '没听到金额',
         muted: minor <= 0,
       ),
       LedgerParseRowData(label: '分类', value: category),
@@ -326,6 +333,8 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   }
 
   List<Widget> _keyboardSection() {
+    final colors = context.colors;
+    final type = context.typography;
     return [
       const SizedBox(height: 12),
       LedgerSeg(
@@ -337,11 +346,17 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
         ],
       ),
       const SizedBox(height: 12),
-      LedgerAmount(label: '金额', amountText: _amountText),
+      LedgerAmountField(
+        controller: _amountController,
+        focusNode: _amountFocus,
+        onChanged: _onAmountChanged,
+      ),
       const SizedBox(height: 12),
       LedgerKindGrid(
         items: [
-          for (final row in _categories.take(_gridLimit))
+          for (final row in _categories
+              .where((row) => !_gridExcluded.contains(row.name))
+              .take(_gridLimit))
             LedgerKindItem(
               key: row.id,
               label: row.name,
@@ -349,33 +364,38 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
             ),
         ],
         selectedKey: _selectedCategoryId,
-        onSelected: (key) => setState(
-          () => _selectedCategoryId = _selectedCategoryId == key ? null : key,
-        ),
+        onSelected: _onCategorySelected,
       ),
       const SizedBox(height: 12),
       LedgerFormRows(
         rows: [
           const LedgerFormRow(label: '账户', value: '零钱'),
-          LedgerFormRow(label: '时间', value: _timeLabel(_occurredAt)),
+          LedgerFormRow(
+            label: '时间',
+            value: _timeLabel(_occurredAt),
+            onTap: _pickOccurredAt,
+          ),
           LedgerFormRow(
             label: '备注',
-            value: _noteController.text.trim().isEmpty
-                ? null
-                : _noteController.text.trim(),
-            placeholder: '一碗拉面…',
-            onTap: () => setState(() => _noteEditing = !_noteEditing),
+            trailing: TextField(
+              key: ledgerNoteFieldKey,
+              controller: _noteController,
+              onChanged: _onNoteChanged,
+              textAlign: TextAlign.right,
+              style: type.rowTitle.copyWith(color: colors.ink),
+              decoration: InputDecoration.collapsed(
+                hintText: '一碗拉面…',
+                hintStyle: type.rowTitle.copyWith(
+                  color: colors.ink3,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      if (_noteEditing) ...[
-        const SizedBox(height: 12),
-        _noteEditor(),
-      ],
       const SizedBox(height: 12),
       MemHint(text: _previewHint),
-      const SizedBox(height: 12),
-      LedgerPad(onKey: _onKey, onBackspace: _onBackspace),
       const SizedBox(height: 12),
       if (_saveFailed) ...[
         _saveFailure(_save),
@@ -398,28 +418,6 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
     return '写下备注，我会帮你自动匹配分类，下次同类消费直接记住';
   }
 
-  Widget _noteEditor() {
-    final colors = context.colors;
-    final type = context.typography;
-    return Container(
-      padding: EdgeInsets.all(context.spacing.cardPadding),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: context.radii.rLg,
-      ),
-      child: TextField(
-        controller: _noteController,
-        autofocus: true,
-        onChanged: _onNoteChanged,
-        style: type.body.copyWith(color: colors.ink),
-        decoration: InputDecoration.collapsed(
-          hintText: '一碗拉面…',
-          hintStyle: type.body.copyWith(color: colors.ink3),
-        ),
-      ),
-    );
-  }
-
   Widget _saveFailure(Future<void> Function() retry) {
     final colors = context.colors;
     final type = context.typography;
@@ -440,37 +438,54 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   }
 }
 
-String _timeLabel(DateTime at) {
-  final hour = at.hour.toString().padLeft(2, '0');
-  final minute = at.minute.toString().padLeft(2, '0');
-  return '今天 $hour:$minute';
+DateTime _nowMinute() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day, now.hour, now.minute);
 }
+
+String _timeLabel(DateTime at) {
+  final now = DateTime.now();
+  final day = DateTime(at.year, at.month, at.day);
+  final today = DateTime(now.year, now.month, now.day);
+  final clock = '${_two(at.hour)}:${_two(at.minute)}';
+  final time = at.second == 0 ? clock : '$clock:${_two(at.second)}';
+  if (day == today) return '今天 $time';
+  if (today.difference(day).inDays == 1) return '昨天 $time';
+  if (at.year == now.year) return '${at.month}/${at.day} $time';
+  return '${at.year}/${at.month}/${at.day} $time';
+}
+
+String _two(int value) => value.toString().padLeft(2, '0');
 
 IconData _iconFor(String name) {
   switch (name) {
     case '餐饮':
-      return AppIcons.coffee;
+      return AppIcons.utensils;
     case '交通':
-      return AppIcons.train;
+      return AppIcons.bus;
     case '购物':
-      return AppIcons.wallet;
+      return AppIcons.shoppingBag;
     case '居住':
-      return AppIcons.home;
+      return AppIcons.building2;
     case '医疗':
-      return AppIcons.activity;
+      return AppIcons.stethoscope;
     case '娱乐':
-      return AppIcons.sparkles;
+      return AppIcons.gamepad2;
     case '学习':
-      return AppIcons.book;
+      return AppIcons.graduationCap;
     case '人情':
-      return AppIcons.heart;
+      return AppIcons.heartHandshake;
     case '养车':
-      return AppIcons.repeat;
+      return AppIcons.car;
+    case '其他':
+      return AppIcons.package;
     case '工资':
+      return AppIcons.banknote;
     case '奖金':
+      return AppIcons.trophy;
     case '其他收入':
-      return AppIcons.arrowUp;
+      return AppIcons.coins;
     default:
-      return AppIcons.wallet;
+      return AppIcons.tag;
   }
 }

@@ -81,6 +81,19 @@ ICONS = [
     ("tag", "tag"),
     ("move", "move"),
     ("pencil", "pencil"),
+    # 记账分类图标（33 宫格语义化，2026-10-07）：购物/娱乐/学习/医疗/人情等
+    # 原来借用 wallet/sparkles/activity 等不贴切的字形，这里补齐 Lucide 对应字形。
+    ("utensils", "utensils"),
+    ("shoppingBag", "shopping-bag"),
+    ("building2", "building-2"),
+    ("stethoscope", "stethoscope"),
+    ("gamepad2", "gamepad-2"),
+    ("graduationCap", "graduation-cap"),
+    ("heartHandshake", "heart-handshake"),
+    ("package", "package"),
+    ("banknote", "banknote"),
+    ("trophy", "trophy"),
+    ("bus", "bus"),
 ]
 
 

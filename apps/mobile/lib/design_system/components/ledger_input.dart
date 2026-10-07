@@ -1,9 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../tokens/tokens.dart';
 import 'gradient_border_card.dart';
 import 'press_scale.dart';
 import 'sparkle.dart';
+
+/// 金额输入约束：最多 8 位整数 + 至多 2 位小数，只允许一个小数点。
+class AmountInputFormatter extends TextInputFormatter {
+  const AmountInputFormatter();
+
+  static final _valid = RegExp(r'^\d{0,8}(?:\.\d{0,2})?$');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) =>
+      newValue.text.isEmpty || _valid.hasMatch(newValue.text)
+          ? newValue
+          : oldValue;
+}
+
+/// 金额输入框的 key（用例与自动化定位用）。
+const ledgerAmountFieldKey = ValueKey<String>('ledger-amount-field');
+
+/// 备注输入框的 key（用例与自动化定位用）。
+const ledgerNoteFieldKey = ValueKey<String>('ledger-note-field');
 
 /// A32 seg 选项
 class LedgerSegOption {
@@ -76,7 +99,7 @@ class LedgerSeg extends StatelessWidget {
   }
 }
 
-/// A32 amount（金额区）
+/// A32 amount（金额区，只读展示）：右侧金额 + 闪烁光标。
 class LedgerAmount extends StatelessWidget {
   const LedgerAmount({
     super.key,
@@ -90,6 +113,95 @@ class LedgerAmount extends StatelessWidget {
   final String amountText;
   final String currency;
   final bool focused;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = Theme.of(context).extension<AppTypography>()!;
+    return _AmountShell(
+      label: label,
+      currency: currency,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            amountText,
+            style: type.amountHero.copyWith(fontSize: 38, letterSpacing: -0.76),
+          ),
+          if (focused) const _BlinkCursor(),
+        ],
+      ),
+    );
+  }
+}
+
+/// A32 amount-field（金额区，可编辑）：点击唤起**系统数字键盘**
+/// （`numberWithOptions(decimal: true)`），不再自绘数字键盘。
+///
+/// 输入框宽度跟随内容（`IntrinsicWidth`）以保证 `¥` 紧贴数字右侧；
+/// 空值时由 `minWidth` 撑出可点区域。
+class LedgerAmountField extends StatelessWidget {
+  const LedgerAmountField({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    this.onChanged,
+    this.label = '金额',
+    this.currency = '¥',
+    this.hint = '0.00',
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
+  final String label;
+  final String currency;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    final type = Theme.of(context).extension<AppTypography>()!;
+    final amountStyle =
+        type.amountHero.copyWith(fontSize: 38, letterSpacing: -0.76);
+    return _AmountShell(
+      label: label,
+      currency: currency,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 60, maxWidth: 220),
+        child: IntrinsicWidth(
+          child: TextField(
+            key: ledgerAmountFieldKey,
+            controller: controller,
+            focusNode: focusNode,
+            onChanged: onChanged,
+            textAlign: TextAlign.right,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: const [AmountInputFormatter()],
+            cursorColor: colors.money,
+            cursorWidth: 2,
+            style: amountStyle,
+            decoration: InputDecoration.collapsed(
+              hintText: hint,
+              hintStyle: amountStyle.copyWith(color: colors.ink3),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A32 amount 外壳：白卡 + 左标签 + 右侧「货币符号 + 内容」。
+class _AmountShell extends StatelessWidget {
+  const _AmountShell({
+    required this.label,
+    required this.currency,
+    required this.child,
+  });
+
+  final String label;
+  final String currency;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -114,17 +226,21 @@ class LedgerAmount extends StatelessWidget {
               fontWeight: FontWeight.w400,
             ),
           ),
-          const Spacer(),
-          Text(
-            currency,
-            style: type.amountHero.copyWith(fontSize: 22, letterSpacing: -0.44),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  currency,
+                  style:
+                      type.amountHero.copyWith(fontSize: 22, letterSpacing: -0.44),
+                ),
+                const SizedBox(width: 4),
+                Flexible(child: child),
+              ],
+            ),
           ),
-          const SizedBox(width: 4),
-          Text(
-            amountText,
-            style: type.amountHero.copyWith(fontSize: 38, letterSpacing: -0.76),
-          ),
-          if (focused) const _BlinkCursor(),
         ],
       ),
     );
@@ -188,29 +304,31 @@ class LedgerKindItem {
   final IconData icon;
 }
 
-/// A32 kind（分类宫格）：4 列，选中边框取记账域 money 色。
+/// A32 kind（分类宫格）：默认 5 列（33 记账页一行五个），选中边框取记账域 money 色。
 class LedgerKindGrid extends StatelessWidget {
   const LedgerKindGrid({
     super.key,
     required this.items,
     this.selectedKey,
     this.onSelected,
+    this.columns = 5,
   });
 
   final List<LedgerKindItem> items;
   final String? selectedKey;
   final ValueChanged<String>? onSelected;
+  final int columns;
 
   @override
   Widget build(BuildContext context) {
     final radii = Theme.of(context).extension<AppRadii>()!;
     final rows = <Widget>[];
-    for (var start = 0; start < items.length; start += 4) {
-      final rowItems = items.skip(start).take(4).toList();
+    for (var start = 0; start < items.length; start += columns) {
+      final rowItems = items.skip(start).take(columns).toList();
       rows.add(
         Row(
           children: [
-            for (var index = 0; index < 4; index++) ...[
+            for (var index = 0; index < columns; index++) ...[
               if (index > 0) const SizedBox(width: 9),
               Expanded(
                 child: index < rowItems.length
@@ -291,6 +409,7 @@ class LedgerFormRow {
     this.placeholder,
     this.helper,
     this.onTap,
+    this.trailing,
   });
 
   final String label;
@@ -298,6 +417,9 @@ class LedgerFormRow {
   final String? placeholder;
   final String? helper;
   final VoidCallback? onTap;
+
+  /// 自定义右侧内容（如内联输入框）。给出时不再渲染 [value] / [placeholder]。
+  final Widget? trailing;
 }
 
 /// A32 form（表单行）：白卡，行间以 `line` 分割。
@@ -333,8 +455,6 @@ class LedgerFormRows extends StatelessWidget {
     LedgerFormRow row,
     bool showDivider,
   ) {
-    final type = Theme.of(context).extension<AppTypography>()!;
-    final filled = row.value != null && row.value!.isNotEmpty;
     return GestureDetector(
       onTap: row.onTap,
       child: Container(
@@ -344,40 +464,30 @@ class LedgerFormRows extends StatelessWidget {
               showDivider ? Border(bottom: BorderSide(color: colors.line)) : null,
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: row.trailing == null
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
           children: [
             SizedBox(
               width: labelWidth,
               child: Text(
                 row.label,
-                style: type.sub.copyWith(
-                  fontSize: 13,
-                  color: colors.ink2,
-                  fontWeight: FontWeight.w400,
-                ),
+                style: Theme.of(context).extension<AppTypography>()!.sub.copyWith(
+                      fontSize: 13,
+                      color: colors.ink2,
+                      fontWeight: FontWeight.w400,
+                    ),
               ),
             ),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    filled ? row.value! : (row.placeholder ?? ''),
-                    textAlign: TextAlign.right,
-                    style: type.rowTitle.copyWith(
-                      color: filled ? colors.ink : colors.ink3,
-                      fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                  if (row.helper != null) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      row.helper!,
-                      style: type.caption.copyWith(
-                        color: colors.ink3,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
+                  Flexible(child: row.trailing ?? _valueColumn(context, colors, row)),
+                  if (row.onTap != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(AppIcons.chevronRight, size: 15, color: colors.ink3),
                   ],
                 ],
               ),
@@ -385,6 +495,34 @@ class LedgerFormRows extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _valueColumn(BuildContext context, AppColors colors, LedgerFormRow row) {
+    final type = Theme.of(context).extension<AppTypography>()!;
+    final filled = row.value != null && row.value!.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          filled ? row.value! : (row.placeholder ?? ''),
+          textAlign: TextAlign.right,
+          style: type.rowTitle.copyWith(
+            color: filled ? colors.ink : colors.ink3,
+            fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+        if (row.helper != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            row.helper!,
+            style: type.caption.copyWith(
+              color: colors.ink3,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

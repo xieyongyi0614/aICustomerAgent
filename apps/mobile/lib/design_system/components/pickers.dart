@@ -67,15 +67,17 @@ class _PickerSheetFrame extends StatelessWidget {
     final radii = _r(context);
     final elevation = _e(context);
     final media = MediaQuery.of(context);
+    // showModalBottomSheet 不管键盘：面板锚在屏底，软键盘会盖住下半屏。
+    // 面板里有输入（choice-sheet 的搜索丸这类）时，把键盘高度让出来，
+    // 「完成」与输入丸才不会被压在键盘底下（2026-10-07 实机踩到）。
+    final keyboard = media.viewInsets.bottom;
+    final bottomPad = keyboard > 0
+        ? keyboard + 8
+        : (media.viewPadding.bottom > 0 ? 8.0 : 14.0);
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          12,
-          8,
-          12,
-          media.viewPadding.bottom > 0 ? 8 : 14,
-        ),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPad),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: media.size.height * 0.72),
           child: Container(
@@ -354,6 +356,155 @@ class _DateWheelContentState extends State<_DateWheelContent> {
     );
   }
 }
+
+/// A41 date-time-wheel：年 / 月 / 日 / 时 / 分 / 秒 六列滚轮，返回所选时刻。
+///
+/// 与 [showDateWheelSheet] 同族；日期维度多的场景（记账时间）用这个，
+/// 只选日期（购车日期等）仍用三列版。
+Future<DateTime?> showDateTimeWheelSheet({
+  required BuildContext context,
+  required String title,
+  DateTime? initial,
+  DateTime? firstDate,
+  DateTime? lastDate,
+}) {
+  final now = DateTime.now();
+  final minDate = firstDate ?? DateTime(now.year - 1, 1, 1);
+  final maxDate = lastDate ?? DateTime(now.year + 20, 12, 31);
+  final raw = initial ?? now;
+  final start = raw.isBefore(minDate)
+      ? minDate
+      : (raw.isAfter(maxDate) ? maxDate : raw);
+  var selected = start;
+  return showPickerSheet<DateTime>(
+    context: context,
+    title: title,
+    result: () => selected,
+    child: _DateTimeWheelContent(
+      initial: start,
+      firstDate: minDate,
+      lastDate: maxDate,
+      onChanged: (value) => selected = value,
+    ),
+  );
+}
+
+class _DateTimeWheelContent extends StatefulWidget {
+  const _DateTimeWheelContent({
+    required this.initial,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onChanged,
+  });
+
+  final DateTime initial;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final ValueChanged<DateTime> onChanged;
+
+  @override
+  State<_DateTimeWheelContent> createState() => _DateTimeWheelContentState();
+}
+
+class _DateTimeWheelContentState extends State<_DateTimeWheelContent> {
+  late int _year = widget.initial.year;
+  late int _month = widget.initial.month;
+  late int _day = widget.initial.day;
+  late int _hour = widget.initial.hour;
+  late int _minute = widget.initial.minute;
+  late int _second = widget.initial.second;
+
+  int get _minYear => widget.firstDate.year;
+  int get _maxYear => widget.lastDate.year;
+  int get _dayCount => DateUtils.getDaysInMonth(_year, _month);
+
+  void _emit() =>
+      widget.onChanged(DateTime(_year, _month, _day, _hour, _minute, _second));
+
+  @override
+  Widget build(BuildContext context) {
+    final years = [for (var y = _minYear; y <= _maxYear; y++) '$y'];
+    final months = [for (var m = 1; m <= 12; m++) '$m 月'];
+    final days = [for (var d = 1; d <= _dayCount; d++) '$d 日'];
+    final hours = [for (var h = 0; h <= 23; h++) _twoDigits(h)];
+    final minutes = [for (var m = 0; m <= 59; m++) _twoDigits(m)];
+    final seconds = [for (var s = 0; s <= 59; s++) _twoDigits(s)];
+    _day = _day.clamp(1, _dayCount);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: WheelColumn(
+              items: years,
+              initialIndex: _year - _minYear,
+              onChanged: (index) {
+                _year = _minYear + index;
+                _day = _day.clamp(1, _dayCount);
+                _emit();
+                setState(() {});
+              },
+            ),
+          ),
+          Expanded(
+            child: WheelColumn(
+              items: months,
+              initialIndex: _month - 1,
+              onChanged: (index) {
+                _month = index + 1;
+                _day = _day.clamp(1, _dayCount);
+                _emit();
+                setState(() {});
+              },
+            ),
+          ),
+          Expanded(
+            child: WheelColumn(
+              items: days,
+              initialIndex: _day - 1,
+              onChanged: (index) {
+                _day = index + 1;
+                _emit();
+              },
+            ),
+          ),
+          Expanded(
+            child: WheelColumn(
+              items: hours,
+              initialIndex: _hour,
+              onChanged: (index) {
+                _hour = index;
+                _emit();
+              },
+            ),
+          ),
+          Expanded(
+            child: WheelColumn(
+              items: minutes,
+              initialIndex: _minute,
+              onChanged: (index) {
+                _minute = index;
+                _emit();
+              },
+            ),
+          ),
+          Expanded(
+            child: WheelColumn(
+              items: seconds,
+              initialIndex: _second,
+              onChanged: (index) {
+                _second = index;
+                _emit();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
 /// picker 搜索框的 key（用例与自动化定位用）。
 const pickerSearchKey = ValueKey<String>('picker-search');

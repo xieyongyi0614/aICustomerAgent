@@ -122,6 +122,42 @@ void main() {
     expect(picked, isNull);
   });
 
+  testWidgets('test_datetime_wheel_sheet_confirms_initial_moment',
+      (tester) async {
+    DateTime? picked;
+    await _openSheet(tester, (context) async {
+      picked = await showDateTimeWheelSheet(
+        context: context,
+        title: '记账时间',
+        initial: DateTime(2026, 10, 3, 8, 5, 7),
+      );
+    });
+
+    expect(find.byType(WheelColumn), findsNWidgets(6));
+    expect(find.text('2026'), findsOneWidget);
+    expect(find.text('10 月'), findsOneWidget);
+    expect(find.text('3 日'), findsOneWidget);
+
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(picked, DateTime(2026, 10, 3, 8, 5, 7));
+  });
+
+  testWidgets('test_datetime_wheel_sheet_cancel_returns_null', (tester) async {
+    DateTime? picked = DateTime(2000);
+    await _openSheet(tester, (context) async {
+      picked = await showDateTimeWheelSheet(
+        context: context,
+        title: '记账时间',
+        initial: DateTime(2026, 10, 3, 8, 5),
+      );
+    });
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(picked, isNull);
+  });
+
   testWidgets('test_wheel_column_reports_scroll', (tester) async {
     var index = 0;
     await tester.pumpWidget(

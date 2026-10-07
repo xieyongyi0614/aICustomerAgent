@@ -74,4 +74,15 @@ class AppIcons {
   static const tag = IconData(0xf521, fontFamily: 'lucide');
   static const move = IconData(0xf3f5, fontFamily: 'lucide');
   static const pencil = IconData(0xf43d, fontFamily: 'lucide');
+  static const utensils = IconData(0xf576, fontFamily: 'lucide');
+  static const shoppingBag = IconData(0xf4c7, fontFamily: 'lucide');
+  static const building2 = IconData(0xf1cd, fontFamily: 'lucide');  // lucide: building-2
+  static const stethoscope = IconData(0xf505, fontFamily: 'lucide');
+  static const gamepad2 = IconData(0xf326, fontFamily: 'lucide');  // lucide: gamepad-2
+  static const graduationCap = IconData(0xf33e, fontFamily: 'lucide');
+  static const heartHandshake = IconData(0xf356, fontFamily: 'lucide');
+  static const package = IconData(0xf414, fontFamily: 'lucide');
+  static const banknote = IconData(0xf184, fontFamily: 'lucide');
+  static const trophy = IconData(0xf54e, fontFamily: 'lucide');
+  static const bus = IconData(0xf1ce, fontFamily: 'lucide');
 }

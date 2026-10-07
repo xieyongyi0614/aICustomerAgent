@@ -35,6 +35,7 @@ class _FakeLedgerRepository extends LedgerRepository {
   final List<String?> createdCategories = [];
   final List<String?> createdNotes = [];
   final List<String> createdKeys = [];
+  final List<DateTime?> createdOccurredAt = [];
 
   @override
   Future<List<LedgerCategoryData>> fetchCategories({String? kind}) async {
@@ -72,6 +73,7 @@ class _FakeLedgerRepository extends LedgerRepository {
     createdCategories.add(categoryId);
     createdNotes.add(note);
     createdKeys.add(idempotencyKey);
+    createdOccurredAt.add(occurredAt);
     if (createGate != null) await createGate!.future;
     if (createFails) throw Exception('create down');
     return const LedgerCreateResult(id: 'ent-1');
@@ -80,8 +82,8 @@ class _FakeLedgerRepository extends LedgerRepository {
 
 Widget _host(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
 
-/// 33 页键盘态信息流长于一屏（8 段 + 键盘），把测试面拉到手机高屏，
-/// 避免键盘/保存键落在视口外。
+/// 33 页键盘态信息流较长（返回 + 两段 seg + 金额 + 宫格 + 表单 + 提示 + 保存），
+/// 把测试面拉到手机高屏，避免保存键落在视口外。
 void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(390, 1500);
   tester.view.devicePixelRatio = 1;
@@ -119,16 +121,12 @@ Future<void> _switchToKeyboard(WidgetTester tester) async {
 }
 
 Future<void> _typeAmount(WidgetTester tester, String digits) async {
-  for (final key in digits.split('')) {
-    await tester.tap(find.text(key));
-    await tester.pump();
-  }
+  await tester.enterText(find.byKey(ledgerAmountFieldKey), digits);
+  await tester.pump();
 }
 
 Future<void> _typeNote(WidgetTester tester, String note) async {
-  await tester.tap(find.text('备注'));
-  await tester.pump();
-  await tester.enterText(find.byType(TextField), note);
+  await tester.enterText(find.byKey(ledgerNoteFieldKey), note);
   await tester.pump(const Duration(milliseconds: 50));
 }
 
@@ -231,11 +229,10 @@ void main() {
       'BackLink',
       'LedgerSeg',
       'LedgerSeg',
-      'LedgerAmount',
+      'LedgerAmountField',
       'LedgerKindGrid',
       'LedgerFormRows',
       'MemHint',
-      'LedgerPad',
       'LedgerSaveButton',
     ];
     final indices = [for (final name in expected) types.indexOf(name)];
@@ -257,6 +254,19 @@ void main() {
     expect(find.text('工资'), findsOneWidget);
   });
 
+  testWidgets('test_ledger_add_amount_uses_native_numeric_keyboard',
+      (tester) async {
+    final repo = _FakeLedgerRepository();
+    await _openEntryPage(tester, repo);
+    await _switchToKeyboard(tester);
+    expect(find.byType(LedgerPad), findsNothing);
+    final field = tester.widget<TextField>(find.byKey(ledgerAmountFieldKey));
+    expect(
+      field.keyboardType,
+      const TextInputType.numberWithOptions(decimal: true),
+    );
+  });
+
   testWidgets('test_ledger_add_amount_submits_integer_minor', (tester) async {
     final repo = _FakeLedgerRepository();
     await _openEntryPage(tester, repo);
@@ -268,14 +278,56 @@ void main() {
     expect(repo.createdAmounts.single, isA<int>());
   });
 
+  testWidgets('test_ledger_add_amount_keeps_two_decimal_places', (tester) async {
+    final repo = _FakeLedgerRepository();
+    await _openEntryPage(tester, repo);
+    await _switchToKeyboard(tester);
+    await _typeAmount(tester, '35.67');
+    await _typeAmount(tester, '35.678');
+    await tester.tap(find.text('保存这一笔'));
+    await tester.pump();
+    expect(repo.createdAmounts, [3567]);
+  });
+
+  testWidgets('test_ledger_add_time_row_opens_datetime_wheel', (tester) async {
+    final repo = _FakeLedgerRepository();
+    await _openEntryPage(tester, repo);
+    await _switchToKeyboard(tester);
+    await tester.tap(find.text('时间'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(WheelColumn), findsNWidgets(6));
+    await tester.tap(find.text('取消'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(WheelColumn), findsNothing);
+  });
+
+  testWidgets('test_ledger_add_time_row_picked_value_is_submitted',
+      (tester) async {
+    final repo = _FakeLedgerRepository();
+    await _openEntryPage(tester, repo);
+    await _switchToKeyboard(tester);
+    await tester.tap(find.text('时间'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('完成'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await _typeAmount(tester, '35');
+    await tester.tap(find.text('保存这一笔'));
+    await tester.pump();
+    final occurredAt = repo.createdOccurredAt.single;
+    expect(occurredAt, isNotNull);
+    expect(occurredAt!.second, 0);
+  });
+
   testWidgets('test_ledger_add_note_preview_is_debounced', (tester) async {
     final repo = _FakeLedgerRepository();
     await _openEntryPage(tester, repo);
     await _switchToKeyboard(tester);
-    await tester.tap(find.text('备注'));
-    await tester.pump();
     for (final text in const ['一', '一碗', '一碗拉', '一碗拉面', '一碗拉面 35']) {
-      await tester.enterText(find.byType(TextField), text);
+      await tester.enterText(find.byKey(ledgerNoteFieldKey), text);
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 400));
