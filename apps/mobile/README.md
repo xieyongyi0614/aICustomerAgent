@@ -67,6 +67,17 @@ adb reverse tcp:8020 tcp:8020
 
 关闭模拟器用 `adb emu kill` 或直接关窗口。已知坑：`adb emu kill` 可能残留 AVD 锁（`~/.android/avd/Medium_Phone_API_36.avd/` 下的 `*.lock`，锁可能是**目录**，用 `rm -rf` 删）——残留后下次启动崩溃、`flutter run` 回落到 `windows` 等其它设备，删锁再拉起即可。
 
+#### 3.1.1 模拟器定位（天气城市依赖）
+
+**模拟器出厂没有任何位置**（系统 `last location` 全为 null，51 分钟 locations=0），天气会一直落到「默认北京」。同时低精度定位走的是**网络定位 provider（GMS）**，模拟器没有 WiFi / 基站数据源，永远拿不到 fix——App 内已做降级：低精度限时 2 秒，超时自动换高精度走 GPS，GPS 由下面的注入供位。真机不受影响（网络定位正常）。
+
+给模拟器注入位置（二选一）：
+
+- **Extended Controls（推荐，持续生效）**：模拟器工具栏 `⋯` → Location → 搜索/点选目标城市（如广州）→ `SET LOCATION`。设置后 GPS 引擎每次出 fix 都用这个位置。
+- **`adb emu geo fix`（一次性）**：`adb emu geo fix <经度> <纬度> [海拔] [卫星数]`（注意**经度在前**，如广州 `adb emu geo fix 113.2644 23.1291 50 12`）。坑：GPS 引擎没被任何请求启动时（`dumpsys location` 里 `mStarted=false`）注入会被丢弃——先打开 App 触发定位（首页加载后 5 秒窗口内）再注入，或在注入后重启 App 再看结果。
+
+验证：`adb shell dumpsys location | grep "last location"` 出现坐标即注入成功；App 侧看 logcat `[geo]` 日志（与 `[net]` 同惯例，仅 debug 构建输出），如 `[geo] LocationAccuracy.high 定位成功: 23.1291,113.2643983`。
+
 #### 3.2 真机（USB 调试）
 
 **前置**：手机连点「版本号」开启开发者选项 → 打开「USB 调试」（vivo / 小米 / OPPO 等还需打开「USB 安装」或「USB 调试（安全设置）」）；插线后手机上弹「允许 USB 调试」点允许。

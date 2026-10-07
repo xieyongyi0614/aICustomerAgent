@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/location/location_service.dart';
 import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
@@ -21,10 +24,12 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _repo = HomeRepository();
+  final _location = const LocationService();
   HomeSummaryData? _data;
   String? _nickname;
   Object? _error;
   bool _loading = true;
+  bool _insightRefreshing = false;
 
   @override
   void initState() {
@@ -67,6 +72,33 @@ class _HomePageState extends ConsumerState<HomePage> {
         _error = e;
         _loading = false;
       });
+      return;
+    }
+    unawaited(_refreshInsightWithLocation());
+  }
+
+  /// 两段式补刷：定位到位后只刷新 AI 卡（服务端按坐标重算，端上不拼装）。
+  /// 未授权不弹窗（requestIfDenied: false），冷启动不被权限弹窗卡住；
+  /// 定位取不到或补刷失败都保持首轮内容。
+  Future<void> _refreshInsightWithLocation() async {
+    if (_insightRefreshing) return;
+    _insightRefreshing = true;
+    try {
+      final coords = await _location.getCurrentCoords(requestIfDenied: false);
+      if (coords == null || !mounted || _data == null) return;
+      final data = await _repo.fetchSummary(lat: coords.lat, lon: coords.lon);
+      if (!mounted || _data == null) return;
+      setState(() {
+        _data = _data!.withInsight(
+          insightTitle: data.insightTitle,
+          insightNarrative: data.insightNarrative,
+          insightAction: data.insightAction,
+        );
+      });
+    } catch (_) {
+      // 补刷失败保持首轮内容，不打断页面
+    } finally {
+      _insightRefreshing = false;
     }
   }
 
@@ -122,7 +154,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ? null
                     : () => context.go('/briefing?type=morning'),
                 child: Text(
-                  d.insightNarrative.isEmpty ? '还没有洞察 —— 亚丝娜还在了解你' : d.insightNarrative,
+                  d.insightNarrative.isEmpty ? '今天还没有新的总结' : d.insightNarrative,
                   style: context.typography.body.copyWith(
                     color: colors.bodyOnCard,
                     height: 1.65,
@@ -130,7 +162,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
               const SizedBox(height: 24),
-              _SectionTitle(title: '今日任务', hint: d.tasksHint),
+              _SectionTitle(
+                title: '今日任务',
+                hint: d.tasksHint.isEmpty ? null : '${d.tasksHint} ›',
+                onHintTap: d.tasksHint.isEmpty
+                    ? null
+                    : () => context.push('/schedule', extra: '首页'),
+              ),
               const SizedBox(height: 6),
               AppCard(
                 listPadding: true,
@@ -266,12 +304,14 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.title,
     this.hint,
+    this.onHintTap,
     this.trailingAction,
     this.onTrailing,
   });
 
   final String title;
   final String? hint;
+  final VoidCallback? onHintTap;
   final String? trailingAction;
   final VoidCallback? onTrailing;
 
@@ -284,7 +324,10 @@ class _SectionTitle extends StatelessWidget {
         Text(title, style: type.sectionTitle),
         const Spacer(),
         if (hint != null)
-          Text(hint!, style: type.caption.copyWith(color: colors.ink3)),
+          GestureDetector(
+            onTap: onHintTap,
+            child: Text(hint!, style: type.caption.copyWith(color: colors.ink3)),
+          ),
         if (trailingAction != null)
           GestureDetector(
             onTap: onTrailing,

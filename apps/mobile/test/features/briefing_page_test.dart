@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile/app/theme/app_theme.dart';
+import 'package:mobile/core/location/location_service.dart';
 import 'package:mobile/features/briefing/data/briefing_repository.dart';
-import 'package:mobile/features/briefing/data/location_service.dart';
 import 'package:mobile/features/briefing/presentation/briefing_page.dart';
 
 BriefContentData _content() => const BriefContentData(
@@ -23,6 +24,7 @@ class _RecordingRepo extends BriefingRepository {
   final String? savedCity;
   final List<double?> fetchedLats = [];
   final List<String?> savedCities = [];
+  int prefsFetches = 0;
 
   @override
   Future<BriefContentData?> cachedBrief(String type) async => null;
@@ -38,7 +40,10 @@ class _RecordingRepo extends BriefingRepository {
   }
 
   @override
-  Future<BriefPrefsData> fetchPrefs() async => BriefPrefsData(city: savedCity);
+  Future<BriefPrefsData> fetchPrefs() async {
+    prefsFetches += 1;
+    return BriefPrefsData(city: savedCity);
+  }
 
   @override
   Future<BriefPrefsData> savePrefs({
@@ -57,6 +62,7 @@ class _FixedLocation extends LocationService {
   @override
   Future<CoordPair?> getCurrentCoords({
     Duration timeLimit = const Duration(seconds: 5),
+    bool requestIfDenied = true,
   }) async {
     calls += 1;
     return const CoordPair(lat: 39.9042, lon: 116.4074);
@@ -69,6 +75,7 @@ class _DeniedLocation extends LocationService {
   @override
   Future<CoordPair?> getCurrentCoords({
     Duration timeLimit = const Duration(seconds: 5),
+    bool requestIfDenied = true,
   }) async {
     calls += 1;
     return null;
@@ -132,15 +139,17 @@ void main() {
     expect(repo.fetchedLats.single, 39.9042);
   });
 
-  testWidgets('skips device coords when a city preference is saved', (
+  testWidgets('does not send device coords when a city preference is saved', (
     tester,
   ) async {
     final repo = _RecordingRepo(savedCity: '上海');
     final location = _FixedLocation();
     await _pump(tester, repo, location);
 
-    expect(location.calls, 0);
+    // 定位与偏好并行预取，城市命中时定位结果仅弃用、绝不下发。
+    expect(location.calls, 1);
     expect(repo.fetchedLats.single, isNull);
+    expect(find.text('上海'), findsOneWidget);
   });
 
   testWidgets('denied location still renders brief without coords', (
@@ -153,18 +162,69 @@ void main() {
     expect(location.calls, 1);
     expect(repo.fetchedLats.single, isNull);
     expect(find.text('开始今天'), findsOneWidget);
+    expect(find.text('默认北京'), findsOneWidget);
   });
 
-  testWidgets('city entry saves a new city and refreshes', (tester) async {
-    final repo = _RecordingRepo(savedCity: null);
+  testWidgets('weather card shows saved city and picker changes it', (
+    tester,
+  ) async {
+    final repo = _RecordingRepo(savedCity: '上海');
     await _pump(tester, repo, _FixedLocation());
 
-    await tester.tap(find.text('天气按实时定位 · 点按设置'));
+    expect(find.text('上海'), findsOneWidget);
+    await tester.tap(find.text('天气'));
     await _flush(tester);
-    await tester.enterText(find.byType(TextField), '北京');
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text('北京'));
     await _flush(tester);
 
     expect(repo.savedCities.single, '北京');
+    // 换城只补拉简报本身：PUT 响应里的偏好直接复用，不再 GET preferences。
+    expect(repo.prefsFetches, 1);
+    expect(repo.fetchedLats.length, 2);
+    expect(repo.fetchedLats.last, isNull);
   });
+
+  testWidgets('picker clears city back to realtime location', (tester) async {
+    final repo = _RecordingRepo(savedCity: '上海');
+    await _pump(tester, repo, _FixedLocation());
+
+    await tester.tap(find.text('天气'));
+    await _flush(tester);
+    await tester.tap(find.text('使用实时定位'));
+    await _flush(tester);
+
+    expect(repo.savedCities.single, isNull);
+    expect(find.text('实时定位'), findsOneWidget);
+  });
+
+  testWidgets('cta goes back home to start the day', (tester) async {
+    final repo = _RecordingRepo(savedCity: null);
+    final router = GoRouter(
+      initialLocation: '/briefing',
+      routes: [
+        GoRoute(
+          path: '/briefing',
+          builder: (_, _) => BriefingPage(
+            type: 'morning',
+            repository: repo,
+            location: _DeniedLocation(),
+          ),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (_, _) => const Scaffold(body: Text('首页')),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp.router(theme: buildAppTheme(), routerConfig: router),
+    );
+    await _flush(tester);
+
+    await tester.tap(find.text('开始今天'));
+    await _flush(tester);
+
+    expect(find.text('首页'), findsOneWidget);
+  });
+
 }

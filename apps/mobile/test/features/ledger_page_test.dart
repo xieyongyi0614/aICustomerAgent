@@ -209,9 +209,9 @@ HomeSummaryData _homeSummary() => const HomeSummaryData(
       headline: '今天也交给我吧',
       sub: '亚丝娜已为你整理好今天的一切',
       modeChip: 'Default 模式',
-      insightTitle: 'AI 洞察',
+      insightTitle: '今日 AI 总结',
       insightNarrative: '上午适合专注。',
-      insightAction: '查看早间简报 →',
+      insightAction: '查看完整早间简报 →',
       tasks: [],
       tasksHint: '0 项',
       spend: HomeSpend(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/features/home/data/home_repository.dart';
@@ -11,9 +12,9 @@ HomeSummaryData _summary() => const HomeSummaryData(
       headline: '今天也交给我吧',
       sub: '亚丝娜已为你整理好今天的一切',
       modeChip: 'Default 模式',
-      insightTitle: 'AI 洞察',
+      insightTitle: '今日 AI 总结',
       insightNarrative: '上午适合专注。',
-      insightAction: '查看早间简报 →',
+      insightAction: '查看完整早间简报 →',
       tasks: [],
       tasksHint: '0 项',
       spend: HomeSpend(
@@ -32,11 +33,36 @@ void main() {
       ),
     );
     await tester.pump();
-    final ai = find.text('AI 洞察');
+    final ai = find.text('今日 AI 总结');
     final tasks = find.text('今日任务');
     expect(ai, findsOneWidget);
     expect(tasks, findsOneWidget);
     expect(tester.getTopLeft(ai).dy, lessThan(tester.getTopLeft(tasks).dy));
+  });
+
+  testWidgets('today-tasks hint links to schedule', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp.router(
+        theme: buildAppTheme(),
+        routerConfig: GoRouter(
+          initialLocation: '/home',
+          routes: [
+            GoRoute(
+              path: '/home',
+              builder: (_, _) => HomePage(debugSummary: _summary()),
+            ),
+            GoRoute(
+              path: '/schedule',
+              builder: (_, _) => const Scaffold(body: Text('SCHEDULE')),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('0 项 ›'));
+    await tester.pumpAndSettle();
+    expect(find.text('SCHEDULE'), findsOneWidget);
   });
 
   testWidgets('home spend section is weekly and drops the fake budget',
@@ -100,7 +126,7 @@ void main() {
       headline: '今天也交给我吧',
       sub: '',
       modeChip: '',
-      insightTitle: 'AI 洞察',
+      insightTitle: '今日 AI 总结',
       insightNarrative: '',
       tasks: const [],
       tasksHint: '',

@@ -46,6 +46,30 @@ class HomeSpend {
   final List<String> weekLabels;
 }
 
+extension HomeSummaryInsightPatch on HomeSummaryData {
+  /// 定位补刷：只替换 AI 卡三件套（服务端按坐标重算），其余区块保持
+  /// 首轮快照，避免二次全量拉取引发整页跳动。
+  HomeSummaryData withInsight({
+    required String insightTitle,
+    required String insightNarrative,
+    required String? insightAction,
+  }) {
+    return HomeSummaryData(
+      dateLabel: dateLabel,
+      greeting: greeting,
+      headline: headline,
+      sub: sub,
+      modeChip: modeChip,
+      insightTitle: insightTitle,
+      insightNarrative: insightNarrative,
+      insightAction: insightAction,
+      tasks: tasks,
+      tasksHint: tasksHint,
+      spend: spend,
+    );
+  }
+}
+
 class HomeSummaryData {
   const HomeSummaryData({
     required this.dateLabel,
@@ -80,8 +104,11 @@ class HomeRepository {
 
   final Dio _dio;
 
-  Future<HomeSummaryData> fetchSummary() async {
-    final resp = await _dio.get<Map<String, dynamic>>('/home/summary');
+  Future<HomeSummaryData> fetchSummary({double? lat, double? lon}) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/home/summary',
+      queryParameters: {'lat': ?lat, 'lon': ?lon},
+    );
     final data = resp.data ?? const {};
     final greeting = data['greeting'] as Map? ?? const {};
     final hero = data['hero'] as Map? ?? const {};
@@ -94,7 +121,7 @@ class HomeRepository {
       headline: hero['headline'] as String? ?? '今天也交给我吧',
       sub: hero['sub'] as String? ?? '',
       modeChip: hero['mode_chip'] as String? ?? '',
-      insightTitle: insight['title'] as String? ?? 'AI 洞察',
+      insightTitle: insight['title'] as String? ?? '今日 AI 总结',
       insightNarrative: insight['narrative'] as String? ?? '',
       insightAction: insight['action_label'] as String?,
       tasks: [

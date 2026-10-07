@@ -1,17 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/theme_context.dart';
+import '../../../core/location/location_service.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import '../data/briefing_repository.dart';
-import '../data/location_service.dart';
+import '../data/cities.dart';
 
 /// B9 #briefing：深色全屏，早间/晚间共用布局，按 type 切换文案与卡片。
 ///
 /// 文案与卡片全部渲染自服务端（API-008 契约字段），端上不拼装结论文案；
-/// 天气定位链：请求坐标（端侧实时定位）> 偏好城市 > 服务端兜底——
+/// 天气定位链（服务端）：偏好城市 > 请求坐标 > 默认北京——
 /// 已设偏好城市时不再带定位坐标（显式选择压过环境感知）。
 class BriefingPage extends StatefulWidget {
   const BriefingPage({
@@ -33,14 +36,12 @@ class BriefingPage extends StatefulWidget {
 }
 
 class _BriefingPageState extends State<BriefingPage> {
-  static const _setCityHint = '按实时定位';
-  static const _citySourceHint = '按城市';
-
   late final BriefingRepository _repo;
   late final LocationService _location;
   BriefContentData? _content;
   BriefPrefsData? _prefs;
   bool _fromCache = false;
+  bool _usedCoords = false;
   bool _loading = true;
   Object? _error;
 
@@ -73,12 +74,21 @@ class _BriefingPageState extends State<BriefingPage> {
     await _refresh();
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({BriefPrefsData? prefs}) async {
     try {
-      final prefs = await _repo.fetchPrefs();
-      final city = prefs.city?.trim() ?? '';
-      final coords =
-          city.isEmpty ? await _location.getCurrentCoords() : null;
+      // 偏好与定位并行取（定位上限 3s），串行等待是进页慢的主因；
+      // 设了城市就用不到坐标（显式选择压过环境感知）。
+      final coordsFuture = _location.getCurrentCoords(
+        timeLimit: const Duration(seconds: 3),
+      );
+      final effectivePrefs = prefs ?? await _repo.fetchPrefs();
+      final city = effectivePrefs.city?.trim() ?? '';
+      CoordPair? coords;
+      if (city.isEmpty) {
+        coords = await coordsFuture;
+      } else {
+        unawaited(coordsFuture);
+      }
       final content = await _repo.fetchBrief(
         widget.type,
         lat: coords?.lat,
@@ -86,7 +96,8 @@ class _BriefingPageState extends State<BriefingPage> {
       );
       if (!mounted) return;
       setState(() {
-        _prefs = prefs;
+        _prefs = effectivePrefs;
+        _usedCoords = coords != null;
         _content = content;
         _fromCache = false;
         _loading = false;
@@ -102,47 +113,39 @@ class _BriefingPageState extends State<BriefingPage> {
   }
 
   Future<void> _editCity() async {
-    final controller = TextEditingController(text: _prefs?.city ?? '');
-    final action = await showDialog<_CityAction>(
+    final currentCity = _prefs?.city?.trim() ?? '';
+    final picked = await showChoiceSheet<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('天气定位'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: '城市',
-            hintText: '如：上海',
-            helperText: '保存为空 = 清除城市，恢复实时定位',
-          ),
+      title: '天气城市',
+      items: [
+        const ChoiceSheetItem(
+          value: '',
+          label: '使用实时定位',
+          note: '清除已存城市，跟随当前位置',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(_CityAction.clear),
-            child: const Text('清除'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(_CityAction.save),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
+        for (final city in briefingCities)
+          ChoiceSheetItem(value: city.name, label: city.name, group: city.region),
+      ],
+      selected: currentCity.isEmpty ? '' : currentCity,
+      searchable: true,
+      searchHint: '搜索城市',
+      freeTextBuilder: (query) => query,
     );
-    if (!mounted || action == null) return;
-    final city = action == _CityAction.save ? controller.text.trim() : '';
+    if (!mounted || picked == null) return;
     try {
       final prefs = await _repo.savePrefs(
         morningAt: _prefs?.morningAt,
         eveningAt: _prefs?.eveningAt,
-        city: city.isEmpty ? null : city,
+        city: picked.isEmpty ? null : picked,
       );
       if (!mounted) return;
       setState(() => _prefs = prefs);
-      await _refresh();
+      // PUT 响应即最新偏好，直接复用，不再 GET preferences。
+      await _refresh(prefs: prefs);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('城市无法识别，换个写法试试')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('城市无法识别，换个写法试试')));
     }
   }
 
@@ -152,16 +155,11 @@ class _BriefingPageState extends State<BriefingPage> {
     final type = context.typography;
     final content = _content;
     if (_loading && content == null) {
-      return _BriefingScaffold(
-        child: const Center(child: LoadingState()),
-      );
+      return _BriefingScaffold(child: const Center(child: LoadingState()));
     }
     if (_error != null && content == null) {
       return _BriefingScaffold(
-        child: ErrorState(
-          message: StateCopy.serverError,
-          onRetry: _refresh,
-        ),
+        child: ErrorState(message: StateCopy.serverError, onRetry: () => _refresh()),
       );
     }
     final cachedAtLabel = _fromCache ? _cachedAtLabel(content) : null;
@@ -204,6 +202,8 @@ class _BriefingPageState extends State<BriefingPage> {
               title: c.title,
               body: c.body,
               note: c.note ?? '',
+              trailingValue: c.title == '天气' ? _cityValueLabel : null,
+              onTap: c.title == '天气' ? _editCity : null,
             ),
             const SizedBox(height: 12),
           ],
@@ -215,7 +215,7 @@ class _BriefingPageState extends State<BriefingPage> {
               borderRadius: context.radii.rFull,
               child: InkWell(
                 borderRadius: context.radii.rFull,
-                onTap: () => Navigator.of(context).maybePop(),
+                onTap: () => context.go('/home'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   child: Text(
@@ -231,47 +231,15 @@ class _BriefingPageState extends State<BriefingPage> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Center(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _editCity,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 6,
-                  horizontal: 10,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      AppIcons.slidersHorizontal,
-                      size: 13,
-                      color: colors.onDeepTertiary,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _cityEntryLabel,
-                      style: type.caption.copyWith(
-                        color: colors.onDeepTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  String get _cityEntryLabel {
+  String get _cityValueLabel {
     final city = _prefs?.city?.trim() ?? '';
-    final source = city.isEmpty
-        ? _setCityHint
-        : '$_citySourceHint：$city';
-    return '天气$source · 点按设置';
+    if (city.isNotEmpty) return city;
+    return _usedCoords ? '实时定位' : '默认北京';
   }
 
   String? _cachedAtLabel(BriefContentData? content) {
@@ -283,8 +251,6 @@ class _BriefingPageState extends State<BriefingPage> {
     return '离线内容 · 数据时间 $formatted';
   }
 }
-
-enum _CityAction { save, clear }
 
 /// deepBrief 全屏容器：无 Tab 栏（壳层 chrome 控制），文字白。
 class _BriefingScaffold extends StatelessWidget {
@@ -304,46 +270,93 @@ class _BriefingScaffold extends StatelessWidget {
 }
 
 /// A29 b-card：底白 .09 / 边白 .14 / rMd / 内边距 15/16。
+///
+/// [trailingValue] 给出时标题行尾展示该值（天气卡的当前城市来源），
+/// [onTap] 让整卡可点（天气卡 = 天气城市切换入口）。
 class _BriefCard extends StatelessWidget {
   const _BriefCard({
     required this.title,
     required this.body,
     required this.note,
+    this.trailingValue,
+    this.onTap,
   });
 
   final String title;
   final String body;
   final String note;
+  final String? trailingValue;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.08),
+    return Material(
+      color: colors.surface.withValues(alpha: 0.08),
+      borderRadius: context.radii.rMd,
+      child: InkWell(
         borderRadius: context.radii.rMd,
-        border:
-            Border.all(color: colors.onDeepSecondary.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: type.label
-                  .copyWith(color: colors.onDeepTertiary, fontSize: 11.5)),
-          const SizedBox(height: 6),
-          Text(body,
-              style: type.rowTitle
-                  .copyWith(color: colors.onDeepPrimary, height: 1.5)),
-          if (note.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(note,
-                style: type.caption
-                    .copyWith(color: colors.onDeepSecondary, fontSize: 11)),
-          ],
-        ],
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: context.radii.rMd,
+            border: Border.all(
+              color: colors.onDeepSecondary.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: type.label.copyWith(
+                      color: colors.onDeepTertiary,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                  if (trailingValue != null) ...[
+                    const Spacer(),
+                    Text(
+                      trailingValue!,
+                      style: type.caption.copyWith(
+                        color: colors.onDeepTertiary,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      AppIcons.chevronRight,
+                      size: 12,
+                      color: colors.onDeepTertiary,
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                body,
+                style: type.rowTitle.copyWith(
+                  color: colors.onDeepPrimary,
+                  height: 1.5,
+                ),
+              ),
+              if (note.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  note,
+                  style: type.caption.copyWith(
+                    color: colors.onDeepSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

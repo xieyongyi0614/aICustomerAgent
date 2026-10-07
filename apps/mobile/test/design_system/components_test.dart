@@ -117,8 +117,8 @@ void main() {
         children: [
           const AppCard(child: Text('卡')),
           AiCard(
-            title: 'AI 洞察',
-            actionLabel: '查看早间简报 →',
+            title: '今日 AI 总结',
+            actionLabel: '查看完整早间简报 →',
             child: const Text('内容'),
           ),
           const MetricCard(label: '睡眠', value: '7h12m', note: '优于上周', sparkValues: [1, 2, 3, 2, 4, 3, 5]),
