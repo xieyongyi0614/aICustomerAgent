@@ -21,15 +21,20 @@ class HomeTaskItem {
 class HomeSpend {
   const HomeSpend({
     required this.amountLabel,
-    required this.budgetLabel,
-    required this.progress,
+    required this.noteLabel,
+    this.progress,
     required this.conclusion,
     this.weekBars = const <double>[],
   });
 
   final String amountLabel;
-  final String budgetLabel;
-  final double progress;
+
+  /// 说明行（A7）：近 7 天口径的真实事实，如「近 7 天 · 6 笔」。
+  final String noteLabel;
+
+  /// 仅当存在**真实预算**时才有值（旧「今日预算 ¥200」是硬编码，已删）；
+  /// null = 不渲染进度条。
+  final double? progress;
   final String conclusion;
 
   /// 近 7 天每日消费序列（元，旧→新）；空序列 = 后端未下发，周柱状图不渲染。
@@ -102,8 +107,8 @@ class HomeRepository {
           ? null
           : HomeSpend(
               amountLabel: spend['amount_label'] as String? ?? '¥0',
-              budgetLabel: spend['budget_label'] as String? ?? '',
-              progress: (spend['progress'] as num?)?.toDouble() ?? 0,
+              noteLabel: spend['note_label'] as String? ?? '',
+              progress: (spend['progress'] as num?)?.toDouble(),
               conclusion: spend['conclusion'] as String? ?? '',
               weekBars: [
                 for (final v in (spend['week_bars'] as List?) ?? const <dynamic>[])

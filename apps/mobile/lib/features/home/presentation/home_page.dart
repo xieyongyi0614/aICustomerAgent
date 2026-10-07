@@ -155,15 +155,15 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               const SizedBox(height: 24),
               _SectionTitle(
-                title: '今日消费',
+                title: '最近消费',
                 trailingAction: '查看账本 ›',
-                onTrailing: () => context.go('/ledger'),
+                onTrailing: () => context.push('/ledger', extra: '首页'),
               ),
               const SizedBox(height: 10),
               if (d.spend != null)
                 SpendSummary(
                   amountLabel: d.spend!.amountLabel,
-                  budgetLabel: d.spend!.budgetLabel,
+                  noteLabel: d.spend!.noteLabel,
                   progress: d.spend!.progress,
                   weekBars: d.spend!.weekBars,
                   conclusion: d.spend!.conclusion,

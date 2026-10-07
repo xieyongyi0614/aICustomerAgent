@@ -44,9 +44,16 @@ class TaskItem(BaseModel):
 
 
 class SpendBlock(BaseModel):
+    """首页消费速览（A7）：**近 7 天**口径。
+
+    按日聚合太细（一天没记账就只剩空卡），且日预算没有数据源
+    （`ledger/budget.py` 的 `BudgetSpec.period` 只有 month/week）——旧实现的
+    「/ 今日预算 ¥200」是硬编码，已删除；`progress` 只在有真实预算时才有值。
+    """
+
     amount_label: str
-    budget_label: str
-    progress: float
+    note_label: str
+    progress: float | None = None
     conclusion: str
 
     # 近 7 天每日消费序列（元，旧→新；DA-25 周柱状图数据源）。
@@ -63,14 +70,31 @@ class HomeSummary(BaseModel):
     proactive_todo: list[str] = []
 
 
-def _day_start() -> datetime:
-    return datetime.combine(
-        timeutil.local_now().date(), time.min, tzinfo=timeutil.LOCAL_TZ
+SPEND_WINDOW_DAYS = 7
+
+
+def _spend_window() -> tuple[datetime, datetime]:
+    """近 7 天（含今天，本地日边界）——与 `daily_expense_series` 同口径。"""
+    today = timeutil.local_now().date()
+    since = datetime.combine(
+        today - timedelta(days=SPEND_WINDOW_DAYS - 1), time.min, tzinfo=timeutil.LOCAL_TZ
     )
+    return since, since + timedelta(days=SPEND_WINDOW_DAYS)
 
 
-def _day_end() -> datetime:
-    return _day_start() + timedelta(days=1)
+def _spend_conclusion(summary) -> str:
+    """结论只用结构化字段说话（日均 + 环比），不编造判断。"""
+    if not summary.entry_count:
+        return "最近还没有记账 —— 亚丝娜"
+    daily = abs(summary.expense_minor) / 100 / SPEND_WINDOW_DAYS
+    compared = summary.compared_to_previous
+    ratio = compared.expense_ratio if compared is not None else None
+    head = f"近 7 天日均 ¥{daily:.0f}"
+    if ratio is None:
+        return f"{head} —— 亚丝娜"
+    if ratio < 0:
+        return f"{head}，比上周少 {abs(ratio) * 100:.0f}% —— 亚丝娜"
+    return f"{head}，比上周多 {ratio * 100:.0f}% —— 亚丝娜"
 
 
 _MODE_LABELS = {
@@ -134,29 +158,35 @@ def home_summary(user_id: str = Depends(require_user)):
         for t in task_rows[:5]
     ]
     try:
-        today = ledger_query.summary(
+        since, until = _spend_window()
+        week = ledger_query.summary(
             user_id,
-            period=ledger_query.Period.custom(_day_start(), _day_end()),
-            compare_previous=False,
+            period=ledger_query.Period.custom(since, until, label="week"),
+            compare_previous=True,
         )
-        spent_major = abs(getattr(today, "expense", 0) or 0) / 100
-        budget = 200.0
+        spent_major = abs(week.expense_minor) / 100
         spend = SpendBlock(
             amount_label=f"¥{spent_major:.0f}",
-            budget_label=f"/ 今日预算 ¥{budget:.0f}",
-            progress=min(1.0, spent_major / budget) if budget else 0.0,
-            conclusion="节奏健康 —— 亚丝娜" if spent_major > 0 else "今天还没有记账 —— 亚丝娜",
+            note_label=(
+                f"近 {SPEND_WINDOW_DAYS} 天 · {week.entry_count} 笔"
+                if week.entry_count
+                else f"近 {SPEND_WINDOW_DAYS} 天"
+            ),
+            progress=None,
+            conclusion=_spend_conclusion(week),
             week_bars=[
                 value / 100
-                for value in ledger_query.daily_expense_series(user_id, days=7)
+                for value in ledger_query.daily_expense_series(
+                    user_id, days=SPEND_WINDOW_DAYS
+                )
             ],
         )
     except Exception:
         spend = SpendBlock(
             amount_label="¥0",
-            budget_label="/ 今日预算 ¥200",
-            progress=0.0,
-            conclusion="今天还没有记账 —— 亚丝娜",
+            note_label=f"近 {SPEND_WINDOW_DAYS} 天",
+            progress=None,
+            conclusion="最近还没有记账 —— 亚丝娜",
         )
     return HomeSummary(
         greeting=GreetingBlock(date_label="今天", greeting=greeting_for(timeutil.now())),

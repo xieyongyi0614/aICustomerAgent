@@ -125,10 +125,10 @@ void main() {
           const TaskRow(title: '回复导师邮件', subtitle: '15:00 产品方案对齐', tag: '工作'),
           const SpendSummary(
             amountLabel: '¥128',
-            budgetLabel: '/ 今日预算 ¥200',
+            noteLabel: '近 7 天 · 4 笔',
             progress: 0.64,
             weekBars: [1, 2, 3, 2, 4, 3, 5],
-            conclusion: '本周日均 ¥96，节奏健康 —— 亚丝娜',
+            conclusion: '近 7 天日均 ¥18，比上周少 12% —— 亚丝娜',
           ),
           const AskPill(),
           const ModeChip(label: 'Default 模式 · 长期记忆运行中'),

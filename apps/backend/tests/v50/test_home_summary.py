@@ -220,3 +220,53 @@ def test_summary_spend_week_bars_degrade_to_empty_on_error(
     summary = home_api.home_summary(user_id="u-home-bars-error")
     assert summary.spend is not None
     assert summary.spend.week_bars == []
+
+
+def test_summary_spend_is_weekly_with_real_amount(db_session_factory, monkeypatch):
+    """回归：金额此前读的是不存在的 `summary.expense`（恒为 ¥0），窗口按日、
+    预算硬编码 ¥200——卡面长期「¥0 / 今天还没有记账」，等于没用。
+    """
+    monkeypatch.setattr(
+        history_service, "find_latest_conversation", lambda _uid: None
+    )
+    user_id = "u-home-spend-week"
+    _seed_expense(user_id, 24000, days_ago=0)
+    _seed_expense(user_id, 800, days_ago=3)
+    _seed_expense(user_id, 99900, days_ago=9)  # 窗外：不得计入
+
+    spend = home_api.home_summary(user_id=user_id).spend
+
+    assert spend is not None
+    assert spend.amount_label == "¥248"
+    assert spend.note_label == "近 7 天 · 2 笔"
+    assert spend.progress is None, "没有真实预算数据源时不再撑进度条"
+    assert spend.conclusion.startswith("近 7 天日均 ¥")
+    assert spend.conclusion.endswith("—— 亚丝娜")
+
+
+def test_spend_conclusion_reports_week_over_week(db_session_factory, monkeypatch):
+    monkeypatch.setattr(
+        history_service, "find_latest_conversation", lambda _uid: None
+    )
+    user_id = "u-home-spend-ratio"
+    _seed_expense(user_id, 10000, days_ago=0)
+    _seed_expense(user_id, 20000, days_ago=8)  # 前 7 天
+
+    spend = home_api.home_summary(user_id=user_id).spend
+
+    assert spend is not None
+    assert spend.conclusion == "近 7 天日均 ¥14，比上周少 50% —— 亚丝娜"
+
+
+def test_summary_spend_empty_window_copy(db_session_factory, monkeypatch):
+    monkeypatch.setattr(
+        history_service, "find_latest_conversation", lambda _uid: None
+    )
+
+    spend = home_api.home_summary(user_id="u-home-spend-none").spend
+
+    assert spend is not None
+    assert spend.amount_label == "¥0"
+    assert spend.note_label == "近 7 天"
+    assert spend.progress is None
+    assert spend.conclusion == "最近还没有记账 —— 亚丝娜"

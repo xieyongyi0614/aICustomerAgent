@@ -158,7 +158,13 @@ class MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: type.caption.copyWith(color: colors.ink3)),
+          // 标签与脚注都钉单行：同一行的多张指标卡不会因文案换行而高低不齐。
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: type.caption.copyWith(color: colors.ink3),
+          ),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -183,7 +189,12 @@ class MetricCard extends StatelessWidget {
           ),
           if (note != null) ...[
             const SizedBox(height: 4),
-            Text(note!, style: type.caption.copyWith(color: colors.ink3)),
+            Text(
+              note!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: type.caption.copyWith(color: colors.ink3),
+            ),
           ],
           if (sparkValues.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -235,15 +246,19 @@ class SpendSummary extends StatelessWidget {
   const SpendSummary({
     super.key,
     required this.amountLabel,
-    required this.budgetLabel,
-    required this.progress,
+    required this.noteLabel,
+    this.progress,
     required this.weekBars,
     required this.conclusion,
   });
 
   final String amountLabel;
-  final String budgetLabel;
-  final double progress;
+
+  /// 说明行（如「近 7 天 · 6 笔」）。
+  final String noteLabel;
+
+  /// 无真实预算时为 null —— 不渲染进度条（不再用编造的额度撑进度）。
+  final double? progress;
   final List<double> weekBars;
   final String conclusion;
 
@@ -257,9 +272,11 @@ class SpendSummary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(amountLabel, style: type.numeric(type.briefTitle)),
-          Text(budgetLabel, style: type.caption.copyWith(color: colors.ink3)),
-          const SizedBox(height: 12),
-          ProgressBar(value: progress, gradient: gradients.barMoney),
+          Text(noteLabel, style: type.caption.copyWith(color: colors.ink3)),
+          if (progress != null) ...[
+            const SizedBox(height: 12),
+            ProgressBar(value: progress!, gradient: gradients.barMoney),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             height: 44,

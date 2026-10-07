@@ -18,9 +18,8 @@ HomeSummaryData _summary() => const HomeSummaryData(
       tasksHint: '0 项',
       spend: HomeSpend(
         amountLabel: '¥0',
-        budgetLabel: '/ 今日预算 ¥200',
-        progress: 0,
-        conclusion: '今天还没有记账 —— 亚丝娜',
+        noteLabel: '近 7 天',
+        conclusion: '最近还没有记账 —— 亚丝娜',
       ),
     );
 
@@ -38,6 +37,29 @@ void main() {
     expect(ai, findsOneWidget);
     expect(tasks, findsOneWidget);
     expect(tester.getTopLeft(ai).dy, lessThan(tester.getTopLeft(tasks).dy));
+  });
+
+  testWidgets('home spend section is weekly and drops the fake budget',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: HomePage(debugSummary: _summary()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('最近消费'), findsOneWidget);
+    expect(find.text('今日消费'), findsNothing, reason: '按日口径太细，已废弃');
+    expect(find.text('近 7 天'), findsOneWidget);
+    expect(
+      tester.widget<SpendSummary>(find.byType(SpendSummary)).progress,
+      isNull,
+      reason: '没有真实预算数据源时不再撑进度条（旧「今日预算 ¥200」是硬编码）',
+    );
   });
 
   testWidgets('home never renders health section', (tester) async {
@@ -84,9 +106,9 @@ void main() {
       tasksHint: '',
       spend: const HomeSpend(
         amountLabel: '¥96',
-        budgetLabel: '/ 今日预算 ¥200',
+        noteLabel: '近 7 天 · 4 笔',
         progress: 0.48,
-        conclusion: '本周日均 ¥96，节奏健康 —— 亚丝娜',
+        conclusion: '近 7 天日均 ¥96，比上周少 12% —— 亚丝娜',
         weekBars: <double>[12, 30, 8, 0, 45, 22, 96],
       ),
     );
