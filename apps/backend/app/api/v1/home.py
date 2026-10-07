@@ -58,6 +58,10 @@ class SpendBlock(BaseModel):
 
     # 近 7 天每日消费序列（元，旧→新；DA-25 周柱状图数据源）。
     week_bars: list[float] = []
+    # 与 `week_bars` **逐位对齐**的横轴标签（周几，末位固定「今天」）。
+    # 服务端下发而不让端上倒推：产品时区（LOCAL_TZ）与设备时区不一致，
+    # 端上按设备时区算会把「今天」错一天（同 `_occurred_label` 的口径）。
+    week_labels: list[str] = []
 
 
 class HomeSummary(BaseModel):
@@ -80,6 +84,24 @@ def _spend_window() -> tuple[datetime, datetime]:
         today - timedelta(days=SPEND_WINDOW_DAYS - 1), time.min, tzinfo=timeutil.LOCAL_TZ
     )
     return since, since + timedelta(days=SPEND_WINDOW_DAYS)
+
+
+_WEEKDAY_LABELS = ("一", "二", "三", "四", "五", "六", "日")
+
+
+def _spend_labels(since: datetime | None = None) -> list[str]:
+    """近 7 天横轴标签：周几，末位固定「今天」。
+
+    服务端下发而不是端上倒推——产品时区与设备时区不一致，端上按设备时区
+    算「今天」会错一天（与 `_occurred_label` 同一条口径）。
+    """
+    first = (since or _spend_window()[0]).date()
+    labels = [
+        _WEEKDAY_LABELS[(first + timedelta(days=offset)).weekday()]
+        for offset in range(SPEND_WINDOW_DAYS)
+    ]
+    labels[-1] = "今天"
+    return labels
 
 
 def _spend_conclusion(summary) -> str:
@@ -180,6 +202,7 @@ def home_summary(user_id: str = Depends(require_user)):
                     user_id, days=SPEND_WINDOW_DAYS
                 )
             ],
+            week_labels=_spend_labels(since),
         )
     except Exception:
         spend = SpendBlock(
@@ -187,6 +210,7 @@ def home_summary(user_id: str = Depends(require_user)):
             note_label=f"近 {SPEND_WINDOW_DAYS} 天",
             progress=None,
             conclusion="最近还没有记账 —— 亚丝娜",
+            week_labels=_spend_labels(),
         )
     return HomeSummary(
         greeting=GreetingBlock(date_label="今天", greeting=greeting_for(timeutil.now())),

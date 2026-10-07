@@ -100,15 +100,18 @@ def test_insight_maps_produced_row(db_session_factory):
     assert block.action_label == "查看完整早间简报 →"
 
 
-def test_summary_carries_no_fabricated_health_or_task_claims(
+def test_summary_carries_no_fabricated_task_or_insight_claims(
     db_session_factory, monkeypatch
 ):
+    """空数据下首页只给诚实空值。
+
+    （原用例还断言 `summary.health.*`，但健康区块已随「移除健康模块」下线，
+    字段不存在；断言随之删除，其余空值契约保留。）
+    """
     monkeypatch.setattr(
         history_service, "find_latest_conversation", lambda _uid: None
     )
     summary = home_api.home_summary(user_id="u-none")
-    assert summary.health.authorized is False
-    assert summary.health.cells == []
     assert summary.tasks == []
     assert summary.tasks_hint == ""
     assert summary.hero.mode_chip == ""
@@ -204,6 +207,29 @@ def test_summary_spend_week_bars_zero_without_entries(
     summary = home_api.home_summary(user_id="u-home-bars-none")
     assert summary.spend is not None
     assert summary.spend.week_bars == [0.0] * 7
+
+
+def test_summary_spend_week_labels_end_with_today(
+    db_session_factory, monkeypatch
+):
+    """横轴标签由服务端按产品时区下发，末位固定「今天」（端上倒推会错一天）。"""
+    monkeypatch.setattr(
+        history_service, "find_latest_conversation", lambda _uid: None
+    )
+    summary = home_api.home_summary(user_id="u-home-bars-none")
+    assert summary.spend is not None
+    labels = summary.spend.week_labels
+    assert len(labels) == 7
+    assert labels[-1] == "今天"
+    assert all(label in ("一", "二", "三", "四", "五", "六", "日") for label in labels[:6])
+
+
+def test_summary_spend_week_labels_follow_local_days(monkeypatch):
+    """标签逐位对齐 `week_bars`：首日 = 今天往前推 6 天。"""
+    fixed = timeutil.ensure_aware(datetime(2026, 10, 7, 12, 0, 0))
+    monkeypatch.setattr(timeutil, "local_now", lambda: fixed)
+    labels = home_api._spend_labels()
+    assert labels == ["四", "五", "六", "日", "一", "二", "今天"]
 
 
 def test_summary_spend_week_bars_degrade_to_empty_on_error(

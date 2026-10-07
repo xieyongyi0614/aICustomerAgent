@@ -166,6 +166,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   noteLabel: d.spend!.noteLabel,
                   progress: d.spend!.progress,
                   weekBars: d.spend!.weekBars,
+                  weekLabels: d.spend!.weekLabels,
                   conclusion: d.spend!.conclusion,
                 ),
               const SizedBox(height: 20),

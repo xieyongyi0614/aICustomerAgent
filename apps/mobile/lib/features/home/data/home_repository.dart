@@ -25,6 +25,7 @@ class HomeSpend {
     this.progress,
     required this.conclusion,
     this.weekBars = const <double>[],
+    this.weekLabels = const <String>[],
   });
 
   final String amountLabel;
@@ -39,6 +40,10 @@ class HomeSpend {
 
   /// 近 7 天每日消费序列（元，旧→新）；空序列 = 后端未下发，周柱状图不渲染。
   final List<double> weekBars;
+
+  /// 与 [weekBars] 逐位对齐的横轴标签（周几，末位「今天」）。服务端按产品时区
+  /// 下发——端上按设备时区倒推会把「今天」算错一天。
+  final List<String> weekLabels;
 }
 
 class HomeSummaryData {
@@ -113,6 +118,10 @@ class HomeRepository {
               weekBars: [
                 for (final v in (spend['week_bars'] as List?) ?? const <dynamic>[])
                   if (v is num) v.toDouble(),
+              ],
+              weekLabels: [
+                for (final v in (spend['week_labels'] as List?) ?? const <dynamic>[])
+                  if (v is String) v,
               ],
             ),
     );

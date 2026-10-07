@@ -93,7 +93,8 @@ void main() {
         amountLabel: '¥128',
         noteLabel: '近 7 天 · 4 笔',
         progress: 0.64,
-        weekBars: [1, 2, 3, 2, 4, 3, 5],
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        weekLabels: ['四', '五', '六', '日', '一', '二', '今天'],
         conclusion: '近 7 天日均 ¥18，比上周少 12% —— 亚丝娜',
       ),
     );

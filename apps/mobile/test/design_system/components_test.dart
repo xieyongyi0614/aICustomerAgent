@@ -163,6 +163,100 @@ void main() {
     expect(find.byType(AppToggle), findsOneWidget);
   });
 
+  test('A7 周柱状：全 0 与空列表都落空桩，不给 NaN 也不留空白', () {
+    for (final values in [<double>[], <double>[0, 0, 0, 0, 0, 0, 0]]) {
+      final maxV =
+          values.isEmpty ? 0.0 : values.reduce((a, b) => a > b ? a : b);
+      for (var i = 0; i < dayBarCount; i++) {
+        final value = i < values.length ? values[i] : 0.0;
+        final bar = dayBarGeometry(value, maxV, 44);
+        expect(bar.empty, isTrue, reason: '$values 第 $i 根');
+        expect(bar.height, greaterThan(0), reason: '空桩也要可见，不能是 0');
+        expect(bar.height.isNaN, isFalse);
+      }
+    }
+  });
+
+  test('A7 周柱状：非 0 按周内最大值归一，极小值给可见下限', () {
+    expect(dayBarGeometry(50, 50, 44).height, 44);
+    expect(dayBarGeometry(25, 50, 44).height, 22);
+    expect(dayBarGeometry(50, 50, 44).empty, isFalse);
+    final tiny = dayBarGeometry(0.01, 1000, 44);
+    expect(tiny.empty, isFalse);
+    expect(tiny.height, greaterThanOrEqualTo(4));
+  });
+
+  testWidgets('A7 消费速览：没有数据时不抛异常且不留空白带', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥0',
+        noteLabel: '近 7 天',
+        weekBars: <double>[],
+        conclusion: '最近还没有记账 —— 亚丝娜',
+      ),
+    ));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(SpendSummary), findsOneWidget);
+    expect(find.text('最近还没有记账 —— 亚丝娜'), findsOneWidget);
+  });
+
+  test('A7 柱顶金额文案：整数元、无千分位', () {
+    expect(dayBarAmountLabel(51), '¥51');
+    expect(dayBarAmountLabel(51.4), '¥51');
+    expect(dayBarAmountLabel(51.6), '¥52');
+    expect(dayBarAmountLabel(1240), '¥1240');
+  });
+
+  testWidgets('A7 消费速览：柱顶只标非零，峰值加深，横轴带「今天」', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥128',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        weekLabels: ['四', '五', '六', '日', '一', '二', '今天'],
+        conclusion: '近 7 天日均 ¥18，比上周少 12% —— 亚丝娜',
+      ),
+    ));
+    expect(find.text('¥0'), findsNothing, reason: '没账的那天不标金额');
+    final peak = tester.widget<Text>(find.text('¥5'));
+    expect(peak.style!.fontWeight, FontWeight.w700, reason: '峰值加深');
+    final other = tester.widget<Text>(find.text('¥2'));
+    expect(other.style!.fontWeight, FontWeight.w400);
+    expect(find.text('今天'), findsOneWidget);
+    expect(find.text('四'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A7 消费速览：横轴标签不足 7 位时不画轴', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥128',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        weekLabels: ['今天'],
+        conclusion: '近 7 天日均 ¥18 —— 亚丝娜',
+      ),
+    ));
+    expect(find.text('今天'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A7 消费速览：金额贴着各自柱顶，柱越矮标得越低', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥11',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        conclusion: '近 7 天日均 ¥2 —— 亚丝娜',
+      ),
+    ));
+    double topOf(String label) => tester.getTopLeft(find.text(label)).dy;
+    expect(topOf('¥5'), lessThan(topOf('¥3')), reason: '峰值最高、标得最高');
+    expect(topOf('¥3'), lessThan(topOf('¥2')));
+    expect(topOf('¥2'), lessThan(topOf('¥1')), reason: '最矮的柱标得最低');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mode selector hugs content in bounded height', (tester) async {
     // 回归：选项 Column 缺 mainAxisSize.min 时，会在有界松约束（modal bottom
     // sheet 的 9/16 高度上限）里膨胀，把整块选择器连同抽屉撑成半屏。
