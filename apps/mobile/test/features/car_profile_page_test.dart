@@ -1,14 +1,50 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/design_system/tokens/tokens.dart';
+import 'package:mobile/features/car/data/car_model_catalog_repository.dart';
 import 'package:mobile/features/car/data/car_repository.dart';
 import 'package:mobile/features/car/domain/car_models.dart';
 import 'package:mobile/features/car/presentation/car_profile_page.dart';
+
+/// 车型目录用内存 bundle 注入：真实 assets 的读取是真实 IO，
+/// 在 widget test 的 fake async 里会与 pump 抢时序，所以测试不依赖它。
+const _catalogJson = '''
+{
+  "updated_at": "2026-10-07",
+  "source": "test",
+  "disclaimer": "test only",
+  "models": [
+    { "brand": "特斯拉", "series": "Model Y", "powertrain": "ev", "variants": [
+      { "name": "后轮驱动版", "battery_kwh": 60.0 },
+      { "name": "长续航全轮驱动版", "battery_kwh": 78.4 }
+    ] },
+    { "brand": "比亚迪", "series": "汉 EV", "powertrain": "ev", "variants": [
+      { "name": "715km 尊贵型", "battery_kwh": 85.4 }
+    ] },
+    { "brand": "丰田", "series": "凯美瑞", "powertrain": "fuel" }
+  ]
+}
+''';
+
+class _MemoryBundle extends CachingAssetBundle {
+  _MemoryBundle(this.json);
+
+  final String json;
+
+  @override
+  Future<ByteData> load(String key) async =>
+      ByteData.sublistView(Uint8List.fromList(utf8.encode(json)));
+}
+
+CarModelCatalogRepository _catalogRepo() =>
+    CarModelCatalogRepository(bundle: _MemoryBundle(_catalogJson));
 
 class _FakeCarRepository extends CarRepository {
   _FakeCarRepository({this.validationError = false}) : super(dio: Dio());
@@ -121,7 +157,11 @@ void _useTallSurface(WidgetTester tester) {
 
 Future<void> _pumpPage(WidgetTester tester, _FakeCarRepository repo) async {
   _useTallSurface(tester);
-  await tester.pumpWidget(_host(CarProfilePage(repository: repo)));
+  await tester.pumpWidget(
+    _host(
+      CarProfilePage(repository: repo, catalogRepository: _catalogRepo()),
+    ),
+  );
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
 }
@@ -201,8 +241,13 @@ void main() {
 
     await tester.tap(find.text('改档案'));
     await tester.pump();
-    await tester.enterText(find.byType(TextField).first, '汉 EV 冠军版');
+    await tester.tap(find.byKey(const ValueKey('car-profile-field-model')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(pickerSearchKey), '汉 EV 冠军版');
     await tester.pump();
+    await tester.tap(find.text('用「汉 EV 冠军版」'));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('保存档案'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -211,6 +256,98 @@ void main() {
     expect(repo.profileCalls, 2);
     expect(find.text('汉 EV 冠军版'), findsOneWidget);
     expect(find.text('改档案'), findsOneWidget);
+  });
+
+  testWidgets('test_car_profile_edit_action_is_a_full_width_button',
+      (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    final entry = tester.getSize(find.widgetWithText(LedgerSaveButton, '改档案'));
+    expect(entry.width, greaterThan(200), reason: '改档案是整行按钮，不再是小 chip');
+    expect(entry.height, greaterThanOrEqualTo(44),
+        reason: '点按区不小于 44');
+  });
+
+  testWidgets('test_car_profile_without_identity_offers_fill_entry',
+      (tester) async {
+    _useTallSurface(tester);
+    await tester.pumpWidget(
+      _host(
+        const CarProfilePage(
+          debugProfile: CarProfileData(
+            files: [],
+            services: [],
+            reminders: [],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('还没有车辆档案，填一次我就替你记着'), findsOneWidget);
+    expect(find.text('填写车辆档案'), findsOneWidget);
+    expect(find.text('改档案'), findsNothing);
+  });
+
+  testWidgets('test_car_profile_edit_actions_keep_row_height', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+
+    final cancel = tester.getSize(find.widgetWithText(LedgerSaveButton, '取消'));
+    final save = tester.getSize(find.widgetWithText(LedgerSaveButton, '保存档案'));
+    expect(cancel.height, closeTo(save.height, 0.5));
+    expect(cancel.width, save.width);
+  });
+
+  testWidgets('test_car_profile_model_row_picks_from_catalog', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('car-profile-field-model')));
+    await tester.pumpAndSettle();
+    expect(find.text('选车型'), findsOneWidget);
+
+    await tester.enterText(find.byKey(pickerSearchKey), '特斯拉');
+    await tester.pump();
+    expect(find.text('Model Y'), findsOneWidget);
+    expect(find.text('汉 EV'), findsNothing, reason: '搜索按品牌过滤掉其它品牌');
+    await tester.tap(find.text('Model Y'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('选「Model Y」的版本'), findsOneWidget);
+    await tester.tap(find.text('后轮驱动版'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('特斯拉 Model Y'), findsOneWidget);
+    expect(
+      tester
+          .widgetList<TextField>(find.byType(TextField))
+          .any((field) => field.controller?.text == '60'),
+      isTrue,
+      reason: '选中版本后按参考值预填电池容量',
+    );
+    expect(find.text('已按「后轮驱动版」预填 60 kWh，参考值可改。'), findsOneWidget);
+  });
+
+  testWidgets('test_car_profile_date_row_uses_date_wheel', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await tester.tap(find.text('改档案'));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('car-profile-field-保险到期')));
+    await tester.pumpAndSettle();
+    expect(find.byType(WheelColumn), findsNWidgets(3));
+
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2027-01-15'), findsOneWidget);
   });
 
   test('test_car_profile_source_has_no_local_claim_or_dio', () {

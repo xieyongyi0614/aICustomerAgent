@@ -224,6 +224,68 @@ void main() {
     expect(repo.keys.toSet().length, 1);
   });
 
+  testWidgets('test_car_add_save_action_is_pinned_to_bottom', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    final button = find.text('保存记录');
+    expect(button, findsOneWidget);
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(
+      tester.getRect(button).bottom,
+      greaterThan(screenHeight - 120),
+      reason: '保存按钮固定在屏底，不必滚到底',
+    );
+  });
+
+  testWidgets('test_car_add_charge_shows_unit_price_helper', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await _typeAmount(tester, '42.5');
+    await tester.enterText(find.byType(TextField).first, '34.2');
+    await tester.pump();
+
+    expect(find.text('单价自动换算 ¥1.24 / kWh'), findsOneWidget);
+  });
+
+  testWidgets('test_car_add_odometer_helper_shows_delta', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    await tester.enterText(find.byType(TextField).at(2), '12500');
+    await tester.pump();
+
+    expect(find.text('较上次 +100 km'), findsOneWidget);
+  });
+
+  testWidgets('test_car_add_switching_kind_keeps_input', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+    await tester.enterText(find.byType(TextField).at(1), '家里充电桩');
+    await tester.pump();
+
+    await _selectKind(tester, 'parking');
+    await _selectKind(tester, 'charge');
+
+    // hint 文案与输入值同字时 find.text 会两个都命中（hint 常驻树中），
+    // 所以直接读充电站字段的 controller。
+    final place = tester.widget<TextField>(find.byType(TextField).at(1));
+    expect(place.controller!.text, '家里充电桩');
+  });
+
+  testWidgets('test_car_add_has_readonly_time_row', (tester) async {
+    final repo = _FakeCarRepository();
+    await _pumpPage(tester, repo);
+
+    expect(find.text('时间'), findsOneWidget);
+    final rows = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((widget) => widget.data ?? '')
+        .where((text) => text.startsWith('今天 '));
+    expect(rows, hasLength(1));
+  });
+
   testWidgets('test_car_add_golden', (tester) async {
     final repo = _FakeCarRepository();
     await _pumpPage(tester, repo);

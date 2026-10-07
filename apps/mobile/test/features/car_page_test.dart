@@ -150,9 +150,28 @@ void main() {
     expect(find.text('合计 ¥242.00'), findsOneWidget);
     expect(find.byType(LoanCard), findsOneWidget);
     expect(find.byType(CategoryBar), findsNWidgets(2));
-    expect(find.text('本月充电费用 元'), findsOneWidget);
+    expect(find.text('本月充电花费'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
     expect(find.text('¥42.00'), findsOneWidget);
+  });
+
+  testWidgets('test_car_page_metric_cards_share_size', (tester) async {
+    for (final overview in [
+      _overview(),
+      _overview(chargeKwhMonth: 186, kwhPer100km: 14.2),
+    ]) {
+      final repo = _FakeCarRepository(overview: overview);
+      await _pumpPage(tester, repo);
+
+      final cards = find.byType(MetricCard);
+      expect(cards, findsNWidgets(3));
+      final first = tester.getSize(cards.at(0));
+      for (var index = 1; index < 3; index++) {
+        final size = tester.getSize(cards.at(index));
+        expect(size.height, first.height, reason: '电车状态三卡等高');
+        expect(size.width, first.width, reason: '电车状态三卡等宽');
+      }
+    }
   });
 
   testWidgets('test_car_page_metrics_use_kwh_when_structured',
@@ -243,7 +262,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(repo.overviewCalls, 1);
 
-    await tester.tap(find.text('＋ 记一笔养车费用'));
+    await tester.tap(find.text('＋ 记一笔养车记录'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('back'));
     await tester.pumpAndSettle();

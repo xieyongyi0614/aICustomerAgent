@@ -38,6 +38,9 @@ class _CarAddPageState extends State<CarAddPage> {
       'car-add-${DateTime.now().microsecondsSinceEpoch}';
   late String _kind = widget.initialKind;
 
+  /// 进入页面的时刻：表单里的「时间」行如实显示它，表示这笔记在此刻。
+  late final DateTime _recordedAt = DateTime.now();
+
   final _amount = _AmountBuffer();
   final _kwhController = TextEditingController();
   final _placeController = TextEditingController();
@@ -161,10 +164,10 @@ class _CarAddPageState extends State<CarAddPage> {
 
   void _onKindChanged(String kind) {
     if (kind == _kind) return;
+    // 切类型不清空已填内容：用户在几个类型之间来回比价时不该丢输入。
     setState(() {
       _kind = kind;
       _validationMessage = null;
-      _placeController.clear();
     });
   }
 
@@ -219,46 +222,71 @@ class _CarAddPageState extends State<CarAddPage> {
                 style: type.caption.copyWith(color: colors.ink2, height: 1.6),
               ),
             ),
-            const SizedBox(height: 16),
-            if (_validationMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _validationMessage!,
-                  style: type.caption.copyWith(
-                    color: colors.danger,
-                    fontWeight: FontWeight.w400,
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _actionBar(context),
+    );
+  }
+
+  /// 底部常驻动作区：校验 / 失败提示与保存按钮固定在屏底，
+  /// 用户填完金额不必滚到底就能保存（页面本身很长：金额键盘 + 表单 + 说明）。
+  Widget _actionBar(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.canvas,
+        border: Border(top: BorderSide(color: colors.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_validationMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _validationMessage!,
+                    style: type.caption.copyWith(
+                      color: colors.danger,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
-              ),
-            if (_saveFailed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        StateCopy.networkError,
-                        style: type.caption.copyWith(
-                          color: colors.danger,
-                          fontWeight: FontWeight.w400,
+              if (_saveFailed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          StateCopy.networkError,
+                          style: type.caption.copyWith(
+                            color: colors.danger,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
-                    ),
-                    ChipButton(
-                      label: StateCopy.retryAction,
-                      ghost: true,
-                      onTap: _save,
-                    ),
-                  ],
+                      ChipButton(
+                        label: StateCopy.retryAction,
+                        ghost: true,
+                        onTap: _save,
+                      ),
+                    ],
+                  ),
                 ),
+              LedgerSaveButton(
+                label: _isMileage ? '保存里程' : '保存记录',
+                enabled: !_saving,
+                onPressed: _save,
               ),
-            LedgerSaveButton(
-              label: _isMileage ? '保存里程' : '保存记录',
-              enabled: !_saving,
-              onPressed: _save,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -280,7 +308,7 @@ class _CarAddPageState extends State<CarAddPage> {
 
   Widget _formCard(BuildContext context) {
     final colors = context.colors;
-    final rows = _formRows(context);
+    final rows = [..._formRows(context), _readonly(context, '时间', _recordedTimeText)];
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: context.spacing.cardPadding,
@@ -311,15 +339,36 @@ class _CarAddPageState extends State<CarAddPage> {
     switch (_kind) {
       case 'charge':
         return [
-          _field(context, '充电度数', _kwhController, hint: '34.2', numeric: true),
+          _field(
+            context,
+            '充电度数',
+            _kwhController,
+            hint: '34.2',
+            numeric: true,
+            helper: _unitPriceHelper,
+          ),
           _field(context, '充电站', _placeController, hint: '家里充电桩'),
-          _field(context, '当前里程', _odometerController, hint: 'km', numeric: true),
+          _field(
+            context,
+            '当前里程',
+            _odometerController,
+            hint: 'km',
+            numeric: true,
+            helper: _odometerHelper,
+          ),
           _field(context, '备注', _noteController, hint: '选填'),
         ];
       case 'fuel':
         return [
           _field(context, '加油站', _placeController, hint: '中石化'),
-          _field(context, '当前里程', _odometerController, hint: 'km', numeric: true),
+          _field(
+            context,
+            '当前里程',
+            _odometerController,
+            hint: 'km',
+            numeric: true,
+            helper: _odometerHelper,
+          ),
           _field(context, '备注', _noteController, hint: '选填'),
         ];
       case 'mileage':
@@ -342,9 +391,48 @@ class _CarAddPageState extends State<CarAddPage> {
         return [
           _field(context, '保养项目', _noteController, hint: '小保养 · 机油机滤'),
           _field(context, '门店', _placeController, hint: '华迪 4S 店'),
-          _field(context, '当前里程', _odometerController, hint: 'km', numeric: true),
+          _field(
+            context,
+            '当前里程',
+            _odometerController,
+            hint: 'km',
+            numeric: true,
+            helper: _odometerHelper,
+          ),
         ];
     }
+  }
+
+  /// 充电单价自动换算（A32 form 的辅助换算位）：金额 ÷ 度数，两边都填了才出现。
+  String? get _unitPriceHelper {
+    if (_kind != 'charge') return null;
+    final kwh = double.tryParse(_kwhController.text.trim());
+    if (kwh == null || kwh <= 0) return null;
+    final minor = _amountMinor;
+    if (minor <= 0) return null;
+    final perKwh = minor / 100 / kwh;
+    return '单价自动换算 ¥${perKwh.toStringAsFixed(2)} / kWh';
+  }
+
+  /// 里程辅助说明（A32 form）：与档案里的上次里程比，用户不用自己心算。
+  String? get _odometerHelper {
+    final previous = _profileOdometer;
+    final current = _odometerKm;
+    if (previous == null || current == null || current == previous) return null;
+    final delta = current - previous;
+    return delta > 0 ? '较上次 +$delta km' : '比上次少 ${-delta} km';
+  }
+
+  /// 记账时刻（只读）：让用户确认这笔落在今天这一刻，不是补录。
+  String get _recordedTimeText {
+    final now = DateTime.now();
+    final sameDay = now.year == _recordedAt.year &&
+        now.month == _recordedAt.month &&
+        now.day == _recordedAt.day;
+    final time =
+        '${_recordedAt.hour.toString().padLeft(2, '0')}:${_recordedAt.minute.toString().padLeft(2, '0')}';
+    if (sameDay) return '今天 $time';
+    return '${_recordedAt.month} 月 ${_recordedAt.day} 日 $time';
   }
 
   String get _totalOdometerText {
@@ -361,10 +449,11 @@ class _CarAddPageState extends State<CarAddPage> {
     TextEditingController controller, {
     String? hint,
     bool numeric = false,
+    String? helper,
   }) {
     final colors = context.colors;
     final type = context.typography;
-    return Row(
+    final row = Row(
       children: [
         SizedBox(
           width: 72,
@@ -391,6 +480,21 @@ class _CarAddPageState extends State<CarAddPage> {
                 fontWeight: FontWeight.w400,
               ),
             ),
+          ),
+        ),
+      ],
+    );
+    if (helper == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        Padding(
+          padding: const EdgeInsets.only(top: 3, left: 72),
+          child: Text(
+            helper,
+            textAlign: TextAlign.right,
+            style: type.caption.copyWith(color: colors.ink3),
           ),
         ),
       ],

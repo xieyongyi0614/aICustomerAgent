@@ -3,16 +3,24 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
+import '../data/car_model_catalog_repository.dart';
 import '../data/car_repository.dart';
+import '../domain/car_model_catalog.dart';
 import '../domain/car_models.dart';
 
 /// B16 #carProfile 我的车：身份卡 + 四档案行 + 保养时间线（末行未发生态）。
 class CarProfilePage extends StatefulWidget {
-  const CarProfilePage({super.key, this.repository, this.debugProfile});
+  const CarProfilePage({
+    super.key,
+    this.repository,
+    this.catalogRepository,
+    this.debugProfile,
+  });
 
   static const subtitle = '你的车辆档案只属于你，可随时查看、修改、删除';
 
   final CarRepository? repository;
+  final CarModelCatalogRepository? catalogRepository;
   final CarProfileData? debugProfile;
 
   @override
@@ -21,6 +29,9 @@ class CarProfilePage extends StatefulWidget {
 
 class _CarProfilePageState extends State<CarProfilePage> {
   late final CarRepository _repo = widget.repository ?? CarRepository();
+  late final CarModelCatalogRepository _catalogRepo =
+      widget.catalogRepository ?? CarModelCatalogRepository();
+  late final Future<CarModelCatalog> _catalogFuture = _catalogRepo.load();
   CarProfileData? _profile;
   bool _loading = true;
   Object? _error;
@@ -28,15 +39,19 @@ class _CarProfilePageState extends State<CarProfilePage> {
   bool _saving = false;
   String? _editError;
 
+  /// 车型预填口径提示：选中车系/版本后告诉用户这个容量从哪来、能不能改。
+  String? _batteryHint;
+
   final _modelController = TextEditingController();
   final _plateController = TextEditingController();
   final _batteryController = TextEditingController();
   final _odometerController = TextEditingController();
-  final _insuranceController = TextEditingController();
-  final _inspectionController = TextEditingController();
   final _chargerController = TextEditingController();
   final _intervalKmController = TextEditingController();
   final _intervalMonthsController = TextEditingController();
+
+  DateTime? _insuranceDue;
+  DateTime? _inspectionDue;
 
   @override
   void initState() {
@@ -55,8 +70,6 @@ class _CarProfilePageState extends State<CarProfilePage> {
     _plateController.dispose();
     _batteryController.dispose();
     _odometerController.dispose();
-    _insuranceController.dispose();
-    _inspectionController.dispose();
     _chargerController.dispose();
     _intervalKmController.dispose();
     _intervalMonthsController.dispose();
@@ -91,8 +104,8 @@ class _CarProfilePageState extends State<CarProfilePage> {
     _plateController.text = identity?.plate ?? '';
     _batteryController.text = identity?.batteryKwh?.toString() ?? '';
     _odometerController.text = identity?.odometerKm?.toString() ?? '';
-    _insuranceController.text = _dateText(files['insurance']?.valueText);
-    _inspectionController.text = _dateText(files['inspection']?.valueText);
+    _insuranceDue = _dateOrNull(files['insurance']?.valueText);
+    _inspectionDue = _dateOrNull(files['inspection']?.valueText);
     _chargerController.text = _numberText(files['charger']?.valueText);
     _intervalKmController.text =
         _numberText(files['service_interval']?.valueText);
@@ -100,14 +113,25 @@ class _CarProfilePageState extends State<CarProfilePage> {
     setState(() {
       _editing = true;
       _editError = null;
+      _batteryHint = null;
     });
   }
 
-  String _dateText(String? valueText) {
-    if (valueText == null) return '';
-    final match = RegExp(r'(\d{4}-\d{2}-\d{2})').firstMatch(valueText);
-    return match?.group(1) ?? '';
+  DateTime? _dateOrNull(String? valueText) {
+    if (valueText == null) return null;
+    final match = RegExp(r'(\d{4})-(\d{2})-(\d{2})').firstMatch(valueText);
+    if (match == null) return null;
+    return DateTime(
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+    );
   }
+
+  String _formatDate(DateTime date) =>
+      '${date.year}-${_pad(date.month)}-${_pad(date.day)}';
+
+  String _pad(int value) => value.toString().padLeft(2, '0');
 
   String _numberText(String? valueText) {
     if (valueText == null) return '';
@@ -133,19 +157,14 @@ class _CarProfilePageState extends State<CarProfilePage> {
     put('charger_power_kw', _chargerController.text, numeric: true);
     put('service_interval_km', _intervalKmController.text, numeric: true);
     put('service_interval_months', _intervalMonthsController.text, numeric: true);
-    final insurance = _isoOrNull(_insuranceController.text);
-    if (insurance != null) payload['insurance_due_at'] = insurance;
-    final inspection = _isoOrNull(_inspectionController.text);
-    if (inspection != null) payload['inspection_due_at'] = inspection;
+    if (_insuranceDue != null) {
+      payload['insurance_due_at'] = _insuranceDue!.toIso8601String();
+    }
+    if (_inspectionDue != null) {
+      payload['inspection_due_at'] = _inspectionDue!.toIso8601String();
+    }
     payload.removeWhere((_, value) => value == null);
     return payload;
-  }
-
-  String? _isoOrNull(String raw) {
-    final text = raw.trim();
-    if (text.isEmpty) return null;
-    final parsed = DateTime.tryParse(text);
-    return parsed?.toIso8601String();
   }
 
   Future<void> _saveEdits() async {
@@ -251,9 +270,14 @@ class _CarProfilePageState extends State<CarProfilePage> {
                       ),
                   ],
                 ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               if (!_editing)
-                ChipButton(label: '改档案', ghost: true, onTap: _startEditing),
+                LedgerSaveButton(
+                  label: profile.identity == null ? '填写车辆档案' : '改档案',
+                  ghost: profile.identity != null,
+                  elevated: false,
+                  onPressed: _startEditing,
+                ),
               const SizedBox(height: 20),
               _SectionTitle(
                 title: '保养记录',
@@ -450,26 +474,71 @@ class _CarProfilePageState extends State<CarProfilePage> {
         _box(
           context,
           [
-            _field(context, '车型', _modelController, hint: '比亚迪 汉 EV'),
-            _field(context, '车牌', _plateController, hint: '沪 A·D8F2K'),
-            _field(context, '电池容量', _batteryController, hint: '85.4', numeric: true),
-            _field(context, '总里程', _odometerController, hint: '12480', numeric: true),
+            _modelRow(context),
+            _plateRow(context),
+            _numberRow(
+              context,
+              '电池容量',
+              _batteryController,
+              hint: '85.4',
+              unit: 'kWh',
+              decimal: true,
+            ),
+            _numberRow(
+              context,
+              '总里程',
+              _odometerController,
+              hint: '12480',
+              unit: 'km',
+            ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            _batteryHint ?? '车型支持搜索，日期点开滚轮选，不用手打。',
+            style: context.typography.caption
+                .copyWith(color: context.colors.ink3),
+          ),
         ),
         const SizedBox(height: 12),
         _box(
           context,
           [
-            _field(context, '保险到期', _insuranceController, hint: '2027-01-15'),
-            _field(context, '年检到期', _inspectionController, hint: '2027-04-01'),
-            _field(context, '充电桩功率', _chargerController, hint: '7', numeric: true),
-            _field(context, '保养周期里程', _intervalKmController, hint: '10000', numeric: true),
-            _field(
+            _dateRow(
+              context,
+              '保险到期',
+              _insuranceDue,
+              (value) => setState(() => _insuranceDue = value),
+            ),
+            _dateRow(
+              context,
+              '年检到期',
+              _inspectionDue,
+              (value) => setState(() => _inspectionDue = value),
+            ),
+            _numberRow(
+              context,
+              '充电桩功率',
+              _chargerController,
+              hint: '7',
+              unit: 'kW',
+              decimal: true,
+            ),
+            _numberRow(
+              context,
+              '保养周期里程',
+              _intervalKmController,
+              hint: '10000',
+              unit: 'km',
+            ),
+            _numberRow(
               context,
               '保养周期月数',
               _intervalMonthsController,
               hint: '12',
-              numeric: true,
+              unit: '个月',
             ),
           ],
         ),
@@ -487,10 +556,10 @@ class _CarProfilePageState extends State<CarProfilePage> {
         Row(
           children: [
             Expanded(
-              child: ChipButton(
+              child: LedgerSaveButton(
                 label: '取消',
                 ghost: true,
-                onTap: () => setState(() => _editing = false),
+                onPressed: () => setState(() => _editing = false),
               ),
             ),
             const SizedBox(width: 10),
@@ -498,6 +567,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
               child: LedgerSaveButton(
                 label: '保存档案',
                 enabled: !_saving,
+                elevated: false,
                 onPressed: _saveEdits,
               ),
             ),
@@ -522,7 +592,7 @@ class _CarProfilePageState extends State<CarProfilePage> {
         children: [
           for (var index = 0; index < rows.length; index++)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 border: index < rows.length - 1
                     ? Border(bottom: BorderSide(color: colors.line))
@@ -535,12 +605,188 @@ class _CarProfilePageState extends State<CarProfilePage> {
     );
   }
 
-  Widget _field(
+  Widget _modelRow(BuildContext context) {
+    final value = _modelController.text.trim();
+    return _selectRow(
+      context,
+      key: const ValueKey('car-profile-field-model'),
+      label: '车型',
+      value: value.isEmpty ? null : value,
+      placeholder: '选车型',
+      onTap: _pickModel,
+    );
+  }
+
+  Future<void> _pickModel() async {
+    final catalog = await _catalogFuture;
+    if (!mounted) return;
+    final picked = await showChoiceSheet<_ModelPick>(
+      context: context,
+      title: '选车型',
+      searchable: true,
+      searchHint: '搜品牌或车系，找不到就直接写',
+      freeTextBuilder: _ModelFreeText.new,
+      items: [
+        for (final option in catalog.models)
+          ChoiceSheetItem(
+            value: _ModelSeries(option),
+            label: option.series,
+            group: option.brand,
+            note: option.powertrain.label,
+          ),
+      ],
+    );
+    if (!mounted) return;
+    switch (picked) {
+      case null:
+        return;
+      case _ModelFreeText(:final text):
+        setState(() {
+          _modelController.text = text;
+          _batteryHint = '目录里没有这个车系，电池容量按购车资料填就好。';
+        });
+      case _ModelSeries(:final option):
+        await _pickVariant(option);
+    }
+  }
+
+  Future<void> _pickVariant(CarModelOption option) async {
+    final variants = option.variants;
+    CarModelVariant? variant;
+    if (variants.length == 1) {
+      variant = variants.first;
+    } else if (variants.length > 1) {
+      variant = await showChoiceSheet<CarModelVariant>(
+        context: context,
+        title: '选「${option.series}」的版本',
+        items: [
+          for (final item in variants)
+            ChoiceSheetItem(
+              value: item,
+              label: item.name,
+              note: item.batteryKwh == null
+                  ? null
+                  : '${_formatKwh(item.batteryKwh!)} kWh',
+            ),
+        ],
+      );
+      if (!mounted || variant == null) return;
+    }
+
+    final battery = variant?.batteryKwh;
+    setState(() {
+      _modelController.text = option.name;
+      // 选车型是明确意图：带得出容量的直接覆盖预填（提示写明是参考值，可改）；
+      // 没有容量数据时不动用户已经填的值。
+      if (battery != null) _batteryController.text = _formatKwh(battery);
+      _batteryHint = _hintFor(option, variant);
+    });
+  }
+
+  String _hintFor(CarModelOption option, CarModelVariant? variant) {
+    final battery = variant?.batteryKwh;
+    if (battery != null && variant != null) {
+      return '已按「${variant.name}」预填 ${_formatKwh(battery)} kWh，参考值可改。';
+    }
+    if (option.powertrain == CarPowertrain.fuel) {
+      return '「${option.name}」是燃油车，电池容量留空就行。';
+    }
+    return '「${option.name}」还没有电池容量数据，按购车资料填就好。';
+  }
+
+  String _formatKwh(double value) =>
+      value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
+
+  Widget _plateRow(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    return _rowShell(
+      context,
+      label: '车牌',
+      trailing: TextField(
+        controller: _plateController,
+        textAlign: TextAlign.right,
+        textCapitalization: TextCapitalization.characters,
+        style: type.rowTitle.copyWith(color: colors.ink),
+        decoration: InputDecoration.collapsed(
+          hintText: '沪 A·D8F2K',
+          hintStyle: type.rowTitle.copyWith(
+            color: colors.ink3,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _numberRow(
     BuildContext context,
     String label,
     TextEditingController controller, {
     String? hint,
-    bool numeric = false,
+    String? unit,
+    bool decimal = false,
+  }) {
+    final colors = context.colors;
+    final type = context.typography;
+    return _rowShell(
+      context,
+      label: label,
+      trailing: Row(
+        children: [
+          Flexible(
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.right,
+              keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+              style: type.rowTitle.copyWith(color: colors.ink),
+              decoration: InputDecoration.collapsed(
+                hintText: hint,
+                hintStyle: type.rowTitle.copyWith(
+                  color: colors.ink3,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+          if (unit != null) ...[
+            const SizedBox(width: 4),
+            Text(unit, style: type.caption.copyWith(color: colors.ink3)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _dateRow(
+    BuildContext context,
+    String label,
+    DateTime? value,
+    ValueChanged<DateTime?> onChanged,
+  ) {
+    return _selectRow(
+      context,
+      key: ValueKey('car-profile-field-$label'),
+      label: label,
+      value: value == null ? null : _formatDate(value),
+      placeholder: '选择日期',
+      onTap: () async {
+        final picked = await showDateWheelSheet(
+          context: context,
+          title: label,
+          initial: value,
+        );
+        if (picked == null || !mounted) return;
+        onChanged(picked);
+      },
+      onClear: value == null ? null : () => onChanged(null),
+    );
+  }
+
+  Widget _rowShell(
+    BuildContext context, {
+    required String label,
+    required Widget trailing,
   }) {
     final colors = context.colors;
     final type = context.typography;
@@ -558,21 +804,81 @@ class _CarProfilePageState extends State<CarProfilePage> {
           ),
         ),
         Expanded(
-          child: TextField(
-            controller: controller,
-            keyboardType: numeric ? TextInputType.number : TextInputType.text,
-            textAlign: TextAlign.right,
-            style: type.rowTitle.copyWith(color: colors.ink),
-            decoration: InputDecoration.collapsed(
-              hintText: hint,
-              hintStyle: type.rowTitle.copyWith(
-                color: colors.ink3,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: trailing,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _selectRow(
+    BuildContext context, {
+    Key? key,
+    required String label,
+    required String placeholder,
+    required VoidCallback onTap,
+    String? value,
+    VoidCallback? onClear,
+  }) {
+    final colors = context.colors;
+    final type = context.typography;
+    final filled = value != null && value.isNotEmpty;
+    return GestureDetector(
+      key: key,
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(
+              label,
+              style: type.sub.copyWith(
+                fontSize: 13,
+                color: colors.ink2,
                 fontWeight: FontWeight.w400,
               ),
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    filled ? value : placeholder,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: type.rowTitle.copyWith(
+                      color: filled ? colors.ink : colors.ink3,
+                      fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                if (onClear != null) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: onClear,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      child: Icon(AppIcons.x, size: 14, color: colors.ink3),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 6),
+                Icon(AppIcons.chevronRight, size: 15, color: colors.ink3),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -601,4 +907,21 @@ class _SectionTitle extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 车型选择结果：目录里的车系（带版本与参数），或用户自己写的车型名。
+sealed class _ModelPick {
+  const _ModelPick();
+}
+
+class _ModelSeries extends _ModelPick {
+  const _ModelSeries(this.option);
+
+  final CarModelOption option;
+}
+
+class _ModelFreeText extends _ModelPick {
+  const _ModelFreeText(this.text);
+
+  final String text;
 }

@@ -1,0 +1,302 @@
+{
+  "schema": 1,
+  "updated_at": "2026-10-07",
+  "source": "厂商公开参数（CLTC 口径）人工整理，覆盖主流在售车系",
+  "disclaimer": "参数随年款与配置变化，这里只用于表单预填参考；车主可随时改，不作为购车或理赔依据",
+  "models": [
+    { "brand": "比亚迪", "series": "汉 EV", "powertrain": "ev", "variants": [
+      { "name": "610km 尊享型", "battery_kwh": 72.0 },
+      { "name": "715km 尊贵型", "battery_kwh": 85.4 },
+      { "name": "506km 标准续航", "battery_kwh": 60.5 }
+    ] },
+    { "brand": "比亚迪", "series": "汉 DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "海豹", "powertrain": "ev", "variants": [
+      { "name": "550km 标准续航", "battery_kwh": 61.4 },
+      { "name": "700km 长续航", "battery_kwh": 82.5 }
+    ] },
+    { "brand": "比亚迪", "series": "海豹 06 DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "秦 PLUS EV", "powertrain": "ev", "variants": [
+      { "name": "420km 领先型", "battery_kwh": 47.5 },
+      { "name": "510km 领先型", "battery_kwh": 57.6 }
+    ] },
+    { "brand": "比亚迪", "series": "秦 PLUS DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "宋 PLUS EV", "powertrain": "ev", "variants": [
+      { "name": "520km 旗舰型", "battery_kwh": 61.4 },
+      { "name": "605km 旗舰 PLUS", "battery_kwh": 71.8 }
+    ] },
+    { "brand": "比亚迪", "series": "宋 PLUS DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "宋 Pro DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "唐 DM-i", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "唐 EV", "powertrain": "ev", "variants": [
+      { "name": "635km 旗舰型", "battery_kwh": 108.8 }
+    ] },
+    { "brand": "比亚迪", "series": "元 PLUS", "powertrain": "ev", "variants": [
+      { "name": "430km 领先型", "battery_kwh": 49.9 },
+      { "name": "510km 旗舰型", "battery_kwh": 60.5 }
+    ] },
+    { "brand": "比亚迪", "series": "海豚", "powertrain": "ev", "variants": [
+      { "name": "301km 活力版", "battery_kwh": 30.7 },
+      { "name": "420km 骑士版", "battery_kwh": 44.9 }
+    ] },
+    { "brand": "比亚迪", "series": "海鸥", "powertrain": "ev", "variants": [
+      { "name": "305km 自由版", "battery_kwh": 30.08 },
+      { "name": "405km 飞翔版", "battery_kwh": 38.88 }
+    ] },
+    { "brand": "比亚迪", "series": "驱逐舰 05", "powertrain": "phev" },
+    { "brand": "比亚迪", "series": "宋 L EV", "powertrain": "ev" },
+    { "brand": "腾势", "series": "D9", "powertrain": "phev" },
+    { "brand": "腾势", "series": "N7", "powertrain": "ev" },
+    { "brand": "腾势", "series": "Z9 GT", "powertrain": "ev", "variants": [
+      { "name": "630km 四驱", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "方程豹", "series": "豹 5", "powertrain": "phev", "variants": [
+      { "name": "探索版", "battery_kwh": 31.8 }
+    ] },
+    { "brand": "特斯拉", "series": "Model 3", "powertrain": "ev", "variants": [
+      { "name": "后轮驱动版", "battery_kwh": 60.0 },
+      { "name": "长续航全轮驱动版", "battery_kwh": 78.4 }
+    ] },
+    { "brand": "特斯拉", "series": "Model Y", "powertrain": "ev", "variants": [
+      { "name": "后轮驱动版", "battery_kwh": 60.0 },
+      { "name": "长续航全轮驱动版", "battery_kwh": 78.4 }
+    ] },
+    { "brand": "特斯拉", "series": "Model S", "powertrain": "ev", "variants": [
+      { "name": "长续航版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "特斯拉", "series": "Model X", "powertrain": "ev", "variants": [
+      { "name": "长续航版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "小米", "series": "SU7", "powertrain": "ev", "variants": [
+      { "name": "标准版", "battery_kwh": 73.6 },
+      { "name": "Pro 版", "battery_kwh": 94.3 },
+      { "name": "Max 版", "battery_kwh": 101.0 }
+    ] },
+    { "brand": "小米", "series": "YU7", "powertrain": "ev" },
+    { "brand": "蔚来", "series": "ET5", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "蔚来", "series": "ET5T", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "蔚来", "series": "ET7", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "蔚来", "series": "ES6", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "蔚来", "series": "EC6", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "蔚来", "series": "ES8", "powertrain": "ev", "variants": [
+      { "name": "标准续航 75kWh", "battery_kwh": 75.0 },
+      { "name": "长续航 100kWh", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "乐道", "series": "L60", "powertrain": "ev", "variants": [
+      { "name": "标准续航 60kWh", "battery_kwh": 60.0 },
+      { "name": "长续航 85kWh", "battery_kwh": 85.0 }
+    ] },
+    { "brand": "小鹏", "series": "MONA M03", "powertrain": "ev", "variants": [
+      { "name": "515km 长续航", "battery_kwh": 51.8 },
+      { "name": "620km 超长续航", "battery_kwh": 62.2 }
+    ] },
+    { "brand": "小鹏", "series": "P7", "powertrain": "ev", "variants": [
+      { "name": "480km 智享版", "battery_kwh": 60.2 },
+      { "name": "706km 智尊版", "battery_kwh": 80.9 }
+    ] },
+    { "brand": "小鹏", "series": "P7+", "powertrain": "ev", "variants": [
+      { "name": "602km 长续航", "battery_kwh": 60.7 },
+      { "name": "710km 超长续航", "battery_kwh": 76.3 }
+    ] },
+    { "brand": "小鹏", "series": "G6", "powertrain": "ev", "variants": [
+      { "name": "580km 长续航", "battery_kwh": 66.0 },
+      { "name": "755km 超长续航", "battery_kwh": 87.5 }
+    ] },
+    { "brand": "小鹏", "series": "G9", "powertrain": "ev", "variants": [
+      { "name": "570km 长续航", "battery_kwh": 78.2 },
+      { "name": "702km 超长续航", "battery_kwh": 98.0 }
+    ] },
+    { "brand": "小鹏", "series": "X9", "powertrain": "ev", "variants": [
+      { "name": "610km 长续航", "battery_kwh": 84.5 },
+      { "name": "702km 超长续航", "battery_kwh": 101.5 }
+    ] },
+    { "brand": "理想", "series": "L6", "powertrain": "phev", "variants": [
+      { "name": "Pro / Max", "battery_kwh": 36.8 }
+    ] },
+    { "brand": "理想", "series": "L7", "powertrain": "phev", "variants": [
+      { "name": "Pro 版", "battery_kwh": 42.8 },
+      { "name": "Max / Ultra 版", "battery_kwh": 52.3 }
+    ] },
+    { "brand": "理想", "series": "L8", "powertrain": "phev", "variants": [
+      { "name": "Pro 版", "battery_kwh": 42.8 },
+      { "name": "Max / Ultra 版", "battery_kwh": 52.3 }
+    ] },
+    { "brand": "理想", "series": "L9", "powertrain": "phev", "variants": [
+      { "name": "Pro / Ultra 版", "battery_kwh": 52.3 }
+    ] },
+    { "brand": "理想", "series": "MEGA", "powertrain": "ev", "variants": [
+      { "name": "超充版", "battery_kwh": 102.7 }
+    ] },
+    { "brand": "问界", "series": "M5", "powertrain": "phev", "variants": [
+      { "name": "增程版", "battery_kwh": 40.0 },
+      { "name": "纯电版", "battery_kwh": 80.0 }
+    ] },
+    { "brand": "问界", "series": "M7", "powertrain": "phev", "variants": [
+      { "name": "增程版", "battery_kwh": 40.0 }
+    ] },
+    { "brand": "问界", "series": "M8", "powertrain": "phev" },
+    { "brand": "问界", "series": "M9", "powertrain": "phev", "variants": [
+      { "name": "增程版", "battery_kwh": 42.0 },
+      { "name": "纯电版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "智界", "series": "S7", "powertrain": "ev" },
+    { "brand": "智界", "series": "R7", "powertrain": "phev" },
+    { "brand": "阿维塔", "series": "11", "powertrain": "ev" },
+    { "brand": "阿维塔", "series": "12", "powertrain": "ev" },
+    { "brand": "智己", "series": "L6", "powertrain": "ev" },
+    { "brand": "智己", "series": "LS6", "powertrain": "ev" },
+    { "brand": "极氪", "series": "001", "powertrain": "ev", "variants": [
+      { "name": "WE 版", "battery_kwh": 95.0 },
+      { "name": "YOU 版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "极氪", "series": "007", "powertrain": "ev", "variants": [
+      { "name": "后驱版", "battery_kwh": 75.6 },
+      { "name": "四驱版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "极氪", "series": "X", "powertrain": "ev", "variants": [
+      { "name": "标准续航", "battery_kwh": 66.0 }
+    ] },
+    { "brand": "极氪", "series": "7X", "powertrain": "ev", "variants": [
+      { "name": "后驱版", "battery_kwh": 75.6 },
+      { "name": "四驱版", "battery_kwh": 100.0 }
+    ] },
+    { "brand": "领克", "series": "03", "powertrain": "fuel" },
+    { "brand": "领克", "series": "08 EM-P", "powertrain": "phev", "variants": [
+      { "name": "标准续航", "battery_kwh": 21.2 },
+      { "name": "长续航", "battery_kwh": 39.6 }
+    ] },
+    { "brand": "领克", "series": "09 EM-P", "powertrain": "phev", "variants": [
+      { "name": "远航版", "battery_kwh": 40.1 }
+    ] },
+    { "brand": "吉利银河", "series": "E5", "powertrain": "ev", "variants": [
+      { "name": "440km 版", "battery_kwh": 49.52 },
+      { "name": "530km 版", "battery_kwh": 60.22 }
+    ] },
+    { "brand": "吉利银河", "series": "E8", "powertrain": "ev", "variants": [
+      { "name": "550km 版", "battery_kwh": 62.0 },
+      { "name": "665km 版", "battery_kwh": 76.0 }
+    ] },
+    { "brand": "吉利银河", "series": "L7", "powertrain": "phev", "variants": [
+      { "name": "100km 版", "battery_kwh": 18.7 }
+    ] },
+    { "brand": "吉利银河", "series": "星愿", "powertrain": "ev", "variants": [
+      { "name": "310km 版", "battery_kwh": 30.12 },
+      { "name": "410km 版", "battery_kwh": 40.16 }
+    ] },
+    { "brand": "吉利", "series": "星越 L", "powertrain": "fuel" },
+    { "brand": "吉利", "series": "星瑞", "powertrain": "fuel" },
+    { "brand": "吉利", "series": "帝豪", "powertrain": "fuel" },
+    { "brand": "极狐", "series": "阿尔法 S5", "powertrain": "ev" },
+    { "brand": "极狐", "series": "阿尔法 T5", "powertrain": "ev" },
+    { "brand": "岚图", "series": "FREE", "powertrain": "phev" },
+    { "brand": "岚图", "series": "梦想家", "powertrain": "phev" },
+    { "brand": "零跑", "series": "C10", "powertrain": "phev" },
+    { "brand": "零跑", "series": "C11", "powertrain": "phev" },
+    { "brand": "零跑", "series": "C16", "powertrain": "phev" },
+    { "brand": "零跑", "series": "T03", "powertrain": "ev", "variants": [
+      { "name": "403km 版", "battery_kwh": 41.3 }
+    ] },
+    { "brand": "哪吒", "series": "L", "powertrain": "ev" },
+    { "brand": "哪吒", "series": "S", "powertrain": "phev" },
+    { "brand": "广汽埃安", "series": "AION S", "powertrain": "ev" },
+    { "brand": "广汽埃安", "series": "AION Y", "powertrain": "ev" },
+    { "brand": "广汽埃安", "series": "AION V", "powertrain": "ev" },
+    { "brand": "广汽埃安", "series": "AION RT", "powertrain": "ev" },
+    { "brand": "五菱", "series": "宏光 MINI EV", "powertrain": "ev", "variants": [
+      { "name": "120km 版", "battery_kwh": 13.8 },
+      { "name": "170km 版", "battery_kwh": 17.4 }
+    ] },
+    { "brand": "五菱", "series": "缤果", "powertrain": "ev", "variants": [
+      { "name": "203km 版", "battery_kwh": 17.3 },
+      { "name": "333km 版", "battery_kwh": 37.9 }
+    ] },
+    { "brand": "五菱", "series": "星光", "powertrain": "phev" },
+    { "brand": "宝骏", "series": "悦也", "powertrain": "ev", "variants": [
+      { "name": "303km 版", "battery_kwh": 28.1 }
+    ] },
+    { "brand": "长安启源", "series": "A05", "powertrain": "phev" },
+    { "brand": "长安启源", "series": "Q05", "powertrain": "phev" },
+    { "brand": "深蓝", "series": "SL03", "powertrain": "phev" },
+    { "brand": "深蓝", "series": "S07", "powertrain": "phev" },
+    { "brand": "长安", "series": "UNI-V", "powertrain": "fuel" },
+    { "brand": "长安", "series": "CS75 PLUS", "powertrain": "fuel" },
+    { "brand": "哈弗", "series": "H6", "powertrain": "fuel" },
+    { "brand": "哈弗", "series": "大狗", "powertrain": "fuel" },
+    { "brand": "坦克", "series": "300", "powertrain": "fuel" },
+    { "brand": "欧拉", "series": "好猫", "powertrain": "ev" },
+    { "brand": "魏牌", "series": "蓝山", "powertrain": "phev" },
+    { "brand": "奇瑞", "series": "瑞虎 8", "powertrain": "fuel" },
+    { "brand": "奇瑞", "series": "艾瑞泽 8", "powertrain": "fuel" },
+    { "brand": "iCAR", "series": "03", "powertrain": "ev" },
+    { "brand": "红旗", "series": "H5", "powertrain": "fuel" },
+    { "brand": "红旗", "series": "HS5", "powertrain": "fuel" },
+    { "brand": "红旗", "series": "E-QM5", "powertrain": "ev" },
+    { "brand": "大众", "series": "ID.4 X", "powertrain": "ev", "variants": [
+      { "name": "入门版", "battery_kwh": 52.8 },
+      { "name": "长续航版", "battery_kwh": 84.8 }
+    ] },
+    { "brand": "大众", "series": "ID.6 X", "powertrain": "ev", "variants": [
+      { "name": "入门版", "battery_kwh": 63.2 },
+      { "name": "长续航版", "battery_kwh": 83.4 }
+    ] },
+    { "brand": "大众", "series": "朗逸", "powertrain": "fuel" },
+    { "brand": "大众", "series": "速腾", "powertrain": "fuel" },
+    { "brand": "大众", "series": "帕萨特", "powertrain": "fuel" },
+    { "brand": "大众", "series": "迈腾", "powertrain": "fuel" },
+    { "brand": "大众", "series": "途观 L", "powertrain": "fuel" },
+    { "brand": "奥迪", "series": "A4L", "powertrain": "fuel" },
+    { "brand": "奥迪", "series": "A6L", "powertrain": "fuel" },
+    { "brand": "奥迪", "series": "Q5L", "powertrain": "fuel" },
+    { "brand": "宝马", "series": "3 系", "powertrain": "fuel" },
+    { "brand": "宝马", "series": "5 系", "powertrain": "fuel" },
+    { "brand": "宝马", "series": "X3", "powertrain": "fuel" },
+    { "brand": "宝马", "series": "i3", "powertrain": "ev", "variants": [
+      { "name": "eDrive 35L", "battery_kwh": 70.3 }
+    ] },
+    { "brand": "宝马", "series": "iX3", "powertrain": "ev", "variants": [
+      { "name": "领先型", "battery_kwh": 74.0 }
+    ] },
+    { "brand": "奔驰", "series": "C 级", "powertrain": "fuel" },
+    { "brand": "奔驰", "series": "E 级", "powertrain": "fuel" },
+    { "brand": "奔驰", "series": "GLC", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "卡罗拉", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "雷凌", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "凯美瑞", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "RAV4 荣放", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "汉兰达", "powertrain": "fuel" },
+    { "brand": "丰田", "series": "bZ4X", "powertrain": "ev", "variants": [
+      { "name": "长续航版", "battery_kwh": 66.7 }
+    ] },
+    { "brand": "本田", "series": "雅阁", "powertrain": "fuel" },
+    { "brand": "本田", "series": "思域", "powertrain": "fuel" },
+    { "brand": "本田", "series": "CR-V", "powertrain": "fuel" },
+    { "brand": "本田", "series": "皓影", "powertrain": "fuel" },
+    { "brand": "日产", "series": "轩逸", "powertrain": "fuel" },
+    { "brand": "日产", "series": "天籁", "powertrain": "fuel" },
+    { "brand": "日产", "series": "奇骏", "powertrain": "fuel" },
+    { "brand": "别克", "series": "君威", "powertrain": "fuel" },
+    { "brand": "别克", "series": "昂科威", "powertrain": "fuel" },
+    { "brand": "别克", "series": "GL8", "powertrain": "fuel" },
+    { "brand": "福特", "series": "蒙迪欧", "powertrain": "fuel" },
+    { "brand": "福特", "series": "锐界", "powertrain": "fuel" },
+    { "brand": "马自达", "series": "昂克赛拉", "powertrain": "fuel" },
+    { "brand": "沃尔沃", "series": "XC60", "powertrain": "fuel" },
+    { "brand": "凯迪拉克", "series": "CT5", "powertrain": "fuel" },
+    { "brand": "现代", "series": "伊兰特", "powertrain": "fuel" },
+    { "brand": "现代", "series": "途胜", "powertrain": "fuel" }
+  ]
+}

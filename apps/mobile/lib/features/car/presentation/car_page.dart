@@ -138,44 +138,51 @@ class _CarPageState extends State<CarPage> {
               const SizedBox(height: 20),
               _SectionTitle(title: '电车状态', hint: '本月'),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: overview.evMetrics.chargeKwhMonth == null
-                        ? MetricCard(
-                            label: '本月充电费用 元',
-                            value: _yuanText(
-                              overview.evMetrics.chargeCostMinorMonth,
+              // 三卡内容行数不同（第三张多一行 note、费用口径标签更长），
+              // IntrinsicHeight + stretch 让它们按最高的那张拉齐，尺寸才统一。
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: overview.evMetrics.chargeKwhMonth == null
+                          ? MetricCard(
+                              label: '本月充电花费',
+                              value: _yuanText(
+                                overview.evMetrics.chargeCostMinorMonth,
+                              ),
+                              unit: '元',
+                            )
+                          : MetricCard(
+                              label: '本月充电',
+                              value: _kwhText(overview.evMetrics.chargeKwhMonth!),
+                              unit: 'kWh',
                             ),
-                          )
-                        : MetricCard(
-                            label: '本月充电',
-                            value: _kwhText(overview.evMetrics.chargeKwhMonth!),
-                            unit: 'kWh',
-                          ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: MetricCard(
-                      label: '百公里电耗',
-                      value: overview.evMetrics.kwhPer100km == null
-                          ? '—'
-                          : _kwhText(overview.evMetrics.kwhPer100km!),
-                      unit: 'kWh',
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: MetricCard(
-                      label: '总里程',
-                      value: overview.evMetrics.odometerKm == null
-                          ? '—'
-                          : _thousands(overview.evMetrics.odometerKm!),
-                      unit: 'km',
-                      note: '本月 +${overview.evMetrics.odometerDeltaMonth} km',
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: MetricCard(
+                        label: '百公里电耗',
+                        value: overview.evMetrics.kwhPer100km == null
+                            ? '—'
+                            : _kwhText(overview.evMetrics.kwhPer100km!),
+                        unit: 'kWh',
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: MetricCard(
+                        label: '总里程',
+                        value: overview.evMetrics.odometerKm == null
+                            ? '—'
+                            : _thousands(overview.evMetrics.odometerKm!),
+                        unit: 'km',
+                        note:
+                            '本月 +${overview.evMetrics.odometerDeltaMonth} km',
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -299,7 +306,7 @@ class _CarPageState extends State<CarPage> {
               ),
               const SizedBox(height: 14),
               LedgerSaveButton(
-                label: '＋ 记一笔养车费用',
+                label: '＋ 记一笔养车记录',
                 onPressed: () => _push('/car/add'),
               ),
             ],
