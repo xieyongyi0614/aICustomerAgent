@@ -67,6 +67,11 @@ def should_confirm(
     top_categories: tuple[str, ...] = (),
 ) -> ConfirmationRequest | None:
     cfg = settings if settings is not None else get_settings()
+    # 非记账消息一律不澄清：抽取器用 `is_ledger_intent=false` 表达「这不是一笔账」
+    # （提示词反例「今天天气不错」）。漏这道守卫会把任何没有金额的普通消息
+    # 登记成「这笔记多少？」——实测「明天早上8点，叫我起床签到」即如此。
+    if not candidate.is_ledger_intent:
+        return None
     timestamp = timeutil.ensure_aware(now) or timeutil.now()
     expires_at = timestamp + timedelta(hours=CONFIRM_TTL_HOURS)
     amount_minor: int | None = None

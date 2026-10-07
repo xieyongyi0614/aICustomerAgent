@@ -259,6 +259,16 @@ def test_alert_records_proactive_action(setup):
     assert draft.dedupe_key.startswith(f"ledger_alert:{draft.kind}:")
 
 
+def test_alert_action_id_is_snowflake(setup):
+    budget.upsert_budget(_spec(limit_minor=10000), now=NOW)
+    _spend(setup, amount=12000)
+    draft = alert.evaluate_alerts(USER, now=NOW)[0]
+    alert.deliver_alert(draft, now=NOW, user_id=USER)
+    rows = proactive_repository.list_since(NOW - timedelta(minutes=1))
+    row = next(row for row in rows if row.dedupe_key == draft.dedupe_key)
+    assert row.id.isdigit(), f"主动动作主键必须是雪花，实得 {row.id}"
+
+
 def test_alert_trigger_registered():
     assert alert.ALERT_TRIGGER_SOURCE == "ledger_alert"
     source = (BACKEND / "app/application/life_loop.py").read_text(encoding="utf-8")

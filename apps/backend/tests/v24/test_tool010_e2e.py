@@ -120,12 +120,16 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
     # 开关固化声明（2026-10-06，批次 2）：`observability_persist_enabled` 总闸删除后
     # `_persist_tool_decision` 守卫收窄 —— 非 TOOL-010 改脏。原值 91e31d92（再前值 bcb7b63c）。
-    "app/application/post_process.py": "83222b5bf4b5282143b501e87e033499ecfe6865a54881a8d12d2311a2e1d12f",
+    # 账本单写面声明（2026-10-07）：新增 `_ledger_detected_payload`（待确认承载词表链路
+    # 解析）与 `_defer_to_ledger_pending`（同轮同金额已进待确认则确定性链路让位，
+    # 修「先入账又被确认一次 → 重复记账」）—— 非 TOOL-010 改脏。原值 83222b5b。
+    "app/application/post_process.py": "ac5698b4ed4f9fe407e27f1bc91dabd883b74e640577d2c793c354bd3a31648a",
     # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
     # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
-    # 原值 36ea3798（再冻结：world_available 赋值去掉恒真 getattr；再前值 6ea39eaf，
-    # 反向依赖清理：logical_clock 下沉 core/clock 导入路径变更）。
-    "app/application/action_engine.py": "fb11fbef264f1da8aea52a5e9b955acfda15fe79e4d40b396d5919eeb2bc6d54",
+    # 记账播种顺序声明（2026-10-07）：新增 `_ensure_ledger_categories`，把账户 / 种子类目
+    # 播种提到「明细 → 类目」归一之前（原先播种只发生在执行期能力层，导致用户首笔
+    # 对话记账必「未分类」）—— 非 TOOL-010 改脏。原值 fb11fbef。
+    "app/application/action_engine.py": "bea2a3101e77ba4f0a5094c618f41c67e7cbb1313c9a6aebfc1b487228496397",
     # services 归位声明（2026-09-30，批次 3）：`relationship_milestone` → `relationship/milestone`
     # 导入路径变更 —— 非 TOOL-010 改脏。原值 d3ee8bf4。
     # 演绎段注入策略位声明（2026-10-02）：新增 `roleplay_prompt_mode`（默认 full）——

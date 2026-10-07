@@ -349,8 +349,13 @@ def _offline_repos(monkeypatch):
     if os.environ.get("TEST_USE_POSTGRES") == "1":
         yield None
         return
+    from app.core.db.engine import json_serializer
+
     engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        json_serializer=json_serializer,
     )
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(engine)

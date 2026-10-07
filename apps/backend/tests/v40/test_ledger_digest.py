@@ -194,6 +194,14 @@ def test_digest_records_proactive_action(settings):
     assert payload.dedupe_key.startswith("ledger_digest:daily:")
 
 
+def test_digest_action_id_is_snowflake(settings):
+    payload = digest.build_daily_digest(USER, now=NOW, settings=settings)
+    digest.deliver_for_user(user_id=USER, payload=payload, now=NOW)
+    rows = proactive_repository.list_since(NOW - timedelta(minutes=1))
+    row = next(row for row in rows if row.dedupe_key == payload.dedupe_key)
+    assert row.id.isdigit(), f"主动动作主键必须是雪花，实得 {row.id}"
+
+
 def test_digest_delivered_via_outbound_gateway(monkeypatch, settings):
     from app.services.delivery import outbound as proactive_delivery
 

@@ -8,6 +8,8 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.timeutil import local as _local
+from app.core.timeutil import local_now as _local_now
 from app.core.timeutil import now as _now
 from app.api.v1.auth import require_user
 from app.services.ledger import budget as budget_service
@@ -68,6 +70,8 @@ class LedgerEntryResponse(BaseModel):
     currency: str
     direction: str
     occurred_at: str
+    # 展示用时间（产品本地时区）：今天 00:23／昨天 12:32／10/3 08:47。
+    occurred_label: str = ""
     merchant: str | None
     note: str | None
     source: str
@@ -226,6 +230,28 @@ def _money(minor: int) -> tuple[int, str]:
     return int(minor), format_service.format_minor(int(minor))
 
 
+def _occurred_label(occurred_at: datetime) -> str:
+    """展示用时间：按**产品本地时区**（`timeutil.LOCAL_TZ`）出「今天/昨天/M/d HH:mm」。
+
+    不能交给客户端按设备时区换算：设备时区不可靠（模拟器默认 UTC），
+    会把本地 00:23 的账显示成 16:23，且与服务端的「本地日」口径（日分桶、
+    区间合计）互相矛盾。口径统一由服务端定。
+    """
+    local = _local(occurred_at)
+    if local is None:
+        return ""
+    today = _local_now().date()
+    day = local.date()
+    time_text = local.strftime("%H:%M")
+    if day == today:
+        return f"今天 {time_text}"
+    if (today - day).days == 1:
+        return f"昨天 {time_text}"
+    if day.year == today.year:
+        return f"{day.month}/{day.day} {time_text}"
+    return f"{day.year}/{day.month}/{day.day} {time_text}"
+
+
 def _entry_out(item) -> LedgerEntryResponse:
     amount_minor, amount_text = _money(item.amount_minor)
     return LedgerEntryResponse(
@@ -237,6 +263,7 @@ def _entry_out(item) -> LedgerEntryResponse:
         currency=item.currency,
         direction=item.direction,
         occurred_at=item.occurred_at.isoformat(),
+        occurred_label=_occurred_label(item.occurred_at),
         merchant=item.merchant,
         note=item.note,
         source=item.source,

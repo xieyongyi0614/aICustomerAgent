@@ -197,11 +197,16 @@ def daily_expense_series(
     方向回冲（冲收入 = 回冲支出）；窗口内单次查询后按 `occurred_at` 当地日分桶，
     冲正落在其发生的当日，净额为负的日截 0（仅影响展示，不影响求和口径）。"""
     anchor = timeutil.ensure_aware(now) or timeutil.now()
-    first_day = timeutil.local(anchor).date() - timedelta(days=days - 1)
+    today = timeutil.local(anchor).date()
+    first_day = today - timedelta(days=days - 1)
+    # 边界必须是本地 aware：naive 会被当作库会话时区（UTC），首日 00:00–08:00
+    # 的账目会被漏掉，柱状之和与区间合计就对不上。
     rows = ledger_repository.list_entries(
         user_id,
-        since=datetime.combine(first_day, time.min),
-        until=datetime.combine(timeutil.local(anchor).date() + timedelta(days=1), time.min),
+        since=timeutil.ensure_aware(datetime.combine(first_day, time.min)),
+        until=timeutil.ensure_aware(
+            datetime.combine(today + timedelta(days=1), time.min)
+        ),
     )
     buckets = [0] * days
     for row in rows:

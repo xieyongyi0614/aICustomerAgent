@@ -77,6 +77,8 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0004_channel_identity_bindings.py",
     "0005_id_scheme_split.py",
     "0006_all_domains_utc_timestamps.py",
+    "0007_ledger_entry_identity_split.py",
+    "0008_ledger_categories_aliases_encoding.py",
 )
 
 SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"

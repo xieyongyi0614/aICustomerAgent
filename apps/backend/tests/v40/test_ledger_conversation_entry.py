@@ -72,6 +72,48 @@ async def test_same_amount_different_detail_stays_two_entries(bootstrapped):
     assert ledger_repository.count_entries(USER) == 2
 
 
+async def test_first_entry_of_fresh_user_is_still_categorized(
+    override_settings, db_session_factory
+):
+    """回归：类目播种必须早于「明细 → 类目」归一。
+
+    原先种子类目只在执行期能力层播种，于是用户**第一笔**对话记账必落「未分类」
+    （线上实测：45 个种子类目与首笔账同一时刻落库，首笔 category_id 为空、第二笔起才有）。
+    """
+    override_settings()
+    fresh = "ledger-fresh-user"
+    intent = detect_action_intent("记账早餐8元", now=NOW)
+    assert intent is not None
+    assert intent.action_type == "record_ledger_entry"
+
+    record = await run_action_planning(fresh, intent, session_id="s-fresh")
+
+    assert record is not None
+    assert record.status == "succeeded", record.gate_reason
+    assert ledger_repository.list_categories(fresh)
+    entry = ledger_repository.list_entries(fresh)[0]
+    assert entry.category_id == _category_id(fresh, "早餐")
+
+
+async def test_longest_category_match_wins_on_multi_item_detail(
+    override_settings, db_session_factory
+):
+    """长句明细按「最长命中」落类目（记录规则实况，非缺陷）。
+
+    例：明细「早餐，吃了3个干蒸，一瓶巧克力味维他奶」同时命中 早餐（名称）与
+    零食（别名「巧克力」），最长者胜 → 零食。归一只保证「有类目」，不保证「猜对」。
+    """
+    override_settings()
+    fresh = "ledger-longest-match-user"
+    intent = detect_action_intent("记账早餐8元，吃了3个干蒸，一瓶巧克力味维他奶", now=NOW)
+    assert intent is not None
+
+    await run_action_planning(fresh, intent, session_id="s-longest")
+
+    entry = ledger_repository.list_entries(fresh)[0]
+    assert entry.category_id == _category_id(fresh, "零食")
+
+
 async def test_conversation_entry_without_detail_stays_uncategorized(bootstrapped):
     """只有金额没有明细时不猜类目（诚实留空，等价于账单页的「未分类」）。"""
     intent = detect_action_intent("记账20元", now=NOW)

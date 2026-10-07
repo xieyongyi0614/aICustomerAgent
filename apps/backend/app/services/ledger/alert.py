@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 
+from app.core import ids
 from app.core import timeutil
 from app.channels.base import ChannelErrorKind, SendResult
 from app.core.settings import get_settings
@@ -218,8 +219,7 @@ def deliver_alert(draft: AlertDraft, *, now: datetime, user_id: str) -> SendResu
 
     try:
         action = ProactiveAction(
-            id="pa_"
-            + __import__("hashlib").sha1(draft.dedupe_key.encode()).hexdigest()[:12],
+            id=ids.new_id_str(),
             user_id=user_id,
             session_id=f"alert:{draft.kind}",
             trigger_type="scheduled_followup",

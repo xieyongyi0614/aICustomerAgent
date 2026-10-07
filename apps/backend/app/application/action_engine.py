@@ -704,6 +704,21 @@ def _normalize_use_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
     return intent.model_copy(update={"params": params})
 
 
+def _ensure_ledger_categories(intent: ActionIntent, user_id: str) -> None:
+    """记账前置：类目树未播种时「明细 → 类目」归一必然落空。
+
+    归一跑在执行之前，而账户 / 种子类目的播种原本只发生在执行期的能力层
+    （`_account_id_for` → `ensure_user_bootstrap`），于是**用户的第一笔对话记账
+    总是「未分类」**（实测：种子类目与首笔账同一时刻落库，首笔 category_id 为空、
+    第二笔起才有类目）。这里把播种提到归一之前，归一失败只可能是「确实没猜出来」。
+    """
+    if intent.action_type != "record_ledger_entry":
+        return
+    from app.services.ledger import ensure_user_bootstrap
+
+    ensure_user_bootstrap(user_id)
+
+
 def _normalize_ledger_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
     """ledger record 参数归一（引擎侧唯一读 IO 点）：明细文本 → 类目 id。
 
@@ -738,6 +753,7 @@ async def run_action_planning(
     if intent is None:
         return None
     intent = _normalize_use_intent(intent, user_id)
+    _ensure_ledger_categories(intent, user_id)
     intent = _normalize_ledger_intent(intent, user_id)
     record = new_record(intent, user_id, session_id, source)
 

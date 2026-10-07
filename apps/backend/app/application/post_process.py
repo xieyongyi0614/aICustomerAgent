@@ -59,6 +59,8 @@ class PostProcessContext:
     intention: object | None = None
     behavior: object | None = None
     action_intent: object | None = None
+    # 本轮登记待确认的账目金额（分）：确定性链路据此让位，保证同一笔只有一个写面
+    ledger_pending_amount: int | None = None
 
 
 async def run_scene_update(ctx: PostProcessContext) -> None:
@@ -420,6 +422,34 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
             )
 
 
+def _defer_to_ledger_pending(
+    ctx: PostProcessContext, intent: ActionIntent
+) -> bool:
+    """本轮同一笔已登记待确认 → 确定性链路让位（账本单写面）。
+
+    原先两条链路对同一条消息各写一遍：词表链路先入账、LLM 抽取链路再登记待确认，
+    用户一点确认就落第二笔（实测 240 元牛杂：16:57 落一笔，17:10 确认后又落一笔）。
+    金额一致才让位——金额对不上说明两条链路读到的不是同一笔，此时不拦。
+    """
+    deferred_amount = getattr(ctx, "ledger_pending_amount", None)
+    if deferred_amount is None:
+        return False
+    if intent.action_type != "record_ledger_entry":
+        return False
+    amount = intent.params.get("amount_minor")
+    if not isinstance(amount, int) or amount != deferred_amount:
+        return False
+    if ctx.trace is not None:
+        ctx.trace.record(
+            "action_planning",
+            0.0,
+            "deferred",
+            reason="ledger_pending_confirmation",
+            amount_minor=amount,
+        )
+    return True
+
+
 async def run_action_planning(ctx: PostProcessContext) -> None:
     """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。
 
@@ -445,6 +475,8 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
         except Exception:
             logger.exception("行动意图反序列化失败，跳过第 9 步")
             return
+    if _defer_to_ledger_pending(ctx, action_intent):
+        return
     started = time.perf_counter()
     try:
         from app.application.action_engine import run_action_planning as _run
@@ -680,6 +712,44 @@ async def run_ledger_extraction(ctx: PostProcessContext) -> None:
         logger.exception("账本抽取失败，忽略本轮候选")
 
 
+def _ledger_detected_payload(ctx: PostProcessContext) -> dict | None:
+    """同轮**确定性词表链路**的解析（明细 + 已归一类目），交给待确认承载。
+
+    返回 None = 本轮没有可直接入账的确定性解析（只有 LLM 认为是记账的情形），
+    此时待确认沿用原有语义（纯 LLM 抽取）。
+    """
+    intent = ctx.action_intent
+    if isinstance(intent, dict):
+        try:
+            intent = ActionIntent.model_validate(intent)
+        except Exception:
+            return None
+    if intent is None or getattr(intent, "action_type", None) != "record_ledger_entry":
+        return None
+    params = getattr(intent, "params", None) or {}
+    amount_minor = params.get("amount_minor")
+    if not isinstance(amount_minor, int) or amount_minor <= 0:
+        return None
+    note = str(params.get("note") or "").strip()
+    direction = str(params.get("direction") or "expense")
+    detected: dict = {
+        "amount_minor": amount_minor,
+        "direction": direction,
+        "note": note or None,
+    }
+    if not note:
+        return detected
+    from app.services.ledger import category as category_service
+    from app.services.ledger import ensure_user_bootstrap
+
+    ensure_user_bootstrap(ctx.user_id)
+    kind = "income" if direction == "income" else "expense"
+    result = category_service.normalize(ctx.user_id, note, kind=kind)
+    if result.category_id:
+        detected["category_name"] = result.category_name
+    return detected
+
+
 async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
     """PLA-010 确认挂接：需澄清则登记待确认；超时清理。失败不影响回答。"""
     try:
@@ -705,13 +775,17 @@ async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
         )
         if request is None:
             return
+        detected = _ledger_detected_payload(ctx)
         record = register_pending(
             user_id=ctx.user_id,
             session_id=ctx.session_id,
             request=request,
             extraction=extraction,
+            detected=detected,
             now=now,
         )
+        if detected is not None and detected.get("amount_minor") == request.amount_minor:
+            ctx.ledger_pending_amount = int(detected["amount_minor"])
         if ctx.trace is not None:
             ctx.trace.record(
                 "ledger_confirmation",
@@ -720,6 +794,7 @@ async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
                 reason=request.reason,
                 pending_key=request.pending_key,
                 question=request.question,
+                deferred_to_pending=ctx.ledger_pending_amount is not None,
             )
     except Exception:
         logger.exception("账本确认挂接失败，忽略本轮")

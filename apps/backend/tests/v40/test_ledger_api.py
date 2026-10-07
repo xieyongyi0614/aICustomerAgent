@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ast
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.core import timeutil
 from app.api.v1 import auth as auth_api
+from app.api.v1 import ledger as ledger_api
 from app.main import create_app
 from app.models.ledger import LedgerEntryDraft
 from app.repositories import ledger_repository
@@ -79,6 +80,47 @@ def test_summary_period_validation(client, setup):
         "/api/v1/ledger/summary", params={"period": "year"}
     )
     assert response.status_code in (400, 422)
+
+
+def test_occurred_label_covers_today_yesterday_and_older():
+    """展示文案由服务端按产品时区（+08）给出，端上只兜底。"""
+    today = timeutil.local_now().date()
+    midnight = datetime.min.time()
+
+    def _at(days_ago: int, hour: int, minute: int) -> datetime:
+        return datetime.combine(
+            today - timedelta(days=days_ago), midnight, tzinfo=timeutil.LOCAL_TZ
+        ).replace(hour=hour, minute=minute)
+
+    assert ledger_api._occurred_label(_at(0, 0, 23)) == "今天 00:23"
+    assert ledger_api._occurred_label(_at(1, 12, 32)) == "昨天 12:32"
+    older = _at(3, 8, 47)
+    assert ledger_api._occurred_label(older) == f"{older.month}/{older.day} 08:47"
+
+
+def test_entry_occurred_label_ignores_device_timezone(client):
+    """回归：本地 00:23 的账在 UTC 设备上曾被端上换算成「今天 16:23」。
+
+    接口仍回 UTC ISO（`occurred_at`），展示文案 `occurred_label` 由服务端定口径。
+    """
+    today = timeutil.local_now().date()
+    occurred = datetime.combine(
+        today, datetime.min.time(), tzinfo=timeutil.LOCAL_TZ
+    ).replace(hour=0, minute=23)
+    created = client.post(
+        "/api/v1/ledger/entries",
+        json={
+            "amount_minor": 100,
+            "direction": "expense",
+            "occurred_at": occurred.isoformat(),
+            "idempotency_key": "api-label-today",
+        },
+    )
+
+    assert created.status_code == 200
+    body = created.json()
+    assert body["occurred_label"] == "今天 00:23"
+    assert "+00:00" in body["occurred_at"], "原始时刻仍是 UTC ISO"
 
 
 def test_entries_pagination(client, setup):

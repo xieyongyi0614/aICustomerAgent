@@ -227,21 +227,32 @@ def ensure_seed_categories(user_id: str, *, seed_tree, now: datetime | None = No
     return created
 
 
+def _find_by_idempotency(
+    session, user_id: str, idempotency_key: str
+) -> LedgerEntryRow | None:
+    """幂等命中查询：键只在**同一用户内**成立（跨用户同键必须各记一笔）。"""
+    return (
+        session.query(LedgerEntryRow)
+        .filter(
+            LedgerEntryRow.user_id == user_id,
+            LedgerEntryRow.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+
+
 def create_entry(
     draft: LedgerEntryDraft, *, idempotency_key: str, now: datetime | None = None
 ) -> tuple[LedgerEntryRow, bool]:
+    """追加一笔分录。id 是独立身份（雪花），幂等由 (user_id, idempotency_key) 承担。"""
     timestamp = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
-        existing = (
-            session.query(LedgerEntryRow)
-            .filter(LedgerEntryRow.idempotency_key == idempotency_key)
-            .first()
-        )
+        existing = _find_by_idempotency(session, draft.user_id, idempotency_key)
         if existing is not None:
             session.expunge(existing)
             return existing, False
         row = LedgerEntryRow(
-            id=f"ent_{idempotency_key}",
+            id=ids.new_id_str(),
             user_id=draft.user_id,
             account_id=draft.account_id,
             category_id=draft.category_id,
@@ -262,11 +273,9 @@ def create_entry(
             session.commit()
         except IntegrityError:
             session.rollback()
-            existing = (
-                session.query(LedgerEntryRow)
-                .filter(LedgerEntryRow.idempotency_key == idempotency_key)
-                .first()
-            )
+            existing = _find_by_idempotency(session, draft.user_id, idempotency_key)
+            if existing is None:
+                raise
             session.expunge(existing)
             return existing, False
         session.refresh(row)

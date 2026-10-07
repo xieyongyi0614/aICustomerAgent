@@ -30,6 +30,14 @@ PENDING_GATE_REASON = "pending_confirmation"
 PENDING_ACTION_TYPE = "record_ledger_entry"
 PENDING_SCAN_MAX = 200
 
+DETECTED_KEY = "detected"
+"""待确认载荷的 `detected` 段：同轮**确定性词表链路**的解析（明细 / 已归一类目）。
+
+存在时优先于 LLM 抽取的 `category_hint`：实测 LLM 会给「饭」这类单字提示，
+四级归一必然落回退类目「其他」；同时保证确认后落的这一笔与词表链路同源
+（明细、类目都不丢）。
+"""
+
 
 def _extract_to_mapping(extraction: LedgerExtraction) -> dict[str, Any]:
     data = extraction.model_dump(mode="json")
@@ -46,6 +54,7 @@ def register_pending(
     session_id: str,
     request: ConfirmationRequest,
     extraction: LedgerExtraction,
+    detected: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> ActionRecord | None:
     """登记待确认：ActionRecord 载荷 + scene_state 指针 + action_schedules 到期。"""
@@ -75,6 +84,7 @@ def register_pending(
         params={
             "confirmation": request_to_mapping(request),
             "extraction": _extract_to_mapping(extraction),
+            **({DETECTED_KEY: detected} if detected else {}),
         },
         status="planned",
         gate_reason="pending_confirmation",
@@ -243,6 +253,12 @@ def _payload(record: ActionRecord) -> tuple[ConfirmationRequest, LedgerExtractio
         return None
 
 
+def _detected_payload(record: ActionRecord) -> dict[str, Any]:
+    payload = record.params or {}
+    detected = payload.get(DETECTED_KEY)
+    return detected if isinstance(detected, dict) else {}
+
+
 def _is_pending_record(record: ActionRecord) -> bool:
     return (
         record.action_type == PENDING_ACTION_TYPE
@@ -258,6 +274,7 @@ def _pointer_is_live(session_id: str, record_id: str) -> bool:
 
 
 def _to_item(record: ActionRecord, request: ConfirmationRequest, extraction: LedgerExtraction) -> PendingItem:
+    detected = _detected_payload(record)
     return PendingItem(
         pending_key=request.pending_key,
         record_id=record.id,
@@ -268,8 +285,8 @@ def _to_item(record: ActionRecord, request: ConfirmationRequest, extraction: Led
         amount_minor=request.amount_minor,
         source_ref=request.source_ref,
         expires_at=request.expires_at,
-        category_hint=extraction.category_hint,
-        direction=extraction.direction,
+        category_hint=str(detected.get("category_name") or "") or extraction.category_hint,
+        direction=str(detected.get("direction") or "") or extraction.direction,
         merchant_hint=extraction.merchant_hint,
         occurred_at_hint=extraction.occurred_at_hint,
         confidence=extraction.confidence,
@@ -382,7 +399,10 @@ def confirm_pending(
     if final_amount <= 0:
         raise PendingValidationError("缺少可入账金额")
     kind = "income" if final_direction == "income" else "expense"
-    chosen = (category_name or extraction.category_hint or "").strip() or None
+    detected = _detected_payload(record)
+    chosen = (
+        category_name or detected.get("category_name") or extraction.category_hint or ""
+    ).strip() or None
     target = category_service.normalize(user_id, chosen, kind=kind, now=timestamp)
     account_id = ledger_service.resolve_account_id(user_id)
     draft = LedgerEntryDraft(
@@ -393,7 +413,7 @@ def confirm_pending(
         direction=final_direction,
         occurred_at=occurred_at or extraction.occurred_at_resolved or timestamp,
         merchant=extraction.merchant_hint,
-        note=extraction.evidence_span,
+        note=str(detected.get("note") or "") or extraction.evidence_span,
         source="conversation",
         source_ref=request.source_ref or None,
         idempotency_key=pending_key,

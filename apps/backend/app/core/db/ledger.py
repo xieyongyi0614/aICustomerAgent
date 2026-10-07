@@ -106,13 +106,18 @@ class LedgerEntryRow(Base):
     note: Mapped[str | None] = mapped_column(String, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False)
     source_ref: Mapped[str | None] = mapped_column(String, nullable=True)
-    idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
     reversal_of: Mapped[str | None] = mapped_column(
         String, ForeignKey("ledger_entries.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_ledger_entries_user_idempotency",
+        ),
         CheckConstraint(
             "amount_minor > 0",
             name="ck_ledger_entries_amount_minor",

@@ -65,6 +65,72 @@ def test_create_entry_different_key_creates_second_row(bootstrapped):
     assert ledger_repository.count_entries(USER) == 2
 
 
+def test_entry_id_is_snowflake_not_idempotency_key(bootstrapped):
+    """ADR-16：分录主键是独立身份（雪花），不再由幂等键加前缀派生。"""
+    _, account = bootstrapped
+    entry = record_entry(
+        _draft(account.id, key="snow-1"), idempotency_key="snow-1", now=NOW
+    ).entry
+    assert entry.id.isdigit(), entry.id
+    assert len(entry.id) >= 16
+    assert entry.id != "snow-1"
+    assert entry.id != f"ent_{entry.idempotency_key}"
+    assert entry.idempotency_key == "snow-1"
+
+
+def test_same_idempotency_key_across_users_records_both(bootstrapped):
+    """回归：幂等键材料不含 user_id，全局唯一会让后写者被当作幂等命中而丢账。"""
+    _, account = bootstrapped
+    other_user = "ledger-other-user"
+    ensure_user_bootstrap(other_user, now=NOW)
+    other_account = ledger_repository.list_accounts(other_user)[0]
+
+    first = record_entry(
+        _draft(account.id, key="shared-key"), idempotency_key="shared-key", now=NOW
+    )
+    second = record_entry(
+        LedgerEntryDraft(
+            user_id=other_user,
+            account_id=other_account.id,
+            amount_minor=2000,
+            direction="expense",
+            occurred_at=NOW,
+            source="manual",
+            source_ref="src-2",
+            idempotency_key="shared-key",
+        ),
+        idempotency_key="shared-key",
+        now=NOW,
+    )
+
+    assert second.created is True, "另一用户同键必须各记一笔"
+    assert second.entry.user_id == other_user
+    assert second.entry.id != first.entry.id
+    assert ledger_repository.count_entries(other_user) == 1
+    assert ledger_repository.count_entries(USER) == 1
+
+
+def test_category_alias_persisted_as_utf8_not_escaped(
+    bootstrapped, db_session_factory
+):
+    """JSON 列改为 UTF-8 直存：别名在库里就是中文（排障 / 文本检索才可用）。
+
+    原先走 Python `json.dumps` 默认 `ensure_ascii=True`，库里存成 `\\uXXXX`：
+    应用读回无损，但 `aliases::text LIKE '%滴滴%'` 查不到、人工查库不可读。
+    """
+    from sqlalchemy import text
+
+    row = next(
+        row for row in ledger_repository.list_categories(USER) if row.name == "打车"
+    )
+    with db_session_factory() as session:
+        raw = session.execute(
+            text("SELECT aliases FROM ledger_categories WHERE id = :i"), {"i": row.id}
+        ).scalar()
+    assert "滴滴" in str(raw)
+    assert "\\u" not in str(raw)
+
+
 def test_reverse_entry_keeps_original_untouched(bootstrapped):
     _, account = bootstrapped
     original = record_entry(_draft(account.id), idempotency_key="k1", now=NOW).entry

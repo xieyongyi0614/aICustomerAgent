@@ -53,16 +53,17 @@ T0+1 轮 行动上下文段："已设提醒：开会，明天 08:00（scheduled�
 ## 4. 行动上下文段（action_ctx）
 
 - 装配：`app/services/action/context.py::build_action_context(user_id, session_id) -> ActionContext | None`，挂载于 chat_pipeline 世界上下文之后（H-A3 与 world_ctx 同构三连：builder 装配 → PromptBuilder 可选参数 → answer_chain 透传）。
-- 渲染 `render_action_section(ctx, budget=action_context_char_budget)` 纯函数，【行动】段内容（优先级序，预算内截断打标）：
+- 渲染 `render_action_section(ctx, budget=action_context_char_budget)` 纯函数，【行动】段内容（优先级序，预算内截断打标；段头声明"只作背景"）：
 
 ```text
-【行动】
+【行动】（我最近做过的事，只作背景，可一句话交代，不要展开点评）
 进行中：买牛奶（create_object，重试中，第 2 次）
 已设提醒：开会 · 明天 08:00（scheduled）
 上次失败：查"今天新闻"未成功——能力未接入
 ```
 
-- 选择规则：非终态行动全部进入（≤3 条）；最近 succeeded/failed 按 updated_at 倒序取 ≤2 条；cancelled（闸门否决）**不进** prompt（对角色不可见，仅审计可见——否则 LLM 会向用户解释内部闸门）。
+- 选择规则：非终态行动全部进入（≤3 条）；终态 2 格 = **failed 优先**（按 updated_at 倒序，≤2）+ **succeeded 最多 1 条**补位；cancelled（闸门否决）**不进** prompt（对角色不可见，仅审计可见——否则 LLM 会向用户解释内部闸门）。
+- V2.4.0 收敛：实测用户说"明天早上8点，叫我起床签到"，回复大半在点评上一条已完成的记账——素材没被声明为背景、且两条已完成旧账占满终态槽位，模型就把旧账当成了本轮话题。故：段头明示"只作背景、不要展开点评"（仍允许一句话交代，§3 的完成宣称不受影响），终态选取由"纯 updated_at 倒序取 2"改为失败优先 + 完成最多 1 条（失败保 ≥1 席，它承担下一轮补救衔接）。
 - 不变量：`action_ctx=None`（无行动记录或开关关）时 prompt 字节与 V8.5 完全一致；段独立预算，不参与既有变量裁剪。
 
 ## 5. Action Evaluation（M10）

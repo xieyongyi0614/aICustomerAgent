@@ -62,6 +62,21 @@ def test_missing_amount_triggers_confirm(settings):
     assert request.reason == REASON_MISSING_AMOUNT
 
 
+def test_non_ledger_message_never_triggers_confirm(settings):
+    """回归：抽取器说「这不是一笔账」时不得回问。
+
+    实测形态：用户说「明天早上8点，叫我起床签到」，抽取结果是
+    `is_ledger_intent=false` + 其余字段全空，却仍被登记成「这笔记多少？」——
+    原因是本函数此前只看 amount 是否为空，没看 `is_ledger_intent`
+    （提示词反例「今天天气不错」正是用该字段表达非记账）。
+    """
+    extraction = LedgerExtraction(is_ledger_intent=False)
+    assert (
+        should_confirm(extraction, settings=settings, now=NOW, source_ref="m-non-ledger")
+        is None
+    )
+
+
 def test_low_confidence_triggers_confirm(settings):
     request = should_confirm(
         _extraction(confidence=0.2),
