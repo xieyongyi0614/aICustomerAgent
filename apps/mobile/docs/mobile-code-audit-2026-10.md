@@ -348,13 +348,27 @@
 
 已完成：返回即刷新（life/album/album_detail）；相册权限归因、`openAppSettings` 出口、扫描批内并行 + 30min TTL 跳过、删除结果检查、原图降采样；`createDio` 单例化、令牌内存缓存、401 统一收口（清凭据→纪元重建→跳登录）、拦截器防悬挂、流式超时接线、多端点 `Future.wait`；life_repository 解析层统一 `toLocal`；24 处 `as int?` → `num?.toInt()`；语音金额「单位优先、否则取首个数字」+ 预览请求序号防乱序；`verifyEmailCode` 异常包装 + `deviceIdentity()` 持久化；重复照片 `_mergeSameContent` 漏报修复 + `count` 与 totalBytes 同口径（可删副本数，`assetIds` 保持候选全集）；头像 emoji 按 grapheme 截取；manifest 补 `POST_NOTIFICATIONS` / `SCHEDULE_EXACT_ALARM` / `READ_MEDIA_VISUAL_USER_SELECTED`。
 
-跳过（并行会话占用相关文件，待其收口后执行）：
+曾跳过（当时文件被并行会话占用）→ **已于第三批收口，见本节末**：
 
-- **P1-7** 日程时间线交互（`schedule_page.dart` 正被并行会话修改）
-- **P1-11** 路由守卫 fail-closed（`app_router.dart` 正被并行会话暂存修改）
-- **P1-9 子项** briefing_page 的 TextEditingController 泄漏与缓存读取兜底（该文件正被并行会话修改）
-- **P1-2 子项** manage 页缩略图网格 sliver 化懒加载（留待中期拆分批次）
+- **P1-7** 日程时间线交互（`schedule_page.dart`）
+- **P1-11** 路由守卫 fail-closed（`app_router.dart`）
+- **P1-9 子项** briefing_page 缓存读取兜底（TextEditingController 泄漏已由 `pickers.dart` 的 `dispose` 收口）
+- **P1-2 子项** manage 页缩略图网格 sliver 化懒加载
 
 ### 遗留测试红（非整改产物）
 
 以下 10 个测试红在整改开始前即存在（stash 隔离验证），归属并行会话工作，未代为修改：life_page ×6（健康模块移除未同步测试）、profile_renders（断言「设备连接」行而页面没有）、prefs_keys_centralized（allKeys 9→8 未同步断言）、goldens ×2（spend_summary / ledger_components）。
+
+### 第三批：跳过项与红测收口（2026-10-07）
+
+| 项 | 处理 |
+|---|---|
+| P1-7 日程时间线 | `ScheduleTimelineItem` 加 `onTap`（`PressScale` 包裹）→ 点卡弹动作条「标记完成 / 删除」，删除补二次确认；AI 结论卡「今天 N 件事」**只数已定时间项**，未排期项单列「另有 M 件」（原 `items.length` 把两者算一起） |
+| P1-11 路由守卫 | 去掉 `_entryGateChecked` 一次性闸：**每次导航**按令牌现状判断，令牌 / 偏好读取异常一律按未登录处理（fail-closed）；已登录访问 `/login`、`/verify` 回首页；`errorBuilder` 由 `HomePage` 换显式 `NotFoundPage` |
+| P1-9 子项 | `briefing_page._initialLoad` 的缓存读取加 try/catch：缓存损坏继续走网络刷新，不再停在骨架态（TextEditingController 泄漏此前已由 `pickers.dart` `dispose` 收口） |
+| P1-2 子项 | 缩略图改**分批并发**（每批 16，去掉逐张串行 await）；分组网格改 `CustomScrollView` + `SliverGrid` 懒加载，去掉 `shrinkWrap: true` + `NeverScrollableScrollPhysics` 的全量布局 |
+| 红测同步 | life_page ×5（宫格五卡、Hero「5 个」、健康摘要 / trend 断言移除、悬空入口循环）、`profile_renders`（去「设备连接」「数据授权」断言）、`prefs_keys_centralized`（实现侧漏登记：`keyFirstUsedAt` 补进 `PrefsStore.allKeys`，它在用 —— profile 页据此算「相识 N 天」） |
+
+**仍未完成（需可用 Flutter 环境）**：`test_life_page_golden`（`goldens/life_page_modules.png` 是六卡快照，宫格改五卡后必 diff）与 audit §10 旧列的 `spend_summary` / `ledger_components` 两个 golden —— 本机 `flutter test` 因 Windows 管道句柄耗尽不可用，需跑 `flutter test --update-goldens` 后再人工确认。
+
+设计侧同批：`components.md` A40 补「时间线条目可点（删除二次确认）」、B4b 补「今日计数只数已定时间项」；`design-alignment-report.md` 新增 **DEV-07**（健康模块移除 → 生活宫格 6→5 格、我的页去「设备连接」行与健康同意入口「数据授权」行）。
