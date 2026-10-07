@@ -148,18 +148,22 @@ def mode_chip_for(user_id: str) -> str:
 
 
 def insight_block_for(user_id: str) -> InsightBlock:
-    """只映射已产出的洞察；无洞察时叙事留空，由客户端出空态，不补默认文案。"""
+    """只映射已产出的洞察；无洞察时叙事留空，由客户端出空态，不补默认文案。
+
+    数据源是 reflection 的长期用户洞察（无日期窗口），故标题不用「今日」话术；
+    每日总结由独立任务承接（V5 任务注册表 API-021）。
+    """
     try:
         items = insights_query.list_insights(user_id, domain="home", limit=1)
     except Exception:
         items = []
     if not items:
-        return InsightBlock(title="今日 AI 总结", narrative="")
+        return InsightBlock(title="AI 洞察", narrative="")
     top = items[0]
     return InsightBlock(
-        title=top.headline or "今日 AI 总结",
+        title=top.headline or "AI 洞察",
         narrative=top.narrative,
-        action_label="查看完整早间简报 →",
+        action_label="查看早间简报 →",
     )
 
 

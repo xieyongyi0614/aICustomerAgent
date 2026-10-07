@@ -94,7 +94,7 @@ class HomeRepository {
       headline: hero['headline'] as String? ?? '今天也交给我吧',
       sub: hero['sub'] as String? ?? '',
       modeChip: hero['mode_chip'] as String? ?? '',
-      insightTitle: insight['title'] as String? ?? '今日 AI 总结',
+      insightTitle: insight['title'] as String? ?? 'AI 洞察',
       insightNarrative: insight['narrative'] as String? ?? '',
       insightAction: insight['action_label'] as String?,
       tasks: [

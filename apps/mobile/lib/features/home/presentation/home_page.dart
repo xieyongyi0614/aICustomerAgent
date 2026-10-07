@@ -122,7 +122,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ? null
                     : () => context.go('/briefing?type=morning'),
                 child: Text(
-                  d.insightNarrative.isEmpty ? '今天还没有新的总结' : d.insightNarrative,
+                  d.insightNarrative.isEmpty ? '还没有洞察 —— 亚丝娜还在了解你' : d.insightNarrative,
                   style: context.typography.body.copyWith(
                     color: colors.bodyOnCard,
                     height: 1.65,

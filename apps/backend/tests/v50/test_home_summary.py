@@ -72,6 +72,7 @@ def test_mode_chip_blank_when_history_lookup_raises(db_session_factory, monkeypa
 
 def test_insight_is_empty_without_produced_insights(db_session_factory):
     block = home_api.insight_block_for("u-none")
+    assert block.title == "AI 洞察"
     assert block.narrative == ""
     assert block.action_label is None
 
@@ -97,7 +98,7 @@ def test_insight_maps_produced_row(db_session_factory):
     block = home_api.insight_block_for("u1")
     assert block.title == "你最近更偏好在家做饭"
     assert block.narrative == "你最近更偏好在家做饭。夜间下单明显减少。"
-    assert block.action_label == "查看完整早间简报 →"
+    assert block.action_label == "查看早间简报 →"
 
 
 def test_summary_carries_no_fabricated_task_or_insight_claims(

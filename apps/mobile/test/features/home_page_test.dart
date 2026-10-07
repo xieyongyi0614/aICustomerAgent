@@ -11,9 +11,9 @@ HomeSummaryData _summary() => const HomeSummaryData(
       headline: '今天也交给我吧',
       sub: '亚丝娜已为你整理好今天的一切',
       modeChip: 'Default 模式',
-      insightTitle: '今日 AI 总结',
+      insightTitle: 'AI 洞察',
       insightNarrative: '上午适合专注。',
-      insightAction: '查看完整早间简报 →',
+      insightAction: '查看早间简报 →',
       tasks: [],
       tasksHint: '0 项',
       spend: HomeSpend(
@@ -32,7 +32,7 @@ void main() {
       ),
     );
     await tester.pump();
-    final ai = find.text('今日 AI 总结');
+    final ai = find.text('AI 洞察');
     final tasks = find.text('今日任务');
     expect(ai, findsOneWidget);
     expect(tasks, findsOneWidget);
@@ -100,7 +100,7 @@ void main() {
       headline: '今天也交给我吧',
       sub: '',
       modeChip: '',
-      insightTitle: '今日 AI 总结',
+      insightTitle: 'AI 洞察',
       insightNarrative: '',
       tasks: const [],
       tasksHint: '',
