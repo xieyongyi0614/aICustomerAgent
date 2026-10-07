@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/storage/cache_db.dart';
 import 'package:mobile/core/storage/prefs_store.dart';
 import 'package:mobile/core/storage/retry_store.dart';
+import 'package:mobile/core/storage/secure_token_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,27 @@ void main() {
     final db = File('lib/core/storage/cache_db.dart').readAsStringSync();
     expect(db.toLowerCase().contains('accesstoken'), isFalse);
     expect(db.toLowerCase().contains('bearer'), isFalse);
+  });
+
+  test('test_token_cache_is_shared_across_store_instances', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final writer = SecureTokenStore();
+    final reader = SecureTokenStore();
+    expect(await reader.readAccessToken(), isNull);
+
+    await writer.writeAccessToken('t-1');
+    expect(
+      await reader.readAccessToken(),
+      't-1',
+      reason: '登录写入必须对共享 Dio 的读取实例立刻可见，否则登录后全量 401',
+    );
+
+    await writer.clearCredentials();
+    expect(
+      await reader.readAccessToken(),
+      isNull,
+      reason: '清凭据后其它实例也不得再回旧令牌',
+    );
   });
 
   test('test_memory_cache_only_active_not_forgotten', () async {

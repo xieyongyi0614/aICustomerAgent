@@ -45,12 +45,23 @@ Dio _build({required TokenReader tokenReader, String? baseUrl}) {
 
 /// 令牌失效统一收口（见 session_expiry.dart）：无论后续错误如何被映射，
 /// 401 都要先触发一次「会话过期」动作。
+///
+/// 登录端点除外：这两处的 401 是「验证码错误 / 已过期 / 尝试过多」，
+/// 不是会话过期——照收口会清掉令牌并把人弹回登录页。
+/// 其余 `/auth/**`（如未来的 `/auth/me`）仍按会话过期处理。
 class UnauthorizedGuard extends Interceptor {
   const UnauthorizedGuard();
 
+  static const _credentialEntryPaths = {
+    '/auth/email/code',
+    '/auth/email/verify',
+  };
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    if (err.response?.statusCode == 401) {
+    final path = err.requestOptions.path;
+    final sessionScoped = !_credentialEntryPaths.any(path.endsWith);
+    if (err.response?.statusCode == 401 && sessionScoped) {
       notifyUnauthorized();
     }
     handler.next(err);
