@@ -40,6 +40,7 @@ class _BriefingPageState extends State<BriefingPage> {
   late final LocationService _location;
   BriefContentData? _content;
   BriefPrefsData? _prefs;
+  List<BriefingCity>? _cities;
   bool _fromCache = false;
   bool _usedCoords = false;
   bool _loading = true;
@@ -51,6 +52,18 @@ class _BriefingPageState extends State<BriefingPage> {
     _repo = widget.repository ?? BriefingRepository();
     _location = widget.location ?? const LocationService();
     _initialLoad();
+    _loadCities();
+  }
+
+  /// 城市目录用于切城面板与已存名回显；资产读取失败不阻塞页面主体。
+  Future<void> _loadCities() async {
+    try {
+      final cities = await loadBriefingCities();
+      if (!mounted) return;
+      setState(() => _cities = cities);
+    } catch (_) {
+      // 加载失败时切城面板回退自由输入
+    }
   }
 
   Future<void> _initialLoad() async {
@@ -114,6 +127,7 @@ class _BriefingPageState extends State<BriefingPage> {
 
   Future<void> _editCity() async {
     final currentCity = _prefs?.city?.trim() ?? '';
+    final cities = _cities ?? await loadBriefingCities();
     final picked = await showChoiceSheet<String>(
       context: context,
       title: '天气城市',
@@ -123,8 +137,12 @@ class _BriefingPageState extends State<BriefingPage> {
           label: '使用实时定位',
           note: '清除已存城市，跟随当前位置',
         ),
-        for (final city in briefingCities)
-          ChoiceSheetItem(value: city.name, label: city.name, group: city.region),
+        for (final city in cities)
+          ChoiceSheetItem(
+            value: city.saveAs ?? city.name,
+            label: city.name,
+            group: city.region,
+          ),
       ],
       selected: currentCity.isEmpty ? '' : currentCity,
       searchable: true,
@@ -238,8 +256,10 @@ class _BriefingPageState extends State<BriefingPage> {
 
   String get _cityValueLabel {
     final city = _prefs?.city?.trim() ?? '';
-    if (city.isNotEmpty) return city;
-    return _usedCoords ? '实时定位' : '默认北京';
+    if (city.isEmpty) return _usedCoords ? '实时定位' : '默认北京';
+    final cities = _cities;
+    if (cities == null) return city;
+    return briefingCityDisplayName(cities, city) ?? city;
   }
 
   String? _cachedAtLabel(BriefContentData? content) {

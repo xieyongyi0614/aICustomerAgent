@@ -63,6 +63,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/car/
+    - assets/data/
   fonts:
     - family: lucide
       fonts:

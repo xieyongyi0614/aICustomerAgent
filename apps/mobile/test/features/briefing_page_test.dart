@@ -174,10 +174,11 @@ void main() {
     expect(find.text('上海'), findsOneWidget);
     await tester.tap(find.text('天气'));
     await _flush(tester);
-    await tester.tap(find.text('北京'));
+    // 面板 ListView 懒构建：只点视口内靠前的条目（石家庄），不滚动找远端城市。
+    await tester.tap(find.text('石家庄'));
     await _flush(tester);
 
-    expect(repo.savedCities.single, '北京');
+    expect(repo.savedCities.single, '石家庄');
     // 换城只补拉简报本身：PUT 响应里的偏好直接复用，不再 GET preferences。
     expect(repo.prefsFetches, 1);
     expect(repo.fetchedLats.length, 2);

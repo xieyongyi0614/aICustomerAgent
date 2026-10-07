@@ -1,53 +1,48 @@
-/// 天气城市选择目录（A41 choice-sheet 分组数据）。
+import 'dart:convert';
+
+import 'package:flutter/services.dart' show rootBundle;
+
+/// 天气城市选择目录：JSON 资产（`assets/data/briefing_cities.json`）运行时加载。
 ///
-/// 只列名称、按大区分组；坐标一律由后端地理编码解析，端上不存坐标。
-/// 目录外的城市走搜索自由输入行（「用「xxx」」）。
+/// [name] 是展示名；[saveAs] 是保存/地理编码值，缺省等于 [name]——少数城市在
+/// GeoNames 里只有全名或罗马化名可搜（如廊坊市 / Lianyungang），保存时发
+/// saveAs，展示仍用中文短名；坐标一律由后端地理编码解析。
 class BriefingCity {
-  const BriefingCity(this.name, this.region);
+  const BriefingCity({required this.name, required this.region, this.saveAs});
+
+  factory BriefingCity.fromJson(Map<String, dynamic> json) => BriefingCity(
+        name: json['name'] as String,
+        region: json['region'] as String,
+        saveAs: json['saveAs'] as String?,
+      );
 
   final String name;
   final String region;
+  final String? saveAs;
 }
 
-const briefingCities = <BriefingCity>[
-  BriefingCity('北京', '华北'),
-  BriefingCity('天津', '华北'),
-  BriefingCity('石家庄', '华北'),
-  BriefingCity('太原', '华北'),
-  BriefingCity('呼和浩特', '华北'),
-  BriefingCity('上海', '华东'),
-  BriefingCity('南京', '华东'),
-  BriefingCity('苏州', '华东'),
-  BriefingCity('杭州', '华东'),
-  BriefingCity('宁波', '华东'),
-  BriefingCity('温州', '华东'),
-  BriefingCity('合肥', '华东'),
-  BriefingCity('福州', '华东'),
-  BriefingCity('厦门', '华东'),
-  BriefingCity('南昌', '华东'),
-  BriefingCity('济南', '华东'),
-  BriefingCity('青岛', '华东'),
-  BriefingCity('广州', '华南'),
-  BriefingCity('深圳', '华南'),
-  BriefingCity('东莞', '华南'),
-  BriefingCity('佛山', '华南'),
-  BriefingCity('南宁', '华南'),
-  BriefingCity('海口', '华南'),
-  BriefingCity('武汉', '华中'),
-  BriefingCity('郑州', '华中'),
-  BriefingCity('长沙', '华中'),
-  BriefingCity('重庆', '西南'),
-  BriefingCity('成都', '西南'),
-  BriefingCity('贵阳', '西南'),
-  BriefingCity('昆明', '西南'),
-  BriefingCity('拉萨', '西南'),
-  BriefingCity('西安', '西北'),
-  BriefingCity('兰州', '西北'),
-  BriefingCity('西宁', '西北'),
-  BriefingCity('银川', '西北'),
-  BriefingCity('乌鲁木齐', '西北'),
-  BriefingCity('沈阳', '东北'),
-  BriefingCity('大连', '东北'),
-  BriefingCity('长春', '东北'),
-  BriefingCity('哈尔滨', '东北'),
-];
+const _assetPath = 'assets/data/briefing_cities.json';
+
+List<BriefingCity>? _cache;
+
+/// 首次读取资产并解析，之后返回内存缓存。
+Future<List<BriefingCity>> loadBriefingCities() async {
+  final cached = _cache;
+  if (cached != null) return cached;
+  final raw = await rootBundle.loadString(_assetPath);
+  final cities = [
+    for (final entry in jsonDecode(raw) as List<dynamic>)
+      BriefingCity.fromJson(entry as Map<String, dynamic>),
+  ];
+  _cache = cities;
+  return cities;
+}
+
+/// 已存城市值回中文显示名（saveAs 存的城市如 Lianyungang -> 连云港）；
+/// 目录外自由输入的城市原样返回。
+String? briefingCityDisplayName(List<BriefingCity> cities, String saved) {
+  for (final city in cities) {
+    if (city.name == saved || city.saveAs == saved) return city.name;
+  }
+  return null;
+}
