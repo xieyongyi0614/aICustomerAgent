@@ -126,10 +126,17 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
 .spend-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
 .spend-top .v{font-size:26px;font-weight:750;letter-spacing:-.02em}
 .spend-top .b{font-size:12px;color:var(--ink3)}
-.pbar{height:7px;border-radius:99px;background:#F0EFE9;overflow:hidden;margin:10px 0 12px}
-.pbar i{display:block;height:100%;width:64%;border-radius:99px;background:linear-gradient(90deg,var(--money),#FFD08A)}
-.daybars{display:flex;align-items:flex-end;gap:6px;height:44px}
-.daybars i{flex:1;border-radius:5px;background:linear-gradient(180deg,#F4C066,#F8DCAB)}
+.daybars{display:flex;gap:6px;margin-top:12px}
+.dcol{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+/* 金额贴着各自柱顶：64 = 柱区 44 + 金额带 20，justify-content:flex-end 让 [金额][柱] 从底往上摞 */
+.dchart{width:100%;height:64px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.dval{height:13px;line-height:13px;font-size:10px;color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dval.peak{color:var(--ink);font-weight:700}
+.dbar{width:100%;height:44px;display:flex;align-items:flex-end}
+.dbar i{width:100%;border-radius:5px;background:linear-gradient(180deg,#F4C066,#F8DCAB)}
+.dbar i.empty{height:4px;background:#F0EFE9}
+.dday{font-size:10px;color:var(--ink3)}
+.dday.today{color:var(--ink2);font-weight:600}
 .ask-pill{margin-top:22px;display:flex;align-items:center;gap:10px;background:var(--card);border-radius:99px;box-shadow:var(--shadow-card);padding:8px 8px 8px 14px;cursor:pointer}
 .ask-pill .ph{font-size:14px;color:var(--ink3)}
 .ask-pill .send{width:38px;height:38px;border-radius:50%;background:var(--grad-ai);display:flex;align-items:center;justify-content:center;margin-left:auto;flex:none}
@@ -212,12 +219,19 @@ h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
         <div class="task"><div class="chk"></div><div><div class="t-t">给妈妈回电话</div><div class="t-s">上次通话是 9 天前，别拖太久</div></div><span class="t-tag">晚间</span></div>
       </div>
 
-      <div class="sec-title"><h2>今日消费</h2><a class="hint" href="31-ledger.html">查看账本 ›</a></div>
+      <div class="sec-title"><h2>最近消费</h2><a class="hint" href="31-ledger.html">查看账本 ›</a></div>
       <a class="card" href="31-ledger.html">
-        <div class="spend-top"><span class="v">¥128</span><span class="b">/ 今日预算 ¥200</span></div>
-        <div class="pbar"><i></i></div>
-        <div class="daybars"><i style="height:35%"></i><i style="height:60%"></i><i style="height:45%"></i><i style="height:80%"></i><i style="height:52%"></i><i style="height:66%"></i><i style="height:64%"></i></div>
-        <div class="sub" style="margin-top:10px">本周日均 ¥96，节奏健康 —— 亚丝娜</div>
+        <div class="spend-top"><span class="v">¥128</span><span class="b">近 7 天 · 4 笔</span></div>
+        <div class="daybars">
+          <div class="dcol"><div class="dchart"><span class="dval"></span><div class="dbar"><i class="empty"></i></div></div><span class="dday">四</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval">¥35</span><div class="dbar"><i style="height:83%"></i></div></div><span class="dday">五</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval"></span><div class="dbar"><i class="empty"></i></div></div><span class="dday">六</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval peak">¥42</span><div class="dbar"><i style="height:100%"></i></div></div><span class="dday">日</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval"></span><div class="dbar"><i class="empty"></i></div></div><span class="dday">一</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval">¥28</span><div class="dbar"><i style="height:67%"></i></div></div><span class="dday">二</span></div>
+          <div class="dcol"><div class="dchart"><span class="dval">¥23</span><div class="dbar"><i style="height:55%"></i></div></div><span class="dday today">今天</span></div>
+        </div>
+        <div class="sub" style="margin-top:10px">近 7 天日均 ¥18，比上周少 12% —— 亚丝娜</div>
       </a>
 
       <a class="ask-pill" href="20-chat.html">
