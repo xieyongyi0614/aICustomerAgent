@@ -143,6 +143,58 @@ void main() {
     expect(find.byType(ShaderMask), findsNothing);
   });
 
+  testWidgets('test_ledger_save_button_ghost_is_outlined_without_shadow',
+      (tester) async {
+    await _pump(
+      tester,
+      LedgerSaveButton(label: '取消', ghost: true, onPressed: () {}),
+    );
+    final ghost = _containers(tester).firstWhere(
+      (container) => _decorationOf(container).color == _colors.surface,
+    );
+    final decoration = _decorationOf(ghost);
+    expect(decoration.boxShadow, isNull);
+    expect((decoration.border! as Border).top.color, _colors.line);
+    final label = tester.widget<Text>(find.text('取消'));
+    expect(label.style!.color, _colors.ink2);
+  });
+
+  testWidgets('test_ledger_save_button_inline_variant_drops_shadow',
+      (tester) async {
+    await _pump(
+      tester,
+      LedgerSaveButton(label: '保存档案', elevated: false, onPressed: () {}),
+    );
+    final primary = _containers(tester).firstWhere(
+      (container) => _decorationOf(container).color == _colors.ink,
+    );
+    expect(_decorationOf(primary).boxShadow, isNull);
+  });
+
+  testWidgets('test_ledger_save_button_ghost_matches_primary_size',
+      (tester) async {
+    await _pump(
+      tester,
+      Row(
+        children: [
+          Expanded(
+            child: LedgerSaveButton(label: '取消', ghost: true, onPressed: () {}),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: LedgerSaveButton(label: '保存档案', onPressed: () {}),
+          ),
+        ],
+      ),
+    );
+    final ghostSize =
+        tester.getSize(find.widgetWithText(LedgerSaveButton, '取消'));
+    final primarySize =
+        tester.getSize(find.widgetWithText(LedgerSaveButton, '保存档案'));
+    expect(ghostSize.height, closeTo(primarySize.height, 0.5));
+    expect(ghostSize.width, primarySize.width);
+  });
+
   testWidgets('test_ledger_stat_card_value_and_unit_typography', (tester) async {
     await _pump(
       tester,

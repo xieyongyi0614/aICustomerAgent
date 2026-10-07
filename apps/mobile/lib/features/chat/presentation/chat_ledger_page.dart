@@ -168,7 +168,7 @@ class _ChatLedgerPageState extends State<ChatLedgerPage> {
           AiCard(
             title: '本月记账',
             actionLabel: '查看账本 →',
-            onAction: () => context.go('/ledger'),
+            onAction: () => context.push('/ledger', extra: '记账'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

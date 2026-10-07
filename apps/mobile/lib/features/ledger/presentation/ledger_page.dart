@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/theme/theme_context.dart';
 import '../../../design_system/components/components.dart';
@@ -18,6 +19,7 @@ class LedgerPage extends StatefulWidget {
     this.debugPending,
     this.repository,
     this.showBackLink = true,
+    this.backLabel = '生活',
   });
 
   final LedgerSummaryData? debugSummary;
@@ -25,8 +27,12 @@ class LedgerPage extends StatefulWidget {
   final List<LedgerPendingData>? debugPending;
   final LedgerRepository? repository;
 
-  /// false = 作为「动态」Tab 根页渲染：不出现「‹ 生活」返回链接。
+  /// false = 作为「动态」Tab 根页渲染：不出现返回链接。
   final bool showBackLink;
+
+  /// 返回链文案 = 来路页名（首页 / 生活 / 记账），由入口随路由传入；
+  /// 返回动作是弹栈回来路页，只有栈中无历史时才按此文案兜底。
+  final String backLabel;
 
   @override
   State<LedgerPage> createState() => _LedgerPageState();
@@ -101,6 +107,14 @@ class _LedgerPageState extends State<LedgerPage> {
     }
   }
 
+  /// A19 分类条标题是**类目名称**：后端只下发 id，名称走既有的 id→名称映射
+  /// （与账单行取色同源）。映射缺失（未分类 / 类目已删 / 拉取失败）统一落
+  /// 「未分类」，绝不把雪花 id 当文案抛给用户。
+  String _categoryLabel(String? categoryId) {
+    if (categoryId == null || categoryId.isEmpty) return '未分类';
+    return _categoryNames[categoryId] ?? '未分类';
+  }
+
   /// 待确认是账本页的增强块，取不到时只隐藏该块，不把整页打成错误态。
   Future<List<LedgerPendingData>> _loadPending() async {
     try {
@@ -126,6 +140,18 @@ class _LedgerPageState extends State<LedgerPage> {
     if (count == 0) return '本月还没有自动记账 · 同步与 AI 规则';
     return '本月已自动记 $count 笔 · 同步与 AI 规则';
   }
+
+  /// 返回 = 弹栈回入口页（首页 / 生活 / 记账各自回来处）；栈里没有历史
+  /// （深链或被 go 直达）时才兜底回「生活」，不留死键。
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/life');
+    }
+  }
+
+  Widget get _backLink => BackLink(label: widget.backLabel, onTap: _back);
 
   Future<void> _openEntry(String location) async {
     await context.push<bool>(location);
@@ -212,8 +238,9 @@ class _LedgerPageState extends State<LedgerPage> {
             children: [
               Text(
                 '改成哪一类',
-                style: context.typography.sectionTitle
-                    .copyWith(color: context.colors.ink),
+                style: context.typography.sectionTitle.copyWith(
+                  color: context.colors.ink,
+                ),
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -358,7 +385,19 @@ class _LedgerPageState extends State<LedgerPage> {
     if (_error != null && _summary == null) {
       return Scaffold(
         backgroundColor: colors.canvas,
-        body: SafeArea(child: ErrorState(onRetry: _load)),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.showBackLink)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                  child: _backLink,
+                ),
+              Expanded(child: ErrorState(onRetry: _load)),
+            ],
+          ),
+        ),
       );
     }
     final s = _summary!;
@@ -375,7 +414,7 @@ class _LedgerPageState extends State<LedgerPage> {
           child: ListView(
             padding: context.spacing.screenPadding.copyWith(bottom: 40),
             children: [
-              if (widget.showBackLink) BackLink(label: '生活'),
+              if (widget.showBackLink) _backLink,
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -386,25 +425,34 @@ class _LedgerPageState extends State<LedgerPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.periodLabel,
-                        style: type.caption
-                            .copyWith(color: colors.onDeepSecondary)),
+                    Text(
+                      s.periodLabel,
+                      style: type.caption.copyWith(
+                        color: colors.onDeepSecondary,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text('¥${s.expenseText}',
-                        style: type.numeric(type.display)
-                            .copyWith(color: colors.onDeepPrimary)),
+                    Text(
+                      '¥${s.expenseText}',
+                      style: type
+                          .numeric(type.display)
+                          .copyWith(color: colors.onDeepPrimary),
+                    ),
                     const SizedBox(height: 6),
                     if (s.comparisonLabel != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            vertical: 3, horizontal: 8),
+                          vertical: 3,
+                          horizontal: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: colors.health.withValues(alpha: 0.18),
                           borderRadius: context.radii.rFull,
                         ),
-                        child: Text(s.comparisonLabel!,
-                            style:
-                                type.caption.copyWith(color: colors.health)),
+                        child: Text(
+                          s.comparisonLabel!,
+                          style: type.caption.copyWith(color: colors.health),
+                        ),
                       ),
                   ],
                 ),
@@ -416,8 +464,10 @@ class _LedgerPageState extends State<LedgerPage> {
                   s.entryCount == 0
                       ? '这段时间还没有记账，说一句「午饭 35 元」就能记上。'
                       : '本期共 ${s.entryCount} 笔。收入 ${s.incomeText}，结余 ${s.netText}。',
-                  style: type.body
-                      .copyWith(color: colors.bodyOnCard, height: 1.65),
+                  style: type.body.copyWith(
+                    color: colors.bodyOnCard,
+                    height: 1.65,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -453,11 +503,10 @@ class _LedgerPageState extends State<LedgerPage> {
               else
                 for (final (index, c) in s.byCategory.take(6).indexed)
                   CategoryBar(
-                    label: c.categoryId ?? '未分类',
-                    amountLabel: '¥${(c.expenseMinor / 100).toStringAsFixed(0)}',
-                    ratio: maxExpense == 0
-                        ? 0
-                        : c.expenseMinor / maxExpense,
+                    label: _categoryLabel(c.categoryId),
+                    amountLabel:
+                        '¥${(c.expenseMinor / 100).toStringAsFixed(0)}',
+                    ratio: maxExpense == 0 ? 0 : c.expenseMinor / maxExpense,
                     gradient: _categoryGradient(index),
                   ),
               const SizedBox(height: 14),
@@ -473,6 +522,7 @@ class _LedgerPageState extends State<LedgerPage> {
       ),
     );
   }
+
   TxRow _entryRow(int index, AppColors colors) {
     final entry = _entries[index];
     final visuals = ledgerCategoryVisuals(
@@ -487,10 +537,34 @@ class _LedgerPageState extends State<LedgerPage> {
       tileColor: visuals.tile,
       iconColor: visuals.fg,
       icon: visuals.icon,
-      subtitle: entry.occurredAt,
+      // 服务端按产品时区下发展示文案（设备时区不可靠），缺省才在端上兜底格式化。
+      subtitle: entry.occurredLabel.isNotEmpty
+          ? entry.occurredLabel
+          : _occurredLabel(entry.occurredAt),
       showDivider: index < _entries.length - 1,
     );
   }
+}
+
+/// 账单行副文案时间（`components.md` B5 §11：「今天 12:32」）。
+///
+/// 接口给的是 UTC ISO 串，直接展示既难看又不在本地时区——这里统一转本地时区：
+/// 今天/昨天用相对日，其余按「今年 M/d HH:mm／跨年 yyyy/M/d HH:mm」。
+/// 解析不出（已是展示文案）时原样返回；空串归一为 null，TxRow 不渲染空副文案。
+String? _occurredLabel(String raw) {
+  if (raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw;
+  final at = parsed.toLocal();
+  final now = DateTime.now();
+  final days = DateTime(now.year, now.month, now.day)
+      .difference(DateTime(at.year, at.month, at.day))
+      .inDays;
+  final time = DateFormat('HH:mm').format(at);
+  if (days == 0) return '今天 $time';
+  if (days == 1) return '昨天 $time';
+  return DateFormat(at.year == now.year ? 'M/d HH:mm' : 'yyyy/M/d HH:mm')
+      .format(at);
 }
 
 class _SectionTitle extends StatelessWidget {

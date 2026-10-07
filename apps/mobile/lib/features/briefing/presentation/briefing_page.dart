@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/theme_context.dart';
@@ -171,6 +172,7 @@ class _BriefingPageState extends State<BriefingPage> {
           BackLink(
             label: '返回首页',
             onDark: true,
+            onTap: () => context.go('/home'),
           ),
           Text(
             content!.greeting,

@@ -4,12 +4,27 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:mobile/app/state/dynamic_tab.dart';
 import 'package:mobile/app/theme/app_theme.dart';
 import 'package:mobile/design_system/components/components.dart';
 import 'package:mobile/design_system/tokens/tokens.dart';
+import 'package:mobile/features/home/data/home_repository.dart';
+import 'package:mobile/features/home/presentation/home_page.dart';
 import 'package:mobile/features/ledger/data/ledger_repository.dart';
 import 'package:mobile/features/ledger/presentation/ledger_category_visuals.dart';
 import 'package:mobile/features/ledger/presentation/ledger_page.dart';
+
+/// 类目 id 用真实形态（雪花十进制串）：后端 `by_category` 下发的是 id，
+/// 名称靠 `GET /ledger/categories` 的 id→名称映射解析——假数据若直接用中文名当
+/// id，会把「分类条显示 id」这种缺陷掩盖掉。
+const _categoryFoodId = '100991278912634880';
+const _categoryTrafficId = '100991279118155776';
+
+const _categories = [
+  LedgerCategoryData(id: _categoryFoodId, name: '餐饮', kind: 'expense'),
+  LedgerCategoryData(id: _categoryTrafficId, name: '交通', kind: 'expense'),
+];
 
 const _summary = LedgerSummaryData(
   periodLabel: '2026年9月',
@@ -18,8 +33,16 @@ const _summary = LedgerSummaryData(
   netText: '-128.50',
   entryCount: 2,
   byCategory: [
-    LedgerCategoryTotal(categoryId: '餐饮', expenseMinor: 12850, incomeMinor: 0),
-    LedgerCategoryTotal(categoryId: '交通', expenseMinor: 8600, incomeMinor: 0),
+    LedgerCategoryTotal(
+      categoryId: _categoryFoodId,
+      expenseMinor: 12850,
+      incomeMinor: 0,
+    ),
+    LedgerCategoryTotal(
+      categoryId: _categoryTrafficId,
+      expenseMinor: 8600,
+      incomeMinor: 0,
+    ),
   ],
   comparisonLabel: '比上月同期少 12%',
 );
@@ -62,11 +85,15 @@ class _FakeLedgerRepository extends LedgerRepository {
     this.pendingFails = false,
     this.confirmFails = false,
     this.entries = _entries,
-    this.categories = const [],
+    this.categories = _categories,
+    this.summary = _summary,
+    this.summaryFails = false,
   }) : super(dio: Dio());
 
   final int autoCount;
   final bool autoFails;
+  final bool summaryFails;
+  final LedgerSummaryData summary;
   final List<LedgerPendingData> pending;
   final bool pendingFails;
   bool confirmFails;
@@ -84,7 +111,8 @@ class _FakeLedgerRepository extends LedgerRepository {
   @override
   Future<LedgerSummaryData> fetchSummary({String period = 'month'}) async {
     summaryCalls++;
-    return _summary;
+    if (summaryFails) throw Exception('summary down');
+    return summary;
   }
 
   @override
@@ -174,6 +202,88 @@ Future<void> _openLedger(WidgetTester tester, LedgerRepository repo) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
 }
+
+HomeSummaryData _homeSummary() => const HomeSummaryData(
+      dateLabel: '今天',
+      greeting: '早上好',
+      headline: '今天也交给我吧',
+      sub: '亚丝娜已为你整理好今天的一切',
+      modeChip: 'Default 模式',
+      insightTitle: '今日 AI 总结',
+      insightNarrative: '上午适合专注。',
+      insightAction: '查看完整早间简报 →',
+      tasks: [],
+      tasksHint: '0 项',
+      spend: HomeSpend(
+        amountLabel: '¥0',
+        noteLabel: '近 7 天',
+        conclusion: '最近还没有记账 —— 亚丝娜',
+      ),
+    );
+
+/// 复刻真实壳层：入口一律 push（栈里有历史），返回即弹栈回各自的来路页。
+GoRouter _routerWithOrigins(
+  LedgerRepository repo, {
+  String initial = '/home',
+}) =>
+    GoRouter(
+      initialLocation: initial,
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (_, _) => HomePage(debugSummary: _homeSummary()),
+        ),
+        GoRoute(
+          path: '/life',
+          builder: (context, _) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () =>
+                    context.push<bool>(LifeModule.ledger.routePath),
+                child: const Text('OPEN_LEDGER_FROM_LIFE'),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/ledger',
+          builder: (_, state) => LedgerPage(
+            repository: repo,
+            backLabel: state.extra as String? ?? '生活',
+          ),
+        ),
+      ],
+    );
+
+Future<void> _openLedgerViaOrigins(
+  WidgetTester tester,
+  LedgerRepository repo, {
+  String initial = '/home',
+}) async {
+  tester.view.physicalSize = const Size(390, 2000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    MaterialApp.router(
+      routerConfig: _routerWithOrigins(repo, initial: initial),
+      theme: buildAppTheme(),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+}
+
+/// 首页带常驻动画（Orb），pumpAndSettle 永不收敛，按固定时长推进转场。
+Future<void> _settleRoute(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
+/// 返回链的 GestureDetector 走 deferToChild：只有图标 / 文字命中，点整块会落空。
+Finder _backLink(String label) => find.descendant(
+  of: find.byType(BackLink),
+  matching: find.text(label),
+);
 
 double _topOf(WidgetTester tester, Finder finder) =>
     tester.getTopLeft(finder).dy;
@@ -369,6 +479,48 @@ void main() {
         reason: '分类条按语义四色轮转，不是全 money');
   });
 
+  testWidgets('test_ledger_page_category_bars_show_names_not_ids',
+      (tester) async {
+    final repo = _FakeLedgerRepository(
+      summary: const LedgerSummaryData(
+        periodLabel: '2026年10月',
+        expenseText: '8.00',
+        incomeText: '0.00',
+        netText: '-8.00',
+        entryCount: 2,
+        byCategory: [
+          LedgerCategoryTotal(
+            categoryId: _categoryFoodId,
+            expenseMinor: 800,
+            incomeMinor: 0,
+          ),
+          LedgerCategoryTotal(categoryId: null, expenseMinor: 100, incomeMinor: 0),
+          LedgerCategoryTotal(
+            categoryId: '100999999999999999',
+            expenseMinor: 50,
+            incomeMinor: 0,
+          ),
+        ],
+      ),
+    );
+    await _openLedger(tester, repo);
+
+    final bars =
+        tester.widgetList<CategoryBar>(find.byType(CategoryBar)).toList();
+    expect(bars[0].label, '餐饮', reason: 'A19 分类条标题是类目名称，不是类目 id');
+    expect(bars[1].label, '未分类');
+    expect(
+      bars[2].label,
+      '未分类',
+      reason: '映射缺失（类目已删 / 名称未拉回）统一降级，绝不把 id 当文案',
+    );
+    expect(
+      find.text(_categoryFoodId),
+      findsNothing,
+      reason: '雪花 id 不应出现在页面上任何位置',
+    );
+  });
+
   testWidgets('test_ledger_page_existing_sections_unchanged', (tester) async {
     await _openLedger(tester, _FakeLedgerRepository());
     expect(find.text('¥128.50'), findsOneWidget);
@@ -385,6 +537,77 @@ void main() {
       find.byType(Scaffold),
       matchesGoldenFile('goldens/ledger_page_entry_row.png'),
     );
+  });
+
+  testWidgets('test_ledger_page_entry_time_is_formatted_local', (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 12, 32);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final older = today.subtract(const Duration(days: 3));
+    // 接口下发 UTC ISO 串（真实形态），页面必须转本地时区并按 B5 §11 格式化
+    final todayIso = today.toUtc().toIso8601String();
+    final yesterdayIso = yesterday.toUtc().toIso8601String();
+    final olderIso = older.toUtc().toIso8601String();
+    final olderPattern = older.year == now.year ? 'M/d HH:mm' : 'yyyy/M/d HH:mm';
+
+    await _openLedger(
+      tester,
+      _FakeLedgerRepository(
+        entries: [
+          LedgerEntryData(
+            id: 'e-today',
+            amountText: '35.00',
+            direction: 'expense',
+            occurredAt: todayIso,
+            merchant: '一碗拉面',
+          ),
+          LedgerEntryData(
+            id: 'e-yesterday',
+            amountText: '6.00',
+            direction: 'expense',
+            occurredAt: yesterdayIso,
+            merchant: '地铁出行',
+          ),
+          LedgerEntryData(
+            id: 'e-older',
+            amountText: '87.00',
+            direction: 'expense',
+            occurredAt: olderIso,
+            merchant: '咖啡豆',
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('今天 12:32'), findsOneWidget);
+    expect(find.text('昨天 12:32'), findsOneWidget);
+    expect(find.text(DateFormat(olderPattern).format(older)), findsOneWidget);
+    for (final iso in [todayIso, yesterdayIso, olderIso]) {
+      expect(find.text(iso), findsNothing, reason: '不得直接把接口 ISO 串当副文案');
+    }
+  });
+
+  testWidgets('test_ledger_page_prefers_server_time_label', (tester) async {
+    // 设备时区不可靠：模拟器默认 UTC，本地 00:23 的账曾显示成「今天 16:23」。
+    // 服务端按产品时区下发 occurred_label，端上不得再按设备时区自行换算覆盖。
+    await _openLedger(
+      tester,
+      _FakeLedgerRepository(
+        entries: const [
+          LedgerEntryData(
+            id: 'e-server-label',
+            amountText: '35.00',
+            direction: 'expense',
+            occurredAt: '2026-10-06T16:23:03.906523+00:00',
+            occurredLabel: '今天 00:23',
+            merchant: '一碗拉面',
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('今天 00:23'), findsOneWidget);
+    expect(find.text('今天 16:23'), findsNothing);
   });
 
   test('test_ledger_page_never_imports_dio', () {
@@ -437,5 +660,71 @@ void main() {
     expect(ledgerCategoryVisuals(colors, '人情').fg, colors.money,
         reason: '未识别分类回落基线');
     expect(ledgerCategoryVisuals(colors, null).icon, AppIcons.fileText);
+  });
+
+  testWidgets('test_ledger_page_back_from_home_returns_home', (tester) async {
+    await _openLedgerViaOrigins(tester, _FakeLedgerRepository());
+
+    await tester.tap(find.text('查看账本 ›'));
+    await _settleRoute(tester);
+    expect(find.byType(LedgerPage), findsOneWidget);
+
+    expect(
+      _backLink('首页'),
+      findsOneWidget,
+      reason: '从首页进来，返回链要写来路页名',
+    );
+    await tester.tap(_backLink('首页'));
+    await _settleRoute(tester);
+
+    expect(find.text('今日任务'), findsOneWidget, reason: '从首页进来要回首页');
+    expect(find.byType(LedgerPage), findsNothing);
+  });
+
+  testWidgets('test_ledger_page_back_from_life_returns_life', (tester) async {
+    await _openLedgerViaOrigins(
+      tester,
+      _FakeLedgerRepository(),
+      initial: '/life',
+    );
+
+    await tester.tap(find.text('OPEN_LEDGER_FROM_LIFE'));
+    await _settleRoute(tester);
+    expect(find.byType(LedgerPage), findsOneWidget);
+
+    expect(
+      _backLink('生活'),
+      findsOneWidget,
+      reason: '生活宫格入口不带来路，回落默认「生活」',
+    );
+    await tester.tap(_backLink('生活'));
+    await _settleRoute(tester);
+
+    expect(
+      find.text('OPEN_LEDGER_FROM_LIFE'),
+      findsOneWidget,
+      reason: '从生活页进来要回生活页',
+    );
+  });
+
+  testWidgets('test_ledger_page_error_state_keeps_back_link', (tester) async {
+    await _openLedgerViaOrigins(
+      tester,
+      _FakeLedgerRepository(summaryFails: true),
+    );
+
+    await tester.tap(find.text('查看账本 ›'));
+    await _settleRoute(tester);
+
+    expect(find.byType(ErrorState), findsOneWidget);
+    expect(
+      _backLink('首页'),
+      findsOneWidget,
+      reason: '错误态也要留返回入口，否则 Tab 栏已隐藏、用户被困在页内',
+    );
+
+    await tester.tap(_backLink('首页'));
+    await _settleRoute(tester);
+    expect(find.text('今日任务'), findsOneWidget);
   });
 }

@@ -752,18 +752,27 @@ class LedgerParseCard extends StatelessWidget {
   }
 }
 
-/// A32 save（深色主按钮）：用户动作，用 `ink` 深色，禁 ai 渐变。
+/// A32 save（pill 动作按钮）：主态为用户动作，用 `ink` 深色 + 投影，禁 ai 渐变。
+///
+/// [ghost] 降级为**同尺寸**次级按钮（白底 + line 描边 + ink2 字），
+/// 与主按钮并列成一行时高度严格一致（「取消 / 保存」这类按钮对）。
+/// 按钮成对**内联在表单里**（不在页面底部做 CTA）时传 [elevated] = false：
+/// 两者都无投影，避免主按钮投影溢到相邻按钮上显得多余。
 class LedgerSaveButton extends StatelessWidget {
   const LedgerSaveButton({
     super.key,
     required this.label,
     this.onPressed,
     this.enabled = true,
+    this.ghost = false,
+    this.elevated = true,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool enabled;
+  final bool ghost;
+  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
@@ -777,25 +786,32 @@ class LedgerSaveButton extends StatelessWidget {
         opacity: enabled ? 1 : 0.5,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(15),
+          // ghost 的 1px 描边会额外占 2px：垂直内边距减 1，两态等高。
+          padding: EdgeInsets.symmetric(
+            vertical: ghost ? 14 : 15,
+            horizontal: 15,
+          ),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: colors.ink,
+            color: ghost ? colors.surface : colors.ink,
             borderRadius: radii.rFull,
-            boxShadow: [
-              BoxShadow(
-                color: colors.ink.withValues(alpha: 0.22),
-                offset: const Offset(0, 12),
-                blurRadius: 26,
-              ),
-            ],
+            border: ghost ? Border.all(color: colors.line) : null,
+            boxShadow: ghost || !elevated
+                ? null
+                : [
+                    BoxShadow(
+                      color: colors.ink.withValues(alpha: 0.22),
+                      offset: const Offset(0, 12),
+                      blurRadius: 26,
+                    ),
+                  ],
           ),
           child: Text(
             label,
             style: type.title.copyWith(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: colors.onDeepPrimary,
+              color: ghost ? colors.ink2 : colors.onDeepPrimary,
             ),
           ),
         ),

@@ -40,6 +40,7 @@ class LedgerEntryData {
     required this.amountText,
     required this.direction,
     required this.occurredAt,
+    this.occurredLabel = '',
     this.merchant,
     this.note,
     this.categoryId,
@@ -49,6 +50,10 @@ class LedgerEntryData {
   final String amountText;
   final String direction;
   final String occurredAt;
+
+  /// 服务端按**产品时区**渲染的展示文案（「今天 00:23」等）。
+  /// 设备时区不可靠（模拟器默认 UTC），端上只做兜底格式化。
+  final String occurredLabel;
   final String? merchant;
   final String? note;
   final String? categoryId;
@@ -207,6 +212,7 @@ class LedgerRepository {
           amountText: raw['amount_text'] as String? ?? '',
           direction: raw['direction'] as String? ?? 'expense',
           occurredAt: raw['occurred_at'] as String? ?? '',
+          occurredLabel: raw['occurred_label'] as String? ?? '',
           merchant: raw['merchant'] as String?,
           note: raw['note'] as String?,
           categoryId: raw['category_id'] as String?,

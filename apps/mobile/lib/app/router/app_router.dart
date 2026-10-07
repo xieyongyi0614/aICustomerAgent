@@ -174,7 +174,12 @@ final appRouter = GoRouter(
           path: '/profile/privacy',
           builder: (_, _) => const ProfilePrivacyPage(),
         ),
-        GoRoute(path: '/ledger', builder: (_, _) => const LedgerPage()),
+        GoRoute(
+          path: '/ledger',
+          builder: (_, state) => LedgerPage(
+            backLabel: state.extra as String? ?? '生活',
+          ),
+        ),
         GoRoute(path: '/ledger/add', builder: (_, _) => const LedgerAddPage()),
         GoRoute(path: '/ledger/auto', builder: (_, _) => const LedgerAutoPage()),
         GoRoute(path: '/memo', builder: (_, _) => const MemoPage()),
