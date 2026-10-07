@@ -32,6 +32,26 @@ def test_memo_kind_allowed(db_session_factory):
     assert task_service.memo_count("u3") == 1
 
 
+def test_create_collapses_double_submit(db_session_factory):
+    first = task_service.create("u-dup", "完成备忘录开发")
+    second = task_service.create("u-dup", "完成备忘录开发")
+    assert second.id == first.id
+    assert len(task_service.list_tasks("u-dup")) == 1
+
+
+def test_create_keeps_distinct_titles(db_session_factory):
+    task_service.create("u-distinct", "完成备忘录开发")
+    task_service.create("u-distinct", "写周报")
+    assert len(task_service.list_tasks("u-distinct")) == 2
+
+
+def test_create_keeps_same_title_across_kinds(db_session_factory):
+    memo = task_service.create("u-kind", "看牙医", kind="memo")
+    task = task_service.create("u-kind", "看牙医", kind="task")
+    assert memo.id != task.id
+    assert len(task_service.list_tasks("u-kind")) == 2
+
+
 def test_api_router_has_no_repositories_import():
     import inspect
 

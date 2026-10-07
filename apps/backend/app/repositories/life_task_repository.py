@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core import timeutil
 from app.core import ids
@@ -45,6 +45,34 @@ def create_task(
 def get_task(task_id: str) -> LifeTaskRow | None:
     with SessionLocal() as session:
         return session.get(LifeTaskRow, task_id)
+
+
+def find_recent_open_duplicate(
+    user_id: str,
+    *,
+    title: str,
+    kind: str,
+    within: timedelta,
+    now: datetime | None = None,
+) -> LifeTaskRow | None:
+    moment = timeutil.ensure_aware(now) or timeutil.now()
+    with SessionLocal() as session:
+        row = (
+            session.query(LifeTaskRow)
+            .filter(
+                LifeTaskRow.user_id == user_id,
+                LifeTaskRow.title == title,
+                LifeTaskRow.kind == kind,
+                LifeTaskRow.status == "open",
+                LifeTaskRow.created_at >= moment - within,
+            )
+            .order_by(LifeTaskRow.created_at.desc())
+            .first()
+        )
+        if row is None:
+            return None
+        session.expunge(row)
+        return row
 
 
 def list_tasks(user_id: str, *, status: str | None = None, kind: str | None = None):

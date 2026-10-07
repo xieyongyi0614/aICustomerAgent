@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -118,5 +120,27 @@ void main() {
 
     expect(spy.calls, isEmpty);
     expect(find.text('先写一句话，再选归到哪里'), findsOneWidget);
+  });
+
+  testWidgets('double submit within one frame lands a single task',
+      (tester) async {
+    final pending = Completer<CaptureRouteResult>();
+    var calls = 0;
+    await _pumpSheet(tester, router: (kind, text) {
+      calls++;
+      return pending.future;
+    });
+
+    await tester.tap(find.text('任务'));
+    await tester.tap(find.text('任务'), warnIfMissed: false);
+    await tester.pump();
+
+    expect(calls, 1, reason: '同一次提交在途时不得再发一次');
+
+    pending.complete(
+      const CaptureRouteResult(receipt: '已归到「任务」', taskId: 't-1'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('已归到「任务」'), findsOneWidget);
   });
 }

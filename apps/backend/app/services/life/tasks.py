@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.repositories import life_task_repository
+
+DOUBLE_SUBMIT_WINDOW = timedelta(seconds=2)
 
 
 def _order_reason(task) -> str:
@@ -16,6 +18,15 @@ def _order_reason(task) -> str:
 
 
 def create(user_id: str, title: str, **kwargs):
+    kind = kwargs.get("kind") or "task"
+    duplicate = life_task_repository.find_recent_open_duplicate(
+        user_id,
+        title=title,
+        kind=kind,
+        within=DOUBLE_SUBMIT_WINDOW,
+    )
+    if duplicate is not None:
+        return duplicate
     row = life_task_repository.create_task(user_id, title, **kwargs)
     if row.order_reason is None:
         row = life_task_repository.update_task(row.id, order_reason=_order_reason(row))
@@ -48,6 +59,7 @@ def list_tasks(
             "order_reason": r.order_reason or _order_reason(r),
             "remind_at": r.remind_at.isoformat() if r.remind_at else None,
             "due_date": r.due_date,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
             "completed_at": r.completed_at.isoformat() if r.completed_at else None,
         }
         for r in rows

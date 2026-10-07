@@ -72,6 +72,7 @@ class _CaptureRouteSheetState extends State<CaptureRouteSheet> {
       widget.debugRouter ?? (kind, text) => routeToTaskDomain(_repo, kind, text);
 
   Future<void> _route(CaptureRouteKind kind) async {
+    if (_busy) return;
     final text = _controller.text.trim();
     if (text.isEmpty) {
       ScaffoldMessenger.of(context)
