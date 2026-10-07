@@ -127,6 +127,7 @@ class ScheduleTimelineItem {
     this.aiNote,
     this.badge,
     this.done = false,
+    this.onTap,
   });
 
   final String timeLabel;
@@ -139,6 +140,9 @@ class ScheduleTimelineItem {
   /// 标题右侧徽章（如任务标签），底色 rgba(122,92,255,.1)。
   final String? badge;
   final bool done;
+
+  /// 点按弹动作条（标记完成 / 删除）；null = 只读条目。
+  final VoidCallback? onTap;
 }
 
 /// A40 tl（今日时间线）：时间戳左置 + 白卡 + 卡片间垂直连线（末项无）。
@@ -192,7 +196,10 @@ class ScheduleTimeline extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 18),
-              child: _card(context, item),
+              child: PressScale(
+                onTap: item.onTap,
+                child: _card(context, item),
+              ),
             ),
           ),
         ],

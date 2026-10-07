@@ -159,11 +159,15 @@ class _SchedulePageState extends State<SchedulePage> {
     if (items.isEmpty) {
       return '今天还没有排到事。想加一件，跟我说一句就行。';
     }
-    final undated = items.where((task) => _dateOf(task) == null).length;
+    final dated = items.where((task) => _dateOf(task) != null).length;
+    final undated = items.length - dated;
     final undatedPart = undated == 0
         ? ''
         : '另有 $undated 件还没定时间，告诉我什么时候做，我帮你排进去。';
-    return '今天 ${items.length} 件事，我按你的精力节奏排好了——'
+    if (dated == 0) {
+      return '今天还没有定好时间的安排。$undatedPart';
+    }
+    return '今天 $dated 件事，我按你的精力节奏排好了——'
         '需要专注的放前面，跑外勤的往后挪。$undatedPart';
   }
 
@@ -205,6 +209,7 @@ class _SchedulePageState extends State<SchedulePage> {
       ),
     );
     if (action == null) return;
+    if (action == 'delete' && !await _confirmDelete(task)) return;
     try {
       if (action == 'complete') {
         await _repo.completeTask(task.id);
@@ -220,6 +225,28 @@ class _SchedulePageState extends State<SchedulePage> {
     }
     if (!mounted) return;
     await _load();
+  }
+
+  Future<bool> _confirmDelete(LifeTaskItem task) async {
+    final colors = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删掉这件事'),
+        content: Text('「${task.title}」删掉后不会再出现在日程里。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('先留着'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('删掉它', style: TextStyle(color: colors.danger)),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
   }
 
   void _back() {
@@ -316,6 +343,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   aiNote: task.orderReason,
                   badge: (task.tag ?? '').isEmpty ? null : task.tag,
                   done: task.status != 'open',
+                  onTap: () => _act(task),
                 ),
             ],
           ),

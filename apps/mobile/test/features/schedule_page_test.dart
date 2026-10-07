@@ -149,6 +149,83 @@ void main() {
     expect(repo.completeCalls, 1);
   });
 
+  testWidgets('test_schedule_page_timeline_item_opens_actions', (tester) async {
+    final at9 = DateTime(_today.year, _today.month, _today.day, 9, 30);
+    final repo = _FakeLifeRepository(
+      tasks: [
+        LifeTaskItem(
+          id: 't-1',
+          title: '回复导师邮件',
+          kind: 'task',
+          status: 'open',
+          remindAt: at9.toIso8601String(),
+        ),
+      ],
+    );
+    await _pump(tester, repo);
+
+    await tester.tap(find.text('回复导师邮件'));
+    await tester.pumpAndSettle();
+    expect(find.text('标记完成'), findsOneWidget,
+        reason: '今天的待办要能在时间线上办掉，不能只做展示');
+  });
+
+  testWidgets('test_schedule_page_delete_needs_confirmation', (tester) async {
+    final at9 = DateTime(_today.year, _today.month, _today.day, 9, 30);
+    final repo = _FakeLifeRepository(
+      tasks: [
+        LifeTaskItem(
+          id: 't-1',
+          title: '回复导师邮件',
+          kind: 'task',
+          status: 'open',
+          remindAt: at9.toIso8601String(),
+        ),
+      ],
+    );
+    await _pump(tester, repo);
+
+    await tester.tap(find.text('回复导师邮件'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+    expect(find.text('删掉这件事'), findsOneWidget);
+    expect(repo.deleteCalls, 0, reason: '未确认前不得删除');
+
+    await tester.tap(find.text('删掉它'));
+    await tester.pumpAndSettle();
+    expect(repo.deleteCalls, 1);
+  });
+
+  testWidgets('test_schedule_page_ai_count_excludes_undated', (tester) async {
+    final at9 = DateTime(_today.year, _today.month, _today.day, 9, 30);
+    final repo = _FakeLifeRepository(
+      tasks: [
+        LifeTaskItem(
+          id: 't-1',
+          title: '产品方案对齐',
+          kind: 'task',
+          status: 'open',
+          remindAt: at9.toIso8601String(),
+        ),
+        LifeTaskItem(
+          id: 't-2',
+          title: '给妈妈回电话',
+          kind: 'task',
+          status: 'open',
+        ),
+      ],
+    );
+    await _pump(tester, repo);
+
+    expect(
+      find.textContaining('今天 1 件事'),
+      findsOneWidget,
+      reason: '未定时间的待办不计入「今天 N 件事」',
+    );
+    expect(find.textContaining('另有 1 件还没定时间'), findsOneWidget);
+  });
+
   testWidgets('test_schedule_page_done_task_is_struck_through', (tester) async {
     final today = _today;
     final at9 = DateTime(today.year, today.month, today.day, 9, 30);
