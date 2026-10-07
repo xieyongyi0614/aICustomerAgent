@@ -425,7 +425,7 @@ class CountPill extends StatelessWidget {
 
 /// A39 备忘行：主题色点 + 内容 + 来源行（来源可带 AI 关联回执）。
 ///
-/// 长按触发编辑 / 删除（设计稿 41「任何一条都可以长按修改或删除」）。
+/// 长按触发删除（设计稿 41 只承诺「长按删除」；修改未落地）。
 class MemoRow extends StatelessWidget {
   const MemoRow({
     super.key,
@@ -433,7 +433,6 @@ class MemoRow extends StatelessWidget {
     required this.dotColor,
     this.sourceNote,
     this.aiNote,
-    this.done = false,
     this.showDivider = true,
     this.onLongPress,
   });
@@ -444,7 +443,6 @@ class MemoRow extends StatelessWidget {
 
   /// AI 关联回执（如「已排进今日任务」），以 aiPrimary 高亮。
   final String? aiNote;
-  final bool done;
   final bool showDivider;
   final VoidCallback? onLongPress;
 
@@ -484,8 +482,7 @@ class MemoRow extends StatelessWidget {
                     title,
                     style: type.body.copyWith(
                       height: 1.55,
-                      color: done ? colors.ink3 : colors.ink,
-                      decoration: done ? TextDecoration.lineThrough : null,
+                      color: colors.ink,
                     ),
                   ),
                   if (hasNote) ...[

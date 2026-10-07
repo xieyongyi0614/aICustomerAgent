@@ -14,6 +14,7 @@ class LifeTaskItem {
     this.note,
     this.remindAt,
     this.dueDate,
+    this.createdAt,
     this.completedAt,
   });
 
@@ -36,6 +37,9 @@ class LifeTaskItem {
   /// ISO 时间串；`null` = 未完成（DA-19 完成态数据源）。
   final String? completedAt;
 
+  /// ISO 时间串；`null` = 服务端未下发（备忘行的「记录时间」）。
+  final String? createdAt;
+
   static LifeTaskItem fromRow(Map row) => LifeTaskItem(
     id: row['id'] as String? ?? '',
     title: row['title'] as String? ?? '',
@@ -46,6 +50,7 @@ class LifeTaskItem {
     note: row['note'] as String?,
     remindAt: row['remind_at'] as String?,
     dueDate: row['due_date'] as String?,
+    createdAt: row['created_at'] as String?,
     completedAt: row['completed_at'] as String?,
   );
 
@@ -56,6 +61,9 @@ class LifeTaskItem {
     final raw = dueDate;
     return raw == null ? null : DateTime.tryParse(raw);
   }
+
+  DateTime? get createdDateTime =>
+      createdAt == null ? null : DateTime.tryParse(createdAt!);
 
   DateTime? get completedDateTime =>
       completedAt == null ? null : DateTime.tryParse(completedAt!);

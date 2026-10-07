@@ -41,7 +41,24 @@ class TaskOut(BaseModel):
     order_reason: str | None = None
     remind_at: str | None = None
     due_date: str | None = None
+    created_at: str | None = None
     completed_at: str | None = None
+
+
+def _out(row) -> TaskOut:
+    return TaskOut(
+        id=row.id,
+        title=row.title,
+        kind=row.kind,
+        status=row.status,
+        tag=row.tag,
+        note=row.note,
+        order_reason=row.order_reason,
+        remind_at=row.remind_at.isoformat() if row.remind_at else None,
+        due_date=row.due_date,
+        created_at=row.created_at.isoformat() if row.created_at else None,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
+    )
 
 
 @tasks_router.get("", response_model=list[TaskOut])
@@ -64,18 +81,7 @@ def create_task(body: TaskCreateRequest, user_id: str = Depends(require_user)):
         remind_at=body.remind_at,
         due_date=body.due_date,
     )
-    return TaskOut(
-        id=row.id,
-        title=row.title,
-        kind=row.kind,
-        status=row.status,
-        tag=row.tag,
-        note=row.note,
-        order_reason=row.order_reason,
-        remind_at=row.remind_at.isoformat() if row.remind_at else None,
-        due_date=row.due_date,
-        completed_at=row.completed_at.isoformat() if row.completed_at else None,
-    )
+    return _out(row)
 
 
 @tasks_router.patch("/{task_id}", response_model=TaskOut)
@@ -95,18 +101,7 @@ def patch_task(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")
-    return TaskOut(
-        id=row.id,
-        title=row.title,
-        kind=row.kind,
-        status=row.status,
-        tag=row.tag,
-        note=row.note,
-        order_reason=row.order_reason,
-        remind_at=row.remind_at.isoformat() if row.remind_at else None,
-        due_date=row.due_date,
-        completed_at=row.completed_at.isoformat() if row.completed_at else None,
-    )
+    return _out(row)
 
 
 @tasks_router.post("/{task_id}/complete", response_model=TaskOut)
@@ -115,18 +110,7 @@ def complete_task(task_id: str, user_id: str = Depends(require_user)):
     row = task_service.complete(task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")
-    return TaskOut(
-        id=row.id,
-        title=row.title,
-        kind=row.kind,
-        status=row.status,
-        tag=row.tag,
-        note=row.note,
-        order_reason=row.order_reason,
-        remind_at=row.remind_at.isoformat() if row.remind_at else None,
-        due_date=row.due_date,
-        completed_at=row.completed_at.isoformat() if row.completed_at else None,
-    )
+    return _out(row)
 
 
 @tasks_router.post("/{task_id}/reopen", response_model=TaskOut)
@@ -135,18 +119,7 @@ def reopen_task(task_id: str, user_id: str = Depends(require_user)):
     row = task_service.reopen(task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="task not found")
-    return TaskOut(
-        id=row.id,
-        title=row.title,
-        kind=row.kind,
-        status=row.status,
-        tag=row.tag,
-        note=row.note,
-        order_reason=row.order_reason,
-        remind_at=row.remind_at.isoformat() if row.remind_at else None,
-        due_date=row.due_date,
-        completed_at=row.completed_at.isoformat() if row.completed_at else None,
-    )
+    return _out(row)
 
 
 @tasks_router.delete("/{task_id}")
