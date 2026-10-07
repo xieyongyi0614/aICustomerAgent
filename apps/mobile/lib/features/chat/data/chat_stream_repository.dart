@@ -30,24 +30,44 @@ class ChatStreamRepository {
     _cancelToken?.cancel('new_turn');
     final cancel = CancelToken();
     _cancelToken = cancel;
-    final response = await _dio.post<ResponseBody>(
-      '/chat/message',
-      data: <String, dynamic>{
-        'content': content,
-        if (sessionId != null) 'session_id': sessionId as Object,
-      },
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: {'Accept': 'application/x-ndjson'},
-      ),
-      cancelToken: cancel,
-    );
-    final remoteSessionId = response.headers.value('x-session-id');
-    if (remoteSessionId != null && remoteSessionId.isNotEmpty) {
-      onSessionId?.call(remoteSessionId);
+    final firstEvent = Completer<void>();
+    final firstEventGuard = Timer(streamFirstTokenTimeout, () {
+      if (!firstEvent.isCompleted) {
+        cancel.cancel('first_token_timeout');
+      }
+    });
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '/chat/message',
+        data: <String, dynamic>{
+          'content': content,
+          if (sessionId != null) 'session_id': sessionId as Object,
+        },
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {'Accept': 'application/x-ndjson'},
+          receiveTimeout: streamIdleTimeout,
+        ),
+        cancelToken: cancel,
+      );
+      final remoteSessionId = response.headers.value('x-session-id');
+      if (remoteSessionId != null && remoteSessionId.isNotEmpty) {
+        onSessionId?.call(remoteSessionId);
+      }
+      final stream = response.data!.stream;
+      yield* _parser
+          .parse(stream)
+          .map((event) {
+            if (!firstEvent.isCompleted) {
+              firstEvent.complete();
+              firstEventGuard.cancel();
+            }
+            return event;
+          });
+    } finally {
+      firstEventGuard.cancel();
+      if (!firstEvent.isCompleted) firstEvent.complete();
     }
-    final stream = response.data!.stream;
-    yield* _parser.parse(stream);
   }
 
   void cancel() {

@@ -64,24 +64,32 @@ class _LifePageState extends ConsumerState<LifePage> {
       _ledgerFailed = false;
       _carFailed = false;
     });
-    List<LifeTaskItem>? tasks;
-    String? expense;
-    LifeCarSummary? car;
-    try {
-      tasks = await _repo.listOpenTasks();
-    } catch (_) {
-      tasks = null;
-    }
-    try {
-      expense = await _repo.monthExpenseText();
-    } catch (_) {
-      expense = null;
-    }
-    try {
-      car = await _repo.monthCarExpense();
-    } catch (_) {
-      car = null;
-    }
+    final results = await Future.wait<Object?>([
+      () async {
+        try {
+          return await _repo.listOpenTasks();
+        } catch (_) {
+          return null;
+        }
+      }(),
+      () async {
+        try {
+          return await _repo.monthExpenseText();
+        } catch (_) {
+          return null;
+        }
+      }(),
+      () async {
+        try {
+          return await _repo.monthCarExpense();
+        } catch (_) {
+          return null;
+        }
+      }(),
+    ]);
+    final tasks = results[0] as List<LifeTaskItem>?;
+    final expense = results[1] as String?;
+    final car = results[2] as LifeCarSummary?;
     if (!mounted) return;
     setState(() {
       _tasks = tasks;
@@ -354,9 +362,17 @@ class _LifePageState extends ConsumerState<LifePage> {
             AiCard(
               title: '亚丝娜的生活小结',
               actionLabel: '查看今日日程',
-              onAction: () => context.push<bool>('/schedule'),
+              onAction: () async {
+                await context.push<bool>('/schedule');
+                if (!mounted) return;
+                await _load();
+              },
               secondaryActionLabel: '去相册看看',
-              onSecondaryAction: () => context.push<bool>('/album'),
+              onSecondaryAction: () async {
+                await context.push<bool>('/album');
+                if (!mounted) return;
+                await _load();
+              },
               child: Text(
                 _lifeSummary(albumSummary),
                 style:
@@ -394,7 +410,11 @@ class _LifePageState extends ConsumerState<LifePage> {
                 if (_dragging == dragging) return;
                 setState(() => _dragging = dragging);
               },
-              onTapModule: (module) => context.push<bool>(module.routePath),
+              onTapModule: (module) async {
+                await context.push<bool>(module.routePath);
+                if (!mounted) return;
+                await _load();
+              },
             ),
             if (_anyFailed) ...[
               const SizedBox(height: 10),

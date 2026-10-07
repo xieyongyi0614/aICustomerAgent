@@ -142,7 +142,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 greeting: d.greeting,
                 initial: (_nickname == null || _nickname!.isEmpty)
                     ? '你'
-                    : _nickname!.substring(0, 1),
+                    : _nickname!.characters.first,
               ),
               const SizedBox(height: 18),
               _HeroBlock(headline: d.headline, sub: d.sub, modeChip: d.modeChip),

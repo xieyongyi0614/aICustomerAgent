@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,7 +32,7 @@ class AlbumPage extends ConsumerStatefulWidget {
   ConsumerState<AlbumPage> createState() => _AlbumPageState();
 }
 
-enum _Phase { permissionPending, denied, loading, ready }
+enum _Phase { permissionPending, denied, loading, ready, loadFailed }
 
 class _AlbumPageState extends ConsumerState<AlbumPage> {
   late final AlbumRepository _repo = widget.repository ?? AlbumRepository();
@@ -39,6 +41,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
   _Phase _phase = _Phase.permissionPending;
   bool _cancelled = false;
   bool _analyzing = false;
+  bool _analysisSkipped = false;
   double _progress = 0;
   int _totalCount = 0;
   List<AlbumBucket> _buckets = [];
@@ -73,49 +76,66 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
   Future<void> _load() async {
     setState(() => _phase = _Phase.loading);
     try {
-      final buckets = await _repo.buckets();
-      final recent = await _repo.assets(start: 0, limit: 6);
+      await _loadGallery();
       if (!mounted) return;
-      final covers = <String, ImageProvider?>{
-        for (final bucket in buckets)
-          bucket.id: await _repo.source.coverProvider(bucket),
-      };
-      final thumbs = <ImageProvider?>[
-        for (final asset in recent.items)
-          await _repo.source.thumbnailProvider(asset),
-      ];
-      if (!mounted) return;
-      setState(() {
-        _buckets = buckets;
-        _recent = recent.items;
-        _covers = covers;
-        _recentThumbs = thumbs;
-        _totalCount = recent.total;
-        _phase = _Phase.ready;
-      });
-      ref.read(albumSummaryProvider.notifier).update(
-            AlbumSummary(authorized: true, totalCount: recent.total),
-          );
-      if (recent.total == 0) {
-        ref.read(albumSummaryProvider.notifier).update(
-              const AlbumSummary(authorized: true, totalCount: 0),
-            );
-        return;
-      }
-      await _runAnalysis();
+      setState(() => _phase = _Phase.ready);
+      unawaited(_runAnalysis());
     } catch (_) {
       if (!mounted) return;
-      setState(() => _phase = _Phase.denied);
+      setState(() => _phase = _Phase.loadFailed);
     }
+  }
+
+  /// 相簿 / 最近添加 / 计数的轻量重载：子页（管理、删除）返回后调用，
+  /// 不重跑整理分析（分析是否重扫由 TTL 决定）。
+  Future<void> _loadGallery() async {
+    final buckets = await _repo.buckets();
+    final recent = await _repo.assets(start: 0, limit: 6);
+    final covers = <String, ImageProvider?>{};
+    final thumbs = <ImageProvider?>[];
+    for (final bucket in buckets) {
+      try {
+        covers[bucket.id] = await _repo.source.coverProvider(bucket);
+      } catch (_) {
+        covers[bucket.id] = null;
+      }
+    }
+    for (final asset in recent.items) {
+      try {
+        thumbs.add(await _repo.source.thumbnailProvider(asset));
+      } catch (_) {
+        thumbs.add(null);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _buckets = buckets;
+      _recent = recent.items;
+      _covers = covers;
+      _recentThumbs = thumbs;
+      _totalCount = recent.total;
+    });
+    ref.read(albumSummaryProvider.notifier).update(
+          AlbumSummary(authorized: true, totalCount: recent.total),
+        );
   }
 
   /// 分析只读本机元数据；任何失败都呈「无建议」诚实态，不伪装成权限问题。
   Future<void> _runAnalysis() async {
     try {
+      if (await _repo.analysisScanFresh()) {
+        if (!mounted) return;
+        setState(() {
+          _analyzing = false;
+          _analysisSkipped = true;
+        });
+        return;
+      }
       setState(() {
         _analyzing = true;
         _cancelled = false;
         _progress = 0;
+        _analysisSkipped = false;
       });
       final snapshots = await _repo.scanSnapshots(
         onProgress: (scanned, total) {
@@ -147,6 +167,19 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
 
   void _stopAnalysis() {
     _cancelled = true;
+  }
+
+  /// 子页返回即刷新（对照 ledger_page 的 push+reload 口径）：
+  /// 管理页删除/移动、详情页变动后，网格与计数不能再停在旧数据。
+  Future<void> _pushThenRefresh(String location) async {
+    await context.push(location);
+    if (!mounted) return;
+    try {
+      await _loadGallery();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _phase = _Phase.loadFailed);
+    }
   }
 
   int get _cleanableCount {
@@ -189,6 +222,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final type = context.typography;
     switch (_phase) {
       case _Phase.permissionPending:
       case _Phase.loading:
@@ -209,6 +243,35 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
                   message: '还没有相册访问权限。授权后，整理建议只在本机计算，照片不会上传服务器。',
                   actionLabel: '去开启权限',
                   onAction: _begin,
+                ),
+                TextButton(
+                  onPressed: _repo.openSystemSettings,
+                  child: Text(
+                    '没弹窗？到系统设置手动开启',
+                    style: type.caption.copyWith(color: colors.ink2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      case _Phase.loadFailed:
+        return Scaffold(
+          backgroundColor: colors.canvas,
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.showBackLink)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+                    child: BackLink(label: '生活'),
+                  ),
+                Expanded(
+                  child: ErrorState(
+                    message: '相册加载失败，照片读取出了点问题',
+                    onRetry: _load,
+                  ),
                 ),
               ],
             ),
@@ -260,7 +323,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
             _secondaryButton(
               context,
               label: '批量管理照片',
-              onTap: () => context.push('/album/manage'),
+              onTap: () => _pushThenRefresh('/album/manage'),
             ),
             const SizedBox(height: 14),
             PrivacyNote(
@@ -278,6 +341,12 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
   Widget _analysisBody(BuildContext context) {
     final colors = context.colors;
     final type = context.typography;
+    if (_analysisSkipped) {
+      return Text(
+        '最近已经分析过，先不重复扫描；想重新看建议去「整理建议」页。',
+        style: type.body.copyWith(color: colors.ink2),
+      );
+    }
     if (_analyzing) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +439,7 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
           thumbnail: _covers[bucket.id],
           name: bucket.name,
           countText: countText,
-          onTap: () => context.push(
+          onTap: () => _pushThenRefresh(
             '/album/detail?album=${Uri.encodeComponent(bucket.id)}'
             '&name=${Uri.encodeComponent(bucket.name)}',
           ),
@@ -405,7 +474,8 @@ class _AlbumPageState extends ConsumerState<AlbumPage> {
           durationText: asset.duration == null
               ? null
               : _formatDuration(asset.duration!),
-          onTap: () => context.push('/album/photo?id=${Uri.encodeComponent(asset.id)}'),
+          onTap: () =>
+              _pushThenRefresh('/album/photo?id=${Uri.encodeComponent(asset.id)}'),
         );
       },
     );

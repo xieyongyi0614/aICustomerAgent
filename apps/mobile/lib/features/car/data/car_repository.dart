@@ -28,7 +28,7 @@ class CarRepository {
       loan: _loan(data['loan'] as Map?),
       evMetrics: _evMetrics(data['ev_metrics'] as Map? ?? const {}),
       expenseBreakdown: _expenseLines(data['expense_breakdown'] as List?),
-      expenseTotalMinor: data['expense_total_minor'] as int? ?? 0,
+      expenseTotalMinor: (data['expense_total_minor'] as num?)?.toInt() ?? 0,
       expenseTotalText: data['expense_total_text'] as String? ?? '0.00',
       reminders: _reminders(data['reminders'] as List?),
       restrictionGuide: data['restriction_guide'] as String?,
@@ -86,7 +86,7 @@ class CarRepository {
       hint: data['hint'] as String? ?? '',
       entryId: data['entry_id'] as String?,
       recordId: data['record_id'] as String?,
-      odometerDeltaKm: data['odometer_delta_km'] as int?,
+      odometerDeltaKm: (data['odometer_delta_km'] as num?)?.toInt(),
     );
   }
 
@@ -103,7 +103,7 @@ class CarRepository {
     return CarProfileSummary(
       model: raw['model'] as String?,
       plate: raw['plate'] as String?,
-      odometerKm: raw['odometer_km'] as int? ?? 0,
+      odometerKm: (raw['odometer_km'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -112,8 +112,8 @@ class CarRepository {
     return CarLoanData(
       remainingText: raw['remaining_text'] as String? ?? '0.00',
       monthlyText: raw['monthly_text'] as String? ?? '0.00',
-      paidPeriods: raw['paid_periods'] as int? ?? 0,
-      totalPeriods: raw['total_periods'] as int? ?? 0,
+      paidPeriods: (raw['paid_periods'] as num?)?.toInt() ?? 0,
+      totalPeriods: (raw['total_periods'] as num?)?.toInt() ?? 0,
       paidRatio: (raw['paid_ratio'] as num?)?.toDouble() ?? 0,
       badgeText: raw['next_due_at'] as String?,
       settledNote: raw['settled_at'] as String?,
@@ -121,11 +121,11 @@ class CarRepository {
   }
 
   CarEvMetricsData _evMetrics(Map raw) => CarEvMetricsData(
-        odometerKm: raw['odometer_km'] as int?,
-        odometerDeltaMonth: raw['odometer_delta_month'] as int? ?? 0,
-        chargeCostMinorMonth: raw['charge_cost_minor_month'] as int? ?? 0,
+        odometerKm: (raw['odometer_km'] as num?)?.toInt(),
+        odometerDeltaMonth: (raw['odometer_delta_month'] as num?)?.toInt() ?? 0,
+        chargeCostMinorMonth: (raw['charge_cost_minor_month'] as num?)?.toInt() ?? 0,
         chargeCostTextMonth: raw['charge_cost_text_month'] as String? ?? '0.00',
-        chargeCountMonth: raw['charge_count_month'] as int? ?? 0,
+        chargeCountMonth: (raw['charge_count_month'] as num?)?.toInt() ?? 0,
         chargeKwhMonth: (raw['charge_kwh_month'] as num?)?.toDouble(),
         kwhPer100km: (raw['kwh_per_100km'] as num?)?.toDouble(),
         basis: raw['basis'] as String? ?? '',
@@ -136,9 +136,9 @@ class CarRepository {
         for (final raw in items ?? const [])
           CarExpenseLineData(
             categoryName: (raw as Map)['category_name'] as String? ?? '',
-            netMinor: raw['net_minor'] as int? ?? 0,
+            netMinor: (raw['net_minor'] as num?)?.toInt() ?? 0,
             netText: raw['net_text'] as String? ?? '0.00',
-            count: raw['count'] as int? ?? 0,
+            count: (raw['count'] as num?)?.toInt() ?? 0,
           ),
       ];
 
@@ -158,8 +158,8 @@ class CarRepository {
             kind: (raw as Map)['kind'] as String? ?? '',
             title: raw['title'] as String? ?? '',
             subtitle: raw['subtitle'] as String?,
-            netMinor: raw['net_minor'] as int?,
-            odometerDeltaKm: raw['odometer_delta_km'] as int?,
+            netMinor: (raw['net_minor'] as num?)?.toInt(),
+            odometerDeltaKm: (raw['odometer_delta_km'] as num?)?.toInt(),
             occurredAt: raw['occurred_at'] as String? ?? '',
             source: raw['source'] as String? ?? '',
           ),
@@ -172,11 +172,11 @@ class CarRepository {
             title: raw['title'] as String? ?? '',
             place: raw['place'] as String?,
             occurredAt: raw['occurred_at'] as String?,
-            amountMinor: raw['amount_minor'] as int?,
+            amountMinor: (raw['amount_minor'] as num?)?.toInt(),
             amountText: raw['amount_text'] as String?,
-            odometerKm: raw['odometer_km'] as int?,
+            odometerKm: (raw['odometer_km'] as num?)?.toInt(),
             upcoming: raw['upcoming'] as bool? ?? false,
-            dueKm: raw['due_km'] as int?,
+            dueKm: (raw['due_km'] as num?)?.toInt(),
           ),
       ];
 
@@ -191,7 +191,7 @@ class CarRepository {
               trimNote: identityRaw['trim_note'] as String?,
               batteryKwh: (identityRaw['battery_kwh'] as num?)?.toDouble(),
               ageText: identityRaw['age_text'] as String?,
-              odometerKm: identityRaw['odometer_km'] as int?,
+              odometerKm: (identityRaw['odometer_km'] as num?)?.toInt(),
             ),
       files: [
         for (final raw in (data['files'] as List?) ?? const [])

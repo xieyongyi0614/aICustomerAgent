@@ -100,6 +100,9 @@ class _FakeSource implements AlbumAssetSource {
     movedIds.add(asset.id);
     return true;
   }
+
+  @override
+  Future<void> openSettings() async {}
 }
 
 class _FakeAnalyzer extends AlbumAnalyzer {

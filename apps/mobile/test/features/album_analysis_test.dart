@@ -109,7 +109,39 @@ void main() {
     expect(section.supported, isTrue);
     expect(section.suggestion!.assetIds, ['dup-1', 'dup-2'],
         reason: '同尺寸但首尾内容不同的文件不得入组');
-    expect(section.suggestion!.count, 2);
+    expect(section.suggestion!.count, 1,
+        reason: 'count 是可删副本数（每组保留一份），与 totalBytes 同口径');
+  });
+
+  test('test_album_analysis_reports_all_duplicate_groups_in_size_group',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('album-analysis');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final payloadA = Uint8List.fromList(List.filled(4096, 7));
+    final payloadB = Uint8List.fromList(List.filled(4096, 11));
+    final files = await _writeFiles(dir, {
+      'a1.jpg': payloadA,
+      'a2.jpg': payloadA,
+      'b1.jpg': payloadB,
+      'b2.jpg': payloadB,
+      'b3.jpg': payloadB,
+    });
+    final analyzer = const AlbumAnalyzer(chunkSize: 10);
+    final result = await analyzer.analyze([
+      _snapshot(id: 'a1', sizeBytes: 4096, path: files[0].path),
+      _snapshot(id: 'a2', sizeBytes: 4096, path: files[1].path),
+      _snapshot(id: 'b1', sizeBytes: 4096, path: files[2].path),
+      _snapshot(id: 'b2', sizeBytes: 4096, path: files[3].path),
+      _snapshot(id: 'b3', sizeBytes: 4096, path: files[4].path),
+    ], config: AlbumAnalysisConfig(now: DateTime(2026, 10, 1)));
+
+    final section = result.section(AlbumSuggestionKind.duplicateSaves)!;
+    expect(section.suggestion!.count, 3,
+        reason: '同尺寸组内两组不同内容都要上报，提前 return 只报第一组');
+    expect(
+      section.suggestion!.assetIds.toSet(),
+      {'a1', 'a2', 'b1', 'b2', 'b3'},
+    );
   });
 
   test('test_album_analysis_runs_off_main_isolate', () async {

@@ -38,6 +38,9 @@ abstract class AlbumAssetSource {
 
   /// 移动到指定相簿（Android 系统能力；平台不支持时返回 false）。
   Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target);
+
+  /// 跳系统设置开权限：永久拒绝后 requestAccess 只会再次 denied，无出口。
+  Future<void> openSettings();
 }
 
 /// `photo_manager` 实现的资产源。
@@ -186,6 +189,9 @@ class PhotoManagerAssetSource implements AlbumAssetSource {
     );
   }
 
+  @override
+  Future<void> openSettings() => PhotoManager.openSetting();
+
   PhotoAsset _toAsset(AssetEntity e) {
     final title = e.title ?? e.id;
     final relative = (e.relativePath ?? '').toLowerCase();
@@ -214,6 +220,19 @@ class AlbumRepository {
 
   static const defaultPageSize = 60;
   static const scanBatchSize = 50;
+
+  /// 整理分析的自动扫描有效期：窗口内再进相册页不重复全库扫描
+  /// （数千张串行扫描一次可达秒级，每次进页必扫是 ANR 根源）。
+  static const analysisScanTtl = Duration(minutes: 30);
+
+  Future<void> openSystemSettings() => source.openSettings();
+
+  /// false = 距上次扫描超过 TTL（或从未扫过），值得重扫。
+  Future<bool> analysisScanFresh() async {
+    final last = await store.loadLastScanAt();
+    if (last == null) return false;
+    return DateTime.now().difference(last) < analysisScanTtl;
+  }
 
   Future<AlbumPermissionStatus> requestAccess() => source.requestAccess();
 
@@ -245,11 +264,14 @@ class AlbumRepository {
         limit: scanBatchSize,
       );
       total = page.total;
-      for (final asset in page.items) {
-        final path = await source.resolvePath(asset);
-        final size = path == null ? 0 : await File(path).length();
-        snapshots.add(asset.toSnapshot(path: path, sizeBytes: size));
-      }
+      snapshots.addAll(await Future.wait([
+        for (final asset in page.items)
+          () async {
+            final path = await source.resolvePath(asset);
+            final size = path == null ? 0 : await File(path).length();
+            return asset.toSnapshot(path: path, sizeBytes: size);
+          }(),
+      ]));
       start += page.items.length;
       onProgress?.call(start, total);
       if (isCancelled?.call() ?? false) return null;

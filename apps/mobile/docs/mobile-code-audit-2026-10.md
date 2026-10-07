@@ -310,3 +310,51 @@
 - `flutter analyze` / `dart analyze` 在本机因 Windows 管道句柄耗尽（`OS error code 231`）无法输出，**缺少 lint 层面的补充数据**；建议在 CI 或正常环境下补跑一次
 - 未审计后端（`apps/backend`）与本次 Flutter 客户端的接口契约一致性
 - 结论中的行号基于审计时的工作区状态，代码变更后需重新定位
+
+---
+
+## 十、整改进度（2026-10-07）
+
+> 审计发现已按「第一批 P0 → 第二批 P1」组织执行并登记于此；行号均以执行时工作区为准。P0 见提交 `c1274eb5`，P1 随本提交入库。
+
+### 核实修正（与本报告原文的出入）
+
+执行前对全部 P0 与关键 P1 逐条比对过源码，以下条目需修正口径：
+
+- **金额截断（原 §2-B5）**：ledger 键盘路径有 `AmountInputFormatter`（限 `^\d{0,8}(\.\d{0,2})?$`）兜底，实际可达的静默截断在 **car 页**（无 formatter）；所称 `_onKey` 位于 car 页而非 ledger 页。
+- **chat 无守卫处（原 §2-A2）**：实为 **5 处**（`:295/:308/:327/:341/:346`），不止 3 处。
+- **createDio 散落（原 §3 网络层）**：实为 **14 处调用 / 13 个文件**，比报告的 8 处更严重。
+- **health 权限（原 §6-3）**：项目 manifest 中 health.* 一条都未声明（「声明 17 项」不属实，或指插件合并清单）；health 模块已由并行提交 `55031078` 整体移除，过授权项随之消解。
+- 相册「全选永远 false」不成立（点全选后恢复，且此时删除不会崩）；briefing 缓存转圈为**潜伏缺陷**（`BriefingRepository` 默认 cache 为 null，接线后才触发）；ledger 待办回滚问题的触发条件是**两个动作在途重叠**（快速连点），非严格串行。
+
+### 第一批 P0（12 项，全部完成 → `c1274eb5`）
+
+| 序 | 处理 |
+|---|---|
+| 1 | 新增 `core/format/money.dart#parseAmountMinor` 为唯一「显示串→分」入口（非法输入返回 null 拒绝）；car 键盘限两位小数；边界单测覆盖 |
+| 2 | 相册管理页预选与视口资产求交集 + 删除/移动按 map 查找缺失即跳过 |
+| 3 | `_pathOf` 对空 paths 返回 null |
+| 4 | chat 5 处 `state =` 全部补 `_disposed` |
+| 5 | `onUpgrade` 改分版本 switch 迁移（v1→v2 建 `brief_contents`），新增迁移测试 |
+| 6 | 待确认回滚只还原失败那条（差集），不再整体快照还原 |
+| 7 | ledger 与 car 幂等键均改「内容指纹绑定」：重试复用同 key，换内容/换路径换新 key |
+| 8 | 里程 baseline 未知阻断保存并区分提示，`?? 0` 与 `catch (_) {}` 移除 |
+| 9 | 车辆档案数值字段逐一客户端校验（拒绝非法/负数）；保养周期月数从档案回显 |
+| 10 | 包名 `com.example.mobile` → `com.zhaoxi.app`；release 签名走 `android/key.properties`（缺失回退 debug 保本地构建） |
+| 11 | `allowBackup=false` + `network_security_config.xml`（禁明文、放行模拟器回环）；**另发现并修复 release 变体缺 INTERNET 权限** |
+| 12 | 一键清空服务端成功后清偏好与 `album.*` 私有键、失败显性报错；登出经 `app/state/auth_epoch.dart` 纪元位重建会话内存态（避免跨 feature import） |
+
+### 第二批 P1（完成 9 项，跳过 4 个子项）
+
+已完成：返回即刷新（life/album/album_detail）；相册权限归因、`openAppSettings` 出口、扫描批内并行 + 30min TTL 跳过、删除结果检查、原图降采样；`createDio` 单例化、令牌内存缓存、401 统一收口（清凭据→纪元重建→跳登录）、拦截器防悬挂、流式超时接线、多端点 `Future.wait`；life_repository 解析层统一 `toLocal`；24 处 `as int?` → `num?.toInt()`；语音金额「单位优先、否则取首个数字」+ 预览请求序号防乱序；`verifyEmailCode` 异常包装 + `deviceIdentity()` 持久化；重复照片 `_mergeSameContent` 漏报修复 + `count` 与 totalBytes 同口径（可删副本数，`assetIds` 保持候选全集）；头像 emoji 按 grapheme 截取；manifest 补 `POST_NOTIFICATIONS` / `SCHEDULE_EXACT_ALARM` / `READ_MEDIA_VISUAL_USER_SELECTED`。
+
+跳过（并行会话占用相关文件，待其收口后执行）：
+
+- **P1-7** 日程时间线交互（`schedule_page.dart` 正被并行会话修改）
+- **P1-11** 路由守卫 fail-closed（`app_router.dart` 正被并行会话暂存修改）
+- **P1-9 子项** briefing_page 的 TextEditingController 泄漏与缓存读取兜底（该文件正被并行会话修改）
+- **P1-2 子项** manage 页缩略图网格 sliver 化懒加载（留待中期拆分批次）
+
+### 遗留测试红（非整改产物）
+
+以下 10 个测试红在整改开始前即存在（stash 隔离验证），归属并行会话工作，未代为修改：life_page ×6（健康模块移除未同步测试）、profile_renders（断言「设备连接」行而页面没有）、prefs_keys_centralized（allKeys 9→8 未同步断言）、goldens ×2（spend_summary / ledger_components）。

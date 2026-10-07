@@ -70,10 +70,16 @@ class _LedgerPageState extends State<LedgerPage> {
       _error = null;
     });
     try {
-      final summary = await _repo.fetchSummary();
-      final entries = await _repo.fetchEntries();
-      final autoCount = await _loadAutoCount();
-      final pending = await _loadPending();
+      final results = await Future.wait([
+        _repo.fetchSummary(),
+        _repo.fetchEntries(),
+        _loadAutoCount(),
+        _loadPending(),
+      ]);
+      final summary = results[0] as LedgerSummaryData;
+      final entries = results[1] as List<LedgerEntryData>;
+      final autoCount = results[2] as int?;
+      final pending = results[3] as List<LedgerPendingData>;
       if (!mounted) return;
       setState(() {
         _summary = summary;

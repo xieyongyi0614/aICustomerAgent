@@ -79,6 +79,9 @@ class _FakeSource implements AlbumAssetSource {
 
   @override
   Future<bool> moveAsset(PhotoAsset asset, AlbumBucket target) async => true;
+
+  @override
+  Future<void> openSettings() async {}
 }
 
 class _RecordingStore implements AlbumLocalStore {

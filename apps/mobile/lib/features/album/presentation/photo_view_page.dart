@@ -107,9 +107,24 @@ class _PhotoViewPageState extends State<PhotoViewPage> {
     );
     if (confirmed != true) return;
     setState(() => _deleting = true);
-    await PhotoManager.editor.deleteWithIds([entity.id]);
-    if (!mounted) return;
-    context.pop();
+    try {
+      final result = await PhotoManager.editor.deleteWithIds([entity.id]);
+      if (!mounted) return;
+      if (result.isEmpty) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('删除没有完成，请再试一次')),
+        );
+        return;
+      }
+      context.pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('删除失败，请再试一次')),
+      );
+    }
   }
 
   PhotoAsset _toPhotoAsset(AssetEntity entity) => PhotoAsset(
@@ -213,12 +228,23 @@ class _PhotoViewPageState extends State<PhotoViewPage> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 480),
         child: Image(
-          image: AssetEntityImageProvider(entity, isOriginal: true),
+          image: ResizeImage(
+            AssetEntityImageProvider(entity, isOriginal: true),
+            width: _decodeTargetWidth(),
+            allowUpscaling: false,
+          ),
           fit: BoxFit.contain,
           alignment: Alignment.topCenter,
         ),
       ),
     );
+  }
+
+  /// 原图解码按屏幕物理宽度降采样：4000×3000 原图全量解码约 48MB，
+  /// 多图累计是 OOM 根源；屏幕放不下的像素没有解码价值。
+  int _decodeTargetWidth() {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return (MediaQuery.sizeOf(context).width * dpr).round();
   }
 
   Widget _infoRow(BuildContext context, String label, String? value) {

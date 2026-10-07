@@ -40,6 +40,9 @@ class _FakeAuthRepository extends AuthRepository {
   }
 
   @override
+  Future<String> deviceIdentity() async => 'test-device';
+
+  @override
   Future<TokenResult> verifyEmailCode({
     required String email,
     required String code,

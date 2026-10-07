@@ -155,17 +155,18 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
       return;
     }
     if (_verifying) return;
+    final platform = Theme.of(context).platform.name;
     setState(() {
       _verifying = true;
       _error = null;
     });
     try {
-      final deviceId = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+      final deviceId = await _repo.deviceIdentity();
       await _repo.verifyEmailCode(
         email: email,
         code: _code.text.trim(),
         deviceId: deviceId,
-        platform: Theme.of(context).platform.name,
+        platform: platform,
       );
       final prefs = await PrefsStore.load();
       final nickname = _nickname.text.trim();

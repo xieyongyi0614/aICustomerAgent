@@ -80,17 +80,31 @@ class AuthRepository {
     required String platform,
     String? deviceName,
   }) async {
-    final resp = await _dio.post<Map<String, dynamic>>(
-      '/auth/email/verify',
-      data: {
-        'email': email,
-        'code': code,
-        'device_id': deviceId,
-        'platform': platform,
-        'device_name': ?deviceName,
-      },
-    );
-    return _persistTokenResponse(resp, deviceId);
+    try {
+      final resp = await _dio.post<Map<String, dynamic>>(
+        '/auth/email/verify',
+        data: {
+          'email': email,
+          'code': code,
+          'device_id': deviceId,
+          'platform': platform,
+          'device_name': ?deviceName,
+        },
+      );
+      return await _persistTokenResponse(resp, deviceId);
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  /// 本机设备标识：同一次登录流程内的重试必须复用同一 id，
+  /// 每次尝试都生成新 id 会让服务端把同一台设备当成多台。
+  Future<String> deviceIdentity() async {
+    final existing = await _store.readDeviceId();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final id = 'dev-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+    await _store.writeDeviceId(id);
+    return id;
   }
 
   Future<TokenResult> _persistTokenResponse(

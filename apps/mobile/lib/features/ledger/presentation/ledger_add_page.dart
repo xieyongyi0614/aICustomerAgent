@@ -27,6 +27,12 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   static const _gridExcluded = {'养车'};
   static final RegExp _amountPattern = RegExp(r'\d+(?:\.\d{1,2})?');
 
+  /// 「35 元」「2 块」这类带货币单位的数字是金额的最强信号；
+  /// 全句没有单位时取**第一个**数字（「充话费 100 送 10」记 100）。
+  /// 取最后一个数字会把「35 元，2 个包子」记成 2 元。
+  static final RegExp _currencyAmountPattern =
+      RegExp(r'(\d+(?:\.\d{1,2})?)(?:元|块(?:钱)?)');
+
   late final LedgerRepository _repo = widget.repository ?? LedgerRepository();
   String? _submitKeySource;
   String? _submitKey;
@@ -92,9 +98,11 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
   int get _amountMinor => parseAmountMinor(_amountController.text) ?? 0;
 
   int get _sayAmountMinor {
-    final matches = _amountPattern.allMatches(_sayController.text);
-    if (matches.isEmpty) return 0;
-    return parseAmountMinor(matches.last.group(0)!) ?? 0;
+    final text = _sayController.text;
+    final amountText = _currencyAmountPattern.firstMatch(text)?.group(1) ??
+        _amountPattern.firstMatch(text)?.group(0);
+    if (amountText == null) return 0;
+    return parseAmountMinor(amountText) ?? 0;
   }
 
   /// 幂等键绑定「同一笔提交」：内容不变的失败重试复用同 key（服务端可去重），
@@ -108,13 +116,23 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
     return _submitKey!;
   }
 
+  int _previewSeq = 0;
+  int _sayPreviewSeq = 0;
+
   void _onDirectionChanged(String value) {
     if (value == _direction) return;
     setState(() {
       _direction = value;
       _selectedCategoryId = null;
+      _preview = null;
+      _sayPreview = null;
     });
     _loadCategories();
+    _debounce?.cancel();
+    _debounce = Timer(
+      _previewDebounce,
+      _mode == 'say' ? _refreshSayPreview : _refreshPreview,
+    );
   }
 
   void _onAmountChanged(String _) {
@@ -154,32 +172,34 @@ class _LedgerAddPageState extends State<LedgerAddPage> {
 
   Future<void> _refreshPreview() async {
     final hint = _noteController.text.trim();
+    final seq = ++_previewSeq;
     if (hint.isEmpty) {
       if (mounted) setState(() => _preview = null);
       return;
     }
     try {
       final preview = await _repo.classifyPreview(hint, kind: _direction);
-      if (!mounted) return;
+      if (!mounted || seq != _previewSeq) return;
       setState(() => _preview = preview);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || seq != _previewSeq) return;
       setState(() => _preview = null);
     }
   }
 
   Future<void> _refreshSayPreview() async {
     final text = _sayController.text.trim();
+    final seq = ++_sayPreviewSeq;
     if (text.isEmpty) {
       if (mounted) setState(() => _sayPreview = null);
       return;
     }
     try {
       final preview = await _repo.classifyPreview(text, kind: _direction);
-      if (!mounted) return;
+      if (!mounted || seq != _sayPreviewSeq) return;
       setState(() => _sayPreview = preview);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || seq != _sayPreviewSeq) return;
       setState(() => _sayPreview = null);
     }
   }

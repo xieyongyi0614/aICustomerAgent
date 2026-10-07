@@ -54,19 +54,20 @@ class LifeTaskItem {
     completedAt: row['completed_at'] as String?,
   );
 
-  DateTime? get remindDateTime =>
-      remindAt == null ? null : DateTime.tryParse(remindAt!);
-
-  DateTime? get dueDateTime {
-    final raw = dueDate;
-    return raw == null ? null : DateTime.tryParse(raw);
+  /// 解析层统一转本地时区：带 Z 的 ISO 串 parse 出的是 UTC，
+  /// 消费点直接取 year/month/day 会把北京时间早晨的提醒归到前一天。
+  static DateTime? _parseLocal(String? raw) {
+    final parsed = raw == null ? null : DateTime.tryParse(raw);
+    return parsed?.toLocal();
   }
 
-  DateTime? get createdDateTime =>
-      createdAt == null ? null : DateTime.tryParse(createdAt!);
+  DateTime? get remindDateTime => _parseLocal(remindAt);
 
-  DateTime? get completedDateTime =>
-      completedAt == null ? null : DateTime.tryParse(completedAt!);
+  DateTime? get dueDateTime => _parseLocal(dueDate);
+
+  DateTime? get createdDateTime => _parseLocal(createdAt);
+
+  DateTime? get completedDateTime => _parseLocal(completedAt);
 }
 
 /// life 域自有数据面：任务域 CRUD + 账本月度摘要。
@@ -124,7 +125,7 @@ class LifeRepository {
   Future<LifeCarSummary> monthCarExpense() async {
     final resp = await _dio.get<Map<String, dynamic>>('/car/overview');
     final data = resp.data ?? const {};
-    final minor = data['expense_total_minor'] as int? ?? 0;
+    final minor = (data['expense_total_minor'] as num?)?.toInt() ?? 0;
     return LifeCarSummary(
       text: formatYuanWhole(minor),
       isEmpty: minor <= 0,

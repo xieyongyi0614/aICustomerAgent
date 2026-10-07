@@ -190,7 +190,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     gradient: context.gradients.avatar,
                   ),
                   child: Text(
-                    name.substring(0, 1),
+                    name.characters.first,
                     style: type.sectionTitle.copyWith(
                       fontSize: 20,
                       color: colors.avatarText,

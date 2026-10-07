@@ -11,12 +11,25 @@ class SecureTokenStore implements TokenReader {
   static const _keyDeviceId = 'zhaoxi.device_id';
 
   final FlutterSecureStorage _storage;
+  String? _cachedToken;
+  bool _tokenLoaded = false;
 
+  /// 每次请求都直读 Keystore 是可感知的延迟；实例内做单飞缓存，
+  /// 写入与清除路径同步失效，登出后不会带旧令牌。
   @override
-  Future<String?> readAccessToken() => _storage.read(key: _keyAccessToken);
+  Future<String?> readAccessToken() async {
+    if (!_tokenLoaded) {
+      _cachedToken = await _storage.read(key: _keyAccessToken);
+      _tokenLoaded = true;
+    }
+    return _cachedToken;
+  }
 
-  Future<void> writeAccessToken(String token) =>
-      _storage.write(key: _keyAccessToken, value: token);
+  Future<void> writeAccessToken(String token) async {
+    await _storage.write(key: _keyAccessToken, value: token);
+    _cachedToken = token;
+    _tokenLoaded = true;
+  }
 
   Future<void> writeDeviceId(String id) =>
       _storage.write(key: _keyDeviceId, value: id);
@@ -26,5 +39,7 @@ class SecureTokenStore implements TokenReader {
   Future<void> clearCredentials() async {
     await _storage.delete(key: _keyAccessToken);
     await _storage.delete(key: _keyDeviceId);
+    _cachedToken = null;
+    _tokenLoaded = false;
   }
 }

@@ -121,15 +121,17 @@ class AlbumAnalyzer {
     Iterable<AlbumDuplicateCluster> clusters,
   ) {
     final ids = <String>[];
+    var deletable = 0;
     var bytes = 0;
     for (final cluster in clusters) {
       if (cluster.ids.length < 2) continue;
       ids.addAll(cluster.ids);
+      deletable += cluster.ids.length - 1;
       bytes += cluster.bytesPerAsset * (cluster.ids.length - 1);
     }
     return AlbumSuggestion(
       kind: AlbumSuggestionKind.duplicateSaves,
-      count: ids.length,
+      count: deletable,
       totalBytes: bytes,
       reason: '同一内容保存了多份：文件大小一致、首尾内容相同',
       assetIds: ids,
@@ -157,8 +159,7 @@ AlbumChunkFindings analyzeChunk(
   final duplicateClusters = <AlbumDuplicateCluster>[];
   for (final entry in clusters.entries) {
     if (entry.value.length < 2) continue;
-    final merged = _mergeSameContent(entry.value, config);
-    if (merged != null) duplicateClusters.add(merged);
+    duplicateClusters.addAll(_mergeSameContent(entry.value, config));
   }
   return AlbumChunkFindings(
     expired: expired,
@@ -167,7 +168,8 @@ AlbumChunkFindings analyzeChunk(
 }
 
 /// 同尺寸组内再按采样内容指纹合并，避免「恰好同尺寸」误判。
-AlbumDuplicateCluster? _mergeSameContent(
+/// 一个尺寸组里可能有多个内容组，全部返回——提前 return 会漏报。
+List<AlbumDuplicateCluster> _mergeSameContent(
   List<AlbumAssetSnapshot> group,
   AlbumAnalysisConfig config,
 ) {
@@ -178,16 +180,15 @@ AlbumDuplicateCluster? _mergeSameContent(
       () => [],
     ).add(snapshot);
   }
-  for (final entry in byFingerprint.entries) {
-    if (entry.value.length < 2) continue;
-    final ids = [for (final s in entry.value) s.id];
-    return AlbumDuplicateCluster(
-      key: entry.key,
-      ids: ids,
-      bytesPerAsset: entry.value.first.sizeBytes,
-    );
-  }
-  return null;
+  return [
+    for (final entry in byFingerprint.entries)
+      if (entry.value.length >= 2)
+        AlbumDuplicateCluster(
+          key: entry.key,
+          ids: [for (final s in entry.value) s.id],
+          bytesPerAsset: entry.value.first.sizeBytes,
+        ),
+  ];
 }
 
 /// 内容指纹：尺寸 + 首尾采样字节（无路径时退化为尺寸 + 时间）。

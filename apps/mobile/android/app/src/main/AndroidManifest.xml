@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- release 变体也需要联网：此前只在 debug/profile 声明，正式包网络全挂 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ 定时通知：缺 POST_NOTIFICATIONS 时通知静默失效 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 14+ 「部分照片授权」降级路径 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <application
         android:label="${app_name}"
         android:name="${applicationName}"

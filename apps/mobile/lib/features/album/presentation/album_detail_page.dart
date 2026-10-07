@@ -191,8 +191,12 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> {
                     durationText: asset.duration == null
                         ? null
                         : _format(asset.duration!),
-                    onTap: () =>
-                        context.push('/album/photo?id=${Uri.encodeComponent(asset.id)}'),
+                    onTap: () async {
+                      await context.push(
+                          '/album/photo?id=${Uri.encodeComponent(asset.id)}');
+                      if (!mounted) return;
+                      await _begin();
+                    },
                   );
                 },
               ),
@@ -211,14 +215,16 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> {
     );
   }
 
-  void _pushManage() {
+  Future<void> _pushManage() async {
     final albumId = widget.albumId;
     final name = widget.albumName;
     final query = [
       if (albumId != null) 'album=${Uri.encodeComponent(albumId)}',
       if (name != null) 'name=${Uri.encodeComponent(name)}',
     ].join('&');
-    context.push(query.isEmpty ? '/album/manage' : '/album/manage?$query');
+    await context.push(query.isEmpty ? '/album/manage' : '/album/manage?$query');
+    if (!mounted) return;
+    await _begin();
   }
 
   int get _cleanableCount {
@@ -228,7 +234,7 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> {
       0,
       (sum, section) =>
           section.supported && section.suggestion != null
-              ? sum + section.suggestion!.assetIds.length
+              ? sum + section.suggestion!.count
               : sum,
     );
   }
@@ -252,9 +258,9 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> {
     for (final section in analysis.sections) {
       final suggestion = section.suggestion;
       if (!section.supported || suggestion == null) continue;
-      if (suggestion.assetIds.isEmpty) continue;
+      if (suggestion.count == 0) continue;
       parts.add(
-        '${suggestion.assetIds.length} 张'
+        '${suggestion.count} 张'
         '${section.kind == AlbumSuggestionKind.expiredScreenshots ? '过期截图' : '重复保存'}',
       );
     }

@@ -186,13 +186,13 @@ class LedgerRepository {
       expenseText: data['expense_text'] as String? ?? '0.00',
       incomeText: data['income_text'] as String? ?? '0.00',
       netText: data['net_text'] as String? ?? '0.00',
-      entryCount: data['entry_count'] as int? ?? 0,
+      entryCount: (data['entry_count'] as num?)?.toInt() ?? 0,
       byCategory: [
         for (final c in (data['by_category'] as List?) ?? const [])
           LedgerCategoryTotal(
             categoryId: (c as Map)['category_id'] as String?,
-            expenseMinor: c['expense_minor'] as int? ?? 0,
-            incomeMinor: c['income_minor'] as int? ?? 0,
+            expenseMinor: (c['expense_minor'] as num?)?.toInt() ?? 0,
+            incomeMinor: (c['income_minor'] as num?)?.toInt() ?? 0,
           ),
       ],
       comparisonLabel: comparisonLabel,
@@ -286,8 +286,8 @@ class LedgerRepository {
     final accuracy = data['accuracy'];
     return LedgerAutoSummaryData(
       periodLabel: period['label'] as String? ?? 'month',
-      autoCount: data['auto_count'] as int? ?? 0,
-      pendingCount: data['pending_count'] as int? ?? 0,
+      autoCount: (data['auto_count'] as num?)?.toInt() ?? 0,
+      pendingCount: (data['pending_count'] as num?)?.toInt() ?? 0,
       accuracy: accuracy is num ? accuracy.toDouble() : null,
     );
   }
@@ -301,7 +301,7 @@ class LedgerRepository {
           pendingKey: (raw as Map)['pending_key'] as String? ?? '',
           reason: raw['reason'] as String? ?? '',
           question: raw['question'] as String? ?? '',
-          amountMinor: raw['amount_minor'] as int?,
+          amountMinor: (raw['amount_minor'] as num?)?.toInt(),
           candidates: [
             for (final option in (raw['candidates'] as List?) ?? const [])
               LedgerPendingCandidate(
