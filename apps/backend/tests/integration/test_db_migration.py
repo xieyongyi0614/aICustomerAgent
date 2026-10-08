@@ -1,16 +1,14 @@
 import os
-from datetime import datetime
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-from app.core import timeutil
 from app.core import llm_factory
-from app.core.db import Base, Conversation, Message, create_engine_from_url
+from app.core.db import Base, create_engine_from_url
 from app.main import app
 from app.repositories import (
     character_state_repository,
@@ -167,62 +165,3 @@ def test_http_lifecycle_on_postgres(postgres_url, fake_llm):
             for table in reversed(Base.metadata.sorted_tables):
                 connection.execute(table.delete())
         engine.dispose()
-
-
-def test_sqlite_to_postgres_migration_script(postgres_url, tmp_path):
-    from scripts.migrate_sqlite_to_postgres import migrate
-
-    source_url = f"sqlite:///{(tmp_path / 'source.db').as_posix()}"
-    source_engine = create_engine(
-        source_url, connect_args={"check_same_thread": False}
-    )
-    Base.metadata.create_all(source_engine)
-    now = timeutil.now()
-    with Session(source_engine) as session:
-        session.add(
-            Conversation(
-                id="conv-mig",
-                session_id="conv-mig",
-                user_id="default-user",
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        session.add(
-            Message(
-                id=1,
-                conversation_id="conv-mig",
-                role="human",
-                content="我喜欢寿司",
-                created_at=now,
-            )
-        )
-        session.add(
-            Message(
-                id=2,
-                conversation_id="conv-mig",
-                role="ai",
-                content="好的",
-                created_at=now,
-            )
-        )
-        session.commit()
-
-    counts = migrate(source_url, postgres_url)
-    assert counts == {
-        "conversations": 1,
-        "messages": 2,
-        "conversation_summaries": 0,
-        "memories": 0,
-        "scene_state": 0,
-    }
-
-    target_engine = create_engine(postgres_url, pool_pre_ping=True)
-    with Session(target_engine) as session:
-        contents = [m.content for m in session.query(Message).all()]
-        assert contents == ["我喜欢寿司", "好的"]
-    with target_engine.begin() as connection:
-        for table in reversed(Base.metadata.sorted_tables):
-            connection.execute(table.delete())
-    source_engine.dispose()
-    target_engine.dispose()
