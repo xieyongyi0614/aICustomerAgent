@@ -135,4 +135,21 @@ CI 上注意：`TEST_DATABASE_URL` 提供 PostgreSQL service container，否则�
 
 - `tests/unit/` 中有 5 个文件实际使用内存 DB（`test_chat_pipeline_split.py`、`test_orchestration_v2.py`、`test_relationship_models.py`、`test_scene_updater.py`、`test_trigger_followup.py`），自动打标会归入 `integration`，不影响正确性；后续可迁至 `tests/integration/`。
 - `tests/v8.5/`、`evaluation/` 为按版本组织的套件，保持现状不迁移，统一按 fixture 打标为 `integration`。
-- 2026-10-08 清理：`tests/v7.8/`、`v8/`、`v9/`、`v21/` 四个历史套件与 v24/v25 冻结快照用例（Flag 矩阵 / 参数默认值 / 逐字节摘要 / 前端未实现契约）已删除，覆盖由 `v23`（世界）、`v26`（动作）、`v30`（Runtime）、`v40`（账本）承接。
+
+## 9. 历史套件归档登记（2026-10-08）
+
+`pytest` 默认只跑管家主线 + 分层测试（约 3170 项）；`pytest --run-legacy` 追加下表 legacy 套件。
+
+| 套件 | 状态 | 覆盖承接方 |
+|---|---|---|
+| `tests/v2/` `v8.5/` `v22/` `v23/` `v24/` `v25/` `v26/` | 保留（`legacy`，默认不收集） | — |
+| `tests/v7.8/` | **已删除** | v30 Runtime + `integration/test_observability_llm_turn_capture.py` 等 |
+| `tests/v8/` | **已删除** | `tests/v23/`（世界模拟） |
+| `tests/v9/` | **已删除** | `tests/v26/`（动作执行 + step-result 契约） |
+| `tests/v21/` | **已删除** | `tests/v30/`（agent_runtime） |
+
+被删除文件明细（同批）：`v24/` 的 `test_tool001_settings.py`、`test_tool006_params.py`、`test_tool_acceptance.py`；`v25/` 的 `test_plan002_settings.py`、`test_plan004_flags.py`、`test_plan009_flags.py`、`test_plan011_regression.py`、`test_plan012_flag_matrix.py`、`test_plan012_gates_and_invariants.py`；另删除两条冻结断言：`v25/test_plan001_flag_regression.py::test_planning_prompt_bytes_are_unchanged`、`v30/test_runtime_autonomous_loop.py::TestSchedulerUnchanged::test_maintenance_steps_unchanged`（v40 `test_runtime_background_cutover.py` 已覆盖新口径）。
+
+删除判据：版本契约 / 开关快照 / 逐字节摘要类用例在每轮合法演进中持续假红（如 `ACTION_TYPES` 白名单扩项即改 prompt 字节），维护成本高于检出价值；行为覆盖均留在承接套件。
+
+引用提示：`docs/version/v1.0.0/v9/regression-checklist.md`、`docs/version/v2.5.0/planning-system/regression-checklist.md` 已就地加注；其余历史设计文档（各版本 `tasks/`、`testing.md`）保留原文，视为当时的记录。

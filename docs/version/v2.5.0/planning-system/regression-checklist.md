@@ -12,6 +12,11 @@
 > 计划编排**恒常开**；`enablement.py` 与整条「子闸 ⇒ 总闸」校验链已删除（批次 8）。
 > 仅 **2 个默认 ON 的策略位保留为常规配置项**：`plan_tool_required`、`plan_context_digest_enabled`（H.6 裁决）。
 > 本清单按收官后语义编写；下文「总闸 / 子闸 / 启用链」表述视为 V2.5.0 设计期坐标，不再对应可配置项。
+>
+> **归档说明（2026-10-08）**：冻结类用例 `test_plan012_flag_matrix.py`、`test_plan012_gates_and_invariants.py`、
+> `test_plan001_flag_regression.py`（prompt 逐字节摘要）、`test_plan002_settings.py`、`test_plan004_flags.py`、
+> `test_plan009_flags.py`、`test_plan011_regression.py` 已删除（版本契约 / 开关快照类，长期假红）；
+> 行为覆盖保留在 `tests/v25` 其余文件（legacy，`--run-legacy` 启用）。登记见 `docs/TESTING.md` §9。
 
 ---
 
