@@ -9,7 +9,7 @@
 - [ ] 飞书开放平台：创建应用 → 开启机器人能力 → 申请 `im:message`（或 `im:message:send_as_bot`）→ 订阅 `im.message.receive_v1`
 - [ ] 配置回调 URL：`https://<公网域名>/api/v1/feishu/events`（内网穿透或测试环境），验证通过（challenge 回显成功）
 - [ ] 配置 Verification Token / Encrypt Key（推荐配置 Encrypt Key，完整校验能力）；凭据写入 `.env`（**不提交**）
-- [ ] 数据库：`uv run alembic upgrade head`，确认迁移链头为 `0036`（`channel_identities` 表存在）
+- [ ] 数据库：`uv run alembic upgrade head`，确认迁移链头为 `tests/support/schema_pins.py::MIGRATION_HEAD` 的当前值（钉测单点；**勿照抄历史编号**），且 `channel_identities` 表存在
 - [ ] 启动服务；确认启动日志**无** SettingsError、无飞书相关报错；确认 `FEISHU_ENABLED=true` 生效
 - [ ] `.env` 中 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_VERIFICATION_TOKEN` 已填写
 
@@ -42,7 +42,31 @@
 
 - [ ] 第二个飞书账号（不同 open_id）对话 → 两账号的上下文/记忆/世界**互不串**
 - [ ] 两账号同时发消息 → 各自回复正确、无交叉
-- [ ] 查 `channel_identities` 表 → 恰好两行，`internal_user_id` 分别为 `feishu:ou_A` / `feishu:ou_B`（ou 为各账号真实 open_id）
+- [ ] 查 `channel_identities` 表 → 恰好两行，`external_id` 为两个真实 open_id，`internal_user_id` 为**两个不同的雪花 ID 十进制串**（ADR-16 起不再由凭据派生；实际 ID 以表内值为准）
+
+## 授权登录与账号绑定（2026-10-08 增量，ADR-19）
+
+> 前置（飞书开放平台，人工）：①复用机器人同一个自建应用并**开启「网页」能力**；②在「安全设置 > 重定向 URL」登记 `https://<公网域名>/api/v1/auth/feishu/callback`；③申请 OAuth 所需权限（获取用户基本信息 / 用户 ID）并**创建版本发布**（自建应用企业内生效）。
+> 配置：`.env` 设 `FEISHU_OAUTH_REDIRECT_URI`（与后台登记**逐字一致**），可选 `FEISHU_OAUTH_SCOPE`；Redis 与 `AUTH_TOKEN_SECRET` 必须可用。
+
+- [ ] 未配置 `FEISHU_OAUTH_REDIRECT_URI` 时调 `GET /api/v1/auth/feishu/authorize` → **503**（文案点名缺哪几项），不是 500
+- [ ] 真机登录页点「飞书」→ 打开浏览器授权页 → 授权后浏览器显示「授权成功，请返回朝夕 App」→ 回到 App 自动进入首页（页面恢复后由 2s 轮询完成，最长 90s）
+- [ ] 该飞书账号此前**未**私聊过机器人 → 首次飞书登录后 `channel_identities` 出现一行，`internal_user_id` 为新雪花 ID；再次飞书登录 → **不新建 users 行**（同一 `user_id`）
+- [ ] 该飞书账号**已**私聊过机器人（自动建过壳账号）→ 飞书登录直接登进壳账号（`internal_user_id` 不变）
+- [ ] 已用邮箱登录的账号在「我的 → 飞书账号」点「去绑定」→ 授权完成后该行变「已绑定 · 飞书里也能找到亚丝娜」
+- [ ] 绑定后：在飞书里给机器人发消息 → 与该账号在 App 里的记忆/账本**同源**（例如 App 里记的账在飞书追问能答上）
+- [ ] 绑定后：`/auth/bindings` 返回 `feishu.bound=true` 且 `bound_at` 非空；查表确认该 open_id 行的 `internal_user_id` 已等于 token 用户
+- [ ] 绑定后主动消息可达：触发一条主动消息（或调试面 `send_proactive`）→ 目标用户的飞书收到（`resolve_recipient` 反查到 open_id）
+- [ ] 冲突（同一 open_id 被另一个**有邮箱**的账号绑着）：另一账号发起绑定 → **409** + 「该飞书账号已绑定其他账号，如需合并请联系管理员」，且**不发生任何数据迁移**
+- [ ] 「一人一飞书」：已绑 A 账号后再绑 B 账号 → **409** + 「已绑定其它飞书账号，请先解绑」
+- [ ] 接管壳账号：已私聊过机器人的 open_id，用邮箱账号绑定 → 成功（`internal_user_id` 改为邮箱账号）；**同时确认**旧壳 `users` 行与其记忆仍在（本次不做数据归并——这是已知取舍，不是缺陷）
+- [ ] 用户在授权页点「拒绝」→ App 提示「你在飞书侧取消了授权」，且不产生任何绑定/用户行
+- [ ] state 复用：同一 state 领取成功后再次 `claim` → **400**（授权请求已失效）；等待期间重复 `claim` → **404 + `Retry-After: 2`**（不烧 state）
+- [ ] 过期 state（等过 `FEISHU_OAUTH_STATE_TTL_SECONDS`）→ `claim` 返回 400，回调页显示「授权已过期」
+- [ ] 解绑：「我的 → 飞书账号 → 解绑」二次确认后该行变「去绑定」，`channel_identities` 中该行**已删除**；再在飞书发消息 → 自动建**新**账号（与解绑前账号数据隔离）
+- [ ] 全程日志/trace 中**不出现** `app_secret` / `user_access_token` / 授权码明文
+
+**平台边界核对（不是缺陷，需如实告知）**：把授权链接发给**不在本飞书团队**的账号 → 授权页提示无企业权限、无法完成登录；对照 `architecture.md` §8.6。若要求外部用户可用，须上架 ISV 商店应用（企业认证），**不属本次范围**。
 
 ## 运维
 
@@ -71,5 +95,5 @@
 
 ## 完成标准
 
-以上全部勾选后，P0 链（FEISHU-001~006）可视为「真实环境验收通过」。
+以上全部勾选后，P0 链（FEISHU-001~006）与「授权登录与账号绑定」增量（ADR-19）可视为「真实环境验收通过」。
 任一项失败：记录现象与日志（脱敏后），回到对应 Task 的 Detail 排查，**不要**在本清单内就地改代码。

@@ -21,6 +21,7 @@ _POSITIVE_INT_FIELDS = (
     "feishu_max_body_bytes",
     "feishu_merge_max_messages",
     "feishu_merge_max_chars",
+    "feishu_oauth_state_ttl_seconds",
 )
 
 _REQUIRED_CREDENTIALS = (
@@ -63,6 +64,12 @@ class FeishuSettings(BaseSettings):
     feishu_http_max_attempts: int = 3
     feishu_http_backoff_seconds: float = 0.5
     feishu_http_backoff_max_seconds: float = 8.0
+    feishu_oauth_authorize_url: str = (
+        "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
+    )
+    feishu_oauth_redirect_uri: str = ""
+    feishu_oauth_scope: str = ""
+    feishu_oauth_state_ttl_seconds: int = 300
 
     @model_validator(mode="after")
     def validate_feishu_config(self):
@@ -135,11 +142,25 @@ class FeishuSettings(BaseSettings):
                     raise SettingsError(
                         "FEISHU_ROUTER_INSTANCE_URLS 每项必须以 http:// 或 https:// 开头"
                     )
+        for env_name, value in (
+            ("FEISHU_OAUTH_AUTHORIZE_URL", self.feishu_oauth_authorize_url),
+            ("FEISHU_OAUTH_REDIRECT_URI", self.feishu_oauth_redirect_uri),
+        ):
+            if value and not value.startswith(("http://", "https://")):
+                raise SettingsError(f"{env_name} 必须以 http:// 或 https:// 开头")
         if not self.feishu_encrypt_key:
             logger.warning(
                 "FEISHU_ENCRYPT_KEY 为空: 仅接受未加密事件且不校验签名，安全性降级"
             )
         return self
+
+    def oauth_configured(self) -> bool:
+        """飞书授权登录的配置就绪判定：可用性由配置齐备性承担，不设功能位开关。"""
+        return bool(
+            self.feishu_app_id
+            and self.feishu_app_secret
+            and self.feishu_oauth_redirect_uri
+        )
 
     def router_target_urls(self) -> tuple[str, ...]:
         """`FEISHU_ROUTER_INSTANCE_URLS` 解析为元组；顺序即分片下标。"""

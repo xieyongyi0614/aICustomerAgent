@@ -73,6 +73,8 @@ def update_identity(
     internal_user_id: str | None = None,
     session_id: str | None = None,
     display_name: str | None = None,
+    union_id: str | None = None,
+    tenant_key: str | None = None,
 ) -> ChannelIdentityRow | None:
     with SessionLocal() as session:
         row = (
@@ -91,10 +93,29 @@ def update_identity(
             row.session_id = session_id
         if display_name is not None:
             row.display_name = display_name
+        if union_id is not None:
+            row.external_union_id = union_id
+        if tenant_key is not None:
+            row.external_tenant_key = tenant_key
         row.updated_at = timeutil.now()
         session.commit()
         session.expunge(row)
         return row
+
+
+def remove(channel: str, external_id: str) -> bool:
+    """解绑：删除该绑定行。返回是否确有删除（重复解绑返回 False）。"""
+    with SessionLocal() as session:
+        deleted = (
+            session.query(ChannelIdentityRow)
+            .filter(
+                ChannelIdentityRow.channel == channel,
+                ChannelIdentityRow.external_id == external_id,
+            )
+            .delete()
+        )
+        session.commit()
+    return bool(deleted)
 
 
 def list_by_internal_user(internal_user_id: str) -> list[ChannelIdentityRow]:

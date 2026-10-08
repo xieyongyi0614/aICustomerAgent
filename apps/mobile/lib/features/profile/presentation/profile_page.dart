@@ -12,17 +12,23 @@ import '../../../design_system/orb/orb.dart';
 import '../data/auth_repository.dart';
 import '../data/care_prefs_repository.dart';
 import '../data/memory_count_repository.dart';
+import 'feishu_sign_in.dart';
 
 /// B8 #profile 我的：相识卡 + 人格卡 + 设置组 + 主动关怀 + 退出登录。
 class ProfilePage extends ConsumerStatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.authRepository, this.feishuFlow});
+
+  final AuthRepository? authRepository;
+  final FeishuSignIn? feishuFlow;
 
   @override
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  final _auth = AuthRepository();
+  late final AuthRepository _auth = widget.authRepository ?? AuthRepository();
+  late final FeishuSignIn _feishuFlow =
+      widget.feishuFlow ?? FeishuSignIn(authRepository: widget.authRepository);
   final _careRepo = CarePrefsRepository();
   final _memoryCountRepo = MemoryCountRepository();
   String? _nickname;
@@ -30,6 +36,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   int? _memoryCount;
   CarePrefs? _care;
   bool _careBusy = false;
+  BindingsResult? _bindings;
+  bool _feishuBusy = false;
 
   @override
   void initState() {
@@ -37,6 +45,92 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _loadIdentity();
     _loadCare();
     _loadMemoryCount();
+    _loadBindings();
+  }
+
+  Future<void> _loadBindings() async {
+    try {
+      final result = await _auth.fetchBindings();
+      if (!mounted) return;
+      setState(() => _bindings = result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _bindings = null);
+    }
+  }
+
+  /// 未绑定 → 走飞书授权绑定；已绑定 → 二次确认后解绑。
+  Future<void> _onFeishuRowTap() async {
+    if (_feishuBusy) return;
+    if (_bindings?.feishuBound ?? false) {
+      await _confirmUnbindFeishu();
+      return;
+    }
+    setState(() => _feishuBusy = true);
+    try {
+      final result = await _feishuFlow.bind();
+      if (!mounted) return;
+      setState(() {
+        _bindings = result;
+        _feishuBusy = false;
+      });
+      _notice('飞书已绑定，以后在飞书里也能找到亚丝娜');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice('绑定没成功，稍后再试');
+    }
+  }
+
+  Future<void> _confirmUnbindFeishu() async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: '解绑飞书',
+      message: '解绑后飞书里会成为独立账号，App 里的记忆不会丢失。',
+      confirmLabel: '解绑',
+      icon: AppIcons.link,
+      danger: true,
+    );
+    if (!confirmed) return;
+    setState(() => _feishuBusy = true);
+    try {
+      final result = await _auth.unbindFeishu();
+      if (!mounted) return;
+      setState(() {
+        _bindings = result;
+        _feishuBusy = false;
+      });
+      _notice('已解绑飞书');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice('解绑没成功，稍后再试');
+    }
+  }
+
+  void _notice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+      ),
+    );
+  }
+
+  String _feishuSubtitle() {
+    if (_feishuBusy) return '正在等待飞书授权…';
+    final bindings = _bindings;
+    if (bindings == null) return '未连接 · 点击重试';
+    if (bindings.feishuBound) return '已绑定 · 飞书里也能找到亚丝娜';
+    return '未绑定 · 绑定后可在飞书聊天';
   }
 
   Future<void> _loadMemoryCount() async {
@@ -302,6 +396,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     color: colors.ink3,
                   ),
                   onTap: () => context.push('/memory'),
+                ),
+                SettingRow(
+                  title: '飞书账号',
+                  subtitle: _feishuSubtitle(),
+                  icon: AppIcons.messageCircle,
+                  iconBg: colors.tileInfo,
+                  iconColor: colors.tagPreferenceFg,
+                  trailing: _feishuBusy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          (_bindings?.feishuBound ?? false) ? '已绑定' : '去绑定',
+                          style: type.caption.copyWith(
+                            color: (_bindings?.feishuBound ?? false)
+                                ? colors.ink2
+                                : colors.aiPrimary,
+                          ),
+                        ),
+                  onTap: _onFeishuRowTap,
                 ),
                 SettingRow(
                   title: '隐私设置',

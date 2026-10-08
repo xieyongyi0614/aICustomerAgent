@@ -420,7 +420,7 @@ API-001 → API-002 ──┘
 | IDENT-007 | 后台用户集合 | `digest.py` / `alert.py` `run_maintenance` 按 `user_repository.list_all` 迭代；空表回落 default-user 分支已于 IDENT-009 摘除（启动播种保证非空，分支不可达） | 已实现 |
 | IDENT-008 | 冷启动回归 | 专项测试 `tests/v50/test_identity_cutover.py`：无 token 401；token 身份贯穿（聊天落库/历史隔离/账本 scope/导出 scope）；全新用户首轮对话不崩（世界/角色状态空态口径） | 已实现 |
 
-留白：IDENT-010（调试面鉴权）、IDENT-011（feishu 身份与 email 身份并集）均 P2，另行登记。IDENT-009 已执行（见下）。
+留白：IDENT-010（调试面鉴权）、~~IDENT-011（feishu 身份与 email 身份并集）~~（**2026-10-08 已关账**，见 §17）。IDENT-009 已执行（见下）。
 
 **IDENT-009 执行结论（2026-09-28，默认用户概念整体退役）**：不再存在"默认用户"这一身份概念——用户行一律由登录链路派生（邮箱 → `email-<sha256[:16]>`；通道 → `feishu:{open_id}`）。
 
@@ -683,3 +683,31 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 - 生成时机（夜间 life loop 步骤 vs 早间首次请求惰性生成）是 Detail 裁决项，倾向**惰性生成**（无 cron 依赖）；新设置按领域命名，禁 `*_enabled`。
 - 按 D22 原纪律：Task Detail 于**开工前**生成；届时按变更顺序回写 `requirements-analysis.md` 与 `traceability.md` §13（顺序不可颠倒）。
 - 落地后同批处置：`design-alignment-report.md` DEV-05 回撤、`test_design_principles.py` 静态断言与 `components.md` A2 卡标签话术同步。
+
+---
+
+## 17. 增量注册：飞书 OAuth 登录与账号绑定（2026-10-08，已实现）
+
+> **背景**：`IDENT-011`（feishu 身份与 email 身份并集）自 §14 起为 P2 留白；`docs/integrations/feishu/architecture.md` §7.2 亦以「账号绑定（Web ↔ 飞书）：表结构已支持改 `internal_user_id`，但流程与 UI 不在本阶段」预留。本次按「个人开发者 / 先自用 + 留公众口」的定位兑现该能力：加入本飞书团队的人可用飞书一键登录，已登录账号可把飞书账号绑定到本人，使机器人与 App **同源**；并支持解绑与绑定状态查看。
+> **体例**：沿用 §12~§15 增量注册体例（从简，不另立 41 任务式 Detail）。**架构依据**：`docs/current-system-architecture-baseline.md` §5.1 / §8.5 / §9 / ADR-19；飞书域契约 `docs/integrations/feishu/architecture.md` §8（唯一真源）。
+
+| Task ID | 名称 | 交付面 | 状态 |
+|---|---|---|---|
+| `IDL-001` | 飞书 OAuth 客户端 | `services/identity/feishu/oauth.py`：`FeishuOAuthClient` 协议 + `UrllibFeishuOAuthClient`（标准库 `urllib` + `to_thread`，`OAuthTransport` 假传输注入点；authorize/token/user_info 三跳；只取 `open_id`/`union_id`/`tenant_key`；token 换码不重试、user_info 退避重试） | 已实现 |
+| `IDL-002` | 一次性 state 与结果回写 | `services/identity/feishu/oauth_state.py`：`OAuthStateStore` 协议 + `RedisOAuthStateStore`（两段式载荷、`peek` 不消费 / `take` GETDEL 单次领取、mode + 发起用户复核）；参数类配置 `FEISHU_OAUTH_*` 四键 | 已实现 |
+| `IDL-003` | 编排与冲突裁决 | `services/identity/feishu/login.py`：三路径（未绑定建号 / 已绑定复用 / 补绑改绑）+ 冲突 409（仅允许接管「无邮箱纯飞书壳账号」）+ 解绑（删行）+ 绑定列表；仓储补 `remove`、`update_identity` 扩 `union_id`/`tenant_key` | 已实现 |
+| `IDL-004` | 端点与回调页 | `api/v1/auth.py`：`/auth/feishu/authorize`、`/auth/feishu/bind/authorize`、`/auth/feishu/callback`（消费授权码 + 一句话页）、`/auth/feishu/login/claim`、`/auth/feishu/bind/claim`、`DELETE /auth/feishu/bind`、`GET /auth/bindings`；404 + `Retry-After` 表示待授权 | 已实现 |
+| `IDL-005` | 移动端接入 | `features/profile/data/auth_repository.dart`（六个方法 + 绑定模型）、`presentation/feishu_sign_in.dart`（`url_launcher` 打开浏览器 + 2s 轮询，45 次上限）、登录页「其他登录方式」飞书入口、我的页「飞书账号」行（绑定 / 二次确认解绑） | 已实现 |
+| `IDL-006` | 文档回写 | 基线 §5.1 / §8.5 / §9 / ADR-19；`integrations/feishu/architecture.md` §7.2 关账 + 新增 §8 + 配置表 + 目录落点；`regression-checklist.md` 新增「授权登录与账号绑定」段并修正两处陈旧断言（迁移链头、`feishu:ou_A`） | 已实现 |
+
+**关键裁决**（详见基线 ADR-19）：①**复用机器人同一个自建应用**（open_id 天然一致）→ 绑定 = 一行改绑，**零迁移**（`external_union_id` / `external_tenant_key` / 可空 `session_id` 均已存在，链头保持 `0008`）；②**授权码不出后端**：飞书回调页消费并回写，App 凭 state 轮询领取 → 客户端**无需自定义 scheme / `app_links`**，只新增 `url_launcher` 依赖；③**冲突不归并数据**（接管壳账号后旧壳 `users` 行与其记忆/世界/账本保留原样，归并脚本列后续）；④**登录与通道解耦**：可用性由配置齐备性判定，**不新增 `*_enabled` 功能位**；⑤**落点 = `services/identity/feishu/` 子包**（身份域的提供方子包）——**不放 `channels/feishu/`**：该目录 allowlist fail-closed（禁 `redis`、禁 `app.repositories`），本能力必然要 Redis（state）与仓储（绑定落库），且 R1 禁止核心层 import 通道实现。两个同名 `feishu` 目录是分层的刻意结果：**`channels/feishu/` = 消息通道（收发），`services/identity/feishu/` = 身份提供方（登录/绑定）**。
+
+**平台边界（须一并对用户如实说明）**：自建应用**仅本企业（团队）成员**可用——机器人只有团队成员能私聊，授权登录对非成员提示无企业权限。故：**自己 + 拉进团队的朋友**可用飞书登录/绑定；**小红书等陌生用户不可用**（既不能飞书登录，也无法与机器人对话），其入口仍是邮箱验证码登录。对公众开放须上架「应用商店应用（ISV）」= 企业认证 + 服务商入驻，**个人主体不可行**；数据模型已预留 `external_union_id` 跨应用桥接，换 ISV 时不改表。
+
+**测试门槛（已过）**：后端新增 `tests/unit/test_feishu_oauth.py` / `tests/unit/test_oauth_state.py` / `tests/v50/test_feishu_login_binding.py` 共 71 绿；相关面复跑（`test_feishu_boundary` / `test_feishu_settings` / `test_datetime_discipline` / `test_channel_identity` / `tests/v50` 全量）284 绿；移动端新增 14 绿，全量 432 绿（3 条 golden 为**基线既存漂移**，见下）；`flutter analyze` 仅剩 1 条既存 `briefing_page` info。
+
+**同批发现与处置（非本能力引入）**：`apps/mobile/lib/design_system/components/schedule_cards.dart` **漏 import `press_scale.dart`**（HEAD 上任一引用 `components.dart` 的测试文件均**编译失败**）——已补该 1 行 import；补后三个 golden 文件可加载，但 `golden_spend_summary` / `golden_ledger_components` / `test_life_page_golden` 与当前视觉不符（在干净 HEAD + 仅补 import 的 worktree 上同样失败 → 属既有视觉漂移）。**golden 未擅自重生成**，待设计侧裁决（基线 §9 已登记）。
+
+**回归清单（真实模型 / 真机人工项）**：见 `docs/integrations/feishu/regression-checklist.md` §「授权登录与账号绑定」——含飞书后台前置（开启网页能力 / 登记重定向 URL / 权限申请 / 发布版本）、配置缺失 503、真机授权登录、绑定同源、409 冲突、接管壳账号、解绑后独立身份、state 复用与过期、平台边界核对。
+
+**非目标**：ISV / 上架 / 企业认证；历史数据自动归并；深链自动回跳（未注册自定义 scheme）；微信 / 手机号登录；调试面鉴权（`IDENT-010` 仍留白）。

@@ -49,7 +49,62 @@ class AuthCodeException implements Exception {
   }
 }
 
-/// 邮箱验证码登录（API-014）：换取长期令牌进 Keychain。
+/// 飞书授权入口：浏览器地址 + 一次性 state + 有效期（秒）。
+class FeishuAuthorizeResult {
+  const FeishuAuthorizeResult({
+    required this.authorizeUrl,
+    required this.state,
+    required this.expiresIn,
+  });
+
+  final String authorizeUrl;
+  final String state;
+  final int expiresIn;
+
+  factory FeishuAuthorizeResult.fromJson(Map<String, dynamic>? data) {
+    final json = data ?? const {};
+    return FeishuAuthorizeResult(
+      authorizeUrl: json['authorize_url'] as String? ?? '',
+      state: json['state'] as String? ?? '',
+      expiresIn: json['expires_in'] as int? ?? 0,
+    );
+  }
+}
+
+/// 单个通道的绑定状态。
+class BindingItem {
+  const BindingItem({required this.bound, this.boundAt});
+
+  final bool bound;
+  final String? boundAt;
+
+  factory BindingItem.fromJson(Object? data) {
+    final json = data is Map ? data : const {};
+    return BindingItem(
+      bound: json['bound'] as bool? ?? false,
+      boundAt: json['bound_at'] as String?,
+    );
+  }
+}
+
+class BindingsResult {
+  const BindingsResult({required this.email, required this.feishu});
+
+  final BindingItem email;
+  final BindingItem feishu;
+
+  bool get feishuBound => feishu.bound;
+
+  factory BindingsResult.fromJson(Map<String, dynamic>? data) {
+    final json = data ?? const {};
+    return BindingsResult(
+      email: BindingItem.fromJson(json['email']),
+      feishu: BindingItem.fromJson(json['feishu']),
+    );
+  }
+}
+
+/// 邮箱验证码登录（API-014）+ 飞书授权登录 / 绑定：换取长期令牌进 Keychain。
 class AuthRepository {
   AuthRepository({Dio? dio, SecureTokenStore? tokenStore})
       : _dio = dio ?? createDio(),
@@ -92,6 +147,83 @@ class AuthRepository {
         },
       );
       return await _persistTokenResponse(resp, deviceId);
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  /// 飞书登录授权地址（未登录可调用）。
+  Future<FeishuAuthorizeResult> startFeishuLogin() async {
+    try {
+      final resp = await _dio.get<Map<String, dynamic>>('/auth/feishu/authorize');
+      return FeishuAuthorizeResult.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  /// 飞书绑定授权地址（需已登录）。
+  Future<FeishuAuthorizeResult> startFeishuBind() async {
+    try {
+      final resp =
+          await _dio.get<Map<String, dynamic>>('/auth/feishu/bind/authorize');
+      return FeishuAuthorizeResult.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  /// 领取飞书登录结果；返回 null 表示授权尚未完成（继续轮询）。
+  Future<TokenResult?> claimFeishuLogin({
+    required String state,
+    required String deviceId,
+    required String platform,
+    String? deviceName,
+  }) async {
+    try {
+      final resp = await _dio.post<Map<String, dynamic>>(
+        '/auth/feishu/login/claim',
+        data: {
+          'state': state,
+          'device_id': deviceId,
+          'platform': platform,
+          'device_name': ?deviceName,
+        },
+      );
+      return await _persistTokenResponse(resp, deviceId);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  /// 领取飞书绑定结果；返回 null 表示授权尚未完成（继续轮询）。
+  Future<BindingsResult?> claimFeishuBind(String state) async {
+    try {
+      final resp = await _dio.post<Map<String, dynamic>>(
+        '/auth/feishu/bind/claim',
+        data: {'state': state},
+      );
+      return BindingsResult.fromJson(resp.data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  Future<BindingsResult> fetchBindings() async {
+    try {
+      final resp = await _dio.get<Map<String, dynamic>>('/auth/bindings');
+      return BindingsResult.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw AuthCodeException.fromDio(e);
+    }
+  }
+
+  Future<BindingsResult> unbindFeishu() async {
+    try {
+      final resp = await _dio.delete<Map<String, dynamic>>('/auth/feishu/bind');
+      return BindingsResult.fromJson(resp.data);
     } on DioException catch (e) {
       throw AuthCodeException.fromDio(e);
     }

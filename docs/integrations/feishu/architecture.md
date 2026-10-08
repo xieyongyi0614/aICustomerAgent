@@ -392,7 +392,8 @@ channel_identities
 | 数据来源 | `channel_identities`（既有 `idx_channel_identities_user` 索引专为此用途） |
 | 多行时（未来一人多通道） | 按 `channel` 精确匹配；同一 `(channel, internal_user_id)` 理论上唯一，多行取 `created_at` 最早一行（确定性，不猜） |
 | 未命中 | 返回 `None`（调用方据此**跳过**该用户，**不得**猜测或兜底到其他收件人） |
-| 停用行（`status='inactive'`） | 本阶段不过滤（无停用路径）；未来账号绑定 Task 再定义语义 |
+| 停用行（`status='inactive'`） | 不存在停用路径（账号绑定以**删行**实现解绑，见 §8）：`resolve` 与 `resolve_recipient` 均无需状态过滤；若未来引入软停用，两处必须同批加过滤 |
+| 多行（同一 `internal_user_id` 多飞书行） | **被绑定流程禁止**（「一人一飞书」，冲突 409，见 §8）——否则上面的「取 `created_at` 最早一行」会退化为隐性歧义 |
 | 不得做的事 | 不得从 `session_id` 反推 open_id（`feishu:{open_id}` 是派生约定而非契约，且未来 `session_id` 可能不再等于 `internal_user_id`）→ **只用 `channel_identities`** |
 
 **为什么必须走表而不是字符串反解析**：`feishu:{open_id}` 只是**默认派生值**，表才是权威记录（§3.1）。若用"拆 `session_id` 前缀"的方式反推，那么未来任何一次账号绑定（改表内 `internal_user_id`）都会让主动消息送错人。
@@ -520,6 +521,10 @@ Feishu Event（im.message.receive_v1）
 | `FEISHU_ROUTER_ENABLED` | bool | `false` | 开启内置的**轻量 router 端点**（`POST /api/v1/feishu/ingress/events`，FEISHU-011 方案 C2）：解密 → 算分片 → 把**原始 body 与原始签名头**转发到目标实例。它本身即是「ingress 已分流」的声明，无需再开 `FEISHU_INGRESS_SHARDED_ROUTING_ENABLED` |
 | `FEISHU_ROUTER_INSTANCE_URLS` | str | `""` | 逗号分隔的实例基址，**顺序即分片下标 0..N-1**，个数必须等于 `FEISHU_INSTANCE_COUNT`（启动期校验）。改 `FEISHU_INSTANCE_COUNT` 时必须同步改这里 |
 | `FEISHU_ROUTER_TIMEOUT_SECONDS` | float | `5.0` | router 转发到目标实例的超时；超时/不可达 → `503`（**不自行改投**，让飞书重投） |
+| `FEISHU_OAUTH_AUTHORIZE_URL` | str | `https://accounts.feishu.cn/open-apis/authen/v1/authorize` | 授权页基址（§8）；测试可指向假服务 |
+| `FEISHU_OAUTH_REDIRECT_URI` | str | `""` | 后端回调地址 `https://<域名>/api/v1/auth/feishu/callback`，须与开发者后台「安全设置 > 重定向 URL」一致；**非空且 app 凭据齐备 = 飞书登录可用**（不设功能位开关） |
+| `FEISHU_OAUTH_SCOPE` | str | `""` | 增量权限（空格分隔，可空）；非空须先在后台申请，否则用户遇 `20027` |
+| `FEISHU_OAUTH_STATE_TTL_SECONDS` | int | `300` | 一次性 state 有效期（授权页停留 + 轮询领取窗口） |
 
 ### 5.2 配置原则
 
@@ -632,7 +637,7 @@ Feishu Event（im.message.receive_v1）
 | **非文本消息的「处理」** | 语音 / 图片 / 文件 / 卡片的**内容理解**仍后置（见上三行）。**注意区分**：N-08 只加了「私聊非文本回一句兜底文案」的**反馈**，不涉及任何内容解析——不要把它理解为非文本已被支持 |
 | **多机器人 / 多应用** | `channel_identities` 已预留 `tenant_key` / `union_id`，但本阶段单应用 |
 | **飞书工作流 / 审批 / 日历等** | 与 Character Runtime 无关，不做 |
-| **账号绑定（Web ↔ 飞书）** | 表结构已支持改 `internal_user_id`，但流程与 UI 不在本阶段 |
+| ~~**账号绑定（Web ↔ 飞书）**~~ | ✅ **已实现（2026-10-08）**：见 §8（授权登录 + 绑定 / 解绑 / 绑定列表，兑现本行原「表结构已支持改 `internal_user_id`，但流程与 UI 不在本阶段」） |
 
 ### 7.3 未来扩展点（仅登记位置，不实现）
 
@@ -663,6 +668,100 @@ Feishu Event（im.message.receive_v1）
 
 ---
 
+## 8. 授权登录与账号绑定（2026-10-08 实现，兑现 §7.2 预留）
+
+> 本节是**已实现**能力的契约描述（与 §2~§7 同为飞书域的唯一架构依据）；基线侧对应 `docs/current-system-architecture-baseline.md` §5.1 / §8.5 与 ADR-19。
+
+### 8.1 为什么绑定 = 一行改绑
+
+飞书授权登录与机器人**复用同一个自建应用**（同一 App 开启「机器人」+「网页」能力）：OAuth 拿到的 `open_id` 与 Webhook 事件 `sender.sender_id` **同应用内同一取值**。于是「绑定飞书机器人」不需要任何 ID 桥接——它就是 `channel_identities` 里 `(channel='feishu', external_id=open_id)` 那一行的 `internal_user_id` 指向谁。`external_union_id` / `external_tenant_key` 照常落库，为跨应用（未来 ISV）桥接预留。
+
+### 8.2 链路：授权码不出后端
+
+```text
+App                          后端                          飞书
+ │ GET /auth/feishu/authorize
+ │────────────────────────────►  签发一次性 state（mode + 发起用户）
+ │ ◄── authorize_url + state
+ │ 打开系统浏览器 ─────────────────────────────────────────► 授权页
+ │                                            用户授权 ↓
+ │                              GET /auth/feishu/callback?code&state
+ │                             ◄──────────────────────────────┘
+ │                              消费 code → 换身份 → 回写 outcome
+ │                             渲染一句话页（「请返回 App」）
+ │ 轮询 POST /auth/feishu/login/claim（state）
+ │────────────────────────────►  404=未完成 / 200=签发本系统令牌
+```
+
+| 端点 | 鉴权 | 语义 |
+|---|---|---|
+| `GET /auth/feishu/authorize` | 无 | 登录用授权地址 + state |
+| `GET /auth/feishu/bind/authorize` | `require_user` | 绑定用授权地址 + state（state 携带发起用户） |
+| `GET /auth/feishu/callback` | 无（飞书浏览器重定向） | 消费授权码、回写结果、渲染提示页；**不做 302 回跳**（未注册自定义 scheme） |
+| `POST /auth/feishu/login/claim` | 无 | 领取登录结果：200 `TokenResponse`（复用既有令牌契约）/ 404 + `Retry-After: 2`（未完成）/ 400 失效或被拒 |
+| `POST /auth/feishu/bind/claim` | `require_user` | 领取绑定结果：200 绑定列表 / 404 未完成 / 403 跨用户 / 409 冲突 |
+| `DELETE /auth/feishu/bind` | `require_user` | 解绑（重复解绑幂等返回当前列表） |
+| `GET /auth/bindings` | `require_user` | 本人绑定状态（email / feishu，含 `bound_at`） |
+
+**state 语义**（`services/identity/oauth_state.py`）：两段式 Redis 载荷——签发时 `{mode, user_id?}`，回调时补 `{outcome}`；`peek` 不消费（轮询安全）、`take` 走 `GETDEL`（**结果只可领取一次**，防二次签发令牌 / 重复绑定）；`mode` 与发起用户逐项复核（bind state 被他人令牌领取 → 403，模式不符 → 视为失效并**烧掉**该 state）。TTL 由 `FEISHU_OAUTH_STATE_TTL_SECONDS` 决定；回调回写 `outcome` 时按该 TTL 重写（授权停留时间不再额外缩短领取窗口）。
+
+**一次授权只服务一次领取**：`claim` 一旦取走结果（无论随后业务是否成功，例如绑定遭遇 409 冲突），该 state 即失效——冲突属于需要用户先处置的前置条件（解绑 / 换账号），重试必然要重新授权，故不保留「可重试的失败结果」以免被反复消费。
+
+### 8.3 三条路径与裁决
+
+| 场景 | 行为 |
+|---|---|
+| 登录 · 该 `open_id` 无绑定 | `channel.resolve` 建 `users` 行 + 写绑定行（既有语义） |
+| 登录 · 该 `open_id` 已绑定（含「此前私聊过机器人」自动建的号） | 命中既有 `user_id` 复用，**绝不重复建号**（有断言） |
+| 补绑 · 已登录用户 | `update_identity` 改绑该行到 token 用户 |
+| 冲突 · 目标 `open_id` 已绑**另一个**用户 | 仅当对方是「**无邮箱的纯飞书壳账号**」（`users.email` 为空且无 email 绑定行）才允许**接管**——用户已用 OAuth 证明对该 `open_id` 的控制权；其余情况 **409** 拒绝 |
+| 冲突 · 本人**已有**另一飞书绑定 | **409** 拒绝（「一人一飞书」，保护 §3.4 的收件人确定性） |
+| 解绑 | 删除绑定行；飞书侧回到「首次私聊自动建独立用户」；`users` 行保留不删 |
+| 接管时的数据 | **不归并**：旧壳 `users` 行与其记忆 / 世界 / 账本留在原 `user_id`（归并脚本登记为后续项，见基线 §9） |
+
+`session_id` **不随改绑轮换**：它是「这个飞书私聊窗口」的稳定键（`feishu:{open_id}`），身份变化不改变窗口——因此绑定后飞书里的对话上下文连续，而记忆 / 世界 / 账本从绑定时刻起归到绑定的 `user_id`。绑定不改动 `conversations.user_id`（既有行保留原值），故飞书窗口不会出现在新账号的会话列表里（不影响正确性，属已知边角）。
+
+### 8.4 分层落点（不得违反 §2.2 R1~R5）
+
+飞书 OAuth 属「**外部身份提供方**」，收在 **`app/services/identity/feishu/` 子包**（身份域 + 提供方子包，先例 `services/tool/ext_api/`、`services/planning/decompose/`），**不放 `app/channels/feishu/`**：该目录依赖 allowlist 是 fail-closed 的（`test_feishu_boundary.py`：禁 `redis` / 禁 `app.repositories` / 禁 `httpx`），而本能力必然要 Redis（state）与仓储（绑定落库）；且 R1 禁止核心层 import 通道实现，放进去会让身份域反向依赖通道实现。
+
+**两个 `feishu` 目录的分工（刻意，非遗漏）**：
+
+| 路径 | 是什么 | 依赖面 |
+|---|---|---|
+| `app/channels/feishu/` | **消息通道**：入站事件 → 管线、出站 Reply/Proactive | fail-closed allowlist（禁 redis / 禁 repositories） |
+| `app/services/identity/feishu/` | **身份提供方**：OAuth 换身份、state、登录与绑定编排 | 身份域常规（可用 Redis 与仓储） |
+
+| 层 | 落点 | 说明 |
+|---|---|---|
+| 契约 + 实现 | `services/identity/feishu/oauth.py` | `FeishuOAuthClient` 协议 + `UrllibFeishuOAuthClient`（标准库 `urllib` + `asyncio.to_thread`；`OAuthTransport` 注入点供假传输）+ 模块级 `get/set_oauth_client` |
+| 状态存储 | `services/identity/feishu/oauth_state.py` | `OAuthStateStore` 协议 + `RedisOAuthStateStore`（复刻 `code_store.py` 的 GETDEL 范式）+ `get/set_state_store`；载荷无飞书专有字段，第二个提供方出现时再上提 |
+| 编排与裁决 | `services/identity/feishu/login.py` | 三条路径 / 冲突 / 解绑 / `record_authorization` / `claim_*`；同步 DB 调用一律 `asyncio.to_thread` |
+| 装配 | `api/v1/auth.py`（组合根豁免） | 端点 + 回调页 + 就绪校验；**入站热路径零新增查询**（仍是 `resolve` 的一次 `find`） |
+
+### 8.5 配置与就绪判定
+
+`FEISHU_OAUTH_AUTHORIZE_URL`（默认 `https://accounts.feishu.cn/open-apis/authen/v1/authorize`）、`FEISHU_OAUTH_REDIRECT_URI`（须在开发者后台「安全设置 > 重定向 URL」登记，且与 token 交换时一致）、`FEISHU_OAUTH_SCOPE`（可空；非空须先在后台申请，否则用户遇 `20027`）、`FEISHU_OAUTH_STATE_TTL_SECONDS`。**可用性 = 配置齐备性**（`app_id` + `app_secret` + `redirect_uri` + Redis + `AUTH_TOKEN_SECRET`），缺一 503；**不引入 `*_enabled` 功能位**，与通道总开关 `feishu_enabled` 解耦（登录与通道各自可用）。
+
+**协议细节**：授权端点 / token 端点 / user_info 三跳的 URL、参数与响应形状以实现期核对的官方文档为准（只取 `open_id` / `union_id` / `tenant_key`，不取昵称头像）；token 响应同时兼容扁平的 v2 与嵌套 `data` 的 v1 形状。**授权码换 token 不重试**（重试会把「响应丢失」变成「码已使用」的假失败），user_info 为幂等 GET 才退避重试。
+
+### 8.6 平台边界（必须如实告知，不得暗示）
+
+- **自建应用仅本企业（团队）成员可用**：机器人只有团队成员能私聊，授权登录对非成员提示无企业权限。
+- 故飞书登录 / 绑定是**小圈子能力**（自己 + 被拉进团队的朋友）；**陌生用户走邮箱验证码登录**（现状不变）。
+- 对公众开放需上架「**应用商店应用（ISV）**」：企业认证 + 服务商入驻，**个人主体不可行**。
+- 换 ISV / 多应用时数据模型不变：`external_union_id`（同一开发者主体跨应用稳定）+ `channel_identities` 单表改绑。
+
+### 8.7 已知缺口（显式登记，不在本次范围）
+
+| 缺口 | 影响 | 后续做法 |
+|---|---|---|
+| 接管壳账号**不归并历史数据** | 绑定后角色「忘记」绑定前的飞书聊天积累 | 归并脚本（动态发现含 `user_id` 列的表 + 单事务 + 默认 dry-run，先例 `scripts/migrate_owner_id_to_email.py`）；先自用阶段建议先跑归并再绑定 |
+| **无深链回跳**（未注册 `zhaoxi://` scheme，未引 `app_links`） | 授权完成后需用户手动切回 App，本流程在 App 恢复后自然续上 | Android `intent-filter` + iOS `CFBundleURLTypes` + 回调页加「返回 App」入口 |
+| 轮询上限 90s（45 次 × 2s） | 超过则提示重试 | 需要更长窗口时改 `FeishuSignIn` 的注入参数 |
+
+---
+
 ## 附录 A：目录落点
 
 ```text
@@ -687,6 +786,11 @@ app/
 │       ├── outbound.py                #     文本规范化 + 超长切分（纯函数）
 │       ├── delivery.py                #     ★ 出站编排：Reply / Proactive 两形态 + 幂等 + 收口
 │       └── errors.py                  #     Feishu 错误分类 → ChannelErrorKind 映射
+├── services/identity/                       # 🌟 身份域（通道/凭据无关：channel / user_service / code_store / verification）
+│   └── feishu/                              # ★ 飞书作为身份提供方（§8；与 channels/feishu 分层分工见 §8.4）
+│       ├── oauth.py                         #     OAuth 客户端协议 + urllib 实现（假传输注入点）
+│       ├── oauth_state.py                   #     一次性 state + 结果回写（Redis，GETDEL 领取）
+│       └── login.py                         #     编排队列：三路径 / 冲突裁决 / 解绑 / 绑定列表
 ├── services/channel_identity_service.py     # ★ 正向 resolve + 反向 resolve_recipient（业务入口）
 ├── repositories/channel_identity_repository.py  # ★ 单表 CRUD（含 list_by_internal_user）
 └── core/settings/feishu.py             # ★ 配置领域模块

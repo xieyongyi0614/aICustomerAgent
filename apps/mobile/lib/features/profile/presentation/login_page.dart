@@ -4,11 +4,15 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/storage/prefs_store.dart';
 import '../../../design_system/orb/orb.dart';
+import '../data/auth_repository.dart';
+import 'feishu_sign_in.dart';
 import 'widgets/agreement_check.dart';
 
 /// 设计稿 ⓪ 登录 / 初见 Onboarding（邮箱优先）：登录即「与亚丝娜的第一天」。
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.feishuFlow});
+
+  final FeishuSignIn? feishuFlow;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -17,8 +21,13 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
+  late final FeishuSignIn _feishuFlow =
+      widget.feishuFlow ?? FeishuSignIn();
+
   final _email = TextEditingController();
   bool _agreed = true;
+  bool _feishuBusy = false;
+  String? _feishuHint;
   String? _lastEmail;
 
   @override
@@ -93,6 +102,39 @@ class _LoginPageState extends State<LoginPage> {
   void _onPhoneLogin() {
     if (!_agreementAccepted) return;
     _notice('手机号登录还没接入，先用邮箱吧');
+  }
+
+  /// 飞书登录：浏览器完成授权后由本流程轮询领取令牌。
+  /// 授权页在飞书 App / 浏览器内完成，回到本页时结果通常已就绪。
+  Future<void> _onFeishuLogin() async {
+    FocusScope.of(context).unfocus();
+    if (!_agreementAccepted) return;
+    if (_feishuBusy) return;
+    setState(() {
+      _feishuBusy = true;
+      _feishuHint = '正在等待飞书授权…';
+    });
+    try {
+      await _feishuFlow.login(platform: Theme.of(context).platform.name);
+      final prefs = await PrefsStore.load();
+      await prefs.markLoginSeen();
+      if (!mounted) return;
+      context.go('/home');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _feishuBusy = false;
+        _feishuHint = null;
+      });
+      _notice(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _feishuBusy = false;
+        _feishuHint = null;
+      });
+      _notice('飞书登录没成功，稍后再试，或先用邮箱');
+    }
   }
 
   @override
@@ -213,11 +255,18 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _AltLogin(
+                    label: '飞书',
+                    icon: Icon(AppIcons.messageCircle,
+                        size: 23, color: colors.ink2),
+                    onTap: _onFeishuLogin,
+                  ),
+                  const SizedBox(width: 34),
+                  _AltLogin(
                     label: '微信',
                     icon: _WeChatGlyph(size: 23, inverted: true),
                     onTap: _onWeChatLogin,
                   ),
-                  const SizedBox(width: 46),
+                  const SizedBox(width: 34),
                   _AltLogin(
                     label: '手机号',
                     icon: Icon(AppIcons.smartphone,
@@ -226,6 +275,30 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ],
               ),
+              if (_feishuHint != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: colors.ink3,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _feishuHint!,
+                      style: type.sub.copyWith(
+                        fontSize: 11.5,
+                        color: colors.ink2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               AgreementCheck(
                 checked: _agreed,
