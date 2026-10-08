@@ -636,6 +636,7 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 4 | ~~**skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」）~~ | `.agents/skills/zhaoxi-design-system/references/components.md` | **已闭环（2026-10-01）**：B14/B15 已按 B17/B18 的 76 = 38+26+12 口径回写；B14/B17/B18「不需要联网权限」同步收敛 |
 | 5 | ~~**`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正**~~ | `design/pages/` | **已闭环（2026-10-01）**：37 页按冲突 17 收敛；39 页按 D13 改口径（skill B16 复述同步） |
 | 6 | ~~**`PLT-007` 的工具链结论须回写 `PLT-001` 式报告**~~ | `apps/mobile/docs/` | **已闭环**：报告 2026-09-30 产出（`plt007-toolchain-report.md`）；依赖面（`photo_manager` demo）结论 2026-10-01 补记 |
+| 7 | **免商店分发与上架合规文档补齐**（新增 `self-distribution-guide.md`；同步核实出 6 项客户端 / 后端缺口：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、打包脚本与版本端点） | `docs/version/v5.0.0/compliance/` | **文档已落地（2026-10-08）**；缺口**尚未立任务**，待并入 `PLT-002` / `PLT-005` 或另开注册 |
 
 ### 15.12 Detail 生成期的上游修正与零偏离声明（2026-09-30）
 
