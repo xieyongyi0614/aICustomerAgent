@@ -365,7 +365,7 @@ def expire_due_objects(user_id: str, now: datetime | None = None) -> int:
             if not expiry_at:
                 continue
             try:
-                deadline = datetime.fromisoformat(str(expiry_at))
+                deadline = timeutil.ensure_aware(datetime.fromisoformat(str(expiry_at)))
             except ValueError:
                 continue
             if deadline > now:

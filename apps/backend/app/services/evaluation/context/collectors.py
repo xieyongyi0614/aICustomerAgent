@@ -14,6 +14,7 @@ from app.engines import behavior as behavior_engine
 from app.services.conversation import state as state_service
 from app.services.conversation import service as conversation_service
 from app.repositories import (
+    conversation_repository,
     decision_repository,
     llm_call_repository,
     loop_run_repository,
@@ -471,7 +472,7 @@ def _collect_proactive_facts(action, settings) -> ProactiveSlice:
     except Exception:
         logger.exception("主动历史切片读取失败，时机审计降级")
     try:
-        window = conversation_service.load_window(action.session_id, max_messages=10)
+        window = conversation_repository.get_recent_messages(action.session_id, 10)
         human_messages = [m for m in window if m.role == "human"]
         if human_messages:
             last_user_message_at = human_messages[-1].created_at

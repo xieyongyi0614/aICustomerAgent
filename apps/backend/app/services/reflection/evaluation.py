@@ -16,6 +16,7 @@ TOOL-009 §5 Step 3：追加工具效能场景 `run_tool_scenario(...)`（注入
 import logging
 from datetime import datetime, timedelta
 
+from app.core import clock
 from app.core import timeutil
 from app.core.db import (
     EvidenceLinkRow,
@@ -303,11 +304,15 @@ def run_tool_scenario(
             )
         )
     outcome = None
-    for run_id in _queued_run_ids(session_factory):
-        reflection_reflector._claim_run(run_id, now)
-        reflection_reflector.execute_run(run_id)
-        run = _run_row(session_factory, run_id)
-        outcome = run.outcome if run is not None else None
+    token = clock.bind(now)
+    try:
+        for run_id in _queued_run_ids(session_factory):
+            reflection_reflector._claim_run(run_id, now)
+            reflection_reflector.execute_run(run_id)
+            run = _run_row(session_factory, run_id)
+            outcome = run.outcome if run is not None else None
+    finally:
+        clock.unbind(token)
     insights = _insight_rows(session_factory, user_id)
     if not insights:
         failures.append("未产出工具效能 Insight")

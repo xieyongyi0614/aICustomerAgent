@@ -209,6 +209,7 @@ def active_grants(
     snapshot: PermissionSnapshot, now: datetime, *, tool_id: str | None = None
 ) -> list[dict[str, Any]]:
     """有效授权（按 `now` 严格判定：过期即不匹配，E2）。"""
+    deadline_now = timeutil.ensure_aware(now)
     result: list[dict[str, Any]] = []
     for grant in snapshot.grants or []:
         if not isinstance(grant, dict):
@@ -216,8 +217,14 @@ def active_grants(
         if tool_id is not None and not _grant_matches_tool(grant, tool_id):
             continue
         expires_at = grant.get("expires_at")
-        if isinstance(expires_at, datetime) and expires_at <= now:
-            continue
+        if isinstance(expires_at, datetime):
+            deadline = timeutil.ensure_aware(expires_at)
+            if (
+                deadline is not None
+                and deadline_now is not None
+                and deadline <= deadline_now
+            ):
+                continue
         result.append(grant)
     return result
 

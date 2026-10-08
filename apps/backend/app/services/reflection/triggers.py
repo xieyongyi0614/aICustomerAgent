@@ -445,7 +445,7 @@ def _channel_field(channel: str) -> dict:
 def _channel_bucket_key(user_id: str, now: datetime, channel: str) -> str:
     """幂等键：用户证据沿用既有日桶；工具证据独立日桶（E14 各自独立入队）。"""
     if channel == CHANNEL_TOOL:
-        return f"reflect:tool:{user_id}:{now:%Y-%m-%d}"
+        return f"reflect:tool:{user_id}:{timeutil.local(now):%Y-%m-%d}"
     return _day_bucket_key(user_id, now)
 
 
@@ -583,7 +583,7 @@ def day_bucket_key(user_id: str, now: datetime) -> str:
 
 
 def _day_bucket_key(user_id: str, now: datetime) -> str:
-    return f"reflect:{user_id}:{now:%Y-%m-%d}"
+    return f"reflect:{user_id}:{timeutil.local(now):%Y-%m-%d}"
 
 
 def _new_run_id() -> str:

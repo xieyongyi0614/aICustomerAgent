@@ -152,19 +152,20 @@ def should_send(payload: DigestPayload, *, now: datetime, settings=None) -> bool
         now, cfg.autonomy_quiet_hours_start, cfg.autonomy_quiet_hours_end
     ):
         return False
+    local_now = timeutil.local(now)
     weekday_token, send_at = parse_send_time(cfg.ledger_digest_send_time)
     if payload.kind == "weekly":
-        if weekday_token and now.strftime("%a").upper()[:3] != weekday_token[:3]:
+        if weekday_token and local_now.strftime("%a").upper()[:3] != weekday_token[:3]:
             return False
-        if weekday_token == "" and timeutil.local(now).weekday() != 6:
+        if weekday_token == "" and local_now.weekday() != 6:
             return False
-        if now.time() < send_at:
+        if local_now.time() < send_at:
             return False
     else:
         daily_at = send_at
         if weekday_token:
             daily_at = _parse_hhmm(DEFAULT_DAILY_HHMM) or time(21, 30)
-        if now.time() < daily_at:
+        if local_now.time() < daily_at:
             return False
     from app.repositories import proactive_repository
 
@@ -235,8 +236,10 @@ def run_maintenance(now: datetime | None = None) -> dict[str, Any]:
         weekday_token, send_at = parse_send_time(cfg.ledger_digest_send_time)
         daily_payload = build_daily_digest(user_id, now=timestamp, settings=cfg)
         weekly_payload = None
-        if (not weekday_token and timeutil.local(timestamp).weekday() == 6) or (
-            weekday_token and timestamp.strftime("%a").upper()[:3] == weekday_token[:3]
+        local_timestamp = timeutil.local(timestamp)
+        if (not weekday_token and local_timestamp.weekday() == 6) or (
+            weekday_token
+            and local_timestamp.strftime("%a").upper()[:3] == weekday_token[:3]
         ):
             weekly_payload = build_weekly_digest(user_id, now=timestamp, settings=cfg)
         for payload in (daily_payload, weekly_payload):
