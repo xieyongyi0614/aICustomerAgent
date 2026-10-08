@@ -46,7 +46,7 @@
 
 ### 0.4 前提四：测试与验证纪律（继承仓库实测经验）
 
-- `tests/conftest.py` autouse `_offline_repos` 把仓储指向内存 SQLite；**测试内不要 `from app.core.db import SessionLocal`**，用 `app.repositories.<x>_repository.SessionLocal`。
+- `tests/conftest.py` autouse `_offline_repos` 把仓储指向离线 SQLite（worker 级文件库）；**测试内不要 `from app.core.db import SessionLocal`**，用 `app.repositories.<x>_repository.SessionLocal`。
 - **HEAD 基线不是绿的**（约 21 failed / 6485 passed，集中 `tests/v24`）→ **零回归用「基线对照法」**：备份 → `git checkout --` → 跑 → `cp` 回；判据 = 当前失败集 ⊂ 基线失败集。
 - 批量 pytest 统计行会被吞（退出期 `PermissionError`）→ 加 `--basetemp=<每次换名的新目录>`（>50 文件触发 safe-delete 闸）+ `-rf`，路径用 Windows 风格 `C:/...`；`-p no:xdist` 报错时用 `-n0`。
 - 新增 `runtime_*` 字段须登记 `tests/v30/runtime_support.py::V30_RUNTIME_FIELDS`。

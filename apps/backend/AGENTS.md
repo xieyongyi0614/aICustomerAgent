@@ -54,7 +54,7 @@ api → application（编排） → services → repositories → core
 - **AI 修改代码后禁止默认执行全量 `pytest`**：必须先 Focused Test → Module Test → 必要时 Fast Test（`pytest -m "(unit or api) and not slow"`；多个 `-m` 连用只有最后一个生效，勿拆开写）。
 - marker（`unit / api / integration / e2e / golden / slow`）由 `tests/conftest.py::pytest_collection_modifyitems` 自动打标，新测试无需手写。
 - **测试禁止真实 LLM 调用**：用 `core/llm_factory.set_llm(mock)` 注入 FakeLLM（结构化输出按 schema 类名分发）。
-- 单元 / 集成 / e2e 测试 DB 用内存 SQLite（`sqlite:///:memory:`），每测试独立建表；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL。
+- 单元 / 集成 / e2e 测试 DB 用 worker 级文件库 SQLite（`.tmp/offline-db/`，WAL + 每 Session 独立连接），每测试重建表；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL。
 - **新增仓储 / 服务必须注册进 `tests/conftest.py`**（仓储 → `_REPO_MODULES`；服务内使用模块级 `SessionLocal` → `_SERVICE_DB_MODULES`），否则内存库补丁被绕过、测试连真实 PG 而挂起。
 - golden prompt 快照回归：`tests/golden/` + `tests/unit/test_prompt_golden.py`，`UPDATE_GOLDEN=1` 重新生成。
 - 慢测试加入 `conftest.py` 的 `SLOW_TEST_FILES`（或 `@pytest.mark.slow`），日常开发用 `-m "not slow"` 排除。

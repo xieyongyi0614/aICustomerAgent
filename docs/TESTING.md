@@ -8,8 +8,8 @@
 | 类型 | 特征 | 位置 | marker |
 |---|---|---|---|
 | Unit | 纯函数 / Chain / Domain 逻辑；无 DB、无 HTTP、无网络；允许 FakeLLM | `tests/unit/` | `unit` |
-| API | FastAPI Router + httpx `ASGITransport`；参数校验 / Status / Response Model / Dependency Override；FakeLLM + 内存 SQLite | `tests/e2e/`（端点类）、unit 内少量编排测试 | `api` |
-| Integration | DB 读写 / Alembic 迁移 / 多模块协作；内存 SQLite（每测试独立建表） | `tests/integration/`、`tests/v8.5/`、`tests/evaluation/` | `integration` |
+| API | FastAPI Router + httpx `ASGITransport`；参数校验 / Status / Response Model / Dependency Override；FakeLLM + 离线 SQLite | `tests/e2e/`（端点类）、unit 内少量编排测试 | `api` |
+| Integration | DB 读写 / Alembic 迁移 / 多模块协作；离线 SQLite（worker 级文件库，每测试重建表） | `tests/integration/`、`tests/v8.5/`、`tests/evaluation/` | `integration` |
 | E2E | HTTP 全链路业务流程（含本地 SSE server 线程） | `tests/e2e/` | `api + e2e` |
 | Golden | prompt 快照回归（`UPDATE_GOLDEN=1` 重新生成） | `tests/golden/` 快照 + `tests/unit/test_prompt_golden.py` | `golden + unit` |
 | Slow | 慢测试（server 线程、轮询等待），可与任意类型叠加 | 见 `conftest.py SLOW_TEST_FILES` | `slow` |
@@ -32,9 +32,9 @@ Marker 由 `tests/conftest.py::pytest_collection_modifyitems` **自动打标**�
 
 - **无 Redis / Celery / MQ**（项目刻意未引入）；队列用 DB 表实现。
 - **禁止真实 LLM 调用**：统一用 `tests/conftest.py::FakeLLM`（`fake_llm` fixture），结构化输出按 schema 类名分发；通过 `core/llm_factory.set_llm` / `get_chat_llm` dependency override 注入。
-- DB：测试全部使用内存 SQLite（StaticPool，每测试独立建表），不依赖外部实例。
+- DB：测试使用 worker 级文件库 SQLite（`apps/backend/.tmp/offline-db/`，WAL + 每 Session 独立连接，每测试 `drop_all + create_all` 重建表），不依赖外部实例；`TEST_USE_POSTGRES=1` 时改用真实 PostgreSQL。
 - 唯一例外：`tests/integration/test_db_migration.py`、`test_relationship_migration.py` 需要真实 PostgreSQL（`TEST_DATABASE_URL`），**无实例时自动 skip**。
-- 无 CI（暂无 `.github/workflows`）。
+- CI：`.github/workflows/ci.yml`（`mobile` / `backend` / `backend-full` 三个 job，见 §7）。
 
 ## 3. 测试命令（在 `apps/backend/` 下执行）
 
@@ -60,7 +60,7 @@ Marker 由 `tests/conftest.py::pytest_collection_modifyitems` **自动打标**�
 > - ⚠️ 聚焦 legacy 域（tool / planning 等）时须带开关：`pytest --run-legacy tests/v24/test_tool009_reflector.py`
 
 > Fast Test 即 `-m "(unit or api) and not slow"`。**多个 `-m` 连用只有最后一个生效**（如 `-m "unit or api" -m "not slow"` 实际等价于只写 `-m "not slow"`，会放进全部 integration），必须写进单个表达式。
-> 全量默认已启用 `pytest-xdist`（`-n auto --dist loadgroup`，见 pyproject addopts），并行安全：每测试独立内存 SQLite、无共享外部状态、无 Redis；需要真实 PostgreSQL 的迁移测试文件用 `xdist_group("migration")` 钉入同一 worker 顺序执行，避免并发升降级同一 `asuna_test` 库互踩。
+> 全量默认已启用 `pytest-xdist`（`-n auto --dist loadgroup`，见 pyproject addopts），并行安全：worker 级文件库 + 每 Session 独立连接、无共享外部状态、无 Redis；需要真实 PostgreSQL 的迁移测试文件用 `xdist_group("migration")` 钉入同一 worker 顺序执行，避免并发升降级同一 `asuna_test` 库互踩。
 
 ## 4. AI Coding 测试执行规则（必须遵守）
 
@@ -122,14 +122,22 @@ AI 修改代码后**不允许直接执行 `pytest`（Full Test）**。默认流�
 
 ## 7. CI 策略
 
-当前无 CI。推荐：
+`.github/workflows/ci.yml`（触发：push 到 `main`、tag `v*`、PR 到 `main`、手动）：
+
+| job | 内容 |
+|---|---|
+| `mobile` | `flutter pub get` + `flutter analyze` + `build_runner build` 产物零 diff + `flutter test` |
+| `backend` | `uv sync` → `pytest tests -q -m "not slow"`（日常全量 − slow；无 PG，迁移类自动 skip） |
+| `backend-full` | `needs: backend`；带 `postgres:16` service（`TEST_DATABASE_URL`）→ `pytest --run-legacy -q`（含 slow、legacy 历史套件与 PG 迁移用例） |
+
+本地节奏不变：
 
 ```text
 Developer / AI：Focused → Module → Fast → commit
-CI（未来接入）：Fast Test → Integration → E2E → Full Test
+CI：Fast（每次触发）→ Full（同一流水线内串行，含 PG）
 ```
 
-CI 上注意：`TEST_DATABASE_URL` 提供 PostgreSQL service container，否则迁移测试 skip。
+CI 上注意：`backend-full` 的 `TEST_DATABASE_URL` 指向 service container；缺 PG 时迁移类用例自动 skip（`backend` job 即此路径）。
 
 ## 8. 已知问题 / 待办
 

@@ -276,7 +276,7 @@
   - `channels/feishu/delivery.py`：新增可注入 seam `set_persistent_idempotency()` / `clear_persistent_idempotency()`；`_claim_delivery` / `_release_delivery` 改为 async 并**只走注入的持久化实现**（原进程内表 `_delivered` / `_evict_delivered` / `reset_delivery_state` 已删除——保留它等于给持久化路径留一个可被静默绕过的隐式开关）。
   - `app/main.py`：组合根在 `feishu_enabled` 分支内**无条件**安装 hook（通道层不得 import `app.repositories`）。**无开关**。
   - `tests/conftest.py`：`feishu_delivery_ledger_repository` 注册进 `_REPO_MODULES`；新增 autouse 夹具 `_persistent_outbound_idempotency` 与生产一致地安装 hook。
-  - ⚠️ **并发用例必须用独立连接**：conftest 的内存 SQLite 用 `StaticPool` 共享单连接，复现不出「两个实例各占一次」的竞态。相关用例改用文件库 + `NullPool`（见 `review-v1.2.md` §7.15）。
+  - ✅ **并发用例的连接模型（2026-10-08 根治）**：conftest 离线库已改为 worker 级文件库（WAL + 每 Session 独立连接），跨线程不再共享单连接；历史上「必须用独立连接 / 文件库 + `NullPool`」的绕行不再需要（背景见 `review-v1.2.md` §7.15）。
 - **Acceptance Criteria**：
   1. 占位判定**始终**落在 `feishu_deliveries`（无开关、无双路径）。
   2. 卸载 hook 再安装（等价于实例重启、进程内状态清零）后，同一键仍判重。

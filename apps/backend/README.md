@@ -113,7 +113,7 @@ uv run pytest             # 全量 7165 项（无本地 PG 实例时迁移一致
 uv run pylint app tests   # 代码检查
 ```
 
-测试分层于 `tests/unit / integration / e2e / golden`，通过 `tests/conftest.py` 的 FakeLLM（结构化输出按 schema 类名分发）与内存 SQLite（每用例独立建表）运行，不发起真实 LLM 调用；golden prompt 快照用 `UPDATE_GOLDEN=1` 重新生成；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL（无实例时自动 skip）。
+测试分层于 `tests/unit / integration / e2e / golden`，通过 `tests/conftest.py` 的 FakeLLM（结构化输出按 schema 类名分发）与离线 SQLite（worker 级文件库，每用例重建表）运行，不发起真实 LLM 调用；golden prompt 快照用 `UPDATE_GOLDEN=1` 重新生成；`tests/integration/test_db_migration.py` 验证 Alembic 与 ORM 一致，需 `TEST_DATABASE_URL` 指向真实 PostgreSQL（无实例时自动 skip）。
 
 ## 配置项（app/core/settings/ 包）
 
