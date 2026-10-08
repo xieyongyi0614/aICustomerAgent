@@ -34,6 +34,10 @@
 - `.agents/skills/zhaoxi-design-system/` — 朝夕设计系统 Skill（`SKILL.md` + `references/` + `assets/app_tokens.dart`）。**任何 UI / 样式 / 设计稿 / Flutter 主题工作先读它**；其优先级**高于** `design/` 下的设计稿与原型（已裁决 4 处歧义，见 `SKILL.md`）。客户端版本规划见 `docs/version/v5.0.0/`。
 - 项目级 Skill 统一放 **`.agents/skills/`**（跨 Agent 互操作目录，Codex / Cursor / GitHub Copilot / VS Code 原生读取）。新增 Skill 也放这里。
 
+**当前版本（V5.x · 客户端）**
+
+- `docs/version/v5.0.0/` — V5.0.0 朝夕 App（Flutter + Riverpod + GoRouter + Dio + Drift）：`requirements-analysis.md`（需求与 11 条决策）+ `tasks.md`（APP / API / PLT / IDENT 任务注册表，含 §12~§18 增量注册）+ `tasks/`（Task Detail 明细，10 节体例见 `tasks/README.md`）+ `flutter-architecture.md`（客户端技术方案）+ **`update-system-architecture.md`（免商店自动更新域唯一架构依据：`PLT-008` 制品发布 / `API-022` 后端版本服务 / `APP-044` 客户端更新安装）** + `traceability.md` + `compliance/`（免商店分发与上架合规）+ `reviews/` / `perf/`
+
 **当前版本（V3.x / V4.x）**
 
 - `docs/version/v4.0.0/` — V4.0.0 Personal Life Agent Foundation（个人生活智能体地基：用户实体 + 账本域）：`architecture.md`（架构依据，含运行时采用裁决）+ `tasks.md`（PLA-001~018）+ `reviews/`（需求评审）+ `audits/`（前置审计）+ `tasks/`（明细，后续生成）

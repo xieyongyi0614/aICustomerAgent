@@ -2,7 +2,7 @@
 
 > **上位文档（按优先级）**：`docs/version/v5.0.0/requirements-analysis.md`（需求与 11 条决策）→ `docs/version/v5.0.0/tasks.md`（任务注册表 + 七条前提）→ `docs/version/v5.0.0/traceability.md`（设计稿 119 条要求的覆盖矩阵）→ `docs/version/v5.0.0/flutter-architecture.md`（客户端技术方案）。
 > **体例来源**：`docs/version/v4.0.0/tasks/PLA-001.md`（后端）、`PLA-016.md`（前端/客户端）。
-> **本目录**：41 个 Task Detail，与 `tasks.md` §1 任务总览一一对应，**不增不减**。
+> **本目录**：Task Detail 与 `tasks.md` 的注册区块一一对应，**不增不减**。§1 任务总览对应 41 份（2026-09-23 生成）；V5.1 增量（`tasks.md` §15）24 份；免商店自动更新（`tasks.md` §18，2026-10-08）3 份。
 
 ---
 
@@ -13,6 +13,11 @@
 | 客户端（Flutter，`apps/mobile/`） | `APP-001.md` ~ `APP-025.md` | 25 |
 | 后端补齐（`apps/backend/`） | `API-001.md` ~ `API-010.md` | 10 |
 | 平台横切（工程 / 合规 / 测试） | `PLT-001.md` ~ `PLT-006.md` | 6 |
+| V5.1 增量（`tasks.md` §15） | `APP-027.md` ~ `APP-043.md`（17）；`API-015.md` ~ `API-020.md`（6）；`PLT-007.md`（1） | 24 |
+| 免商店自动更新（`tasks.md` §18，2026-10-08） | `APP-044.md`；`API-022.md`；`PLT-008.md` | 3 |
+
+> **增量注册体例**：`tasks.md` §12~§14、§16、§17 为「从简体例」（不另立 Detail），本目录**不为它们建文件**；上表第 4 行的 V5.1 与第 5 行的更新域**已有 Detail**，故登记在此。
+> **编号避坑**：`API-021` 属 `tasks.md` §16（首页每日 AI 总结生成器，从简体例、无 Detail），**不是**更新域任务；更新域的后端任务是 **`API-022`**。
 
 ---
 

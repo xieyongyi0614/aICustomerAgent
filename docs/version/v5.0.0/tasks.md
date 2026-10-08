@@ -621,10 +621,12 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 
 | 任务线 | §12~§14 已占用 | V5.1 新增（本节） | 下一可用号 |
 |---|---|---|---|
-| `APP-` | `APP-026` | `APP-027`~`APP-043`（17 个） | `APP-044` |
-| `API-` | `API-011`~`API-014`、`API-021`（§16） | `API-015`~`API-020`（6 个） | `API-022` |
-| `PLT-` | `PLT-001`~`PLT-006` | `PLT-007`（1 个） | `PLT-008` |
+| `APP-` | `APP-026` | `APP-027`~`APP-043`（17 个） | `APP-045` |
+| `API-` | `API-011`~`API-014`、`API-021`（§16） | `API-015`~`API-020`（6 个） | `API-023` |
+| `PLT-` | `PLT-001`~`PLT-006` | `PLT-007`（1 个） | `PLT-009` |
 | `IDENT-` | `IDENT-001`~`IDENT-009`（`010`/`011` 为 P2 留白） | — | `IDENT-012` |
+
+> **占用更新（2026-10-08）**：`APP-044` / `API-022` / `PLT-008` 已由 **§18**（免商店自动更新）占用，故上表「下一可用号」已相应 bump。`API-021` 仍是 §16「首页每日 AI 总结生成器」，**与本批无关、不得复用**。
 
 ### 15.11 待回写台账（本轮发现，非本注册表能自行了结）
 
@@ -636,7 +638,7 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 4 | ~~**skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」）~~ | `.agents/skills/zhaoxi-design-system/references/components.md` | **已闭环（2026-10-01）**：B14/B15 已按 B17/B18 的 76 = 38+26+12 口径回写；B14/B17/B18「不需要联网权限」同步收敛 |
 | 5 | ~~**`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正**~~ | `design/pages/` | **已闭环（2026-10-01）**：37 页按冲突 17 收敛；39 页按 D13 改口径（skill B16 复述同步） |
 | 6 | ~~**`PLT-007` 的工具链结论须回写 `PLT-001` 式报告**~~ | `apps/mobile/docs/` | **已闭环**：报告 2026-09-30 产出（`plt007-toolchain-report.md`）；依赖面（`photo_manager` demo）结论 2026-10-01 补记 |
-| 7 | **免商店分发与上架合规文档补齐**（新增 `self-distribution-guide.md`；同步核实出 6 项客户端 / 后端缺口：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、打包脚本与版本端点） | `docs/version/v5.0.0/compliance/` | **文档已落地（2026-10-08）**；缺口**尚未立任务**，待并入 `PLT-002` / `PLT-005` 或另开注册 |
+| 7 | **免商店分发与上架合规文档补齐**（新增 `self-distribution-guide.md`；同步核实出 6 项客户端 / 后端缺口：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、打包脚本与版本端点） | `docs/version/v5.0.0/compliance/` | **文档已落地（2026-10-08）**；**部分已立项（2026-10-08）**：打包脚本 / 后端版本端点 / 应用内检查更新 / 关于页 四项由 **§18** 承接（`PLT-008` / `API-022` / `APP-044`），**未并入 `PLT-005`**（边界见 `tasks/PLT-008.md` §7.3）；剩余「首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`」仍在 `PLT-002` 待办 |
 
 ### 15.12 Detail 生成期的上游修正与零偏离声明（2026-09-30）
 
@@ -711,3 +713,42 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 **回归清单（真实模型 / 真机人工项）**：见 `docs/integrations/feishu/regression-checklist.md` §「授权登录与账号绑定」——含飞书后台前置（开启网页能力 / 登记重定向 URL / 权限申请 / 发布版本）、配置缺失 503、真机授权登录、绑定同源、409 冲突、接管壳账号、解绑后独立身份、state 复用与过期、平台边界核对。
 
 **非目标**：ISV / 上架 / 企业认证；历史数据自动归并；深链自动回跳（未注册自定义 scheme）；微信 / 手机号登录；调试面鉴权（`IDENT-010` 仍留白）。
+
+---
+
+## 18. 增量注册：免商店自动更新（2026-10-08 立项，未开工）
+
+> **背景**：当前未上架商店，`self-distribution-guide.md:17` 已定性「不上架 = 失去商店自动更新：版本告知、下载与安装引导必须自己承担（当前无「检查更新」实现）」；`self-distribution-guide.md:134-144`（§7 配套缺口登记）把「应用内检查更新」「关于页」「后端版本端点」「发布打包脚本」四项登记为**待立任务**；本文件 §15.11 台账 #7（`tasks.md:639`）亦记「缺口**尚未立任务**，待并入 `PLT-002` / `PLT-005` 或另开注册」。本次按用户裁决（2026-10-08 四问四答）**另开注册**并合批立项，承接其中三项（打包脚本 / 后端版本端点 / 应用内检查更新 + 关于页）。
+> **体例**：沿用 §12~§17 增量注册体例（从简，不另立 41 任务式 Detail）。
+> **架构依据**：`docs/version/v5.0.0/update-system-architecture.md` —— 更新域**唯一**架构依据（选型裁决 / 接口契约 / 安全双校验 / 安装链路 / 数据面 / 增量演进路径）。
+
+| Task ID | 名称 | 交付面（概要） | 状态 |
+|---|---|---|---|
+| `PLT-008` | 制品打包与版本发布 | 打包/发布脚本（从**产物反读** `versionCode` / `versionName`，不解析 `pubspec.yaml`）+ 制品归档布局 `{channel}/{version_code}/full/` + `release-manifest.json`（16 字段）+ **签名指纹硬门禁**（debug 签名回退 → 非 0 退出）+ 发布操作手册 `release-runbook.md`；与 `PLT-005` 边界：`PLT-005` 只出签名 APK，本任务负责「APK → 制品 + 元数据」 | 未开工 |
+| `API-022` | 后端版本元数据与制品分发 | 增量迁移 `0009` 建 `app_releases` + `app_release_artifacts`（表数 55 → **57**；`artifact_type` 的 CHECK **预置 `'patch'`** 作为扩展位）+ `GET /api/v1/app-release/latest` + `GET /api/v1/app-release/artifacts/{id}/download`（**Range → `206`** 断点续传）+ 入库脚本（读 manifest，幂等 upsert，**不开管理写端点**）+ 参数类设置 `app_release_storage_dir` / `app_release_notes_max_chars` + `docker-compose.yml` 卷挂载 `asuna_releases` | 未开工 |
+| `APP-044` | 客户端应用内更新与 APK 安装通道 | `lib/core/updater/`（7 文件：api / models / checker / downloader / verifier / installer / providers）+ `lib/app/update/`（`update_gate` 首帧后触发 + `update_sheet` **`A41` 规格**面板）+ 原生 `ApkInstaller.kt`（`MethodChannel` 5 方法）+ `AndroidManifest.xml` 补 `REQUEST_INSTALL_PACKAGES` / `ACCESS_NETWORK_STATE` / FileProvider（authority = `${applicationId}.fileprovider`）+ 3 个 prefs 键 + 关于页（skill 登记 `B20 #about`）+ 我的页「检查更新」行 + 版本行**真值化**（消除 `profile_page.dart:509` 硬编码）+ 唯一新增 Dart 依赖 `package_info_plus` | 未开工 |
+
+**关键裁决**（逐条理由见 `update-system-architecture.md` §11）：
+
+1. **平台与渠道**：仅 **Android 自有渠道侧载自更新**（App 内下载 APK → 双校验 → 系统安装器）。iOS 自更新、Google Play In-App Updates、国内应用商店跳转**均不做**。
+2. **本期只做全量**：整包 APK 下载安装；`artifacts[]` 契约**预留 `patch` 类型**（数据面 CHECK 预置 `'patch'`），客户端遇未知 `type` **fail-closed 忽略**，**不做差分**（演进路径见架构方案 §10）。
+3. **制品托管 = 后端自建**：后端表 + FastAPI 静态分发 + Docker volume；**不引入**对象存储 / CDN SDK / 第三方分发平台。
+4. **自动检查不挂在 `bootstrap()` 内**，而是挂首帧后的 `app/update/update_gate.dart`。理由：`self-distribution-guide.md:122` 合规底线 1 要求「未点『同意』前不得发起业务网络请求」，而 `bootstrap.dart:19-50` 当前**无同意门控**；挂首帧后则 `PLT-002` 落地门控时**无需改动本域**。
+5. **安全双校验不可省**：`sha256`（完整性）+ **与「运行中 App 自身签名」比对**（应用身份）——只比服务端清单里的指纹等于没校验（清单与 `sha256` 同源）。
+6. **`dev` flavor 只检测不安装**：防开发机被线上包覆盖、防打断联调（`self-distribution-guide.md:101` 已有装机事故先例）。
+7. **不引入 `connectivity_plus`**：网络类型走本已要写的原生通道 `isOnWifi()`（依赖数量已被审计点名，`mobile-code-audit-2026-10.md:218-232`）。
+
+**迁移链**：新增 `0009`（两表）；链尾 `0008` → **`0009`**；钉测升级清单（`schema_pins.py` 四项 / `test_car_schema.py:51` 的 `55`→`57` / `tool012_support.py` 追加文件名）见 `tasks/API-022.md` §4.1.2。
+
+**边界（与既有任务线）**：
+
+- `PLT-005`（构建 / 签名 / 内测分发，`tasks.md:222`）**不含**应用内更新与制品元数据——分工留痕见 `tasks/PLT-008.md` §7.3。
+- 「首启隐私弹窗 / 政策页可点击 / 账号注销入口 / AI 显式标识」四项（`self-distribution-guide.md:144`）为**共同前置**，**不在本注册范围**（仍在 `PLT-002`）。
+- `dart_defines/prod.json` 与 Web 目标定稿（`self-distribution-guide.md:141-142`）**不在本注册范围**。
+- 关于页的「备案号 / 软著名公示位」**只留位不填值**，内容归 `PLT-002`。
+
+**开工前置（顺序不可颠倒）**：`.agents/skills/zhaoxi-design-system/references/components.md` **先登记 `B20 #about`**（skill 现为 `B1~B19`，无关于页），再落 `APP-044`；更新面板文案范例同批回写 `references/principles.md` §5.3（现版 §5.3 无更新相关范例，仅版本行 `principles.md:95` 可沿用）。
+
+**溯源说明**：本域**无设计稿条目**可溯源（已核实 `traceability.md` 0 命中），故不走「先改 `traceability.md` 矩阵」的顺序纪律；变更入口 = `update-system-architecture.md` §11 裁决表 + 上述 skill 回写。三份 Detail 的 §10 均以「合规文档登记的缺口 + 待回写台账 + 仓库既有硬约束」为溯源依据（同 `traceability.md:295` `API-001`、`:306` `PLT-007` 的「工程前提 / 合规推导」写法）。
+
+**回写清单**（本注册批同批完成）：① §15.10 编号占用表的「下一可用号」已 bump（`APP-045` / `API-023` / `PLT-009`）；② §15.11 台账 #7 的「打包脚本 / 版本端点 / 应用内检查更新 / 关于页」四项改为「已由 §18 立项」（**实施完成时**再关账）；③ `docs/current-system-architecture-baseline.md` 迁移链尾 `0008` → `0009`（由 `API-022` 实施同批，AGENTS.md 要求「架构演进须先更新基线再进入开发」）。
