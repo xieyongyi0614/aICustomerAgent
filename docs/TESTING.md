@@ -9,10 +9,11 @@
 |---|---|---|---|
 | Unit | 纯函数 / Chain / Domain 逻辑；无 DB、无 HTTP、无网络；允许 FakeLLM | `tests/unit/` | `unit` |
 | API | FastAPI Router + httpx `ASGITransport`；参数校验 / Status / Response Model / Dependency Override；FakeLLM + 内存 SQLite | `tests/e2e/`（端点类）、unit 内少量编排测试 | `api` |
-| Integration | DB 读写 / Alembic 迁移 / 多模块协作；内存 SQLite（每测试独立建表） | `tests/integration/`、`tests/v7.8/`、`tests/v8/`、`tests/v8.5/`、`tests/evaluation/` | `integration` |
+| Integration | DB 读写 / Alembic 迁移 / 多模块协作；内存 SQLite（每测试独立建表） | `tests/integration/`、`tests/v8.5/`、`tests/evaluation/` | `integration` |
 | E2E | HTTP 全链路业务流程（含本地 SSE server 线程） | `tests/e2e/` | `api + e2e` |
 | Golden | prompt 快照回归（`UPDATE_GOLDEN=1` 重新生成） | `tests/golden/` 快照 + `tests/unit/test_prompt_golden.py` | `golden + unit` |
 | Slow | 慢测试（server 线程、轮询等待），可与任意类型叠加 | 见 `conftest.py SLOW_TEST_FILES` | `slow` |
+| Legacy | 历史版本套件（被测模块仍在跑，但不参与日常回归） | `tests/v2/`、`tests/v8.5/`、`tests/v22/`~`tests/v26/` | `legacy`（默认不收集，`--run-legacy` 启用） |
 
 Marker 不互斥，一个测试可同时是 `integration + slow`。
 
@@ -46,14 +47,17 @@ Marker 由 `tests/conftest.py::pytest_collection_modifyitems` **自动打标**�
 | E2E | `pytest -m e2e` | 全链路回归 |
 | Full | `pytest` | **禁止作为日常默认动作**，仅阶段完成 / PR / 发布 / CI |
 
-> ⚠️ **层级命令一律按 marker，不要按目录切片。** `tests/v*`（约 5100 项，占全量 70%）是历史版本
-> 目录，**不在** `tests/unit|integration|e2e` 之内。按 `tests/conftest.py::pytest_collection_modifyitems`
-> 的自动打标规则，未命中这两个目录且无 `db_session_factory` / `asgi_transport` 的用例会落到
-> **`integration` marker** —— 因此：
+> ⚠️ **层级命令一律按 marker，不要按目录切片。** 版本目录中 `v30 / v40 / v50 / v51` 保留在默认集，
+> `v2 / v8.5 / v22~v26` 为历史版本套件（`legacy` marker），由 `tests/conftest.py::pytest_ignore_collect`
+> **默认不收集**。按 `pytest_collection_modifyitems` 的自动打标规则，非 `unit` / `e2e` 目录且无
+> `db_session_factory` / `asgi_transport` 的用例会落到 **`integration` marker** —— 因此：
 >
-> - ✅ `pytest -m integration` —— 覆盖 `tests/v*`，改 DB / 迁移 / 跨模块时的正确层级命令
-> - ❌ `pytest tests/unit tests/integration tests/e2e` —— **只覆盖约 30%**，会静默漏掉 `tests/v*`
->   的全部回归（2026-10-03 雪花 ID 改造即因此漏掉 4 个回归）
+> - ✅ `pytest` —— 日常全量（管家主线 + 全部分层测试）
+> - ✅ `pytest --run-legacy` —— 含历史套件的完整全量，阶段收口 / PR / 发布时用
+> - ✅ `pytest -m integration` —— 改 DB / 迁移 / 跨模块时的层级命令
+> - ❌ `pytest tests/unit tests/integration tests/e2e` —— 只覆盖分层目录，会漏掉 `tests/v30|v40|v50|v51`
+>   等版本目录（2026-10-03 雪花 ID 改造即因此漏掉 4 个回归）
+> - ⚠️ 聚焦 legacy 域（tool / planning 等）时须带开关：`pytest --run-legacy tests/v24/test_tool009_reflector.py`
 
 > Fast Test 即 `-m "(unit or api) and not slow"`。**多个 `-m` 连用只有最后一个生效**（如 `-m "unit or api" -m "not slow"` 实际等价于只写 `-m "not slow"`，会放进全部 integration），必须写进单个表达式。
 > 全量默认已启用 `pytest-xdist`（`-n auto --dist loadgroup`，见 pyproject addopts），并行安全：每测试独立内存 SQLite、无共享外部状态、无 Redis；需要真实 PostgreSQL 的迁移测试文件用 `xdist_group("migration")` 钉入同一 worker 顺序执行，避免并发升降级同一 `asuna_test` 库互踩。
@@ -94,6 +98,7 @@ AI 修改代码后**不允许直接执行 `pytest`（Full Test）**。默认流�
 ### Full Test 使用时机
 
 仅限：一个完整开发阶段结束、PR、发布前、CI、用户明确要求。执行前如预计耗时较长，先汇报测试规模。
+日常全量为 `pytest`（自动排除 `legacy` 历史套件）；阶段收口 / 发布 / 需回归历史域时用 `pytest --run-legacy`。
 
 ## 5. LLM / Agent 测试规则
 
@@ -129,4 +134,5 @@ CI 上注意：`TEST_DATABASE_URL` 提供 PostgreSQL service container，否则�
 ## 8. 已知问题 / 待办
 
 - `tests/unit/` 中有 5 个文件实际使用内存 DB（`test_chat_pipeline_split.py`、`test_orchestration_v2.py`、`test_relationship_models.py`、`test_scene_updater.py`、`test_trigger_followup.py`），自动打标会归入 `integration`，不影响正确性；后续可迁至 `tests/integration/`。
-- `tests/v7.8/`、`v8/`、`v8.5/`、`evaluation/` 为按版本组织的套件，保持现状不迁移，统一按 fixture 打标为 `integration`。
+- `tests/v8.5/`、`evaluation/` 为按版本组织的套件，保持现状不迁移，统一按 fixture 打标为 `integration`。
+- 2026-10-08 清理：`tests/v7.8/`、`v8/`、`v9/`、`v21/` 四个历史套件与 v24/v25 冻结快照用例（Flag 矩阵 / 参数默认值 / 逐字节摘要 / 前端未实现契约）已删除，覆盖由 `v23`（世界）、`v26`（动作）、`v30`（Runtime）、`v40`（账本）承接。

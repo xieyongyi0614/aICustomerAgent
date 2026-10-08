@@ -58,6 +58,7 @@ api → application（编排） → services → repositories → core
 - **新增仓储 / 服务必须注册进 `tests/conftest.py`**（仓储 → `_REPO_MODULES`；服务内使用模块级 `SessionLocal` → `_SERVICE_DB_MODULES`），否则内存库补丁被绕过、测试连真实 PG 而挂起。
 - golden prompt 快照回归：`tests/golden/` + `tests/unit/test_prompt_golden.py`，`UPDATE_GOLDEN=1` 重新生成。
 - 慢测试加入 `conftest.py` 的 `SLOW_TEST_FILES`（或 `@pytest.mark.slow`），日常开发用 `-m "not slow"` 排除。
+- 历史版本套件（`tests/v2`、`v8.5`、`v22`~`v26`）默认不收集（`legacy` marker + `--run-legacy` 开关）；改这些域时聚焦命令需带 `--run-legacy`。
 - commit 门槛：影响范围分级测试全绿（Focused Test → Module Test → 必要时 Fast Test；`core/` 基础设施改动走 Fast Test）。全量 pytest 仅在阶段收口 / PR / 发布 / 用户明确要求时执行，执行前先汇报测试规模。
 
 ## 临时文件处理
