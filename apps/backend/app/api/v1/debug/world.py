@@ -22,7 +22,9 @@ from app.api.v1.schemas import (
 from app.application import world_engine
 from app.repositories import world_repository
 
-world_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
+world_router = APIRouter(
+    dependencies=[Depends(debug_surface_gate)], tags=["debug"]
+)
 
 
 class EntityCreate(BaseModel):

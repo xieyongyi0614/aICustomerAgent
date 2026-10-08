@@ -249,7 +249,7 @@ class TestCapabilityDeferral:
 
 class TestDebugOutbox:
     def test_get_action_attaches_outbox_status(self, db_session_factory, outbox_on):
-        from app.api.v1.action import get_action
+        from app.api.v1.debug.action import get_action
 
         record = _make_succeeded_record("act-dbg")
         integrate_result(record, ActionResult(status="succeeded", effects=[]))

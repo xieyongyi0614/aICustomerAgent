@@ -306,7 +306,7 @@ class TestContractsAndObserve:
         assert all(contracts.freeze_contracts().values())
 
     def test_no_external_rest_for_execution_layer(self):
-        from app.api.v1.action_execution import action_execution_router
+        from app.api.v1.debug.action_execution import action_execution_router
 
         paths = [getattr(r, "path", "") for r in action_execution_router.routes]
         assert all(p.startswith("/debug/action-execution") for p in paths)

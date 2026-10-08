@@ -19,7 +19,9 @@ from app.services.conversation import history as history_service
 from app.services.conversation import state as state_service
 from app.services.observability import collector as trace_collector
 
-state_router = APIRouter(dependencies=[Depends(debug_surface_gate)])
+state_router = APIRouter(
+    dependencies=[Depends(debug_surface_gate)], tags=["debug"]
+)
 
 
 def _latest_mode(user_id: str) -> str | None:

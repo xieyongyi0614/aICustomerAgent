@@ -1,7 +1,5 @@
 from fastapi import APIRouter
 from app.api.v1 import (
-    action,
-    action_execution,
     auth,
     briefing,
     car,
@@ -15,9 +13,7 @@ from app.api.v1 import (
     llm,
     memory,
     proactive,
-    state,
     tasks,
-    world,
 )
 from app.api.v1.feishu import feishu_ingress_router, feishu_router
 
@@ -26,13 +22,9 @@ api_router.include_router(chat.chat_router)
 api_router.include_router(debug.debug_router)
 api_router.include_router(feishu_router)
 api_router.include_router(feishu_ingress_router)
-api_router.include_router(action.action_router)
-api_router.include_router(action_execution.action_execution_router)
-api_router.include_router(state.state_router)
 api_router.include_router(history.history_router)
 api_router.include_router(llm.llm_router)
 api_router.include_router(proactive.proactive_router)
-api_router.include_router(world.world_router)
 api_router.include_router(governance.governance_router)
 api_router.include_router(ledger.ledger_router)
 api_router.include_router(tasks.tasks_router)

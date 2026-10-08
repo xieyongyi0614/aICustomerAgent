@@ -3,7 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
-from app.api.v1 import action_execution as api
+from app.api.v1.debug import action_execution as api
 from app.services.action import contracts, manager, scheduler
 from datetime import timedelta
 

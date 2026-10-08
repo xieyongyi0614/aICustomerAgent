@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.core import timeutil
-from app.api.v1 import action_execution as debug_api
+from app.api.v1.debug import action_execution as debug_api
 from app.core.settings import get_settings
 from app.models.action import ActionResult, ActionIntent, transition_action
 from app.repositories import action_repository
