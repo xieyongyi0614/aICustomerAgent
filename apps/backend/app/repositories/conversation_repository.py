@@ -18,7 +18,6 @@ def get_or_create_conversation(session_id: str, user_id: str) -> Conversation:
             )
             session.add(conversation)
             session.commit()
-            session.refresh(conversation)
         return conversation
 
 

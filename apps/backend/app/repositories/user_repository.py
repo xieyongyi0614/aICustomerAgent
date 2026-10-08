@@ -40,7 +40,6 @@ def create(
         )
         session.add(row)
         session.commit()
-        session.refresh(row)
         session.expunge(row)
         return row
 

@@ -55,5 +55,4 @@ def upsert_scene_state(session_id: str, state: SceneState) -> SceneState:
         row.completed_actions = state.completed_actions
         row.updated_at = now
         session.commit()
-        session.refresh(row)
         return _to_state(row)
