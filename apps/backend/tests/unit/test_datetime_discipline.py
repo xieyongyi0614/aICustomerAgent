@@ -1,9 +1,11 @@
 """时间口径防回归护栏（时间口径统一收官批 §5.7；基线见 §6.4）。
 
-三条断言：
+四条断言：
 1. 全库模型时间列一律 `UtcDateTime`（Postgres → `timestamptz`、SQLite 补 UTC）；
 2. 模型与新迁移不出现裸 `DateTime(timezone=True)`；
-3. `app/` 内无裸 `datetime.now()` / `utcnow()` 取时点（唯一取时口 `timeutil.now()`）。
+3. `app/` 内无裸 `datetime.now()` / `utcnow()` 取时点（唯一取时口 `timeutil.now()`）；
+4. 测试侧不得对模块 `datetime` 打桩（空操作）：取时口已是 `timeutil.now()`，
+   时钟打桩须打 `timeutil`，否则用例看似受控、实则读真实墙钟（时间炸弹）。
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ pytestmark = pytest.mark.unit
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"
+TESTS_ROOT = BACKEND_ROOT / "tests"
 DB_MODELS_ROOT = APP_ROOT / "core" / "db"
 MIGRATIONS_ROOT = BACKEND_ROOT / "migrations" / "versions"
 
@@ -114,3 +117,32 @@ def test_postgres_engine_pins_utc_session_timezone(monkeypatch):
     engine_module.create_engine_from_url("postgresql+psycopg://u:p@localhost:5432/db")
     options = captured["kwargs"]["connect_args"]["options"]
     assert "-c timezone=UTC" in options
+
+
+def _module_datetime_patch_lines(path: Path) -> list[int]:
+    """`*.setattr(<module>, "datetime", ...)` 打桩：app 侧已无裸 `datetime.now()` 取时，必然空操作。"""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    lines: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "setattr" or len(node.args) < 2:
+            continue
+        target = node.args[1]
+        if isinstance(target, ast.Constant) and target.value == "datetime":
+            lines.append(node.lineno)
+    return lines
+
+
+def test_tests_do_not_patch_module_datetime():
+    offenders: dict[str, list[int]] = {}
+    for path in sorted(TESTS_ROOT.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        lines = _module_datetime_patch_lines(path)
+        if lines:
+            offenders[path.relative_to(BACKEND_ROOT).as_posix()] = lines
+    assert offenders == {}, (
+        "对模块 datetime 打桩是空操作（取时口为 timeutil.now）："
+        "改用 monkeypatch.setattr(timeutil, 'now', ...) 或绑定 app.core.clock"
+    )
