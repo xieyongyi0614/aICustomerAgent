@@ -14,7 +14,6 @@ from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.services.car import aggregate as car_aggregate
 from app.services.car import entries as car_entries
-from app.services.car import service as car_service
 from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
@@ -24,10 +23,6 @@ CHARGE_AT = timeutil.ensure_aware(datetime(2026, 9, 28, 9, 0, 0))
 SERVICE_AT = timeutil.ensure_aware(datetime(2026, 9, 29, 9, 0, 0))
 
 
-class _FixedClock(datetime):
-    @classmethod
-    def now(cls, tz=None):
-        return NOW
 ENDPOINTS = (
     ("GET", "/api/v1/car/overview"),
     ("GET", "/api/v1/car/profile"),
@@ -73,7 +68,7 @@ def _put_profile(client, payload: dict):
 
 
 def test_car_overview_returns_all_blocks_in_one_request(client, monkeypatch):
-    monkeypatch.setattr(car_service, "datetime", _FixedClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW)
     _seed_expenses()
     response = _put_profile(
         client,
@@ -116,7 +111,7 @@ def test_car_overview_returns_all_blocks_in_one_request(client, monkeypatch):
 
 
 def test_car_overview_expense_matches_aggregate(client, monkeypatch):
-    monkeypatch.setattr(car_service, "datetime", _FixedClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW)
     _seed_expenses()
 
     body = client.get("/api/v1/car/overview").json()

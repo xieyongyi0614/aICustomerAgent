@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 # 测试进程强制离线：系统代理（Windows 注册表层，env 不可见）会把 LLM 调用与
@@ -559,6 +560,28 @@ SLOW_TEST_FILES = {
     "test_db_migration.py",
 }
 GOLDEN_TEST_FILES = {"test_prompt_golden.py"}
+LEGACY_TEST_DIRS = ("v2", "v8.5", "v22", "v23", "v24", "v25", "v26")
+"""历史版本套件（2026-10-08 归档）：被测模块仍在跑，但默认不收集，`--run-legacy` 时才参与全量回归。"""
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-legacy",
+        action="store_true",
+        default=False,
+        help="收集并运行历史版本套件（tests/v2、v8.5、v22~v26）",
+    )
+
+
+def pytest_ignore_collect(collection_path, config):
+    if config.getoption("--run-legacy"):
+        return False
+    tests_root = Path(__file__).resolve().parent
+    try:
+        relative = collection_path.resolve().relative_to(tests_root)
+    except ValueError:
+        return False
+    return bool(relative.parts) and relative.parts[0] in LEGACY_TEST_DIRS
 
 
 def pytest_collection_modifyitems(config, items):
@@ -588,5 +611,7 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(pytest.mark.integration)
             else:
                 item.add_marker(pytest.mark.integration)
+        if any(f"/tests/{legacy_dir}/" in path for legacy_dir in LEGACY_TEST_DIRS):
+            item.add_marker(pytest.mark.legacy)
         if filename in SLOW_TEST_FILES:
             item.add_marker(pytest.mark.slow)

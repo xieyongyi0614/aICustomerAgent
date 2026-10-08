@@ -36,14 +36,7 @@ def _setup(db_session_factory, session_id="s1"):
 def test_debug_proactive_correlation_bundle(
     db_session_factory, fake_llm, override_settings, monkeypatch
 ):
-    from app.repositories import proactive_repository
-
-    class _SimClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return NOW + timedelta(minutes=40)
-
-    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW + timedelta(minutes=40))
     override_settings(
         observability_prompt_capture_mode="always",
         evaluation_llm_judge_sample_rate=0,

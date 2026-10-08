@@ -242,7 +242,9 @@ def test_scheduled_tick_once_per_user_per_day(db_session_factory, reflection_on,
 
 def test_scheduled_tick_before_schedule_hour_idle(db_session_factory, reflection_on):
     now = _seed_passing_evidence(db_session_factory)
-    early = now.replace(hour=3, minute=59, second=0, microsecond=0)
+    early = timeutil.ensure_aware(
+        timeutil.local(now).replace(hour=3, minute=59, second=0, microsecond=0)
+    )
     assert triggers.run_reflection_trigger_tick(now=early) == 0
     assert _jobs(db_session_factory) == []
 

@@ -7,6 +7,7 @@
 import pytest
 
 from app.application import observability
+from app.core import timeutil
 from app.models.goal import CRITERION_FACT_SOURCES, CRITERION_METRIC_PATHS
 from app.models.observability import DecisionKind
 from app.models.plan import PLAN_ADVANCE_TERMINAL_DECISIONS, PlanAdvance
@@ -213,7 +214,7 @@ class TestCollectFacts:
                 "status": "succeeded",
                 "tool_id": support.REMINDER_CREATE,
                 "action_id": "action-1",
-                "at": support.NOW,
+                "at": timeutil.ensure_aware(support.NOW),
             }
         ]
 

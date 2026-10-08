@@ -251,7 +251,9 @@ def test_e6_active_events_truncated_and_sorted(db_session_factory):
     assert [event["title"] for event in events] == ["高-早", "高-晚", "中-1", "中-2", "中-3"]
     assert set(events[0]) == {"type", "title", "due_at"}
     assert events[0]["type"] == "reminder"
-    assert events[0]["due_at"] == (NOW + timedelta(hours=10)).isoformat()
+    assert events[0]["due_at"] == timeutil.ensure_aware(
+        NOW + timedelta(hours=10)
+    ).isoformat()
 
 
 def test_e6_ordering_is_deterministic_across_runs(db_session_factory):

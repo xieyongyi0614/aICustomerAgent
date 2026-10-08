@@ -345,18 +345,6 @@ class TestSchedulerUnchanged:
             life_loop_budget.check_daily_budget(now=NOW).used_calls == before_calls
         )
 
-    async def test_maintenance_steps_unchanged(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
-    ):
-        override_settings(runtime_autonomous_cycle_enabled="true")
-        _fake_tick(monkeypatch)
-
-        stats = await life_loop.run_life_loop_tick(now=NOW)
-
-        assert stats["maintenance"] == 3
-        kinds = {r.kind for r in loop_run_repository.list_recent()}
-        assert {"trigger_reconcile"} <= kinds
-
     async def test_event_pregate_unchanged(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):

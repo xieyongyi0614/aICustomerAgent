@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core import clock
 from app.core import timeutil
 from app.character.asuna import evaluation as asuna_evaluation
 from app.core.db import BackgroundJobRow, InsightRow, Memory, ReflectionRunRow
@@ -89,8 +90,12 @@ def _queued_run_id(session_factory) -> str:
 def _execute_queued(session_factory, llm, proposal) -> str:
     run_id = _queued_run_id(session_factory)
     llm.proposals = [proposal]
-    assert reflector._claim_run(run_id, timeutil.now()) is True
-    outcome = reflector.execute_run(run_id)
+    token = clock.bind(NOW)
+    try:
+        assert reflector._claim_run(run_id, NOW) is True
+        outcome = reflector.execute_run(run_id)
+    finally:
+        clock.unbind(token)
     return outcome
 
 
@@ -308,9 +313,13 @@ def test_insight_is_not_auto_revoked_when_tool_succeeds_later(
         record_prefix="act009-later",
     )
     triggers.trigger_for_user(USER, now=NOW + timedelta(hours=3), channel=triggers.CHANNEL_TOOL)
-    for run_id in [run.id for run in _runs(db_session_factory) if run.status == "queued"]:
-        reflector._claim_run(run_id, timeutil.now())
-        reflector.execute_run(run_id)
+    token = clock.bind(NOW + timedelta(hours=3))
+    try:
+        for run_id in [run.id for run in _runs(db_session_factory) if run.status == "queued"]:
+            reflector._claim_run(run_id, NOW + timedelta(hours=3))
+            reflector.execute_run(run_id)
+    finally:
+        clock.unbind(token)
     insight = _insights(db_session_factory)[0]
     assert insight.id == insight_id
     assert insight.status == "active"

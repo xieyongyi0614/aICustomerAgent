@@ -41,7 +41,9 @@ async def test_reminder_create_world_event(ctx, override_settings):
     assert event is not None
     assert event.type == "reminder"
     assert event.title == "开会"
-    assert event.due_at == datetime.fromisoformat("2026-09-04T08:00:00")
+    assert event.due_at == timeutil.ensure_aware(
+        datetime.fromisoformat("2026-09-04T08:00:00")
+    )
     assert event.source.value == "autonomy"
     assert event.status.value == "scheduled"
 

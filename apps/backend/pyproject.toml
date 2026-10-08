@@ -70,4 +70,5 @@ markers = [
   "e2e: 完整业务流程（HTTP 全链路）",
   "golden: prompt 快照回归（UPDATE_GOLDEN=1 重新生成）",
   "slow: 慢测试（本地 SSE server 线程 / 大量轮询），日常开发默认排除",
+  "legacy: 历史版本套件（v2 / v8.5 / v22~v26），默认不收集，需 --run-legacy 启用",
 ]
