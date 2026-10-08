@@ -4,6 +4,7 @@ from app.core.settings import get_settings
 from app.main import app
 from app.repositories import evaluation_repository
 from app.services import agent_service
+from tests.conftest import WAIT_TIMEOUT
 
 
 def _structured():
@@ -32,8 +33,8 @@ def _structured():
     }
 
 
-async def _wait_report(turn_id: str, timeout: float = 2.0):
-    deadline = asyncio.get_event_loop().time() + timeout
+async def _wait_report(turn_id: str, timeout: float | None = None):
+    deadline = asyncio.get_event_loop().time() + (timeout or WAIT_TIMEOUT)
     while asyncio.get_event_loop().time() < deadline:
         report = evaluation_repository.get_by_subject("turn", turn_id)
         if report is not None:

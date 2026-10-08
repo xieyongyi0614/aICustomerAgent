@@ -27,9 +27,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableLambda
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
@@ -339,27 +338,69 @@ def use_auth_user(user_id: str) -> None:
     app.dependency_overrides[auth_api.require_user] = lambda: user_id
 
 
+_OFFLINE_DB_DIR = Path(__file__).resolve().parent.parent / ".tmp" / "offline-db"
+_OFFLINE_ENGINES: dict[str, Any] = {}
+
+
+def _offline_engine():
+    """xdist worker 级复用引擎：文件库 + 连接池 + WAL（每 Session 独立连接）。
+
+    早期用 `sqlite://` + StaticPool 让全进程共用一条连接，用例内的
+    `asyncio.to_thread` / TestClient portal 线程 / 用例线程并发时互相踩踏事务与
+    identity map（`Could not refresh instance`、丢行、时序抖动），并发用例在 xdist
+    负载下随机红。改为 worker 级文件库后由 SQLite 自身序列化写入（busy_timeout 兜底），
+    且不产生每测试一个临时文件（避免 pytest tmp 目录膨胀）。
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    engine = _OFFLINE_ENGINES.get(worker)
+    if engine is None:
+        from app.core.db.engine import json_serializer
+
+        _OFFLINE_DB_DIR.mkdir(parents=True, exist_ok=True)
+        engine = create_engine(
+            f"sqlite:///{(_OFFLINE_DB_DIR / f'{worker}.db').as_posix()}",
+            connect_args={"check_same_thread": False, "timeout": 30},
+            json_serializer=json_serializer,
+        )
+
+        @event.listens_for(engine, "connect")
+        def _sqlite_concurrency_pragmas(dbapi_connection, _record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=OFF")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
+
+        _OFFLINE_ENGINES[worker] = engine
+    return engine
+
+
+def pytest_sessionfinish(session, exitstatus):
+    for worker, engine in list(_OFFLINE_ENGINES.items()):
+        engine.dispose()
+        for suffix in ("", "-wal", "-shm"):
+            (_OFFLINE_DB_DIR / f"{worker}.db{suffix}").unlink(missing_ok=True)
+    _OFFLINE_ENGINES.clear()
+
+
 @pytest.fixture(autouse=True)
 def _offline_repos(monkeypatch):
-    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory 服务的 SessionLocal 指向内存 SQLite。
+    """Autouse：除显式 TEST_USE_POSTGRES=1 外，把所有 repo 与 memory 服务的 SessionLocal 指向离线 SQLite。
 
     修复根因B：PromptBuilder.build(analysis=...) 等“纯单测”隐含访问
     relationship_milestone_repository.SessionLocal，若不替换则连真实 PostgreSQL(.env) 而挂起。
     services 层新增模块级 SessionLocal 的模块必须同步加入 _SERVICE_DB_MODULES。
+
+    隔离：worker 级文件库（`_offline_engine`，每 Session 独立连接），每测试
+    `drop_all + create_all` 重建表；测试间不共享内存状态。
     """
     if os.environ.get("TEST_USE_POSTGRES") == "1":
         yield None
         return
-    from app.core.db.engine import json_serializer
-
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        json_serializer=json_serializer,
-    )
-    testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    engine = _offline_engine()
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (*_REPO_MODULES, *_SERVICE_DB_MODULES):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
     yield testing_session
@@ -373,7 +414,6 @@ def _offline_repos(monkeypatch):
     from app.application import post_process as chat_post_process
 
     chat_post_process.reset_user_write_locks()
-    Base.metadata.drop_all(engine)
     engine.dispose()
 
 

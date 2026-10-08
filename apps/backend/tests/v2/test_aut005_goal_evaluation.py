@@ -184,9 +184,16 @@ class TestRules:
     def test_clean_slice_passes_all(self, db_session_factory, aut_on, monkeypatch):
         import app.application.observability as observability
 
+        from app.core.db import GoalRow
+        from app.repositories.goal_repository import SessionLocal
+
         monkeypatch.setattr(observability, "on_decision", lambda record: None)
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)])
+        with SessionLocal() as session:
+            row = session.get(GoalRow, goal.id)
+            row.updated_at = NOW
+            session.commit()
         slice_ = collect_goal_slice(USER, now=NOW)
         plan_ref = slice_.plans[0]
         plan_ref.sub_goal_statuses = ["done"]

@@ -110,6 +110,8 @@ async def test_error_call_recorded(db_session_factory, fake_llm, override_settin
 async def test_llm_call_recorded_unconditionally(db_session_factory, fake_llm):
     """批次 2 固化后 LLM 调用采集无总闸（`observability_persist_enabled` 已删）。"""
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
-    await _run_turn(llm, "s-v78-llm-off")
-    await asyncio.sleep(0.3)
-    assert llm_call_repository.search(limit=500) != []
+    events = await _run_turn(llm, "s-v78-llm-off")
+    request_id = events[-1]["request_id"]
+    assert await _await_until(
+        lambda: llm_call_repository.get_by_request(request_id) != []
+    )

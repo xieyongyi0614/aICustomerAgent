@@ -61,6 +61,8 @@ init-hook = "import sys, os; cwd = os.getcwd(); candidates = [os.path.join(cwd, 
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-n auto --dist loadgroup"
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
 timeout = 120
 timeout_method = "thread"
 markers = [

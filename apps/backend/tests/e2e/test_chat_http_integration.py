@@ -207,7 +207,9 @@ def test_http_summary_trigger(
                 body["session_id"] = session_id
             resp = client.post("/api/v1/chat/message", json=body)
             session_id = resp.headers.get("x-session-id")
-    assert wait_until(lambda: summary_repository.get_summary(session_id) is not None)
+    assert wait_until(
+        lambda: summary_repository.get_summary(session_id) is not None, timeout=30
+    )
 
 
 def test_http_full_lifecycle(

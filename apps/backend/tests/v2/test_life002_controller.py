@@ -165,7 +165,8 @@ class TestUserCycle:
         stats = await life_loop.run_life_loop_tick(now=NOW)
         assert stats["user_cycles"] == 1 and stats["aborted"] == 0
         run = loop_run_repository.list_recent(user_id=USER)[0]
-        assert run.status == "done"
+        # M-9：任一 step error → 台账终态 degraded；「不阻塞后续步骤」由下方 decision 断言保证
+        assert run.status == "degraded"
         perception = next(s for s in run.steps if s["step"] == "perception")
         assert perception["status"] == "error"
         assert "decision" in [s["step"] for s in run.steps]
