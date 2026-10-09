@@ -19,6 +19,9 @@
 | 4 | `66a909c7` | T-10（AGENTS.md 立规 services 域间边界） |
 | 4 | `151deef8` | 测试基建：conftest 惰性加载 `app.main`（全量 -15%，零回归） |
 | 5 | `7f7fb3c0` | T-24（冻结摘要诊断 `tests/support/frozen_surface.py`）· T-25（TESTING.md §10 判据 + 基线重采）· T-23（TESTING.md §11 钉测处置流程） |
+| 6 | 待提交 | T-32（services 域间边界守卫：`tests/support/domain_boundary.py` + 232 条基线 + `tests/unit/test_services_domain_boundary.py`） |
+
+**T-32 关键结论（2026-10-09）**：守卫上线，覆盖**全部 services 域**（不止原计划的三域）。基线实测 **232 条**跨域内部依赖 / 58 个域对；守卫只对**新增** fail-closed，同时提示「基线已消失」以鼓励收紧。**两个设计裁决**：① 覆盖全域（三域方案会把 `action`→`ledger` 等 200+ 条置于守卫外）；② `__init__.py` re-export 绕行与直连子模块同罪（防「改走 re-export 即规避守卫」）。实现中发现并修正一处**真误报**：`from app.services.X import port` 会同时产出包根候选 `app.services.X`，被 re-export 规则误判 → 已按「同语句显式点名契约面则豁免包根」修正（消除 5 条假阳性）。
 
 **T-25 关键结论（2026-10-09 重采）**：**当前真实已知失败集为空（0 条）**。两次默认全量失败集几乎不重叠（21 vs 7，交集仅 1 条），交集那条隔离重跑亦通过 → 全部为 `safe-delete` 环境噪声。**旧的「26 failed 基线」清单正式作废**，判据固化为「改动前后失败集 diff，不是计数」。
 
@@ -45,7 +48,7 @@
 | T-11 | `chat_pipeline` 拆前台/后台 | P1 | M | 中 | ✅ | ⬜ 待做 |
 | T-13 | `post_process` 步骤改显式注册表 | P1 | M | 中 | ✅ | ⬜ 待做 |
 | T-10 | services 域间边界立规（文档） | P1 | XS | 极低 | ✅ | ✅ 已完成 |
-| T-32 | services 域间边界守卫测试 | P1 | M | 低 | ⚠️ 依赖 T-10 | ⬜ 待做 |
+| T-32 | services 域间边界守卫测试 | P1 | M | 低 | ✅ T-10 已满足 | ✅ 已完成 |
 | T-31 | 抽 `RuntimeStateStore` 协议 + Redis 实现 | **P0** | L | **高** | ✅ | ⬜ 待做 |
 | T-14 | `world_engine` 纯计算下沉 `engines/` | P1 | XL | **高** | ✅ | ⬜ 待做 |
 | T-15 | `action_engine` 纯计算下沉 | P1 | L | **高** | ⚠️ 建议 T-14 后 | ⬜ 待做 |
@@ -138,11 +141,18 @@
 - **收益**：零成本立规，是 T-32 的验收依据。
 - **判据**：文档条目落地。
 
-### ⚠️ T-32 · services 域间边界守卫测试（依赖 T-10）
+### ✅ T-32 · services 域间边界守卫测试（依赖 T-10）
 
-- **改动**：仿 `tests/unit/test_feishu_boundary.py`（fail-closed allowlist）写扫描式守卫测试，先只覆盖 **3 个最大域**（`tool` / `action` / `world`）以降低初始红灯面。
-- **注意事项**：直接全量开启会有大量既有违规 → 建议「先记录基线违规集，再只拦新增」的渐进策略。
-- **判据**：守卫测试存在且对新增违规 fail-closed。
+- **改动**（已落地）：`tests/support/domain_boundary.py`（AST 扫描器，非正则）+ `tests/support/domain_boundary_baseline.py`（232 条基线）+ `tests/unit/test_services_domain_boundary.py`（13 个用例，含 7 个负向测试证明 fail-closed）。
+- **与计划的差异**：原计划「先只覆盖 `tool` / `action` / `world` 三域」，实测后**改为覆盖全部 services 域**——三域方案会把 `planning`→各域（64 条）、`action`→`ledger`、`ledger`→`governance` 等 200+ 条置于守卫外，性价比不成立。
+- **两个设计裁决**（用户 2026-10-09 选定）：① 全 services 域 + 基线冻结（只拦新增）；② `__init__.py` re-export 绕行算违规（否则改走 re-export 即可规避守卫）。
+- **实现细节**：
+  - 基线 key = `(源文件, 目标模块)`，**不含行号** → 行号漂移不假红。
+  - 根目录由 `__file__` 锚定，**不依赖 CWD**（优于 `test_feishu_boundary.py` 的 `Path("app")`）。
+  - `diff_against_baseline` 双向报告：新增 → 断言失败；基线消失 → 提示收紧。
+  - 覆盖动态导入（`__import__` / `importlib.import_module`）。
+- **实测数据**：基线 232 条 / 58 域对；最大 `planning`→`tool` 40、`tool`↔`action` 双向 35。修正一处真误报（`from app.services.X import port` 的包根候选被误判，消除 5 条假阳性 → 237 降为 232）。
+- **判据**：守卫存在且对新增违规 fail-closed —— ✅ 已用注入实验验证（临时加 `from app.services.tool import registry` 到 `car/aggregate.py` → 守卫红并给出修法；已还原）。
 
 ### ✅ T-11 · `chat_pipeline` 拆前台/后台
 
@@ -235,20 +245,20 @@
 
 ---
 
-## 🎯 剩余可选项按「性价比」重排（2026-10-09 17:50）
+## 🎯 剩余可选项按「性价比」重排（2026-10-09 18:30）
 
-> T-10 已于 `66a909c7` 完成 → **T-32 现在已解锁**（不再被依赖阻塞）。
+> T-10（`66a909c7`）→ **T-32 已于批次 6 完成**。域间守卫已就位，后续结构改动的越界会被自动拦截。
 
 | 推荐序 | ID | 一句话 | 工作量 | 风险 | 备注 |
 |:--:|---|---|:--:|:--:|---|
-| 1 | **T-32** | services 域间边界守卫测试（渐进式） | M | 低 | **依赖 T-10 已满足**；须先记基线违规集再只拦新增 |
-| 2 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线 |
-| 3 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
-| 4 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面 |
-| 5 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
-| 6 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
-| 7 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
-| 8 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
+| 1 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线；定下 outbox 归属 |
+| 2 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
+| 3 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面（T-24 工具已降低同步成本） |
+| 4 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
+| 5 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
+| 6 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
+| 7 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
 | — | **D-2** | 六段循环是否推进（决策） | 决策 | — | **前置：必须先做真实模型人工回归** |
 
-> 快赢档（T-23/T-24/T-25）已于批次 5 清空。
+> 快赢档（T-23/T-24/T-25）已于批次 5 清空；**T-32 已于批次 6 完成**。
+> 建议下一步：**D-1（纯决策、定方向）** 或 **T-13（结构改动、守卫已在位）**。
