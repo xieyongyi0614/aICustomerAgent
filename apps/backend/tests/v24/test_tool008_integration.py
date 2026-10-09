@@ -6,7 +6,6 @@ Flag on 走 `memory_policy_key` 泛化路径，候选仍必经 R1~R8。
 不再直写 memories；断言目标相应从 memories 前移到 candidates。
 """
 
-import hashlib
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +32,7 @@ from tests.v24.tool008_support import (
     record,
     tool_definition,
 )
+from tests.support.frozen_surface import assert_frozen, file_digest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -510,11 +510,11 @@ def test_extraction_and_tool_delivery_are_parallel(
 
 @pytest.mark.parametrize("relative,digest", sorted(FROZEN_SOURCES.items()))
 def test_frozen_sources_have_zero_diff(relative, digest):
-    """零 diff 冻结：比对前做**行尾归一（LF）**，CRLF 检出不应造成假失败（P2-4）。"""
-    data = (BACKEND_ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
-    assert hashlib.sha256(data).hexdigest() == digest, (
-        f"{relative} 被修改：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 模板资产在本任务内必须零 diff"
-    )
+    """零 diff 冻结：比对前做**行尾归一（LF）**，CRLF 检出不应造成假失败（P2-4）。
+
+    实际/期望摘要均在失败信息中呈现（T-24），便于区分「本次改坏」与「常量旧账」。
+    """
+    assert_frozen(relative, expected=digest, actual=file_digest(relative))
 
 
 def test_memory_tables_unchanged():

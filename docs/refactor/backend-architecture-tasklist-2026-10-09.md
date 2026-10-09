@@ -18,6 +18,9 @@
 | 3 | `778d6c27` | T-33（删 `agent_service` 兼容壳，入口收敛至 `chat_pipeline` + `channel_gateway` 门面） |
 | 4 | `66a909c7` | T-10（AGENTS.md 立规 services 域间边界） |
 | 4 | `151deef8` | 测试基建：conftest 惰性加载 `app.main`（全量 -15%，零回归） |
+| 5 | 待提交 | T-24（冻结摘要诊断 `tests/support/frozen_surface.py`）· T-25（TESTING.md §10 判据 + 基线重采）· T-23（TESTING.md §11 钉测处置流程） |
+
+**T-25 关键结论（2026-10-09 重采）**：**当前真实已知失败集为空（0 条）**。两次默认全量失败集几乎不重叠（21 vs 7，交集仅 1 条），交集那条隔离重跑亦通过 → 全部为 `safe-delete` 环境噪声。**旧的「26 failed 基线」清单正式作废**，判据固化为「改动前后失败集 diff，不是计数」。
 
 **回归结论**：各批改动前后均跑全量 → 失败集无 diff。批次 3 实测 **unit 1591 passed / integration 428 passed + 7 skipped / e2e 182 passed / v24+v30+v50 689 passed**，全部 exit=0。批次 4 实测全量 `unit+integration+e2e` **2201 passed + 7 skipped** 连跑 4 次，与基线逐字一致。
 
@@ -46,9 +49,9 @@
 | T-31 | 抽 `RuntimeStateStore` 协议 + Redis 实现 | **P0** | L | **高** | ✅ | ⬜ 待做 |
 | T-14 | `world_engine` 纯计算下沉 `engines/` | P1 | XL | **高** | ✅ | ⬜ 待做 |
 | T-15 | `action_engine` 纯计算下沉 | P1 | L | **高** | ⚠️ 建议 T-14 后 | ⬜ 待做 |
-| T-23 | 钉测处置流程文档化 | P3 | S | 极低 | ✅ | ⬜ 待做 |
-| T-24 | 冻结摘要诊断改良（先打印后比对） | P3 | S | 低 | ✅ | ⬜ 待做 |
-| T-25 | known-failing set 登记入 TESTING.md | P3 | S | 极低 | ✅ | ⬜ 待做 |
+| T-23 | 钉测处置流程文档化 | P3 | S | 极低 | ✅ | ✅ 已完成 |
+| T-24 | 冻结摘要诊断改良（先打印后比对） | P3 | S | 低 | ✅ | ✅ 已完成 |
+| T-25 | known-failing set 登记入 TESTING.md | P3 | S | 极低 | ✅ | ✅ 已完成 |
 | T-26 | `models/` 与 `core/db/` 命名统一 | P3 | M | 低 | ✅ | ⬜ 待做 |
 | D-1 | `action_outbox_enabled` 架构裁决 | P2 | S | 极低 | ✅ | ⬜ 待决策 |
 | D-2 | 六段循环是否推进（需真实模型回归） | P2 | 决策 | — | ✅ | ⬜ 待决策 |
@@ -238,15 +241,14 @@
 
 | 推荐序 | ID | 一句话 | 工作量 | 风险 | 备注 |
 |:--:|---|---|:--:|:--:|---|
-| 1 | **T-23** | 钉测处置流程写进 `TESTING.md` | S | 极低 | 纯文档，降低后续撞钉测的误判成本 |
-| 2 | **T-24** | 冻结摘要校验改为先打印后比对 | S | 低 | 治「摘要静默 stale」这个真实踩过的坑 |
-| 3 | **T-25** | known-failing set 登记进 `TESTING.md` | S | 极低 | 纯文档（**注意：旧 26 条清单已实测作废，需重查**） |
-| 4 | **T-32** | services 域间边界守卫测试（渐进式） | M | 低 | **依赖 T-10 已满足**；须先记基线违规集再只拦新增 |
-| 5 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线 |
-| 6 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
-| 7 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面 |
-| 8 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
-| 9 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
-| 10 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
-| 11 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
+| 1 | **T-32** | services 域间边界守卫测试（渐进式） | M | 低 | **依赖 T-10 已满足**；须先记基线违规集再只拦新增 |
+| 2 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线 |
+| 3 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
+| 4 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面 |
+| 5 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
+| 6 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
+| 7 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
+| 8 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
 | — | **D-2** | 六段循环是否推进（决策） | 决策 | — | **前置：必须先做真实模型人工回归** |
+
+> 快赢档（T-23/T-24/T-25）已于批次 5 清空。

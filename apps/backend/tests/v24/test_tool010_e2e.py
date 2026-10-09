@@ -6,7 +6,6 @@ normalize）：成功路径的实现体对 4 个 V9 能力用打桩（V9 实现�
 用**真实实现体**——它们的"成功"语义正是本任务的交付物。
 """
 
-import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,6 +28,7 @@ from app.services.tool.surface import ToolSurfaceResolver, ToolSelector
 from app.models.tool import ToolInvocation
 from tests.v24.tool004_support import surface_context
 from tests.v24.tool005_support import grant, snapshot
+from tests.support.frozen_surface import assert_frozen, file_digest
 from tests.v24.tool010_support import (
     CAPABILITY_ACTIONS,
     CHANNEL_ENVS,
@@ -68,9 +68,6 @@ def _expected_success_status(tool_id: str) -> str:
     """路线 B：检索工具的可判定结果就是 `unavailable`（不是 succeeded）。"""
     return "unavailable" if tool_id == SEARCH_TOOL_ID else "succeeded"
 
-
-CRLF = b"\r\n"
-LF = b"\n"
 
 ZERO_DIFF_HASHES: dict[str, str] = {
     "app/channels/base.py": "f992542b7585468c09f169a16d1f6d4aab36639eb35ae840936b201402359617",
@@ -356,15 +353,19 @@ def test_every_declared_tool_is_describable_and_resolvable():
 
 
 def _file_digest(relative_path: str) -> str:
-    """行尾归一（LF）后的 sha256：抵消 CRLF 检出带来的假失败（P2-4）。"""
-    data = (BACKEND_ROOT / relative_path).read_bytes().replace(CRLF, LF)
-    return hashlib.sha256(data).hexdigest()
+    """行尾归一（LF）后的 sha256：抵消 CRLF 检出带来的假失败（P2-4）。
+
+    实现已抽到 `tests/support/frozen_surface.py`（T-24：比对前先暴露 actual）。
+    """
+    return file_digest(relative_path)
 
 
 @pytest.mark.parametrize("relative_path", sorted(ZERO_DIFF_HASHES), ids=lambda value: value)
 def test_zero_diff_frozen_surfaces(relative_path):
-    assert _file_digest(relative_path) == ZERO_DIFF_HASHES[relative_path], (
-        f"{relative_path} 被 TOOL-010 改动"
+    assert_frozen(
+        relative_path,
+        expected=ZERO_DIFF_HASHES[relative_path],
+        actual=_file_digest(relative_path),
     )
 
 
@@ -462,7 +463,11 @@ async def test_four_step_tool_addition_keeps_pipelines_untouched():
     assert MATRIX_OBSERVATIONS["world.object.move"] != execution.result["observations"]
 
     for relative_path in ZERO_DIFF_HASHES:
-        assert _file_digest(relative_path) == ZERO_DIFF_HASHES[relative_path]
+        assert_frozen(
+            relative_path,
+            expected=ZERO_DIFF_HASHES[relative_path],
+            actual=_file_digest(relative_path),
+        )
 
 
 # --- Flag 全 off：既有路径零变化 -------------------------------------------

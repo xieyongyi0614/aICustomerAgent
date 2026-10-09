@@ -6,7 +6,6 @@
 """
 
 import ast
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -27,6 +26,7 @@ from tests.v24.tool007_support import (
     tool_context,
     world_settings,
 )
+from tests.support.frozen_surface import assert_frozen, file_digest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -251,11 +251,9 @@ def test_frozen_sources_have_zero_diff(relative, digest):
     """世界模拟与 outbox 消费路径零 diff（TOOL-007 硬约束）。
 
     摘要比对前做**行尾归一（LF）**：CRLF 检出不应造成假失败（P2-4）。
+    实际/期望摘要均在失败信息中呈现（T-24），便于区分「本次改坏」与「常量旧账」。
     """
-    data = (BACKEND_ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
-    assert hashlib.sha256(data).hexdigest() == digest, (
-        f"{relative} 被修改：世界模拟 / outbox 消费器在本任务内必须零 diff"
-    )
+    assert_frozen(relative, expected=digest, actual=file_digest(relative))
 
 
 def test_outbox_consumer_has_no_tool_dependency():

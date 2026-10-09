@@ -161,3 +161,107 @@ CI 上注意：`backend-full` 的 `TEST_DATABASE_URL` 指向 service container�
 删除判据：版本契约 / 开关快照 / 逐字节摘要类用例在每轮合法演进中持续假红（如 `ACTION_TYPES` 白名单扩项即改 prompt 字节），维护成本高于检出价值；行为覆盖均留在承接套件。
 
 引用提示：`docs/version/v1.0.0/v9/regression-checklist.md`、`docs/version/v2.5.0/planning-system/regression-checklist.md` 已就地加注；其余历史设计文档（各版本 `tasks/`、`testing.md`）保留原文，视为当时的记录。
+
+## 10. 回归判据与已知失败基线（T-25，2026-10-09 重采）
+
+### 10.1 判据：**失败集 diff，不是失败计数**（铁律）
+
+> **判「本次改动是否引入回归」的唯一判据**：把改动前后两次全量的**失败用例集合**做 diff。
+> **禁止**用「失败数从 N 变成 M」来判断——本机存在非确定性环境噪声（见 10.2），
+> 计数天然抖动（实测两次默认全量：21 failed vs 7 failed，同一份代码、未改一行）。
+
+正确流程：
+
+```text
+① 改动前跑一次全量 → 存失败集 A（用例 id 列表，排序去重）
+② 改动后再跑一次   → 存失败集 B
+③ A - B 与 B - A 均应为空（或差异项能逐个解释）
+④ 对差异项做隔离重跑（-n 0）判定真伪
+```
+
+### 10.2 本机既有环境噪声：`safe-delete` 外部守卫（**不在仓库内**）
+
+- **现象**：批量跑（`>50` 文件）时，外部 `safe-delete` 守卫对 `.tmp/offline-db/*.db`
+  执行 `trash` 失败 → `_offline_repos` 的 SQLite `drop_all + create_all` 失败 →
+  用例报 `sqlalchemy.exc.OperationalError: no such table: <x>`，或以 **setup `ERROR`** 形式出现。
+- **特征**：**非确定性**——同一份代码重复跑，命中集合与数量都变；
+  隔离重跑（`-n 0`、单独文件/目录）**稳定通过**。
+- **判定方法**：差异项隔离重跑 3 次，3/3 通过即判**噪声**，不是回归。
+- **规避**：`--basetemp=<每次换名的新目录>`；分目录跑（unit / integration / e2e 分开）
+  可降低触发概率；输出重定向**必须写 `apps/backend/.tmp/`**（禁写仓库根）。
+
+### 10.3 当前已知失败基线（2026-10-09 实测）
+
+> **当前真实已知失败集：空（0 条）。**
+
+采证过程（本机，PG 在跑 + `.env` 已加载，HEAD `ea32bbf9`）：
+
+| 运行 | 命令 | 结果 |
+|---|---|---|
+| 默认全量 #1 | `pytest -q` | **21 failed / 3283 passed / 7 skipped / 25 errors** |
+| 默认全量 #2 | `pytest -q` | **7 failed / 3298 passed / 7 skipped / 24 errors** |
+| 两次失败集交集 | — | **仅 1 条**（`v50/test_memory_product_view.py::test_total_matches_group_sum`） |
+| `tests/v50` 隔离 | `pytest tests/v50 -n 0` | **284 passed**（0 失败） |
+| `tests/v51` 隔离 | `pytest tests/v51 -n 0` | **97 passed**（0 失败） |
+| 交集那条隔离 | `pytest tests/v50/test_memory_product_view.py tests/v51/test_ledger_stats_api.py -n 0` | **47 passed** |
+
+**结论**：两次默认全量的失败集**几乎不重叠**（21 vs 7，交集仅 1 条），且交集那条隔离通过
+→ **全部为 10.2 所述环境噪声，真实回归为零。**
+
+> ⚠️ **旧的「26 failed 基线」清单已作废**（2026-10-09 实测其中多条隔离重跑通过）。
+> 该清单不再作为判据；**以「改动前后失败集 diff」为准**。
+
+分层基线参考（`-n auto`，`tests/unit + integration + e2e`）：**2201 passed + 7 skipped**。
+
+## 11. 冻结面 / 钉测处置流程（T-23）
+
+固定整文件摘要的钉测（`ZERO_DIFF_HASHES` / `FROZEN_SOURCES`）在涉事文件被改动时会红，
+这是**设计意图**（防止无意改动关键路径）。处置步骤：
+
+### 11.1 先判「是我改坏的」还是「常量旧账」
+
+**步骤 1 — 拿到 actual 摘要。** 自 T-24 起，失配断言会直接打印 expected 与 actual
+（见 11.2），无需手工计算。若需手工复算：
+
+```bash
+# 在 apps/backend/ 下
+python -c "import hashlib,pathlib; p=pathlib.Path('app/application/world_engine.py'); print(hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest())"
+```
+
+**步骤 2 — 对照本次改动范围。**
+- 本次**确实**改了这个文件 → 属预期，走 11.1 的同步流程。
+- 本次**没碰**这个文件 → 常量**早已 stale**（旧账）：查该文件最近一次改动 commit
+  当时是否漏同步摘要。**不要**把它当成自己的回归。
+
+> 🚨 真实踩过的坑：2026-09-28 实测 `world_engine.py` 在**动手改动之前**就是红的
+> （上一次演进漏同步）。这正是 T-24 把「先打印 actual」做进断言的原因。
+
+### 11.2 T-24：诊断工具 `tests/support/frozen_surface.py`
+
+所有整文件冻结比对统一走该模块（失败信息含 expected / actual / 可直接粘贴的同步行）：
+
+```python
+from tests.support.frozen_surface import assert_frozen, file_digest
+
+assert_frozen(relative, expected=FROZEN_SOURCES[relative], actual=file_digest(relative))
+```
+
+摘要算法：读字节 → `\r\n` 归一为 `\n` → `sha256` hexdigest
+（行尾归一抵消 `core.autocrlf=true` 检出的假失败）。
+**该模块只做诊断呈现，不改任何摘要常量、不放宽断言。**
+
+### 11.3 合法同步摘要（确认磁盘内容正确后）
+
+1. 复制失败信息里给出的 `路径: "摘要"` 行，替换常量中的对应值。
+2. 在常量处**加一行声明注释**（改了哪个文件、为什么、日期）。
+3. 只改摘要常量 + 声明注释，**不要顺手改被测文件**。
+4. 重跑该钉测文件（`--run-legacy`，见 §3 提示）确认转绿。
+
+### 11.4 其他需同步的钉测点（改迁移 / 改 schema 时）
+
+- `tests/support/schema_pins.py`：`MIGRATION_HEAD` / `SCHEMA_PREVIOUS_HEAD` /
+  `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`（全仓唯一定义，禁止本地字面量）。
+- 各版本测试内的硬编码断言（如 `tests/v40/test_ledger_migration_0054.py::test_schema_table_count_is_49`）。
+  **加一个迁移会打破约 22 个跨版本钉测**，上述两处都要查，只改前者会漏。
+- `tests/v24/test_tool011_security.py::EXPECTED_TASK_GLOBALS` / `EXPECTED_CREATE_TASK_COUNT`：
+  `main.py` 常驻 task 清单期望值——**增删 `main.py` 的 `create_task` 必须同步**。
