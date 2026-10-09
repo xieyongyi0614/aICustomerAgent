@@ -23,7 +23,7 @@ FORBIDDEN_IMPORTS = (
     "app.repositories",
     "app.chains",
     "app.prompts",
-    "app.services.agent_service",
+    "app.application.chat_pipeline",
 )
 
 FEISHU = inbound_gateway.CHANNEL_FEISHU

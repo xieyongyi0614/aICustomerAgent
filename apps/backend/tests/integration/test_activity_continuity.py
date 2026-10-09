@@ -9,7 +9,7 @@ from app.core import llm_factory
 from app.main import app
 from app.models.scene import SceneState
 from app.repositories import scene_state_repository
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from tests.conftest import wait_until
 
 DEFAULT_MODE = {
@@ -54,7 +54,7 @@ def test_activity_continuity_injects_section_and_reduces_budget(
     llm_factory.set_llm(llm)
     first = _post(client, "在吗")
     session_id = first.headers.get("x-session-id")
-    wait_until(lambda: not agent_service._background_tasks)
+    wait_until(lambda: not agent_service.background_tasks)
     scene_state_repository.upsert_scene_state(
         session_id, SceneState(session_id=session_id, current_activity="切西瓜")
     )
@@ -94,7 +94,7 @@ def test_pending_scene_no_double_injection(client, fake_llm):
     llm_factory.set_llm(llm)
     first = _post(client, "在吗")
     session_id = first.headers.get("x-session-id")
-    wait_until(lambda: not agent_service._background_tasks)
+    wait_until(lambda: not agent_service.background_tasks)
     scene_state_repository.upsert_scene_state(
         session_id,
         SceneState(

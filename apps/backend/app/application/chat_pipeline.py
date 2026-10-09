@@ -920,3 +920,31 @@ async def run_chat_pipeline(
                 await task
             except BaseException:  # pylint: disable=broad-except
                 pass
+
+
+async def stream_chat(
+    session_id: str, user_id: str, content: str, llm=None, trace=None
+) -> AsyncIterator[dict]:
+    """前台对话入口（自 `services/agent_service` 收编，行为不变）。
+
+    透传 `run_chat_pipeline`，并负责 trace 兜底创建与 observability trace
+    context 的 set/reset。生产侧 2 处调用点（`api/v1/chat.py`、`channels/feishu/adapter.py`）
+    均显式传入 trace，故兜底分支实际只服务测试；语义与旧壳逐字一致。
+    """
+    if trace is None:
+        trace = trace_collector.get_trace_collector().begin_trace()
+    observability_token = observability.current_trace.set(trace)
+    try:
+        async for event in run_chat_pipeline(session_id, user_id, content, llm, trace):
+            yield event
+    except Exception as exc:
+        trace.record(
+            "llm",
+            0.0,
+            "error",
+            error=exc.__class__.__name__,
+        )
+        observability.on_turn_error(trace, user_id=user_id, session_id=session_id)
+        raise
+    finally:
+        observability.current_trace.reset(observability_token)

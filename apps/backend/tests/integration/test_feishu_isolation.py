@@ -174,7 +174,7 @@ async def test_two_users_concurrent_turns_no_cross_talk(db_session_factory, monk
         yield {"kind": "token", "text": f"reply-{content}"}
         yield {"kind": "done", "turn_id": content}
 
-    monkeypatch.setattr(adapter.agent_service, "stream_chat", _stream)
+    monkeypatch.setattr(adapter, "stream_chat", _stream)
 
     tasks = [
         adapter.handle_inbound_message(_inbound("A1", "ou_A_cc", "om_cc_a1")),

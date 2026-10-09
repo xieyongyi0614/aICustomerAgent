@@ -17,8 +17,8 @@ CHANNELS_ALLOWLIST_PREFIXES = (
     "app.channels",
     "app.services.identity.channel",
     "app.services.observability.collector",
-    "app.services.agent_service",
-    # R-7'：通道只依赖独立叶子门面，不绑定 agent_runtime 包内路径。
+    # R-7'：通道只依赖独立叶子门面，不绑定 agent_runtime / chat_pipeline 包内路径。
+    # T-33：`app.services.agent_service` 壳退役后，前台入口经本门面转发。
     "app.application.channel_gateway",
 )
 

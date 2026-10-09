@@ -8,10 +8,9 @@ from fastapi.responses import StreamingResponse
 from app.api.v1.auth import require_user
 from app.api.v1.deps import get_chat_llm
 from app.api.v1.schemas import ChatRequest
-from app.services import agent_service
 from app.services.observability import collector as trace_collector
 from app.services.observability.analytics import track_event
-from app.services.agent_service import EmptyLLMResponseError
+from app.application.chat_pipeline import EmptyLLMResponseError, stream_chat
 from app.services.tool.step_events import (
     CHAT_EVENT_TOOL_STEP,
     CollectingToolStepSink,
@@ -60,7 +59,7 @@ async def chat_message(
         step_sink = CollectingToolStepSink()
         sink_token = bind_tool_step_sink(step_sink)
         try:
-            async for event in agent_service.stream_chat(
+            async for event in stream_chat(
                 session_id, user_id, body.content, llm=llm, trace=trace
             ):
                 for step in step_sink.drain():

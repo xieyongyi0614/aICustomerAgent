@@ -32,7 +32,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api.v1.deps import get_chat_llm
 from app.core import llm_factory
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from app.services.relationship import evaluation as relationship_evaluation_service
 from app.services.relationship import narrative as relationship_narrative_service
 from app.services.relationship import patterns as relationship_patterns_service
@@ -408,7 +408,7 @@ def _offline_repos(monkeypatch):
     yield testing_session
     deadline = time.time() + 2.0
     while (
-        (agent_service._background_tasks or chat_post_process_tasks() or observability_tasks())
+        (agent_service.background_tasks or chat_post_process_tasks() or observability_tasks())
         and time.time() < deadline
     ):
         time.sleep(0.02)

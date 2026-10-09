@@ -19,7 +19,7 @@ FORBIDDEN_IMPORTS = (
     "app.repositories",
     "app.chains",
     "app.prompts",
-    "app.services.agent_service",
+    "app.application.chat_pipeline",
 )
 
 NOW = datetime(2026, 9, 21, 12, 0, 0, tzinfo=timezone.utc)

@@ -5,9 +5,7 @@ import pytest
 
 from app.application import post_process
 from app.repositories import scene_state_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 @pytest.fixture(autouse=True)
 def _no_ledger_confirmation(monkeypatch):
     """本文件测 V3 场景连续性；PLA-010 账本确认挂接复用同一 pending_action 槽位，

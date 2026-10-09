@@ -6,11 +6,24 @@
 
 from __future__ import annotations
 
+from typing import AsyncIterator
+
+from app.application import chat_pipeline as _chat_pipeline
 from app.application.agent_runtime import inbound as _inbound
 from app.application.agent_runtime import outbound as _outbound
 
 CHANNEL_WEB = _inbound.CHANNEL_WEB
 CHANNEL_FEISHU = _inbound.CHANNEL_FEISHU
+
+EmptyLLMResponseError = _chat_pipeline.EmptyLLMResponseError
+
+
+async def stream_chat(
+    session_id: str, user_id: str, content: str, llm=None, trace=None
+) -> AsyncIterator[dict]:
+    """前台对话流（T-33 收编）：通道经本门面消费，不直连 chat_pipeline。"""
+    async for event in _chat_pipeline.stream_chat(session_id, user_id, content, llm, trace):
+        yield event
 
 
 def is_enabled(channel: str) -> bool:
@@ -60,6 +73,7 @@ def enabled_channels() -> frozenset[str]:
 __all__ = [
     "CHANNEL_FEISHU",
     "CHANNEL_WEB",
+    "EmptyLLMResponseError",
     "clear_adapters",
     "deliver_proactive",
     "deliver_reply",
@@ -71,4 +85,5 @@ __all__ = [
     "registered_channels",
     "resolve_adapter",
     "resolve_session",
+    "stream_chat",
 ]

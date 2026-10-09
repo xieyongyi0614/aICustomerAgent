@@ -6,10 +6,9 @@ from app.channels.feishu import adapter
 from app.channels.feishu.adapter import FALLBACK_TEXTS, TurnOutcome, reset_feishu_adapter
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.core.settings import get_settings
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from app.services.identity import channel as channel_identity_service
-from app.services.agent_service import EmptyLLMResponseError
-
+from app.application.chat_pipeline import EmptyLLMResponseError
 EXPECTED_ERROR_KINDS = ("llm_error", "empty_response", "pipeline_error", "identity_error", "overloaded")
 
 

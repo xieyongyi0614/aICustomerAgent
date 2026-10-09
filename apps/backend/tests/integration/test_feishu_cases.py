@@ -220,7 +220,7 @@ async def test_case_stream_incomplete_sends_partial(db_session_factory, monkeypa
         calls.append(content)
         yield {"kind": "token", "text": "半截"}
 
-    monkeypatch.setattr(adapter.agent_service, "stream_chat", _stream)
+    monkeypatch.setattr(adapter, "stream_chat", _stream)
     delivered = []
 
     def _respond(url, body):
@@ -260,7 +260,7 @@ async def test_case_overload_then_recovery(db_session_factory, monkeypatch, over
         yield {"kind": "token", "text": content}
         yield {"kind": "done", "turn_id": content}
 
-    monkeypatch.setattr(adapter.agent_service, "stream_chat", _stream)
+    monkeypatch.setattr(adapter, "stream_chat", _stream)
     delivered = []
 
     def _respond(url, body):

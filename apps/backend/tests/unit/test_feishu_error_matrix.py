@@ -28,9 +28,7 @@ from app.channels.feishu.errors import (
 from app.channels.feishu import events
 from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.services.identity import channel as channel_identity_service
-from app.services.agent_service import EmptyLLMResponseError
-
-
+from app.application.chat_pipeline import EmptyLLMResponseError
 @pytest.fixture(autouse=True)
 def _reset_state():
     events.reset_event_state()
@@ -132,7 +130,7 @@ def _mount_stream(monkeypatch, events_seq=None, exc=None):
             yield event
 
     _stream.calls = calls
-    monkeypatch.setattr(adapter.agent_service, "stream_chat", _stream)
+    monkeypatch.setattr(adapter, "stream_chat", _stream)
     return _stream
 
 
@@ -302,7 +300,7 @@ async def test_row12_overload_rejects_latest_and_recovers(monkeypatch, override_
         yield {"kind": "token", "text": "x"}
         yield {"kind": "done", "turn_id": "t"}
 
-    monkeypatch.setattr(adapter.agent_service, "stream_chat", _blocking)
+    monkeypatch.setattr(adapter, "stream_chat", _blocking)
     delivered = []
 
     async def _record(outcome):

@@ -5,7 +5,7 @@ import pytest
 
 from app.core.settings import get_settings
 from app.main import app
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from app.services.observability import collector as tc_module
 from app.services.observability.collector import TraceCollector, TurnTraceSession, get_trace_collector
 from tests.conftest import wait_until

@@ -24,10 +24,9 @@ from app.channels.feishu.identity import FEISHU_CHANNEL
 from app.channels.feishu.inbox import SessionInbox
 from app.core import llm_factory
 from app.core.settings import get_settings
-from app.services import agent_service
+from app.application.channel_gateway import EmptyLLMResponseError, stream_chat
 from app.services.identity import channel as channel_identity_service
 from app.services.observability import collector as trace_collector
-from app.services.agent_service import EmptyLLMResponseError
 
 logger = logging.getLogger(__name__)
 
@@ -363,7 +362,7 @@ async def _consume_turn(resolved, inbound: InboundMessage, llm, trace):
     chunks: list[str] = []
     turn_id: str | None = None
     saw_done = False
-    async for event in agent_service.stream_chat(
+    async for event in stream_chat(
         resolved.session_id,
         resolved.internal_user_id,
         inbound.text,

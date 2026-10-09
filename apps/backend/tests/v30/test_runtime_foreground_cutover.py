@@ -15,8 +15,7 @@ import pytest
 from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
 from app.core.settings import get_settings
 from app.repositories import loop_run_repository
-from app.services import agent_service
-
+from app.application import chat_pipeline as agent_service
 BACKEND = Path(__file__).resolve().parents[2]
 REPO = BACKEND.parent.parent
 ENTRY_DOC = REPO / "docs" / "version" / "v3.0.0" / "entry-convergence.md"
@@ -35,7 +34,7 @@ TURN_META_ORDER: tuple[str, ...] = (
     "mode",
 )
 DONE_KEYS = frozenset({"kind", "session_id", "turn_id", "request_id"})
-CALL_PATTERN = re.compile(r"agent_service\.stream_chat\s*\(")
+CALL_PATTERN = re.compile(r"(?<![\w.])stream_chat\s*\(")
 
 
 def _llm(fake_llm):
@@ -215,7 +214,8 @@ class TestEntryConvergence:
 
     pytestmark = pytest.mark.unit
 
-    def test_agent_service_call_sites_registered(self):
+    def test_entry_call_sites_registered(self):
+        """T-33：`agent_service` 壳退役后，前台入口调用点收敛到登记在案的两处。"""
         doc = ENTRY_DOC.read_text(encoding="utf-8")
         found: list[str] = []
         unregistered: list[str] = []
@@ -230,13 +230,21 @@ class TestEntryConvergence:
                 stripped = line.strip()
                 if stripped.startswith("#") or stripped.startswith('"'):
                     continue
+                if stripped.startswith(("def ", "async def ")):
+                    continue
                 rel = path.relative_to(BACKEND).as_posix()
                 found.append(f"{rel}:{lineno}")
                 if rel not in doc:
                     unregistered.append(f"{rel}:{lineno}")
 
-        assert found, "未找到 agent_service.stream_chat 调用点，登记守卫本身失效"
+        assert found, "未找到 stream_chat 调用点，登记守卫本身失效"
         assert not unregistered, f"未登记的生产调用点：{unregistered}"
+
+    def test_agent_service_shell_retired(self):
+        """T-33：兼容壳已退役，`services/agent_service.py` 不得复活。"""
+        assert not (BACKEND / "app" / "services" / "agent_service.py").exists(), (
+            "agent_service 兼容壳应已退役（T-33）；恢复双入口须显式重新登记"
+        )
 
     def test_entry_convergence_doc_is_present(self):
         doc = ENTRY_DOC.read_text(encoding="utf-8")

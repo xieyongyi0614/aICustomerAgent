@@ -8,9 +8,7 @@
 
 import pytest
 
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {"mode": "default", "intent": "casual", "confidence": 0.9, "reason": "hi"},

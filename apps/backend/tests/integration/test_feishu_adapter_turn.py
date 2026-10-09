@@ -10,10 +10,10 @@ from app.channels.feishu.adapter import FALLBACK_TEXTS
 from app.core import llm_factory
 from app.core.db import Conversation
 from app.repositories import conversation_repository
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from app.services.identity import channel as channel_identity_service
 from app.services.observability import collector as trace_collector
-from app.services.agent_service import EmptyLLMResponseError
+from app.application.chat_pipeline import EmptyLLMResponseError
 from tests.conftest import TEST_USER_ID
 
 

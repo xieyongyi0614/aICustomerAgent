@@ -111,7 +111,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # memory 域时间口径迁移（2026-10-05，0006/0007）：`timeutil.now()` 改走 `timeutil`
     # （aware UTC），`_select_goal` 深夜判定改 `timeutil.local_now()` —— 非 TOOL-010 改脏。
     # 原值 6571ef69。
-    "app/application/chat_pipeline.py": "e119d89bcf45675891cf5815d498dbb520193d3e864e2c2ead436f9e836d940d",
+    # 入口收敛声明（2026-10-09，T-33）：`agent_service` 兼容壳退役，`stream_chat`
+    # （trace 兜底 + observability context set/reset）收编入本文件；生产调用点改直连
+    # / 经 `channel_gateway` 转发 —— 非 TOOL-010 改脏。原值 e119d89b。
+    "app/application/chat_pipeline.py": "d7be7201e20876c5be778ab1e1652a1d2813a74ce0151b1b032019f90dd8a927",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步

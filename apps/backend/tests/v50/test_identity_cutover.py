@@ -193,7 +193,7 @@ def test_life_export_scoped_to_token(real_auth):
 def test_fresh_user_cold_start_chat(db_session_factory):
     import asyncio
 
-    from app.services import agent_service
+    from app.application import chat_pipeline as agent_service
 
     llm = FakeLLM(response="晚安。", structured_responses=_structured())
 

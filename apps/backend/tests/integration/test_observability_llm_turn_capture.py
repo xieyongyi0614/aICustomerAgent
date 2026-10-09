@@ -8,9 +8,7 @@ import pytest
 from app.application import observability
 from app.models.observability import CallSite
 from app.repositories import llm_call_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {

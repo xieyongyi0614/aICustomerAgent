@@ -3,7 +3,7 @@ import asyncio
 from app.core.settings import get_settings
 from app.main import app
 from app.repositories import evaluation_repository
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
 from tests.conftest import WAIT_TIMEOUT
 
 

@@ -6,9 +6,7 @@ import time
 import pytest
 
 from app.repositories import prompt_snapshot_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {

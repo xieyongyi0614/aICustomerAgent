@@ -1,20 +1,21 @@
 from app.application import chat_pipeline
-from app.services import agent_service
 
 
-def test_agent_service_reexports_pipeline_symbols():
-    assert agent_service.background_tasks is chat_pipeline.background_tasks
-    assert agent_service.EmptyLLMResponseError is chat_pipeline.EmptyLLMResponseError
-    assert agent_service.run_chat_pipeline is chat_pipeline.run_chat_pipeline
+def test_agent_service_shell_retired():
+    """T-33：`services/agent_service` 兼容壳已退役，入口收敛到 `chat_pipeline`。"""
+    import importlib.util
+
+    assert importlib.util.find_spec("app.services.agent_service") is None
+    assert callable(chat_pipeline.stream_chat)
+    assert chat_pipeline.EmptyLLMResponseError is not None
 
 
 def test_background_tasks_set_shared_with_pipeline_registration():
     sentinel = object()
     chat_pipeline.background_tasks.add(sentinel)
     assert sentinel in chat_pipeline.background_tasks
-    assert sentinel in agent_service._background_tasks
     chat_pipeline.background_tasks.discard(sentinel)
-    assert sentinel not in agent_service._background_tasks
+    assert sentinel not in chat_pipeline.background_tasks
 
 
 def test_post_process_registry_contains_v5_v6_v65_steps():

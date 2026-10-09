@@ -10,9 +10,7 @@ from app.channels.feishu import delivery
 from app.channels.feishu import adapter
 from app.core.db import ChannelIdentityRow, Conversation
 from app.main import app
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 @pytest.fixture(autouse=True)
 def _reset_state(override_settings):
     override_settings(feishu_enabled=False)
