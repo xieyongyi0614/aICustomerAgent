@@ -12,15 +12,55 @@
 
 import asyncio
 import contextvars
+from collections import OrderedDict
 
 from app.core.settings import get_settings
 
-_user_write_locks: dict[str, asyncio.Lock] = {}
+_USER_WRITE_LOCK_CAP = 4096
+"""per-user 写锁容量上限（超过即按 LRU 淘汰未持有的锁）。
+
+锁按 `user_id` 累积，长跑进程会随「历史活跃用户数」单调增长。
+淘汰只针对**当前未被持有**的锁：持锁中的用户其锁被引用，不会被移除，
+故不会破坏互斥语义；被淘汰用户的锁在下次请求时按需重建。
+"""
+
+_user_write_locks: OrderedDict[str, asyncio.Lock] = OrderedDict()
 
 
 def get_user_write_lock(user_id: str) -> asyncio.Lock:
     """per-user 写锁公共入口（REF-010）；V7 Executor 复用同一把锁。"""
-    return _user_write_locks.setdefault(user_id, asyncio.Lock())
+    lock = _user_write_locks.get(user_id)
+    if lock is not None:
+        _user_write_locks.move_to_end(user_id)
+        return lock
+    lock = asyncio.Lock()
+    _user_write_locks[user_id] = lock
+    _evict_released_locks()
+    return lock
+
+
+def _evict_released_locks() -> None:
+    """在超容时按 LRU 淘汰**未被持有**的锁；已持有的锁保留（互斥不可破坏）。"""
+    if len(_user_write_locks) <= _USER_WRITE_LOCK_CAP:
+        return
+    for key in list(_user_write_locks):
+        if len(_user_write_locks) <= _USER_WRITE_LOCK_CAP:
+            return
+        lock = _user_write_locks.get(key)
+        if lock is not None and _lock_is_free(lock):
+            del _user_write_locks[key]
+
+
+def _lock_is_free(lock: asyncio.Lock) -> bool:
+    """锁当前既未被持有也无人等待（可安全淘汰）。
+
+    `asyncio.Lock` 无公开的「有无等待者」接口，`_waiters` 是 CPython 实现细节，
+    故用 `getattr` 兜底：取不到时保守判定为「非空闲」（宁可少淘汰，不破坏互斥）。
+    """
+    if lock.locked():
+        return False
+    waiters = getattr(lock, "_waiters", None)
+    return not waiters
 
 
 def reset_user_write_locks() -> None:

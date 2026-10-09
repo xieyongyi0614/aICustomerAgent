@@ -8,6 +8,7 @@
 import logging
 
 from app.core.settings import Settings, get_settings
+from app.core.settings.evaluation import DIMENSION_ENABLED_FIELDS
 from app.models.evaluation import (
     DimensionScore,
     EvaluationDimension,
@@ -35,7 +36,7 @@ class EvaluationRule:
 def rule_active(rule: EvaluationRule, context: EvaluationContext, settings: Settings) -> bool:
     if context.subject not in rule.subjects:
         return False
-    return bool(getattr(settings, f"evaluation_{rule.dimension.value}_enabled", True))
+    return _dimension_enabled(rule.dimension, settings)
 
 
 def run_rules(context: EvaluationContext, settings: Settings | None = None) -> list[Issue]:
@@ -70,7 +71,12 @@ def eligible_dimensions(
 
 
 def _dimension_enabled(dimension: EvaluationDimension, settings: Settings) -> bool:
-    return bool(getattr(settings, f"evaluation_{dimension.value}_enabled", True))
+    """经显式白名单取维度开关；未登记维度即 `KeyError`（fail-closed）。
+
+    取代原 `getattr(settings, f"evaluation_{dimension.value}_enabled", True)`——
+    后者在字段缺失时静默退化为「永远开启」。
+    """
+    return bool(getattr(settings, DIMENSION_ENABLED_FIELDS[dimension.value]))
 
 
 def penalty_for(severity: IssueSeverity, settings: Settings) -> float:

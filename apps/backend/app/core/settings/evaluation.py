@@ -1,10 +1,13 @@
 """评估域设置（V7.5 Character Evaluation）：开关、惩罚、权重表。
 
 维度开关命名约定：`evaluation_{EvaluationDimension.value}_enabled`。
-读取点为动态拼名（静态 grep 字段名搜不到消费方）：
-  evaluation_rules.rule_active / _dimension_enabled
-    → getattr(settings, f"evaluation_{dimension.value}_enabled", True)
+读取点经 `DIMENSION_ENABLED_FIELDS` **显式白名单**映射
+（`evaluation_rules.rule_active` / `_dimension_enabled`），不再动态拼名 getattr。
 关闭某维 = 该维规则全跳过 + 不进 eligible 分数表；LLM Judge 路不受维开关控制。
+
+为什么不用 `getattr(settings, f"..., True")`：字段名拼错或字段被删时，
+`getattr(..., True)` 会**静默退化为「永远开启」**——规则照跑、无人知晓开关已失效。
+白名单 + `attribute` 访问使缺字段直接抛错（fail-closed）。
 """
 
 import json
@@ -12,6 +15,25 @@ import json
 from pydantic import model_validator
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, SettingsError
+
+DIMENSION_ENABLED_FIELDS: dict[str, str] = {
+    "persona": "evaluation_persona_enabled",
+    "emotion": "evaluation_emotion_enabled",
+    "memory": "evaluation_memory_enabled",
+    "behavior": "evaluation_behavior_enabled",
+    "autonomy": "evaluation_autonomy_enabled",
+    "goal": "evaluation_goal_enabled",
+    "reflection": "evaluation_reflection_enabled",
+    "relationship": "evaluation_relationship_enabled",
+    "action": "evaluation_action_enabled",
+    "development": "evaluation_development_enabled",
+}
+"""维度值 → 开关字段名（`EvaluationDimension.value` 全覆盖）。
+
+新增维度必须同批登记本表；缺登记即 `KeyError`（fail-closed），
+不再退化为「无开关 = 永远开启」。字段集合由 `tests/v40/support.py`
+的 `V30_ENABLED_FLAGS` 冻结。"""
+
 
 
 class EvaluationSettings(BaseSettings):
