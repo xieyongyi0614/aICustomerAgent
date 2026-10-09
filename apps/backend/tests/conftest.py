@@ -61,7 +61,28 @@ from app.services.reflection import tool_feed as reflection_tool_feed
 from app.services.reflection import triggers as reflection_triggers
 from app.core.db import Base
 from app.core.settings import get_settings
-from app.main import app
+
+# `app.main` 在模块级 import 会连带拉入整个 FastAPI 应用（全部 router + LangChain +
+# OpenAI SDK），每个 xdist worker 白付约 3.8s；而 3300+ 用例里只有 3 个 fixture 需要
+# app 对象（llm_override / _default_auth_user / use_auth_user）。故改为惰性取值，
+# 让纯逻辑用例完全不付这笔启动开销。
+# 注：main.py 无模块级注册副作用（register_* 全在 lifespan 内），故延迟导入安全。
+_APP = None
+
+# 内部标记：标注「会加载 FastAPI 应用（app.main）因而需要 auth override」的用例。
+# 由 `pytest_collection_modifyitems` 按「用例所在模块是否 import app.main」自动打标，
+# 供 autouse `_default_auth_user` 决定是否安装 dependency override。
+_APP_BASED_MARKER = "app_based"
+
+
+def _get_app():
+    """惰性取 FastAPI 应用单例（首次调用触发 app.main 导入并缓存）。"""
+    global _APP
+    if _APP is None:
+        from app.main import app as _app_instance
+
+        _APP = _app_instance
+    return _APP
 
 from app.application import action_engine as _action_engine_impl
 from app.application import autonomy_bridge as _autonomy_bridge_impl
@@ -286,11 +307,11 @@ def _reset_llm():
 @pytest.fixture
 def llm_override():
     def _apply(llm):
-        app.dependency_overrides[get_chat_llm] = lambda: llm
+        _get_app().dependency_overrides[get_chat_llm] = lambda: llm
         return llm
 
     yield _apply
-    app.dependency_overrides.pop(get_chat_llm, None)
+    _get_app().dependency_overrides.pop(get_chat_llm, None)
 
 
 @pytest.fixture(autouse=True)
@@ -315,18 +336,27 @@ TEST_USER_ID = "default-user"
 
 
 @pytest.fixture(autouse=True)
-def _default_auth_user():
+def _default_auth_user(request):
     """产品端点 user_id 收口自 require_user（v5.0.0 §14 / ADR 13）。
 
     HTTP 测试统一以 `TEST_USER_ID` 直连，免除逐用例造令牌；需切换身份的用例用
     `use_auth_user`；鉴权语义专项用例（tests/v50/test_identity_cutover.py）在用例内
     pop 掉本 override 走真实解析。
+
+    仅对**确实会加载 FastAPI 应用**的用例安装 override（见
+    `_APP_BASED_MARKER`）：其余纯逻辑用例跳过，从而完全不触发 `app.main` 的
+    重型导入（约 3.8s/进程）。未加载应用的用例本就不会经 ASGI 发请求，
+    override 对其无意义。
     """
+    if request.node.get_closest_marker(_APP_BASED_MARKER) is None:
+        yield
+        return
+
     from app.api.v1 import auth as auth_api
 
-    app.dependency_overrides[auth_api.require_user] = lambda: TEST_USER_ID
+    _get_app().dependency_overrides[auth_api.require_user] = lambda: TEST_USER_ID
     yield
-    app.dependency_overrides.pop(auth_api.require_user, None)
+    _get_app().dependency_overrides.pop(auth_api.require_user, None)
 
 
 def use_auth_user(user_id: str) -> None:
@@ -337,7 +367,7 @@ def use_auth_user(user_id: str) -> None:
     """
     from app.api.v1 import auth as auth_api
 
-    app.dependency_overrides[auth_api.require_user] = lambda: user_id
+    _get_app().dependency_overrides[auth_api.require_user] = lambda: user_id
 
 
 _OFFLINE_DB_DIR = Path(__file__).resolve().parent.parent / ".tmp" / "offline-db"
@@ -606,6 +636,33 @@ LEGACY_TEST_DIRS = ("v2", "v8.5", "v22", "v23", "v24", "v25", "v26")
 """历史版本套件（2026-10-08 归档）：被测模块仍在跑，但默认不收集，`--run-legacy` 时才参与全量回归。"""
 
 
+def _mark_app_based(item) -> None:
+    """按「用例所在模块是否加载 FastAPI 应用」打 `_APP_BASED_MARKER`。
+
+    判据（任一命中即标记）：
+      1) 模块对象已有 `app` 属性，且其类型属 FastAPI（`from app.main import app` 的形态）；
+      2) 模块源码含 `app.main` 导入（覆盖 `import app.main` 等写法）。
+    命中后由 autouse `_default_auth_user` 安装 require_user override。
+    """
+    module = getattr(item, "module", None)
+    if module is None:
+        return
+
+    app_obj = getattr(module, "app", None)
+    if app_obj is not None and app_obj.__class__.__name__ == "FastAPI":
+        item.add_marker(_APP_BASED_MARKER)
+        return
+
+    source = getattr(module, "__source__", None)
+    if source is None:
+        try:
+            source = Path(module.__file__).read_text(encoding="utf-8", errors="ignore")
+        except (OSError, TypeError):
+            source = ""
+    if "app.main" in source or "from app import main" in source:
+        item.add_marker(_APP_BASED_MARKER)
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-legacy",
@@ -631,6 +688,7 @@ def pytest_collection_modifyitems(config, items):
         path = item.path.as_posix().replace("\\", "/")
         filename = item.path.name
         fixtures = set(item.fixturenames or ())
+        _mark_app_based(item)
         if filename in GOLDEN_TEST_FILES:
             item.add_marker(pytest.mark.golden)
             item.add_marker(pytest.mark.unit)
