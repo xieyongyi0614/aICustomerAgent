@@ -19,7 +19,7 @@
 | 4 | `66a909c7` | T-10（AGENTS.md 立规 services 域间边界） |
 | 4 | `151deef8` | 测试基建：conftest 惰性加载 `app.main`（全量 -15%，零回归） |
 | 5 | `7f7fb3c0` | T-24（冻结摘要诊断 `tests/support/frozen_surface.py`）· T-25（TESTING.md §10 判据 + 基线重采）· T-23（TESTING.md §11 钉测处置流程） |
-| 6 | 待提交 | T-32（services 域间边界守卫：`tests/support/domain_boundary.py` + 232 条基线 + `tests/unit/test_services_domain_boundary.py`） |
+| 6 | `e11762f6` | T-32（services 域间边界守卫：`tests/support/domain_boundary.py` + 232 条基线 + `tests/unit/test_services_domain_boundary.py`） |
 
 **T-32 关键结论（2026-10-09）**：守卫上线，覆盖**全部 services 域**（不止原计划的三域）。基线实测 **232 条**跨域内部依赖 / 58 个域对；守卫只对**新增** fail-closed，同时提示「基线已消失」以鼓励收紧。**两个设计裁决**：① 覆盖全域（三域方案会把 `action`→`ledger` 等 200+ 条置于守卫外）；② `__init__.py` re-export 绕行与直连子模块同罪（防「改走 re-export 即规避守卫」）。实现中发现并修正一处**真误报**：`from app.services.X import port` 会同时产出包根候选 `app.services.X`，被 re-export 规则误判 → 已按「同语句显式点名契约面则豁免包根」修正（消除 5 条假阳性）。
 
