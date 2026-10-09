@@ -1,5 +1,6 @@
 """规划域调试端点：计划清单 / 上下文装配投影 / 修订链 / 待推进 / 步骤 / 详情。"""
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -329,7 +330,7 @@ async def get_plan_context(user_id: str, goal_id: str):
     硬依赖不可得（工具系统 off / 注册表不可得 / 目标缺失）时返回**降级结构**
     （`degraded` 记 `PlanUnavailable.reason`），不抛错——与 §6.5 的投影读取异常同款处置。
     """
-    goal = goal_repository.get_goal(goal_id)
+    goal = await asyncio.to_thread(goal_repository.get_goal, goal_id)
     if goal is None or (user_id and goal.user_id != user_id):
         raise HTTPException(status_code=404, detail="目标不存在")
     try:

@@ -62,6 +62,9 @@ async def lifespan(application: FastAPI):
     engine_port.register_world_engine(_world_engine_impl)
     autonomy_port.register_autonomy_bridge(_autonomy_bridge_impl)
     job_worker.register_worker_loop(run_worker_loop)
+    from app.core.runtime_state import assert_single_instance_runtime
+
+    assert_single_instance_runtime()
     if redis_client.is_configured():
         if await redis_client.ping_redis():
             logging.getLogger(__name__).info("Redis 连接正常")
