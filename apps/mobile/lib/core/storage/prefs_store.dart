@@ -13,6 +13,9 @@ class PrefsStore {
   static const keyLoginSeen = 'profile.login_seen';
   static const keyFirstUsedAt = 'profile.first_used_at';
   static const keyModuleOrder = 'life.module_order';
+  static const keyUpdateLastCheckAt = 'update.last_check_at';
+  static const keyUpdateIgnoredVersionCode = 'update.ignored_version_code';
+  static const keyUpdateWifiOnly = 'update.wifi_only';
 
   static const allKeys = [
     keyMorningBriefAt,
@@ -24,6 +27,9 @@ class PrefsStore {
     keyLoginSeen,
     keyFirstUsedAt,
     keyModuleOrder,
+    keyUpdateLastCheckAt,
+    keyUpdateIgnoredVersionCode,
+    keyUpdateWifiOnly,
   ];
 
   final SharedPreferences _prefs;
@@ -67,6 +73,23 @@ class PrefsStore {
   String? moduleOrder() => _prefs.getString(keyModuleOrder);
   Future<void> setModuleOrder(String order) =>
       _prefs.setString(keyModuleOrder, order);
+
+  /// 上次**成功**检查更新的时间（毫秒）；缺失表示从未检查 → 首次自动检查立即执行。
+  int? updateLastCheckAtMillis() => _prefs.getInt(keyUpdateLastCheckAt);
+  Future<void> setUpdateLastCheckAtMillis(int millis) =>
+      _prefs.setInt(keyUpdateLastCheckAt, millis);
+
+  /// 用户忽略过的版本号：同一版本不再提示，更高版本会重新提示。
+  int? ignoredUpdateVersionCode() => _prefs.getInt(keyUpdateIgnoredVersionCode);
+  Future<void> setIgnoredUpdateVersionCode(int versionCode) =>
+      _prefs.setInt(keyUpdateIgnoredVersionCode, versionCode);
+  Future<void> clearIgnoredUpdateVersionCode() =>
+      _prefs.remove(keyUpdateIgnoredVersionCode);
+
+  /// 仅 Wi-Fi 下载（默认开）。
+  bool updateWifiOnly() => _prefs.getBool(keyUpdateWifiOnly) ?? true;
+  Future<void> setUpdateWifiOnly(bool value) =>
+      _prefs.setBool(keyUpdateWifiOnly, value);
 
   Future<void> _ensureFirstUsedAt() async {
     if (_prefs.getString(keyFirstUsedAt) == null) {

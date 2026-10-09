@@ -160,6 +160,7 @@ lib/
 │   ├── env/           #   --dart-define 注入（fail-fast）
 │   ├── network/       #   Dio 工厂、auth/错误映射/日志脱敏拦截器、NDJSON 流解析、Freezed 事件 union、重试队列
 │   ├── storage/       #   Drift 缓存库（服务端 DTO 投影）、SecureTokenStore、PrefsStore
+│   ├── updater/       #   应用内更新：版本检查、策略裁决、流式下载（Range 续传）、双校验、原生安装通道
 │   └── notify/        #   早/晚简报本地通知（时间随用户偏好）
 ├── design_system/     # tokens（色/字/距/径/影/动效/Lucide 图标）、components、orb（AI 核心球）
 └── features/          # 按域垂直切分：data / domain / presentation
@@ -185,6 +186,7 @@ GoRouter 全量路由（壳层 Tab 5 位：首页 / 动态 / 对话 / 生活 / �
 | `/briefing?form=morning\|evening` | 早/晚简报（通知点开直达） |
 | `/health` · `/health/consent` | 健康页 / 健康授权同意 |
 | `/profile/privacy` | 隐私（数据导出与删除） |
+| `/profile/about` | 关于（版本真值 / 检查更新 / 仅 Wi-Fi 下载；skill 登记 `B20 #about`） |
 
 ## 依赖的后端 API（前缀 `/api/v1`）
 
@@ -198,6 +200,8 @@ GoRouter 全量路由（壳层 Tab 5 位：首页 / 动态 / 对话 / 生活 / �
 | `GET /life/data` · `GET /life/export` · `DELETE /life/data` | 生活数据读取 / 导出 / 删除（隐私页） |
 | `GET /brief/{form}` · `GET/PUT /brief/prefs/me` | 早/晚简报内容与偏好 |
 | `GET /health/score` · `POST /health/sync` | 健康分与数据同步 |
+| `GET /app-release/latest` | 检查更新（`platform` / `channel` / `version_code`；无更新返回 `200 + has_update:false`） |
+| `GET /app-release/artifacts/{id}/download` | 制品下载（支持 `Range` 断点续传；不鉴权——冷启动路径不可依赖 token） |
 
 ## 测试
 

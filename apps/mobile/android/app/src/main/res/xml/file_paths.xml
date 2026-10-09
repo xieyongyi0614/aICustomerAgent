@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 只暴露应用私有目录下的 updates/（下载的安装包），不暴露整个内部存储。 -->
+<paths>
+    <files-path
+        name="updates"
+        path="updates/" />
+</paths>

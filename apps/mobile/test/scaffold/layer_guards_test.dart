@@ -21,6 +21,7 @@ void main() {
     for (final path in [
       'lib/app/router',
       'lib/app/theme',
+      'lib/app/update',
       'lib/core/network',
       'lib/core/storage',
       'lib/design_system/tokens',

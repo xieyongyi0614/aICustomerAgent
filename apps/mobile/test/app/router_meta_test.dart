@@ -27,12 +27,13 @@ void main() {
       '/profile',
       '/briefing',
       '/profile/privacy',
+      '/profile/about',
       '/login',
       '/verify',
     ]) {
       expect(chromeByPath.containsKey(p), isTrue, reason: p);
     }
-    expect(chromeByPath.length, 24);
+    expect(chromeByPath.length, 25);
   });
 
   test('test_tab_hidden_on_immersive_routes', () {
@@ -53,6 +54,7 @@ void main() {
       '/chat/ledger',
       '/briefing',
       '/profile/privacy',
+      '/profile/about',
       '/chat',
       '/login',
       '/verify',

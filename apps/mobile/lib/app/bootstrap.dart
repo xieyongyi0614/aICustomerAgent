@@ -12,6 +12,7 @@ import 'router/app_router.dart';
 import 'state/auth_epoch.dart';
 import 'state/dynamic_tab.dart';
 import 'theme/app_theme.dart';
+import 'update/update_gate.dart';
 
 late final SecureTokenStore appTokenStore;
 late final LocalBriefNotifier appBriefNotifier;
@@ -59,6 +60,8 @@ class MobileApp extends StatelessWidget {
       theme: buildAppTheme(),
       darkTheme: buildAppDarkTheme(),
       routerConfig: appRouter,
+      builder: (context, child) =>
+          UpdateGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }

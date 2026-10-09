@@ -7,6 +7,7 @@ import '../../../app/state/persona_mode.dart';
 import '../../../app/theme/theme_context.dart';
 import '../../../core/notify/local_brief_notifier.dart';
 import '../../../core/storage/prefs_store.dart';
+import '../../../core/updater/update_providers.dart';
 import '../../../design_system/components/components.dart';
 import '../../../design_system/orb/orb.dart';
 import '../data/auth_repository.dart';
@@ -131,6 +132,29 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (bindings == null) return '未连接 · 点击重试';
     if (bindings.feishuBound) return '已绑定 · 飞书里也能找到亚丝娜';
     return '未绑定 · 绑定后可在飞书聊天';
+  }
+
+  /// 「检查更新」行副标题：四态与服务端实际状态一致，不写「即将开放」这类占位。
+  String _updateSubtitle(UpdateState state) {
+    final current = state.versionLabel;
+    switch (state.stage) {
+      case UpdateStage.checking:
+        return '正在检查…';
+      case UpdateStage.failed:
+        return '检查没成功，可以再试一次';
+      case UpdateStage.available:
+      case UpdateStage.confirmWifi:
+      case UpdateStage.downloading:
+      case UpdateStage.verifying:
+      case UpdateStage.readyToInstall:
+      case UpdateStage.permissionRequired:
+        final latest = state.decision?.latestVersionLabel ?? '';
+        return latest.isEmpty ? '有新版本可用' : '$latest 可用';
+      case UpdateStage.upToDate:
+        return '已是最新';
+      case UpdateStage.idle:
+        return current.isEmpty ? '看看有没有新版本' : '当前 $current';
+    }
   }
 
   Future<void> _loadMemoryCount() async {
@@ -431,7 +455,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     color: colors.ink3,
                   ),
                   onTap: () => context.push('/profile/privacy'),
-                  showDivider: false,
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final update = ref.watch(updateControllerProvider);
+                    final controller =
+                        ref.read(updateControllerProvider.notifier);
+                    return SettingRow(
+                      title: '检查更新',
+                      subtitle: _updateSubtitle(update),
+                      icon: AppIcons.download,
+                      iconBg: colors.tileInfo,
+                      iconColor: colors.tagPreferenceFg,
+                      trailing: update.stage == UpdateStage.checking
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              AppIcons.chevronRight,
+                              size: 16,
+                              color: colors.ink3,
+                            ),
+                      onTap: () => controller.check(manual: true),
+                      showDivider: false,
+                    );
+                  },
                 ),
               ],
             ),
@@ -503,13 +553,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '朝夕 v0.1.0 (MVP) · Personal AI OS 的第一步',
-                textAlign: TextAlign.center,
-                style: type.sub.copyWith(color: colors.ink2),
-              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final version =
+                    ref.watch(updateControllerProvider).localVersion;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => context.push('/profile/about'),
+                    child: Text(
+                      '朝夕 ${version == null ? '—' : 'v${version.versionName}'}'
+                      ' (MVP) · Personal AI OS 的第一步',
+                      textAlign: TextAlign.center,
+                      style: type.numeric(type.sub).copyWith(color: colors.ink2),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 40),
           ],

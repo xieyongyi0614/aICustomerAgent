@@ -163,7 +163,16 @@ void main() {
   });
 
   test('test_prefs_keys_centralized', () {
-    expect(PrefsStore.allKeys.length, 9);
-    expect(PrefsStore.allKeys.toSet().length, 9);
+    // 12 = 既有 9 项 + 更新域 3 项（last_check_at / ignored_version_code / wifi_only）
+    expect(PrefsStore.allKeys.length, 12);
+    expect(PrefsStore.allKeys.toSet().length, 12);
+    expect(
+      PrefsStore.allKeys.where((key) => key.startsWith('update.')).toSet(),
+      {
+        PrefsStore.keyUpdateLastCheckAt,
+        PrefsStore.keyUpdateIgnoredVersionCode,
+        PrefsStore.keyUpdateWifiOnly,
+      },
+    );
   });
 }

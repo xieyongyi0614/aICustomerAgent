@@ -66,8 +66,11 @@ void main() {
     expect(find.text('主动关怀'), findsOneWidget);
     expect(find.text('状态异常提醒'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
+    // 版本行已改为真值（package_info）：未装配更新依赖时占位为「—」，
+    // 不再断言写死的 v0.1.0。
+    expect(find.text('检查更新'), findsOneWidget);
     expect(
-      find.text('朝夕 v0.1.0 (MVP) · Personal AI OS 的第一步'),
+      find.textContaining('Personal AI OS 的第一步'),
       findsOneWidget,
     );
     final context = tester.element(find.text('阿远'));

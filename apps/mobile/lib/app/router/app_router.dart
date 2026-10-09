@@ -27,6 +27,7 @@ import '../../features/life/presentation/life_page.dart';
 import '../../features/life/presentation/memo_page.dart';
 import '../../features/life/presentation/schedule_page.dart';
 import '../../features/memory/presentation/memory_page.dart';
+import '../../features/profile/presentation/about_page.dart';
 import '../../features/profile/presentation/login_page.dart';
 import '../../features/profile/presentation/privacy_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
@@ -77,6 +78,8 @@ const chromeByPath = <String, RouteChrome>{
   '/chat/ledger': chromeImmersive,
   '/briefing': chromeBriefing,
   '/profile/privacy': chromeImmersive,
+  // 关于（B20）：版本真值 + 更新入口 + 公示位，与隐私页同为「我的」子页
+  '/profile/about': chromeImmersive,
 };
 
 RouteChrome chromeForLocation(String location) {
@@ -187,6 +190,10 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/profile/privacy',
           builder: (_, _) => const ProfilePrivacyPage(),
+        ),
+        GoRoute(
+          path: '/profile/about',
+          builder: (_, _) => const AboutPage(),
         ),
         GoRoute(
           path: '/ledger',
