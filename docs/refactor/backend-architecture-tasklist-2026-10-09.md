@@ -1,23 +1,26 @@
 # 后端架构改进任务列表（Backlog）
 
-> 生成日期：2026-10-09 ｜ 更新：2026-10-09 16:00（批次 1+2 已落地）
+> 生成日期：2026-10-09 ｜ 更新：2026-10-09 17:50（批次 3+4 已落地）
 > 依据：`docs/refactor/backend-architecture-review-2026-10-09.md`
-> 基线 HEAD：`dda3f7e2` → 当前 HEAD：`7cdf7a45`
+> 基线 HEAD：`dda3f7e2` → 当前 HEAD：`151deef8`
 > 用途：**供决策的候选任务池**，非执行计划。每条含「改动面 / 风险 / 收益 / 判据」，你选定后再展开为 `tasks.md`。
 
 ---
 
-## 进度总览（截至 2026-10-09 16:20）
+## 进度总览（截至 2026-10-09 17:50）
 
-已落地 **7 项**，分三批提交：
+已落地 **9 项**（+1 项测试基建优化），分四批提交：
 
 | 批次 | commit | 内容 |
 |---|---|---|
 | 1 | `3b64713d` | T-34（删 `_LEGACY` 死映射）· T-12（修异步越界）· T-21（env 一致性脚本）· T-30（单实例启动守卫） |
 | 2 | `7cdf7a45` | T-20（评估维开关显式白名单）· T-22（运行态容量上限 + 限流窗口清扫） |
-| 3 | 待提交 | T-33（删 `agent_service` 兼容壳，入口收敛至 `chat_pipeline` + `channel_gateway` 门面） |
+| 3 | `778d6c27` | T-33（删 `agent_service` 兼容壳，入口收敛至 `chat_pipeline` + `channel_gateway` 门面） |
+| 4 | `66a909c7` | T-10（AGENTS.md 立规 services 域间边界） |
+| 4 | `151deef8` | 测试基建：conftest 惰性加载 `app.main`（全量 -15%，零回归） |
 
-**回归结论**：三批改动前后均跑全量 → 失败集无 diff。批次 3 实测 **unit 1591 passed / integration 428 passed + 7 skipped / e2e 182 passed / v24+v30+v50 689 passed**，全部 exit=0。
+**回归结论**：各批改动前后均跑全量 → 失败集无 diff。批次 3 实测 **unit 1591 passed / integration 428 passed + 7 skipped / e2e 182 passed / v24+v30+v50 689 passed**，全部 exit=0。批次 4 实测全量 `unit+integration+e2e` **2201 passed + 7 skipped** 连跑 4 次，与基线逐字一致。
+
 
 **T-20 追加核验（2026-10-09 16:00）**：确认 `evaluation_*_enabled` 10 个字段是**活代码**（`post_process.run_evaluation` → `evaluation/engine.py` → `rules.run_rules` → `_dimension_enabled` → 白名单，每轮必跑；并由 `tests/unit/test_evaluation_rule_engine.py` 实测 setenv 翻转生效）。白名单**保留**——它把原来的 `getattr(..., True)` 静默 fail-open 收敛为 `KeyError` fail-closed，不可删。结论：**保留现状**（用户 2026-10-09 决定）。
 
@@ -38,7 +41,7 @@
 | T-33 | 删 `agent_service` 兼容壳（31 文件引用点） | P2 | M | 低 | ✅ | ✅ 已完成 |
 | T-11 | `chat_pipeline` 拆前台/后台 | P1 | M | 中 | ✅ | ⬜ 待做 |
 | T-13 | `post_process` 步骤改显式注册表 | P1 | M | 中 | ✅ | ⬜ 待做 |
-| T-10 | services 域间边界立规（文档） | P1 | XS | 极低 | ✅ | ⬜ 待做 |
+| T-10 | services 域间边界立规（文档） | P1 | XS | 极低 | ✅ | ✅ 已完成 |
 | T-32 | services 域间边界守卫测试 | P1 | M | 低 | ⚠️ 依赖 T-10 | ⬜ 待做 |
 | T-31 | 抽 `RuntimeStateStore` 协议 + Redis 实现 | **P0** | L | **高** | ✅ | ⬜ 待做 |
 | T-14 | `world_engine` 纯计算下沉 `engines/` | P1 | XL | **高** | ✅ | ⬜ 待做 |
@@ -125,7 +128,7 @@
 
 ## 🥈 P1 — 结构与纪律
 
-### ✅ T-10 · services 域间边界立规（文档）
+### ✅ T-10 · services 域间边界立规（文档）—— **已完成（2026-10-09 批次 4 · `66a909c7`）**
 
 - **改动**：`apps/backend/AGENTS.md` 补一条：`services/<domain>` 不得直接 import 其他 `services/<other_domain>` 内部模块，只能经该域 `port.py` / `contracts.py`。
 - **现成先例**：`services/{action,autonomy,observability}/port.py` + `services/world/engine_port.py`。
@@ -229,20 +232,21 @@
 
 ---
 
-## 🎯 剩余可选项按「性价比」重排（2026-10-09 16:00）
+## 🎯 剩余可选项按「性价比」重排（2026-10-09 17:50）
+
+> T-10 已于 `66a909c7` 完成 → **T-32 现在已解锁**（不再被依赖阻塞）。
 
 | 推荐序 | ID | 一句话 | 工作量 | 风险 | 备注 |
 |:--:|---|---|:--:|:--:|---|
-| 1 | **T-10** | 在 `AGENTS.md` 补一条 services 域间边界铁律 | XS | 极低 | 零成本立规，且是 T-32 的验收依据 |
-| 2 | **T-23** | 钉测处置流程写进 `TESTING.md` | S | 极低 | 纯文档，降低后续撞钉测的误判成本 |
-| 3 | **T-25** | known-failing set 登记进 `TESTING.md` | S | 极低 | 纯文档，把「判据=失败集 diff」固化下来 |
-| 4 | **T-24** | 冻结摘要校验改为先打印后比对 | S | 低 | 治「摘要静默 stale」这个真实踩过的坑 |
+| 1 | **T-23** | 钉测处置流程写进 `TESTING.md` | S | 极低 | 纯文档，降低后续撞钉测的误判成本 |
+| 2 | **T-24** | 冻结摘要校验改为先打印后比对 | S | 低 | 治「摘要静默 stale」这个真实踩过的坑 |
+| 3 | **T-25** | known-failing set 登记进 `TESTING.md` | S | 极低 | 纯文档（**注意：旧 26 条清单已实测作废，需重查**） |
+| 4 | **T-32** | services 域间边界守卫测试（渐进式） | M | 低 | **依赖 T-10 已满足**；须先记基线违规集再只拦新增 |
 | 5 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线 |
 | 6 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
 | 7 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面 |
-| 8 | **T-32** | services 域间边界守卫测试（渐进式） | M | 低 | 依赖 T-10；必须先记基线违规集再只拦新增 |
-| 9 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
-| 10 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
-| 11 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
-| 12 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
+| 8 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
+| 9 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
+| 10 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
+| 11 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
 | — | **D-2** | 六段循环是否推进（决策） | 决策 | — | **前置：必须先做真实模型人工回归** |
