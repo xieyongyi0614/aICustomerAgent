@@ -79,6 +79,7 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0006_all_domains_utc_timestamps.py",
     "0007_ledger_entry_identity_split.py",
     "0008_ledger_categories_aliases_encoding.py",
+    "0009_app_release_artifacts.py",
 )
 
 SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
@@ -97,6 +98,8 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "car_loans",
     "car_service_records",
     "car_mileage_logs",
+    "app_releases",
+    "app_release_artifacts",
 )
 SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state",)
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"

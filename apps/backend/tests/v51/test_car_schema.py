@@ -48,7 +48,7 @@ def test_car_tables_are_registered_in_metadata():
 
 
 def test_schema_table_count_matches_pin():
-    assert len(Base.metadata.tables) == SCHEMA_TABLE_COUNT == 55
+    assert len(Base.metadata.tables) == SCHEMA_TABLE_COUNT == 57
 
 
 def test_schema_columns_digest_matches_pin():

@@ -56,6 +56,7 @@ from app.core.db.relationship import (
     RelationshipSnapshotRow,
     RelationshipStateRow,
 )
+from app.core.db.release import AppReleaseArtifactRow, AppReleaseRow
 from app.core.db.runtime import (
     AgentMetricSnapshotRow,
     AgentStateSnapshotRow,
@@ -79,6 +80,8 @@ __all__ = [
     "ActionScheduleRow",
     "AgentMetricSnapshotRow",
     "AgentStateSnapshotRow",
+    "AppReleaseArtifactRow",
+    "AppReleaseRow",
     "BackgroundJobRow",
     "Base",
     "BriefingPreferenceRow",

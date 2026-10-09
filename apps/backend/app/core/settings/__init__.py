@@ -13,6 +13,7 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, STAGE_KEYS, SettingsE
 from app.core.settings.action import ActionSettings
 from app.core.settings.action_execution import ActionExecutionSettings
 from app.core.settings.agent_runtime import AgentRuntimeSettings
+from app.core.settings.app_release import AppReleaseSettings
 from app.core.settings.autonomy import AutonomySettings
 from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
 from app.core.settings.car import CarSettings
@@ -74,6 +75,7 @@ class Settings(
     PlanSettings,
     WeatherSettings,
     IdsSettings,
+    AppReleaseSettings,
     DebugSettings,
     BaseSettings,
 ):

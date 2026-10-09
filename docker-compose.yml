@@ -40,8 +40,11 @@ services:
       DATABASE_URL: postgresql+psycopg://asuna:asuna@postgres:5432/asuna
       REDIS_URL: redis://redis:6379/0
       CONSOLE_PORT: "8020"
+      APP_RELEASE_STORAGE_DIR: /srv/backend/releases
     ports:
        - "127.0.0.1:8020:8020"
+    volumes:
+      - asuna_releases:/srv/backend/releases
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,4 +53,5 @@ services:
 
 volumes:
   asuna_pgdata:
+  asuna_releases:
 
