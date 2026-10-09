@@ -18,7 +18,7 @@
 | 3 | `778d6c27` | T-33（删 `agent_service` 兼容壳，入口收敛至 `chat_pipeline` + `channel_gateway` 门面） |
 | 4 | `66a909c7` | T-10（AGENTS.md 立规 services 域间边界） |
 | 4 | `151deef8` | 测试基建：conftest 惰性加载 `app.main`（全量 -15%，零回归） |
-| 5 | 待提交 | T-24（冻结摘要诊断 `tests/support/frozen_surface.py`）· T-25（TESTING.md §10 判据 + 基线重采）· T-23（TESTING.md §11 钉测处置流程） |
+| 5 | `7f7fb3c0` | T-24（冻结摘要诊断 `tests/support/frozen_surface.py`）· T-25（TESTING.md §10 判据 + 基线重采）· T-23（TESTING.md §11 钉测处置流程） |
 
 **T-25 关键结论（2026-10-09 重采）**：**当前真实已知失败集为空（0 条）**。两次默认全量失败集几乎不重叠（21 vs 7，交集仅 1 条），交集那条隔离重跑亦通过 → 全部为 `safe-delete` 环境噪声。**旧的「26 failed 基线」清单正式作废**，判据固化为「改动前后失败集 diff，不是计数」。
 
