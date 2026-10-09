@@ -241,13 +241,13 @@
 |---|---|---|
 | 首次启动隐私弹窗 | ⬜ **未实现** | 启动链路无同意门控（`apps/mobile/lib/app/bootstrap.dart:19-50`）；偏好键清单无 privacy / consent 类键（`apps/mobile/lib/core/storage/prefs_store.dart:7-27`） |
 | 隐私政策 / 用户协议 | ⬜ **仅不可点击文本，且登录页默认勾选同意** | `apps/mobile/lib/features/profile/presentation/widgets/agreement_check.dart:42-64`（无 TapGestureRecognizer）；`apps/mobile/lib/features/profile/presentation/login_page.dart:21` `bool _agreed = true;` |
-| 「关于」页 / 版本号 / 备案号公示位 | ⬜ 无关于页、无公示位；版本号为硬编码串 | `apps/mobile/lib/features/profile/presentation/profile_page.dart:393`（与 `apps/mobile/pubspec.yaml:4` 的 `version: 0.1.0+1` 无绑定；未引入 `package_info_plus`） |
+| 「关于」页 / 版本号 / 备案号公示位 | ⚠️ **版本号与关于页已实现（2026-10-09，`APP-044`）**：新增 `B20 #about` 页面、我的页版本行改为 `package_info` 真值（不再与 `pubspec.yaml` 脱钩）；**备案号 / 软著名公示位仍为留位**，内容归 `PLT-002` | 实现落点 `apps/mobile/lib/features/profile/presentation/about_page.dart`、`profile_page.dart`（版本行）；skill 登记 `.agents/skills/zhaoxi-design-system/references/components.md` §B20 |
 | 账号注销入口 | ⬜ **未实现（客户端与后端均无）** | 鉴权仓储仅 3 个动作（`apps/mobile/lib/features/profile/data/auth_repository.dart:70 / :85 / :132`），仅有「退出登录」（`profile_page.dart:150-166`） |
 | AI 生成内容显式标识 | ⬜ 无文字告知（现有 ✦ 视觉标签是身份标识，不等于标识办法要求的显式标识） | `apps/mobile/lib/design_system/components/cards.dart:46-49` |
 | 健康免责 / 相册仅本机 | ✅ 已实现（常驻文案） | `privacy_page.dart:50`、`capture_route.dart:203`、`album_detail_page.dart:206-209`、`album_cards.dart:23` |
 | Android 权限 / release INTERNET | ✅ 已实现（main 清单 9 项，含 INTERNET 修复） | `apps/mobile/android/app/src/main/AndroidManifest.xml:4-18`（`:12-13` 为 INTERNET 修复注释） |
 | release 签名与密钥排除 | ✅ 已实现 | `apps/mobile/android/.gitignore:12-14`；`android/app/build.gradle.kts:10-14`、`:35-44` |
-| 应用内检查更新 / 后端版本端点 | ⬜ 均未实现 | 无更新类依赖（`pubspec.yaml:9-36`）；后端路由表无 version / update 模块（`apps/backend/app/api/v1/router.py:2-36`） |
+| 应用内检查更新 / 后端版本端点 | ✅ **已实现（2026-10-09）**：客户端 `APP-044`（`core/updater/` + `app/update/` + 原生安装通道），后端 `API-022`（`/api/v1/app-release/*`），发布侧 `PLT-008`（制品打包脚本 + 入库脚本 + 手册） | 客户端 `apps/mobile/lib/core/updater/`；后端 `apps/backend/app/api/v1/app_release.py`；发布 `apps/backend/scripts/publish_release.py`、`scripts/import_release.py`；依赖新增 `package_info_plus` / `crypto` / `path_provider`（`apps/mobile/pubspec.yaml`） |
 | Web（H5 免安装）目标 | ⚠️ 目录文件齐备但仍是模板占位 | `apps/mobile/web/index.html:21`（`description` 为模板默认）、`:32`（`<title>mobile</title>`）、`manifest.json:2-3` |
 
 > 未上架（自分发）场景下的同批缺口与替代做法，见 `compliance/self-distribution-guide.md` §6 / §7。

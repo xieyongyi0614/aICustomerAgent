@@ -638,7 +638,7 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 | 4 | ~~**skill 相册数值待修正**（B14/B15 的「12 张 / 8 张 / 4 张」）~~ | `.agents/skills/zhaoxi-design-system/references/components.md` | **已闭环（2026-10-01）**：B14/B15 已按 B17/B18 的 76 = 38+26+12 口径回写；B14/B17/B18「不需要联网权限」同步收敛 |
 | 5 | ~~**`pages/37-album.html:166` / `pages/39-car-profile.html:125` 文案待修正**~~ | `design/pages/` | **已闭环（2026-10-01）**：37 页按冲突 17 收敛；39 页按 D13 改口径（skill B16 复述同步） |
 | 6 | ~~**`PLT-007` 的工具链结论须回写 `PLT-001` 式报告**~~ | `apps/mobile/docs/` | **已闭环**：报告 2026-09-30 产出（`plt007-toolchain-report.md`）；依赖面（`photo_manager` demo）结论 2026-10-01 补记 |
-| 7 | **免商店分发与上架合规文档补齐**（新增 `self-distribution-guide.md`；同步核实出 6 项客户端 / 后端缺口：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、打包脚本与版本端点） | `docs/version/v5.0.0/compliance/` | **文档已落地（2026-10-08）**；**部分已立项（2026-10-08）**：打包脚本 / 后端版本端点 / 应用内检查更新 / 关于页 四项由 **§18** 承接（`PLT-008` / `API-022` / `APP-044`），**未并入 `PLT-005`**（边界见 `tasks/PLT-008.md` §7.3）；剩余「首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`」仍在 `PLT-002` 待办 |
+| 7 | **免商店分发与上架合规文档补齐**（新增 `self-distribution-guide.md`；同步核实出 6 项客户端 / 后端缺口：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、打包脚本与版本端点） | `docs/version/v5.0.0/compliance/` | **文档已落地（2026-10-08）**；**缺口已部分闭环（2026-10-09）**：打包脚本 / 后端版本端点 / 应用内检查更新 / 版本号真值化与关于页 四项由 **§18** 实施完成（`PLT-008` / `API-022` / `APP-044`，**未并入 `PLT-005`**——边界见 `tasks/PLT-008.md` §7.3），合规文档对应行已关账；**剩余仍在 `PLT-002` 待办**：首启隐私弹窗、政策页可点击、账号注销入口、AI 显式标识、`dart_defines/prod.json`、备案号 / 软著名公示位 |
 
 ### 15.12 Detail 生成期的上游修正与零偏离声明（2026-09-30）
 
@@ -724,9 +724,9 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 
 | Task ID | 名称 | 交付面（概要） | 状态 |
 |---|---|---|---|
-| `PLT-008` | 制品打包与版本发布 | 打包/发布脚本（从**产物反读** `versionCode` / `versionName`，不解析 `pubspec.yaml`）+ 制品归档布局 `{channel}/{version_code}/full/` + `release-manifest.json`（16 字段）+ **签名指纹硬门禁**（debug 签名回退 → 非 0 退出）+ 发布操作手册 `release-runbook.md`；与 `PLT-005` 边界：`PLT-005` 只出签名 APK，本任务负责「APK → 制品 + 元数据」 | 未开工 |
-| `API-022` | 后端版本元数据与制品分发 | 增量迁移 `0009` 建 `app_releases` + `app_release_artifacts`（表数 55 → **57**；`artifact_type` 的 CHECK **预置 `'patch'`** 作为扩展位）+ `GET /api/v1/app-release/latest` + `GET /api/v1/app-release/artifacts/{id}/download`（**Range → `206`** 断点续传）+ 入库脚本（读 manifest，幂等 upsert，**不开管理写端点**）+ 参数类设置 `app_release_storage_dir` / `app_release_notes_max_chars` + `docker-compose.yml` 卷挂载 `asuna_releases` | 未开工 |
-| `APP-044` | 客户端应用内更新与 APK 安装通道 | `lib/core/updater/`（7 文件：api / models / checker / downloader / verifier / installer / providers）+ `lib/app/update/`（`update_gate` 首帧后触发 + `update_sheet` **`A41` 规格**面板）+ 原生 `ApkInstaller.kt`（`MethodChannel` 5 方法）+ `AndroidManifest.xml` 补 `REQUEST_INSTALL_PACKAGES` / `ACCESS_NETWORK_STATE` / FileProvider（authority = `${applicationId}.fileprovider`）+ 3 个 prefs 键 + 关于页（skill 登记 `B20 #about`）+ 我的页「检查更新」行 + 版本行**真值化**（消除 `profile_page.dart:509` 硬编码）+ 唯一新增 Dart 依赖 `package_info_plus` | 未开工 |
+| `PLT-008` | 制品打包与版本发布 | 打包/发布脚本（从**产物反读** `versionCode` / `versionName`，不解析 `pubspec.yaml`）+ 制品归档布局 `{channel}/{version_code}/full/` + `release-manifest.json`（16 字段）+ **签名指纹硬门禁**（debug 签名回退 → 非 0 退出）+ 发布操作手册 `release-runbook.md`；与 `PLT-005` 边界：`PLT-005` 只出签名 APK，本任务负责「APK → 制品 + 元数据」 | **已实现（2026-10-09）** |
+| `API-022` | 后端版本元数据与制品分发 | 增量迁移 `0009` 建 `app_releases` + `app_release_artifacts`（表数 55 → **57**；`artifact_type` 的 CHECK **预置 `'patch'`** 作为扩展位）+ `GET /api/v1/app-release/latest` + `GET /api/v1/app-release/artifacts/{id}/download`（**Range → `206`** 断点续传）+ 入库脚本（读 manifest，幂等 upsert，**不开管理写端点**）+ 参数类设置 `app_release_storage_dir` / `app_release_notes_max_chars` + `docker-compose.yml` 卷挂载 `asuna_releases` | **已实现（2026-10-09）** |
+| `APP-044` | 客户端应用内更新与 APK 安装通道 | `lib/core/updater/`（7 文件：api / models / checker / downloader / verifier / installer / providers）+ `lib/app/update/`（`update_gate` 首帧后触发 + `update_sheet` **`A41` 规格**面板）+ 原生 `ApkInstaller.kt`（`MethodChannel` **7 方法**）+ `AndroidManifest.xml` 补 `REQUEST_INSTALL_PACKAGES` / `ACCESS_NETWORK_STATE` / FileProvider（authority = `${applicationId}.fileprovider`）+ 3 个 prefs 键 + 关于页（skill 登记 `B20 #about`）+ 我的页「检查更新」行 + 版本行**真值化**（消除 `profile_page.dart:509` 硬编码）+ 直接依赖净增 3 项（`package_info_plus` + `crypto` / `path_provider` 提升为直接依赖） | **已实现（2026-10-09）** |
 
 **关键裁决**（逐条理由见 `update-system-architecture.md` §11）：
 
@@ -752,3 +752,15 @@ APP-042（车辆族）─→ APP-030 / APP-031 / APP-032 ─→ APP-033
 **溯源说明**：本域**无设计稿条目**可溯源（已核实 `traceability.md` 0 命中），故不走「先改 `traceability.md` 矩阵」的顺序纪律；变更入口 = `update-system-architecture.md` §11 裁决表 + 上述 skill 回写。三份 Detail 的 §10 均以「合规文档登记的缺口 + 待回写台账 + 仓库既有硬约束」为溯源依据（同 `traceability.md:295` `API-001`、`:306` `PLT-007` 的「工程前提 / 合规推导」写法）。
 
 **回写清单**（本注册批同批完成）：① §15.10 编号占用表的「下一可用号」已 bump（`APP-045` / `API-023` / `PLT-009`）；② §15.11 台账 #7 的「打包脚本 / 版本端点 / 应用内检查更新 / 关于页」四项改为「已由 §18 立项」（**实施完成时**再关账）；③ `docs/current-system-architecture-baseline.md` 迁移链尾 `0008` → `0009`（由 `API-022` 实施同批，AGENTS.md 要求「架构演进须先更新基线再进入开发」）。
+
+### 18.1 实施记录（2026-10-09）
+
+| 项 | 结果 |
+|---|---|
+| 后端迁移 | `0009_app_release_artifacts.py` 入链；链尾 `0008` → **`0009`**；表数 **55 → 57**；钉测四项已升级（`schema_pins.py` 的 `MIGRATION_HEAD` / `MIGRATION_HEAD_PARENT` / `SCHEMA_TABLE_COUNT` / 实测回填的 `SCHEMA_COLUMNS_DIGEST`）；`test_car_schema.py:51` 的 `55` → `57`；`tool012_support.py` 已追加文件名与两表名 |
+| 后端测试 | `tests/v50/test_app_release_schema.py`（21）+ `tests/v50/test_app_release_api.py`（26）+ `tests/v50/test_publish_release.py`（22）全绿；Fast 集 **2283 passed / 0 failed**（零回归） |
+| 客户端测试 | 新增 `test/core/updater_core_test.dart` / `updater_controller_test.dart` / `test/app/update_ui_test.dart` 共 43 绿；全量 **475 passed / 3 failed**，失败的 3 条 = `golden_spend_summary` / `golden_ledger_components` / `test_life_page_golden`（**基线既存漂移**，见 §17 同批记录，非本次引入） |
+| 静态检查 | `flutter analyze lib` 仅剩 1 条既存 info（`briefing_page.dart:136`） |
+| 与设计稿初稿的差异（已在文档中回写） | ① 脚本落点定为 `apps/backend/scripts/`（非 `apps/mobile/tool/`，理由见 `PLT-008.md` §6.1）；② 客户端直接依赖净增 **3** 项而非 1 项（`crypto` / `path_provider` 提升为直接依赖，前者算 sha256、后者定位私有目录）；③ 原生通道 **7** 方法而非 6（新增「APK 归档内签名指纹」与「App 自身签名指纹」两个方法，D7 需要）；④ 数据面只保留业务键的唯一约束，**删掉了与它同列的冗余索引**（`API-022.md` §4.2 D12）；⑤ `force_update` 不设 `server_default`（同一 DDL 需 SQLite / PG 通用） |
+| 回写 | skill：`components.md` 新增 **`B20 #about`**、`principles.md` §5.3 新增更新域范例文案；合规：`self-distribution-guide.md` §7 三项关账 + §6 补「底线 1 与自动检查的位置约束」、`android-store-release-guide.md` 两条关账；基线：新增 **ADR-20** + 迁移链尾改 `0009` |
+| 遗留（**不在本批**） | `dart_defines/prod.json`（出 `prod` 包前置）、备案号 / 软著名公示位内容、首启隐私弹窗 / 政策页可点击 / 注销入口 / AI 显式标识（共同前置，归 `PLT-002`）、APK 二进制差分（契约已就位，见 `update-system-architecture.md` §10）、真机端到端验证（`release-runbook.md` §5 人工项） |

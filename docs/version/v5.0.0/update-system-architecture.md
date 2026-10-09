@@ -16,7 +16,7 @@
 | 关注点 | 选型 | 评估 | 约束 / 说明 |
 |---|---|---|---|
 | 更新通道 | **自有后端分发 + 应用内安装** | ✅ 唯一可行路径 | 未上架商店（`self-distribution-guide.md:17`「不上架 = 失去商店自动更新」），版本告知、下载、安装引导必须自己承担 |
-| 本地版本读取 | **`package_info_plus`**（唯一新增依赖） | ✅ 必需 | 现状无任何版本读取能力（`android-store-release-guide.md:244`「未引入 `package_info_plus`」）；`profile_page.dart:509` 的版本行是硬编码串 |
+| 本地版本读取 | **`package_info_plus`**（**新增包**） | ✅ 必需 | 现状无任何版本读取能力（`android-store-release-guide.md:244`「未引入 `package_info_plus`」）；`profile_page.dart:509` 的版本行是硬编码串。**实现后定稿**：Dart **直接**依赖净增 **3 项**——`package_info_plus`（新增包）+ `crypto`（sha256，原传递依赖）+ `path_provider`（私有目录 `updates/`，原传递依赖）；后两者**不新增包**，只改声明位置 |
 | 安装通道 | **Kotlin 原生 + `MethodChannel`** | ✅ 必需 | Flutter 无标准安装 API；`MainActivity.kt` 已继承 `FlutterFragmentActivity`，可承载 Channel 与权限跳转 |
 | 文件暴露 | **FileProvider（`content://`）** | ⚠️ **硬阻断项** | Android 7.0+ 用 `file://` 直接 `FileUriExposedException`；现状 `AndroidManifest.xml:19-55` **无任何 `<provider>`** |
 | 安装授权 | **`REQUEST_INSTALL_PACKAGES` + `canRequestPackageInstalls()` 引导** | ⚠️ **硬阻断项** | Android 8.0+ 缺该权限无法调起安装器；现状 `AndroidManifest.xml:4-18` **未声明** |
@@ -234,7 +234,7 @@ artifacts: [
     "url": "/api/v1/app-release/artifacts/art_.../download",
     "size_bytes": 24000000,
     "sha256": "…",
-    "signature_fingerprint": "…",     // SHA-256 指纹，大写冒号分隔，与 apksigner 输出同形
+    "signature_fingerprint": "…",     // SHA-256 指纹：大写冒号分隔（apksigner 原始输出为连续小写十六进制，发布脚本归一化）
     "from_version_code": null         // patch 专用：基线版本号；full 恒 null
   }
 ]
@@ -338,7 +338,9 @@ MethodChannel: "com.zhaoxi.app/updater"
   canInstallPackages() -> Boolean                   // 是否已授予「安装未知应用」
   openInstallPermissionSettings() -> void           // 拒权时跳系统设置页
   installedVersionCode() -> Int                     // 读回已安装版本，用于结果回收
-  signatureFingerprint(apkPath: String) -> String?  // 读 APK 签名指纹（§5.4 ③）
+  installedSignatureFingerprint() -> String?        // 运行中 App **自身**签名（§5.4 ③ 的比对锚点）
+  apkSignatureFingerprint(apkPath: String) -> String? // 候选 APK 归档内签名
+  isOnWifi() -> Boolean                             // 仅 Wi-Fi 下载判定（不引 connectivity_plus）
 ```
 
 | 项 | 契约 | 理由 |
@@ -399,12 +401,12 @@ MethodChannel: "com.zhaoxi.app/updater"
 | | `version_name` | `String` | `NOT NULL` |
 | | `version_code` | `Integer` | `NOT NULL` |
 | | `min_supported_version_code` | `Integer` | `NOT NULL`；`CHECK (min_supported_version_code >= 0)` |
-| | `force_update` | `Boolean` | `NOT NULL`，`server_default = "false"` |
+| | `force_update` | `Boolean` | `NOT NULL`（Python 侧 `default=False`；**不设 `server_default`**——同一 DDL 需在 SQLite 与 PG 上通用，`'false'` 字面量在 SQLite 上不可靠） |
 | | `release_notes` | `Text` | `NULL` |
 | | `published_at` | `UtcDateTime` | `NOT NULL` |
 | | `created_at` / `updated_at` | `UtcDateTime` | `NOT NULL`（`identity.py:27-28` 惯例） |
-| | 唯一性 | | `UniqueConstraint(platform, channel, version_code)` |
-| | 索引 | | `Index("ix_app_releases_lookup", "platform", "channel", "version_code")` |
+| | 唯一性 | | `UniqueConstraint("platform", "channel", "version_code", name="uq_app_releases_identity")` |
+| | 索引 | | **不另建**：唯一约束的隐式索引已覆盖 `(platform, channel, version_code)` 的等值 + 范围查询；再建一条同列索引是纯冗余（`uq_` 命名对齐 `car_profiles` 的 `uq_car_profiles_user` 先例，`identity.py:36` 的 `ux_` 用于**部分**唯一索引） |
 | `app_release_artifacts` | `id` | `String` | 主键 |
 | | `release_id` | `String` | `NOT NULL` + 外键 → `app_releases.id` |
 | | `artifact_type` | `String` | `NOT NULL`；`CHECK (artifact_type IN ('full','patch'))` |
