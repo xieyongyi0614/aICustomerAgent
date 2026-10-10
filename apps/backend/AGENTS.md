@@ -40,10 +40,9 @@ api → application（编排） → services → repositories → core
 - 所有阈值/魔法数字放 `core/settings/` 包（**24 个领域模块**，平铺字段名），禁止硬编码。
 - 数据流：读取进链、写入出链——DB 写入在流式回答结束后执行；后处理（post_process）失败不得影响已产出的回答。
 - 单一写面纪律：计划落库只经 `goal_repository` 计划面；行动写世界只走 `deferred_world_op → outbox → world_engine`；Run 只写 `loop_runs`；关系状态只经 `relationship_evolution` / 状态只经 `state_service`。
-- **services 域间边界**：`services/<domain>` **不得**直接 import 另一个域 `services/<other_domain>` 的内部模块，只能经该域对外契约面（`port.py` / `contracts.py` / `engine_port.py`）访问。域内文件互相 import 不受限；跨域一律走契约面，使域间依赖可枚举、可守卫（守卫已落地：`tests/unit/test_services_domain_boundary.py`，扫描器 `tests/support/domain_boundary.py`，既有违规基线 `tests/support/domain_boundary_baseline.py`，只拦新增）。现有契约面先例：`services/action/port.py`、`services/action/contracts.py`、`services/autonomy/port.py`、`services/observability/port.py`、`services/world/engine_port.py`。
+- **services 域间边界**：`services/<domain>` **不得**直接 import 另一个域 `services/<other_domain>` 的内部模块，只能经该域对外契约面（`port.py` / `contracts.py` / `engine_port.py`）访问。域内文件互相 import 不受限；跨域一律走契约面，使域间依赖可枚举。现有契约面先例：`services/action/port.py`、`services/action/contracts.py`、`services/autonomy/port.py`、`services/observability/port.py`、`services/world/engine_port.py`。
   - 注意与「垂直门面」区分：`port.py` 的另一职责是让 `services` 不 import `app.application`（分层纪律）；本条约束的是**同一层内的域与域之间**（水平方向）。
   - 新增跨域调用时，优先复用既有契约面；确需新开面时，在目标域新增 `port.py` / `contracts.py`，而非让消费方直接 import 对方内部模块。
-  - ⚠️ 经目标域 `__init__.py` 的 re-export 绕行（`from app.services.<other> import <内部符号>`）**同属违规**——守卫一视同仁，不得借此规避。
 - 角色资产按人设分子目录存放于 `character/<persona>/`（如 `character/asuna/`），每人设一套 identity/personality/relationship/behavior/modes/goals/habits。
 
 ## 代码规范
