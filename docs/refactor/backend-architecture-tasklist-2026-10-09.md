@@ -44,8 +44,8 @@
 | T-20 | settings 动态 key 构造改显式白名单 | P2 | S | 低 | ✅ | ✅ 已完成 |
 | T-22 | `_user_write_locks` / `active_generations` 加容量上限 | P2 | S | 低 | ✅ | ✅ 已完成 |
 | T-33 | 删 `agent_service` 兼容壳（31 文件引用点） | P2 | M | 低 | ✅ | ✅ 已完成 |
-| T-11 | `chat_pipeline` 拆前台/后台 | P1 | M | 中 | ✅ | ⬜ 待做 |
-| T-13 | `post_process` 步骤改显式注册表 | P1 | M | 中 | ✅ | ⬜ 待做 |
+| T-11 | `chat_pipeline` 拆前台/后台 | P1 | M | 中 | ✅ | ❌ 已评估·不采用 |
+| T-13 | `post_process` 步骤改显式注册表 | P1 | M | 中 | ✅ | ❌ 已评估·不采用 |
 | T-10 | services 域间边界立规（文档） | P1 | XS | 极低 | ✅ | ✅ 已完成 |
 | T-32 | services 域间边界守卫测试 | P1 | M | 低 | ✅ T-10 已满足 | ❌ 已评估·不采用 |
 | T-31 | 抽 `RuntimeStateStore` 协议 + Redis 实现 | **P0** | L | **高** | ✅ | ⬜ 待做 |
@@ -55,7 +55,7 @@
 | T-24 | 冻结摘要诊断改良（先打印后比对） | P3 | S | 低 | ✅ | ✅ 已完成 |
 | T-25 | known-failing set 登记入 TESTING.md | P3 | S | 极低 | ✅ | ✅ 已完成 |
 | T-26 | `models/` 与 `core/db/` 命名统一 | P3 | M | 低 | ✅ | ⬜ 待做 |
-| D-1 | `action_outbox_enabled` 架构裁决 | P2 | S | 极低 | ✅ | ⬜ 待决策 |
+| D-1 | `action_outbox_enabled` 收口 | P2 | S | 极低 | ✅ | 🔧 部分完成 |
 | D-2 | 六段循环是否推进（需真实模型回归） | P2 | 决策 | — | ✅ | ⬜ 待决策 |
 
 **工作量口径**：XS ≤2h ｜ S ≤1d ｜ M 2~3d ｜ L 4~6d ｜ XL ≥1w
@@ -155,19 +155,17 @@
   - 若将来只做一件事，**应优先解双向耦合**（循环依赖是唯一无歧义的缺陷：拆不开、没法独立测、初始化顺序隐式）。
 - **T-10 规则本身保留**在 `AGENTS.md`（作为方向指引，不再配机器守卫）。
 
-### ✅ T-11 · `chat_pipeline` 拆前台/后台
+### ❌ T-11 · `chat_pipeline` 拆前台/后台 —— **已评估·不采用（2026-10-10）**
 
-- **现状**：922 行，docstring 自陈「前台关键路径与后台任务编排」。
-- **改动**：拆 `application/foreground.py`（上下文→四链并行→流式回答→落库）与后台派发（`schedule_post_process` 委派，实际步骤本就在 `post_process.py`）。
-- **风险**：中 —— `chat_pipeline.py` 在 `test_tool010_e2e.py::ZERO_DIFF_HASHES` 冻结面内，拆分会破钉测，需**显式声明 + 同步摘要**。
-- **判据**：前台管线无后台步骤代码；冻结摘要已同步。
+- **现状（2026-10-10 校正）**：950 行。**「后台」那一半早已不在本文件**——后台步骤在 `post_process.py::STEP_HANDLERS`，本文件只在 `record_handoff` 段调 `schedule_post_process`（`chat_pipeline.py:821`）触发，仅此一处。**前台也已半结构化**：已有 `_foreground_registry`（第 343 行）+ Profile 驱动段序（`agent_runtime/profiles.py::ProfileSpec.stages/critical`），9 个 runner 已注册（第 869-881 行）。原文 docstring「与后台任务编排」**名不副实**。
+- **不采用理由**：任务**前提已被现状满足**——「前台/后台」这条分界线本来就在文件边界上（后台在 `post_process.py`），无需拆。曾实做（把前台管线整体搬到 `application/foreground.py`）并全量验证通过，但**净收益为负**：0 功能变化，仅 `+1 文件 / +1 层间接`，且 `chat_pipeline.py` 退化为**纯 re-export 空壳**（无存在理由的转发层，本身是坏味道）→ 遂**回退**（`chat_pipeline.py` 保持原样，`foreground.py` 已删除）。
+- **真正的痛点（未解决）**：`chat_pipeline.py` 950 行是**上帝文件**，值得拆的是它**内部**（helpers / 段实现 / 驱动）；但 9 个段 runner 是**闭包**、捕获 25+ `nonlocal` 变量，不 class 化就拆不动。若将来要做须单独立项，并预算 `ZERO_DIFF_HASHES` 冻结面同步成本。
 
-### ✅ T-13 · `post_process` 步骤改显式注册表
+### ❌ T-13 · `post_process` 步骤改显式注册表 —— **已评估·不采用（2026-10-10）**
 
-- **现状**：894 行，15+ 步骤已函数化但「步骤清单 / 顺序 / 关键性」藏在代码里。
-- **改动**：改为 `PostProcessStep` 列表（函数 + 顺序 + `critical` 标志），把编排变成数据。直接对齐 `AGENTS.md`「注册新 post-process 步骤」的表述。
-- **收益**：新增后处理步骤无需改编排代码；顺序与关键性可测。
-- **判据**：`run_post_process` 中无硬编码步骤顺序。
+- **现状（2026-10-10 校正）**：894 行。**「显式注册表」已是现状**——`STEP_HANDLERS` 元组已存在（`post_process.py:830`），`run_post_process` 即 `for handler in STEP_HANDLERS`（第 853 行）；模块 docstring 第 1 行自称「步骤注册表 + 调度」、第 4 行「新增能力只需实现 `run_*` 并加入 `STEP_HANDLERS`」；`AGENTS.md:32` 亦把「post_process 步骤注册」列为既有模式。原文「步骤清单 / 顺序 / 关键性藏在代码里」**前两项不成立**。
+- **不采用理由**：① 清单与顺序**早已是显式数据**，「新增步骤无需改编排代码」也已成立 → 原任务主体已完成；② 唯一真正缺的 `critical` 标志**本来就不该有**——docstring 第 3 行明确「每个步骤独立容错（失败仅 trace/log，不影响其余步骤）」，即**所有步骤设计上都是非关键的**，加 `critical` 等于为「全 false」的概念建模。属**为不需要的抽象买单**（同 T-11 模式）。
+- **残余真问题（不是 T-13，另议）**：`run_post_process` 循环**无结构化逐步骤兜底**（`for handler: await handler(ctx)`，无 try/except），「独立容错」靠**约定**而非结构强制。实测 13 个步骤均自觉 try 住（`run_action_planning` 的 try 外 preamble 亦安全：`_run_confirmation_round` 内部有 try、`_defer_to_ledger_pending` 纯逻辑）→ 属**防御性加固，非修 bug**；若要做是 XS 级 ~5 行小改，须同步 `post_process.py` 冻结摘要。
 
 ### ⚠️ T-14 · `world_engine` 纯计算下沉 `engines/`
 
@@ -209,11 +207,13 @@
 - **冻结面**：`chat_pipeline.py` 在 `tests/v24/test_tool010_e2e.py::ZERO_DIFF_HASHES` 内 → 摘要同步 `e119d89b` → `d7be7201` + 声明注释。
 - **判据**：`app/services/agent_service.py` 不存在（新增守门测试）；全量测试失败集无 diff。**✅ 达成**。
 
-### ⚠️ D-1 · `action_outbox_enabled` 架构裁决
+### 🔧 D-1 · `action_outbox_enabled` 收口 —— **消费器断链已修（2026-10-10）；action 侧投递待决策**
 
-- **背景**：基线 §9 挂账 —— 关闭它**会破坏** `deferred_world_op → outbox → world_engine` 唯一写面纪律，故不能走普通门控清理，须走架构裁决。当前默认 `False`、8 处读取。
-- **动作**：**决策任务**（非编码）—— 决定「固化常开」还是「保留为特殊裁决位并补文档」。
-- **判据**：裁决结论写入基线 §9/§10。
+- **性质（2026-10-10 校正）**：**不是策略位，是迁移位**——`False`=action 结果**同步直写**世界；`True`=写 outbox 同事务、由消费器**幂等落库**（幂等键 + 崩溃重放 + 退避 + 死信）。两条路径都完整实现、都有测试（`tests/v26/test_v26_outbox_world_write.py` 两用例分别覆盖）。基线 §9 原把它与 `foreground_gateway_enforced` 并列称「不是未收敛的门控」，属**分类错误**；其理由「关闭会破坏唯一写面纪律」是**循环论证**。
+- 🚨 **已确认的断链**：`outbox_events` 有第二个**无条件**写入方 `services/world/event_bridge.py`（角色→世界事件 `goal_completed` / `interest_emerged`，由 `main.py` 注册、goal/planning 域调用，**不检查开关**），但**唯一消费者** `outbox_consumer.consume_pending` 只在被 `action_outbox_enabled` 门控的 life_loop 维护步里调用 → **默认配置下这些行永久滞留、世界事件不生成**。**实测**：`flag=off` → 维护步跑完 `pending 1→1`、`goal_events 0`；`flag=on` → `pending 1→0`、`goal_events 1`。
+- ✅ **第 1 步（已做，2026-10-10）**：**解绑消费器**——`_run_maintenance` / `_maintenance_pending` 去掉 `action_outbox_enabled` 门控，`outbox_consume` 常开。消费器是**共享**机制，不该被 action 的策略位门控。复验：默认配置下 `pending 1→0`、`goal_events 1`（断链修复）。基线 §9 与维护步描述已同步。
+- ⬜ **第 2 步（待决策）**：action 侧投递固化哪条 —— ① **固化 outbox**（对齐基线 §10 决策 9，保留幂等/重放/死信；代价 = 世界写变最终一致、工具结果**丢失同步 `world_event_id`**，见 `services/tool/normalizer.py:181`）；② **固化直写**（保留同步 `world_event_id`；须**同时**改 `event_bridge` 不再走 outbox）。**前置**：确认「工具结果无 world 效果」对模型是否可接受。
+- **判据**：第 2 步结论写入基线 §9/§10。
 
 ---
 
@@ -239,8 +239,8 @@
 **路线 乙 · 直接啃 P0（1~2 周）· ⬜ 未开工**
 `T-30 ✅ → T-31a/b/c/d` —— 解决真正的多实例正确性。适合你近期有多实例 / 横向扩容计划。**风险集中，建议单独一个迭代，不夹带其他改动。**
 
-**路线 丙 · 结构治理（2~3 周）· ⬜ 未开工**
-`T-10 → T-11 → T-13 → T-14 → T-15` —— 解决 `services` 单体化与 `application` 上帝文件。适合你近期要密集新增领域能力。**注意 T-14/T-15 会碰两个冻结面，需预算钉测同步成本。**
+**路线 丙 · 结构治理（2~3 周）· ⬜ 未开工（已缩水：T-11 / T-13 判不采用）**
+`T-10 → T-14 → T-15` —— 解决 `services` 单体化与 `application` 上帝文件。适合你近期要密集新增领域能力。**注意 T-14/T-15 会碰两个冻结面，需预算钉测同步成本。**（原含 T-11 / T-13，均已于 2026-10-10 评估为不采用。）
 
 > 三条路线可串行，无硬冲突。唯一强依赖：**T-31 之前先做 T-30（✅ 已满足）**；**T-15 之前建议先做 T-14**。
 
@@ -248,18 +248,53 @@
 
 ## 🎯 剩余可选项按「性价比」重排（2026-10-10）
 
-> T-32（域间边界守卫）已于 2026-10-10 **评估为不采用并回退**（见上文结论）。T-10 的规则条目保留为方向指引，但不配机器守卫——services 耦合的收敛改由 T-11/T-13/T-14 等实际重构承担，而非靠测试拦截。
+> T-32（域间边界守卫）已于 2026-10-10 **评估为不采用并回退**（见上文结论）。T-10 的规则条目保留为方向指引，但不配机器守卫——services 耦合的收敛改由 T-13/T-14 等实际重构承担，而非靠测试拦截。
 
 | 推荐序 | ID | 一句话 | 工作量 | 风险 | 备注 |
 |:--:|---|---|:--:|:--:|---|
-| 1 | **D-1** | `action_outbox_enabled` 架构裁决（决策） | S | 极低 | 纯决策，不改码，结论写进基线；定下 outbox 归属 |
-| 2 | **T-13** | `post_process` 步骤改显式注册表 | M | 中 | 理顺 894 行的编排；对齐 AGENTS.md 表述 |
-| 3 | **T-11** | `chat_pipeline` 拆前台/后台 | M | 中 | 922 行上帝文件；会碰 `ZERO_DIFF_HASHES` 冻结面（T-24 工具已降低同步成本） |
-| 4 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；建议单独迭代 |
-| 5 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
-| 6 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
-| 7 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾 |
+| 1 | **D-1** | `action_outbox_enabled` 收口 | S | 极低 | 消费器断链**已修**（解绑门控）；残余 = action 侧投递二选一（写进基线 §9/§10） |
+| 2 | **T-31** | `RuntimeStateStore` 协议 + Redis（P0） | L | **高** | 多实例正确性；体检建议只做 T-31a、Redis 押后 |
+| 3 | **T-14** | `world_engine` 纯计算下沉 | XL | **高** | 碰 `FROZEN_SOURCES`；改动面最大 |
+| 4 | **T-15** | `action_engine` 纯计算下沉 | L | **高** | 建议 T-14 后复用经验 |
+| 5 | **T-26** | `models/` 与 `core/db/` 命名统一 | M | 低 | 低收益长尾（体检建议不采用） |
 | — | **D-2** | 六段循环是否推进（决策） | 决策 | — | **前置：必须先做真实模型人工回归** |
 
-> 快赢档（T-23/T-24/T-25）已于批次 5 清空；**T-32 已评估为不采用**。
-> 建议下一步：**D-1（纯决策、定方向）** 或 **T-13（理顺 post_process 编排）**。
+> **T-11 / T-13 已于 2026-10-10 评估为不采用**——两者的前提均已被现状满足：T-11 的「前台/后台」分界线本就在文件边界上；T-13 的「显式注册表」早已是 `STEP_HANDLERS` 现状。实做 T-11 后确认净收益为负，已回退。
+
+> 快赢档（T-23/T-24/T-25）已于批次 5 清空；**T-32 / T-11 / T-13 已评估为不采用**。
+> 建议下一步：**D-1（纯决策、定方向）**——T-13 已判不采用，D-1 是当前唯一零风险可推进项。
+
+---
+
+## 🔍 过度设计体检（2026-10-10）
+
+> 触发：复查本列表「是否存在过度设计」。方法：**逐条对照代码实现**，不只看描述。
+> 结论：列表整体纪律良好（判据 / 风险 / 改动面齐全，且已有 T-32 自我否决先例），但**两条任务的「现状描述」已与代码脱节**，导致难度与收益被高估；**一条属真正的过度设计**。
+
+### 🔴 T-31 · 唯一真正的过度设计候选
+
+- **问题**：系统当前**显式单实例**（`core/runtime_state.py::assert_single_instance_runtime()` 在 `FEISHU_INSTANCE_COUNT>1` 时 fail-closed 拒绝启动，T-30 已落地）。为 7 处进程内态建「协议 + Redis 实现」，等于为**尚未承诺的横向扩容**预付复杂度。
+- **7 态可分两类**：
+  - **真需跨实例**：`_user_write_locks`、飞书 `_session_locks` / `_seen_events`。
+  - **可裁决为「单实例近似」**：`active_generations`、限流 `_windows`、Life Loop 的 3 个 `_*_last`、`_SUBSCRIBERS`。任务自己也留了这条退路（T-31c）。
+- **建议**：**只做 T-31a（抽协议 + 内存实现，零行为变化）**，把 Redis 实现押后到真有扩容计划时。既保住「接口就位」的低成本收益，又不预付 Redis 复杂度与 ~22 个钉测的同步成本。
+- **复用面**：`core/redis_client.py` 已存在（现用于身份验证码），若真做 Redis 实现无需从零搭客户端。
+
+### 🔴 两条「前提已被现状满足」的伪任务 → 均判不采用
+
+- **T-11（`chat_pipeline` 拆前台/后台）**：后台步骤早已独立在 `post_process.py`，「前台/后台」分界线本就在文件边界上 → 任务**前提已被现状满足**。曾实做（前台管线整体迁 `application/foreground.py`）并全量验证通过，但确认净收益为负（`+1 文件 / +1 层间接`、0 功能变化、`chat_pipeline.py` 沦为纯 re-export 空壳）→ **已回退并判「不采用」**。
+- **T-13（`post_process` 步骤改显式注册表）**：`STEP_HANDLERS` 元组**早已是显式注册表**（`post_process.py:830`），清单 / 顺序早已是数据；docstring 与 `AGENTS.md` 亦以此为准 → 原任务主体**已完成**。唯一残余的 `critical` 标志**本不该有**（设计上所有步骤非关键）→ **判「不采用」**。
+- 两条的条目标题原均误标 ✅（与「选型速览」的「⬜ 待做」矛盾），已改为 ❌ 并注明理由。
+- **方法论**：判一个重构任务是否值得做，**先看它的「前提」是否已被现状满足**——前提已满足即为伪任务，描述再合理也不该做（T-32 / T-11 / T-13 同一模式）。
+
+### 🟡 T-26 · 建议同 T-32 处理（不采用）
+
+- 任务自称「低收益长尾」。改名 `models/` ↔ `core/db/` 会大面积碰测试夹具，收益≈0 → 与 T-32 一样**评估为不采用**，避免长期挂在池子里反复被评估。
+
+### 🟢 非过度设计，但需知成本
+
+- **T-14 / T-15**：`app/engines/` 已存在且是既有设计意图（`autonomy` / `decision` / `relationship_*` 等），下沉属**对齐模式**，不是过度抽象；但 XL / 高风险、碰 `FROZEN_SOURCES` 冻结面 → 是「昂贵重构」，不是「过度设计」。
+
+### 📌 结论
+
+本列表的真问题不是「想太多」，而是**任务与代码脱节**（`STEP_HANDLERS` / `_foreground_registry` / `assert_single_instance_runtime` 均已落地，描述仍停在改造前）。**T-11 / T-13 已据此判定「不采用」**（T-11 实做后验证净收益为负并回退）；剩余 **T-31** 建议同样先做「现状核对」再定优先级，否则会把已完成的活重做一遍。
