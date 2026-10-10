@@ -111,8 +111,8 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 
 | 子域 | 实现 | 说明 |
 |---|---|---|
-| World State | `worlds` 表 + `application/world_engine.py` | 单一世界（`home`），`time_mode`（real_sync/simulated/story）、`sim_time`、`current_location`、`environment`、`notes`；**归属维度（V4.0 PLA-002）**：`owner_type`/`owner_id`（NULL 归一为 `character`），角色世界对用户只读可见，用户容器跨用户拒绝 |
-| Object | `world_entities` 表 + `models/world.py::WorldObject` + 对象状态机 `OBJECT_STATE_MACHINES` | 物品（category 7 类），状态机迁移、消耗扣减、别名解析、默认家庭库存幂等播种 |
+| World State | `worlds` 表 + `application/world_engine.py` | 单一世界（`home`），`time_mode`（real_sync/simulated/story）、`sim_time`、`current_location`、`environment`、`notes`；**归属维度**：`owner_type`/`owner_id`，**新建世界归属用户**（2026-10-10：`owner_type="user"` / `owner_id=user_id`，居家物品世界归用户），存量 NULL 行归一为 `character`，角色世界对用户只读可见，用户容器跨用户拒绝 |
+| Object | `world_entities` 表 + `models/world.py::WorldObject` + 对象状态机 `OBJECT_STATE_MACHINES` | 物品（category 7 类），状态机迁移、消耗扣减、别名解析；**默认家庭库存种子与自动回填已移除**（2026-10-10）：世界建档为空，物品只在**用户显式要求记录**时创建（`chains/object_intake_chain.py`，经 `run_world_update` 步骤内部增强）或由角色动作抽取（`character_action_sync`）产生。录入可选带**价格（整数分 `price_minor`）与购买日期（`purchased_at`）**，存于 `WorldObject.properties`（无迁移）；`models/world.py::usage_cost` 纯函数按二者算「已用天数 / 日均金额」，仅在有价时渲染进世界切片 |
 | Environment | `worlds.environment` JSON（weather/lighting）+ `services/world/weather.py` | 天气演化、光照建议 |
 
 世界服务（`services/world/`）细分：`interpreter.py`（用户消息→世界迁移解释）、`locations.py` / `movement.py`（地点与移动）、`time_provider.py` / `time_advancer.py` / `day_cycle.py` / `catch_up.py`（时间与日循环）、`daily_plan.py` / `user_situation.py` / `world_brief.py`（日计划/处境/简报）、`context_selector.py`（世界切片装配）、`event_impact.py`（事件影响裁决）、`memory_bridge.py` / `event_bridge.py`（记忆/事件桥）。
@@ -143,6 +143,8 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 规划服务（`services/planning/`）：`engine.py`（七道闸引擎）、`decompose.py`（拆解）、`context.py`（上下文装配 + digest）、`goal_contract.py`（失败理由契约）、`observer.py`（四源观察）、`revision.py` / `revision_listener.py`（重规划裁决）、`scheduler.py`（当前步调度）、`executor_bridge.py`（执行桥）、`memory_policy.py`（记忆策略）。
 
 目标生命周期：`materialize`（供给装配，三来源候选）→ `PlanningEngine.enqueue/plan`（七道闸）→ `PlanScheduler` 执行 → `PlanObserver` 观察推进 → `PlanRevisionPolicy` 重规划 → 终态经 `goal_repository.settle` 单一写面。
+
+**计划状态机**（`GoalPlanStatus` 五值：`draft` / `validated` / `active` / `rejected` / `superseded`，库内 CHECK `ck_goal_plans_status`）：`services/goal/planning.py::plan_goal()` 经七道闸后**创建即 `validated`**——`validated` 既是结构闸产物，也是**计划审批闸门的停靠态**（见 §8.6）。计划执行候选集由 `goal_repository.list_active_plans` 界定，查询条件为 `GoalPlanRow.status == "active"` **且** `GoalRow.status == "active"`；即「计划是否被执行」完全由该状态位决定，且目标转终态后其计划即刻退出候选集（冻结语义）。`plan_require_approval`（默认 `False`）决定 `validated → active` 是**立即发生**（自动执行）还是**等待人工批准**；批准/驳回经 `services/goal/approval.py`。与之并存的还有**工具/动作级**逐次确认（`services/tool/confirmation.py`，`pending_confirmation` 经 `PlanExecutorBridge` 归一为步骤 `blocked` + 停留 `in_progress`）——两者层级不同：前者是**计划级、一次性、执行前**，后者是**工具级、逐次、执行中**。
 
 ### 3.5 Action Execution（行动执行）
 
@@ -429,7 +431,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 - **`vXX_` 版本变量**：带 `vXX_` 前缀 **0**（settings 字段总数 2026-10-06 实测 **430**）。存量开关收敛分三批：**批次 1**（2026-09-22）删 2 个死开关；**开关清理批**（2026-09-28）删 6 个（含世界域四闸）；**批次 2**（2026-10-06）固化 **11 个默认 ON 应急关断位**并删字段——`observability_persist_enabled` / `evaluation_enabled` / `evaluation_llm_judge_enabled` / `evaluation_world_consistency_enabled` / `rel_evolution_enabled` / `rel_milestone_enabled` / `rel_conflict_enabled` / `plan_context_digest_enabled` / `scene_idle_reset_enabled` / `action_detector_enabled` / `action_memory_policy_enabled`；`evaluation_autonomy_enabled` **保留**（仅移除其「自治评估整段短路」用途，仍作 autonomy 维度闸）、`db_pool_pre_ping` **保留**（运维调优位）。开关审计台账 `docs/refactor/remaining-flag-audit.md` 已于 2026-10-06 随「已收官台账清理」删除，各批记录以本段为准。
 - **启动期未知 env 键告警**：`unknown_versioned_env_keys()` 已删除（2026-09-28，连带 `app/main.py` lifespan 的告警循环与 3 条自测）。删除时全仓 `V<数字>_` 键为 0、函数返回 `[]`，故**零行为变化**；代价是**生产启动边界不再有「env 键 ↔ settings 字段」一致性检查**（`tests/conftest.py::set_known_env` 只在测试进程生效），部署侧死键将完全静默。
 - **世界域四闸**：`world_enabled`（总闸，曾 11 处读取）与 `world_household_autoseed_enabled` / `world_interpreter_enabled` / `world_memory_bridge_enabled` 已删除（2026-09-28，固化常开，世界域不可再配置旁路）。TOOL-007 的 `world["world_enabled"]` 键保留为**装配标记**（「已装配 vs 未装配」数据契约，非配置开关）。
-- **剩余策略位**：仍有少数按领域命名的布尔开关作为策略/裁决保留（如 `action_outbox_enabled`、`foreground_gateway_enforced`，以及 tool/plan/action 域的调试与策略子闸），语义非版本门控。2026-10-02 新增 `roleplay_prompt_mode`（`full`（默认）/ `off`，模式串口径同 `inventory_grounding_mode`，不引入 `*_enabled` 字段）：**只控制回答链 prompt 是否注入演绎段**（人设 / 情绪 / 角色状态 / 关系 / 世界 / 场景 / 行为 / 风格），`off` 仅保留功能上下文（记忆 / 认知 / 目标 / 意图 / 行动段 / 摘要 / 历史）；世界与角色**引擎照常运行**，世界域「不可配置旁路」裁决与 `world_enabled` 已删除的结论不受影响。
+- **剩余策略位**：仍有少数按领域命名的布尔开关作为策略/裁决保留（如 `action_outbox_enabled`、`foreground_gateway_enforced`，以及 tool/plan/action 域的调试与策略子闸；2026-10-10 新增 `plan_require_approval`——计划审批闸门，默认 `OFF`，见 §8.6），语义非版本门控。2026-10-02 新增 `roleplay_prompt_mode`（`full`（默认）/ `off`，模式串口径同 `inventory_grounding_mode`，不引入 `*_enabled` 字段）：**只控制回答链 prompt 是否注入演绎段**（人设 / 情绪 / 角色状态 / 关系 / 世界 / 场景 / 行为 / 风格），`off` 仅保留功能上下文（记忆 / 认知 / 目标 / 意图 / 行动段 / 摘要 / 历史）；世界与角色**引擎照常运行**，世界域「不可配置旁路」裁决与 `world_enabled` 已删除的结论不受影响。
 
 ---
 
@@ -480,6 +482,27 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 **配置与就绪判定**：`FEISHU_OAUTH_AUTHORIZE_URL`（默认 `accounts.feishu.cn` 授权页）、`FEISHU_OAUTH_REDIRECT_URI`（须在开发者后台「安全设置 > 重定向 URL」登记）、`FEISHU_OAUTH_SCOPE`（可空）、`FEISHU_OAUTH_STATE_TTL_SECONDS`。可用性由**配置齐备性**判定（`app_id` + `app_secret` + `redirect_uri` + Redis + `AUTH_TOKEN_SECRET`），与通道总开关 `feishu_enabled` **解耦**——登录是登录，通道是通道。
 
 **平台边界（必须如实告知用户）**：自建应用**仅本企业（团队）成员可用**——机器人只有团队成员能私聊，飞书授权登录对非成员会提示无企业权限。故飞书登录/绑定是**小圈子能力**（自己与被拉进团队的朋友），陌生用户继续走邮箱验证码登录；要对公众开放需上架「应用商店应用（ISV）」，要求企业认证 + 服务商入驻（个人主体不可行）。数据模型已为此预留：`channel_identities.external_union_id` 承载同一开发者主体下的跨应用桥接，换 ISV 时不改表。
+
+### 8.6 Plan Approval Gate（计划审批闸门，2026-10-10 落地）
+
+**能力**：计划级 human-in-the-loop——Agent 生成整份计划后**暂停等待人工批准**，批准转 `active` 执行、驳回转 `rejected`。与既有的**工具/动作级**逐次确认（`services/tool/confirmation.py`）层级不同：本闸门是**计划级、一次性、执行前**。
+
+| 面 | 落点 | 说明 |
+|---|---|---|
+| 策略位 | `core/settings/plan.py::plan_require_approval`（**默认 `False`**） | OFF 维持「过闸即 `active` 自动执行」（逐字节不变）；ON 停在 `validated` |
+| 闸门插入点 | `services/goal/planning.py::plan_goal()` | 经 `if not settings.plan_require_approval: activate_plan(...)` 决定是否立即激活 |
+| 停靠状态 | `GoalPlanStatus.validated` | **零迁移**——该值已在 `ck_goal_plans_status` CHECK 内，且 `list_active_plans` 不拾取它，故「停住即不执行」是既有语义 |
+| 激活写面 | `services/goal/planning.py::activate_plan(goal_id, plan_id)` | 自动路径与人工批准**共用**：撤同目标其余 `active` → 置本计划 `active`（单一 active 不变量） |
+| 审批服务 | `services/goal/approval.py`（新） | `list_pending` / `approve` / `reject`；归属与状态守卫 fail-closed |
+| 待批清单 | `goal_repository.list_plans_by_status(user_id, ("validated",))` | 已有只读函数，直接复用 |
+| 对外端点 | `api/v1/plans.py`（新）：`GET /plans/pending`、`POST /plans/{id}/approve`、`POST /plans/{id}/reject` | 挂 `require_user`；404 = 不存在或非本人，409 = 非待批态（不改库） |
+| 批准后续跑 | Life Loop 下一 tick 拉 `list_active_plans` | **无需额外触发**——状态置 `active` 即自动进入调度 |
+
+**纪律与边界**：审批服务落 `services/goal/`（`plan_goal()` 所在域），**不落** `services/planning/`——后者有包模块数量负向断言（`test_plan010_static_scan.py`）与 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 白名单（`goal_contract.py`）双重约束。写面只复用 `goal_repository` 计划面既有函数，**不新增写接口、不新增状态值、不新增 `decision_records` kind**（新增 kind 需改 CHECK = 需迁移）。`services/goal/planning.py` 不在任何冻结哈希面（`FROZEN_SOURCES` / `ZERO_DIFF_HASHES` 均未覆盖）。
+
+**闸门 ON 时的语义**：新计划停在 `validated` 且**不撤下**旧 `active` 计划（驳回后原状保持，不误伤在跑的计划）；批准时才撤旧并激活新。**已知取舍**：若 ON 且长期无人裁决，目标将停在「有 `validated` 计划、无 `active` 计划」——超时策略（永久等待 / 自动批准 / 自动驳回）为**待决策项**，当前未实现。
+
+**当前未实现**（后续可选）：审批超时策略、审批触达（飞书推送）、审批审计归因行、前端 plans 页面。
 
 ---
 
@@ -534,6 +557,8 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 19. **飞书 OAuth 登录与账号绑定（2026-10-08）**：把「加入本飞书团队的人可用飞书登录，并让飞书机器人与 App 账号同源」做成能力（兑现 `docs/integrations/feishu/architecture.md` §7.2 的「账号绑定不在本阶段」与 `docs/version/v5.0.0/tasks.md` 的 `IDENT-011` 留白）。**四条裁决**：①**复用同一自建应用**（登录能力与机器人能力同 App，`open_id` 天然一致）→ 绑定退化为 `channel_identities` 一行改绑，**零迁移**（`external_union_id` / `external_tenant_key` / 可空 `session_id` 均已存在）；②**授权码不出后端**——飞书回调页消费授权码并回写结果，App 凭一次性 `state` 轮询领取（`GETDEL` 只可领取一次），故 App 侧不需要自定义 scheme / `app_links`，只用 `url_launcher` 打开浏览器；③**冲突不做数据归并**——目标 `open_id` 已绑他人时仅允许接管「无邮箱的纯飞书壳账号」，其余 409 拒绝，并显式接受「绑定前飞书侧历史记忆不随绑定迁移」（§9 登记归并脚本为后续项）；④**登录与通道解耦**——可用性由配置齐备性判定（不引入 `*_enabled` 功能位），与 `feishu_enabled` 各自独立。分层落点：OAuth 属「外部身份提供方」，收在 **`services/identity/feishu/` 子包**（`oauth.py` / `oauth_state.py` / `login.py`；协议 + 实现同模块 + `set_*` 注入点，先例 `services/email/sender.py`），装配在 `api/v1/auth.py`（组合根豁免）。**为什么不放 `app/channels/feishu/`**：该目录是被 `tests/unit/test_feishu_boundary.py` 守门的 fail-closed allowlist（禁 `redis`、禁 `app.repositories`、禁 `httpx/requests/aiohttp`），而本能力必然需要 Redis（state）与仓储（绑定落库）；同时 R1 禁止核心层 import 通道实现，放进去会让身份域反向依赖通道实现。职责划分：**`channels/feishu/` 是消息通道（收发），`services/identity/feishu/` 是身份提供方（登录/绑定）**——两者同名不同层，是分层架构的刻意结果，不是遗漏归类。**平台边界**（自建应用仅本团队成员、ISV 需企业认证）与技术债见 §9、§8.5。
 
 20. **免商店自动更新域（2026-10-09）**：当前未上架商店，`self-distribution-guide.md` §6/§7 登记的「应用内检查更新 / 关于页 / 后端版本端点 / 打包脚本」四项缺口由本域承接（`docs/version/v5.0.0/update-system-architecture.md` 为唯一架构依据；任务注册见 `tasks.md` §18 的 `PLT-008` / `API-022` / `APP-044`）。**后台（后端）**：新增 `app_releases` + `app_release_artifacts` 两表（迁移 `0009`，表数 55 → 57），`artifact_type` 的 CHECK **预置 `'patch'`** 作为差分扩展位（当前无写入路径）；读面为 `GET /api/v1/app-release/latest`（按 `platform` / `channel` / `version_code` 取分组内最大号，无更新返回 `200 + has_update:false`）与 `GET /api/v1/app-release/artifacts/{id}/download`（`FileResponse`，`Range` → `206` 断点续传）；两个端点**均不鉴权**（冷启动路径不可依赖 token、本域无用户数据），制品路径由行 id 反查并在服务层做存储根**越界拒绝**（绝对路径 / `..` / 反斜杠一律 403）；落库与读面无反向依赖（端点 → `services/app_release/` → `repositories/app_release_repository.py`，对齐 `car.py` 先例）。**入库不走 HTTP**：由 `scripts/import_release.py` 读 `PLT-008` 的 `release-manifest.json`（`schema_version` 未知即拒绝 + **重算** `size_bytes`/`sha256` 与 manifest 比对 + 幂等 upsert），理由是内测期无可信管理鉴权体系（`IDENT-010` 仍留白），开放未鉴权写接口等于可被推假版本。**前端（客户端）**：更新能力收敛在 `lib/core/updater/`（api / models / checker / downloader / verifier / installer / providers），装配层在 `lib/app/update/`（`update_gate` 首帧后触发 + `update_sheet` 承载 `A41` 规格面板）；安装经原生 `MethodChannel('com.zhaoxi.app/updater')`（7 方法：安装调起 / 未知来源权限 / 跳设置页 / 已装版本 / 自身签名指纹 / APK 签名指纹 / 网络类型）→ FileProvider `content://`（authority = `${applicationId}.fileprovider`，dev flavor 带 `.dev` 后缀）→ 系统安装器；新增权限 `REQUEST_INSTALL_PACKAGES` 与 `ACCESS_NETWORK_STATE`。**四条关键裁决**：①**自动检查不在 `bootstrap()` 内**（合规底线「未点同意前不得发起业务网络请求」，而同意门控归 `PLT-002`）——挂首帧之后，`PLT-002` 落地后无需改动本域；②**双校验链**＝`sha256` + **与「运行中 App 自身签名」比对**（只比服务端清单里的指纹等于没校验，清单与 sha256 同源）；③**未知 `artifact.type` fail-closed 忽略**（含未来 `patch`），对齐后端 `EXPECTED_EVENT_TYPES` 纪律；④**`dev` flavor 只检测不安装**，防开发机被线上包覆盖。发布侧 `scripts/publish_release.py` 从**产物反读** `versionCode`/`versionName`（不解析 `pubspec.yaml`），并以「`key.properties` 缺失 / 证书 DN 含 `Android Debug` / 命中已知 debug 摘要」三条独立路径硬拦 debug 签名回退包。客户端直接依赖净增 3 项（`package_info_plus` + 提升为直接依赖的 `crypto`、`path_provider`）。
+
+21. **计划审批闸门（Plan Approval Gate，2026-10-10 落地）**：为「角色自主规划」引入**计划级人在环**——Agent 生成整份计划后**暂停等待人工批准**，批准转 `active` 执行、驳回转 `rejected`。**四条裁决**：①**停靠状态复用 `validated`**——该值已在 `ck_goal_plans_status` CHECK 内，且 `list_active_plans` 只认 `active`，故「停住即不执行」是既有语义，**零迁移、零新状态值**；②**策略位 `plan_require_approval` 默认 `False`**——OFF 时 `plan_goal()` 行为逐字节不变，保证既有 v25 钉测（`test_plan003_mount.py` 钉「规划后即 active」等）零回归，同时具备灰度能力；③**审批服务落 `services/goal/` 而非 `services/planning/`**——后者有包模块数量负向断言与 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 白名单双重约束；④**写面复用既有计划面两函数**（`set_plan_status` / `set_plan_rejection`），**不新增写函数、不新增 `decision_records` kind**（新增 kind 需改 CHECK = 需迁移）。闸门 ON 时新计划停 `validated` 且**不撤下**旧 `active` 计划（驳回不误伤在跑计划），批准时经 `activate_plan` 统一撤旧激活。落点表与待决策项见 §8.6。
 
 ---
 

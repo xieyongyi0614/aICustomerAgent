@@ -111,7 +111,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 入口收敛声明（2026-10-09，T-33）：`agent_service` 兼容壳退役，`stream_chat`
     # （trace 兜底 + observability context set/reset）收编入本文件；生产调用点改直连
     # / 经 `channel_gateway` 转发 —— 非 TOOL-010 改脏。原值 e119d89b。
-    "app/application/chat_pipeline.py": "d7be7201e20876c5be778ab1e1652a1d2813a74ce0151b1b032019f90dd8a927",
+    # 注释补充声明（2026-10-10）：为前台管线补中文 docstring / 行内注释（零逻辑改动，
+    # 逐行仅新增）—— 非 TOOL-010 改脏。原值 d7be7201。
+    "app/application/chat_pipeline.py": "7b2ee0e48cae22edc3c1f872678067e66983bd8283705cc123fd226167b9cb5d",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
@@ -123,7 +125,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 账本单写面声明（2026-10-07）：新增 `_ledger_detected_payload`（待确认承载词表链路
     # 解析）与 `_defer_to_ledger_pending`（同轮同金额已进待确认则确定性链路让位，
     # 修「先入账又被确认一次 → 重复记账」）—— 非 TOOL-010 改脏。原值 83222b5b。
-    "app/application/post_process.py": "ac5698b4ed4f9fe407e27f1bc91dabd883b74e640577d2c793c354bd3a31648a",
+    # 物品录入声明（2026-10-10）：`run_world_update` 步骤内部增强——新增 `_run_object_intake`
+    # （用户显式要求记录物品 → LLM 抽取 → 建档）；默认家庭库存种子已移除 —— 非 TOOL-010 改脏。
+    # 原值 ac5698b4。
+    "app/application/post_process.py": "ea3399d914b66a48a1173b4b9cd5aeb51ee1a36938a67adfcfb4d71f7717cb93",
     # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
     # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
     # 记账播种顺序声明（2026-10-07）：新增 `_ensure_ledger_categories`，把账户 / 种子类目

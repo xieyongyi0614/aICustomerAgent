@@ -121,6 +121,13 @@ PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（�
 同步更名。`services/reflection/evidence.py` 的 `plan_evidence_enabled` 子闸函数亦随批次删除，
 上文 74 行所述「子闸开启时追加」的扩源语义转为恒扩源（历史描述不改写）。
 
+**留痕（计划审批闸门，2026-10-10，ADR-21）**：新增策略位 `plan_require_approval`（默认 `False`），
+`PLAN_002_SETTINGS_FLAGS` 由 1 项扩为 **2 项**（2 + 13 = 15 项）；对应 `len(...) == 1` 断言改为
+`== 2`，并新增默认值断言 `settings.plan_require_approval is False`。该字段语义与
+`plan_tool_required` 同款——是「编排启用后的行为修饰位」（ON 时计划停在 `validated` 等人工批准，
+OFF 时维持「生成即 active 自动执行」），**非**计划编排总闸（总闸已随开关体系删除）。见
+`docs/current-system-architecture-baseline.md` §8.6 与 §10 ADR-21。
+
 本纪律由 `test_plan_002_flag_contract_assertions_survive_flag_removal` 消费
 （`PLAN_002_FLAG_CONTRACT_ASSERTIONS`）：若有人用「删掉用例」来消除开关删除引发的失败，
 该守卫会失败。
@@ -140,6 +147,7 @@ from app.services.planning import goal_contract
 
 PLAN_002_SETTINGS_FLAGS = (
     "plan_tool_required",
+    "plan_require_approval",
 )
 
 PLAN_002_SETTINGS_PARAMS = (
@@ -261,9 +269,10 @@ def test_plan_002_settings_are_embedded_and_the_policy_bits_default_on():
     settings = get_settings()
     declared = set(PlanSettings.model_fields)
     assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
-    assert len(PLAN_002_SETTINGS_FLAGS) == 1
+    assert len(PLAN_002_SETTINGS_FLAGS) == 2
     assert len(PLAN_002_SETTINGS_PARAMS) == 13
     assert settings.plan_tool_required is True
+    assert settings.plan_require_approval is False
     assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
 
 

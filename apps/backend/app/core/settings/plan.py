@@ -8,6 +8,10 @@
 步骤必须绑定工具，off 允许无面规划——它不是「激活计划编排」的开关，而是编排启用后的行为
 修饰位。`plan_context_digest_enabled` 已按批次 2 固化常开并删字段（计划落库恒写
 `context_digest`）。
+
+保留**策略位** `plan_require_approval`（默认 OFF）：ON 时计划通过结构闸后**停在 `validated`
+等人工批准**（批准转 `active`、驳回转 `rejected`），OFF 时维持「生成即 `active` 自动执行」的
+既有行为。它同样是编排启用后的行为修饰位，不是计划编排的总闸（总闸已随开关体系删除）。
 """
 
 from pydantic import model_validator
@@ -21,6 +25,8 @@ class PlanSettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
     plan_tool_required: bool = True
+
+    plan_require_approval: bool = False
 
     plan_max_steps: int = 5
     plan_max_depth: int = 2

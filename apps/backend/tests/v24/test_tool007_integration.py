@@ -46,7 +46,10 @@ FROZEN_SOURCES: dict[str, str] = {
     # 过期检查归一化（2026-10-08）：`expiry_at`（JSON 列）读回的 naive 串经
     # `timeutil.ensure_aware` 再与 aware now 比较，修复 naive/aware 比较抛错导致的
     # 「过期物品永不回收」—— 非 TOOL-007 改脏。原值 cf74e817。
-    "app/application/world_engine.py": "ffa2a4319764c85e15a8d1ffdc6c8a181e122d9478a535963f13279d9012b0a2",
+    # 物品录入声明（2026-10-10）：默认家庭库存种子与自动回填移除（`seed_default_household` /
+    # `_household_missing_defaults` 删除，`ensure_world` 不再播种）—— 非 TOOL-007 改脏。
+    # 原值 ffa2a431。
+    "app/application/world_engine.py": "b2bca4083302ae9c126a7f09728e9a4d74044966969c88737b0b28e70ab80e6b",
     # 同上。原值 f6de9c06。
     "app/application/outbox_consumer.py": "3b39824bea81e6c12bfa6bf2c49ce6436b7c3b45e0f4076db9cec2ac41c48109",
 }

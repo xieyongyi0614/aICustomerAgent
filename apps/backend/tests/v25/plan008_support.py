@@ -76,7 +76,6 @@ WORLD_WRITE_FACE: tuple[str, ...] = (
     "set_environment",
     "set_location",
     "advance_time",
-    "seed_default_household",
     "record_character_action_event",
     "merge_character_action_notes",
 )

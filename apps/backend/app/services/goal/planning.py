@@ -6,8 +6,9 @@ Development 调制 / Relationship Pattern / 编排投影的 World 高显著事�
 
 规划本体（后台 job，main 档，唯一 LLM 面）：前置闸（attempt 封顶/在途
 幂等）→ LLM 结构化提案 → 结构闸（判据白名单/能力对齐/深度数量封顶）→
-validated→active（旧 active 版本 superseded 留痕）；拒绝/失败全 trace，
-不静默降级执行。World 事实由编排方传入 payload（GAP-AUT-02 编排投影），
+validated→active（旧 active 版本 superseded 留痕；`plan_require_approval` ON 时停在
+validated 等人工批准，不自动转 active，批准/驳回见 `services/goal/approval.py`）；拒绝/失败
+全 trace，不静默降级执行。World 事实由编排方传入 payload（GAP-AUT-02 编排投影），
 本模块零 World/Action 查询。
 """
 
@@ -61,6 +62,11 @@ REASON_COUNT_EXCEEDED = "subgoal_count_exceeded"
 REASON_CAPABILITY_UNALIGNED = "capability_unaligned"
 REASON_INVALID_SHAPE = "invalid_sub_goal_shape"
 REASON_LLM_FAILED = "llm_failed"
+
+PLAN_STATUS_PENDING_APPROVAL = "validated"
+PLAN_STATUS_ACTIVE = "active"
+PLAN_STATUS_SUPERSEDED = "superseded"
+PLAN_STATUS_REJECTED = "rejected"
 
 _WORLD_IMPORTANCE_HIGH = "high"
 _WORLD_TITLE_MAX_CHARS = GOAL_DESCRIPTION_MAX_LENGTH - 2
@@ -382,6 +388,19 @@ def _persist_trace(trace, user_id: str) -> None:
         logger.exception("规划 trace 落库失败，已忽略")
 
 
+def activate_plan(goal_id: str, plan_id: str) -> GoalPlanRecord | None:
+    """把指定计划置 active，并撤下同目标其余 active 计划（单一 active 不变量）。
+
+    审批闸门与既有自动路径**共用本函数**：自动路径在 `plan_goal` 内直接调用，人工批准由
+    `services/goal/approval.py` 调用。写面只经 `goal_repository` 计划面既有两函数
+    （`list_plans` / `set_plan_status`），不新增写接口。
+    """
+    for existing in goal_repository.list_plans(goal_id):
+        if existing.id != plan_id and existing.status == PLAN_STATUS_ACTIVE:
+            goal_repository.set_plan_status(existing.id, PLAN_STATUS_SUPERSEDED)
+    return goal_repository.set_plan_status(plan_id, PLAN_STATUS_ACTIVE)
+
+
 def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> dict:
     """单 goal 规划：前置闸 → LLM → 结构闸 → [validated→active | rejected]。
 
@@ -469,16 +488,14 @@ def plan_goal(goal_id: str, trigger: str, world_facts: dict | None = None) -> di
         GoalPlanRecord(
             goal_id=goal_id,
             version=version,
-            status="validated",
+            status=PLAN_STATUS_PENDING_APPROVAL,
             sub_goals=specs,
             created_at=now,
             updated_at=now,
         )
     )
-    for existing in goal_repository.list_plans(goal_id):
-        if existing.id != plan.id and existing.status == "active":
-            goal_repository.set_plan_status(existing.id, "superseded")
-    goal_repository.set_plan_status(plan.id, "active")
+    if not settings.plan_require_approval:
+        activate_plan(goal_id, plan.id)
     if failure_replan:
         goal_repository.reactivate_goal(goal_id)
     trace.record(

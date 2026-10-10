@@ -229,6 +229,8 @@ class InventoryItem(BaseModel):
     location_name: str | None = None
     state: str
     consumable: bool = False
+    price_minor: int | None = None
+    purchased_at: str | None = None
 
 
 class ConsumeResult(BaseModel):
@@ -288,3 +290,59 @@ def bounded_notes(notes: list[str], max_chars: int) -> list[str]:
         bounded.append(text)
         total += len(text)
     return bounded
+
+
+class ObjectIntakeItem(BaseModel):
+    """用户显式录入的单件物品规格。
+
+    LLM 只填 `price_yuan` 与 `purchased_at_hint`（原话）；`price_minor`（整数分）与
+    `purchased_at`（ISO 日期）由链侧归一填入，供「已用天数 / 日均金额」计算。
+    """
+
+    name: str
+    category: str = "misc"
+    quantity: float = 1.0
+    unit: str = ""
+    price_yuan: float | None = None
+    purchased_at_hint: str | None = None
+    price_minor: int | None = None
+    purchased_at: str | None = None
+
+
+class ObjectIntake(BaseModel):
+    """用户消息 → 物品录入意图；`is_record_intent=False` 时 `items` 恒空。"""
+
+    is_record_intent: bool = False
+    confidence: float = 0.0
+    items: tuple[ObjectIntakeItem, ...] = ()
+
+
+def usage_cost(
+    price_minor: int | None,
+    purchased_at: str | None,
+    now: datetime | None = None,
+) -> dict | None:
+    """按购买价（整数分）与购买日算「已用天数 / 日均金额（分）」。
+
+    缺价或缺日期返回 None；当天购买按 1 天计（避免除零）。纯函数，不落库。
+    """
+    if not isinstance(price_minor, int) or price_minor <= 0 or not purchased_at:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(purchased_at))
+    except (TypeError, ValueError):
+        return None
+    # 展示用日期取**原串的本地日期**（`ensure_aware` 会转 UTC，跨时区会偏移一天）。
+    local_date = parsed.date().isoformat()
+    purchased = timeutil.ensure_aware(parsed)
+    if purchased is None:
+        return None
+    moment = timeutil.ensure_aware(now) or timeutil.now()
+    days = max((moment - purchased).days, 1)
+    return {
+        "days_used": days,
+        "daily_cost_minor": round(price_minor / days),
+        "price_minor": price_minor,
+        "purchased_at": local_date,
+    }
+

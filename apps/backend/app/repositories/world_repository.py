@@ -109,6 +109,8 @@ def ensure_world(user_id: str) -> World:
             row = WorldRow(
                 id=ids.new_id_str(),
                 user_id=user_id,
+                owner_type="user",
+                owner_id=user_id,
                 name="家",
                 time_mode=get_settings().world_time_mode,
                 sim_rate=get_settings().world_sim_rate,

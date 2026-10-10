@@ -46,7 +46,6 @@ WORLD_WRITE_FACE = (
     "expire_due_objects",
     "set_environment",
     "set_location",
-    "seed_default_household",
     "record_character_action_event",
     "merge_character_action_notes",
     "advance_time",
@@ -512,7 +511,14 @@ class TestAssemblyDiscipline:
     ):
         goal = make_goal(description="零写库目标")
         world_repository.ensure_world(V25_USER)
-        world_engine.seed_default_household(V25_USER)
+        world_engine.create_object(
+            V25_USER,
+            name="鸡蛋",
+            category="food",
+            location_id="home.kitchen.fridge",
+            quantity=6,
+            consumable=True,
+        )
         world_simulation_repository.save_situation(_situation())
         override_settings()
         _stub_memories(monkeypatch)

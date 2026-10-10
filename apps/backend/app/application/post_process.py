@@ -330,7 +330,9 @@ async def run_evaluation(ctx: PostProcessContext) -> None:
 
 async def run_world_update(ctx: PostProcessContext) -> None:
     """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。
-    V2.3.0 追加：用户处境检出（确定性模式，独立子闸）。"""
+    V2.3.0 追加：用户处境检出（确定性模式，独立子闸）。
+    物品录入（2026-10-10）：步骤**内部**增强（不新增步骤、不改序列）——默认家庭库存
+    种子已移除，物品只在用户**显式要求记录**时（确定性前置闸命中）走 LLM 抽取建档。"""
     try:
         world_engine.run_turn_update(ctx.user_id, ctx.user_input, trace=ctx.trace)
     except Exception:
@@ -345,6 +347,55 @@ async def run_world_update(ctx: PostProcessContext) -> None:
         )
     except Exception:
         logger.exception("用户处境检出异常")
+    await _run_object_intake(ctx)
+
+
+async def _run_object_intake(ctx: PostProcessContext) -> None:
+    """用户显式要求记录物品 → LLM 抽取 → 建档。
+
+    幂等：同名物品已存在则跳过（避免与词表链路/多轮重复录入）。前置闸未命中零 LLM。
+    """
+    from app.chains.object_intake_chain import extract_objects, has_record_intent
+
+    if not has_record_intent(ctx.user_input):
+        return
+    started = time.perf_counter()
+    try:
+        intake = await asyncio.to_thread(extract_objects, ctx.user_input, llm=ctx.llm)
+        created: list[str] = []
+        for item in intake.items:
+            if world_engine.find_object_by_name(ctx.user_id, item.name) is not None:
+                continue
+            obj = world_engine.create_object(
+                ctx.user_id,
+                name=item.name,
+                category=item.category,
+                quantity=item.quantity,
+                unit=item.unit,
+                consumable=item.category in ("food", "drink"),
+                **{
+                    key: value
+                    for key, value in (
+                        ("price_minor", item.price_minor),
+                        ("purchased_at", item.purchased_at),
+                    )
+                    if value is not None
+                },
+            )
+            if obj is not None:
+                created.append(item.name)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "object_intake",
+                (time.perf_counter() - started) * 1000,
+                "ok",
+                extracted=len(intake.items),
+                created=len(created),
+            )
+    except Exception:
+        logger.exception("物品录入失败，不影响本轮回答")
+        if ctx.trace is not None:
+            ctx.trace.record("object_intake", 0.0, "error", error="object intake failed")
 
 
 async def run_character_action_sync(ctx: PostProcessContext) -> None:

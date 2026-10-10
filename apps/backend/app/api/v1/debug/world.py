@@ -72,10 +72,6 @@ class ConsumeBody(BaseModel):
     quantity: float
 
 
-class HouseholdSeedBody(BaseModel):
-    user_id: str | None = None
-
-
 class WorldSimTickBody(BaseModel):
     user_id: str | None = None
 
@@ -111,12 +107,6 @@ def create_entity(body: EntityCreate, caller: str = Depends(require_user)):
     if obj is None:
         raise HTTPException(status_code=409, detail="实体创建失败（上限或参数非法）")
     return obj.model_dump(mode="json")
-
-
-@world_router.post("/debug/world/household/seed")
-def seed_household(body: HouseholdSeedBody, caller: str = Depends(require_user)):
-    created = world_engine.seed_default_household(_user(body.user_id, caller))
-    return {"seeded": created}
 
 
 @world_router.post("/debug/world/consume")

@@ -87,3 +87,21 @@
 ## 5. 结论
 
 当前 Household Inventory 的**被动查询/消耗链路（Tests 1~8）是完整且正确的**；本次对话暴露的是**「角色自主行为」未接入消耗记账**导致的叙事与世界状态脱节。这是下一阶段（Cooking / Autonomy）的功能缺口，而非现有被动链路的功能缺陷。修复方向见第 4 节，建议从低成本的「库存数量强制校验」入手，不与现有范围冲突。
+
+---
+
+## 6. 变更记录（2026-10-10）
+
+第 4 节的三条改进方向中，**#1（库存数量强制校验）已落地**为 `inventory_grounding_mode`（默认 `rewrite`，`services/grounding/inventory_guard.py`），**#2（角色自主消耗记账）已落地**为后台第 11 步 `character_action_sync`（抽取 → 校验 → 执行 CONSUME 等）。
+
+本日进一步按产品裁决调整了**库存的起点与归属**：
+
+| 变更 | 内容 |
+|---|---|
+| 种子移除 | `DEFAULT_HOUSEHOLD`（鸡蛋6/牛奶1/可乐2/面条2/大米2/面包1）删除；`world_engine.seed_default_household` / `_household_missing_defaults` 删除；`ensure_world` 不再播种、也不再自动回填 |
+| 起点为空 | 世界建档为空，物品**只在被显式录入时创建**：① 用户显式要求记录（新增 `chains/object_intake_chain.py`，经 `run_world_update` 步骤内部增强，确定性前置闸未命中零 LLM）；② 角色动作抽取（`character_action_sync`） |
+| 归属改为用户 | `worlds` 建档写 `owner_type="user"` / `owner_id=user_id`（原先恒为 NULL → 归一为 `character`）；`HOME_LOCATIONS["home"].description` 由「你和亚丝娜的家」改为「你的家」。存量 NULL 行保持 legacy 语义 |
+| 价格与日均 | 录入时可选带**价格**与**购买时间**：价格落**整数分** `price_minor`（元 × 100，零 float），购买时间经解析归一为 ISO 日期 `purchased_at`，两者存 `WorldObject.properties`（**无迁移**）。`models/world.py::usage_cost` 纯函数按二者算「**已用天数 / 日均金额**」，仅在有价时渲染进世界切片，形如 `锅 × 1（购于 2026-09-10，¥120.00，已用 30 天，日均 ¥4.00）` |
+
+**影响**：本文档第 1~2 节描述的「初始库存 6 件」不再存在——真实初始状态为空，只有被录入过的物品才会出现在世界清单里。第 5 节结论中「被动链路完整正确」的判定不变，只是**前提从「种子给的 6 件」变成「显式录入的物品」**。
+

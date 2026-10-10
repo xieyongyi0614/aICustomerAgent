@@ -478,7 +478,14 @@ class TestAssemblyZeroWrite:
         self, db_session_factory, planning_world_on, assembler, make_goal, monkeypatch
     ):
         seed_all(USER, location=LOCATION)
-        world_engine.seed_default_household(USER)
+        world_engine.create_object(
+            USER,
+            name="鸡蛋",
+            category="food",
+            location_id="home.kitchen.fridge",
+            quantity=6,
+            consumable=True,
+        )
         probe = support.install_world_write_probe(monkeypatch)
         goal = make_goal(user_id=USER, description="装配零写目标")
         before = support.table_counts(db_session_factory)

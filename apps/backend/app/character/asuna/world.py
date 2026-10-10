@@ -9,7 +9,7 @@ HOME_LOCATIONS = {
         "parent_id": None,
         "traits": ["indoor"],
         "available_actions": ["休息", "聊天"],
-        "description": "你和亚丝娜的家",
+        "description": "你的家",
     },
     "home.living_room": {
         "name": "客厅",
@@ -307,58 +307,4 @@ OBJECT_NAME_ALIASES: dict[str, tuple[str, ...]] = {
     "鸡蛋": ("蛋",),
     "大米": ("米",),
     "牛奶": ("奶",),
-}
-
-DEFAULT_HOUSEHOLD = {
-    "name": "默认家庭库存",
-    "objects": [
-        {
-            "name": "鸡蛋",
-            "category": "food",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 6,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "牛奶",
-            "category": "drink",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 1,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "可乐",
-            "category": "drink",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 2,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "面条",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 2,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "大米",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 2,
-            "unit": "kg",
-            "consumable": True,
-        },
-        {
-            "name": "面包",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 1,
-            "unit": "piece",
-            "consumable": True,
-        },
-    ],
 }

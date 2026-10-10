@@ -2,6 +2,13 @@
 
 前台：上下文构建 → 目标选择 → 四链并行检测 → 意图校验 → 场景收敛 → 流式回答 → 落库 → 触发后台。
 后台：scene_update ‖ state_update ‖ goal_review ‖ summary ‖ memory_extract，互相独立容错。
+
+本模块只提供「段实现」与薄驱动，**不含手写段序**：
+- 段**序**由 `agent_runtime/profiles.py` 的 `foreground_chat` Profile 声明；
+- 段**本体**是 `run_chat_pipeline` 内的闭包（捕获 25+ `nonlocal` 中间值），
+  经 `_foreground_registry` 登记为 `{段名: runner}` 后交给 `AgentLoop`（或线性旧链）驱动；
+- 两条驱动路径共用同一份 runners，由 kill switch `runtime_foreground_loop_enabled`
+  切换（ON=建台账+运行时事件，OFF=零台账线性旧链），行为等价、可一键回退。
 """
 
 import asyncio
@@ -90,8 +97,14 @@ def _idle_seconds_since(moment: datetime) -> float:
 
 
 def _stabilize_mode(role_mode_result, state, session_id: str) -> mode_service.ModeDecision:
+    """模式稳定：把 router 的「候选模式」与已确认模式比对，抑制抖动后给出生效模式。
+
+    已确认模式来自持久化 state，候选来自本轮 router 链；稳定器（R5）据候选置信度与
+    距上次切换的时长（idle_seconds）决定是否切换，避免一句话就来回改角色语气。
+    """
     candidate, confidence = _router_candidate(role_mode_result)
     confirmed = state.mode or "default"
+    # 距上次进入当前模式已过多久：稳定器用它做「切换冷却」。
     idle_seconds = 0.0
     if state.mode_entered_at is not None:
         idle_seconds = _idle_seconds_since(state.mode_entered_at)
@@ -113,6 +126,7 @@ def _stabilize_mode(role_mode_result, state, session_id: str) -> mode_service.Mo
 
 
 def _resolve_analysis(result) -> TurnAnalysis:
+    """轮次分析归一：异常或非法输出一律降级为默认 `TurnAnalysis()`。"""
     if isinstance(result, BaseException):
         logger.error("轮次分析失败，使用默认分析", exc_info=result)
         return TurnAnalysis()
@@ -129,6 +143,7 @@ def _resolve_analysis(result) -> TurnAnalysis:
 
 
 def _resolve_scene_intent(result) -> SceneIntentResult:
+    """场景意图归一：失败 / 非法降级为 `intent=chat`（当作普通闲聊处理）。"""
     if isinstance(result, BaseException) or not isinstance(result, SceneIntentResult):
         logger.error("场景意图识别失败，降级 chat")
         return SceneIntentResult(
@@ -138,6 +153,7 @@ def _resolve_scene_intent(result) -> SceneIntentResult:
 
 
 def _resolve_intention(result) -> IntentionDecision | None:
+    """意图归一：失败 / 非法返回 None，交由下游策略（enforce_intention）降级。"""
     if isinstance(result, BaseException):
         logger.error("意图链失败，交由策略降级", exc_info=result)
         return None
@@ -154,6 +170,7 @@ def _resolve_intention(result) -> IntentionDecision | None:
 
 
 def _is_pending(scene_state: SceneState | None) -> bool:
+    """场景是否处于「待用户确认」态：存在 pending_action 且状态为 pending。"""
     return (
         scene_state is not None
         and scene_state.pending_action is not None
@@ -164,6 +181,11 @@ def _is_pending(scene_state: SceneState | None) -> bool:
 def _select_goal(
     state: ConversationState, scene_state: SceneState | None, user_id: str
 ) -> SelectedGoal:
+    """本轮目标选择：候选目标 + 多维上下文 → 目标服务打分 → 选出本轮要推进的目标。
+
+    输入维度：关系张力 / 用户情绪 / 角色心情与强度 / 是否有待确认场景 / 是否深夜 /
+    development 覆盖权重。失败降级为「无目标」（动机层降级，不影响本轮回复）。
+    """
     try:
         settings = get_settings()
         now = timeutil.local_now()
@@ -190,6 +212,7 @@ def _select_goal(
 
 
 def _development_weights(state: ConversationState) -> dict[str, float] | None:
+    """development 覆盖层给出的目标权重；无覆盖时返回 None（由目标服务用基线权重）。"""
     overlay = getattr(state, "development_overlay", None)
     if overlay is None or not overlay.goal_weights:
         return None
@@ -233,6 +256,11 @@ def _record_development_apply(trace, state: ConversationState, behavior_ctx) -> 
 
 
 def _apply_inventory_grounding(reply: str, content: str, world_ctx, mode: str, trace) -> str:
+    """库存 grounding 守卫：检查回复是否与角色背包 / 世界物品矛盾，命中且 mode=rewrite 时纠正。
+
+    仅在 `inventory_grounding_mode ∈ {rewrite, annotate}` 时调用（此时回复被缓冲、可整段改）；
+    守卫自身异常一律放行原始回复（grounding 不得成为硬失败点）。
+    """
     try:
         from app.services.grounding.inventory_guard import (
             check_inventory_grounding,
@@ -459,6 +487,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _context_assembly(_ctx):
+        """第 2 段：装配上下文——AgentState 快照 / 世界上下文 / 会话状态 / 场景，并选出本轮目标。"""
         nonlocal snapshot, world_ctx, state, scene_state, current_turn, selected_goal
         nonlocal stage_error
         if stage_error is not None:
@@ -488,6 +517,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _turn_decisions(_ctx):
+        """第 3 段：四链并行（角色路由 / 轮次分析 / 场景意图 / 意图决策），单链失败即降级。"""
         nonlocal role_mode, analysis, scene_intent, intention_candidate
         nonlocal turn, scene_intent_result, stage_error
         if stage_error is not None:
@@ -509,6 +539,7 @@ async def run_chat_pipeline(
                 trace.record(name, (time.perf_counter() - step_started) * 1000)
                 return result
 
+            # return_exceptions=True：四链互不拖累，失败项以异常对象返回，下面逐项归一。
             role_mode, analysis, scene_intent, intention_candidate = await asyncio.gather(
                 _timed("role_router", router_chain.route(content, llm=llm)),
                 _timed("turn_analyzer", turn_analysis_chain.analyze(content, state, llm=llm)),
@@ -540,6 +571,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _mode_stabilize(_ctx):
+        """第 4 段：模式稳定——产出本轮生效的角色模式 `effective_mode`。"""
         nonlocal mode_decision, effective_mode, stage_error
         if stage_error is not None:
             return {"status": "skipped"}
@@ -566,6 +598,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _scene_resolve(_ctx):
+        """第 5 段：场景收敛 + 意图校验（enforce_intention）+ 前台决策管线（目标栈只读）。"""
         nonlocal resolved_state, directive, scene_ctx
         nonlocal validated_intention, decision_audit, current_goal, stage_error
         if stage_error is not None:
@@ -611,6 +644,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _behavior_resolve(_ctx):
+        """第 6 段：关系上下文 + 行为引擎 + 风格契约（决定「怎么回应」）。"""
         nonlocal relationship_ctx, behavior_ctx, style_ctx, stage_error
         if stage_error is not None:
             return {"status": "skipped"}
@@ -674,6 +708,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _action_planning(_ctx):
+        """第 7 段：检出行动意图，并组装 / 发出首帧 `turn_meta`。"""
         nonlocal action_intent, stage_error
         if stage_error is not None:
             return {"status": "skipped"}
@@ -710,6 +745,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _reply_generation(_ctx):
+        """第 8 段（唯一关键段）：流式生成回答，逐 token 推事件；grounding 重写时补发替换帧。"""
         nonlocal full_reply, first_token_ms, reply, stage_error
         if stage_error is not None:
             return {"status": "skipped"}
@@ -723,6 +759,7 @@ async def run_chat_pipeline(
                 build_action_context, user_id, session_id
             )
             settings = get_settings()
+            # grounding 重写需「看到完整回复」才能纠错，故 rewrite/annotate 模式下缓冲整段回复。
             grounding_mode = (
                 settings.inventory_grounding_mode if world_ctx is not None else "off"
             )
@@ -799,6 +836,7 @@ async def run_chat_pipeline(
         return {"status": "ok"}
 
     async def _record_handoff(_ctx):
+        """第 9 段：落库本轮、复位主动行为、调度后台任务、发出 `done` 结束帧。"""
         nonlocal ai_message_id, stage_error
         if stage_error is not None:
             return {"status": "skipped"}
@@ -879,6 +917,8 @@ async def run_chat_pipeline(
             "record_handoff": _record_handoff,
         }
     )
+    # 两条驱动路径共用同一份 runners：ON 走 AgentLoop（建台账 + 运行时事件），
+    # OFF 走线性旧链（零台账，用于一键回退）。
     if foreground_loop:
         loop = AgentLoop(
             spec,
@@ -896,24 +936,29 @@ async def run_chat_pipeline(
     else:
         task = asyncio.ensure_future(_drive_foreground_linear(spec, runners))
     try:
+        # 事件桥：并发等待「队列出事件」与「驱动 task 结束」，谁先到先处理。
         while True:
             getter = asyncio.ensure_future(events.get())
             done, _pending = await asyncio.wait(
                 {getter, task}, return_when=asyncio.FIRST_COMPLETED
             )
             if getter in done:
+                # 有事件先出：逐条 yield 给调用方（chat.py 转 NDJSON）。
                 item = getter.result()
                 yield item
                 continue
+            # task 先结束：取消待取任务，排空队列剩余事件后退出循环。
             getter.cancel()
             while not events.empty():
                 yield events.get_nowait()
             break
+        # 段内记录的错误优先冒泡（保证关键段失败能被上层感知）。
         if stage_error is not None:
             raise stage_error
         if task.done() and not task.cancelled() and task.exception() is not None:
             raise task.exception()
     finally:
+        # 调用方提前关闭流时取消驱动 task，避免留下后台孤儿运行。
         if not task.done():
             task.cancel()
             try:

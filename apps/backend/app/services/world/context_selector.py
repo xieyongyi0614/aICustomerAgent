@@ -18,6 +18,7 @@ from app.models.world import (
     WorldEvent,
     WorldObject,
     part_of_day,
+    usage_cost,
 )
 from app.services.world.locations import build_location_context, location_name
 
@@ -98,6 +99,7 @@ def build_world_context(
 
     inventory = []
     for obj in entities:
+        props = obj.properties or {}
         inventory.append(
             InventoryItem(
                 name=obj.name,
@@ -107,6 +109,8 @@ def build_world_context(
                 location_name=location_name(obj.location_id),
                 state=obj.state,
                 consumable=obj.consumable,
+                price_minor=props.get("price_minor"),
+                purchased_at=props.get("purchased_at"),
             )
         )
 
@@ -139,9 +143,11 @@ def render_world_section(
     ctx: WorldContext | None,
     budget: int = 600,
     brief=None,
+    now: datetime | None = None,
 ) -> str | None:
     """渲染【当前世界】段；ctx 为 None → None（Prompt 字节不变的关键路径）。
-    brief（V2.3.0 WorldBrief）非空时其行优先于其余行进入预算。"""
+    brief（V2.3.0 WorldBrief）非空时其行优先于其余行进入预算。
+    now 仅用于「已用天数 / 日均金额」计算（缺省取当前时间）。"""
     if ctx is None:
         return None
 
@@ -157,7 +163,7 @@ def render_world_section(
         "家里的物品、数量、位置以本清单为准，不得凭空捏造或增减；"
         "未列出的物品视为不存在，不得声称拥有或还有。"
     )
-    inventory_lines = _inventory_lines(ctx.inventory)
+    inventory_lines = _inventory_lines(ctx.inventory, now=now)
 
     brief_lines: list[str] = []
     if brief is not None:
@@ -186,7 +192,7 @@ def render_world_section(
     return prefix + head + "\n" + "\n".join(body)
 
 
-def _inventory_lines(items) -> list[str]:
+def _inventory_lines(items, now: datetime | None = None) -> list[str]:
     grouped: dict = {}
     for item in items:
         grouped.setdefault(item.location_id, []).append(item)
@@ -197,15 +203,23 @@ def _inventory_lines(items) -> list[str]:
         )
         lines.append(f"{loc_name}：")
         for obj in objs:
-            lines.append(f"  {_inventory_item_line(obj)}")
+            lines.append(f"  {_inventory_item_line(obj, now=now)}")
     return lines
 
 
-def _inventory_item_line(item) -> str:
+def _inventory_item_line(item, now: datetime | None = None) -> str:
     qty = int(item.quantity) if item.quantity == int(item.quantity) else f"{item.quantity:g}"
     if item.unit and item.unit not in ("piece", "个"):
-        return f"{item.name} × {qty}{item.unit}"
-    return f"{item.name} × {qty}"
+        base = f"{item.name} × {qty}{item.unit}"
+    else:
+        base = f"{item.name} × {qty}"
+    cost = usage_cost(item.price_minor, item.purchased_at, now=now)
+    if cost is None:
+        return base
+    return (
+        f"{base}（购于 {cost['purchased_at']}，¥{cost['price_minor'] / 100:.2f}，"
+        f"已用 {cost['days_used']} 天，日均 ¥{cost['daily_cost_minor'] / 100:.2f}）"
+    )
 
 
 def _recent_changes_lines(rows: list[str]) -> list[str]:

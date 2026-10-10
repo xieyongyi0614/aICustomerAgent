@@ -13,6 +13,7 @@ from app.api.v1 import (
     ledger,
     llm,
     memory,
+    plans,
     proactive,
     tasks,
 )
@@ -35,4 +36,5 @@ api_router.include_router(home.home_router)
 api_router.include_router(briefing.briefing_router)
 api_router.include_router(car.car_router)
 api_router.include_router(auth.auth_router)
+api_router.include_router(plans.plans_router)
 api_router.include_router(app_release.app_release_router)

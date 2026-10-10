@@ -166,6 +166,14 @@ def test_grounding_cap_and_take_consume_chain(db_session_factory):
 
     user_id = "cas-take"
     world_engine.ensure_world(user_id)
+    world_engine.create_object(
+        user_id,
+        name="鸡蛋",
+        category="food",
+        location_id="home.kitchen.fridge",
+        quantity=6,
+        consumable=True,
+    )
     raw_reply = "从冰箱拿出鸡蛋6个，熟练地磕进碗里煎好。"
     inventory = [
         InventoryItem(
@@ -195,6 +203,14 @@ def test_grounding_cap_and_take_consume_chain(db_session_factory):
 def test_omitted_subject_take_consumes_from_context(db_session_factory):
     user_id = "cas-omit"
     world_engine.ensure_world(user_id)
+    world_engine.create_object(
+        user_id,
+        name="鸡蛋",
+        category="food",
+        location_id="home.kitchen.fridge",
+        quantity=6,
+        consumable=True,
+    )
     ctx = _ctx(
         user_id,
         ai_reply="刚才拿了两个出来煎给你了，冰箱里应该还剩四个。",
