@@ -299,7 +299,7 @@ decision → world_experience
 - `decision` 是唯一 LLM capable 且 critical 阶段：两道既有预算闸 → `llm_gateway.acquire` 第三道闸 → `autonomy_engine.tick`（V7 决策管线）。
 - `event_driven` Profile（Flow C）：白名单世界事件（`escalation_whitelist`）升级为完整 Run，其余 0 消耗。
 
-**维护步**（`_run_maintenance`，按间隔调度）：world_maintenance、world_simulation、action_retry、action_schedule、outbox_consume（`action_outbox_enabled` 门控）、trigger_reconcile、**ledger_digest**（PLA-011 日结/周报，数字只来自聚合）。
+**维护步**（`_run_maintenance`，按间隔调度）：world_maintenance、world_simulation、action_retry、action_schedule、outbox_consume（**常开，不按间隔、不受 `action_outbox_enabled` 门控**——消费器是共享机制，`world/event_bridge` 等生产者无条件写入 outbox；`action_outbox_enabled` 只决定 action 结果同步直写 vs 经 outbox 延迟投递）、trigger_reconcile、**ledger_digest**（PLA-011 日结/周报，数字只来自聚合）。
 
 **其它常驻后台循环**（`main.py` lifespan）：memory reclaim、job worker（`memory2.job_worker`）、agent evolution worker（指标快照 + 人格编译 + goal rebalance）、observability retention（`observability_persist_enabled` 门控）、世界维护循环。
 
@@ -490,7 +490,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | `services/agent_service.py` 是"兼容壳"，编排已迁 `chat_pipeline` 但壳仍保留供 api/测试依赖 | 双入口符号残留，新同学易误入旧路径 | P2 |
 | **ORM 模型已按领域包化**（2026-10-03，`core/db.py` → `core/db/`：`base`/`engine` + 13 个领域子模块，`app/core/db/__init__.py` 显式 re-export 全部符号，217 处 `from app.core.db import …` 零改动；门面 import 全部子模块保证 `Base.metadata` 完整供 autogenerate）；`app/models/` 仍为 Pydantic 领域模型 | 新增表先选领域子模块落位；`Memory` 与 `*Row` 命名不统一仍是历史遗留 | 已收口 |
 | **迁移链头钉测已收口**（2026-09-29 全链折叠为单迁移 `0001`，ADR-14）：钉测单点 `tests/support/schema_pins.py`（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`），v24 取证常量单点 `tool012_support.py`；新增迁移只需 bump 钉文件 | 残余：`v24`/`v25`/`v26`/`v30`/`v40` 部分测试文件名仍带历史版本号字面量（如 `test_runtime_migration_0052.py`），语义已泛化为最终态断言，待未来顺手改名 | P2 |
-| `foreground_gateway_enforced` / `action_outbox_enabled` **不是「未收敛的门控」**（2026-10-06 校正）：前者是**成本策略位**（硬拒绝 vs 软降级，两值皆为合法运行态，**应保留**）；后者是**特殊裁决项**（关闭会破坏 `deferred_world_op → outbox → world_engine` 唯一写面纪律，须走架构裁决而非普通门控清理，当前默认 `False`、8 处读取） | 分类口径已校正；`action_outbox_enabled` 尚待架构裁决 | P2 |
+| `foreground_gateway_enforced` **不是「未收敛的门控」**（2026-10-06 校正）：是**成本策略位**（硬拒绝 vs 软降级，两值皆为合法运行态，**应保留**）。`action_outbox_enabled`（**2026-10-10 校正**）：是 **action 结果投递的迁移位**（同步直写 vs 经 outbox 延迟投递），**不是**策略位；其**消费器门控已解绑**（`outbox_consume` 现常开——门控它曾致 `event_bridge` 的行永久滞留、角色→世界事件不生成，已实测确认并修复）。残余待决策 = action 侧固化哪条路径 | 分类口径已校正；消费器断链已修；`action_outbox_enabled` 残余待收口 | P2 |
 | **开关清理批次未开工**：批次 2（B 类应急关断位择机固化，现存 **13** 个默认 ON 门控）与批次 3（C 类预留位逐项决策，现存 **12** 个默认 OFF 字段 + 4 个 csv 集合闸） | 门控长期保留会掩盖「能力已常开」的事实；**批次 2 的前置 = 真实模型人工回归**（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 / V2.1.0~V2.6.1），未执行前不得开工；批次 3 需先决策：六段方案 A 是否推进、飞书多实例部署是否需要、自治动作与关系信号是否启用 | P2 |
 | `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` 已转常开（无配置读取点），字段与代码级回退位仍在 | 「常开」语义需靠代码阅读确认；清理前须确认代码级回退位（`_drive_foreground_linear` / `_legacy_run_autonomous_cycle`）仍可显式调用 | P3 |
 | 调试台面端点（`/debug/*`、`/state`、action、action-execution、world、`/llm/profiles`）**一律要求 token 身份**（router 级 `require_user`，2026-10-03 ADR-17；此前 52 端点裸奔仅靠 flag 兜底），`user_id` 显式传入可覆盖（IDENT-009 既有语义）——**已无魔法默认值**；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离；生产侧同时钉死 `DEBUG_SURFACE_ENFORCED=true`（ADR-16 遗留项） | 调试面无多用户隔离；产品面已隔离 | P2 |

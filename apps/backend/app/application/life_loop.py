@@ -592,7 +592,12 @@ def _step_world_experience(user_id: str, now: datetime) -> dict:
 
 
 async def _run_maintenance(now: datetime) -> int:
-    """维护步骤：world / action retry / trigger reconcile 按各自间隔调度。"""
+    """维护步骤：world / action retry / trigger reconcile 按各自间隔调度。
+
+    `outbox_consume` 不按间隔、也不受 `action_outbox_enabled` 门控：消费器是**共享**机制
+    （`services/world/event_bridge` 等生产者无条件写入 outbox），门控它会让非 action 生产者
+    的行永久滞留。`action_outbox_enabled` 只决定 **action 结果**同步直写还是经 outbox 延迟投递。
+    """
     settings = get_settings()
     executed = 0
     if _maintenance_due(
@@ -655,16 +660,14 @@ async def _run_maintenance(now: datetime) -> int:
             }
         _record_maintenance_run("action_schedule", [entry], now)
         executed += 1
-    if settings.action_outbox_enabled:
-        pending = outbox_repository.list_pending(now=now, limit=1)
-        if pending:
-            stats = outbox_consumer.consume_pending(now=now)
-            _record_maintenance_run(
-                "outbox_consume",
-                [{"step": "outbox_consume", "status": "ok", **stats}],
-                now,
-            )
-            executed += 1
+    if outbox_repository.list_pending(now=now, limit=1):
+        stats = outbox_consumer.consume_pending(now=now)
+        _record_maintenance_run(
+            "outbox_consume",
+            [{"step": "outbox_consume", "status": "ok", **stats}],
+            now,
+        )
+        executed += 1
     if _maintenance_due("trigger_reconcile", _RECONCILE_INTERVAL_SECONDS):
         _mark_maintenance("trigger_reconcile")
         recovered = trigger_registry_repository.recover_stale(
@@ -746,9 +749,8 @@ def _maintenance_pending(settings) -> bool:
         "action_schedule", settings.action_maintenance_interval_seconds
     ):
         return True
-    if settings.action_outbox_enabled:
-        if outbox_repository.list_pending(limit=1):
-            return True
+    if outbox_repository.list_pending(limit=1):
+        return True
     if _maintenance_due("ledger_digest", 60):
         return True
     if _maintenance_due("ledger_alert", 60):
