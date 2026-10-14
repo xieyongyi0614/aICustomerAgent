@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.chains import memory_rerank_chain as memory_rerank
 from app.core import timeutil
 from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
@@ -30,6 +31,9 @@ STEP_NAME = "memory_retrieve_v2"
 MODE_HYBRID = "hybrid"
 MODE_STRUCTURED = "structured"
 MODE_DEGRADED = "degraded"
+
+RERANK_MODE_OFF = "off"
+RERANK_MODE_LITE = "lite"
 
 VISIBILITY_HYPOTHETICAL = "hypothetical"
 STATUS_ACTIVE = "active"
@@ -61,12 +65,14 @@ class RankedMemory:
     penalty: float = 0.0
     score: float = 0.0
     reason: str = ""
+    rerank_score: float | None = None
 
 
 @dataclass
 class RankedMemories:
     items: list[RankedMemory] = field(default_factory=list)
     mode: str = MODE_STRUCTURED
+    rerank_mode: str = RERANK_MODE_OFF
 
     def memories(self) -> list[UserMemory]:
         return [item.memory for item in self.items]
@@ -262,6 +268,44 @@ def _score_all(
     return ranked
 
 
+def _rerank_sort_key(item: RankedMemory):
+    has_rerank = item.rerank_score is not None
+    return (
+        0 if has_rerank else 1,
+        -(item.rerank_score or 0.0),
+        -item.score,
+        -item.memory.importance,
+        item.memory.id,
+    )
+
+
+def _maybe_rerank(
+    query: str, ranked: list[RankedMemory], settings
+) -> tuple[list[RankedMemory], str]:
+    if settings.memory_rerank_mode != RERANK_MODE_LITE:
+        return ranked, RERANK_MODE_OFF
+    if len(ranked) < settings.memory_rerank_min_candidates:
+        return ranked, RERANK_MODE_OFF
+    pool = ranked[: settings.memory_rerank_top_k]
+    candidates = [(item.memory.id, item.memory.content or "") for item in pool]
+    try:
+        scored = memory_rerank.rerank_memories_sync(query, candidates)
+    except Exception as exc:
+        logger.warning("记忆重排失败，降级既有排序：%s", exc.__class__.__name__)
+        return ranked, RERANK_MODE_OFF
+    by_id = {item.memory.id: item for item in ranked}
+    applied = 0
+    for entry in scored:
+        target = by_id.get(entry.id)
+        if target is None:
+            continue
+        target.rerank_score = float(entry.score)
+        applied += 1
+    if not applied:
+        return ranked, RERANK_MODE_OFF
+    return sorted(ranked, key=_rerank_sort_key), RERANK_MODE_LITE
+
+
 def retrieve(
     user_id: str,
     query: str,
@@ -315,8 +359,9 @@ def retrieve(
             continue
         kept.append(item)
     kept.sort(key=lambda item: (-item.score, -item.memory.importance))
+    kept, rerank_mode = _maybe_rerank(query_text, kept, settings)
     kept = kept[:limit]
-    result = RankedMemories(items=kept, mode=mode)
+    result = RankedMemories(items=kept, mode=mode, rerank_mode=rerank_mode)
 
     for item in kept:
         memory_lifecycle.record_reinforce(item.memory.id)
@@ -324,6 +369,7 @@ def retrieve(
         trace,
         started,
         mode=mode,
+        rerank_mode=rerank_mode,
         pool_size=len(pool),
         returned=[_item_digest(item) for item in kept],
         filtered=[_item_digest(item) for item in filtered],
@@ -369,6 +415,7 @@ def _item_digest(item: RankedMemory) -> dict:
         "structured": round(item.structured, 4),
         "affinity": round(item.affinity, 4),
         "score": round(item.score, 4),
+        **({"rerank_score": round(item.rerank_score, 4)} if item.rerank_score is not None else {}),
         **({"penalty_reason": item.reason} if item.reason else {}),
     }
 
