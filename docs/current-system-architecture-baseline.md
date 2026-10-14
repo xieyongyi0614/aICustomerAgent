@@ -137,14 +137,14 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 | 子域 | 实现 | 说明 |
 |---|---|---|
 | Goal | `character_goals` 表（type/priority/status/horizon/source/layer/domain/parent_goal_id）+ `services/goal_*.py` | 目标分层（short_term/medium/long_term），Goal Stack（`goal_stack.py`）只读编译 + 后台长期化 |
-| Plan | `goal_plans` 表（sub_goals JSON，versioned）+ `services/planning/engine.py::PlanningEngine` | 七道闸规划引擎：attempt_cap → 形状 → 步数 → 能力对齐 → 工具可解析 → 工具在面 → LLM 失败；计划落库只经 `goal_repository` 计划面 |
+| Plan | `goal_plans` 表（sub_goals JSON，versioned）；**生成主路径 = `services/goal/planning.py::plan_goal`**（由 `life_loop` → `run_planning_jobs` 驱动），候选集与终态写面 = `goal_repository` 计划面 | 生产主路径经六道结构闸后**创建即 `validated`**；七闸引擎 `services/planning/engine.py::PlanningEngine`（attempt_cap → 形状 → 步数 → 能力对齐 → 工具可解析 → 工具在面 → LLM 失败）当前**仅由默认关闭的可选段**接入，尚未接管主路径（2026-10-14 更正，见 `docs/agent-evolution-plan-2026-10.md` §1.2 D2） |
 | Decision | `decision_records` 表 + `services/decision_pipeline.py` | 统一决策管线：候选评估 + 胜者审计，前台/后台同一代码路径；目标栈长期化写入只发生在后台（铁律 4） |
 
-规划服务（`services/planning/`）：`engine.py`（七道闸引擎）、`decompose.py`（拆解）、`context.py`（上下文装配 + digest）、`goal_contract.py`（失败理由契约）、`observer.py`（四源观察）、`revision.py` / `revision_listener.py`（重规划裁决）、`scheduler.py`（当前步调度）、`executor_bridge.py`（执行桥）、`memory_policy.py`（记忆策略）。
+规划服务（`services/planning/`）：`engine.py`（七道闸引擎）、`decompose/decomposer.py`（拆解，PLAN-004）、`context.py`（上下文装配 + digest）、`goal_contract.py`（失败理由契约）、`observer.py`（四源观察）、`revision.py` / `revision_listener.py`（重规划裁决）、`scheduler.py`（当前步调度）、`executor_bridge.py`（执行桥）、`memory_policy.py`（记忆策略）。
 
-目标生命周期：`materialize`（供给装配，三来源候选）→ `PlanningEngine.enqueue/plan`（七道闸）→ `PlanScheduler` 执行 → `PlanObserver` 观察推进 → `PlanRevisionPolicy` 重规划 → 终态经 `goal_repository.settle` 单一写面。
+目标生命周期：`materialize`（供给装配，三来源候选）→ 规划 job（生产路径 `goal_planning.plan_goal`；七闸 `PlanningEngine.plan` 仅可选段接入）→ `PlanScheduler` 执行 → `PlanObserver` 观察推进 → `PlanRevisionPolicy` 重规划 → 终态经 `goal_repository.settle` 单一写面。
 
-**计划状态机**（`GoalPlanStatus` 五值：`draft` / `validated` / `active` / `rejected` / `superseded`，库内 CHECK `ck_goal_plans_status`）：`services/goal/planning.py::plan_goal()` 经七道闸后**创建即 `validated`**——`validated` 既是结构闸产物，也是**计划审批闸门的停靠态**（见 §8.6）。计划执行候选集由 `goal_repository.list_active_plans` 界定，查询条件为 `GoalPlanRow.status == "active"` **且** `GoalRow.status == "active"`；即「计划是否被执行」完全由该状态位决定，且目标转终态后其计划即刻退出候选集（冻结语义）。`plan_require_approval`（默认 `False`）决定 `validated → active` 是**立即发生**（自动执行）还是**等待人工批准**；批准/驳回经 `services/goal/approval.py`。与之并存的还有**工具/动作级**逐次确认（`services/tool/confirmation.py`，`pending_confirmation` 经 `PlanExecutorBridge` 归一为步骤 `blocked` + 停留 `in_progress`）——两者层级不同：前者是**计划级、一次性、执行前**，后者是**工具级、逐次、执行中**。
+**计划状态机**（`GoalPlanStatus` 五值：`draft` / `validated` / `active` / `rejected` / `superseded`，库内 CHECK `ck_goal_plans_status`；其中 `draft` 为**已定义但当前无写入路径**的保留值——两条规划路径都直接落 `validated`，2026-10-14 更正）：`services/goal/planning.py::plan_goal()` 经结构闸后**创建即 `validated`**——`validated` 既是结构闸产物，也是**计划审批闸门的停靠态**（见 §8.6）。计划执行候选集由 `goal_repository.list_active_plans` 界定，查询条件为 `GoalPlanRow.status == "active"` **且** `GoalRow.status == "active"`；即「计划是否被执行」完全由该状态位决定，且目标转终态后其计划即刻退出候选集（冻结语义）。`plan_require_approval`（默认 `False`）决定 `validated → active` 是**立即发生**（自动执行）还是**等待人工批准**；批准/驳回经 `services/goal/approval.py`。与之并存的还有**工具/动作级**逐次确认（`services/tool/confirmation.py`，`pending_confirmation` 经 `PlanExecutorBridge` 归一为步骤 `blocked` + 停留 `in_progress`）——两者层级不同：前者是**计划级、一次性、执行前**，后者是**工具级、逐次、执行中**。
 
 ### 3.5 Action Execution（行动执行）
 
@@ -166,8 +166,8 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 
 | 层 | 实现 | 说明 |
 |---|---|---|
-| V4 长期记忆 | `services/memory_service.py` + `services/memory_policy.py` + `services/memory_conflict.py` | 提取 → 策略 → 冲突消解（LCS 同题检测）→ 落库 → 打分召回（词法/重要性/时效/类型加权）→ 注入上下文 |
-| Memory 2.0 | `services/memory2/`（`types`/`sources`/`ingest`/`evaluator`/`retriever`/`lifecycle`/`embeddings`/`commands`/`attribution`/`migration`/`offline_metrics`/`job_worker`） | 7 类类型封顶（user_preference/user_fact/experience/relationship_fact/commitment/milestone_event/behavior_pattern）；四源摄取（Conversation/ActionRecord/WorldEvent/RelationshipEvent）幂等入 `memory_candidates`；三段评估（规则分 → 灰区 lite LLM 兜底 → 转正/拒绝）；混合检索（语义 cosine + 结构化 recency/importance/salience/类型亲和）；六态生命周期（active/superseded/invalidated/decayed/forgotten + 软删后物理删，salience·exp(-λ·Δdays) 衰减）；Embedding 批处理；显式命令（记住/忘掉） |
+| V4 长期记忆（提取 / 策略 / 冲突） | `chains/extractor_chain.py`（提取）+ `engines/memory_policy.py`（策略硬规则）+ `engines/memory_conflict.py`（冲突消解，LCS 同题检测） | 提取 → 策略 → 冲突消解 → 落库；**打分召回已并入 `services/memory/retriever.py`**（不再是独立的 v1 打分器）。原文档所写 `services/memory_service.py` / `services/memory_policy.py` / `services/memory_conflict.py` 三路径**均不存在**（2026-10-14 更正，见 `docs/agent-evolution-plan-2026-10.md` §1.2 D1） |
+| Memory 2.0 | `services/memory/`（**单包**，14 模块：`types`/`sources`/`ingest`/`evaluator`/`embeddings`/`lifecycle`/`retriever`/`commands`/`attribution`/`job_worker`/`offline_metrics`/`product_view`/`refs`/`migration`） | 7 类类型封顶（user_preference/user_fact/experience/relationship_fact/commitment/milestone_event/behavior_pattern）；四源摄取（Conversation/ActionRecord/WorldEvent/RelationshipEvent）幂等入 `memory_candidates`；三段评估（规则分 → 灰区 lite LLM 兜底 → 转正/拒绝）；混合检索（语义 cosine + 结构化 recency/importance/salience/类型亲和）；六态生命周期（active/superseded/invalidated/decayed/forgotten + 软删后物理删，salience·exp(-λ·Δdays) 衰减）；Embedding 批处理；显式命令（记住/忘掉）。原文档所写 `services/memory2/` 路径**不存在**（2026-10-14 更正） |
 | Reflection（反思） | `services/reflection/` + `insights`/`reflection_runs`/`evidence_links` 表 | 证据窗聚合 → LLM 结构化推理 → confidence 校准 → 三闸复检 → Insight 落库；Insight 生命周期（active→superseded/invalidated） |
 | Development（成长） | `services/development/` + `development_state`/`development_changes`/`personality_state` 表 | belief/preference/pattern 三类发展状态，编译为对人格轴的调制，可回滚/重放 |
 
@@ -303,7 +303,7 @@ decision → world_experience
 
 **维护步**（`_run_maintenance`，按间隔调度）：world_maintenance、world_simulation、action_retry、action_schedule、outbox_consume（**常开，不按间隔、不受 `action_outbox_enabled` 门控**——消费器是共享机制，`world/event_bridge` 等生产者无条件写入 outbox；`action_outbox_enabled` 只决定 action 结果同步直写 vs 经 outbox 延迟投递）、trigger_reconcile、**ledger_digest**（PLA-011 日结/周报，数字只来自聚合）。
 
-**其它常驻后台循环**（`main.py` lifespan）：memory reclaim、job worker（`memory2.job_worker`）、agent evolution worker（指标快照 + 人格编译 + goal rebalance）、observability retention（`observability_persist_enabled` 门控）、世界维护循环。
+**其它常驻后台循环**（`main.py` lifespan）：memory reclaim、job worker（`services.memory.job_worker`）、agent evolution worker（指标快照 + 人格编译 + goal rebalance）、observability retention（`observability_persist_enabled` 门控）、世界维护循环。
 
 ---
 
@@ -452,7 +452,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 
 ### 8.2 Memory Evolution（记忆演进）
 
-支持 **Episodic Memory / Semantic Memory** 的落点：当前 `memory2` 已是类型化（7 类）+ 生命周期化 + 混合检索（语义 cosine + 结构化）的底座，`reflection`（Insight）与 `development`（belief/preference/pattern）是上层加工。显式 Episodic/Semantic 双通道在此之上扩展，**当前尚未实现**。
+支持 **Episodic Memory / Semantic Memory** 的落点：当前 `services/memory/`（单包）已是类型化（7 类）+ 生命周期化 + 混合检索（语义 cosine + 结构化）的底座，`reflection`（Insight）与 `development`（belief/preference/pattern）是上层加工。显式 Episodic/Semantic 双通道在此之上扩展，**当前尚未实现**（演进设计见 `docs/agent-evolution-plan-2026-10.md` §2.3 阶段 M2）。
 
 ### 8.3 Multi Channel（多通道）
 
@@ -498,11 +498,25 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | 对外端点 | `api/v1/plans.py`（新）：`GET /plans/pending`、`POST /plans/{id}/approve`、`POST /plans/{id}/reject` | 挂 `require_user`；404 = 不存在或非本人，409 = 非待批态（不改库） |
 | 批准后续跑 | Life Loop 下一 tick 拉 `list_active_plans` | **无需额外触发**——状态置 `active` 即自动进入调度 |
 
-**纪律与边界**：审批服务落 `services/goal/`（`plan_goal()` 所在域），**不落** `services/planning/`——后者有包模块数量负向断言（`test_plan010_static_scan.py`）与 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 白名单（`goal_contract.py`）双重约束。写面只复用 `goal_repository` 计划面既有函数，**不新增写接口、不新增状态值、不新增 `decision_records` kind**（新增 kind 需改 CHECK = 需迁移）。`services/goal/planning.py` 不在任何冻结哈希面（`FROZEN_SOURCES` / `ZERO_DIFF_HASHES` 均未覆盖）。
+**纪律与边界**：审批服务落 `services/goal/`（`plan_goal()` 所在域），**不落** `services/planning/`——后者有**包模块枚举**负向断言（`tests/v25/test_plan002_static_scan.py:189-207`；`test_plan010_static_scan.py` 为边界 / 零迁移静态红线）与 `PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 白名单（`goal_contract.py`）双重约束。写面只复用 `goal_repository` 计划面既有函数，**不新增写接口、不新增状态值、不新增 `decision_records` kind**（新增 kind 需改 CHECK = 需迁移）。`services/goal/planning.py` 不在任何冻结哈希面（`FROZEN_SOURCES` / `ZERO_DIFF_HASHES` 均未覆盖）。
 
 **闸门 ON 时的语义**：新计划停在 `validated` 且**不撤下**旧 `active` 计划（驳回后原状保持，不误伤在跑的计划）；批准时才撤旧并激活新。**已知取舍**：若 ON 且长期无人裁决，目标将停在「有 `validated` 计划、无 `active` 计划」——超时策略（永久等待 / 自动批准 / 自动驳回）为**待决策项**，当前未实现。
 
 **当前未实现**（后续可选）：审批超时策略、审批触达（飞书推送）、审批审计归因行、前端 plans 页面。
+
+### 8.7 Plan Clarification Gate（计划澄清闸门，**规划中，未实现**）
+
+支持 **计划级 human-in-the-loop 澄清**的落点：在计划生成后、审批闸门（§8.6）之前增加一层「Agent 带多选项提问 → 用户答复 → 重新提案」的**信息补齐**闸门，与既有两闸构成三层：**L1 澄清 → L2 审批 → L3 工具确认**。三者语义不同（补齐信息 / 许可裁决 / 执行授权），不可合并。
+
+| 面 | 规划落点 | 说明 |
+|---|---|---|
+| 挂起态 | 复用既有停靠态 `validated` + `trigger_registry` 新增 kind（如 `plan_clarification`） | **零迁移**优先；新增 `clarifying` 状态值或专用表为备选（需迁移） |
+| 生成闸 | `services/goal/planning.py`（`plan_goal()` 之后、`activate_plan()` 之前） | 澄清服务须落 `services/goal/`，**不落** `services/planning/`（包模块枚举断言，见 §8.6） |
+| 上下文槽位 | `services/planning/context.py::_build_context` 增 `clarification` 字段；`services/goal/planning.py::_build_messages` 注入「用户已澄清」段 | 当前两者均无澄清问答槽位（现状证据见 `docs/agent-evolution-plan-2026-10.md` §3.1.4） |
+| 恢复路径 | 前台对话轮次（复用 `services/tool/confirmation.py::ConfirmationIntentDetector` 的零 LLM 词表范式） | 零客户端改动；结构化端点 / 超时自动决策为后续项 |
+| 策略位 | `plan_require_clarification`（默认 `False`，保证零回归；对齐既有 `plan_require_approval` 先例，**非 `*_enabled` 形态**）+ 轮次与问题数上限 | 领域命名，不带版本前缀 |
+
+**边界与纪律**：澄清发生在审批**之前**，两者串联而非并行；澄清挂起期间**不撤下**旧 `active` 计划（沿用 §8.6 语义）；链路任何异常一律降级为「不澄清、直接按现状提案」，绝不阻断规划；不新增 `decision_records` kind（新增 kind 需改 CHECK = 需迁移）。**完整设计见 `docs/agent-evolution-plan-2026-10.md` §3；任务注册见 `docs/version/v6.0.0/tasks.md`（`PLN-` 任务线）。**
 
 ---
 
@@ -574,13 +588,13 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 
 ### 11.2 Memory Evolution
 
-- 在 `memory2`（7 类型 + 生命周期 + 混合检索）与 `reflection`/`development` 之上，引入显式 **Episodic Memory**（按时间线组织的情景事件）与 **Semantic Memory**（跨事件抽象的概念/偏好）双通道。
+- 在 `services/memory/`（7 类型 + 生命周期 + 混合检索）与 `reflection`/`development` 之上，引入显式 **Episodic Memory**（按时间线组织的情景事件）与 **Semantic Memory**（跨事件抽象的概念/偏好）双通道。分阶段路径（M1 检索质量 → M2 分层 → M3 图谱与产品面）见 `docs/agent-evolution-plan-2026-10.md` §2.3。
 - 复用 `memory_candidates`（四源摄取 + 幂等）、`embeddings`（向量）、`retriever`（混合排序）作为检索底座。
 
 ### 11.3 Evaluation System
 
 - 现有 `evaluation_reports` / `services/agent_evaluation.py` / `evaluation_rules/`（persona/emotion/relationship/goal/behavior/action/autonomy/memory/reflection/development 多域规则）+ `chains/evaluation_judge_chain.py` 已构成规则 + LLM Judge 双路评估骨架。
-- 方向为：把离线评估（`memory2/offline_metrics`、`relationship_evaluation`、`reflection/evaluation`）与在线评估统一，形成持续回归 + 门槛门控的评估闭环。
+- 方向为：把离线评估（`services/memory/offline_metrics`、`relationship_evaluation`、`reflection/evaluation`）与在线评估统一，形成持续回归 + 门槛门控的评估闭环。
 
 ---
 
