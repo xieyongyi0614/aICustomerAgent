@@ -281,7 +281,7 @@ class TestTrace:
 
         trace = _TraceSpy()
         retriever.retrieve("u1", "查询", trace=trace)
-        steps = [s for s in trace.records if s.name == "memory_retrieve_v2"]
+        steps = [s for s in trace.records if s.name == "memory_recall"]
         assert len(steps) == 1
         returned_ids = [entry["id"] for entry in steps[0].extra["returned"]]
         assert returned_ids == ["m1"]

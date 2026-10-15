@@ -27,7 +27,7 @@ from app.engines.memory_conflict import same_topic
 
 logger = logging.getLogger(__name__)
 
-STEP_NAME = "memory_retrieve_v2"
+STEP_NAME = "memory_recall"
 
 MODE_HYBRID = "hybrid"
 MODE_STRUCTURED = "structured"

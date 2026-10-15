@@ -14,7 +14,7 @@ MEMORY_TRACE_STEPS = (
     "memory_evaluate",
     "memory_embed",
     "memory_lifecycle",
-    "memory_retrieve_v2",
+    "memory_recall",
     "memory_command",
 )
 

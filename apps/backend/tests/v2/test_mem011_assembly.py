@@ -200,7 +200,7 @@ class TestAssembleTrace:
         trace = _TraceSpy()
         result = asyncio.run(context_builder.build("s1", "u1", "查询", trace=trace))
         assert [m.id for m in result.memories] == ["m1"]
-        steps = [s for s in trace.records if s.name == "context_assemble_v2"]
+        steps = [s for s in trace.records if s.name == "context_assemble"]
         assert len(steps) == 1
         extra = steps[0].extra
         assert extra["retrieval_selected"] == 1

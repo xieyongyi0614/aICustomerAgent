@@ -41,7 +41,7 @@ def _select_retrieval_segment(ranked) -> tuple[list, int, int]:
     """检索段装配：Freshness 排序 + 合并预算（≤memory_retrieval_budget）贪心装入。
 
     Working 段（近期消息/信号/Scene）由既有分段承载；本函数只裁定长期检索段。
-    超预算的条目按 Freshness 丢弃并计数，明细随 context_assemble_v2 步骤进 trace。
+    超预算的条目按 Freshness 丢弃并计数，明细随 context_assemble 步骤进 trace。
     """
     settings = get_settings()
     budget = settings.memory_retrieval_budget
@@ -264,7 +264,7 @@ def _build_sync(
     if trace is not None:
         recent_window = _working_window(messages)
         trace.record(
-            "context_assemble_v2",
+            "context_assemble",
             0.0,
             "ok",
             working_messages=len(recent_window),
