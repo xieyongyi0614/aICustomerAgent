@@ -314,3 +314,49 @@ class TestEvaluatorWiring:
         assert client.calls == [["我在深圳工作"]]
         assert _memory_row(decision.memory_id).embedding is not None
 
+
+class TestQueryEmbeddingBatch:
+    def test_all_queries_embeds_in_one_call_and_keeps_order(self, monkeypatch):
+        client = _fake_client(monkeypatch, dim=3)
+
+        vectors = embeddings.embed_queries(["查询一", "查询二", "查询三"])
+
+        assert client.calls == [["查询一", "查询二", "查询三"]]
+        assert all(vector is not None and len(vector) == 3 for vector in vectors)
+
+    def test_blank_entries_stay_none_without_extra_call(self, monkeypatch):
+        client = _fake_client(monkeypatch, dim=3)
+
+        vectors = embeddings.embed_queries(["查询一", "   ", ""])
+
+        assert client.calls == [["查询一"]]
+        assert vectors[0] is not None
+        assert vectors[1] is None
+        assert vectors[2] is None
+
+    def test_all_blank_skips_client_entirely(self, monkeypatch):
+        client = _fake_client(monkeypatch)
+
+        assert embeddings.embed_queries(["", "  "]) == [None, None]
+        assert client.calls == []
+
+    def test_empty_input_returns_empty(self, monkeypatch):
+        client = _fake_client(monkeypatch)
+
+        assert embeddings.embed_queries([]) == []
+        assert client.calls == []
+
+    def test_unconfigured_client_returns_none_per_entry(self, monkeypatch):
+        monkeypatch.setattr(embeddings, "get_embedding_client", lambda: None)
+
+        assert embeddings.embed_queries(["查询一", "查询二"]) == [None, None]
+
+    def test_endpoint_failure_degrades_whole_batch(self, monkeypatch, caplog):
+        _fake_client(monkeypatch, fail=True)
+
+        with caplog.at_level("WARNING"):
+            assert embeddings.embed_queries(["查询一", "查询二"]) == [None, None]
+        assert any(
+            "query 批量向量化失败" in record.message for record in caplog.records
+        )
+

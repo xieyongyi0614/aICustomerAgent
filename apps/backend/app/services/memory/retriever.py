@@ -325,16 +325,21 @@ def _maybe_rerank(
 
 
 def _recall(
-    user_id: str, character_id: str, query_text: str, now: datetime
+    user_id: str,
+    character_id: str,
+    query_text: str,
+    now: datetime,
+    query_embedding: list[float] | None,
 ) -> tuple[list[RankedMemory], str, int]:
-    """单 query 召回（结构路 ∪ 向量路）+ 逐候选分量；返回 (ranked, mode, pool_size)。"""
+    """单 query 召回（结构路 ∪ 向量路）+ 逐候选分量；query 向量由调用方统一提供。
+
+    多路检索时调用方一次批量向量化全部 query（`embed_queries`），逐路不再各自网络往返。
+    """
     pool = _candidate_pool(user_id, character_id)
     facts = _row_facts([memory.id for memory in pool])
     pool = [m for m in pool if facts.get(m.id, {}).get("visibility") != VISIBILITY_HYPOTHETICAL]
-    query_embedding = None
     mode = MODE_STRUCTURED
     if query_text:
-        query_embedding = memory_embeddings.embed_query(query_text)
         if query_embedding is not None:
             mode = MODE_HYBRID
             vector_hits = _vector_recall(user_id, character_id, query_embedding)
@@ -428,7 +433,11 @@ def retrieve(
 
     queries, rewrite_mode = _resolve_queries(query_text, settings)
     if len(queries) > 1:
-        recalls = [_recall(user_id, character_id, text, now) for text in queries]
+        query_embeddings = memory_embeddings.embed_queries(queries)
+        recalls = [
+            _recall(user_id, character_id, text, now, query_embeddings[index])
+            for index, text in enumerate(queries)
+        ]
         ranked = _merge_ranked(
             [items for items, _, _ in recalls],
             now,
@@ -437,7 +446,12 @@ def retrieve(
         mode = _merge_mode([recall_mode for _, recall_mode, _ in recalls])
         pool_size = len(ranked)
     else:
-        ranked, mode, pool_size = _recall(user_id, character_id, query_text, now)
+        query_embedding = (
+            memory_embeddings.embed_query(query_text) if query_text else None
+        )
+        ranked, mode, pool_size = _recall(
+            user_id, character_id, query_text, now, query_embedding
+        )
 
     rejected_contents = _recently_rejected_contents(user_id, now) if pool_size else []
     cooldown_ids = _contradicts_cooldown_ids(user_id, now) if pool_size else set()

@@ -210,6 +210,32 @@ def embed_query(text: str) -> list[float] | None:
         return None
 
 
+def embed_queries(texts: list[str]) -> list[list[float] | None]:
+    """读路径批量查询向量化：一次端点调用覆盖全部 query，顺序与入参一一对应。
+
+    空串与未配置客户端的位置留 None（检索侧逐路降级纯结构化）；端点异常时整批 None。
+    """
+    results: list[list[float] | None] = [None] * len(texts)
+    pending = [
+        (index, _truncate(text))
+        for index, text in enumerate(texts)
+        if (text or "").strip()
+    ]
+    if not pending:
+        return results
+    client = get_embedding_client()
+    if client is None:
+        return results
+    try:
+        vectors = _embed_batch([text for _, text in pending])
+    except Exception as exc:
+        logger.warning("query 批量向量化失败，降级结构化检索：%s", exc.__class__.__name__)
+        return results
+    for (index, _), vector in zip(pending, vectors):
+        results[index] = vector
+    return results
+
+
 def reset_queue() -> None:
     """清空内存队列（测试与运维复位用；持久恢复依赖 NULL 补扫，不依赖内存态）。"""
     _queue.clear()

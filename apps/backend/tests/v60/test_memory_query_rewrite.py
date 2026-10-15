@@ -130,14 +130,21 @@ def rewrite_stub(monkeypatch):
 
 @pytest.fixture
 def recall_stub(monkeypatch):
-    """以 query 文本为键注入逐 query 召回结果，隔离真实 DB / 向量 / 打分。"""
+    """以 query 文本为键注入逐 query 召回结果，隔离真实 DB / 向量 / 打分。
+
+    `_install(...)` 返回本次收到的 `(query_text, query_embedding)` 序列，供向量化入口断言。
+    """
 
     def _install(by_query, mode=retriever.MODE_HYBRID):
-        def _fake(user_id, character_id, query_text, now):
+        seen: list = []
+
+        def _fake(user_id, character_id, query_text, now, query_embedding=None):
+            seen.append((query_text, query_embedding))
             items = list(by_query.get(query_text, []))
             return items, mode, len(items)
 
         monkeypatch.setattr(retriever, "_recall", _fake)
+        return seen
 
     return _install
 
@@ -305,6 +312,56 @@ class TestMultiQueryRecall:
 
         assert result.rewrite_mode == "lite"
         assert trace.step(retriever.STEP_NAME)["queries_count"] == 3
+
+    def test_multi_query_embeds_once_by_batch(
+        self, recall_stub, rewrite_settings, rewrite_stub, monkeypatch
+    ):
+        rewrite_settings(memory_query_rewrite_mode="lite")
+        rewrite_stub.result = ["改写A", "改写B"]
+        batches = []
+        vectors = {"查询": [0.1], "改写A": [0.2], "改写B": [0.3]}
+
+        def _batch(texts):
+            batches.append(list(texts))
+            return [vectors[text] for text in texts]
+
+        monkeypatch.setattr(retriever.memory_embeddings, "embed_queries", _batch)
+        seen = recall_stub(
+            {
+                "查询": [_item("m0", structured=0.9)],
+                "改写A": [_item("m1", structured=0.8)],
+                "改写B": [_item("m2", structured=0.7)],
+            }
+        )
+
+        retriever.retrieve("u1", "查询", top_k=5)
+
+        assert batches == [["查询", "改写A", "改写B"]]
+        assert [embedding for _, embedding in seen] == [[0.1], [0.2], [0.3]]
+
+    def test_single_query_keeps_single_embedding_entry(
+        self, recall_stub, rewrite_settings, monkeypatch
+    ):
+        rewrite_settings(memory_query_rewrite_mode="off")
+        singles = []
+        monkeypatch.setattr(
+            retriever.memory_embeddings,
+            "embed_query",
+            lambda text: singles.append(text) or [0.4],
+        )
+
+        def _unexpected_batch(texts):
+            raise AssertionError("单路不应走批量向量化")
+
+        monkeypatch.setattr(
+            retriever.memory_embeddings, "embed_queries", _unexpected_batch
+        )
+        seen = recall_stub({"查询": [_item("m0", structured=0.9)]})
+
+        retriever.retrieve("u1", "查询", top_k=5)
+
+        assert singles == ["查询"]
+        assert [embedding for _, embedding in seen] == [[0.4]]
 
     def test_merge_dedupes_by_memory_id_and_takes_max_components(
         self, recall_stub, rewrite_settings, rewrite_stub
