@@ -205,9 +205,12 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 > 完整裁决、护栏与「方案 A 真收编」的前置条件见
 > `docs/version/v3.0.0/architecture.md` 附「实现期裁决登记 D-1」。
 >
-> **前台回退开关**：`RUNTIME_FOREGROUND_LOOP_ENABLED`（默认 `True`）。关闭时前台走
-> `chat_pipeline._drive_foreground_linear`（线性旧链：同一段序列与段本体，**不建 Run 台账、
-> 不发运行时事件、不冻结上下文**），用于一键回退而不必回滚代码。
+> **前台回退位（已物理删除，2026-10-15）**：C-2 线性旧链
+> `_drive_foreground_linear` / `_ephemeral_run_context` 与
+> `RUNTIME_FOREGROUND_LOOP_ENABLED` 字段（部署侧 `.env` 本无此键）已同批删除；
+> 生产前台固定走 `open_foreground_run` + `AgentLoop`，**无回退开关**（回退 = git revert）。
+> 后台侧同日对称收尾：`_legacy_run_autonomous_cycle` / `legacy_cycle_runnable` 与
+> `runtime_autonomous_cycle_enabled` 字段一并物理删除。
 >
 > 验收与评审：`docs/version/v3.0.0/acceptance-report.md`（G1~G12）、
 > `docs/version/v3.0.0/reviews/RT-ALL-code-review.md` + `RT-ALL-remediation.md`。
@@ -288,7 +291,7 @@ User Message
 
 `life_loop.py::run_life_loop_worker` 常驻循环，先 sleep 后 tick；`run_life_loop_tick` 先工作发现（0 LLM），再逐用户跑 `agent_runtime.run_autonomous_cycle`（autonomous_tick Profile），最后跑事件预闸与维护步。
 
-**调度路径（V4.0.0 PLA-018 统一）**：`run_autonomous_cycle` **固定经 `AgentLoop`** 驱动自治 tick 的 Profile 段序列，不再按配置分支；`controller._legacy_run_autonomous_cycle` 为**代码级回退位**，仅回滚期可显式调用、**不可由配置触达**。`runtime_autonomous_cycle_enabled` 字段保留但**已无读取点**，待后续批次清理（登记见 §9 技术债表）。六段认知循环（`agent_runtime/stages/*`）**仍为影子实现**，未接入生产 `run()`。
+**调度路径（V4.0.0 PLA-018 统一；2026-10-15 回退位物理删除）**：`run_autonomous_cycle` **固定经 `AgentLoop`** 驱动自治 tick 的 Profile 段序列，无配置分支、无回退位——`_legacy_run_autonomous_cycle` / `legacy_cycle_runnable` 与 `runtime_autonomous_cycle_enabled` 字段已删除（回退 = git revert）。六段认知循环（`agent_runtime/stages/*`）**仍为影子实现**，未接入生产 `run()`。
 
 **autonomous_tick Profile 阶段序列**（`profiles.py` 唯一声明处，禁止另开阶段序列）：
 
@@ -529,7 +532,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 | **迁移链头钉测已收口**（2026-09-29 全链折叠为单迁移 `0001`，ADR-14）：钉测单点 `tests/support/schema_pins.py`（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`），v24 取证常量单点 `tool012_support.py`；新增迁移只需 bump 钉文件 | 残余：`v24`/`v25`/`v26`/`v30`/`v40` 部分测试文件名仍带历史版本号字面量（如 `test_runtime_migration_0052.py`），语义已泛化为最终态断言，待未来顺手改名 | P2 |
 | `foreground_gateway_enforced` **不是「未收敛的门控」**（2026-10-06 校正）：是**成本策略位**（硬拒绝 vs 软降级，两值皆为合法运行态，**应保留**）。`action_outbox_enabled`（**2026-10-10 校正**）：是 **action 结果投递的迁移位**（同步直写 vs 经 outbox 延迟投递），**不是**策略位；其**消费器门控已解绑**（`outbox_consume` 现常开——门控它曾致 `event_bridge` 的行永久滞留、角色→世界事件不生成，已实测确认并修复）。残余待决策 = action 侧固化哪条路径 | 分类口径已校正；消费器断链已修；`action_outbox_enabled` 残余待收口 | P2 |
 | **开关清理批次未开工**：批次 2（B 类应急关断位择机固化，现存 **13** 个默认 ON 门控）与批次 3（C 类预留位逐项决策，现存 **12** 个默认 OFF 字段 + 4 个 csv 集合闸） | 门控长期保留会掩盖「能力已常开」的事实；**批次 2 的前置 = 真实模型人工回归**（V4 / V7 / V7.5 / V7.8 / V8 / V2.0.0 / V2.1.0~V2.6.1），未执行前不得开工；批次 3 需先决策：六段方案 A 是否推进、飞书多实例部署是否需要、自治动作与关系信号是否启用 | P2 |
-| `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` 已转常开（无配置读取点），字段与代码级回退位仍在 | 「常开」语义需靠代码阅读确认；清理前须确认代码级回退位（`_drive_foreground_linear` / `_legacy_run_autonomous_cycle`）仍可显式调用 | P3 |
+| `runtime_foreground_loop_enabled` / `runtime_autonomous_cycle_enabled` **已全部清理**（2026-10-15 同批：读取点、字段、回退位（`_drive_foreground_linear` / `_ephemeral_run_context` / `_legacy_run_autonomous_cycle` / `legacy_cycle_runnable`）与孤儿辅助函数（`_run_decision_stage` / `_promote_degraded_status`）、两张测试登记表、on/off 对照测试删除或迁移至单路径；前后台回退 = git revert） | 已闭环：无残留读取点 / 死代码；回退位不得复活为开发基线（V4.0 R2），如需再引入回退手段须走新 ADR | P3 |
 | 调试台面端点（`/debug/*`、`/state`、action、action-execution、world、`/llm/profiles`）**一律要求 token 身份**（router 级 `require_user`，2026-10-03 ADR-17；此前 52 端点裸奔仅靠 flag 兜底），`user_id` 显式传入可覆盖（IDENT-009 既有语义）——**已无魔法默认值**；调试面无多用户隔离（可任意指定 user_id 查看他人数据），产品面已隔离；生产侧同时钉死 `DEBUG_SURFACE_ENFORCED=true`（ADR-16 遗留项） | 调试面无多用户隔离；产品面已隔离 | P2 |
 | **身份 ID 列保持 `VARCHAR`**（ADR-16，2026-10-03 **评估后主动取消翻转**）：`users.id` 与 37 张表的 `user_id` 存**雪花 ID 的十进制串**，不做 `BIGINT` 列翻转。已实测收益只剩「DB 类型层强制 ID 为数字」，成本为 **584 处**测试字面量（**180 个文件**，191 个不同字面量）+ 删库重建（与 B1「存量用户下次登录自动回填绑定」的自愈路径矛盾）；而存储差异在 `users` 规模下 **< 2KB**、对外契约（字符串出 JSON）两种方案完全一致 | 需强约束时改在**应用边界**校验（成本 1 处）；列类型与 Python 类型均为字符串，语义一致 | P3 |
 | **雪花 ID 可枚举性**（ADR-16，2026-10-03）：`user_id` 由不可枚举的 `email-<sha256[:16]>` 变为**高位含时间戳、按时间递增**的雪花 ID，攻击者可推算「某时刻注册的用户 ID 落在某区间」 | 与上一行「调试面无多用户隔离」叠加后，同一缺陷的**严重度上升一档**；需配套：调试面环境门禁 + 「产品端点忽略显式 `user_id` 参数」测试 | P2 |

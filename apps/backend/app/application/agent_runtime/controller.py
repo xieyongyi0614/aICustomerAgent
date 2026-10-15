@@ -25,7 +25,6 @@ from app.application.agent_runtime.models import (
     TERMINAL_DONE,
     RunContext,
 )
-from app.application.life_loop_context import memory_digest_var
 from app.core.settings import get_settings
 from app.core import clock as logical_clock
 from app.repositories import llm_call_repository, loop_run_repository
@@ -119,9 +118,7 @@ def append_step(run: RunContext, steps: list, entry: dict) -> None:
     loop_run_repository.mark_step(run.run_id, entry)
 
 
-def _llm_call_count(
-    run: RunContext, finished: datetime, trace_ref: str | None
-) -> int:
+def _llm_call_count(run: RunContext, finished: datetime, trace_ref: str | None) -> int:
     """LLM 调用归因（M-7）：有 trace 锚点时**精确**按 `request_id` 计数。
 
     无 trace（自治 tick 等）时退回时间窗计数——并发 Run 下会互相重复记账，属**近似**。
@@ -164,17 +161,6 @@ def close_run(
         budget_state=budget_state,
         now=finished,
     )
-
-
-def _promote_degraded_status(status: str, run: RunContext, steps: list) -> str:
-    """任一 error step 或 run.degraded → 台账终态 degraded（M-9，与观测口径对齐）。"""
-    if status != TERMINAL_DONE:
-        return status
-    if getattr(run, "degraded", False) or any(
-        isinstance(step, dict) and step.get("status") == "error" for step in steps
-    ):
-        return TERMINAL_DEGRADED
-    return status
 
 
 def _reset_run_projections(run: RunContext) -> None:
@@ -221,7 +207,9 @@ def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: date
         "state_update": lambda: asyncio.to_thread(
             life_loop_mod._step_state_update, user_id, now
         ),
-        "state_snapshot": lambda: asyncio.to_thread(run_state_snapshot_stage, user_id, run),
+        "state_snapshot": lambda: asyncio.to_thread(
+            run_state_snapshot_stage, user_id, run
+        ),
         "goal_check": lambda: asyncio.to_thread(
             life_loop_mod._step_goal_check, user_id, now
         ),
@@ -248,79 +236,6 @@ def _autonomous_stage_runner(name: str, user_id: str, run: RunContext, now: date
         raise ValueError(f"Profile 声明了未实现的阶段：{name}") from exc
 
 
-def legacy_cycle_runnable():
-    """【回退位·代码级】取回退执行体；**不可由配置触达**（PLA-018）。
-
-    仅回滚期以代码显式调用；删除动作归 flag-removal 批次，不在本任务范围。
-    """
-    return _legacy_run_autonomous_cycle
-
-
-async def _legacy_run_autonomous_cycle(
-    user_id: str,
-    llm=None,
-    now: datetime | None = None,
-    trigger_type: str | None = None,
-    reason: str | None = None,
-) -> str:
-    """【回退位·代码级】按 Profile Registry 声明的阶段序列同步执行。
-
-    PLA-018 后不再是 `run_autonomous_cycle` 的分支目标（统一经 `AgentLoop`）；
-    保留为回退手段与等价性对照基线，待 flag-removal 批次删除。
-    新增能力不得挂接此处——挂载面唯一为 `profiles.py` 的自治 tick 段序列。
-    """
-    from app.application.post_process import get_user_write_lock
-
-    now = timeutil.ensure_aware(now) or timeutil.now()
-    clock_token = logical_clock.bind(now)
-    settings = get_settings()
-    if trigger_type is None or reason is None:
-        trigger_type, reason = trigger_router.classify_background_trigger(user_id, now)
-    run = open_run(user_id, RUN_KIND_AUTONOMOUS_TICK, trigger_type, reason, now)
-    steps: list = []
-    budget = life_loop_budget.check_daily_budget(now=now)
-    status = TERMINAL_DONE
-    spec = profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK)
-    try:
-        async with get_user_write_lock(user_id):
-            for name in spec.stages:
-                if name == "decision":
-                    await _run_decision_stage(run, steps, user_id, llm, now, budget, settings)
-                    continue
-                runner = _autonomous_stage_runner(name, user_id, run, now)
-                await run_stage_async(
-                    run, steps, name, runner, critical=name in spec.critical
-                )
-    except asyncio.CancelledError:
-        logger.warning("agent run 用户周期被取消，按 aborted 关账：%s", user_id)
-        status = TERMINAL_ABORTED
-        steps.append({"step": "cancel", "status": "error", "error": "CancelledError"})
-        raise
-    except Exception as exc:
-        logger.exception("agent run 用户周期中止：%s", user_id)
-        status = TERMINAL_ABORTED
-        steps.append(
-            {"step": "abort", "status": "error", "error": exc.__class__.__name__}
-        )
-    except BaseException as exc:  # noqa: BLE001 — KeyboardInterrupt / SystemExit 等
-        logger.exception("agent run 用户周期被中断：%s", user_id)
-        status = TERMINAL_ABORTED
-        steps.append(
-            {"step": "abort", "status": "error", "error": exc.__class__.__name__}
-        )
-        raise
-    finally:
-        logical_clock.unbind(clock_token)
-        digest_token = run.data.get("digest_token")
-        if digest_token is not None:
-            memory_digest_var.reset(digest_token)
-        agent_state_assembler.reset_run_state(run)
-        _reset_run_projections(run)
-        status = _promote_degraded_status(status, run, steps)
-        _safe_close_run(run, status, steps, budget_state=budget.as_dict())
-    return status
-
-
 async def run_autonomous_cycle(
     user_id: str,
     llm=None,
@@ -330,9 +245,9 @@ async def run_autonomous_cycle(
 ) -> str:
     """autonomous_tick 唯一入口：固定经 `AgentLoop`（PLA-018 收敛，无分支）。
 
-    段序列唯一来自 `profiles.py`；decision 三道闸与 11 段阶段本体与回退位
-    `_legacy_run_autonomous_cycle` 逐项等价。曾按 `runtime_autonomous_cycle_enabled`
-    分支到 legacy——该分支已删除，配置位不再改变调度路径（零平行路径）。
+    段序列唯一来自 `profiles.py`；decision 三道闸与 11 段阶段本体保持
+    PLA-018 验收口径。曾按 `runtime_autonomous_cycle_enabled` 分支到 legacy
+    ——分支与回退位已删除（2026-10-15），配置位字段同批移除，无平行路径。
     """
     return await _run_autonomous_cycle_via_loop(
         user_id, llm=llm, now=now, trigger_type=trigger_type, reason=reason
@@ -386,7 +301,7 @@ async def _run_autonomous_cycle_via_loop(
 async def _decision_stage_with_gates(
     run, steps, user_id, llm, now, budget, settings
 ) -> dict:
-    """decision 三道闸（与 legacy `_run_decision_stage` 同序同语义）。"""
+    """decision 三道闸：预算两闸 + Gateway 第三闸（PLA-018 验收口径）。"""
     from app.application import life_loop as life_loop_mod
 
     if life_loop_budget.is_degraded_verdict(budget):
@@ -396,33 +311,6 @@ async def _decision_stage_with_gates(
     if not acquire(user_id, "proactive", run, now=now).granted:
         return {"status": "skipped", "skip_reason": "gateway_denied"}
     return await life_loop_mod._step_decision(user_id, llm, now)
-
-
-async def _run_decision_stage(run, steps, user_id, llm, now, budget, settings) -> None:
-    """decision 阶段：两道既有预算闸 → Gateway 第三道闸 → critical 执行。"""
-    from app.application import life_loop as life_loop_mod
-
-    if life_loop_budget.is_degraded_verdict(budget):
-        append_step(
-            run, steps,
-            {"step": "decision", "status": "skipped", "skip_reason": "quota_circuit_open"},
-        )
-    elif life_loop_mod._cycle_llm_budget_exhausted(steps, settings):
-        append_step(
-            run, steps,
-            {"step": "decision", "status": "skipped", "skip_reason": "step_budget"},
-        )
-    elif not acquire(user_id, "proactive", run, now=now).granted:
-        append_step(
-            run, steps,
-            {"step": "decision", "status": "skipped", "skip_reason": "gateway_denied"},
-        )
-    else:
-        await run_stage_async(
-            run, steps, "decision",
-            lambda: life_loop_mod._step_decision(user_id, llm, now),
-            critical=True,
-        )
 
 
 async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
@@ -443,18 +331,26 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
         if not user_id:
             continue
         run = open_run(
-            user_id, RUN_KIND_EVENT_DRIVEN, "world_event", f"event:{row.event_type}", now
+            user_id,
+            RUN_KIND_EVENT_DRIVEN,
+            "world_event",
+            f"event:{row.event_type}",
+            now,
         )
         steps: list = []
         status = TERMINAL_ABORTED
         try:
             inner_status = await run_autonomous_cycle(
-                user_id, llm=llm, now=now,
-                trigger_type="world_event", reason=f"event:{row.event_type}",
+                user_id,
+                llm=llm,
+                now=now,
+                trigger_type="world_event",
+                reason=f"event:{row.event_type}",
             )
             status = _escalation_status(inner_status)
             append_step(
-                run, steps,
+                run,
+                steps,
                 {
                     "step": "event_pregate",
                     "status": "ok" if status == TERMINAL_DONE else "error",
@@ -468,7 +364,8 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
             logger.warning("事件升级被取消：%s", row.idempotency_key)
             status = TERMINAL_ABORTED
             append_step(
-                run, steps,
+                run,
+                steps,
                 {"step": "event_pregate", "status": "error", "escalated": True},
             )
             raise
@@ -476,7 +373,8 @@ async def run_event_pregate(llm=None, now: datetime | None = None) -> int:
             logger.exception("事件升级 Run 失败：%s", row.idempotency_key)
             status = TERMINAL_ABORTED
             append_step(
-                run, steps,
+                run,
+                steps,
                 {"step": "event_pregate", "status": "error", "escalated": True},
             )
         finally:

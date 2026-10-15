@@ -6,9 +6,10 @@
 本模块只提供「段实现」与薄驱动，**不含手写段序**：
 - 段**序**由 `agent_runtime/profiles.py` 的 `foreground_chat` Profile 声明；
 - 段**本体**是 `run_chat_pipeline` 内的闭包（捕获 25+ `nonlocal` 中间值），
-  经 `_foreground_registry` 登记为 `{段名: runner}` 后交给 `AgentLoop`（或线性旧链）驱动；
-- 两条驱动路径共用同一份 runners，由 kill switch `runtime_foreground_loop_enabled`
-  切换（ON=建台账+运行时事件，OFF=零台账线性旧链），行为等价、可一键回退。
+  经 `_foreground_registry` 登记为 `{段名: runner}` 后交给 `AgentLoop` 驱动；
+- 生产路径固定为 `AgentLoop`（建台账 + 运行时事件）；C-2 线性旧链与
+  `runtime_foreground_loop_enabled` 字段已于 2026-10-15 物理删除，
+  前台回退 = git revert。
 """
 
 import asyncio
@@ -25,7 +26,7 @@ from app.chains import (
     turn_analysis_chain,
 )
 from app.core.logutils import content_preview
-from app.core import ids, timeutil
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
@@ -45,11 +46,7 @@ from app.application.agent_runtime import profiles as runtime_profiles
 from app.application.agent_runtime import state as runtime_state_manager
 from app.application.agent_runtime.contracts import RuntimeInput, SessionContext
 from app.application.agent_runtime.loop import AgentLoop
-from app.application.agent_runtime.models import (
-    RUN_KIND_FOREGROUND_CHAT,
-    TRIGGER_CHANNEL_MESSAGE,
-    RunContext,
-)
+from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
 from app.application.post_process import background_tasks, schedule_post_process
 from app.prompts.goal import GoalContext
 from app.engines import behavior as behavior_engine
@@ -377,38 +374,6 @@ def _foreground_registry(runners: dict) -> dict:
     return dict(runners)
 
 
-def _ephemeral_run_context(user_id: str, session_id: str | None) -> RunContext:
-    """线性旧链的 Run 载体：**只存在于内存，不建 `loop_runs` 台账行**（C-2）。
-
-    段本体需要 `RunContext` 承载 `run.data` 与 LLM Gateway 记账，故仍需一个实例；
-    但回退路径零台账写入、零运行时事件，行为等价于收编前的线性链。
-    """
-    return RunContext(
-        run_id=f"ephemeral:{session_id or user_id}:{ids.new_id_str()}",
-        user_id=user_id,
-        run_kind=RUN_KIND_FOREGROUND_CHAT,
-        trigger_type=TRIGGER_CHANNEL_MESSAGE,
-        reason="user_message",
-        started_at=timeutil.now(),
-    )
-
-
-async def _drive_foreground_linear(spec, runners: dict) -> None:
-    """线性旧链驱动（C-2 kill switch）：按 Profile 顺序直驱段本体。
-
-    与 `AgentLoop` 的差别**仅**在于不产生 Run 台账与运行时事件；段序仍只来自
-    `profiles.py`（无手写阶段序列），关键段失败照旧冒泡，非关键段失败继续
-    （后续段据 `stage_error` 自行跳过）。
-    """
-    for name in spec.stages:
-        try:
-            await runners[name](None)
-        except BaseException:  # noqa: BLE001 — 关键段冒泡，非关键段继续
-            if name in spec.critical:
-                raise
-            logger.exception("前台段失败（线性旧链，非关键段继续）：%s", name)
-
-
 async def run_chat_pipeline(
     session_id: str,
     user_id: str,
@@ -421,30 +386,27 @@ async def run_chat_pipeline(
 ) -> AsyncIterator[dict]:
     """前台关键路径（RT-015 收编）：流式协议不变，段序列来自 foreground_chat Profile。
 
-    `runtime_foreground_loop_enabled`（C-2 kill switch）关闭时走**线性旧链**：
-    同一段序列、同一段本体，但**不建 Run 台账、不发运行时事件、不冻结上下文**，
-    以便一键回退（无需代码回滚）。默认开启。
+    生产路径固定经 `AgentLoop`（建台账 + 运行时事件）；C-2 线性旧链与
+    `runtime_foreground_loop_enabled` 字段已于 2026-10-15 物理删除，
+    无回退开关（回退 = git revert）。
     """
     events: asyncio.Queue = asyncio.Queue()
-    foreground_loop = get_settings().runtime_foreground_loop_enabled
-    run_ctx = (
-        agent_runtime.open_foreground_run(user_id, session_id=session_id)
-        if foreground_loop
-        else _ephemeral_run_context(user_id, session_id)
-    )
+    run_ctx = agent_runtime.open_foreground_run(user_id, session_id=session_id)
+    runtime_state_manager.activate(run_ctx, user_id)
     runtime_context_value = None
-    if foreground_loop:
-        runtime_state_manager.activate(run_ctx, user_id)
-        if (
-            get_settings().runtime_context_freeze_enabled
-            and session_context is not None
-        ):
-            runtime_context_value = await runtime_context_manager.assemble(
-                session_context,
-                runtime_input,
-                run=run_ctx,
-                trace=trace,
-            )
+    # 护栏：前台九段闭包与生产调用点均未消费冻结上下文（stream_chat 不传
+    # session_context，业务链仍自建 state/world_ctx），开启即双倍构建纯开销；
+    # 接线点在 _context_assembly 复用 context.current(run)。
+    if (
+        get_settings().runtime_context_freeze_enabled
+        and session_context is not None
+    ):
+        runtime_context_value = await runtime_context_manager.assemble(
+            session_context,
+            runtime_input,
+            run=run_ctx,
+            trace=trace,
+        )
     spec = runtime_profiles.get_profile(RUN_KIND_FOREGROUND_CHAT)
     stage_error: BaseException | None = None
 
@@ -917,24 +879,17 @@ async def run_chat_pipeline(
             "record_handoff": _record_handoff,
         }
     )
-    # 两条驱动路径共用同一份 runners：ON 走 AgentLoop（建台账 + 运行时事件），
-    # OFF 走线性旧链（零台账，用于一键回退）。
-    if foreground_loop:
-        loop = AgentLoop(
-            spec,
-            user_id=user_id,
-            run=run_ctx,
-            llm=llm,
-            trace=trace,
-            registry=runners,
-        )
-        task = asyncio.ensure_future(
-            loop.run(
-                runtime_input, session_context, runtime_context=runtime_context_value
-            )
-        )
-    else:
-        task = asyncio.ensure_future(_drive_foreground_linear(spec, runners))
+    loop = AgentLoop(
+        spec,
+        user_id=user_id,
+        run=run_ctx,
+        llm=llm,
+        trace=trace,
+        registry=runners,
+    )
+    task = asyncio.ensure_future(
+        loop.run(runtime_input, session_context, runtime_context=runtime_context_value)
+    )
     try:
         # 事件桥：并发等待「队列出事件」与「驱动 task 结束」，谁先到先处理。
         while True:

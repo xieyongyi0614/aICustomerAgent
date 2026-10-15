@@ -1,4 +1,4 @@
-"""RT-016 Autonomous Loop Scheduler：开关分派 / 循环等价 / 预算三闸 / 调度零改动。"""
+"""RT-016 Autonomous Loop Scheduler：AgentLoop 唯一路径 / 预算三闸 / 调度零改动（开关与回退位已删除）。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from app.application import agent_runtime, life_loop
 from app.application.agent_runtime import controller
 from app.application.agent_runtime import loop as loop_module
 from app.application.agent_runtime.llm_gateway import Grant
-from app.core.settings import get_settings
 from app.repositories import (
     conversation_repository,
     loop_run_repository,
@@ -76,62 +75,12 @@ def _fake_tick(monkeypatch):
     monkeypatch.setattr(life_loop.autonomy_engine, "tick", fake_tick)
 
 
-def _steps_shape(steps: list[dict]) -> list[tuple[str, ...]]:
-    return [tuple(sorted(entry)) for entry in steps]
-
-
-def _budget_shape(budget_state: dict) -> tuple[str, ...]:
-    return tuple(sorted(budget_state))
-
-
-class TestFlagDispatch:
+class TestDispatchPath:
     pytestmark = pytest.mark.unit
 
-    def test_flag_default_is_on_after_cutover(self):
-        """PLA-018 语义同步：原 `test_flag_defaults_off` 断言默认 False，
-        而收敛的交付面正是「默认值与唯一有效值均为 True」。"""
-        assert get_settings().runtime_autonomous_cycle_enabled is True
-
-    async def test_flag_off_does_not_route_to_legacy(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
+    async def test_run_uses_agent_loop(
+        self, db_session_factory, cycle_on, monkeypatch
     ):
-        """PLA-018 语义同步：配置位不再改变调度路径。
-
-        原 `test_flag_off_uses_legacy_path` 断言「开关关闭走 legacy」；收敛后该行为
-        已废止（零平行路径），改为断言同一配置下**仍走 AgentLoop 且 legacy 体零调用**
-        ——即「legacy 不可由配置触达」。
-        """
-        override_settings(runtime_autonomous_cycle_enabled="false")
-        _setup_conversation()
-        _fake_tick(monkeypatch)
-        created: list = []
-        legacy_calls: list[str] = []
-
-        class _SpyLoop(loop_module.AgentLoop):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                created.append(self)
-
-        monkeypatch.setattr(loop_module, "AgentLoop", _SpyLoop)
-        monkeypatch.setattr(
-            controller,
-            "legacy_cycle_runnable",
-            lambda: (lambda *a, **k: legacy_calls.append("legacy")),
-        )
-
-        status = await controller.run_autonomous_cycle(
-            USER, now=NOW, trigger_type="schedule", reason="flag-off"
-        )
-
-        assert len(created) == 1
-        assert created[0].stages == EXPECTED_STAGES
-        assert legacy_calls == []
-        assert status in {"done", "degraded", "aborted"}
-
-    async def test_flag_on_uses_agent_loop(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
-    ):
-        override_settings(runtime_autonomous_cycle_enabled="true")
         _setup_conversation()
         _fake_tick(monkeypatch)
         created: list = []
@@ -144,7 +93,7 @@ class TestFlagDispatch:
         monkeypatch.setattr(loop_module, "AgentLoop", _SpyLoop)
 
         status = await controller.run_autonomous_cycle(
-            USER, now=NOW, trigger_type="schedule", reason="flag-on"
+            USER, now=NOW, trigger_type="schedule", reason="dispatch"
         )
 
         assert len(created) == 1
@@ -160,61 +109,8 @@ class TestFlagDispatch:
 class TestCycleEquivalence:
     pytestmark = pytest.mark.integration
 
-    async def test_cycle_equivalence_with_baseline(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
-    ):
-        """PLA-018 语义同步：对照基线改为**显式调用 legacy 执行体**。
-
-        原用例靠 `runtime_autonomous_cycle_enabled` false/true 切换两条路径；收敛后
-        该开关不再改变调度路径，故基线臂改为直接调用回退位，等价性证据得以保留。
-        两次均在同一配置（false）下运行——顺带证明配置位不再影响生产入口。
-        """
-        from app.core.db import Message
-
-        def _seed(user_id: str, session_id: str):
-            conversation_repository.get_or_create_conversation(session_id, user_id)
-            conversation_repository.save_message(session_id, "human", "在吗")
-            conversation_repository.save_message(session_id, "ai", "在的")
-            with conversation_repository.SessionLocal() as session:
-                for row in session.query(Message).all():
-                    row.created_at = NOW - timedelta(minutes=40)
-                session.commit()
-
-        _fake_tick(monkeypatch)
-        user_a, session_a = "rt016-eq-a", "rt016-eq-s-a"
-        user_b, session_b = "rt016-eq-b", "rt016-eq-s-b"
-        _seed(user_a, session_a)
-        _seed(user_b, session_b)
-
-        override_settings(runtime_autonomous_cycle_enabled="false")
-        legacy_status = await controller.legacy_cycle_runnable()(
-            user_a, now=NOW, trigger_type="schedule", reason="equiv"
-        )
-        legacy_row = loop_run_repository.list_recent(user_id=user_a)[0]
-        legacy_shape = _steps_shape(
-            [s for s in legacy_row.steps if s["step"] != "abort"]
-        )
-        legacy_budget = _budget_shape(legacy_row.budget_state or {})
-
-        loop_status = await controller.run_autonomous_cycle(
-            user_b,
-            now=NOW,
-            trigger_type="schedule",
-            reason="equiv",
-        )
-        loop_row = loop_run_repository.list_recent(user_id=user_b)[0]
-        loop_shape = _steps_shape([s for s in loop_row.steps if s["step"] != "abort"])
-        loop_budget = _budget_shape(loop_row.budget_state or {})
-
-        assert legacy_status == loop_status == "done"
-        assert legacy_shape == loop_shape
-        assert legacy_budget == loop_budget
-        assert [s["step"] for s in legacy_row.steps if s["step"] != "abort"] == [
-            s["step"] for s in loop_row.steps if s["step"] != "abort"
-        ]
-
     async def test_cleanup_and_digest_reset_equivalent(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
+        self, db_session_factory, cycle_on, monkeypatch
     ):
         from app.application import agent_state_assembler
         from app.core import clock as logical_clock
@@ -237,7 +133,6 @@ class TestCycleEquivalence:
 
         _setup_conversation()
         _fake_tick(monkeypatch)
-        override_settings(runtime_autonomous_cycle_enabled="true")
 
         await controller.run_autonomous_cycle(
             USER, now=NOW, trigger_type="schedule", reason="cleanup"
@@ -255,9 +150,6 @@ class TestDecisionGates:
     ):
         _setup_conversation()
         _fake_tick(monkeypatch)
-        override_settings(
-            runtime_autonomous_cycle_enabled="true"
-        )
 
         if gate == "quota_circuit_open":
             from app.core.db import LlmCallRecordRow
@@ -327,9 +219,8 @@ class TestSchedulerUnchanged:
     pytestmark = pytest.mark.integration
 
     async def test_idle_short_circuit_zero_llm_zero_runs(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
+        self, db_session_factory, cycle_on, monkeypatch
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true")
         _fake_tick(monkeypatch)
 
         await life_loop.run_life_loop_tick(now=NOW)
@@ -348,7 +239,6 @@ class TestSchedulerUnchanged:
     async def test_event_pregate_unchanged(
         self, db_session_factory, cycle_on, monkeypatch, override_settings
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true")
         _fake_tick(monkeypatch)
         assert await agent_runtime.run_event_pregate(now=NOW) == 0
 
@@ -363,9 +253,8 @@ class TestSchedulerUnchanged:
         assert {"event_driven", "autonomous_tick"} <= run_kinds
 
     async def test_run_writes_loop_runs_only(
-        self, db_session_factory, cycle_on, monkeypatch, override_settings
+        self, db_session_factory, cycle_on, monkeypatch
     ):
-        override_settings(runtime_autonomous_cycle_enabled="true")
         _setup_conversation()
         _fake_tick(monkeypatch)
         before = len(loop_run_repository.list_recent())

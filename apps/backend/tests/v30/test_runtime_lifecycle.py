@@ -126,7 +126,7 @@ class TestCancellationClosesLedger:
         assert row.status == TERMINAL_ABORTED
         assert row.finished_at is not None
 
-    def test_legacy_cycle_closes_ledger_on_cancellation(
+    def test_autonomous_cycle_closes_ledger_on_cancellation(
         self, db_session_factory, override_settings, monkeypatch
     ):
         override_settings()
@@ -144,7 +144,7 @@ class TestCancellationClosesLedger:
                 lambda name, user_id, run, now: _blocking_step,
             )
             task = asyncio.ensure_future(
-                controller._legacy_run_autonomous_cycle(  # pylint: disable=protected-access
+                controller.run_autonomous_cycle(
                     "u-legacy", now=NOW, trigger_type="schedule", reason="cancel"
                 )
             )
@@ -163,14 +163,14 @@ class TestCancellationClosesLedger:
         assert row.finished_at is not None
         assert any(step.get("step") == "cancel" for step in row.steps or [])
 
-    def test_legacy_cycle_closes_ledger_on_base_exception(
+    def test_autonomous_cycle_closes_ledger_on_base_exception(
         self, db_session_factory, override_settings, monkeypatch
     ):
         override_settings()
 
         async def _scenario() -> str:
             async def _boom_step(*_args, **_kwargs):
-                raise _Boom("legacy")
+                raise _Boom("autonomous")
 
             monkeypatch.setattr(
                 controller,
@@ -178,7 +178,7 @@ class TestCancellationClosesLedger:
                 lambda name, user_id, run, now: _boom_step,
             )
             with pytest.raises(_Boom):
-                await controller._legacy_run_autonomous_cycle(  # pylint: disable=protected-access
+                await controller.run_autonomous_cycle(
                     "u-legacy-boom", now=NOW, trigger_type="schedule", reason="boom"
                 )
             rows = loop_run_repository.list_recent(user_id="u-legacy-boom")
@@ -250,7 +250,6 @@ class TestEventPregateStatusPropagation:
         from app.repositories import outbox_repository
 
         override_settings(
-            runtime_autonomous_cycle_enabled="true",
             AGENT_EVENT_ESCALATION_TYPES="action_result",
         )
         monkeypatch.setattr(
@@ -278,7 +277,6 @@ class TestEventPregateStatusPropagation:
         from app.repositories import outbox_repository
 
         override_settings(
-            runtime_autonomous_cycle_enabled="true",
             AGENT_EVENT_ESCALATION_TYPES="action_result",
         )
         monkeypatch.setattr(controller, "run_autonomous_cycle", _stub_cycle("done"))
@@ -659,84 +657,50 @@ class TestLlmCallAttribution:
 
 
 class TestDegradedPromotion:
-    """M-9：任一 error step 或 run.degraded → 台账终态 degraded。"""
+    """M-9：任一 error step 或 run.degraded → 台账终态 degraded（实现：`AgentLoop._close`）。"""
 
     pytestmark = pytest.mark.unit
 
-    def test_error_step_promotes_done_to_degraded(self, db_session_factory):
-        from app.application.agent_runtime import controller
-        from app.repositories import loop_run_repository
-
-        now = timeutil.now()
-        row = loop_run_repository.create_run(
-            user_id="u-m9", kind="chat", reason="m9", now=now
-        )
-        run = controller.RunContext(
-            run_id=row.id,
-            user_id="u-m9",
-            run_kind="autonomous_tick",
-            trigger_type="schedule",
-            reason="m9",
-            started_at=now,
-        )
-        steps = [{"step": "perception", "status": "error", "error": "RuntimeError"}]
-
-        status = controller._promote_degraded_status("done", run, steps)
-        assert status == "degraded"
-
-        controller.close_run(run, status, steps)
-        assert loop_run_repository.get(row.id).status == "degraded"
-
-    def test_run_degraded_flag_promotes_to_degraded(self):
-        from app.application.agent_runtime import controller
-
-        now = timeutil.now()
-        run = controller.RunContext(
-            run_id="r-m9-flag",
-            user_id="u-m9",
-            run_kind="autonomous_tick",
-            trigger_type="schedule",
-            reason="m9",
-            started_at=now,
-            degraded=True,
-        )
-        assert controller._promote_degraded_status("done", run, []) == "degraded"
-
-    def test_clean_done_stays_done(self):
-        from app.application.agent_runtime import controller
-
-        now = timeutil.now()
-        run = controller.RunContext(
-            run_id="r-m9-ok",
-            user_id="u-m9",
-            run_kind="autonomous_tick",
-            trigger_type="schedule",
-            reason="m9",
-            started_at=now,
-        )
-        assert (
-            controller._promote_degraded_status(
-                "done", run, [{"step": "perception", "status": "ok"}]
-            )
-            == "done"
-        )
-        assert controller._promote_degraded_status("aborted", run, []) == "aborted"
-
-    def test_loop_close_treats_error_step_as_degraded(self):
-        from app.application.agent_runtime.loop import AgentLoop
-        from app.application.agent_runtime.models import RunContext
-        from app.application.agent_runtime.profiles import get_profile
-
+    def _loop(
+        self, run_id: str, *, degraded: bool = False, steps: list | None = None
+    ) -> AgentLoop:
         run = RunContext(
-            run_id="r-m9-loop",
+            run_id=run_id,
             user_id="u-m9",
             run_kind="autonomous_tick",
             trigger_type="schedule",
             reason="m9",
             started_at=timeutil.now(),
+            degraded=degraded,
         )
         loop = AgentLoop(get_profile("autonomous_tick"), user_id="u-m9", run=run)
         loop._status = "done"
-        loop._steps = [{"step": "goal_check", "status": "error", "error": "ValueError"}]
+        loop._steps = steps if steps is not None else []
+        return loop
+
+    def test_error_step_promotes_done_to_degraded(self, db_session_factory):
+        row = loop_run_repository.create_run(
+            user_id="u-m9", kind="chat", reason="m9"
+        )
+        loop = self._loop(
+            row.id,
+            steps=[{"step": "goal_check", "status": "error", "error": "ValueError"}],
+        )
+        loop._close()
+        assert loop_run_repository.get(row.id).status == "degraded"
+
+    def test_run_degraded_flag_promotes_to_degraded(self):
+        loop = self._loop("r-m9-flag", degraded=True)
         loop._close()
         assert loop._status == "degraded"
+
+    def test_clean_done_stays_done(self):
+        loop = self._loop("r-m9-ok", steps=[{"step": "perception", "status": "ok"}])
+        loop._close()
+        assert loop._status == "done"
+
+    def test_aborted_stays_aborted(self):
+        loop = self._loop("r-m9-abort")
+        loop._status = "aborted"
+        loop._close()
+        assert loop._status == "aborted"

@@ -1,12 +1,8 @@
-"""C-2 补充 e2e（RT-ALL-code-review Must Fix 1）：前台收编总闸 on/off 的全轮次流对照与故障注入。
+"""前台收编 e2e：生产路径（固定 `AgentLoop`）的全轮次流契约与故障面。
 
-总闸 = `RUNTIME_FOREGROUND_LOOP_ENABLED`：
-
-- **on**（默认）：前台链经 `open_foreground_run` + `AgentLoop`（落 `loop_runs` 台账、发运行时事件）。
-- **off**：`chat_pipeline._drive_foreground_linear`（线性旧链：同一段序列与段本体，零台账 / 零事件 / 零冻结）。
-
-两态必须在以下四面**逐字段一致**——这是「方案 A 真收编」的前置安全网（见
-`docs/version/v3.0.0/architecture.md` 附 D-1 与 `reviews/RT-ALL-remediation.md` R-12）：
+原 C-2 总闸 on/off 全轮次对照（RT-ALL-code-review Must Fix 1）随「生产路径固定
+`AgentLoop`」收缩为**单路径契约**：线性旧链 `_drive_foreground_linear` 与开关
+字段已于 2026-10-15 物理删除。原四面安全网不再做两态对照，只锁生产路径自身：
 
 1. 全轮次 SSE 事件序列（事件类型序列 + 逐事件键序 + delta 文本 + `done` 键集）
 2. 中段 LLM 失败的错误面
@@ -108,19 +104,8 @@ def _kind(line: dict) -> str:
     return "other"
 
 
-def _fingerprint(lines: list[dict]) -> list[tuple[str, tuple[str, ...]]]:
-    """录制流指纹：事件类型序列 + 逐事件键序（不含易变值）。"""
-    return [(_kind(line), tuple(line)) for line in lines]
-
-
 def _deltas(lines: list[dict]) -> list[str]:
     return [line["delta"] for line in lines if "delta" in line]
-
-
-def _done_keys(lines: list[dict]) -> set[str]:
-    done = next((line for line in lines if line.get("done") is True), None)
-    assert done is not None, "流未以 done 收尾"
-    return set(done)
 
 
 def _meta(lines: list[dict]) -> dict:
@@ -147,59 +132,32 @@ def _is_subsequence(observed: tuple[str, ...], contract: tuple[str, ...]) -> boo
     return all(any(name == observed_name for name in iterator) for observed_name in observed)
 
 
-def _assert_parity(on: list[dict], off: list[dict], *, expect_done: bool = True) -> None:
-    """两态的全轮次流必须逐字段一致。"""
-    assert _fingerprint(off) == _fingerprint(on)
-    assert _deltas(off) == _deltas(on)
-    if expect_done:
-        assert _done_keys(off) == _done_keys(on)
-    # turn_meta 的稳定子集（值与开关无关）
-    assert _meta(off)["role_mode"] == _meta(on)["role_mode"]
-    assert _meta(off)["mode"] == _meta(on)["mode"]
-
-
-def _both_modes(
+def _single_turn(
     server,
     override_settings,
     llm_override,
     build_llm,
     *,
     content="在吗",
-    tag="parity",
-    expect_done=True,
+    tag="e2e",
     **settings,
 ):
-    """同一输入在总闸 on / off 两态各跑一轮，返回 (on_lines, off_lines)。
-
-    两态用**各自独立的用户**（`use_auth_user`），否则同一用户的跨轮状态（如本轮是否选中目标）
-    会让 `current_goal` 这类「按值决定是否下发」的字段产生与开关无关的差异——
-    那是数据依赖，不是收编差异。
-    """
-    on_user, off_user = f"u-{tag}-on", f"u-{tag}-off"
-
-    use_auth_user(on_user)
-    override_settings(**settings, runtime_foreground_loop_enabled="true")
+    """单轮生产路径流：独立用户 + 显式设置覆盖，返回逐行 JSON。"""
+    use_auth_user(f"u-{tag}")
+    override_settings(**settings)
     llm_override(build_llm())
-    on = _turn(server, content, f"s-{tag}-on")
-
-    use_auth_user(off_user)
-    override_settings(**settings, runtime_foreground_loop_enabled="false")
-    llm_override(build_llm())
-    off = _turn(server, content, f"s-{tag}-off")
-
-    _assert_parity(on, off, expect_done=expect_done)
-    return on, off
+    return _turn(server, content, f"s-{tag}")
 
 
 # ---------------------------------------------------------------------------
-# 1. 全轮次流对照（正常轮次）
+# 1. 全轮次流契约（正常轮次）
 # ---------------------------------------------------------------------------
 
 
-def test_full_turn_stream_parity(
+def test_full_turn_stream_contract(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
-    on, off = _both_modes(
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
@@ -207,39 +165,36 @@ def test_full_turn_stream_parity(
             response=["别急", "，有我呢"], structured_responses=_structured()
         ),
         content="我今天压力很大",
-        tag="parity",
+        tag="contract",
         inventory_grounding_mode="off",
     )
 
-    assert [_kind(line) for line in on] == ["turn_meta", "delta", "delta", "done"]
-    assert _deltas(off) == ["别急", "，有我呢"]
+    assert [_kind(line) for line in lines] == ["turn_meta", "delta", "delta", "done"]
+    assert _deltas(lines) == ["别急", "，有我呢"]
     # `current_goal` 由 api 层「非 None 才下发」，其存在与否取决于本轮是否选中目标——
-    # 属**数据依赖**，与总闸无关；两态必须一致（fingerprint 整体比对已覆盖）。
-    # 此处补一条契约序断言：观测键序必须是契约序的**子序列**（值依赖键可缺席，顺序不得漂移）。
-    assert _is_subsequence(tuple(_meta(on)), TURN_META_ORDER)
-    assert _is_subsequence(tuple(_meta(off)), TURN_META_ORDER)
+    # 属**数据依赖**，与收编路径无关。此处锁契约序：观测键序必须是契约序的**子序列**
+    # （值依赖键可缺席，顺序不得漂移）。
+    assert _is_subsequence(tuple(_meta(lines)), TURN_META_ORDER)
 
 
-def test_flag_off_skips_run_ledger_but_on_records_it(
+def test_foreground_run_ledger_recorded(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
-    """两态的**唯一**预期差异：台账。"""
+    """生产路径每轮必落 `loop_runs` 台账。"""
     from app.repositories import loop_run_repository
 
-    override_settings(
-        inventory_grounding_mode="off",
-        runtime_foreground_loop_enabled="true",
-    )
-    llm_override(fake_llm(response=["好"], structured_responses=_structured()))
     before = len(loop_run_repository.list_recent())
-    _turn(http_server, "在吗", "s-ledger-on")
-    after_on = len(loop_run_repository.list_recent())
-    assert after_on > before
 
-    override_settings(runtime_foreground_loop_enabled="false")
-    llm_override(fake_llm(response=["好"], structured_responses=_structured()))
-    _turn(http_server, "在吗", "s-ledger-off")
-    assert len(loop_run_repository.list_recent()) == after_on
+    _single_turn(
+        http_server,
+        override_settings,
+        llm_override,
+        lambda: fake_llm(response=["好"], structured_responses=_structured()),
+        tag="ledger",
+        inventory_grounding_mode="off",
+    )
+
+    assert len(loop_run_repository.list_recent()) > before
 
 
 # ---------------------------------------------------------------------------
@@ -247,26 +202,24 @@ def test_flag_off_skips_run_ledger_but_on_records_it(
 # ---------------------------------------------------------------------------
 
 
-def test_mid_turn_llm_failure_parity(
+def test_mid_turn_llm_failure_error_face(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
     exc = RuntimeError("mid-turn-llm-failure")
 
-    on, off = _both_modes(
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
         lambda: fake_llm(raise_exc=exc, structured_responses=_structured()),
-        content="在吗",
         tag="llmfail",
-        expect_done=False,
         inventory_grounding_mode="off",
     )
 
-    # 失败面：先 turn_meta，后错误块；无 token 下发；两态一致
-    assert _kind(on[0]) == "turn_meta"
-    assert _kind(on[-1]) == "other"
-    assert _deltas(on) == []
+    # 错误面：先 turn_meta，后错误块；无 token 下发
+    assert _kind(lines[0]) == "turn_meta"
+    assert _kind(lines[-1]) == "other"
+    assert _deltas(lines) == []
 
 
 # ---------------------------------------------------------------------------
@@ -274,32 +227,30 @@ def test_mid_turn_llm_failure_parity(
 # ---------------------------------------------------------------------------
 
 
-def test_grounding_streamed_parity(
+def test_grounding_off_streams_tokens(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
-    """grounding 关闭 → 不缓冲 → 逐 token 流；两态一致。"""
-    on, off = _both_modes(
+    """grounding 关闭 → 不缓冲 → 逐 token 流。"""
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
         lambda: fake_llm(
             response=["别急", "，有我呢"], structured_responses=_structured()
         ),
-        content="在吗",
         tag="gs",
         inventory_grounding_mode="off",
     )
 
-    # 逐 token 流（非聚合）
-    assert _kind(on[0]) == "turn_meta"
-    assert _deltas(on) == ["别急", "，有我呢"]
+    assert _kind(lines[0]) == "turn_meta"
+    assert _deltas(lines) == ["别急", "，有我呢"]
 
 
 def test_grounding_rewrite_streams_tokens(
     http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
     """grounding=rewrite 不再缓冲：恒逐 token 流；无库存冲突时不发替换。"""
-    on, off = _both_modes(
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
@@ -311,9 +262,8 @@ def test_grounding_rewrite_streams_tokens(
         inventory_grounding_mode="rewrite",
     )
 
-    assert _deltas(on) == ["别急", "，有我呢"]
-    assert all(line.get("type") != "reply_replace" for line in on)
-    assert all(line.get("type") != "reply_replace" for line in off)
+    assert _deltas(lines) == ["别急", "，有我呢"]
+    assert all(line.get("type") != "reply_replace" for line in lines)
 
 
 def test_grounding_rewrite_replaces_changed_reply(
@@ -327,7 +277,7 @@ def test_grounding_rewrite_replaces_changed_reply(
     monkeypatch.setattr(
         "app.application.chat_pipeline._apply_inventory_grounding", _rewrite
     )
-    on, off = _both_modes(
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
@@ -339,12 +289,12 @@ def test_grounding_rewrite_replaces_changed_reply(
         inventory_grounding_mode="rewrite",
     )
 
-    assert _deltas(on) == ["别急", "，有我呢"]
+    assert _deltas(lines) == ["别急", "，有我呢"]
     replaces = [
-        line["text"] for line in on if line.get("type") == "reply_replace"
+        line["text"] for line in lines if line.get("type") == "reply_replace"
     ]
     assert replaces == ["别急，有我呢（已校准）"]
-    assert on[-1].get("done") is True
+    assert lines[-1].get("done") is True
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +302,7 @@ def test_grounding_rewrite_replaces_changed_reply(
 # ---------------------------------------------------------------------------
 
 
-def test_post_process_failure_parity(
+def test_post_process_failure_does_not_break_stream(
     http_server,
     db_session_factory,
     llm_override,
@@ -365,16 +315,15 @@ def test_post_process_failure_parity(
 
     monkeypatch.setattr(post_process, "STEP_HANDLERS", (_boom,))
 
-    on, off = _both_modes(
+    lines = _single_turn(
         http_server,
         override_settings,
         llm_override,
         lambda: fake_llm(response=["别急"], structured_responses=_structured()),
-        content="在吗",
         tag="ppf",
         inventory_grounding_mode="off",
     )
 
     # 后台步骤失败不影响已产出的回复与流终态
-    assert _kind(on[-1]) == "done"
-    assert _deltas(on) == ["别急"]
+    assert _kind(lines[-1]) == "done"
+    assert _deltas(lines) == ["别急"]

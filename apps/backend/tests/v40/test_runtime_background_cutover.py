@@ -4,10 +4,11 @@
 
 1. **单一路径**：生产入口 `run_autonomous_cycle` 无配置分支、全仓唯一实现体、
    编排体内零内联段序列（段序列唯一声明处为 `profiles.py`）。
-2. **legacy 不可由配置触达**：回退位仅代码级可达。
-3. **等价性**：回退位与生产路径同 (user, now) 语义下段序列 / 终态 / 预算口径逐项一致。
-4. **不激活六段**：`stages/*` 仍为影子实现。
-5. **零新增开关**：`*_enabled` 字段集合与 V3.0.0 基线一致（本版只改默认值）。
+2. **无回退位**：`_legacy_run_autonomous_cycle` / `legacy_cycle_runnable` 与
+   `runtime_autonomous_cycle_enabled` 字段已于 2026-10-15 物理删除（等价性
+   已由 PLA-018 验收沉淀，回退 = git revert）。
+3. **不激活六段**：`stages/*` 仍为影子实现。
+4. **零新增开关**：`*_enabled` 字段集合与基线一致。
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from app.application import life_loop
-from app.application.agent_runtime import controller, profiles
+from app.application.agent_runtime import profiles
 from app.application.agent_runtime import loop as loop_module
 from app.application.agent_runtime import stages as stages_pkg
 from app.application.agent_runtime.models import RUN_KIND_AUTONOMOUS_TICK
@@ -128,24 +129,6 @@ class TestSingleOrchestrationPath:
                     found.append(path.relative_to(BACKEND).as_posix())
         assert found == ["app/application/agent_runtime/controller.py"]
 
-    def test_legacy_body_is_code_level_only(self):
-        """回退位不得被任何模块级配置读取路径引用（只允许显式代码调用）。"""
-        source = CONTROLLER.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        callers = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name in {"legacy_cycle_runnable", "_legacy_run_autonomous_cycle"}:
-                continue
-            for inner in ast.walk(node):
-                if (
-                    isinstance(inner, ast.Name)
-                    and inner.id in {"legacy_cycle_runnable", "_legacy_run_autonomous_cycle"}
-                ):
-                    callers.append(node.name)
-        assert callers == []
-
     def test_no_inline_stage_sequence_in_orchestrator(self):
         assert _stage_tuples(CONTROLLER.read_text(encoding="utf-8")) == []
         assert _stage_tuples(PROFILES.read_text(encoding="utf-8"))
@@ -161,9 +144,6 @@ class TestShadowAndFlagBudget:
         assert stages_pkg.SHADOW_STAGE_IMPLEMENTATION is True
         assert loop_module.SHADOW_STAGE_METHODS is True
 
-    def test_default_is_unified_on(self):
-        assert get_settings().runtime_autonomous_cycle_enabled is True
-
     def test_no_new_enabled_flag(self):
         actual = {name for name in Settings.model_fields if name.endswith("_enabled")}
         assert actual == set(V30_ENABLED_FLAGS)
@@ -171,38 +151,9 @@ class TestShadowAndFlagBudget:
 
 
 class TestCutoverEquivalence:
-    """AC2 / AC3 / AC7：等价性、空转语义与维护步。"""
+    """AC2 / AC3 / AC7：空转语义与维护步（等价性已由 PLA-018 验收沉淀）。"""
 
     pytestmark = pytest.mark.integration
-
-    async def test_cycle_equivalence_with_legacy(
-        self, db_session_factory, background_ready, monkeypatch
-    ):
-        _fake_tick(monkeypatch)
-        user_legacy, session_legacy = "pla018-eq-legacy", "pla018-eq-s-legacy"
-        user_prod, session_prod = "pla018-eq-prod", "pla018-eq-s-prod"
-        _seed_conversation(user_legacy, session_legacy)
-        _seed_conversation(user_prod, session_prod)
-
-        legacy_status = await controller.legacy_cycle_runnable()(
-            user_legacy, now=NOW, trigger_type="schedule", reason="equiv"
-        )
-        legacy_row = loop_run_repository.list_recent(user_id=user_legacy)[0]
-
-        prod_status = await controller.run_autonomous_cycle(
-            user_prod, now=NOW, trigger_type="schedule", reason="equiv"
-        )
-        prod_row = loop_run_repository.list_recent(user_id=user_prod)[0]
-
-        expected = list(profiles.get_profile(RUN_KIND_AUTONOMOUS_TICK).stages)
-        assert legacy_status == prod_status
-        assert _step_names(legacy_row) == _step_names(prod_row) == expected
-        assert set(legacy_row.budget_state or {}) == set(prod_row.budget_state or {})
-
-        legacy_decision = next(s for s in legacy_row.steps if s["step"] == "decision")
-        prod_decision = next(s for s in prod_row.steps if s["step"] == "decision")
-        assert legacy_decision["status"] == prod_decision["status"]
-        assert legacy_decision.get("skip_reason") == prod_decision.get("skip_reason")
 
     async def test_life_loop_tick_runs_via_agent_runtime(
         self, db_session_factory, background_ready, monkeypatch

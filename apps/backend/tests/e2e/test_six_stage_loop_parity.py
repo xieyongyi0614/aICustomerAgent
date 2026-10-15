@@ -131,7 +131,6 @@ def _both_six_modes(
     use_auth_user(on_user)
     override_settings(
         **settings,
-        runtime_foreground_loop_enabled="true",
         runtime_six_stage_loop_enabled="true",
     )
     llm_override(build_llm())
@@ -140,7 +139,6 @@ def _both_six_modes(
     use_auth_user(off_user)
     override_settings(
         **settings,
-        runtime_foreground_loop_enabled="true",
         runtime_six_stage_loop_enabled="false",
     )
     llm_override(build_llm())

@@ -167,7 +167,7 @@
     </div>
   </div>
 
-  <div class="note">前台 9 段由 <code>profiles.py</code> 的 <code>foreground_chat</code> Profile 唯一声明；段本体是 <code>run_chat_pipeline</code> 内的闭包，经 AgentLoop 驱动（或 <code>runtime_foreground_loop_enabled</code> 关闭时走零台账线性旧链，行为等价、可一键回退）。</div>
+  <div class="note">前台 9 段由 <code>profiles.py</code> 的 <code>foreground_chat</code> Profile 唯一声明；段本体是 <code>run_chat_pipeline</code> 内的闭包，经 AgentLoop 驱动（C-2 线性旧链与开关字段已于 2026-10-15 删除，前台回退 = git revert）。</div>
 
   <!-- 流式协议 -->
   <h2><span class="dot" style="background:var(--stream)"></span>三、流式输出协议（NDJSON）</h2>

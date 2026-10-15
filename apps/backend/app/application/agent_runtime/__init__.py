@@ -34,7 +34,6 @@ from app.application.agent_runtime.controller import (
     open_foreground_run,
     open_run,
     run_autonomous_cycle,
-    legacy_cycle_runnable,
     run_event_pregate,
     run_stage_async,
 )
@@ -281,7 +280,6 @@ __all__ = [
     "resolve_session",
     "resume_session",
     "run_autonomous_cycle",
-    "legacy_cycle_runnable",
     "run_event_pregate",
     "run_stage_async",
     "snapshot",
