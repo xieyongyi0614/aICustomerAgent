@@ -84,6 +84,35 @@ async def test_memory_save_user_stated(ctx, override_settings):
 
 
 @pytest.mark.asyncio
+async def test_memory_save_normalizes_legacy_type(ctx, override_settings):
+    """写入口归一（2026-10-15）：参数里的遗留类型名不落库，落 `normalize_type` 后的规范类型。"""
+    override_settings()
+    from app.services.action.capabilities.memory import MemoryCapability
+
+    result = await MemoryCapability().execute(
+        "save", {"fact": "我生日是7月30日", "memory_type": "important_event"}, ctx
+    )
+    assert result.status == "succeeded"
+    memory = memory_repository.get_memory(result.payload["memory_id"])
+    assert memory.type == "experience"
+
+
+@pytest.mark.asyncio
+async def test_memory_save_unknown_type_fails_closed(ctx, override_settings):
+    """表外类型 fail-closed：不落库、不抛异常，返回 permanent 失败。"""
+    override_settings()
+    from app.services.action.capabilities.memory import MemoryCapability
+
+    before = memory_repository.list_by_user(USER)
+    result = await MemoryCapability().execute(
+        "save", {"fact": "表外类型事实", "memory_type": "brand_new"}, ctx
+    )
+    assert result.status == "failed"
+    assert result.payload["failure_kind"] == "permanent"
+    assert memory_repository.list_by_user(USER) == before
+
+
+@pytest.mark.asyncio
 async def test_world_action_create_and_use(ctx, override_settings):
     override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability

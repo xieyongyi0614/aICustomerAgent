@@ -82,7 +82,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 改经 `services/world/engine_port` 端口访问 —— 非 TOOL-010 改脏。原值分别
     # aa217128 / 2ad7ae8f / 69eeff31。
     "app/services/action/capabilities/reminder.py": "5ddf80197aff21b0074142f6c0331224abe93047d2097be4cda668d40c860257",
-    "app/services/action/capabilities/memory.py": "cfb232780c1510776b7b50e9bfb5b6bb69306c9521039d08cd16b5a8f7746119",  # 前值 912619b5（services 归位批次 4：memory/policy → engines/memory_policy 导入路径变更）；再前值 b8cedddd（memory 域清理）
+    # 写入口归一声明（2026-10-15）：`memory_type` 参数经 `types.normalize_type` 归一
+    # （遗留类型名不落库、表外取值 fail-closed）—— 非 TOOL-010 改脏。
+    "app/services/action/capabilities/memory.py": "31f26046e754a41d38afd779679659acf8838e682aac1421072c77447f32dc6e",  # 前值 cfb23278（services 归位批次 4：memory/policy → engines/memory_policy 导入路径变更）；再前值 912619b5 / b8cedddd（memory 域清理）
     "app/services/action/capabilities/world_action.py": "d01ea0b163c1e0beb3fbfb812ba6e25f31dd403a23824f65712813a46ac7be1d",
     "app/services/action/capabilities/environment_query.py": "f48b75e8a105ea907d1c352c348e39813e3a1cbed47919783e3cbd5eb7c603f8",
     # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补

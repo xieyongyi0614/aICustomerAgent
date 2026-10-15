@@ -91,6 +91,7 @@ from app.repositories import action_repository, memory_repository
 from app.engines import memory_policy as memory_policy_gate
 from app.services.memory import commands as memory_commands
 from app.services.memory import ingest as memory_ingest
+from app.services.memory import types as memory_types
 from app.services.tool import memory_policy as tool_memory_policy
 from app.services.tool.memory_policy import (
     DEFAULT_CONFIDENCE,
@@ -359,11 +360,19 @@ def _deliver(goal, plan, event_kind: str, policy) -> dict | None:
         )
         return None
     chosen = saved[0]
+    stored_type = memory_types.normalize_type(chosen.type)
+    if stored_type is None:
+        logger.warning(
+            "计划终态记忆类型非法，已丢弃（不回滚计划终态）: goal=%s type=%s",
+            goal.id,
+            chosen.type,
+        )
+        return None
     memory = memory_repository.create_memory(
         goal.user_id,
         CHARACTER_ID,
         content=chosen.content or "",
-        memory_type=chosen.type,
+        memory_type=stored_type,
         importance=chosen.importance,
         confidence=chosen.confidence,
         source=chosen.source,

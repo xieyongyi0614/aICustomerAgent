@@ -155,7 +155,9 @@ class TestTerminalDelivery:
         stored = support.memories(goal.user_id)
         assert len(stored) == 1
         assert stored[0].content == f"完成了目标：{support.COMPLETED_DESCRIPTION}"
-        assert stored[0].type == tool_memory_policy.DEFAULT_MEMORY_TYPE
+        # 落库类型经 `normalize_type` 归一（边界表仍写遗留名 `important_event`，
+        # 2026-10-15 写入口收口后落库为 `experience`；候选侧契约不变，见 test_plan009_candidate.py）
+        assert stored[0].type == "experience"
         assert stored[0].importance == plan_memory_policy.PLAN_COMPLETED_IMPORTANCE
         assert stored[0].source == "user_derived"
 

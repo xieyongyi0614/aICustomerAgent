@@ -257,9 +257,13 @@ class TestWorldAndPlanMemoryChannelsStayIndependent:
             }
             if subset:
                 imports[path.name] = subset
+        # 写入口收口声明（2026-10-15）：计划终态落库前经 `types.normalize_type` 归一，
+        # 遗留类型名不落库（导入面 +1，`memory` 包自身仍零改动）。原值 ["commands", "ingest"]。
         assert imports == {
             "context.py": {"app.services.memory": ["retriever"]},
-            "memory_policy.py": {"app.services.memory": ["commands", "ingest"]},
+            "memory_policy.py": {
+                "app.services.memory": ["commands", "ingest", "types"]
+            },
         }
         module = support.module_path("memory_policy.py")
         assert scan.called_attributes(module, "memory_ingest") == {
