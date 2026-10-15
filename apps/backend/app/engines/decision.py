@@ -389,7 +389,7 @@ def run_risk_gates(
         gates = [
             _persona_gate(candidate, stack, snapshot),
             _relationship_gate(candidate, snapshot),
-            {_GATE_ACTION: "delegated", "reason": "v9_execution_chain"},
+            {_GATE_ACTION: "delegated", "reason": "delegated_to_execution_chain"},
         ]
         if candidate.source == "silence":
             gates.append({_GATE_BUDGET: "pass", "reason": "zero_cost"})

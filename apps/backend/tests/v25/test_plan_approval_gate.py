@@ -135,11 +135,17 @@ def test_list_pending_scopes_to_user_and_pending_status(make_goal, make_plan):
 
 
 def test_plans_endpoints_require_token():
-    """三个产品端点一律经 `require_user`：无 token 即 401（写面不得裸奔）。"""
+    """三个产品端点一律经 `require_user`：无 token 即 401（写面不得裸奔）。
+
+    本用例断言的是**真实鉴权**，须先摘掉 conftest 的默认鉴权 override
+    （同 `tests/v50/test_identity_cutover.py::real_auth` 口径），否则拿到的是 override 后的 200。
+    """
     from fastapi.testclient import TestClient
 
+    from app.api.v1 import auth as auth_api
     from app.main import app
 
+    app.dependency_overrides.pop(auth_api.require_user, None)
     client = TestClient(app)
     assert client.get("/api/v1/plans/pending").status_code == 401
     assert client.post("/api/v1/plans/any/approve").status_code == 401

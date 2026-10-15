@@ -82,7 +82,10 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0009_app_release_artifacts.py",
 )
 
-SCHEMA_TABLE_SET_DIGEST = "88d74b2ee107db18"
+# 旧账同步声明（2026-10-15）：表集在 0002~0009 增量迁移期间合法增长后漏同步本摘要
+# （HEAD 即红）；核对现表集 57 张与 `tests/support/schema_pins.py::SCHEMA_TABLE_COUNT`
+# 一致后同步。原值 88d74b2e。
+SCHEMA_TABLE_SET_DIGEST = "8704b2b571d513ce"
 # ID 体系收敛声明（2026-10-03，ADR-16 阶段 D）：feishu 两台账表加雪花 id 主键、业务键转 UNIQUE —— 有意演进。
 SCHEMA_COLUMNS_DIGEST_BASELINE = "10134443a5903a3f"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (

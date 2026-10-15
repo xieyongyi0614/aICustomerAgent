@@ -35,8 +35,6 @@ SEARCH_RESULT_COUNT = 0
 
 UNTRUSTED = True
 
-V9_ERROR_TEXT = "该能力尚未接入"
-
 
 def _settings_of(ctx: ExecutionContext):
     return getattr(ctx, "settings", None) or get_settings()

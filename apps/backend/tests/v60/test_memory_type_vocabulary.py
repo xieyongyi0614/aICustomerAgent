@@ -51,7 +51,10 @@ HITTING_QUERIES = {
 NO_KEYWORD_QUERY = "今天天气"
 
 PRESERVED_FUNCTION_DIGESTS = {
-    "normalize_type": "4917df56b1930afc",
+    # 命名卫生声明（2026-10-15）：`normalize_type` 函数体内 `V2_MEMORY_TYPES`
+    # 改名 `CANONICAL_MEMORY_TYPES`，源码摘要随之刷新（原值 4917df56b1930afc）；
+    # 仅标识符改名，分支与返回值语义逐项不变。
+    "normalize_type": "4231c001f40ea05e",
     "storage_type": "f9a67d2989b40ca7",
 }
 
@@ -129,8 +132,8 @@ def _third_party_roots(relative_path: str) -> set[str]:
 
 class TestAffinityVocabulary:
     def test_affinity_keywords_cover_all_canonical_types(self):
-        assert set(memory_types.TYPE_AFFINITY_KEYWORDS) == set(memory_types.V2_MEMORY_TYPES)
-        assert set(memory_types.V2_MEMORY_TYPES) == set(memory_types.TYPE_AFFINITY_KEYWORDS)
+        assert set(memory_types.TYPE_AFFINITY_KEYWORDS) == set(memory_types.CANONICAL_MEMORY_TYPES)
+        assert set(memory_types.CANONICAL_MEMORY_TYPES) == set(memory_types.TYPE_AFFINITY_KEYWORDS)
 
     def test_affinity_keywords_values_are_non_empty_unique_strings(self):
         for memory_type, keywords in memory_types.TYPE_AFFINITY_KEYWORDS.items():
@@ -145,13 +148,13 @@ class TestAffinityVocabulary:
             for word in previous:
                 assert word in current, f"{memory_type} 丢失既有词条 {word}"
 
-    @pytest.mark.parametrize("memory_type", list(memory_types.V2_MEMORY_TYPES))
+    @pytest.mark.parametrize("memory_type", list(memory_types.CANONICAL_MEMORY_TYPES))
     def test_each_canonical_type_has_at_least_one_hitting_query(self, memory_type):
         detected = retriever._detect_query_types(HITTING_QUERIES[memory_type])
         assert memory_type in detected, f"{memory_type} 无法被任何关键词命中"
         assert detected == {memory_type}, f"{memory_type} 命中集不纯净：{detected}"
 
-    @pytest.mark.parametrize("memory_type", list(memory_types.V2_MEMORY_TYPES))
+    @pytest.mark.parametrize("memory_type", list(memory_types.CANONICAL_MEMORY_TYPES))
     def test_affinity_score_positive_for_covered_types(self, memory_type):
         memory = _memory("m1", memory_type)
         hitting = retriever._affinity_score(
@@ -186,8 +189,8 @@ class TestTypeLabels:
 
     def test_label_keys_order_follows_type_constants(self):
         keys = list(MEMORY_TYPE_LABELS)
-        split = len(memory_types.V2_MEMORY_TYPES)
-        assert keys[:split] == list(memory_types.V2_MEMORY_TYPES)
+        split = len(memory_types.CANONICAL_MEMORY_TYPES)
+        assert keys[:split] == list(memory_types.CANONICAL_MEMORY_TYPES)
         assert keys[split:] == list(memory_types.LEGACY_MEMORY_TYPES)
 
     def test_canonical_type_labels_rendered_in_prompt(self, caplog):
@@ -225,7 +228,7 @@ class TestTypeLabels:
 
 class TestContracts:
     def test_type_constants_unchanged(self):
-        assert memory_types.V2_MEMORY_TYPES == (
+        assert memory_types.CANONICAL_MEMORY_TYPES == (
             "user_preference",
             "user_fact",
             "experience",
@@ -240,7 +243,7 @@ class TestContracts:
             "relationship_event": "relationship_fact",
         }
         assert memory_types.STORAGE_MEMORY_TYPES == (
-            memory_types.V2_MEMORY_TYPES + memory_types.LEGACY_MEMORY_TYPES
+            memory_types.CANONICAL_MEMORY_TYPES + memory_types.LEGACY_MEMORY_TYPES
         )
         assert memory_types.DEFAULT_MEMORY_TYPE == "user_fact"
 

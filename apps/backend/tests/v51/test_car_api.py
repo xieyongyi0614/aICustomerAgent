@@ -14,6 +14,7 @@ from app.api.v1 import auth as auth_api
 from app.main import create_app
 from app.services.car import aggregate as car_aggregate
 from app.services.car import entries as car_entries
+from app.services.car import reminders as car_reminders
 from tests.conftest import TEST_USER_ID
 
 BACKEND = Path(__file__).resolve().parents[2]
@@ -21,6 +22,16 @@ USER = TEST_USER_ID
 NOW = timeutil.ensure_aware(datetime(2026, 9, 30, 12, 0, 0))
 CHARGE_AT = timeutil.ensure_aware(datetime(2026, 9, 28, 9, 0, 0))
 SERVICE_AT = timeutil.ensure_aware(datetime(2026, 9, 29, 9, 0, 0))
+
+
+def _purchased_at_months_ago(months: int) -> str:
+    """购买日期锚定「今天 − N 个月」（正午规避时区跨日）。
+
+    车龄随日历增长，写死日期会让精确断言按天腐烂；换算规则本身由
+    `tests/v51/test_car_reminders.py::test_age_text_reports_years_and_months` 钉值。
+    """
+    naive = timeutil.local_naive(car_reminders.add_months(timeutil.now(), -months))
+    return naive.replace(hour=12, minute=0, second=0, microsecond=0).isoformat()
 
 
 ENDPOINTS = (
@@ -144,7 +155,7 @@ def test_car_profile_derives_age_and_paid_ratio(client):
         {
             "battery_kwh": 85.4,
             "odometer_km": 12480,
-            "purchased_at": "2024-06-15T00:00:00",
+            "purchased_at": _purchased_at_months_ago(27),
             "charger_power_kw": 7.0,
             "charger_note": "家用 7 kW · 谷电",
             "loan": {

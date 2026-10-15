@@ -1,8 +1,10 @@
 """REL-001 关系事实真相源统一测试。
 
 覆盖：里程碑转写通道（类型/salience/source_ref/幂等/insight 溯源位）、
-v1 直写旁路已删除（静态守卫）、v1 遗留记忆迁移（dry-run/apply/幂等/校验）、
-debug timeline 账本↔记忆互相溯源。
+v1 直写旁路已删除（静态守卫）、debug timeline 账本↔记忆互相溯源。
+
+注：v1 遗留类型迁移（原 `memory/migration.py`）已于 2026-10-15 整体删除——
+存量库可重建，迁移无对象；本文件对应的 `TestLegacyMigration` 同步移除。
 """
 
 import pathlib
@@ -24,8 +26,8 @@ from app.repositories import (
     relationship_event_repository,
     relationship_milestone_repository,
 )
-from app.services.memory import ingest, migration
-from app.services.memory.types import V2_MEMORY_TYPES
+from app.services.memory import ingest
+from app.services.memory.types import CANONICAL_MEMORY_TYPES
 
 BACKEND = pathlib.Path(__file__).resolve().parents[2]
 
@@ -96,8 +98,8 @@ class TestMilestoneIngest:
         assert row.source_ref["insight_id"] == "ins-7"
 
     def test_milestone_event_type_is_canonical(self):
-        assert "milestone_event" in V2_MEMORY_TYPES
-        assert "relationship_fact" in V2_MEMORY_TYPES
+        assert "milestone_event" in CANONICAL_MEMORY_TYPES
+        assert "relationship_fact" in CANONICAL_MEMORY_TYPES
 
 
 class TestV1BypassGate:
@@ -109,46 +111,6 @@ class TestV1BypassGate:
     def test_state_service_has_no_v1_delivery_reference(self):
         source = (BACKEND / "app/services/conversation/state.py").read_text(encoding="utf-8")
         assert "relationship_memory" not in source
-
-
-class TestLegacyMigration:
-    def _seed_legacy(self, user_id="u-mig", content="我们一起去看过海"):
-        return memory_repository.create_memory(
-            user_id=user_id,
-            character_id="asuna",
-            content=content,
-            memory_type="relationship_event",
-            importance=0.8,
-            confidence=0.8,
-            source="ai_inferred",
-        )
-
-    def test_dry_run_report(self, _offline_repos):
-        self._seed_legacy()
-        report = migration.collect_report()
-        assert report["pending_rows"] == 1
-        assert report["per_user"] == {"u-mig": 1}
-        assert report["without_source_ref"] == 1
-        assert report["replay_source_rows"] == 1
-        assert report["target_type"] == "relationship_fact"
-
-    def test_apply_migrates_and_verifies(self, _offline_repos):
-        memory = self._seed_legacy()
-        report = migration.apply_migration(batch_size=10)
-        assert report["mode"] == "apply"
-        assert report["migrated"] == 1
-        assert report["verification"]["remaining_rows"] == 0
-        assert report["verification"]["alias_mapping_ok"] is True
-        assert report["verification"]["affinity_normalize_ok"] is True
-        row = memory_repository.get_memory(memory.id)
-        assert row.type == "relationship_fact"
-        assert row.content == "我们一起去看过海"
-        assert row.source == "ai_inferred"
-
-    def test_apply_idempotent(self, _offline_repos):
-        self._seed_legacy()
-        assert migration.apply_migration(batch_size=10)["migrated"] == 1
-        assert migration.apply_migration(batch_size=10)["migrated"] == 0
 
 
 class TestTimelineNarrativeLink:

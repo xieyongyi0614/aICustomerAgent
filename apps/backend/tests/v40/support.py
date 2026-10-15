@@ -2,7 +2,7 @@
 
 约定同 V3.0（`tests/v30/runtime_support.py`）：
 
-- `V30_ENABLED_FLAGS` 是 **V3.0.0 冻结基线**（PLA-018 AC6 / PLA-001 AC6）。V4.0
+- `BASELINE_ENABLED_FLAGS` 是 **V3.0.0 冻结基线**（PLA-018 AC6 / PLA-001 AC6）。V4.0
   禁止新增任何功能开关（v4.0.0 `architecture.md` 铁律 5 / 不变量 11），故 `core/settings/`
   的 `*_enabled` 字段集合必须与它**完全一致**——本版只允许改既有字段的默认值。
   基线是**静态快照**而非运行时计算：动态计算会让「防新增」的断言退化为同义反复。
@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-V30_ENABLED_FLAGS: frozenset[str] = frozenset(
+BASELINE_ENABLED_FLAGS: frozenset[str] = frozenset(
     {
         "action_outbox_enabled",
         "action_relationship_enabled",

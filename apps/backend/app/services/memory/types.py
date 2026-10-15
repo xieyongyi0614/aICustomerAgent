@@ -6,7 +6,7 @@
 共 9 值；v1 的 Pydantic MemoryType Literal 放宽为同集合，既有 4 值行为不变。
 """
 
-V2_MEMORY_TYPES = (
+CANONICAL_MEMORY_TYPES = (
     "user_preference",
     "user_fact",
     "experience",
@@ -23,7 +23,7 @@ LEGACY_TYPE_ALIASES = {
     "relationship_event": "relationship_fact",
 }
 
-STORAGE_MEMORY_TYPES = V2_MEMORY_TYPES + LEGACY_MEMORY_TYPES
+STORAGE_MEMORY_TYPES = CANONICAL_MEMORY_TYPES + LEGACY_MEMORY_TYPES
 
 DEFAULT_MEMORY_TYPE = "user_fact"
 
@@ -127,7 +127,7 @@ TYPE_AFFINITY_KEYWORDS = {
 评估侧（`evaluator._type_affinity`）对 `proposed_type` 先经 `normalize_type` 归一，
 检索侧（`retriever._detect_query_types` / `_affinity_score`）对查询与存储类型同样
 归一后消费本表；遗留类型名经 `LEGACY_TYPE_ALIASES` 映入同组，评分语义不变。
-键集合与 `V2_MEMORY_TYPES` 一一对应（有静态用例钉住），新增类型必须同步扩表。
+键集合与 `CANONICAL_MEMORY_TYPES` 一一对应（有静态用例钉住），新增类型必须同步扩表。
 """
 
 
@@ -135,7 +135,7 @@ def normalize_type(memory_type: str | None) -> str | None:
     """归一化为 7 规范类型之一；遗留类型映射到对应规范类型，非法返回 None。"""
     if memory_type is None:
         return None
-    if memory_type in V2_MEMORY_TYPES:
+    if memory_type in CANONICAL_MEMORY_TYPES:
         return memory_type
     return LEGACY_TYPE_ALIASES.get(memory_type)
 

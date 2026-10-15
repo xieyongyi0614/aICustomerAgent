@@ -4,9 +4,7 @@ from app.models.relationship import RelationshipDelta
 
 STAGE_ORDER = ("stranger", "friend", "close_friend", "partner")
 
-RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
-
-RELATIONSHIP_DIMENSIONS_V85 = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
+RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
 
 EMOTION_EVENTS: dict[str, dict] = {
     "praise": {"emotion": "happy", "delta": 0.3},

@@ -95,7 +95,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # `state_engine` / `goal_alignment` → `engines/*`、领域包归位导入路径变更；
     # 批次 4 文件由 `services/decision_pipeline.py` 归位至 `engines/decision.py`，
     # 内容逐字节未变（摘要不变），仅键路径更新。原值 0c671330。
-    "app/engines/decision.py": "92f5d7b46313d925f0ce62fc2110af0b704a4f3eeab59c47f5480d50b502a6e4",
+    # 命名卫生声明（2026-10-15）：决策 `reason` 值 `v9_execution_chain` →
+    # `delegated_to_execution_chain`（可观测字面量去版本号）—— 非 TOOL-010 改脏。
+    # 原值 92f5d7b4。
+    "app/engines/decision.py": "4f3320f1e79420d7028d28a57afc57d79e89d5879f4f7dd6e88187d6bd772d95",
     # API-003 语义变更声明：turn_meta 追加 memory_refs（键序末尾可选），非 TOOL-010 改脏。
     # 开关清理声明（2026-09-28）：删除 inventory_grounding_enabled / character_action_sync_enabled
     # 并固化常开，grounding 关断改由 inventory_grounding_mode=off 承担 —— 非 TOOL-010 改脏。
@@ -113,7 +116,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # / 经 `channel_gateway` 转发 —— 非 TOOL-010 改脏。原值 e119d89b。
     # 注释补充声明（2026-10-10）：为前台管线补中文 docstring / 行内注释（零逻辑改动，
     # 逐行仅新增）—— 非 TOOL-010 改脏。原值 d7be7201。
-    "app/application/chat_pipeline.py": "7b2ee0e48cae22edc3c1f872678067e66983bd8283705cc123fd226167b9cb5d",
+    # 旧账同步声明（2026-10-15）：`0989a507`（删除前后台旧链回退位与死开关）改本文件时漏
+    # 同步摘要，摘要早已 stale（HEAD 即红）；核对磁盘内容正确后同步。原值 7b2ee0e4。
+    "app/application/chat_pipeline.py": "3ea744995a3365173b815fa408e61f7d5d3b3d7ce18ae37d95fc014229512cfe",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
@@ -140,7 +145,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 演绎段注入策略位声明（2026-10-02）：新增 `roleplay_prompt_mode`（默认 full）——
     # `off` 时回答链不注入人设/情绪/关系/世界/场景/行为/风格段，`full` 时字节不变。
     # 非 TOOL-010 改脏。原值 2683cf60。
-    "app/prompts/builder.py": "ac4476d1d7b4ca49795c3f730253a9c8f14dc4b568eaee79544d40fa22decb51",
+    # 命名卫生声明（2026-10-15）：docstring 内 `V2_MEMORY_TYPES` → `CANONICAL_MEMORY_TYPES`。
+    # 另 `87989c62`（MEV-003 词表与标签覆盖）改本文件时漏同步摘要（旧账）—— 非 TOOL-010 改脏。
+    # 原值 ac4476d1。
+    "app/prompts/builder.py": "52479c740c1080c9e3c65fb784dd2c2e06322af59d7beaa286b00d5f2558318b",
 }
 """整文件零 diff 冻结面。
 

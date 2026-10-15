@@ -176,7 +176,7 @@ class GoalRecord(BaseModel):
     arbitration_state: dict | None = None
 
 
-V1_STATUS_TARGETS: tuple[str, ...] = ("completed", "expired", "cancelled")
+LEGACY_STATUS_TARGETS: tuple[str, ...] = ("completed", "expired", "cancelled")
 
 GOAL_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "active": ("completed", "failed", "abandoned", "suspended"),
@@ -192,7 +192,7 @@ GOAL_TRANSITIONS: dict[str, tuple[str, ...]] = {
 def goal_transitions(layer: str | None, current: str) -> tuple[str, ...]:
     """状态机唯一权威：v1 行（layer NULL）保持既有出口；层级行走六语义状态机。"""
     if layer is None:
-        return V1_STATUS_TARGETS if current == "active" else ()
+        return LEGACY_STATUS_TARGETS if current == "active" else ()
     return GOAL_TRANSITIONS.get(current, ())
 
 

@@ -42,7 +42,6 @@ from app.services.memory import evaluator as memory_evaluator
 from app.services.memory import ingest as memory_ingest
 from app.services.memory import job_worker as memory_job_worker
 from app.services.memory import lifecycle as memory_lifecycle
-from app.services.memory import migration as memory_migration
 from app.services.memory import product_view as memory_product_view
 from app.services.memory import retriever as memory_retriever
 from app.services.development import evolution as evolution_service
@@ -192,7 +191,6 @@ _SERVICE_DB_MODULES = (
     memory_ingest,
     memory_job_worker,
     memory_lifecycle,
-    memory_migration,
     memory_product_view,
     relationship_evaluation_service,
     relationship_narrative_service,

@@ -32,7 +32,7 @@ DIMENSION_ENABLED_FIELDS: dict[str, str] = {
 
 新增维度必须同批登记本表；缺登记即 `KeyError`（fail-closed），
 不再退化为「无开关 = 永远开启」。字段集合由 `tests/v40/support.py`
-的 `V30_ENABLED_FLAGS` 冻结。"""
+的 `BASELINE_ENABLED_FLAGS` 冻结。"""
 
 
 

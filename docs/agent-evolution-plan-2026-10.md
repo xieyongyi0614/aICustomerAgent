@@ -126,7 +126,7 @@ score = w_semantic·cosine
 
 | # | 缺口 | 证据 |
 |---|---|---|
-| G-M1 | **无情景/语义分层**：类型是扁平 9 值（`types.py:9` 起 `V2_MEMORY_TYPES`），无 episodic/semantic 通道概念 | `apps/backend/app/services/memory/types.py:9`、`apps/backend/app/core/db/memory.py:61` |
+| G-M1 | **无情景/语义分层**：类型是扁平 9 值（`types.py:9` 起 `CANONICAL_MEMORY_TYPES`），无 episodic/semantic 通道概念 | `apps/backend/app/services/memory/types.py:9`、`apps/backend/app/core/db/memory.py:61` |
 | G-M2 | **无记忆图谱/多跳检索**：`memory_links` 只有三种关系且不参与检索 | `apps/backend/app/core/db/memory.py:120`、`retriever.py:265`（单次单跳） |
 | G-M3 | **无 LLM rerank / query 改写 / 多轮检索** | `retriever.py:265` 无 LLM 调用点 |
 | G-M4 | **无聚类/主题聚合、无 learned importance** | 未找到证据（`importance` 为写入期给定值） |

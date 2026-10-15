@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 
 from app.core import timeutil
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 from app.core.settings import get_settings
 from app.models.behavior_strategy import ActionBudget
 from app.engines import behavior as behavior_engine
@@ -278,19 +279,16 @@ def _collect_relationship(user_id: str) -> RelationshipSlice | None:
     )
 
 
-_RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
-
-
 def _state_dims(state) -> dict | None:
     if state is None:
         return None
-    return {dim: float(getattr(state, dim, 0.0)) for dim in _RELATIONSHIP_DIMENSIONS}
+    return {dim: float(getattr(state, dim, 0.0)) for dim in RELATIONSHIP_DIMENSIONS}
 
 
 def _delta_dims(delta) -> dict | None:
     if delta is None:
         return None
-    return {dim: float(getattr(delta, dim, 0.0)) for dim in _RELATIONSHIP_DIMENSIONS}
+    return {dim: float(getattr(delta, dim, 0.0)) for dim in RELATIONSHIP_DIMENSIONS}
 
 
 def _collect_world(user_id: str) -> dict | None:

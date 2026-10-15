@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85, BEHAVIOR_DELTAS
+from app.core.constants import RELATIONSHIP_DIMENSIONS, BEHAVIOR_DELTAS
 from app.core.settings import get_settings
 from app.models.relationship import (
     InteractionSignal,
@@ -147,7 +147,7 @@ def rate_limit(
     settings = get_settings()
     truncated: dict[str, float] = {}
     limited = {}
-    for dimension in RELATIONSHIP_DIMENSIONS_V85:
+    for dimension in RELATIONSHIP_DIMENSIONS:
         total = getattr(event_delta, dimension) + getattr(behavior_delta, dimension)
         capped = max(
             -settings.rel_max_event_delta, min(settings.rel_max_event_delta, total)
@@ -215,7 +215,7 @@ def evolve(
     )
     new_values: dict[str, float] = {}
     applied: dict[str, float] = {}
-    for dimension in RELATIONSHIP_DIMENSIONS_V85:
+    for dimension in RELATIONSHIP_DIMENSIONS:
         current = getattr(state, dimension)
         new_value = clamp01(current + getattr(limited, dimension))
         new_values[dimension] = new_value
@@ -284,7 +284,7 @@ def replay(state: RelationshipState, events: list[Any]) -> RelationshipState:
             dimension: clamp01(
                 getattr(current, dimension) + getattr(impact, dimension)
             )
-            for dimension in RELATIONSHIP_DIMENSIONS_V85
+            for dimension in RELATIONSHIP_DIMENSIONS
         }
         updates["stage"] = next_stage(
             updates["intimacy"],

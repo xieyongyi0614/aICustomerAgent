@@ -30,8 +30,6 @@ NOTIFICATION_CONTENT_MAX_CHARS = 200
 
 NOTE_ID_PREFIX = "note"
 
-V9_ERROR_TEXT = "该能力尚未接入"
-
 
 def _settings_of(ctx: ExecutionContext):
     return getattr(ctx, "settings", None) or get_settings()

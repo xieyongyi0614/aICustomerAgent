@@ -28,7 +28,7 @@ from app.core.settings import Settings, get_settings
 from app.repositories import conversation_repository, loop_run_repository
 from app.services.life import budget as life_loop_budget
 from app.services.autonomy import trigger as trigger_evaluator
-from tests.v40.support import V30_ENABLED_FLAGS
+from tests.v40.support import BASELINE_ENABLED_FLAGS
 
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
@@ -146,8 +146,8 @@ class TestShadowAndFlagBudget:
 
     def test_no_new_enabled_flag(self):
         actual = {name for name in Settings.model_fields if name.endswith("_enabled")}
-        assert actual == set(V30_ENABLED_FLAGS)
-        assert not {name for name in V30_ENABLED_FLAGS if name not in actual}
+        assert actual == set(BASELINE_ENABLED_FLAGS)
+        assert not {name for name in BASELINE_ENABLED_FLAGS if name not in actual}
 
 
 class TestCutoverEquivalence:

@@ -9,7 +9,7 @@ tests/v8.5/test_relationship_replay.py 与本报告共同承担。
 import logging
 from datetime import datetime
 
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 from app.models.relationship import RelationshipState
 from app.repositories import (
     relationship_event_repository,
@@ -57,7 +57,7 @@ def replay_report(user_id: str) -> dict:
     reconciled: list[str] = []
     explained: dict[str, dict] = {}
     unexplained: dict[str, dict] = {}
-    for dim in RELATIONSHIP_DIMENSIONS_V85:
+    for dim in RELATIONSHIP_DIMENSIONS:
         replayed = float(getattr(rebuilt, dim))
         actual = float(getattr(current, dim))
         diff = round(actual - replayed, 6)
@@ -85,10 +85,10 @@ def replay_report(user_id: str) -> dict:
 
 
 def _bonus_since(user_id: str, since: datetime) -> dict[str, float]:
-    totals = {dim: 0.0 for dim in RELATIONSHIP_DIMENSIONS_V85}
+    totals = {dim: 0.0 for dim in RELATIONSHIP_DIMENSIONS}
     for record in relationship_milestone_repository.list_milestones(user_id):
         if record.created_at <= since:
             continue
-        for dim in RELATIONSHIP_DIMENSIONS_V85:
+        for dim in RELATIONSHIP_DIMENSIONS:
             totals[dim] += float(getattr(record.applied_bonus, dim, 0.0) or 0.0)
     return totals

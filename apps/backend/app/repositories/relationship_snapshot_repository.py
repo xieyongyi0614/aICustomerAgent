@@ -9,7 +9,7 @@ from app.core import ids
 from app.core.db import RelationshipSnapshotRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.relationship import RelationshipSnapshot, RelationshipState
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 
 
 def _to_snapshot(row: RelationshipSnapshotRow) -> RelationshipSnapshot:
@@ -27,7 +27,7 @@ def _to_snapshot(row: RelationshipSnapshotRow) -> RelationshipSnapshot:
 
 
 def _dimensions_from_state(state: RelationshipState) -> dict[str, float]:
-    return {dim: getattr(state, dim, 0.0) for dim in RELATIONSHIP_DIMENSIONS_V85}
+    return {dim: getattr(state, dim, 0.0) for dim in RELATIONSHIP_DIMENSIONS}
 
 
 def list_snapshots(user_id: str, limit: int = 50) -> list[RelationshipSnapshot]:

@@ -9,7 +9,7 @@ from app.core.settings import get_settings
 from app.models.character_state import CharacterState
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 from app.models.relationship import (
     RelationshipDelta,
     RelationshipEvent,
@@ -34,7 +34,7 @@ from app.repositories import (
 
 logger = logging.getLogger(__name__)
 
-RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
+LEGACY_RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
 
 _reputation_audits: dict[str, dict] = {}
 
@@ -65,7 +65,7 @@ def _day_impact_totals(
     for event in events:
         if timeutil.local(event.created_at).date() != timeutil.local(now).date():
             continue
-        for dim in RELATIONSHIP_DIMENSIONS_V85:
+        for dim in RELATIONSHIP_DIMENSIONS:
             value = getattr(event.impact, dim)
             if value > 0:
                 setattr(positive, dim, getattr(positive, dim) + value)
@@ -474,7 +474,7 @@ def _replay_relationship_memories(
             discount = settings.rel_replay_discount
             new_values = {}
             applied = {}
-            for dim in RELATIONSHIP_DIMENSIONS:
+            for dim in LEGACY_RELATIONSHIP_DIMENSIONS:
                 delta = getattr(base, dim) * discount
                 current = getattr(updated, dim)
                 new_value = state_engine.clamp(current + delta, 0.0, 1.0)

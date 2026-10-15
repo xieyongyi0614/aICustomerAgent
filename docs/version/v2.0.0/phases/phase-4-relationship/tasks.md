@@ -120,6 +120,10 @@ Integration: REL-003 Patterns 接入 / REL-004 叙事里程碑与评估
 
 ## 实现状态（2026-09-06 完成）
 
+> **更正注（2026-10-15）**：下文 REL-001 所述迁移脚本 `scripts/migrate_relationship_memory_types.py`
+> 从未创建，其底层 `app/services/memory/migration.py` 亦无生产入口；该模块已随「存量窗口关闭」
+> （库可重建，无历史行待迁移）于 2026-10-15 整体删除。原文保留，视为当时的记录。
+
 ```text
 REL-001 已实现（v2_relationship_evolved_enabled 总闸 settings 化；Flag ON 关停
 state_service v1 直写旁路（冲突/里程碑/快照子系统不动）；里程碑转写通道

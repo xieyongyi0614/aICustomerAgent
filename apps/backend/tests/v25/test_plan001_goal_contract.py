@@ -32,7 +32,7 @@ from app.models.goal import (
     GOAL_PRIORITY_MAX,
     GOAL_PRIORITY_MIN,
     GOAL_TRANSITIONS,
-    V1_STATUS_TARGETS,
+    LEGACY_STATUS_TARGETS,
     IllegalGoalTransition,
     SubGoalSpec,
     goal_transitions,
@@ -66,7 +66,7 @@ TUPLE_SNAPSHOT = {
     "DOMAIN_VALUES": ("personal", "relationship", "world", "budget"),
     "PLAN_STATUS_VALUES": ("draft", "validated", "active", "rejected", "superseded"),
     "SUB_GOAL_STATUS_VALUES": ("pending", "in_progress", "done", "failed"),
-    "V1_STATUS_TARGETS": ("completed", "expired", "cancelled"),
+    "LEGACY_STATUS_TARGETS": ("completed", "expired", "cancelled"),
     "GOAL_ORIGINS": (
         "insight",
         "commitment",
@@ -287,7 +287,7 @@ def test_u2_failed_and_suspended_hold_the_only_edges_back_to_active():
 
 
 def test_u3_layered_and_v1_branches_are_distinct():
-    assert goal_transitions(None, "active") == V1_STATUS_TARGETS
+    assert goal_transitions(None, "active") == LEGACY_STATUS_TARGETS
     assert not goal_transitions(None, "completed")
     assert not goal_transitions(None, "suspended")
     for status, targets in GOAL_TRANSITIONS.items():

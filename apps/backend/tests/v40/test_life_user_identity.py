@@ -9,7 +9,7 @@ import pytest
 from app.core.db import UserRow
 from app.core.settings import Settings
 from app.services.identity.user_service import UserContext, get_user
-from tests.v40.support import V30_ENABLED_FLAGS
+from tests.v40.support import BASELINE_ENABLED_FLAGS
 
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
@@ -60,4 +60,4 @@ def test_life_settings_has_no_enabled_flag_field():
 
 def test_no_new_enabled_flag_across_settings():
     current = {name for name in Settings.model_fields if name.endswith("_enabled")}
-    assert current == set(V30_ENABLED_FLAGS)
+    assert current == set(BASELINE_ENABLED_FLAGS)

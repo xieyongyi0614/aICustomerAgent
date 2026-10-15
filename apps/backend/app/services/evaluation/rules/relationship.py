@@ -6,7 +6,7 @@ narrative 切片缺席（None）时静默跳过——向后兼容既有 turn 评
 
 import json
 
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 from app.core.settings import get_settings
 from app.models.evaluation import (
     EvaluationDimension,
@@ -35,7 +35,7 @@ class RelationshipJumpRule(EvaluationRule):
         if rel is None or rel.after is None or rel.before is None:
             return None
         settings = get_settings()
-        for dim in RELATIONSHIP_DIMENSIONS_V85:
+        for dim in RELATIONSHIP_DIMENSIONS:
             delta = abs(rel.after[dim] - rel.before[dim])
             if delta > settings.rel_max_turn_delta + _TOLERANCE:
                 return build_issue(
@@ -57,11 +57,11 @@ class LedgerReconciliationRule(EvaluationRule):
         rel = ctx.relationship
         if rel is None or rel.after is None or rel.before is None:
             return None
-        ledger: dict[str, float] = {dim: 0.0 for dim in RELATIONSHIP_DIMENSIONS_V85}
+        ledger: dict[str, float] = {dim: 0.0 for dim in RELATIONSHIP_DIMENSIONS}
         for event in rel.events:
-            for dim in RELATIONSHIP_DIMENSIONS_V85:
+            for dim in RELATIONSHIP_DIMENSIONS:
                 ledger[dim] += float(getattr(event.impact, dim, 0.0))
-        for dim in RELATIONSHIP_DIMENSIONS_V85:
+        for dim in RELATIONSHIP_DIMENSIONS:
             observed = rel.after[dim] - rel.before[dim]
             explained = ledger[dim]
             tolerance = _TOLERANCE

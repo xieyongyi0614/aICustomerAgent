@@ -51,6 +51,21 @@ from . import plan011_support as support
 pytestmark = pytest.mark.api
 
 
+@pytest.fixture(autouse=True)
+def _auth_override():
+    """调试面自身份收口（v5.0.0 §14）起一律经 `require_user`。
+
+    本模块经 `plan011_support` 走真实路由，但模块源码不含 `app.main` 字面量，
+    命中不了 `tests/conftest.py::_mark_app_based` 的自动识别，故就地显式装 override。
+    """
+    from app.api.v1 import auth as auth_api
+    from app.main import app as server_app
+
+    server_app.dependency_overrides[auth_api.require_user] = lambda: support.USER
+    yield
+    server_app.dependency_overrides.pop(auth_api.require_user, None)
+
+
 @pytest.fixture
 def plan_panel_on(override_settings, monkeypatch):
     monkeypatch.setattr(tool_registry_module, "_registry", None)
