@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.chains import memory_query_rewrite_chain as memory_query_rewrite
 from app.chains import memory_rerank_chain as memory_rerank
 from app.core import timeutil
 from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
@@ -34,6 +35,9 @@ MODE_DEGRADED = "degraded"
 
 RERANK_MODE_OFF = "off"
 RERANK_MODE_LITE = "lite"
+
+REWRITE_MODE_OFF = "off"
+REWRITE_MODE_LITE = "lite"
 
 VISIBILITY_HYPOTHETICAL = "hypothetical"
 STATUS_ACTIVE = "active"
@@ -66,6 +70,7 @@ class RankedMemory:
     score: float = 0.0
     reason: str = ""
     rerank_score: float | None = None
+    matched_queries: str = ""
 
 
 @dataclass
@@ -73,6 +78,7 @@ class RankedMemories:
     items: list[RankedMemory] = field(default_factory=list)
     mode: str = MODE_STRUCTURED
     rerank_mode: str = RERANK_MODE_OFF
+    rewrite_mode: str = REWRITE_MODE_OFF
 
     def memories(self) -> list[UserMemory]:
         return [item.memory for item in self.items]
@@ -231,6 +237,25 @@ def _parse_vector(value) -> list[float] | None:
     return None
 
 
+def _weighted_score(
+    semantic: float,
+    structured: float,
+    affinity: float,
+    memory: UserMemory,
+    now: datetime,
+    temporal: bool,
+) -> float:
+    settings = get_settings()
+    score = (
+        settings.memory_weight_semantic * semantic
+        + settings.memory_weight_structured * structured
+        + settings.memory_weight_affinity * affinity
+    )
+    if temporal:
+        score += settings.memory_temporal_recency_boost * _recency(memory, now)
+    return score
+
+
 def _score_all(
     memories: list[UserMemory],
     facts: dict[str, dict],
@@ -239,7 +264,6 @@ def _score_all(
     now: datetime,
     temporal: bool = False,
 ) -> list[RankedMemory]:
-    settings = get_settings()
     ranked = []
     for memory in memories:
         fact = facts.get(memory.id, {})
@@ -249,13 +273,7 @@ def _score_all(
             semantic = _cosine(query_embedding, embedding)
         structured = _structured_score(memory, fact.get("salience"), now)
         affinity = _affinity_score(memory, query_types)
-        score = (
-            settings.memory_weight_semantic * semantic
-            + settings.memory_weight_structured * structured
-            + settings.memory_weight_affinity * affinity
-        )
-        if temporal:
-            score += settings.memory_temporal_recency_boost * _recency(memory, now)
+        score = _weighted_score(semantic, structured, affinity, memory, now, temporal)
         ranked.append(
             RankedMemory(
                 memory=memory,
@@ -306,19 +324,10 @@ def _maybe_rerank(
     return sorted(ranked, key=_rerank_sort_key), RERANK_MODE_LITE
 
 
-def retrieve(
-    user_id: str,
-    query: str,
-    character_id: str = "asuna",
-    top_k: int | None = None,
-    trace=None,
-) -> RankedMemories:
-    started = time.perf_counter()
-    settings = get_settings()
-    limit = top_k or settings.memory_top_k
-    now = timeutil.now()
-    query_text = (query or "").strip()
-
+def _recall(
+    user_id: str, character_id: str, query_text: str, now: datetime
+) -> tuple[list[RankedMemory], str, int]:
+    """单 query 召回（结构路 ∪ 向量路）+ 逐候选分量；返回 (ranked, mode, pool_size)。"""
     pool = _candidate_pool(user_id, character_id)
     facts = _row_facts([memory.id for memory in pool])
     pool = [m for m in pool if facts.get(m.id, {}).get("visibility") != VISIBILITY_HYPOTHETICAL]
@@ -337,13 +346,102 @@ def retrieve(
         elif pool:
             mode = MODE_DEGRADED
 
-    rejected_contents = _recently_rejected_contents(user_id, now) if pool else []
-    cooldown_ids = _contradicts_cooldown_ids(user_id, now) if pool else set()
-
     query_types = _detect_query_types(query_text)
     ranked = _score_all(
         pool, facts, query_embedding, query_types, now, temporal=_is_temporal_query(query_text)
     )
+    return ranked, mode, len(pool)
+
+
+def _merge_ranked(
+    ranked_lists: list[list[RankedMemory]], now: datetime, temporal: bool
+) -> list[RankedMemory]:
+    """多路归并：按 memory.id 去重，分量与惩罚取最大，score 用同一公式与权重重算。
+
+    `matched_queries` 记录命中该记忆的 query 序号（`q0` = 原 query），供 MEV-004 归因。
+    """
+    merged: dict[str, RankedMemory] = {}
+    order: list[str] = []
+    hits: dict[str, list[str]] = {}
+    for index, ranked in enumerate(ranked_lists):
+        tag = f"q{index}"
+        for item in ranked:
+            memory_id = item.memory.id
+            target = merged.get(memory_id)
+            if target is None:
+                target = RankedMemory(memory=item.memory)
+                merged[memory_id] = target
+                order.append(memory_id)
+                hits[memory_id] = []
+            target.semantic = max(target.semantic, item.semantic)
+            target.structured = max(target.structured, item.structured)
+            target.affinity = max(target.affinity, item.affinity)
+            target.penalty = max(target.penalty, item.penalty)
+            if tag not in hits[memory_id]:
+                hits[memory_id].append(tag)
+
+    merged_items: list[RankedMemory] = []
+    for memory_id in order:
+        item = merged[memory_id]
+        item.score = _weighted_score(
+            item.semantic, item.structured, item.affinity, item.memory, now, temporal
+        )
+        item.matched_queries = ",".join(hits[memory_id])
+        merged_items.append(item)
+    return merged_items
+
+
+def _merge_mode(modes: list[str]) -> str:
+    if MODE_HYBRID in modes:
+        return MODE_HYBRID
+    if MODE_DEGRADED in modes:
+        return MODE_DEGRADED
+    return MODE_STRUCTURED
+
+
+def _resolve_queries(query_text: str, settings) -> tuple[list[str], str]:
+    """解析本次检索的 query 集合：`lite` 且改写返回非空才扩多路，否则单路 + `off`。"""
+    if settings.memory_query_rewrite_mode != REWRITE_MODE_LITE or not query_text:
+        return [query_text], REWRITE_MODE_OFF
+    try:
+        rewritten = memory_query_rewrite.rewrite_queries_sync(query_text)
+    except Exception as exc:
+        logger.warning("记忆查询改写失败，回落单 query：%s", exc.__class__.__name__)
+        return [query_text], REWRITE_MODE_OFF
+    if not rewritten:
+        return [query_text], REWRITE_MODE_OFF
+    return [query_text, *rewritten], REWRITE_MODE_LITE
+
+
+def retrieve(
+    user_id: str,
+    query: str,
+    character_id: str = "asuna",
+    top_k: int | None = None,
+    trace=None,
+) -> RankedMemories:
+    started = time.perf_counter()
+    settings = get_settings()
+    limit = top_k or settings.memory_top_k
+    now = timeutil.now()
+    query_text = (query or "").strip()
+
+    queries, rewrite_mode = _resolve_queries(query_text, settings)
+    if len(queries) > 1:
+        recalls = [_recall(user_id, character_id, text, now) for text in queries]
+        ranked = _merge_ranked(
+            [items for items, _, _ in recalls],
+            now,
+            temporal=any(_is_temporal_query(text) for text in queries),
+        )
+        mode = _merge_mode([recall_mode for _, recall_mode, _ in recalls])
+        pool_size = len(ranked)
+    else:
+        ranked, mode, pool_size = _recall(user_id, character_id, query_text, now)
+
+    rejected_contents = _recently_rejected_contents(user_id, now) if pool_size else []
+    cooldown_ids = _contradicts_cooldown_ids(user_id, now) if pool_size else set()
+
     kept: list[RankedMemory] = []
     filtered: list[RankedMemory] = []
     for item in ranked:
@@ -361,7 +459,9 @@ def retrieve(
     kept.sort(key=lambda item: (-item.score, -item.memory.importance))
     kept, rerank_mode = _maybe_rerank(query_text, kept, settings)
     kept = kept[:limit]
-    result = RankedMemories(items=kept, mode=mode, rerank_mode=rerank_mode)
+    result = RankedMemories(
+        items=kept, mode=mode, rerank_mode=rerank_mode, rewrite_mode=rewrite_mode
+    )
 
     for item in kept:
         memory_lifecycle.record_reinforce(item.memory.id)
@@ -370,7 +470,14 @@ def retrieve(
         started,
         mode=mode,
         rerank_mode=rerank_mode,
-        pool_size=len(pool),
+        rewrite_mode=rewrite_mode,
+        queries_count=len(queries),
+        matched_queries=[
+            {"id": item.memory.id, "queries": item.matched_queries}
+            for item in kept
+            if item.matched_queries
+        ],
+        pool_size=pool_size,
         returned=[_item_digest(item) for item in kept],
         filtered=[_item_digest(item) for item in filtered],
     )
@@ -416,6 +523,7 @@ def _item_digest(item: RankedMemory) -> dict:
         "affinity": round(item.affinity, 4),
         "score": round(item.score, 4),
         **({"rerank_score": round(item.rerank_score, 4)} if item.rerank_score is not None else {}),
+        **({"matched_queries": item.matched_queries} if item.matched_queries else {}),
         **({"penalty_reason": item.reason} if item.reason else {}),
     }
 

@@ -10,6 +10,8 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 logger = logging.getLogger(__name__)
 
 _MEMORY_RERANK_MODES = ("off", "lite")
+_MEMORY_QUERY_REWRITE_MODES = ("off", "lite")
+_MAX_QUERY_REWRITE_QUERIES = 3
 
 
 class MemorySettings(BaseSettings):
@@ -72,6 +74,8 @@ class MemorySettings(BaseSettings):
     memory_rerank_mode: str = "off"
     memory_rerank_top_k: int = 20
     memory_rerank_min_candidates: int = 3
+    memory_query_rewrite_mode: str = "off"
+    memory_query_rewrite_max_queries: int = 2
     memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
     )
@@ -96,6 +100,30 @@ class MemorySettings(BaseSettings):
             logger.warning("MEMORY_RERANK_MODE=%r 非法，回落 off", value)
             return "off"
         return mode
+
+    @field_validator("memory_query_rewrite_mode", mode="before")
+    @classmethod
+    def normalize_query_rewrite_mode(cls, value) -> str:
+        mode = str(value or "").strip().lower()
+        if mode not in _MEMORY_QUERY_REWRITE_MODES:
+            logger.warning("MEMORY_QUERY_REWRITE_MODE=%r 非法，回落 off", value)
+            return "off"
+        return mode
+
+    @model_validator(mode="after")
+    def normalize_query_rewrite_limits(self):
+        queries = max(
+            1, min(self.memory_query_rewrite_max_queries, _MAX_QUERY_REWRITE_QUERIES)
+        )
+        if queries == self.memory_query_rewrite_max_queries:
+            return self
+        logger.warning(
+            "记忆查询改写上限越界，已收敛：%s→%s",
+            self.memory_query_rewrite_max_queries,
+            queries,
+        )
+        self.memory_query_rewrite_max_queries = queries
+        return self
 
     @model_validator(mode="after")
     def normalize_rerank_limits(self):
