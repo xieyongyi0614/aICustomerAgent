@@ -1,3 +1,5 @@
+import logging
+
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -32,18 +34,42 @@ from app.repositories import relationship_milestone_repository
 from app.services.action.context import render_action_section
 from app.services.relationship.milestone import MILESTONES
 
+logger = logging.getLogger(__name__)
+
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",
     "user_fact": "事实",
+    "experience": "经历",
+    "relationship_fact": "关系",
+    "commitment": "目标",
+    "milestone_event": "里程碑",
+    "behavior_pattern": "习惯",
     "important_event": "事件",
     "relationship_event": "关系事件",
 }
+"""记忆类型中文标签（键覆盖 `STORAGE_MEMORY_TYPES` 全部 9 值，有静态用例钉住）。
+
+键顺序 = `V2_MEMORY_TYPES`（7 规范）+ `LEGACY_MEMORY_TYPES`（2 遗留）。规范类型措辞
+与记忆产品读面（`services/memory/product_view.py::TYPE_LABELS`）同源；其中
+`user_fact` / `experience` 与 `commitment` / `milestone_event` 在该表内同标签，
+此处按「标签两两不同」纪律细化为「事实 / 经历」「目标 / 里程碑」。
+"""
 
 INSIGHT_TYPE_LABELS = {
     "belief": "看法",
     "preference": "偏好",
     "pattern": "模式",
 }
+
+
+def memory_type_label(memory_type: str) -> str:
+    """标签查表：未覆盖的类型落回原值并告警（prompt 装配不得因数据异常失败）。"""
+    label = MEMORY_TYPE_LABELS.get(memory_type)
+    if label is None:
+        logger.warning("unknown memory type for label: %s", memory_type)
+        return memory_type
+    return label
+
 
 EMOTION_BUDGET_CHARS = 120
 RELATIONSHIP_BUDGET_CHARS = 150
@@ -440,7 +466,7 @@ class PromptBuilder:
 
         if memories:
             memory_lines = "\n".join(
-                f"- ({MEMORY_TYPE_LABELS.get(m.type, m.type)}) {m.content}"
+                f"- ({memory_type_label(m.type)}) {m.content}"
                 for m in memories
             )
             messages.append(
