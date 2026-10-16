@@ -1,8 +1,13 @@
 """Memory 2.0 离线评估指标计算器（MEM-010）。
 
-E-MEM-01~06 的门槛判定与报告聚合（evaluation.md §指标与门槛）。纯函数、只读：
+E-MEM-01~08 的门槛判定与报告聚合（evaluation.md §指标与门槛）。纯函数、只读：
 输入逐场景执行结果（由 tests/eval 场景运行器产出），输出 Eval Gate 报告 JSON。
 场景标注集规模不足时门槛照常生效，覆盖率在报告中显式标注。
+
+E-MEM-07 / E-MEM-08 为 MEV-004 扩展：把 M1 的重排与改写能力纳入可判定范围。
+二者的阈值为**评估模块常量**（非运行期设置，保持与既有 6 项同源）；当前取值按既定
+「top-1 一致率 / 相关条目占比」口径在评估集上实测后冻结，重排 / 改写开启的批次若口径变化
+须同批复核。
 """
 
 from datetime import datetime
@@ -16,6 +21,8 @@ GATE_THRESHOLDS = {
     "E-MEM-04": {"metric": "语义召回 Recall（改述）", "threshold": 0.8},
     "E-MEM-05": {"metric": "Roleplay/假设拦截率", "threshold": 1.0},
     "E-MEM-06": {"metric": "Context 注入合规", "threshold": 1.0},
+    "E-MEM-07": {"metric": "重排增益（top-1 与人工首选一致率）", "threshold": 0.9},
+    "E-MEM-08": {"metric": "改写贡献（仅改写 query 命中的相关条目占比）", "threshold": 0.8},
 }
 
 KIND_TO_METRIC = {
@@ -30,6 +37,8 @@ KIND_TO_METRIC = {
     "paraphrase_recall": "E-MEM-04",
     "roleplay": "E-MEM-05",
     "hypothetical": "E-MEM-05",
+    "rerank_gain": "E-MEM-07",
+    "rewrite_gain": "E-MEM-08",
 }
 
 

@@ -120,7 +120,9 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 逐行仅新增）—— 非 TOOL-010 改脏。原值 d7be7201。
     # 旧账同步声明（2026-10-15）：`0989a507`（删除前后台旧链回退位与死开关）改本文件时漏
     # 同步摘要，摘要早已 stale（HEAD 即红）；核对磁盘内容正确后同步。原值 7b2ee0e4。
-    "app/application/chat_pipeline.py": "3ea744995a3365173b815fa408e61f7d5d3b3d7ce18ae37d95fc014229512cfe",
+    # 名次观测量声明（2026-10-16，MEV-004）：`build_memory_refs` 调用点回传
+    # `state.memory_rank`（检索名次快照）—— 非 TOOL-010 改脏。原值 3ea74499（更早 7b2ee0e4）。
+    "app/application/chat_pipeline.py": "d30e18f09478e39451ef28fac6b508e5ffcdfc10d6d7f1e3176068ffdba1809d",
     # memory 域清理声明（2026-09-29）：`memory_service` 死导入移除（该模块生产零调用，
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步

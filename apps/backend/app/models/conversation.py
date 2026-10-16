@@ -33,3 +33,9 @@ class ConversationState(BaseModel):
     relationship_patterns: list[RelationshipPattern] = []
     mode: str = "default"
     mode_entered_at: datetime | None = None
+    memory_rank: list[dict] = []
+    """本轮检索名次快照（MEV-004）：`[{id, score, rank, rank_pre, reranked}]`。
+
+    仅进程内传递（检索处 → turn_meta 装配），供 `services/memory/refs.py` 派生引用观测量；
+    不落库、不参与 prompt 装配。
+    """

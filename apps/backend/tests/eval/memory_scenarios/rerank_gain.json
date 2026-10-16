@@ -1,0 +1,65 @@
+{
+  "kind": "rerank_gain",
+  "scenarios": [
+    {
+      "id": "rg-01",
+      "description": "人工首选（preferred_id）在最终名次中保持 top-1——重排关闭时即单 query 检索基线，重排开启时即重排增益的判定面",
+      "preferred_id": "rg-01-preferred",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "preferred",
+          "content": "用户下个月要去东京出差",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.9
+        },
+        {
+          "action": "seed",
+          "ref": "other",
+          "content": "用户喜欢喝冰美式",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.6
+        },
+        {
+          "action": "probe",
+          "query": "用户要去东京出差吗",
+          "top_k": 2,
+          "expect_top": "preferred",
+          "expect_ids": ["preferred"]
+        }
+      ]
+    },
+    {
+      "id": "rg-02",
+      "description": "同主题次相似条目不得挤掉人工首选（top-1 一致性）",
+      "preferred_id": "rg-02-preferred",
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "preferred",
+          "content": "用户的体检报告显示指标都正常",
+          "type": "experience",
+          "source": "user_stated",
+          "salience": 0.9
+        },
+        {
+          "action": "seed",
+          "ref": "distractor",
+          "content": "用户约了周末的牙医洗牙",
+          "type": "experience",
+          "source": "user_stated",
+          "salience": 0.7
+        },
+        {
+          "action": "probe",
+          "query": "用户的体检报告结果如何",
+          "top_k": 2,
+          "expect_top": "preferred",
+          "expect_ids": ["preferred"]
+        }
+      ]
+    }
+  ]
+}

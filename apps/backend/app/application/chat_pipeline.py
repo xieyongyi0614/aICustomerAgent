@@ -697,7 +697,10 @@ async def run_chat_pipeline(
             }
             if action_intent is not None:
                 turn_meta["action_intent"] = action_intent.model_dump(mode="json")
-            memory_refs = build_memory_refs(state.memories if state else None)
+            memory_refs = build_memory_refs(
+                state.memories if state else None,
+                state.memory_rank if state else None,
+            )
             if memory_refs:
                 turn_meta["memory_refs"] = memory_refs
             await events.put(turn_meta)

@@ -129,6 +129,11 @@
 
 **M1 验收口径**：`memory_rerank_mode="off"` 且 `memory_query_rewrite_mode="off"` 时，`retriever.retrieve` 输出的分数序列与基线**逐字节一致**（钉测）；全 on 时离线评估集指标不低于基线且无 P95 延迟爆炸（预算内）；任一 LLM 调用失败时回落既有排序并落 trace。
 
+> **M1 实施状态（2026-10-16）**：`MEV-001 ~ MEV-004` **全部交付**（`MEV-004` 的名次观测量经
+> `ConversationState.memory_rank` 中转；离线门槛增至 `E-MEM-01~08`，新增场景见
+> `tests/eval/memory_scenarios/rerank_gain.json` / `rewrite_gain.json`）。重排 / 改写**默认仍 off**，
+> 开启批次的阈值复核见 `tasks/MEV-004.md` 实施回填表末行。
+
 ---
 
 ## 3. M2 · 记忆显式分层（`MEV-005 ~ MEV-008`，迁移 `0012`）

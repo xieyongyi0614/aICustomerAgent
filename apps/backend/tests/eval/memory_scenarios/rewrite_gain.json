@@ -1,0 +1,75 @@
+{
+  "kind": "rewrite_gain",
+  "scenarios": [
+    {
+      "id": "rw-01",
+      "description": "改写 query（同义词面）命中目标；原 query（无关词面）top-1 被诱饵占据——改写贡献的判定面",
+      "unreachable_by_original_query": true,
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "beach",
+          "content": "用户喜欢在海边散步",
+          "type": "user_preference",
+          "source": "user_stated",
+          "salience": 0.6
+        },
+        {
+          "action": "seed",
+          "ref": "decoy",
+          "content": "用户的季度预算正在走审批流程",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.95
+        },
+        {
+          "action": "probe",
+          "query": "海边散步",
+          "top_k": 3,
+          "expect_ids": ["beach"]
+        },
+        {
+          "action": "probe",
+          "query": "季度预算审批流程",
+          "top_k": 1,
+          "expect_not_ids": ["beach"]
+        }
+      ]
+    },
+    {
+      "id": "rw-02",
+      "description": "改写 query 命中关系事实；原 query（指代未消解）top-1 被诱饵占据",
+      "unreachable_by_original_query": true,
+      "steps": [
+        {
+          "action": "seed",
+          "ref": "gift",
+          "content": "用户送过角色一条围巾",
+          "type": "relationship_fact",
+          "source": "user_stated",
+          "salience": 0.6
+        },
+        {
+          "action": "seed",
+          "ref": "decoy",
+          "content": "用户最近在学做川菜",
+          "type": "user_fact",
+          "source": "user_stated",
+          "salience": 0.95
+        },
+        {
+          "action": "probe",
+          "query": "用户送过角色什么礼物",
+          "top_k": 3,
+          "expect_ids": ["gift"]
+        },
+        {
+          "action": "probe",
+          "query": "最近在学做菜",
+          "top_k": 1,
+          "expect_not_ids": ["gift"]
+        }
+      ]
+    }
+  ]
+}
