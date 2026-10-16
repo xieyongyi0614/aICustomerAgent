@@ -183,7 +183,7 @@ def apply_relationship(
     )
 
 
-def apply_relationship_v5(
+def apply_relationship_update(
     relationship: RelationshipState,
     event_type: str,
     magnitude: str,

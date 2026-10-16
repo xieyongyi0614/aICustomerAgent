@@ -209,7 +209,7 @@ class TestForgetCommand:
 
 class TestPostProcessWiring:
     async def test_command_hit_skips_ingest(self, cmd_db, monkeypatch):
-        from app.application.post_process import PostProcessContext, _run_memory_ingest_v2
+        from app.application.post_process import PostProcessContext, _ingest_memory_candidates
         from app.models.conversation import ConversationState
         from app.models.emotion import TurnAnalysis
 
@@ -233,13 +233,13 @@ class TestPostProcessWiring:
             ),
             analysis=TurnAnalysis(),
         )
-        await _run_memory_ingest_v2(ctx)
+        await _ingest_memory_candidates(ctx)
         assert executed["ingest"] is False
         memories = [row for row in _rows() if row.status == "active"]
         assert len(memories) == 1
 
     async def test_command_miss_runs_ingest(self, cmd_db, monkeypatch):
-        from app.application.post_process import PostProcessContext, _run_memory_ingest_v2
+        from app.application.post_process import PostProcessContext, _ingest_memory_candidates
         from app.models.conversation import ConversationState
         from app.models.emotion import TurnAnalysis
         from app.models.memory import MemoryExtraction
@@ -268,7 +268,7 @@ class TestPostProcessWiring:
             ),
             analysis=TurnAnalysis(),
         )
-        await _run_memory_ingest_v2(ctx)
+        await _ingest_memory_candidates(ctx)
         assert _candidates() == []
 
 

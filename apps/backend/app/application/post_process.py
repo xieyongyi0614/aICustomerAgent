@@ -150,8 +150,8 @@ async def run_summary(ctx: PostProcessContext) -> None:
 async def run_memory_extract(ctx: PostProcessContext) -> None:
     started = time.perf_counter()
     try:
-        await _run_memory_ingest_v2(ctx)
-        await _run_memory_evaluate_v2(ctx)
+        await _ingest_memory_candidates(ctx)
+        await _evaluate_memory_candidates(ctx)
         if ctx.trace is not None:
             ctx.trace.record(
                 "memory_extractor", (time.perf_counter() - started) * 1000
@@ -167,7 +167,7 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
             )
 
 
-async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
+async def _ingest_memory_candidates(ctx: PostProcessContext) -> None:
     """v2 摄取通道：显式命令优先，未命中再走四源收敛到 memory_candidates。
 
     ActionRecord/完结 WorldEvent/RelationshipEvent 在本轮后续步骤（world/action）才产生，
@@ -249,7 +249,7 @@ def _register_followups(user_id: str, rows) -> None:
             logger.exception("followup 登记失败，跳过")
 
 
-async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
+async def _evaluate_memory_candidates(ctx: PostProcessContext) -> None:
     """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。
 
     尾部接线 REF-003：flush 强化缓冲并把落库 id 喂给反思事件计数；
@@ -857,12 +857,12 @@ async def run_memory_evaluate(ctx: PostProcessContext) -> None:
     v2 评估原本只在第 5 步执行，而世界事件完结（第 10 步）与工具记忆投递
     （第 12 步内 `integrate_result`）产出的候选要等下一轮第 5 步才被评估——
     记忆可见性会比旁路直写时期晚一轮。本步补一次 `evaluate_pending`：
-    无待评估候选时为一次空查询，有则同轮转正（REF 接线复用 `_run_memory_evaluate_v2`，
+    无待评估候选时为一次空查询，有则同轮转正（REF 接线复用 `_evaluate_memory_candidates`，
     缓冲区二刷为空操作）。
     """
     started = time.perf_counter()
     try:
-        await _run_memory_evaluate_v2(ctx)
+        await _evaluate_memory_candidates(ctx)
         if ctx.trace is not None:
             ctx.trace.record(
                 "memory_evaluate_tail", (time.perf_counter() - started) * 1000

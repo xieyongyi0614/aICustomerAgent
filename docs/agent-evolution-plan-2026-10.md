@@ -55,7 +55,7 @@ types.py 57 | migration.py 83
 
 | 环节 | 落点与证据 | 说明 |
 |---|---|---|
-| 摄取触发 | `apps/backend/app/application/post_process.py:170`（`_run_memory_ingest_v2`） | 会话轮后处理入口；**显式命令优先** `:177` → `extract_candidates` `:188` → `ingest_from_conversation` `:197`；随后四源补扫：action `:204`、world `:209`、relationship `:214`、milestone `:219` |
+| 摄取触发 | `apps/backend/app/application/post_process.py:170`（`_ingest_memory_candidates`） | 会话轮后处理入口；**显式命令优先** `:177` → `extract_candidates` `:188` → `ingest_from_conversation` `:197`；随后四源补扫：action `:204`、world `:209`、relationship `:214`、milestone `:219` |
 | 另一接入点 | `apps/backend/app/application/agent_runtime/stages/update.py:205` | 调 `ingest_from_action_record` |
 | 旁路写源 | `apps/backend/app/services/ledger/memory_bridge.py:47`、`apps/backend/app/services/planning/memory_policy.py:398`、`apps/backend/app/services/relationship/evaluation.py:269` | 账本洞察（仅 `behavior_pattern`）、目标完成、关系里程碑 |
 | 候选唯一入口 | `apps/backend/app/services/memory/ingest.py:67`（`create_candidate`） | 文件内注释明确「禁止直写 memories」 |

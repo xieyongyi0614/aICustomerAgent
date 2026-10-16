@@ -74,7 +74,7 @@ def test_memory_pipeline_registers_followup(db_session_factory, fake_llm):
     """V7-010 断链恢复：会话候选经 v2 摄取（run_memory_extract）登记 followup。
 
     原 v1 契约（extract_and_save → _register_followups）随 v1 删除断链，
-    登记点现承接于 post_process._run_memory_ingest_v2 的会话候选行。
+    登记点现承接于 post_process._ingest_memory_candidates 的会话候选行。
     """
     import asyncio
 

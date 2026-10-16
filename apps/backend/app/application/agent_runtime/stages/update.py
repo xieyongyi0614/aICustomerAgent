@@ -221,7 +221,7 @@ def _acknowledge_relationship_route(action_outcome: Any) -> FeedbackItem:
     """关系信号路由**只登记不重投**：`deliver_action_signal` 已在 Act 的
     `integrate_result` 内调用（`action_engine` 的唯一调用点之一）。
 
-    段内再调会造成关系域**二次写**（`relationship_events` 追加 + `apply_relationship_v5`
+    段内再调会造成关系域**二次写**（`relationship_events` 追加 + `apply_relationship_update`
     的日影响钳制双应用），并打破 V2.5 PLAN-008 的「全仓只有既有两处导入
     `relationship_bridge`」守卫。故此处只登记路由与承接方（D1 只路由不写）。
     """

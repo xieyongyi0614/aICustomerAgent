@@ -1,6 +1,6 @@
 """V9 Action Relationship Bridge（relationship-impact.md §2~§5，V9-008）。
 
-V9 零直写 RelationshipState：信号经既有 apply_relationship_v5（三层钳制）
+V9 零直写 RelationshipState：信号经既有 apply_relationship_update（三层钳制）
 + commit_relationship_update 通道投递；门控 action_relationship_enabled 默认关。
 """
 
@@ -54,7 +54,7 @@ def deliver_action_signal(record: ActionRecord, user_id: str) -> dict | None:
         now = timeutil.now()
         relationship = relationship_repository.get_relationship(user_id)
         day_positive, day_negative = _day_impact_totals(user_id, now, events=events)
-        new_relationship, applied = state_engine.apply_relationship_v5(
+        new_relationship, applied = state_engine.apply_relationship_update(
             relationship,
             event_type,
             magnitude,

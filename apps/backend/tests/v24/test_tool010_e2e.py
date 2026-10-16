@@ -127,7 +127,7 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 写路径已全量走 memory ingest/evaluate）—— 非 TOOL-010 改脏。
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：新增 `run_memory_evaluate` 收尾评估步
     # （世界/行动步骤当轮投递的候选当轮转正，保证可见性时序不回退）—— 非 TOOL-010 改脏。
-    # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_run_memory_ingest_v2` 尾部承接
+    # V7-010 恢复声明（2026-09-30，台账 §3.3.2）：`_ingest_memory_candidates` 尾部承接
     # `_register_followups`（会话候选 → scheduled_followup 登记）—— 非 TOOL-010 改脏。
     # 开关固化声明（2026-10-06，批次 2）：`observability_persist_enabled` 总闸删除后
     # `_persist_tool_decision` 守卫收窄 —— 非 TOOL-010 改脏。原值 91e31d92（再前值 bcb7b63c）。
@@ -137,7 +137,12 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # 物品录入声明（2026-10-10）：`run_world_update` 步骤内部增强——新增 `_run_object_intake`
     # （用户显式要求记录物品 → LLM 抽取 → 建档）；默认家庭库存种子已移除 —— 非 TOOL-010 改脏。
     # 原值 ac5698b4。
-    "app/application/post_process.py": "ea3399d914b66a48a1173b4b9cd5aeb51ee1a36938a67adfcfb4d71f7717cb93",
+    # 命名卫生声明（2026-10-16）：两个内层私有函数去版本号 ——
+    # `_run_memory_ingest_v2` → `_ingest_memory_candidates`、
+    # `_run_memory_evaluate_v2` → `_evaluate_memory_candidates`（语义化而非简单删 `_v2`：
+    # 后者会与同名 STEP handler `run_memory_evaluate` 仅差一个下划线，视觉上近似递归）
+    # —— 非 TOOL-010 改脏。原值 ea3399d9。
+    "app/application/post_process.py": "74d1d68080fb639f660781377eb4a01986b431e6ff5e9c253a7f8eeec9aeb633",
     # 记账明细/类目声明（2026-10-02，记账链路修复）：新增 `_normalize_ledger_intent`
     # （明细文本 → 类目 id，归一放在引擎侧，能力层仍只收结构化 id）—— 非 TOOL-010 改脏。
     # 记账播种顺序声明（2026-10-07）：新增 `_ensure_ledger_categories`，把账户 / 种子类目
