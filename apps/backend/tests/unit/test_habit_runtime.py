@@ -25,11 +25,6 @@ def test_derive_candidates_at_threshold():
     assert candidates[0].id.startswith("auto_")
 
 
-def test_derive_ignores_memory_replay_events():
-    events = [_Event("conflict"), _Event("conflict", source="memory_replay")]
-    assert derive_habit_candidates(events) == []
-
-
 def test_effective_habits_default_is_asset_only():
     habits = load_effective_habits()
     assert habits == habit_runtime.HABIT_LIST

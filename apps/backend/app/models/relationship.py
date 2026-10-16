@@ -22,7 +22,7 @@ RelationshipEventType = Literal[
     "none",
 ]
 
-RelationshipEventSource = Literal["conversation", "memory_replay", "system"]
+RelationshipEventSource = Literal["conversation", "system"]
 
 InteractionKind = Literal[
     "smalltalk",

@@ -122,9 +122,9 @@ class TestProjection:
         assert all(entry.kind == "relationship_event" for entry in entries)
         assert entries[0].source_ref == {"table": "relationship_events", "id": "e1"}
 
-    def test_excludes_none_type_and_replay_source(self, _offline_repos):
+    def test_excludes_none_type_rows(self, _offline_repos):
+        """`type=none`（无互动实质）不进投影；`memory_replay` 派生行已随该源值退役消失。"""
         _event("e-none", type="none", source="system", cause="")
-        _event("e-replay", source="memory_replay")
         _event("e-system", type="none", source="system", cause="冲突结算")
         _event("e-ok", source="system", cause="和解")
         entries = relationship_shared.collect_shared_experiences("u-rel2")

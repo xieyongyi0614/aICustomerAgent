@@ -44,8 +44,8 @@ def _ledger_entries(user_id: str) -> list[SharedExperience]:
     ):
         if event.type == "none":
             continue
-        if event.source not in ("conversation", "system"):
-            continue
+        # 「排除派生行（原 memory_replay）」过滤已随该源值退役删除（2026-10-16）：
+        # `RelationshipEventSource` 只剩 conversation / system，投影自然只含真实互动行。
         entries.append(
             SharedExperience(
                 entry_id=event.id,

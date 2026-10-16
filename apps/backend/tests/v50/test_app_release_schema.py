@@ -66,12 +66,14 @@ def test_schema_columns_digest_matches_pin():
 def test_migration_chain_head_matches_pin():
     script = ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini")))
     assert script.get_heads() == [MIGRATION_HEAD]
-    # 钉值升级声明（2026-10-16，MEV-015）：词表收窄迁移 `0010` 入链后，0009（本任务迁移）
-    # 成为链尾的父版本；原断言 `MIGRATION_HEAD == "0009"`（当时 0009 即链尾）。
-    assert MIGRATION_HEAD_PARENT == "0009"
-    revision = script.get_revision(MIGRATION_HEAD)
-    assert revision is not None
-    assert revision.down_revision == MIGRATION_HEAD_PARENT
+    # 钉值升级声明（2026-10-16）：`0010` / `0011` 入链后 0009（本任务迁移）不再是链尾，
+    # 断言改为**不绑定链尾**：「本任务迁移自身在链上且父版本不变」——后续迁移不再动本用例。
+    app_release_revision = script.get_revision("0009")
+    assert app_release_revision is not None
+    assert app_release_revision.down_revision == "0008"
+    head_revision = script.get_revision(MIGRATION_HEAD)
+    assert head_revision is not None
+    assert head_revision.down_revision == MIGRATION_HEAD_PARENT
 
 
 def test_migration_exists_with_expected_filename():

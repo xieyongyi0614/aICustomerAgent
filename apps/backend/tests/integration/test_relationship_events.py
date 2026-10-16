@@ -71,8 +71,10 @@ class TestRelationshipEventModel:
         with pytest.raises(ValidationError):
             make_event(source="somewhere")
 
-    def test_memory_replay_source_valid(self):
-        assert make_event(source="memory_replay").source == "memory_replay"
+    def test_retired_memory_replay_source_rejected(self):
+        """`memory_replay` 随回放补记退役（2026-10-16）：源枚举只认 conversation / system。"""
+        with pytest.raises(ValidationError):
+            make_event(source="memory_replay")
 
     def test_confidence_out_of_range_rejected(self):
         with pytest.raises(ValidationError):
@@ -106,10 +108,10 @@ class TestRepository:
         assert repo.count_events("u1") == 2
         assert repo.count_events("u2") == 0
 
-    def test_memory_replay_source_persisted(self, db_session_factory):
-        repo.create_event(make_event(source="memory_replay", type="user_help"))
+    def test_system_source_persisted(self, db_session_factory):
+        repo.create_event(make_event(source="system", type="user_help"))
         stored = repo.list_events("u1")[0]
-        assert stored.source == "memory_replay"
+        assert stored.source == "system"
 
 
 class TestCombinedCommit:

@@ -45,11 +45,9 @@ CANDIDATE_MIN_COUNT = 3
 
 
 def derive_habit_candidates(events, min_count: int = CANDIDATE_MIN_COUNT) -> list[HabitRule]:
-    counts = Counter(
-        event.type
-        for event in events
-        if getattr(event, "source", "conversation") != "memory_replay"
-    )
+    # 原「排除 memory_replay 派生事件」过滤已随该源值退役删除（2026-10-16）：
+    # `RelationshipEventSource` 只剩 conversation / system，账本无派生事件。
+    counts = Counter(event.type for event in events)
     candidates: list[HabitRule] = []
     for event_type, template in HABIT_CANDIDATE_TEMPLATES.items():
         if counts.get(event_type, 0) >= min_count:

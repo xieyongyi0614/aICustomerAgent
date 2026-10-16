@@ -290,10 +290,11 @@ class TestContracts:
     def test_migration_pins_follow_the_narrowing(self):
         from tests.support import schema_pins
 
-        # 钉值升级声明（2026-10-16，MEV-015）：词表收窄迁移 `0010` 入链，HEAD/PARENT 随之推进
-        # （原 `0009` / `0008`）；表数与列摘要不变（只改 CHECK 值域，不动列）。
-        assert schema_pins.MIGRATION_HEAD == "0010"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
+        # 钉值升级声明（2026-10-16）：`0010`（MEV-015 词表收窄）与 `0011`（relationship
+        # 事件源枚举收窄）先后入链，HEAD/PARENT 随之推进（原 `0009` / `0008`）；
+        # 表数与列摘要不变（只改值域 CHECK，不动列）。
+        assert schema_pins.MIGRATION_HEAD == "0011"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "f4f1cc5b50ae78ed"
 

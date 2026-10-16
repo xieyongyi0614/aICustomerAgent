@@ -307,8 +307,8 @@ Fast Test → **2302 passed**；`tests/e2e/test_memory_e2e.py` + `tests/integrat
 `_replay_is_idle` / `REPLAY_TYPE_KEYWORDS` / `LEGACY_RELATIONSHIP_DIMENSIONS` / 调用点）与 settings
 `rel_replay_discount` / `rel_replay_min_idle_hours` 一并删除——其唯一输入
 `memories.type == "relationship_event"` 已不可存储。`tests/integration/test_memory_replay.py`（7 用例）
-同批删除。`relationship_events.source` 的 `memory_replay` 值**保留**（历史行可读；收窄需另一条迁移，
-已登记基线技术债 P3）。
+同批删除。`relationship_events.source` 的 `memory_replay` 值当时**保留**（历史行可读），
+同日即行收窄（见 §十）。
 
 ### 9.4 迁移与钉测（T2d）
 
@@ -340,8 +340,45 @@ Fast Test → **2302 passed**；`tests/e2e/test_memory_e2e.py` + `tests/integrat
 | e2e（`-m e2e`，含 slow） | **182 passed** |
 | eval（`tests/eval`） | **11 passed** |
 
-### 9.7 遗留（本轮不做）
+### 9.7 遗留（本节时点；前两项已于同日收口，见 §十）
 
-- `relationship_events.source = memory_replay` 枚举收窄（需迁移；已登记基线技术债 P3）。
-- `memory_candidates.proposed_type` 无 CHECK（归一在入口）；「候选表也钉 7 值」需另一条迁移。
+- ~~`relationship_events.source = memory_replay` 枚举收窄~~ → §10.2 已收窄（迁移 `0011`）。
+- ~~`memory_candidates.proposed_type` 无 CHECK~~ → §10.3 评估后**不做**（理由见该节）。
 - 历史文档（`v1.0.0/*`、`v2.0.0/REL-001` 等）中的遗留类型叙述按 `docs/TESTING.md` §9 惯例保留原文。
+
+---
+
+## 十、退役清账 A 组（2026-10-16 续）
+
+> 承接 §九 的三项遗留（A1 守卫 / A2 枚举收窄 / A3 候选表约束），逐项收口或明确不做。
+
+### 10.1 A1 写入口机械守卫（新增）
+
+`tests/unit/test_memory_write_guard.py`：AST 扫描 `app/` 下 `create_memory` /
+`create_memory_and_supersede` 直调点，冻结为清单 `{（文件, 所在函数）}` 并断言
+「所在函数体内出现 `normalize_type(`」。当前清单两处——`capabilities/memory.py::execute`、
+`planning/memory_policy.py::_deliver`；**新增直调点即红**，迫使作者显式决定归一点或在守卫里登记。
+（仓储自身定义不计入；测试侧调用不在范围。）
+
+### 10.2 A2 `memory_replay` 枚举收窄（迁移 `0011`）
+
+| 面 | 动作 |
+|---|---|
+| Schema | 迁移 `0011_relationship_event_source_enum.py`：删存量派生行（`source='memory_replay'`，库可重建时为 no-op）+ `ck_relationship_events_source` 收窄为 `conversation` / `system`；降级只放宽值域 |
+| 契约 | `models/relationship.py::RelationshipEventSource` 去值；`core/db/relationship.py` CHECK 同步 |
+| 死代码 | `engines/habit.py` 的派生行过滤、`services/relationship/shared.py` 的 `source not in (...)` 过滤删除（枚举已保证） |
+| 测试 | 关系事件模型「派生源合法」用例改为「退役值被拒」；仓库「派生源持久化」改为 `system`；习惯推导的 `test_derive_ignores_memory_replay_events` 删除；共同经历投影用例去掉派生行构造；`v5_matrix` 文档串同步 |
+| 取号 | 占 `0011` → `MEV-005` 顺延 `0012`、`MEV-009` 顺延 `0013`（注册表 + 两份 Task Detail 注已更新） |
+| 钉测 | `schema_pins` HEAD `0011` / PARENT `0010`（表数 57、列摘要不变——只改 CHECK 文本）；`v60` 两处 pins 同步；`v50` 链头用例改为**不绑定链尾**（断言本任务迁移自身在链上且父版本不变），后续迁移不再碰它 |
+
+### 10.3 A3 候选表 `proposed_type` 约束（评估后不做）
+
+`memory_candidates.proposed_type` 当前无 CHECK：值域由入口归一保证（`create_candidate` 归一 +
+`evaluator._final_type` 兜底），且该表是**转正前的瞬态表**（行随转正/拒绝流转）。加 CHECK 需再占一条
+迁移号，收益仅是「防御性约束」，故**不做**；若要钉，建议并入后续 `MEV-009`/`MEV-010` 的迁移批次。
+
+### 10.4 验证
+
+| 范围 | 结果 |
+|---|---|
+| Fast / Integration / 历史套件 / e2e / eval | 见提交前最终回验（全绿，失败集为空） |

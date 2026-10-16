@@ -101,7 +101,7 @@ class RelationshipEventRow(Base):
             name="ck_relationship_events_magnitude",
         ),
         CheckConstraint(
-            "source IN ('conversation', 'memory_replay', 'system')",
+            "source IN ('conversation', 'system')",
             name="ck_relationship_events_source",
         ),
         Index("idx_relationship_events_user", "user_id", "created_at"),
