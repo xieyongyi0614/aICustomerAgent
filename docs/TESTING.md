@@ -181,14 +181,29 @@ CI 上注意：`backend-full` 的 `TEST_DATABASE_URL` 指向 service container�
 
 ### 10.2 本机既有环境噪声：`safe-delete` 外部守卫（**不在仓库内**）
 
-- **现象**：批量跑（`>50` 文件）时，外部 `safe-delete` 守卫对 `.tmp/offline-db/*.db`
-  执行 `trash` 失败 → `_offline_repos` 的 SQLite `drop_all + create_all` 失败 →
-  用例报 `sqlalchemy.exc.OperationalError: no such table: <x>`，或以 **setup `ERROR`** 形式出现。
-- **特征**：**非确定性**——同一份代码重复跑，命中集合与数量都变；
+- **机制（2026-10-16 查实）**：本机 CLI 经 `sitecustomize.py`
+  （`<WorkBuddyAI>/resources/app.asar.unpacked/cli/vendor/shim/`）包装
+  `shutil.rmtree` / `os.remove` / `os.unlink`：
+  - 目标路径**在 `tempfile.gettempdir()`（即 `%TEMP%`）之下 → 走原生删除（旁路）**；
+  - **否则 → 移入 Windows 回收站**（`genie-trash`），且**单棵目录 >50 文件时
+    `_check_bulk_delete_guard` 直接 `raise SystemExit(1)`**（阈值与状态见 `CODEBUDDY_SAFE_DELETE_BULK_*`）。
+- **现象**：pytest 清理 `tmp_path` 时撞上守卫 → 用例以 **teardown `ERROR: SystemExit: 1`** 出现，
+  同一 worker 后续用例级联报 `AssertionError: previous item was not torn down properly`；
+  被删文件同时堆进回收站（C 盘配额 25.79GB，堆满即 C 盘爆满）。
+- **特征**：**非确定性**——命中集合与数量随 worker 负载变化；
   隔离重跑（`-n 0`、单独文件/目录）**稳定通过**。
 - **判定方法**：差异项隔离重跑 3 次，3/3 通过即判**噪声**，不是回归。
-- **规避**：`--basetemp=<每次换名的新目录>`；分目录跑（unit / integration / e2e 分开）
-  可降低触发概率；输出重定向**必须写 `apps/backend/.tmp/`**（禁写仓库根）。
+  报错栈里出现 `sitecustomize.py` / `_check_bulk_delete_guard` / `SystemExit: 1` 即为本条，与本仓库代码无关。
+- **规避（2026-10-16 修正，原建议有误）**：
+  - ✅ **不要传 `--basetemp`** → 默认落在 `%TEMP%\pytest-of-<user>\pytest-<N>`，删除自动旁路、零回收站流量；
+  - ✅ 若需自定义命名，**必须放在 `%TEMP%` 之下**（如 `--basetemp="$TEMP/t_xxx"`）；
+  - 🚫 **不要指向 `C:\tmp` 或别的盘**——路径一旦离开 `%TEMP%`，回收站与 50 文件守卫**都会**命中；
+  - 📌 实测对照：`--basetemp=C:/tmp/...` → `3507 passed / 18 errors`；默认 basetemp →
+    **`3516 passed / 7 skipped / 0 failed / 0 errors`**，且回收站零增长；
+  - 📌 清理大量临时目录：先 `Move-Item` 到 `%TEMP%` 再删（移动不是删除，不进回收站）；
+  - 📌 `_OFFLINE_DB_DIR`（`apps/backend/.tmp/offline-db`）**不受 basetemp 影响**、也不在 `%TEMP%` 下
+    → 每轮约 20MB `gw*.db` 的删除仍会进回收站；要归零需把它也移到 `%TEMP%` 下，或关闭 C 盘回收站。
+- **输出重定向**：**必须写 `apps/backend/.tmp/`**（禁写仓库根）。
 
 ### 10.3 当前已知失败基线（2026-10-09 实测）
 
