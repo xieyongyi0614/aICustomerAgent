@@ -22,6 +22,7 @@ from app.repositories import background_job_repository
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import episodic as memory_episodic
 from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import semantic as memory_semantic
 logger = logging.getLogger(__name__)
 
 STEP_NAME = "memory_job_worker"
@@ -34,10 +35,13 @@ _JOB_HANDLERS = {
     JOB_TYPE_EMBEDDING_BACKFILL: memory_embeddings.backfill_scan,
     # 情景聚合（MEV-006）：同域 job 直接列在此处；门控在 handler 内（mode=off → 零动作）
     memory_episodic.JOB_TYPE_MEMORY_EPISODIC_AGGREGATE: memory_episodic.run_aggregate_job,
+    # 语义抽象（MEV-007）：同上；门控在 handler 内（mode=off → 零动作、零 LLM）
+    memory_semantic.JOB_TYPE_MEMORY_SEMANTIC_ABSTRACT: memory_semantic.run_semantic_job,
 }
 
-_TICK_HOOKS: list = [memory_episodic.run_aggregate_tick]
-"""周期挂靠点：默认挂情景聚合入队 hook（MEV-006），门控在 hook 内（mode=off → 零动作）。"""
+_TICK_HOOKS: list = [memory_episodic.run_aggregate_tick, memory_semantic.run_semantic_tick]
+"""周期挂靠点：默认挂情景聚合（MEV-006）与语义抽象（MEV-007）入队 hook，
+门控在各自 hook 内（mode=off → 零动作、不查库）。"""
 
 _CLAIM_BATCH_LIMIT = 20
 

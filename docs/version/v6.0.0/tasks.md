@@ -160,7 +160,12 @@
 > - `MEV-006` **已交付**：新增 `services/memory/episodic.py`（零 LLM 确定性归组 + 幂等 `source_id`
 >   + 防递归护栏），job 类型 `memory_episodic_aggregate` 与周期 hook 挂进 `job_worker`，
 >   4 个设置字段（默认 `off`），产品读面来源枚举 11 → 12；26 条聚焦用例钉住幂等/预算/隔离/只读。
-> - `MEV-007` / `MEV-008` 未开工。
+> - `MEV-007` **已交付**：新增 `services/memory/semantic.py`（只读 `episodic` → lite LLM 抽象 → 一条
+>   `semantic` 候选，幂等键 `semantic:{theme_key}:{未覆盖来源 id 升序}`）、链
+>   `chains/memory_semantic_abstract_chain.py` + prompt `prompts/memory_semantic_abstract.py`（类型白名单
+>   fail-closed / 明细护栏命中即丢弃 / 无自反馈回路），job 类型 `memory_semantic_abstract` 与周期 hook
+>   挂进 `job_worker`，3 个设置字段（默认 `off`）；37 条聚焦用例钉住白名单、幂等、无环、隔离与 Preserve。
+> - `MEV-008` 未开工。
 
 ---
 
