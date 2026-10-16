@@ -373,13 +373,21 @@ _OFFLINE_ENGINES: dict[str, Any] = {}
 
 
 def _offline_engine():
-    """xdist worker 级复用引擎：文件库 + 连接池 + WAL（每 Session 独立连接）。
+    """xdist worker 级复用引擎：文件库 + 连接池（每 Session 独立连接）。
 
     早期用 `sqlite://` + StaticPool 让全进程共用一条连接，用例内的
     `asyncio.to_thread` / TestClient portal 线程 / 用例线程并发时互相踩踏事务与
     identity map（`Could not refresh instance`、丢行、时序抖动），并发用例在 xdist
     负载下随机红。改为 worker 级文件库后由 SQLite 自身序列化写入（busy_timeout 兜底），
     且不产生每测试一个临时文件（避免 pytest tmp 目录膨胀）。
+
+    🚨 **journal_mode 用 `MEMORY`，不用 `WAL`**（2026-10-16 变更）：WAL 会在库文件旁
+    常驻生成 `{worker}.db-wal` 与 `{worker}.db-shm`（后者只要库有多个连接就必然出现），
+    在文件监视 / 安全软件 / 同步工具下形成持续的「生成—删除」噪音并额外占盘。
+    `MEMORY` 把回滚日志放在进程内存里，**不产生任何伴生文件**。
+    代价：失去 WAL 的「读不阻塞写」优势（回滚日志模式仅在提交的 EXCLUSIVE 阶段短暂
+    阻塞读者，`busy_timeout=30000` 兜底）；崩溃持久性本就已由 `synchronous=OFF` 放弃，
+    测试场景无额外损失。每个 worker 独占自己的库文件，故不涉及跨进程共享内存语义。
     """
     worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
     engine = _OFFLINE_ENGINES.get(worker)
@@ -396,7 +404,7 @@ def _offline_engine():
         @event.listens_for(engine, "connect")
         def _sqlite_concurrency_pragmas(dbapi_connection, _record):
             cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA journal_mode=MEMORY")
             cursor.execute("PRAGMA synchronous=OFF")
             cursor.execute("PRAGMA busy_timeout=30000")
             cursor.close()
@@ -408,7 +416,9 @@ def _offline_engine():
 def pytest_sessionfinish(session, exitstatus):
     for worker, engine in list(_OFFLINE_ENGINES.items()):
         engine.dispose()
-        for suffix in ("", "-wal", "-shm"):
+        # `-wal` / `-shm` 已不再生成（journal_mode=MEMORY）；仍列入清理，
+        # 以回收上一次运行（WAL 时期）或异常中断遗留的伴生文件。
+        for suffix in ("", "-journal", "-wal", "-shm"):
             (_OFFLINE_DB_DIR / f"{worker}.db{suffix}").unlink(missing_ok=True)
     _OFFLINE_ENGINES.clear()
 
