@@ -40,7 +40,7 @@ def to_memory_candidates(record: ActionRecord) -> list[MemoryCandidate]:
     row = policy.get(record.action_type)
     if row is None or not row.get("deposit"):
         return []
-    memory_type = str(row.get("memory_type", "important_event"))
+    memory_type = str(row.get("memory_type", "experience"))
     importance = float(row.get("importance", 0.5))
     source = str(row.get("source", "user_derived"))
 
@@ -57,7 +57,7 @@ def to_memory_candidates(record: ActionRecord) -> list[MemoryCandidate]:
     if record.status == "failed":
         content = f"上次没能帮用户完成：{content}"
         importance = max(importance, 0.6)
-        memory_type = "important_event"
+        memory_type = "experience"
     return [
         MemoryCandidate(
             action="save",

@@ -33,7 +33,7 @@
 | 项 | 内容 |
 |---|---|
 | 链尾现状 | `apps/backend/migrations/versions/0009_app_release_artifacts.py`（增量链 `0002`~`0009` 已存在） |
-| 本版本新增 | **`0010`**（`memories.layer`，服务 `MEV-005`）；**`0011`**（`memory_links.relation` CHECK 扩展，服务 `MEV-009`）；`SAG-002` 若开工再顺延取号 |
+| 本版本新增 | **`0010`**（`ck_memories_type` 收窄为 7 值，服务 `MEV-015`，2026-10-16 入链）；**`0011`**（`memories.layer`，服务 `MEV-005`）；**`0012`**（`memory_links.relation` CHECK 扩展，服务 `MEV-009`）；`SAG-002` 若开工再顺延取号 |
 | 串行纪律 | 同一批迁移必须**串行入链**，不得并行改链尾；一个迁移承载一个域面 |
 | 已知陷阱 | 加一条迁移会打破跨版本钉测（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`，单点 `tests/support/schema_pins.py`）→ 执行前先取干净基线测 blast radius（继承 `docs/version/v5.0.0/tasks.md` §0.3） |
 | 禁止 | 再次折叠迁移链；`create_all` 路径（测试内存 SQLite 属豁免） |
@@ -86,16 +86,33 @@
 
 | 里程碑 | 主题 | 任务 | 数量 |
 |---|---|---|---|
+| **M0** | 记忆词表收窄（迁移 `0010`） | `MEV-015` | 1 |
 | **M1** | 记忆检索质量（零迁移） | `MEV-001 ~ MEV-004` | 4 |
-| **M2** | 记忆显式分层（迁移 `0010`） | `MEV-005 ~ MEV-008` | 4 |
-| **M3** | 记忆图谱与产品面（迁移 `0011`） | `MEV-009 ~ MEV-014` | 6 |
+| **M2** | 记忆显式分层（迁移 `0011`） | `MEV-005 ~ MEV-008` | 4 |
+| **M3** | 记忆图谱与产品面（迁移 `0012`） | `MEV-009 ~ MEV-014` | 6 |
 | **P1** | 计划澄清地基（零迁移） | `PLN-001 ~ PLN-005` | 5 |
 | **P2** | 计划澄清产品面 | `PLN-006 ~ PLN-009` | 4 |
 | **S** | 子 Agent（**未排期**，阻塞于 SAG-000 裁决） | `SAG-000 ~ SAG-004` | 5 |
-| | | **主干合计（M1~M3 + P1~P2）** | **23** |
-| | | **含未排期候选合计** | **28** |
+| | | **主干合计（M0~M3 + P1~P2）** | **24** |
+| | | **含未排期候选合计** | **29** |
 
-**依赖总览**：M1 → M2 → M3（串行）；P1 → P2（串行）；**M 与 P 可并行**，但 P 的澄清上下文消费 `PlanContext._assemble_memory`（`apps/backend/app/services/planning/context.py:605`），故 M1 交付会直接改善澄清质量。**S 依赖 P1 的「挂起态 + 恢复」范式**。
+**依赖总览**：**M0 → M1 → M2 → M3**（串行；M0 先入链以腾出类型词表的确定状态，M2 的 `layer` 回填映射因此只需覆盖 7 规范类型）；P1 → P2（串行）；**M 与 P 可并行**，但 P 的澄清上下文消费 `PlanContext._assemble_memory`（`apps/backend/app/services/planning/context.py:605`），故 M1 交付会直接改善澄清质量。**S 依赖 P1 的「挂起态 + 恢复」范式**。
+
+### 1.1 M0 · 记忆词表收窄（`MEV-015`，迁移 `0010`，**2026-10-16 已实施**）
+
+> **目标**：把记忆类型**存储词表**由 9 值（7 规范 + 2 遗留）收窄为 7 规范值，遗留类型
+> `important_event` / `relationship_event` 退役；遗留名只保留在**入站归一**（LLM 输出 / 旧数据）。
+> 触发：`docs/refactor/memory-migration-and-version-naming-audit-2026-10-15.md` §2.3 / §7.3
+> （库可重建，存量迁移随之作废；写入口未归一仍会产遗留行）。
+
+| ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
+|---|---|---|---|---|---|
+| MEV-015 | 遗留记忆类型退役 | 数据/契约 | P1 | — | 迁移 `0010`：`ck_memories_type` 收窄 + 存量遗留行就地归一；`models/memory.py`（`MemoryType` 7 值 + `CandidateMemoryType` 入站域）；`services/memory/types.py`（删 `STORAGE_MEMORY_TYPES`/`storage_type`，`LEGACY_TYPE_ALIASES` 降为入站归一表）；入站产出四处改规范名；标签表 / 分组表收窄；回放路径（`state.py::_replay_relationship_memories`）随之删除 |
+
+**交付判据**：① 新库 / 重建库 `upgrade head` 到 `0010` 后 `memories.type` 仅接受 7 值；
+② 遗留名从任一入口（LLM 提取、动作参数、世界/关系摄取、计划终态）进入后**落库即规范值**；
+③ 回放补记路径与其 settings 字段一并删除，`memory_replay` 事件源不再产生新行；
+④ `schema_pins` 四钉同步（HEAD/PARENT 推进，表数与列摘要不变）且全仓钉测绿。
 
 ---
 
@@ -114,13 +131,13 @@
 
 ---
 
-## 3. M2 · 记忆显式分层（`MEV-005 ~ MEV-008`，迁移 `0010`）
+## 3. M2 · 记忆显式分层（`MEV-005 ~ MEV-008`，迁移 `0011`）
 
 > **目标**：在既有扁平 7 类型之上引入显式 **Episodic / Semantic** 通道，检索按通道分配配额，生命周期按通道差异化衰减。**`layer` 只作检索分通道依据，不做权限或来源真相。**
 
 | ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
 |---|---|---|---|---|---|
-| MEV-005 | `memories.layer` 迁移与回填 | 数据 | P0 | M1 | 迁移 `0010`：ADD COLUMN `layer`（`episodic` / `semantic`）+ **幂等回填**（由既有 `type` 映射推导）+ 索引；改 `apps/backend/app/core/db/memory.py`；bump `tests/support/schema_pins.py` 钉测 |
+| MEV-005 | `memories.layer` 迁移与回填 | 数据 | P0 | M0, M1 | 迁移 `0011`：ADD COLUMN `layer`（`episodic` / `semantic`）+ **幂等回填**（由既有 `type` 映射推导）+ 索引；改 `apps/backend/app/core/db/memory.py`；bump `tests/support/schema_pins.py` 钉测 |
 | MEV-006 | 情景聚合（Episodic） | 能力 | P0 | MEV-005 | 新增 `apps/backend/app/services/memory/episodic.py`：按 `(user_id, 时间窗, 主题)` 聚合会话/行动/世界事件为情景条目，保留 `source_ref` 指针；经既有三段评估转正；后台 job 注册（复用 `register_job_type`） |
 | MEV-007 | 语义抽象（Semantic） | 能力 | P1 | MEV-006 | 新增 `apps/backend/app/services/memory/semantic.py`：由若干 `episodic` 条目经 LLM 抽象为跨事件概念/偏好，复用 `evaluator` 三段评估与冲突消解 |
 | MEV-008 | 分层检索配额与衰减差异化 | 调优 | P1 | MEV-006 | `retriever.py` 按 `layer` 分配召回配额（配置 `memory_layer_quota`）；`core/settings/memory.py::memory_decay_lambda_json` 扩展为按 `layer` 差异化（episodic 快、semantic 慢） |
@@ -129,11 +146,11 @@
 
 ---
 
-## 4. M3 · 记忆图谱与产品面（`MEV-009 ~ MEV-014`，迁移 `0011`）
+## 4. M3 · 记忆图谱与产品面（`MEV-009 ~ MEV-014`，迁移 `0012`）
 
 | ID | 任务 | 类型 | 优先级 | 依赖 | 交付面 |
 |---|---|---|---|---|---|
-| MEV-009 | `memory_links` 关系扩展与 1-hop 检索 | 数据/能力 | P2 | M2 | 迁移 `0011` 改 `relation` CHECK（新增 `caused_by` / `before` / `related`）；`retriever.py` 增 1-hop 扩展召回（扩展结果降权）；bump 钉测 |
+| MEV-009 | `memory_links` 关系扩展与 1-hop 检索 | 数据/能力 | P2 | M2 | 迁移 `0012` 改 `relation` CHECK（新增 `caused_by` / `before` / `related`）；`retriever.py` 增 1-hop 扩展召回（扩展结果降权）；bump 钉测 |
 | MEV-010 | 记忆关系抽取 | 能力 | P2 | MEV-009 | 转正链路延伸 `services/memory/evaluator.py`：LLM 判定新记忆与既有记忆的关系并落 `memory_links`；失败静默跳过（不阻断转正） |
 | MEV-011 | 记忆搜索与筛选端点 | API | P2 | M1 | `GET /memory/items`（`apps/backend/app/api/v1/memory.py:51`）增 `q` / `type` / `layer` / 时间区间参数，服务端检索复用 `retriever`；**向后兼容**（无参时行为不变） |
 | MEV-012 | 主题聚类卡片 | 产品 | P3 | MEV-007 | `services/memory/product_view.py` 增只读派生「主题卡片」；后台 job 周期计算；**不新表** |
@@ -191,8 +208,8 @@
 
 | 项 | 状态 |
 |---|---|
-| Task Detail | **已生成（28/28）**（2026-10-14）。**M1**：`MEV-001`（lite 重排）/ `MEV-002`（query 改写与多路召回）/ `MEV-003`（词表与标签覆盖）/ `MEV-004`（可观测与离线门槛）。**M2**：`MEV-005`（`layer` 列与迁移 `0010`）/ `MEV-006`（情景聚合）/ `MEV-007`（语义抽象）/ `MEV-008`（分层配额与衰减调制）。**M3**：`MEV-009`（`memory_links` 值域与 1-hop，迁移 `0011`）/ `MEV-010`（关系抽取）/ `MEV-011`（记忆搜索与筛选 API）/ `MEV-012`（主题卡片，只读派生）/ `MEV-013`（客户端记忆面：Web 可编辑 + 移动端搜索）/ `MEV-014`（部分遗忘）。**P1**：`PLN-001`（澄清判定闸）/ `PLN-002`（上下文与 prompt 槽位）/ `PLN-003`（挂起载体，零迁移）/ `PLN-004`（前台恢复）/ `PLN-005`（超时兜底）。**P2**：`PLN-006`（移动端澄清卡片）/ `PLN-007`（结构化端点 + Web plans 视图）/ `PLN-008`（审计与归因）/ `PLN-009`（移动端审批 UI）。**S（未排期）**：`SAG-000`（红线裁决，阻塞项）/ `SAG-001`（身份抽象）/ `SAG-002`（Run 血缘，迁移 `0012`）/ `SAG-003`（派发与收敛 + S-C 最小验证）/ `SAG-004`（域架构文档）。体例见 `tasks/README.md`（10 节）。**已登记的依赖/落点修正**：`PLN-006` 依赖改为 `PLN-007`（客户端需结构化端点）；`MEV-014` 留痕由 `merge_chain` 改为 `source_ref.partial_forget_history`（避免虚增 `source_count`）；`MEV-012` 与注册表「后台 job 周期计算」的显式偏差（改为读时派生）；`MEV-002` 落点由「`services/conversation/context.py` 调用处扩展为并集打分」改为「`services/memory/retriever.py` 内部多 query 召回 + 归并」（`conversation/context.py` 零改动，签名冻结） |
-| 迁移编号占用 | `0010` = MEV-005；`0011` = MEV-009；`SAG-002` 待取号（不得并行改链尾） |
+| Task Detail | **已生成（28/28）**（2026-10-14）。**M0**：`MEV-015`（遗留记忆类型退役，迁移 `0010`）——2026-10-16 由审查驱动直接实施，**未生成 Task Detail**。**M1**：`MEV-001`（lite 重排）/ `MEV-002`（query 改写与多路召回）/ `MEV-003`（词表与标签覆盖）/ `MEV-004`（可观测与离线门槛）。**M2**：`MEV-005`（`layer` 列与迁移 `0011`）/ `MEV-006`（情景聚合）/ `MEV-007`（语义抽象）/ `MEV-008`（分层配额与衰减调制）。**M3**：`MEV-009`（`memory_links` 值域与 1-hop，迁移 `0012`）/ `MEV-010`（关系抽取）/ `MEV-011`（记忆搜索与筛选 API）/ `MEV-012`（主题卡片，只读派生）/ `MEV-013`（客户端记忆面：Web 可编辑 + 移动端搜索）/ `MEV-014`（部分遗忘）。**P1**：`PLN-001`（澄清判定闸）/ `PLN-002`（上下文与 prompt 槽位）/ `PLN-003`（挂起载体，零迁移）/ `PLN-004`（前台恢复）/ `PLN-005`（超时兜底）。**P2**：`PLN-006`（移动端澄清卡片）/ `PLN-007`（结构化端点 + Web plans 视图）/ `PLN-008`（审计与归因）/ `PLN-009`（移动端审批 UI）。**S（未排期）**：`SAG-000`（红线裁决，阻塞项）/ `SAG-001`（身份抽象）/ `SAG-002`（Run 血缘，迁移 `0012`）/ `SAG-003`（派发与收敛 + S-C 最小验证）/ `SAG-004`（域架构文档）。体例见 `tasks/README.md`（10 节）。**已登记的依赖/落点修正**：`PLN-006` 依赖改为 `PLN-007`（客户端需结构化端点）；`MEV-014` 留痕由 `merge_chain` 改为 `source_ref.partial_forget_history`（避免虚增 `source_count`）；`MEV-012` 与注册表「后台 job 周期计算」的显式偏差（改为读时派生）；`MEV-002` 落点由「`services/conversation/context.py` 调用处扩展为并集打分」改为「`services/memory/retriever.py` 内部多 query 召回 + 归并」（`conversation/context.py` 零改动，签名冻结） |
+| 迁移编号占用 | `0010` = MEV-015（已入链）；`0011` = MEV-005；`0012` = MEV-009；`SAG-002` 顺延待取号（不得并行改链尾） |
 | 待决策项 | ① 澄清超时策略（自动继续 / 自动驳回 / 永久等待）；② 是否为新 memory 模块补静态扫描；③ `MEV-008` 配额取值；④ subAgent 红线（SAG-000） |
 | 未登记项 | V6.0.0 **不覆盖**：审批触达（飞书推送）、审批审计归因表、Self Improvement 闭环、多通道（Discord / Telegram）——属其他方向，须另立注册表 |
 | 基线同步 | 已完成（2026-10-14）：§3.4 D2/D3、§3.6 D1、§8.2 / §11.2 / §11.3 路径更正、§8.7 新增 Plan Clarification Gate 扩展点 |

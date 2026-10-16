@@ -117,7 +117,10 @@ BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "messages": ("859d319a9c244bfb", "28485ce6aa400d11", "80cc53e497c96a49"),
     "memory_candidates": ("2e5d80cbd4a5c8e5", "41df4f3ee6f0c7bc", "1152da1a25969f8a"),
     "memory_links": ("3d3ded6c6e54c04a", "283ca81681e4286f", "35da9fa6f9d0bbf0"),
-    "memories": ("727a9d903fefaf06", "70aeda5a3b94d14f", "f548dcfb8ad1dc1a"),
+    # 词表收窄声明（2026-10-16，MEV-015）：`ck_memories_type` 由 9 值收窄为 7 值（遗留类型
+    # 退役，迁移 `0010`）—— 有意演进，非 TOOL-012 改脏。列摘要与索引摘要零变化，仅 checks
+    # 摘要刷新。原 checks 值 70aeda5a3b94d14f。
+    "memories": ("727a9d903fefaf06", "76588b8db9bf9e39", "f548dcfb8ad1dc1a"),
     "outbox_events": ("d41598a8d9dd0a59", "a3d68da9b90a22f4", "37e2a34025bbdc06"),
     "trigger_registry": ("ab91ce9b9b46c0ce", "2abe4ba951c80f5e", "917152757e46a642"),
     "world_entities": ("911237899993c840", "1981fcf3f0fe94f6", "a0a707e89ac86a7a"),

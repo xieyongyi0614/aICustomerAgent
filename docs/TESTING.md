@@ -213,6 +213,19 @@ CI 上注意：`backend-full` 的 `TEST_DATABASE_URL` 指向 service container�
 
 分层基线参考（`-n auto`，`tests/unit + integration + e2e`）：**2201 passed + 7 skipped**。
 
+### 10.4 2026-10-15/16 清账记录（已归零）
+
+历史套件（`--run-legacy`）此前累积 **25 条既存失败**，已按 §10.1 手法逐条定性并全部清除：
+
+| 组 | 条数 | 性质 | 处置 |
+|---|---|---|---|
+| `v25/test_plan011_debug_api.py` | 19 | 调试面身份收口后需 token，而该模块命中不了 conftest 的自动鉴权 override | 模块内显式安装 override |
+| `v25/test_plan_approval_gate.py` | 1 | 断言真实 401，但 conftest 已装默认 override | 用例内自清 override |
+| `v51/test_car_api.py` | 1 | **日历腐烂**（写死购买日期 + 精确车龄断言） | 断言锚定「今天 − N 个月」 |
+| `v24` 冻结摘要 / 表集摘要 | 4 | 2 条旧账（漏同步）+ 2 条本次改脏 | 按 §11.3 同步并附声明 |
+
+**当前状态**：默认全量与 `--run-legacy` 全量失败集均为空；新增失败一律按 §10.1 与本次改动做 diff。
+
 ## 11. 冻结面 / 钉测处置流程（T-23）
 
 固定整文件摘要的钉测（`ZERO_DIFF_HASHES` / `FROZEN_SOURCES`）在涉事文件被改动时会红，

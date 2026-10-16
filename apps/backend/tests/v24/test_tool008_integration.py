@@ -56,12 +56,16 @@ FROZEN_SOURCES: dict[str, str] = {
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`
     # 归位到本文件 —— 非 TOOL-008 改脏。
-    "app/models/memory.py": "3d9419eb68a23f856ced8fb0db9c88088a3124735c8164b8e07788bf3d38de47",
+    # 词表收窄声明（2026-10-16，MEV-015）：`MemoryType` 收窄为 7 规范值，候选类型域拆出
+    # `CandidateMemoryType`（入站容忍遗留名）—— 非 TOOL-008 改脏。原值 3d9419eb。
+    "app/models/memory.py": "09d0ce66fb6a255afb45b73351c3facd68b33cf6446b2c527808ebb0fca831cc",
     # memory 域通道收敛声明（2026-09-30，台账 §5.2）：`materialize_event_memory` 直写分支
     # 改为经 memory.ingest.create_candidate 投 v2 候选（评估转正），边界表构造不变 —— 非 TOOL-008 改脏。
     # 时间口径统一（2026-10-05，0006~0008）：`timeutil.now()` → `timeutil.now()`（aware UTC）
     # —— 非 TOOL-008 改脏。原值 952f4bfc。
-    "app/services/world/memory_bridge.py": "cd32a6a1c420bedb107e9d98230617ed2240e03c112d38240548aebe42130939",
+    # 词表收窄声明（2026-10-16，MEV-015）：`EVENT_MEMORY_TYPES` 与兜底值由遗留名
+    # `important_event` 改规范类型 `experience` —— 非 TOOL-008 改脏。原值 cd32a6a1。
+    "app/services/world/memory_bridge.py": "0fadddca644b8c75f975e0fd0e83dee80b63f091a19149384533e9326143caea",
     # 记账词表补齐声明（2026-10-02，记账链路修复）：LEDGER_RECORD_TRIGGERS 增补
     # `花费 / 付款 / 买 / 充值 / 交了 / 缴了` —— 非 TOOL-008 改脏。原值 2da514d9。
     "app/character/asuna/action.py": "0269c402790461de1923aa55c58195f05f68b3bb675be2eac5353f7bc50698e0",
@@ -81,10 +85,10 @@ MEMORY_CANDIDATES_COLUMNS: tuple[str, ...] = (
 )
 
 MEMORY_TYPE_DOMAIN: tuple[str, ...] = (
+    # 词表收窄声明（2026-10-16，MEV-015）：`important_event` / `relationship_event` 退役，
+    # 存储词表 9 → 7 值（原元祖含这两项，位于 `user_fact` 之后）。
     "user_preference",
     "user_fact",
-    "important_event",
-    "relationship_event",
     "experience",
     "relationship_fact",
     "commitment",
@@ -151,7 +155,7 @@ def test_important_result_invests_candidate_with_template_content(
     assert payload["content"] == "用户不想再被提醒：开会"
     rows = candidate_rows(USER)
     assert [row.content for row in rows] == ["用户不想再被提醒：开会"]
-    assert rows[0].proposed_type == "important_event"
+    assert rows[0].proposed_type == "experience"
     assert rows[0].salience == 0.5
     assert rows[0].source == "user_derived"
     assert rows[0].character_id == "asuna"
@@ -191,7 +195,7 @@ def test_reminder_create_candidate_passes_policy_and_lands(
     assert payload["content"] == "用户请我提醒：开会"
     assert candidate_count(USER) == 1
     rows = candidate_rows(USER)
-    assert rows[0].proposed_type == "important_event"
+    assert rows[0].proposed_type == "experience"
     assert rows[0].salience == 0.7
     assert rows[0].source == "user_derived"
 
@@ -409,7 +413,7 @@ def test_timeout_deposits_unfinished_semantics(db_session_factory, tool_memory_o
     assert payload["content"] == "上次没能帮用户完成：用户不想再被提醒：开会"
     rows = [row for row in candidate_rows(USER) if row.id == payload["candidate_id"]]
     assert len(rows) == 1
-    assert rows[0].proposed_type == "important_event"
+    assert rows[0].proposed_type == "experience"
     assert rows[0].salience >= 0.6
 
 

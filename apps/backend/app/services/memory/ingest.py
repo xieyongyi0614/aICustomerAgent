@@ -13,6 +13,7 @@ from app.core.db import MemoryCandidateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
 from app.services.action.memory_bridge import has_memory_effect, to_memory_candidates
+from app.services.memory import types as memory_types
 from app.services.relationship.milestone import MILESTONES
 from app.core import ids, timeutil
 
@@ -77,7 +78,14 @@ def create_candidate(
     source_ref_extra: dict | None = None,
     created_at: datetime | None = None,
 ) -> MemoryCandidateRow:
-    """幂等投递唯一入口：跨域旁路（世界/行动/账本）统一经此投 v2 候选，禁止直写 memories。"""
+    """幂等投递唯一入口：跨域旁路（世界/行动/账本）统一经此投 v2 候选，禁止直写 memories。
+
+    `proposed_type` 在此归一（遗留类型名 → 规范类型名，2026-10-16）：候选表不再落遗留值，
+    表外取值原样保留（交由转正侧 `_final_type` 兜底，保留脏数据可诊断性）。
+    """
+    normalized_type = memory_types.normalize_type(proposed_type)
+    if normalized_type is not None:
+        proposed_type = normalized_type
     created_at = created_at or timeutil.now()
     source_ref: dict = {"table": source_table, "id": source_id}
     if source_ref_extra:
@@ -245,7 +253,7 @@ def ingest_from_world_event(event, user_id: str, trace=None) -> MemoryCandidateR
         source_table=SOURCE_WORLD,
         source_id=event.id,
         content=_completed_event_content(event),
-        proposed_type="important_event",
+        proposed_type="experience",
         source_kind="user_stated",
         salience_init=_salience_from_world_importance(importance),
         source_ref_extra={
@@ -280,7 +288,7 @@ def ingest_from_relationship_event(event, trace=None) -> MemoryCandidateRow | No
         source_table=SOURCE_RELATIONSHIP,
         source_id=event.id,
         content=content,
-        proposed_type="relationship_event",
+        proposed_type="relationship_fact",
         source_kind="user_derived",
         salience_init=_MAGNITUDE_SALIENCE.get(event.magnitude, 0.6),
         source_ref_extra={"type": event_type, "magnitude": event.magnitude},

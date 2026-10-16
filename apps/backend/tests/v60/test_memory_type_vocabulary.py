@@ -29,7 +29,15 @@ BASELINE_AFFINITY_KEYWORDS = {
     "relationship_fact": ("我们", "一起", "送过", "看过", "去过"),
 }
 
-BASELINE_LEGACY_LABELS = {"important_event": "事件", "relationship_event": "关系事件"}
+BASELINE_CANONICAL_LABELS = {
+    "user_preference": "偏好",
+    "user_fact": "事实",
+    "experience": "经历",
+    "relationship_fact": "关系",
+    "commitment": "目标",
+    "milestone_event": "里程碑",
+    "behavior_pattern": "习惯",
+}
 
 BASELINE_INSIGHT_LABELS = {"belief": "看法", "preference": "偏好", "pattern": "模式"}
 
@@ -54,8 +62,9 @@ PRESERVED_FUNCTION_DIGESTS = {
     # 命名卫生声明（2026-10-15）：`normalize_type` 函数体内 `V2_MEMORY_TYPES`
     # 改名 `CANONICAL_MEMORY_TYPES`，源码摘要随之刷新（原值 4917df56b1930afc）；
     # 仅标识符改名，分支与返回值语义逐项不变。
+    # 词表收窄声明（2026-10-16，MEV-015）：`storage_type` 随 `STORAGE_MEMORY_TYPES` 整体删除
+    # （无生产消费者），本表只剩 `normalize_type`——其函数体未动，摘要保持不变。
     "normalize_type": "4231c001f40ea05e",
-    "storage_type": "f9a67d2989b40ca7",
 }
 
 
@@ -172,26 +181,28 @@ class TestAffinityVocabulary:
 
 
 class TestTypeLabels:
-    def test_type_labels_cover_all_storage_types(self):
-        for memory_type in memory_types.STORAGE_MEMORY_TYPES:
+    def test_type_labels_cover_all_canonical_types(self):
+        for memory_type in memory_types.CANONICAL_MEMORY_TYPES:
             assert memory_type in MEMORY_TYPE_LABELS, memory_type
-        assert set(MEMORY_TYPE_LABELS) >= set(memory_types.STORAGE_MEMORY_TYPES)
+        assert set(MEMORY_TYPE_LABELS) == set(memory_types.CANONICAL_MEMORY_TYPES)
 
     def test_type_labels_are_unique_and_non_empty(self):
         labels = list(MEMORY_TYPE_LABELS.values())
-        assert len(labels) == len(memory_types.STORAGE_MEMORY_TYPES)
+        assert len(labels) == len(memory_types.CANONICAL_MEMORY_TYPES)
         assert len(set(labels)) == len(labels)
         assert all(label for label in labels)
 
-    def test_legacy_type_labels_unchanged(self):
-        for memory_type, label in BASELINE_LEGACY_LABELS.items():
+    def test_canonical_type_labels_unchanged(self):
+        for memory_type, label in BASELINE_CANONICAL_LABELS.items():
             assert MEMORY_TYPE_LABELS[memory_type] == label
 
+    def test_legacy_type_labels_retired(self):
+        """词表收窄（2026-10-16）：遗留名不再入标签表（届时走「落回原值 + 告警」分支）。"""
+        for legacy in memory_types.LEGACY_MEMORY_TYPES:
+            assert legacy not in MEMORY_TYPE_LABELS
+
     def test_label_keys_order_follows_type_constants(self):
-        keys = list(MEMORY_TYPE_LABELS)
-        split = len(memory_types.CANONICAL_MEMORY_TYPES)
-        assert keys[:split] == list(memory_types.CANONICAL_MEMORY_TYPES)
-        assert keys[split:] == list(memory_types.LEGACY_MEMORY_TYPES)
+        assert list(MEMORY_TYPE_LABELS) == list(memory_types.CANONICAL_MEMORY_TYPES)
 
     def test_canonical_type_labels_rendered_in_prompt(self, caplog):
         memories = [
@@ -242,16 +253,19 @@ class TestContracts:
             "important_event": "experience",
             "relationship_event": "relationship_fact",
         }
-        assert memory_types.STORAGE_MEMORY_TYPES == (
-            memory_types.CANONICAL_MEMORY_TYPES + memory_types.LEGACY_MEMORY_TYPES
-        )
+        assert memory_types.LEGACY_MEMORY_TYPES == tuple(memory_types.LEGACY_TYPE_ALIASES)
         assert memory_types.DEFAULT_MEMORY_TYPE == "user_fact"
 
-    def test_normalize_and_storage_type_unchanged(self):
+    def test_normalize_type_unchanged(self):
         for name, digest in PRESERVED_FUNCTION_DIGESTS.items():
             assert _source_digest(getattr(memory_types, name)) == digest, name
 
-    def test_retriever_and_schema_untouched(self):
+    def test_legacy_storage_symbols_retired(self):
+        """词表收窄（2026-10-16，MEV-015）：存储面 9 值符号退役，仅留入站归一表。"""
+        assert not hasattr(memory_types, "STORAGE_MEMORY_TYPES")
+        assert not hasattr(memory_types, "storage_type")
+
+    def test_retriever_untouched_and_schema_narrowed(self):
         assert (
             retriever.memory_types.TYPE_AFFINITY_KEYWORDS
             is memory_types.TYPE_AFFINITY_KEYWORDS
@@ -268,14 +282,18 @@ class TestContracts:
             if getattr(constraint, "name", None) == "ck_memories_type"
         }
         assert "ck_memories_type" in checks
-        for memory_type in memory_types.STORAGE_MEMORY_TYPES:
+        for memory_type in memory_types.CANONICAL_MEMORY_TYPES:
             assert f"'{memory_type}'" in checks["ck_memories_type"]
+        for legacy in memory_types.LEGACY_MEMORY_TYPES:
+            assert f"'{legacy}'" not in checks["ck_memories_type"]
 
-    def test_no_new_migration_and_pins_unchanged(self):
+    def test_migration_pins_follow_the_narrowing(self):
         from tests.support import schema_pins
 
-        assert schema_pins.MIGRATION_HEAD == "0009"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0008"
+        # 钉值升级声明（2026-10-16，MEV-015）：词表收窄迁移 `0010` 入链，HEAD/PARENT 随之推进
+        # （原 `0009` / `0008`）；表数与列摘要不变（只改 CHECK 值域，不动列）。
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "f4f1cc5b50ae78ed"
 

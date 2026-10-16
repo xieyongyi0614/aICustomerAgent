@@ -594,8 +594,10 @@ class TestContracts:
     def test_no_new_migration_and_pins_unchanged(self):
         from tests.support import schema_pins
 
-        assert schema_pins.MIGRATION_HEAD == "0009"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0008"
+        # 钉值升级声明（2026-10-16，MEV-015）：词表收窄迁移 `0010` 入链，HEAD/PARENT 随之推进
+        # （原 `0009` / `0008`）；本任务（query 改写）自身仍零迁移，表数与列摘要不变。
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "f4f1cc5b50ae78ed"
 

@@ -56,7 +56,7 @@ class TestToolSideDepositIsNotOverridden:
         assert len(candidates) == 1
         assert candidates[0].importance == 0.7
         assert candidates[0].source == "user_derived"
-        assert candidates[0].type == "important_event"
+        assert candidates[0].type == "experience"
         assert tool_memory_policy.BOUNDARY_TABLE[support.REMINDER_CREATE]["deposit"] is True
 
     def test_env_query_never_deposits_even_when_configured_to_deposit(self):
@@ -64,7 +64,7 @@ class TestToolSideDepositIsNotOverridden:
         rows = {
             support.ENV_QUERY: {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.9,
                 "source": "user_derived",
             }
@@ -110,13 +110,13 @@ class TestToolSideDepositIsNotOverridden:
         assert tool_memory_policy.BOUNDARY_TABLE == {
             "builtin.reminder.create": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.7,
                 "source": "user_derived",
             },
             "builtin.reminder.cancel": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.5,
                 "source": "user_derived",
             },
@@ -133,13 +133,13 @@ class TestToolSideDepositIsNotOverridden:
             "builtin.search.query": {"deposit": False},
             "builtin.notification.send": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.6,
                 "source": "ai_inferred",
             },
             "channel.feishu.send": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.6,
                 "source": "ai_inferred",
             },

@@ -10,7 +10,7 @@ from app.core import timeutil
 from app.core.db import Memory, RuntimeTraceRow
 from app.repositories import memory_repository, trace_repository
 from app.services.memory import product_view
-from app.services.memory.types import STORAGE_MEMORY_TYPES
+from app.services.memory.types import CANONICAL_MEMORY_TYPES
 
 pytestmark = pytest.mark.unit
 
@@ -79,8 +79,8 @@ def _seed_traces(*rows: RuntimeTraceRow) -> None:
 # --- 分组映射（§4.1.3 冻结表） ---
 
 
-def test_group_table_covers_every_storable_type():
-    assert set(product_view.TYPE_TO_GROUP) == set(STORAGE_MEMORY_TYPES)
+def test_group_table_covers_every_canonical_type():
+    assert set(product_view.TYPE_TO_GROUP) == set(CANONICAL_MEMORY_TYPES)
 
 
 def test_group_table_is_frozen():
@@ -91,9 +91,7 @@ def test_group_table_is_frozen():
         "milestone_event": "goal",
         "user_fact": "now",
         "experience": "now",
-        "important_event": "now",
         "relationship_fact": "now",
-        "relationship_event": "now",
     }
 
 
@@ -148,12 +146,7 @@ def test_total_matches_group_sum(db_session_factory):
     assert result.total == sum(len(group.items) for group in result.groups) == 4
 
 
-def test_legacy_type_normalized_in_payload(db_session_factory):
-    _seed(_memory(id="a", type="important_event"))
-    item = product_view.list_product_memories("u1").groups[3].items[0]
-    assert item.type == "experience"
-    assert item.type_label == "近况"
-    assert item.kind == "now"
+
 
 
 def test_added_this_week_counts_only_current_week(db_session_factory):

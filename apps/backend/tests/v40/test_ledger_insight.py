@@ -16,6 +16,7 @@ from app.repositories import ledger_repository
 from app.services.ledger import insight, memory_bridge
 from app.services.ledger.service import ensure_user_bootstrap, record_entry
 from app.services.memory import ingest as memory_ingest
+from app.services.memory.types import CANONICAL_MEMORY_TYPES
 
 BACKEND = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 9, 22, 23, 10, 0)
@@ -190,8 +191,10 @@ def test_insight_does_not_write_personality_state():
 
 
 def test_no_new_memory_type():
+    # 词表收窄声明（2026-10-16，MEV-015）：存储词表由 9 值收窄为 7 值（遗留 2 类型退役），
+    # 本任务（账本洞察）自身仍零新增类型。
     assert "behavior_pattern" in MemoryType.__args__
-    assert len(MemoryType.__args__) == 9
+    assert len(MemoryType.__args__) == len(CANONICAL_MEMORY_TYPES)
 
 
 def test_no_advice_language(setup):

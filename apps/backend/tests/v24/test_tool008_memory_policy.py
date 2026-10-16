@@ -21,13 +21,13 @@ TEMPLATE_REMINDER_CREATE = "用户请我提醒：开会"
 BOUNDARY_ROWS: tuple[tuple[str, dict[str, Any], dict[str, Any], str], ...] = (
     (
         "builtin.reminder.create",
-        {"deposit": True, "memory_type": "important_event", "importance": 0.7, "source": "user_derived"},
+        {"deposit": True, "memory_type": "experience", "importance": 0.7, "source": "user_derived"},
         REMINDER_PARAMS,
         "policy_deposit",
     ),
     (
         "builtin.reminder.cancel",
-        {"deposit": True, "memory_type": "important_event", "importance": 0.5, "source": "user_derived"},
+        {"deposit": True, "memory_type": "experience", "importance": 0.5, "source": "user_derived"},
         CANCEL_PARAMS,
         "policy_deposit",
     ),
@@ -44,13 +44,13 @@ BOUNDARY_ROWS: tuple[tuple[str, dict[str, Any], dict[str, Any], str], ...] = (
     ("builtin.search.query", {"deposit": False}, {"query": "明天天气"}, "read_only_tool"),
     (
         "builtin.notification.send",
-        {"deposit": True, "memory_type": "important_event", "importance": 0.6, "source": "ai_inferred"},
+        {"deposit": True, "memory_type": "experience", "importance": 0.6, "source": "ai_inferred"},
         NOTIFY_PARAMS,
         "policy_deposit",
     ),
     (
         "channel.feishu.send",
-        {"deposit": True, "memory_type": "important_event", "importance": 0.6, "source": "ai_inferred"},
+        {"deposit": True, "memory_type": "experience", "importance": 0.6, "source": "ai_inferred"},
         NOTIFY_PARAMS,
         "policy_deposit",
     ),
@@ -145,7 +145,7 @@ def test_read_only_tool_ignores_configured_deposit():
         rows={
             "world.env.query": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.9,
                 "source": "user_derived",
             }
@@ -172,7 +172,7 @@ def test_untrusted_namespace_ignores_configured_deposit(tool_id, namespace):
         rows={
             tool_id: {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.9,
                 "source": "user_derived",
             }
@@ -204,7 +204,7 @@ def test_mixed_side_effects_is_not_read_only():
         rows={
             "world.env.query": {
                 "deposit": True,
-                "memory_type": "important_event",
+                "memory_type": "experience",
                 "importance": 0.9,
                 "source": "user_derived",
             }
@@ -260,7 +260,7 @@ def test_failed_without_gate_reason_deposits_failure_shape():
     candidates = POLICY.to_candidates(rec, None)
     assert len(candidates) == 1
     candidate = candidates[0]
-    assert candidate.type == "important_event"
+    assert candidate.type == "experience"
     assert candidate.importance >= 0.6
     assert candidate.content == "上次没能帮用户完成：用户请我提醒：开会"
 
@@ -386,7 +386,7 @@ def test_birthday_keyword_only_applies_to_reminder_create():
         record("builtin.notification.send", params={"content": "生日提醒"}),
         None,
     )
-    assert candidates[0].type == "important_event"
+    assert candidates[0].type == "experience"
     assert candidates[0].importance == 0.6
 
 

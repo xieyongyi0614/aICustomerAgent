@@ -174,7 +174,7 @@ REL-001（V2.0.0 Phase 4 关系域）交付的「v1 遗留 `relationship_event` 
 | （旧 4 维）`core/constants.py::RELATIONSHIP_DIMENSIONS` 死常量 | 删除 | 无 import 者（§3.3） |
 | （旧 4 维）`services/conversation/state.py` 本地副本 | `LEGACY_RELATIONSHIP_DIMENSIONS` | 仅 v1 回放路径消费，语义不变 |
 | （旧 6 维）`collectors.py::_RELATIONSHIP_DIMENSIONS` 副本 | 删除，改 import 真源 | §3.3 四点收敛为一份 |
-| `V4_EXTRACTOR_PROMPT` | `MEMORY_EXTRACTOR_PROMPT` | **正文未动**（见 7.5） |
+| `V4_EXTRACTOR_PROMPT` | `MEMORY_EXTRACTOR_PROMPT` | 正文口径 2026-10-16 更新（见 §7.7） |
 | `V9_ERROR_TEXT` | 删除 | 两文件各一行死代码（§3.1） |
 | `V30_ENABLED_FLAGS`（测试侧） | `BASELINE_ENABLED_FLAGS` | 比建议更进一步：测试符号一并改名，生产 docstring 同步 |
 | `"v9_execution_chain"`（`decision.reason`） | `"delegated_to_execution_chain"` | 仅影响新落库观测值；旧值随库重建消失 |
@@ -227,8 +227,8 @@ REL-001（V2.0.0 Phase 4 关系域）交付的「v1 遗留 `relationship_event` 
 
 | 项 | 状态 | 阻塞点 |
 |---|---|---|
-| §3.2 `MEMORY_EXTRACTOR_PROMPT` 正文「仅以下 4 类」且含 2 个遗留类型 | **未改** | ① 属语义口径（LLM 产不出 `commitment` / `milestone_event` / `behavior_pattern`）非命名问题；② 正文受 `tests/unit/test_prompt_golden.py` 快照钉住，改动须同批更新 golden；③ 需确认「有意保守」还是「漏更新」 |
-| 遗留 2 类型的**完整退役** | **未改** | §7.3 只堵了写入口（新行不再落遗留类型）；退役还牵动 `MemoryType` Literal、`ck_memories_type`（需新迁移，**取号须排 `MEV-005` 的 `0010` 之后**）、别名表 / 标签表、读侧归一与 v1 回放路径（`conversation/state.py::_replay_relationship_memories`），属独立任务 |
+| §3.2 提示词正文口径 | **已改**（2026-10-16，见 §7.7） | — |
+| 遗留 2 类型的**完整退役** | **已实施**（2026-10-16，迁移 `0010`；见 §九） | — |
 
 ### 7.6 验证（终态）
 
@@ -244,3 +244,104 @@ REL-001（V2.0.0 Phase 4 关系域）交付的「v1 遗留 `relationship_event` 
 （`PRESERVED_FUNCTION_DIGESTS["normalize_type"]`、`ZERO_DIFF_HASHES[decision.py / capabilities/memory.py]`）
 与 1 条静态导入面清单（v25 plan009），全部按 §11.3 同步并附声明；其余 25 条经 HEAD 副本对照判为既存，
 已按 §7.4 逐条清除。
+
+---
+
+## 八、提示词口径落地（T1，2026-10-16）
+
+§3.2 裁决为**「漏更新」**（非有意保守）：`MEMORY_EXTRACTOR_PROMPT` 正文由「仅以下 4 类」
+（含遗留名 `important_event` / `relationship_event`）改为**逐字列出 7 个规范类型**，并补两侧护栏：
+
+| 面 | 内容 |
+|---|---|
+| 类型表 | 7 类各给一个定义 + 例句（新增 `commitment` / `milestone_event` / `behavior_pattern`） |
+| 正例节 | 7 类各一条「用户说… → content=…」，与既有 4 条同体例 |
+| 反例节 | 保留原 3 条，新增 2 条：单次行为不算 `behavior_pattern`（需自述习惯或反复出现）、普通日常事件不算 `milestone_event`（需「第一次 / 纪念日 / 达成」类节点） |
+| 纪律句 | 仍保留「不要创造其他类型」，并明确「不要使用已废弃的旧名」 |
+
+| 项 | 内容 |
+|---|---|
+| 改动落点 | `app/prompts/extractor.py` 正文；`chains/extractor_chain.py` 调用面零改动 |
+| 口径护栏 | 新增 `tests/unit/test_memory_extractor.py::TestPromptTypeContract`：7 规范类型**必须逐字出现**、2 个遗留类型名**必须不出现**（双向钉住，防未来漂移） |
+| 下游影响 | 提取结果仍经 `evaluator._final_type` 归一，规范类型为恒等映射 → 存储 / 检索语义不变；此前经该通道**产不出**的 `commitment` / `milestone_event` / `behavior_pattern` 自此可达 |
+
+**更正 §7.5 旧注**：先前记「正文受 `tests/unit/test_prompt_golden.py` 快照钉住」**不成立**——
+golden 快照只覆盖 `PromptBuilder`（`prompt_v1_default` / `v5_full` / `v6_full` / `v65_full`），
+不含提取器 prompt；本次改动**无需重生 golden**（实测 golden 用例零改动通过）。
+
+**验证**：`tests/unit/test_memory_extractor.py` + `tests/unit/test_prompt_golden.py` → **22 passed**；
+Fast Test → **2302 passed**；`tests/e2e/test_memory_e2e.py` + `tests/integration/test_evaluation_pipeline.py` → **7 passed**。
+
+**仍遗留**：当时点末行所述「词表未收窄」已在次日补齐（§九）。
+
+---
+
+## 九、遗留记忆类型退役（T2b / T2c / T2d，2026-10-16）
+
+> 承接 §7.5「遗留 2 类型完整退役」。库可重建已解除存量负担，故本批一次收口：
+> **存储词表 9 → 7**，遗留名降为**入站兼容名**，读侧回放路径随之删除。登记为 V6.0.0
+> `MEV-015`（M0，迁移 `0010`），注册表与两份 Task Detail 已同步。
+
+### 9.1 契约分层（本次核心裁决）
+
+| 面 | 内容 |
+|---|---|
+| **存储词表（7）** | `MemoryType` Literal、`ck_memories_type`、`memory_repository.VALID_MEMORY_TYPES`、`MEMORY_TYPE_LABELS`、`product_view.TYPE_TO_GROUP`、`TYPE_AFFINITY_KEYWORDS` |
+| **入站兼容（2）** | `LEGACY_TYPE_ALIASES`（`important_event → experience`、`relationship_event → relationship_fact`）+ `LEGACY_MEMORY_TYPES`（= 键集，语义改为「入站兼容名」）；新增 `models/memory.py::CandidateMemoryType = MemoryType \| LegacyMemoryType`——**候选是入站值对象（容忍旧名），存储值对象只认 7 值** |
+| **归一点** | ① `services/memory/ingest.py::create_candidate`（候选表总入口：LLM 提取 + 世界/关系/里程碑/行动/账本五源）；② 两处 `create_memory` 直写点（T2a 已收口）；③ `evaluator._final_type` 留作第二层兜底 |
+| **退役符号** | `STORAGE_MEMORY_TYPES`、`storage_type()`（无生产消费者）、`MEMORY_TYPE_LABELS` / `TYPE_TO_GROUP` 的 2 个遗留键 |
+
+### 9.2 入站产出改规范名（否则落库即撞新 CHECK）
+
+| 落点 | 改动 |
+|---|---|
+| `services/world/memory_bridge.py` | `EVENT_MEMORY_TYPES` 5 键 + 两处兜底：`important_event` → `experience` |
+| `services/tool/memory_policy.py` | `DEFAULT_MEMORY_TYPE` 与 `BOUNDARY_TABLE` 4 行 → `experience`（计划侧复用同常量，随之收口） |
+| `services/action/memory_bridge.py` | 默认值 + 失败回落 → `experience` |
+| `services/memory/ingest.py` | 世界事件候选 → `experience`；关系事件候选 → `relationship_fact`；`create_candidate` 增入口归一 |
+| `core/settings/action.py` | `action_memory_policy_json` 默认 JSON 两处 → `experience`（**部署侧同名 env 需同步**） |
+
+### 9.3 回放补记路径退役（T2c）
+
+`conversation/state.py::_replay_relationship_memories`（连同 `_replay_type_for` / `_replay_exists` /
+`_replay_is_idle` / `REPLAY_TYPE_KEYWORDS` / `LEGACY_RELATIONSHIP_DIMENSIONS` / 调用点）与 settings
+`rel_replay_discount` / `rel_replay_min_idle_hours` 一并删除——其唯一输入
+`memories.type == "relationship_event"` 已不可存储。`tests/integration/test_memory_replay.py`（7 用例）
+同批删除。`relationship_events.source` 的 `memory_replay` 值**保留**（历史行可读；收窄需另一条迁移，
+已登记基线技术债 P3）。
+
+### 9.4 迁移与钉测（T2d）
+
+| 项 | 内容 |
+|---|---|
+| 迁移 | `migrations/versions/0010_memory_type_vocabulary.py`：① 存量遗留行就地归一（幂等，与别名表同映射）；② `ck_memories_type` 收窄为 7 值（PG：DROP + ADD；SQLite：batch 重建表）。降级只放宽值域、不反向还原数据 |
+| 取号顺延 | 本任务占 `0010` → `MEV-005` 顺延 `0011`、`MEV-009` 顺延 `0012`、`SAG-002` 再顺延；`docs/version/v6.0.0/tasks.md`（§0.2 / 总览 / M2·M3 标题与行 / §7 编号占用）与两份 Task Detail 头部已加注 |
+| 钉值同步 | `tests/support/schema_pins.py`（HEAD `0010` / PARENT `0009`；**表数 57 与列摘要不变**——只改 CHECK 文本）；`v24/tool012_support.py`（`memories` checks 摘要 `70aeda5a…` → `76588b8d…`，列/索引摘要不变）；`v24/test_tool008_integration.py`（`MemoryType` 域清单 7 值 + `models/memory.py` 与 `world/memory_bridge.py` 摘要）；`v24/test_tool010_e2e.py`（`builder.py` 摘要）；`v60` 两处 pins、`v50` 链头断言 |
+
+### 9.5 同批更新的测试
+
+`v60/test_memory_type_vocabulary.py`（标签/契约/CHECK 文本/符号退役；`normalize_type` 函数体未动故摘要不变）、
+`v60/test_memory_query_rewrite.py`（pins）、`v50/test_memory_product_view.py`（分组表 7 键；删「遗留行归一」用例——
+该前提已不可构造）、`v50/test_app_release_schema.py`（链头断言改为「0009 是父版本」）、
+`v2/test_mem012_types.py`（存储 7 值 / 遗留名拒绝 / 入站兼容名）、`v2/test_mem002_ingest.py`（+ 入口归一用例）、
+`v24/test_tool008_memory_policy.py`、`v24/test_tool008_integration.py`、`v25/test_plan009_step_criteria.py`（边界表值与域清单）、
+`unit/test_world_memory_bridge.py`、`unit/test_acceptance_temporal_fix.py`、`integration/test_memory_repository.py`、
+`v40/test_ledger_insight.py`（类型域 7 值）。
+
+> `tests/eval/memory_scenarios/*.json` **有意保留遗留名**：它们模拟「LLM 提取输出」，正好持续验证入口归一。
+
+### 9.6 验证（终态）
+
+| 范围 | 结果 |
+|---|---|
+| Fast（`-m "(unit or api) and not slow"`） | **2301 passed** |
+| Integration（`-m "integration and not slow"`） | **1213 passed / 5 skipped** |
+| 历史套件（`--run-legacy tests/v2 v8.5 v24 v25 v26`） | **3561 passed / 7 skipped / 0 failed** |
+| e2e（`-m e2e`，含 slow） | **182 passed** |
+| eval（`tests/eval`） | **11 passed** |
+
+### 9.7 遗留（本轮不做）
+
+- `relationship_events.source = memory_replay` 枚举收窄（需迁移；已登记基线技术债 P3）。
+- `memory_candidates.proposed_type` 无 CHECK（归一在入口）；「候选表也钉 7 值」需另一条迁移。
+- 历史文档（`v1.0.0/*`、`v2.0.0/REL-001` 等）中的遗留类型叙述按 `docs/TESTING.md` §9 惯例保留原文。

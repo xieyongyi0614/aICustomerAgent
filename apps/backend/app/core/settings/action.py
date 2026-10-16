@@ -25,9 +25,9 @@ class ActionSettings(BaseSettings):
     chat_rate_limit_per_minute: int = 30
     action_context_char_budget: int = 400
     action_memory_policy_json: str = (
-        '{"create_reminder": {"deposit": true, "memory_type": "important_event",'
+        '{"create_reminder": {"deposit": true, "memory_type": "experience",'
         ' "importance": 0.7, "source": "user_derived"},'
-        ' "cancel_reminder": {"deposit": true, "memory_type": "important_event",'
+        ' "cancel_reminder": {"deposit": true, "memory_type": "experience",'
         ' "importance": 0.5, "source": "user_derived"},'
         ' "remember_fact": {"deposit": true, "memory_type": "user_fact",'
         ' "importance": 0.8, "source": "user_stated"},'

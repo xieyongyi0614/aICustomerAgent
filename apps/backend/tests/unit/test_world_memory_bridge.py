@@ -23,7 +23,7 @@ def test_completed_normal_event_becomes_candidate():
     candidates = to_memory_candidates(_event())
     assert len(candidates) == 1
     candidate = candidates[0]
-    assert candidate["memory_type"] == "important_event"
+    assert candidate["memory_type"] == "experience"
     assert candidate["importance"] == 0.6
     assert "面试" in candidate["content"]
     assert "09月02日" in candidate["content"]

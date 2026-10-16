@@ -52,10 +52,9 @@ TYPE_TO_GROUP = {
     "milestone_event": "goal",
     "user_fact": "now",
     "experience": "now",
-    "important_event": "now",
     "relationship_fact": "now",
-    "relationship_event": "now",
 }
+"""分组表：键集 = 存储词表 7 值（调用方先经 `normalize_type` 归一，旧库行不会落到查表）。"""
 
 TYPE_LABELS = {
     "user_preference": "偏好",

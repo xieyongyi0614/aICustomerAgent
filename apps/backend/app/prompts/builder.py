@@ -44,15 +44,15 @@ MEMORY_TYPE_LABELS = {
     "commitment": "目标",
     "milestone_event": "里程碑",
     "behavior_pattern": "习惯",
-    "important_event": "事件",
-    "relationship_event": "关系事件",
 }
-"""记忆类型中文标签（键覆盖 `STORAGE_MEMORY_TYPES` 全部 9 值，有静态用例钉住）。
+"""记忆类型中文标签（键覆盖 `CANONICAL_MEMORY_TYPES` 全部 7 值，有静态用例钉住）。
 
-键顺序 = `CANONICAL_MEMORY_TYPES`（7 规范）+ `LEGACY_MEMORY_TYPES`（2 遗留）。规范类型措辞
-与记忆产品读面（`services/memory/product_view.py::TYPE_LABELS`）同源；其中
+键顺序 = `CANONICAL_MEMORY_TYPES`。措辞与记忆产品读面
+（`services/memory/product_view.py::TYPE_LABELS`）同源；其中
 `user_fact` / `experience` 与 `commitment` / `milestone_event` 在该表内同标签，
 此处按「标签两两不同」纪律细化为「事实 / 经历」「目标 / 里程碑」。
+遗留类型名（`important_event` / `relationship_event`）已退役，不再入表；
+`memory_type_label` 对未覆盖值落回原值并告警（旧库行不会因此失败）。
 """
 
 INSIGHT_TYPE_LABELS = {

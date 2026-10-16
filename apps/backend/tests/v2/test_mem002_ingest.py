@@ -140,6 +140,16 @@ class TestCreateCandidate:
             ).count()
         assert count == 1
 
+    def test_normalizes_legacy_type_at_entry(self, ingest_db):
+        """入口归一（2026-10-16，MEV-015）：遗留名不落候选表，直接落规范类型。"""
+        row = ingest.create_candidate(
+            user_id="u1", character_id="asuna",
+            source_table="action_records", source_id="a9",
+            content="用户帮我修过电脑", proposed_type="relationship_event",
+            source_kind="user_derived", salience_init=0.6,
+        )
+        assert row.proposed_type == "relationship_fact"
+
 
 class TestIngestFromConversation:
     def test_normal_candidates_created(self, ingest_db):
@@ -229,7 +239,7 @@ class TestIngestFromWorldEvent:
         assert row is not None
         assert row.source_table == "world_events"
         assert row.content == "用户在09月29日完成了面试通过"
-        assert row.proposed_type == "important_event"
+        assert row.proposed_type == "experience"
         assert row.salience == 0.8
 
     def test_content_matches_world_bridge_format(self, ingest_db):
@@ -259,7 +269,7 @@ class TestIngestFromRelationshipEvent:
         row = ingest.ingest_from_relationship_event(event)
         assert row is not None
         assert row.source_table == "relationship_events"
-        assert row.proposed_type == "relationship_event"
+        assert row.proposed_type == "relationship_fact"
 
     def test_idempotent(self, ingest_db):
         event = _relationship_event(id="r1", user_id="u1", type="praise")

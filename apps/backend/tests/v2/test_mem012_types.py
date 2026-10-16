@@ -1,9 +1,13 @@
-"""V2 类型体系收口测试：7 规范类型 + 2 遗留类型的归一化、存储与检索亲和。"""
+"""V2 类型体系收口测试：7 规范类型（存储词表）+ 遗留名的入站归一、存储与检索亲和。
+
+2026-10-16 词表收窄（迁移 `0010`）后，`important_event` / `relationship_event` 不再可存储，
+只作为**入站兼容名**（LLM 输出 / 旧行）经 `normalize_type` 归一。"""
 
 import datetime
 from typing import get_args
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -83,13 +87,11 @@ class TestNormalizeType:
     def test_normalize(self, raw, expected):
         assert types.normalize_type(raw) == expected
 
-    def test_storage_type_accepts_legacy_and_canonical(self):
-        for value in types.STORAGE_MEMORY_TYPES:
-            assert types.storage_type(value) == value
-        assert types.storage_type("goal") is None
+    def test_entry_compat_names_are_alias_keys(self):
+        assert types.LEGACY_MEMORY_TYPES == tuple(types.LEGACY_TYPE_ALIASES)
 
-    def test_model_literal_covers_storage_set(self):
-        assert set(types.STORAGE_MEMORY_TYPES) == set(get_args(MemoryType))
+    def test_model_literal_covers_canonical_set(self):
+        assert set(types.CANONICAL_MEMORY_TYPES) == set(get_args(MemoryType))
 
 
 class TestPromotionNormalization:
@@ -136,8 +138,8 @@ class TestPromotionNormalization:
                 )
                 session.commit()
 
-    def test_user_memory_loads_all_storage_types(self, types_db):
-        for memory_type in types.STORAGE_MEMORY_TYPES:
+    def test_user_memory_loads_all_canonical_types(self, types_db):
+        for memory_type in types.CANONICAL_MEMORY_TYPES:
             memory = UserMemory(
                 id=f"m-{memory_type}",
                 user_id="u1",
@@ -150,24 +152,25 @@ class TestPromotionNormalization:
             )
             assert memory.type == memory_type
 
+    def test_user_memory_rejects_legacy_type(self, types_db):
+        """存储值对象只认 7 规范值：遗留名不再可构造（写入口负责归一）。"""
+        with pytest.raises(ValidationError):
+            UserMemory(
+                id="m-legacy",
+                user_id="u1",
+                character_id="asuna",
+                type="important_event",
+                content="内容",
+                importance=0.5,
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
+            )
+
 
 class TestRetrieverAffinityAliases:
     def test_legacy_query_keywords_alias_to_canonical(self):
         assert retriever._detect_query_types("面试经历") == {"experience"}
         assert retriever._detect_query_types("我们一起去过") == {"relationship_fact"}
-
-    def test_legacy_stored_type_matches_canonical_query(self):
-        memory = UserMemory(
-            id="m1",
-            user_id="u1",
-            character_id="asuna",
-            type="important_event",
-            content="内容",
-            importance=0.5,
-            created_at=timeutil.now(),
-            updated_at=timeutil.now(),
-        )
-        assert retriever._affinity_score(memory, {"experience"}) == 1.0
 
 
 class TestEvaluatorAffinityUnification:

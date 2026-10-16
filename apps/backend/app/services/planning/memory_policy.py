@@ -16,9 +16,9 @@
 
 | `event_kind` | deposit | `memory_type` | `importance` | `source` |
 |---|---|---|---|---|
-| `plan_completed` | ✅ | `important_event` | 0.7 | `user_derived` |
-| `plan_failed` | ✅ | `important_event` | ≥ `plan_memory_importance_floor` | `user_derived` |
-| `plan_abandoned` | ✅ | `important_event` | ≥ `plan_memory_importance_floor` | `user_derived` |
+| `plan_completed` | ✅ | `experience` | 0.7 | `user_derived` |
+| `plan_failed` | ✅ | `experience` | ≥ `plan_memory_importance_floor` | `user_derived` |
+| `plan_abandoned` | ✅ | `experience` | ≥ `plan_memory_importance_floor` | `user_derived` |
 | `plan_created` / `plan_revised` / `step_succeeded` / `step_failed` | ❌ | — | — | — |
 
 **G-MEMORY（本任务唯一 Gate）**：`memory_policy._evaluate` 的 R1 对 `source == "ai_inferred"`

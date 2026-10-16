@@ -19,8 +19,6 @@ class RelationshipSettings(BaseSettings):
     rel_max_turn_delta: float = 0.15
     rel_max_day_delta: float = 0.30
     rel_tension_freeze: float = 0.5
-    rel_replay_discount: float = 0.5
-    rel_replay_min_idle_hours: float = 24.0
     rel_repetition_decay: float = 0.7
     rel_trust_negative_amp: float = 1.5
     rel_comfort_drift: float = 0.05

@@ -1,9 +1,9 @@
 """Memory 2.0 类型体系（design.md §3，7 类封顶）。
 
-规范类型为 7 类；v1 遗留类型（important_event/relationship_event）在存储层保持
-合法以兼容既有行，但在 v2 转正入口统一归一化：relationship_event → relationship_fact
-（统一真相源裁决）、important_event → experience。DB check 约束为「7 规范 + 2 遗留」
-共 9 值；v1 的 Pydantic MemoryType Literal 放宽为同集合，既有 4 值行为不变。
+**存储词表 = 7 个规范类型**（`memories.type` CHECK 与 `UserMemory.type` 同域）。
+历史遗留类型（`important_event` / `relationship_event`）已**退役**（2026-10-16，迁移 `0010`）：
+存储层不再接受这两值；它们只在**入站归一**处保留（LLM 输出、旧客户端参数、旧库行），
+经 `normalize_type` 映入对应规范类型后方可落库。
 """
 
 CANONICAL_MEMORY_TYPES = (
@@ -16,16 +16,16 @@ CANONICAL_MEMORY_TYPES = (
     "behavior_pattern",
 )
 
-LEGACY_MEMORY_TYPES = ("important_event", "relationship_event")
+DEFAULT_MEMORY_TYPE = "user_fact"
 
 LEGACY_TYPE_ALIASES = {
     "important_event": "experience",
     "relationship_event": "relationship_fact",
 }
+"""入站归一表（历史类型名 → 规范类型名）：仅入口 / 读侧归一使用，**不属存储词表**。"""
 
-STORAGE_MEMORY_TYPES = CANONICAL_MEMORY_TYPES + LEGACY_MEMORY_TYPES
-
-DEFAULT_MEMORY_TYPE = "user_fact"
+LEGACY_MEMORY_TYPES = tuple(LEGACY_TYPE_ALIASES)
+"""入站兼容名（= 归一表键集）：存储层不接受这些值，落库前一律归一。"""
 
 TYPE_AFFINITY_KEYWORDS = {
     "user_preference": (
@@ -138,10 +138,3 @@ def normalize_type(memory_type: str | None) -> str | None:
     if memory_type in CANONICAL_MEMORY_TYPES:
         return memory_type
     return LEGACY_TYPE_ALIASES.get(memory_type)
-
-
-def storage_type(memory_type: str | None) -> str | None:
-    """可入库类型（7 规范 + 2 遗留均可存储，用于读侧兼容判断）。"""
-    if memory_type in STORAGE_MEMORY_TYPES:
-        return memory_type
-    return None

@@ -17,11 +17,11 @@ from app.services.memory import ingest as memory_ingest
 logger = logging.getLogger(__name__)
 
 EVENT_MEMORY_TYPES = {
-    "interview": "important_event",
-    "exam": "important_event",
-    "appointment": "important_event",
-    "trip": "important_event",
-    "meeting": "important_event",
+    "interview": "experience",
+    "exam": "experience",
+    "appointment": "experience",
+    "trip": "experience",
+    "meeting": "experience",
     "birthday": "user_fact",
 }
 
@@ -43,7 +43,7 @@ def to_memory_candidates(event: WorldEvent) -> list[dict]:
                     f"用户在{started.strftime('%m月%d日')}提到过{event.title}，"
                     f"后来没有完成，已过期"
                 ),
-                "memory_type": EVENT_MEMORY_TYPES.get(event.type, "important_event"),
+                "memory_type": EVENT_MEMORY_TYPES.get(event.type, "experience"),
                 "importance": min(threshold, 0.5),
                 "confidence": 0.7,
             }
@@ -51,7 +51,7 @@ def to_memory_candidates(event: WorldEvent) -> list[dict]:
     return [
         {
             "content": f"用户在{moment.strftime('%m月%d日')}完成了{event.title}",
-            "memory_type": EVENT_MEMORY_TYPES.get(event.type, "important_event"),
+            "memory_type": EVENT_MEMORY_TYPES.get(event.type, "experience"),
             "importance": threshold,
             "confidence": 0.8,
         }

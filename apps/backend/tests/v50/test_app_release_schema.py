@@ -63,10 +63,12 @@ def test_schema_columns_digest_matches_pin():
     assert schema_columns_digest() == SCHEMA_COLUMNS_DIGEST
 
 
-def test_migration_chain_head_is_0009():
+def test_migration_chain_head_matches_pin():
     script = ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini")))
     assert script.get_heads() == [MIGRATION_HEAD]
-    assert MIGRATION_HEAD == "0009"
+    # 钉值升级声明（2026-10-16，MEV-015）：词表收窄迁移 `0010` 入链后，0009（本任务迁移）
+    # 成为链尾的父版本；原断言 `MIGRATION_HEAD == "0009"`（当时 0009 即链尾）。
+    assert MIGRATION_HEAD_PARENT == "0009"
     revision = script.get_revision(MIGRATION_HEAD)
     assert revision is not None
     assert revision.down_revision == MIGRATION_HEAD_PARENT

@@ -54,7 +54,7 @@ UNTRUSTED_KEY_PREFIXES: dict[str, str] = {"ext.api.": "ext.api", "user.": "user"
 MEMORY_CONTENT_MAX_CHARS = 120
 FAILED_IMPORTANCE_FLOOR = 0.6
 DEFAULT_CONFIDENCE = 0.8
-DEFAULT_MEMORY_TYPE = "important_event"
+DEFAULT_MEMORY_TYPE = "experience"
 DEFAULT_IMPORTANCE = 0.5
 DEFAULT_SOURCE = "user_derived"
 
@@ -66,13 +66,13 @@ BIRTHDAY_PROMOTED_IMPORTANCE = 0.8
 BOUNDARY_TABLE: dict[str, dict[str, Any]] = {
     "builtin.reminder.create": {
         "deposit": True,
-        "memory_type": "important_event",
+        "memory_type": "experience",
         "importance": 0.7,
         "source": "user_derived",
     },
     "builtin.reminder.cancel": {
         "deposit": True,
-        "memory_type": "important_event",
+        "memory_type": "experience",
         "importance": 0.5,
         "source": "user_derived",
     },
@@ -89,13 +89,13 @@ BOUNDARY_TABLE: dict[str, dict[str, Any]] = {
     "builtin.search.query": {"deposit": False},
     "builtin.notification.send": {
         "deposit": True,
-        "memory_type": "important_event",
+        "memory_type": "experience",
         "importance": 0.6,
         "source": "ai_inferred",
     },
     "channel.feishu.send": {
         "deposit": True,
-        "memory_type": "important_event",
+        "memory_type": "experience",
         "importance": 0.6,
         "source": "ai_inferred",
     },

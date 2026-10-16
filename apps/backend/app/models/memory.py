@@ -6,14 +6,19 @@ from pydantic import BaseModel, Field, model_validator
 MemoryType = Literal[
     "user_preference",
     "user_fact",
-    "important_event",
-    "relationship_event",
     "experience",
     "relationship_fact",
     "commitment",
     "milestone_event",
     "behavior_pattern",
 ]
+"""存储词表（`memories.type`，7 规范值）；与 DB CHECK `ck_memories_type` 同域。"""
+
+LegacyMemoryType = Literal["important_event", "relationship_event"]
+"""入站兼容名：LLM 输出 / 旧数据可能携带，经 `normalize_type` 归一后方可落库。"""
+
+CandidateMemoryType = MemoryType | LegacyMemoryType
+"""候选类型域：候选是入站值对象，容忍遗留名；存储层只认 `MemoryType`。"""
 
 MemorySource = Literal["user_stated", "user_derived", "ai_inferred"]
 
@@ -51,7 +56,7 @@ class UserMemory(BaseModel):
 
 class MemoryCandidate(BaseModel):
     action: MemoryAction = "none"
-    type: MemoryType
+    type: CandidateMemoryType
     content: str | None = None
     importance: float = Field(default=0.0, ge=0.0, le=1.0)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

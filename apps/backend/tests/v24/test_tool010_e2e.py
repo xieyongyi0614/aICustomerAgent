@@ -148,9 +148,10 @@ ZERO_DIFF_HASHES: dict[str, str] = {
     # `off` 时回答链不注入人设/情绪/关系/世界/场景/行为/风格段，`full` 时字节不变。
     # 非 TOOL-010 改脏。原值 2683cf60。
     # 命名卫生声明（2026-10-15）：docstring 内 `V2_MEMORY_TYPES` → `CANONICAL_MEMORY_TYPES`。
-    # 另 `87989c62`（MEV-003 词表与标签覆盖）改本文件时漏同步摘要（旧账）—— 非 TOOL-010 改脏。
-    # 原值 ac4476d1。
-    "app/prompts/builder.py": "52479c740c1080c9e3c65fb784dd2c2e06322af59d7beaa286b00d5f2558318b",
+    # 另 `87989c62`（MEV-003 词表与标签覆盖）改本文件时漏同步摘要（旧账）。
+    # 词表收窄声明（2026-10-16，MEV-015）：`MEMORY_TYPE_LABELS` 9 → 7 键（遗留标签退役）
+    # —— 非 TOOL-010 改脏。原值 ac4476d1（更早 52479c74）。
+    "app/prompts/builder.py": "007d66444fe6e0f4759f00706536f755ecdec641954b4af1876d256a060223f0",
 }
 """整文件零 diff 冻结面。
 
