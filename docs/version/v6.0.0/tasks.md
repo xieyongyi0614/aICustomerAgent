@@ -150,12 +150,17 @@
 
 **M2 验收口径**：`0001`+`0010` 全链可 `upgrade head` 且回填幂等（重复执行结果不变）；`layer` 与 `type` 语义不重叠（文档 + 单测断言映射关系）；关闭分层配额时检索结果与 M1 一致。
 
-> **M2 实施状态（2026-10-16）**：`MEV-005` **已交付**（合并进单条迁移 `0010`）：`memories.layer`
-> 列 + 幂等回填 + 撤默认 + CHECK + 索引；层词汇单一真源落 `app/core/constants.py`
-> （`services/memory/types.py` 再导出并提供带归一的 `layer_for_type()`）；三条写入路径
-> （`create_candidate` / `evaluator._promote` / `memory_repository` 两写面）显式赋值，
-> 不变量 `layer ≡ layer_for_type(type)` 有单测钉住；SQLite 侧 `alembic upgrade head` 由
-> `tests/v2/test_ref001_foundation.py` 实证。`MEV-006 ~ MEV-008` 未开工。
+> **M2 实施状态（2026-10-16）**：
+>
+> - `MEV-005` **已交付**（合并进单条迁移 `0010`）：`memories.layer` 列 + 幂等回填 + 撤默认 +
+>   CHECK + 索引；层词汇单一真源落 `app/core/constants.py`（`services/memory/types.py` 再导出并
+>   提供带归一的 `layer_for_type()`）；三条写入路径（`create_candidate` / `evaluator._promote` /
+>   `memory_repository` 两写面）显式赋值，不变量 `layer ≡ layer_for_type(type)` 有单测钉住；
+>   SQLite 侧 `alembic upgrade head` 由 `tests/v2/test_ref001_foundation.py` 实证。
+> - `MEV-006` **已交付**：新增 `services/memory/episodic.py`（零 LLM 确定性归组 + 幂等 `source_id`
+>   + 防递归护栏），job 类型 `memory_episodic_aggregate` 与周期 hook 挂进 `job_worker`，
+>   4 个设置字段（默认 `off`），产品读面来源枚举 11 → 12；26 条聚焦用例钉住幂等/预算/隔离/只读。
+> - `MEV-007` / `MEV-008` 未开工。
 
 ---
 

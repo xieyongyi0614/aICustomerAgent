@@ -78,6 +78,9 @@ SOURCE_LABELS = {
     "user_stated": "你亲口说过",
     "user_derived": "从对话里整理",
     "ai_inferred": "我自己留意到的",
+    # MEV-006 契约扩展（2026-10-16）：情景聚合产物来源（11 → 12 值）；
+    # 新值只可能出现在新数据上，既有 11 条与兜底分支不变。
+    "memory_aggregate": "一段经历",
 }
 
 RECEIPT_KINDS = (

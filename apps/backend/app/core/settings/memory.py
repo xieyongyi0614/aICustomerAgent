@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 _MEMORY_RERANK_MODES = ("off", "lite")
 _MEMORY_QUERY_REWRITE_MODES = ("off", "lite")
 _MAX_QUERY_REWRITE_QUERIES = 3
+_MEMORY_EPISODIC_MODES = ("off", "auto")
+_MAX_EPISODIC_WINDOW_HOURS = 168
+_MAX_EPISODIC_PER_RUN = 200
+_MIN_EPISODIC_EVENTS = 2
 
 
 class MemorySettings(BaseSettings):
@@ -76,6 +80,10 @@ class MemorySettings(BaseSettings):
     memory_rerank_min_candidates: int = 3
     memory_query_rewrite_mode: str = "off"
     memory_query_rewrite_max_queries: int = 2
+    memory_episodic_mode: str = "off"
+    memory_episodic_window_hours: int = 12
+    memory_episodic_min_events: int = 3
+    memory_episodic_max_per_run: int = 20
     memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
     )
@@ -109,6 +117,40 @@ class MemorySettings(BaseSettings):
             logger.warning("MEMORY_QUERY_REWRITE_MODE=%r 非法，回落 off", value)
             return "off"
         return mode
+
+    @field_validator("memory_episodic_mode", mode="before")
+    @classmethod
+    def normalize_episodic_mode(cls, value) -> str:
+        mode = str(value or "").strip().lower()
+        if mode not in _MEMORY_EPISODIC_MODES:
+            logger.warning("MEMORY_EPISODIC_MODE=%r 非法，回落 off", value)
+            return "off"
+        return mode
+
+    @model_validator(mode="after")
+    def normalize_episodic_limits(self):
+        window = max(1, min(self.memory_episodic_window_hours, _MAX_EPISODIC_WINDOW_HOURS))
+        min_events = max(_MIN_EPISODIC_EVENTS, self.memory_episodic_min_events)
+        max_per_run = max(1, min(self.memory_episodic_max_per_run, _MAX_EPISODIC_PER_RUN))
+        if (window, min_events, max_per_run) == (
+            self.memory_episodic_window_hours,
+            self.memory_episodic_min_events,
+            self.memory_episodic_max_per_run,
+        ):
+            return self
+        logger.warning(
+            "情景聚合参数越界，已收敛：window %s→%s，min_events %s→%s，max_per_run %s→%s",
+            self.memory_episodic_window_hours,
+            window,
+            self.memory_episodic_min_events,
+            min_events,
+            self.memory_episodic_max_per_run,
+            max_per_run,
+        )
+        self.memory_episodic_window_hours = window
+        self.memory_episodic_min_events = min_events
+        self.memory_episodic_max_per_run = max_per_run
+        return self
 
     @model_validator(mode="after")
     def normalize_query_rewrite_limits(self):

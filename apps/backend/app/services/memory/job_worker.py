@@ -20,6 +20,7 @@ from app.core.db import BackgroundJobRow, SessionLocal
 from app.core.settings import get_settings
 from app.repositories import background_job_repository
 from app.services.memory import embeddings as memory_embeddings
+from app.services.memory import episodic as memory_episodic
 from app.services.memory import lifecycle as memory_lifecycle
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,12 @@ JOB_TYPE_EMBEDDING_BACKFILL = "embedding_backfill"
 _JOB_HANDLERS = {
     JOB_TYPE_MEMORY_DECAY: memory_lifecycle.run_decay_cycle,
     JOB_TYPE_EMBEDDING_BACKFILL: memory_embeddings.backfill_scan,
+    # 情景聚合（MEV-006）：同域 job 直接列在此处；门控在 handler 内（mode=off → 零动作）
+    memory_episodic.JOB_TYPE_MEMORY_EPISODIC_AGGREGATE: memory_episodic.run_aggregate_job,
 }
 
-_TICK_HOOKS: list = []
+_TICK_HOOKS: list = [memory_episodic.run_aggregate_tick]
+"""周期挂靠点：默认挂情景聚合入队 hook（MEV-006），门控在 hook 内（mode=off → 零动作）。"""
 
 _CLAIM_BATCH_LIMIT = 20
 
