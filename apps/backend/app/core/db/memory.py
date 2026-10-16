@@ -13,6 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.constants import DEFAULT_LAYER
 from app.core.db.base import Base, UtcDateTime, VectorType
 
 
@@ -23,6 +24,12 @@ class Memory(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     type: Mapped[str] = mapped_column(String, nullable=False)
+    layer: Mapped[str] = mapped_column(String(16), nullable=False, default=DEFAULT_LAYER)
+    """通道层（`layer_for_type(type)`）：episodic = 时间线经历；semantic = 跨事件抽象。
+
+    Python 侧默认 `semantic` 保证测试与直写路径不炸；**不带 `server_default`**——迁移撤默认后
+    「漏设 layer」的写入显式失败（fail-closed）。写入路径必须显式赋值。
+    """
     importance: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
     character_id: Mapped[str] = mapped_column(
         String, nullable=False, default="*", server_default="*"
@@ -64,6 +71,10 @@ class Memory(Base):
             " 'behavior_pattern')",
             name="ck_memories_type",
         ),
+        CheckConstraint(
+            "layer IN ('episodic', 'semantic')",
+            name="ck_memories_layer",
+        ),
         Index("idx_memories_user", "user_id"),
         Index(
             "idx_memories_user_character_status",
@@ -71,6 +82,7 @@ class Memory(Base):
             "character_id",
             "status",
         ),
+        Index("idx_memories_user_layer_status", "user_id", "layer", "status"),
     )
 
 

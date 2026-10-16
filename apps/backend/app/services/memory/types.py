@@ -6,6 +6,26 @@
 经 `normalize_type` 映入对应规范类型后方可落库。
 """
 
+import logging
+
+from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE, MEMORY_LAYERS
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "CANONICAL_MEMORY_TYPES",
+    "DEFAULT_LAYER",
+    "DEFAULT_MEMORY_TYPE",
+    "LAYER_FOR_TYPE",
+    "LEGACY_MEMORY_TYPES",
+    "LEGACY_TYPE_ALIASES",
+    "MEMORY_LAYERS",
+    "TYPE_AFFINITY_KEYWORDS",
+    "layer_for_type",
+    "normalize_type",
+]
+"""公开面：词表 / 层词汇（再导出自身份真源）/ 两个纯函数。"""
+
 CANONICAL_MEMORY_TYPES = (
     "user_preference",
     "user_fact",
@@ -26,6 +46,10 @@ LEGACY_TYPE_ALIASES = {
 
 LEGACY_MEMORY_TYPES = tuple(LEGACY_TYPE_ALIASES)
 """入站兼容名（= 归一表键集）：存储层不接受这些值，落库前一律归一。"""
+
+# 层词汇（`MEMORY_LAYERS` / `DEFAULT_LAYER` / `LAYER_FOR_TYPE`）定义在 `app/core/constants.py`
+# 并在本模块**再导出**（单一真源）：低层定义便于仓储写入路径直接消费，本模块另提供带类型归一的
+# `layer_for_type()`（见文件末）。
 
 TYPE_AFFINITY_KEYWORDS = {
     "user_preference": (
@@ -138,3 +162,16 @@ def normalize_type(memory_type: str | None) -> str | None:
     if memory_type in CANONICAL_MEMORY_TYPES:
         return memory_type
     return LEGACY_TYPE_ALIASES.get(memory_type)
+
+
+def layer_for_type(memory_type: str | None) -> str:
+    """类型 → 通道层（纯函数）：先经 `normalize_type` 归一（遗留名同样可判层）。
+
+    未命中 → `logger.warning` + `DEFAULT_LAYER`（**不抛**，对齐记忆域降级纪律）。
+    """
+    canonical = normalize_type(memory_type) or memory_type
+    layer = LAYER_FOR_TYPE.get(canonical or "")
+    if layer is None:
+        logger.warning("unknown memory type for layer: %s", memory_type)
+        return DEFAULT_LAYER
+    return layer

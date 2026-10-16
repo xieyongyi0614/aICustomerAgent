@@ -77,19 +77,28 @@ def create_candidate(
     visibility: str | None = VISIBILITY_PRIVATE,
     source_ref_extra: dict | None = None,
     created_at: datetime | None = None,
+    layer: str | None = None,
 ) -> MemoryCandidateRow:
     """幂等投递唯一入口：跨域旁路（世界/行动/账本）统一经此投 v2 候选，禁止直写 memories。
 
     `proposed_type` 在此归一（遗留类型名 → 规范类型名，2026-10-16）：候选表不再落遗留值，
     表外取值原样保留（交由转正侧 `_final_type` 兜底，保留脏数据可诊断性）。
+
+    `layer`（MEV-005）为**可选**显式层：`None` 时按类型推导（`layer_for_type`），与迁移回填结果
+    一致；显式传入时随候选留在 `source_ref["layer"]`，转正侧沿用（候选表结构零改动）。
     """
     normalized_type = memory_types.normalize_type(proposed_type)
     if normalized_type is not None:
         proposed_type = normalized_type
+    if layer is not None and layer not in memory_types.MEMORY_LAYERS:
+        logger.warning("未知记忆层，按类型推导：layer=%s type=%s", layer, proposed_type)
+        layer = None
     created_at = created_at or timeutil.now()
     source_ref: dict = {"table": source_table, "id": source_id}
     if source_ref_extra:
         source_ref.update(source_ref_extra)
+    if layer is not None:
+        source_ref["layer"] = layer
     with SessionLocal() as session:
         existing = (
             session.query(MemoryCandidateRow)

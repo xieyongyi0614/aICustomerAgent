@@ -594,13 +594,13 @@ class TestContracts:
     def test_no_new_migration_and_pins_unchanged(self):
         from tests.support import schema_pins
 
-        # 钉值升级声明（2026-10-16）：`0010`（MEV-015）与 `0011`（relationship 事件源枚举
-        # 收窄）先后入链，HEAD/PARENT 随之推进（原 `0009` / `0008`）；本任务（query 改写）
-        # 自身仍零迁移，表数与列摘要不变。
-        assert schema_pins.MIGRATION_HEAD == "0011"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
+        # 钉值升级声明（2026-10-16）：V6.0.0 合并迁移 `0010` 入链（MEV-015 + 事件源收窄 +
+        # MEV-005 `layer`），HEAD/PARENT 由 `0009`/`0008` 推进为 `0010`/`0009`；本任务
+        # （query 改写）自身仍零迁移，表数不变、列摘要因 `layer` 列刷新。
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
-        assert schema_pins.SCHEMA_COLUMNS_DIGEST == "f4f1cc5b50ae78ed"
+        assert schema_pins.SCHEMA_COLUMNS_DIGEST == "2088c55108ab39a1"
 
     def test_services_do_not_import_application(self):
         for relative in (

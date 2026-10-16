@@ -51,7 +51,10 @@ FROZEN_SOURCES: dict[str, str] = {
     # memory 域时间口径迁移（2026-10-05，0006）：`timeutil.now()` 改走
     # `timeutil.now()`（aware UTC），列改 UtcDateTime —— 非 TOOL-008 改脏。
     # 原值 eb001f3e。
-    "app/repositories/memory_repository.py": "d959dabcd36448a92271330ee343e4d352dd4f6445bf9670d62ddfb5326bfdca",
+    # 分层写入声明（2026-10-16，MEV-005）：`create_memory` / `create_memory_and_supersede`
+    # 落库时按 `core.constants.LAYER_FOR_TYPE` 显式赋值 `layer`（迁移撤默认后漏设即失败）
+    # —— 非 TOOL-008 改脏。原值 d959dabc。
+    "app/repositories/memory_repository.py": "1c85603c4859a561f96b0c9391928c3f9ed368771e1ae2cc5b4b1b5c279e8a0b",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`
@@ -72,8 +75,10 @@ FROZEN_SOURCES: dict[str, str] = {
 }
 """零 diff 冻结摘要：政策闸 / 记忆仓储 / 记忆模型 / 世界记忆桥 / V9 行动模板资产。"""
 
+# 分层列声明（2026-10-16，MEV-005）：`memories` 在 `type` 之后新增 `layer`（合并迁移 `0010`）
+# —— 列序即 ORM 声明序，其余 22 列与列序不变。
 MEMORIES_COLUMNS: tuple[str, ...] = (
-    "id", "user_id", "content", "type", "importance", "character_id", "confidence",
+    "id", "user_id", "content", "type", "layer", "importance", "character_id", "confidence",
     "source", "status", "superseded_by", "last_accessed_at", "expires_at", "created_at",
     "updated_at", "embedding", "salience", "last_reinforced_at", "last_decayed_at",
     "forgotten_at", "merge_chain", "source_ref", "visibility",

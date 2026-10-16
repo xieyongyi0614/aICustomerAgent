@@ -224,6 +224,26 @@ def _promotion_salience(row: MemoryCandidateRow) -> float:
     return _DEFAULT_PROMOTION_SALIENCE
 
 
+def _layer_of(candidate: MemoryCandidateRow, final_type: str) -> str:
+    """转正落库的通道层（MEV-005）：不变量 `layer ≡ layer_for_type(type)` 优先。
+
+    候选带显式层（`source_ref["layer"]`，`ingest.create_candidate` 写入）且与类型映射一致时沿用；
+    不一致（或缺失/非法）时按 `final_type` 推导并告警——层是派生观测量，不得与类型冲突。
+    """
+    derived = memory_types.layer_for_type(final_type)
+    explicit = (candidate.source_ref or {}).get("layer")
+    if isinstance(explicit, str) and explicit in memory_types.MEMORY_LAYERS:
+        if explicit == derived:
+            return explicit
+        logger.warning(
+            "候选层与类型映射不一致，按类型推导：candidate=%s derived=%s type=%s",
+            explicit,
+            derived,
+            final_type,
+        )
+    return derived
+
+
 def _promote(
     candidate: MemoryCandidateRow, *, final_type: str, salience: float, reason: str
 ) -> str:
@@ -240,6 +260,7 @@ def _promote(
                 character_id=row.character_id or "*",
                 content=row.content,
                 type=final_type,
+                layer=_layer_of(row, final_type),
                 importance=_importance_of(row),
                 confidence=_confidence_of(row),
                 source=_memory_source_of(row.source),

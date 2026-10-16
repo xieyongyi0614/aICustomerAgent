@@ -187,9 +187,10 @@ def _seed_round_trip_rows(url):
     with engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO memories (id, user_id, content, type, importance,"
+                # `layer` 由迁移 `0010` 加入且**无 server_default**（fail-closed）：裸 SQL 必须显式给值
+                "INSERT INTO memories (id, user_id, content, type, layer, importance,"
                 " character_id, confidence, source, status, created_at, updated_at)"
-                " VALUES ('mem-rt', 'u-rt', 'v1 往返数据', 'user_fact', 0.5, '*',"
+                " VALUES ('mem-rt', 'u-rt', 'v1 往返数据', 'user_fact', 'semantic', 0.5, '*',"
                 " 0.9, 'ai_inferred', 'active', :now, :now)"
             ),
             {"now": now},
@@ -242,6 +243,8 @@ def test_head_structure_and_seed_data(sqlite_round_trip):
     } <= run_columns
     link_columns = {c["name"] for c in inspector.get_columns("evidence_links")}
     assert {"id", "insight_id", "memory_id", "weight", "created_at"} <= link_columns
+    # 合并迁移 `0010` 在 SQLite 上同样生效：`memories.layer` 存在（列 + 回填 + 撤默认）
+    assert "layer" in {c["name"] for c in inspector.get_columns("memories")}
 
     with engine.connect() as conn:
         memory = conn.execute(

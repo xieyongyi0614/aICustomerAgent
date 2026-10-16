@@ -5,6 +5,7 @@ from typing import get_args
 from sqlalchemy import text as sa_text
 
 from app.core import ids, timeutil
+from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE
 from app.core.db import Memory, SessionLocal
 from app.models.memory import MemoryType, UserMemory
 
@@ -55,6 +56,7 @@ def create_memory(
             user_id=user_id,
             content=content,
             type=memory_type,
+            layer=LAYER_FOR_TYPE.get(memory_type, DEFAULT_LAYER),
             importance=importance,
             character_id=character_id,
             confidence=confidence,
@@ -265,6 +267,7 @@ def create_memory_and_supersede(
             user_id=user_id,
             content=content,
             type=memory_type,
+            layer=LAYER_FOR_TYPE.get(memory_type, DEFAULT_LAYER),
             importance=importance,
             character_id=character_id,
             confidence=confidence,

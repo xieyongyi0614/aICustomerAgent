@@ -80,6 +80,9 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0007_ledger_entry_identity_split.py",
     "0008_ledger_categories_aliases_encoding.py",
     "0009_app_release_artifacts.py",
+    # V6.0.0 合并迁移声明（2026-10-16）：类型词表收窄 + 关系事件源收窄 + `memories.layer`
+    # 三项合并为单条迁移（用户裁决：同版本未应用迁移不再逐域拆分）。
+    "0010_memory_layer_and_enums.py",
 )
 
 # 旧账同步声明（2026-10-15）：表集在 0002~0009 增量迁移期间合法增长后漏同步本摘要
@@ -87,7 +90,9 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
 # 一致后同步。原值 88d74b2e。
 SCHEMA_TABLE_SET_DIGEST = "8704b2b571d513ce"
 # ID 体系收敛声明（2026-10-03，ADR-16 阶段 D）：feishu 两台账表加雪花 id 主键、业务键转 UNIQUE —— 有意演进。
-SCHEMA_COLUMNS_DIGEST_BASELINE = "10134443a5903a3f"
+# 基线表列定义演进登记（2026-10-16，MEV-005）：基线表 `memories` 增 `layer` 列（迁移 `0010`）
+# —— 第二次登记（首次为 0004 的 `channel_identities.session_id` 放开可空）。原值 10134443a5903a3f。
+SCHEMA_COLUMNS_DIGEST_BASELINE = "f07df4d264a5954a"
 SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "feishu_dedupe_ledger",
     "feishu_deliveries",
@@ -104,7 +109,9 @@ SCHEMA_ADDED_TABLES_VS_BASELINE: tuple[str, ...] = (
     "app_releases",
     "app_release_artifacts",
 )
-SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state",)
+# 分层索引声明（2026-10-16，MEV-005）：基线表 `memories` 增 `idx_memories_user_layer_status`
+# —— 有意演进（迁移 `0010`），非 TOOL-012 改脏。
+SCHEMA_INDEXES_CHANGED_TABLES: tuple[str, ...] = ("development_state", "memories")
 SCHEMA_CHECKS_DIGEST_BASELINE = "94ca6c7f046b3638"
 SCHEMA_CHECKS_CHANGED_TABLES: tuple[str, ...] = ("insights", "development_changes")
 BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
@@ -117,10 +124,11 @@ BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "messages": ("859d319a9c244bfb", "28485ce6aa400d11", "80cc53e497c96a49"),
     "memory_candidates": ("2e5d80cbd4a5c8e5", "41df4f3ee6f0c7bc", "1152da1a25969f8a"),
     "memory_links": ("3d3ded6c6e54c04a", "283ca81681e4286f", "35da9fa6f9d0bbf0"),
-    # 词表收窄声明（2026-10-16，MEV-015）：`ck_memories_type` 由 9 值收窄为 7 值（遗留类型
-    # 退役，迁移 `0010`）—— 有意演进，非 TOOL-012 改脏。列摘要与索引摘要零变化，仅 checks
-    # 摘要刷新。原 checks 值 70aeda5a3b94d14f。
-    "memories": ("727a9d903fefaf06", "76588b8db9bf9e39", "f548dcfb8ad1dc1a"),
+    # 词表收窄 + 分层声明（2026-10-16，MEV-015 / MEV-005）：`ck_memories_type` 由 9 值收窄为
+    # 7 值、加 `ck_memories_layer` CHECK，并新增 `layer` 列与 `idx_memories_user_layer_status`
+    # 索引（合并迁移 `0010`）—— 有意演进，非 TOOL-012 改脏。
+    # 原值：列 727a9d903fefaf06 / checks 76588b8db9bf9e39（再前 70aeda5a3b94d14f）/ 索引 f548dcfb8ad1dc1a。
+    "memories": ("1f000049dd552b1a", "ccee249050184b60", "ff32f0b56e6492c3"),
     "outbox_events": ("d41598a8d9dd0a59", "a3d68da9b90a22f4", "37e2a34025bbdc06"),
     "trigger_registry": ("ab91ce9b9b46c0ce", "2abe4ba951c80f5e", "917152757e46a642"),
     "world_entities": ("911237899993c840", "1981fcf3f0fe94f6", "a0a707e89ac86a7a"),
@@ -948,11 +956,12 @@ def schema_columns_digest(exclude_tables: tuple[str, ...] = ()) -> str:
     且 `schema_columns_digest(SCHEMA_ADDED_TABLES_VS_BASELINE)` ==
     `SCHEMA_COLUMNS_DIGEST_BASELINE`。直接改基线摘要常量会让断言变成谎，故不采用。
 
-    **例外（2026-10-03，ADR-16）**：`SCHEMA_COLUMNS_DIGEST_BASELINE` 由
-    `45eef10a675e4794` 更新为 `3631831cc3c8c1d5`。这是**唯一一次**对基线表列定义的
-    有意演进——迁移 `0004` 把基线表 `channel_identities.session_id` 放开为可空
-    （该表成为全通道统一凭据绑定表后，邮箱绑定行无会话概念，NOT NULL 是原飞书专用
-    设计的残留）。此处更新是**登记该演进**，不是用它掩盖未登记漂移：新增表仍走
+    **例外（已登记两次）**：`SCHEMA_COLUMNS_DIGEST_BASELINE` 由
+    `45eef10a675e4794` 更新为 `3631831cc3c8c1d5`（2026-10-03，ADR-16）——迁移 `0004` 把基线表
+    `channel_identities.session_id` 放开为可空（该表成为全通道统一凭据绑定表后，邮箱绑定行无会话
+    概念，NOT NULL 是原飞书专用设计的残留）；再由 `10134443a5903a3f` 更新为
+    `f07df4d264a5954a`（2026-10-16，MEV-005）——迁移 `0010` 给基线表 `memories` 加 `layer` 列。
+    两次更新都是**登记演进**，不是用它掩盖未登记漂移：新增表仍走
     `SCHEMA_ADDED_TABLES_VS_BASELINE`，其余基线表列定义仍受本摘要保护。
     """
     from app.core.db import Base
