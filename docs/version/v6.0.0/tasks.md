@@ -165,7 +165,16 @@
 >   `chains/memory_semantic_abstract_chain.py` + prompt `prompts/memory_semantic_abstract.py`（类型白名单
 >   fail-closed / 明细护栏命中即丢弃 / 无自反馈回路），job 类型 `memory_semantic_abstract` 与周期 hook
 >   挂进 `job_worker`，3 个设置字段（默认 `off`）；37 条聚焦用例钉住白名单、幂等、无环、隔离与 Preserve。
-> - `MEV-008` 未开工。
+> - `MEV-008` **已交付**：`retriever.py` 增 `parse_layer_quota` / `_resolve_layer` / `_quota_select`
+>   （最终排序后按 `layer` 分配名额：floor 分配 + 另一层补齐 + 层内不重排 + 不改分数；`""` 时走既有
+>   截取路径，**逐字节一致**）；`lifecycle.decay_lambda_for(memory_type, layer=None)` 增可选层形参 +
+>   乘数调制（缺层 / 空表 / 非法 → `1.0`），`_decay_batch` 传 `row.layer`；2 个设置字段默认禁用
+>   （`memory_layer_quota=""` / `memory_decay_layer_multiplier_json="{}"`）。★ 层由 `LAYER_FOR_TYPE`
+>   从 `type` **派生**（`UserMemory` 读模型无 `layer` 字段；依据 `core/constants.py`「层是派生依据」与
+>   MEV-005 不变量），故未改 `models/memory.py` / `memory_repository.py`。新增 31 条聚焦用例；记忆域
+>   + 相关既有套件 **335 passed**；全量 **3547 passed / 7 skipped / 0 failed / 0 errors**（失败集
+>   `COUNT=0`）。🚨 跨任务摘要同步：`test_memory_semantic.py` / `test_memory_episodic.py` 冻结的
+>   `lifecycle.py` / `retriever.py` 整文件摘要已随本任务更新。**M2（`MEV-005`~`MEV-008`）至此全部交付。**
 
 ---
 

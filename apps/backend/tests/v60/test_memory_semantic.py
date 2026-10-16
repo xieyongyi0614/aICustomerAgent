@@ -51,14 +51,17 @@ PRESERVED_FUNCTION_DIGESTS = {
 }
 
 PRESERVED_FILE_DIGESTS = {
+    # MEV-008（2026-10-16）：`lifecycle.py` / `retriever.py` 由该任务**合法扩展**
+    # （分层配额截取 + λ 层乘数调制），摘要已同步为 MEV-008 交付态；
+    # `evaluator.py` / `episodic.py` 仍逐字节冻结（MEV-008 未触碰）。
     "app/services/memory/evaluator.py": (
         "f33da2b3323773d2d04a5169d3b204164c64dc1e3c2276f17ce613eae2829286"
     ),
     "app/services/memory/lifecycle.py": (
-        "dab72edb75de5bbd0a00b7d590ac73df52c719dc6aebd7e4f491f8341f9f069d"
+        "7e07d94bf49547d88cd8d8ba573586c1581762bdea4374094aa82db9343d98cb"
     ),
     "app/services/memory/retriever.py": (
-        "ccd29686a0a61eff86b95a8fa2b4edd4b273cede959f9700774eb0a798a423fa"
+        "90cca1582e99807c0bdb80e42b48d84c5d1a7254098595baf8ac53a9939c856f"
     ),
     "app/services/memory/episodic.py": (
         "5dac7df90c46e5806cbeae24bd1580e6da0fd6618bc05581910f1369e02f8c81"

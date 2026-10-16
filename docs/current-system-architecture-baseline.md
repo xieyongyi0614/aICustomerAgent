@@ -169,13 +169,13 @@ Database              （PostgreSQL 16；core/db/ 按领域拆分的 SQLAlchemy 
 | 层 | 实现 | 说明 |
 |---|---|---|
 | V4 长期记忆（提取 / 策略 / 冲突） | `chains/extractor_chain.py`（提取）+ `engines/memory_policy.py`（策略硬规则）+ `engines/memory_conflict.py`（冲突消解，LCS 同题检测） | 提取 → 策略 → 冲突消解 → 落库；**打分召回已并入 `services/memory/retriever.py`**（不再是独立的 v1 打分器）。原文档所写 `services/memory_service.py` / `services/memory_policy.py` / `services/memory_conflict.py` 三路径**均不存在**（2026-10-14 更正，见 `docs/agent-evolution-plan-2026-10.md` §1.2 D1） |
-| Memory 2.0 | `services/memory/`（**单包**，13 模块：`types`/`sources`/`ingest`/`evaluator`/`embeddings`/`lifecycle`/`retriever`/`commands`/`attribution`/`job_worker`/`offline_metrics`/`product_view`/`refs`） | **存储词表 = 7 规范类型**（user_preference/user_fact/experience/relationship_fact/commitment/milestone_event/behavior_pattern，`ck_memories_type` 同域）；**遗留类型已退役**（2026-10-16，迁移 `0010`）：`important_event` / `relationship_event` 只在**入站归一**保留（`normalize_type` 映入 `experience` / `relationship_fact`，LLM 输出与旧数据的容忍层），任一入口落库即规范值；**通道层 `memories.layer`**（`episodic` / `semantic`，2026-10-16 同批迁移）：由类型映射（`core/constants.py::LAYER_FOR_TYPE` → `types.layer_for_type`）在三条写入路径显式赋值，回填幂等，撤默认后漏设即失败；**情景聚合**（2026-10-16 `MEV-006`，`supply/memory/episodic.py`）：`memory_episodic_mode=auto` 时后台周期把同窗同主题的 `episodic` 碎片聚成一条上层候选（零 LLM、确定性 `source_id`、排除聚合产物防递归），经既有三段评估转正，产品读面来源显示为「一段经历」；四源摄取（Conversation/ActionRecord/WorldEvent/RelationshipEvent）幂等入 `memory_candidates`；三段评估（规则分 → 灰区 lite LLM 兜底 → 转正/拒绝）；混合检索（语义 cosine + 结构化 recency/importance/salience/类型亲和；**分层配额与衰减差异化属 `MEV-008`，未实现**）；六态生命周期（active/superseded/invalidated/decayed/forgotten + 软删后物理删，salience·exp(-λ·Δdays) 衰减）；Embedding 批处理；显式命令（记住/忘掉）。原文档所写 `services/memory2/` 路径**不存在**（2026-10-14 更正；`migration` 模块已于 2026-10-15 删除——存量窗口关闭） |
+| Memory 2.0 | `services/memory/`（**单包**，13 模块：`types`/`sources`/`ingest`/`evaluator`/`embeddings`/`lifecycle`/`retriever`/`commands`/`attribution`/`job_worker`/`offline_metrics`/`product_view`/`refs`） | **存储词表 = 7 规范类型**（user_preference/user_fact/experience/relationship_fact/commitment/milestone_event/behavior_pattern，`ck_memories_type` 同域）；**遗留类型已退役**（2026-10-16，迁移 `0010`）：`important_event` / `relationship_event` 只在**入站归一**保留（`normalize_type` 映入 `experience` / `relationship_fact`，LLM 输出与旧数据的容忍层），任一入口落库即规范值；**通道层 `memories.layer`**（`episodic` / `semantic`，2026-10-16 同批迁移）：由类型映射（`core/constants.py::LAYER_FOR_TYPE` → `types.layer_for_type`）在三条写入路径显式赋值，回填幂等，撤默认后漏设即失败；**情景聚合**（2026-10-16 `MEV-006`，`supply/memory/episodic.py`）：`memory_episodic_mode=auto` 时后台周期把同窗同主题的 `episodic` 碎片聚成一条上层候选（零 LLM、确定性 `source_id`、排除聚合产物防递归），经既有三段评估转正，产品读面来源显示为「一段经历」；**语义抽象**（2026-10-16 `MEV-007`，`services/memory/semantic.py`）：`memory_semantic_mode=auto` 时把同主题 ≥ `memory_semantic_min_sources` 条 `episodic` 经 lite LLM 归纳为**恰好 1 条** `semantic` 候选（类型白名单 fail-closed、账目明细护栏命中即丢弃、只读 episodic 故无自反馈），经既有三段评估转正；四源摄取（Conversation/ActionRecord/WorldEvent/RelationshipEvent）幂等入 `memory_candidates`；三段评估（规则分 → 灰区 lite LLM 兜底 → 转正/拒绝）；混合检索（语义 cosine + 结构化 recency/importance/salience/类型亲和；**分层配额**：`memory_layer_quota` 非空时在最终排序后按 `layer` 分配名额——floor 分配 + 另一层补齐、不改分数、层内不重排，2026-10-16 `MEV-008`）；六态生命周期（active/superseded/invalidated/decayed/forgotten + 软删后物理删，salience·exp(-λ·Δdays) 衰减，**λ 按层乘数调制** `memory_decay_layer_multiplier_json`，2026-10-16 `MEV-008`）；Embedding 批处理；显式命令（记住/忘掉）。原文档所写 `services/memory2/` 路径**不存在**（2026-10-14 更正；`migration` 模块已于 2026-10-15 删除——存量窗口关闭） |
 | Reflection（反思） | `services/reflection/` + `insights`/`reflection_runs`/`evidence_links` 表 | 证据窗聚合 → LLM 结构化推理 → confidence 校准 → 三闸复检 → Insight 落库；Insight 生命周期（active→superseded/invalidated） |
 | Development（成长） | `services/development/` + `development_state`/`development_changes`/`personality_state` 表 | belief/preference/pattern 三类发展状态，编译为对人格轴的调制，可回滚/重放 |
 
 **未实现部分（当前不存在，仅作边界标注）：**
 
-- **显式 Episodic / Semantic 记忆分层**：当前记忆是扁平 7 类型 + 反思/成长上层，尚无显式的"情景记忆 / 语义记忆"双通道子系统（见 §8 Extension Points）。
+- ~~**显式 Episodic / Semantic 记忆分层**~~：**已于 2026-10-16 落地**（`MEV-005`~`MEV-008`：`memories.layer` 通道 + 情景聚合 + 语义抽象 + 分层配额/衰减调制），**不再属未实现项**（详见 §3 Memory 行与 §8.2）。
 - **Self Improvement**：尚未实现，属未来方向（见 §11）。
 
 ---
@@ -457,7 +457,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 
 ### 8.2 Memory Evolution（记忆演进）
 
-支持 **Episodic Memory / Semantic Memory** 的落点：当前 `services/memory/`（单包）已是类型化（7 类）+ 生命周期化 + 混合检索（语义 cosine + 结构化）的底座，`reflection`（Insight）与 `development`（belief/preference/pattern）是上层加工。显式 Episodic/Semantic 双通道在此之上扩展，**当前尚未实现**（演进设计见 `docs/agent-evolution-plan-2026-10.md` §2.3 阶段 M2）。
+支持 **Episodic Memory / Semantic Memory** 的落点：当前 `services/memory/`（单包）已是类型化（7 类）+ 生命周期化 + 混合检索（语义 cosine + 结构化）的底座，`reflection`（Insight）与 `development`（belief/preference/pattern）是上层加工。显式 Episodic/Semantic 双通道在此之上扩展，**已于 2026-10-16 落地（`MEV-005`~`MEV-008`，M2 收口）**：`memories.layer` 通道（`MEV-005`）→ 情景聚合 `episodic.py`（`MEV-006`）→ 语义抽象 `semantic.py`（`MEV-007`）→ 检索分层配额与 λ 层乘数衰减调制（`MEV-008`）；三者均经既有三段评估转正，且**默认禁用**（`memory_episodic_mode` / `memory_semantic_mode` = `off`、`memory_layer_quota` = `""`、`memory_decay_layer_multiplier_json` = `"{}"`），关闭时行为逐字节同基线。后续阶段 M3（记忆图谱与产品面）见 `docs/agent-evolution-plan-2026-10.md` §2.3。
 
 ### 8.3 Multi Channel（多通道）
 
@@ -594,7 +594,7 @@ Schema 唯一真相 = Alembic 迁移链（`migrations/versions/`，基线迁移 
 
 ### 11.2 Memory Evolution
 
-- 在 `services/memory/`（7 类型 + 生命周期 + 混合检索）与 `reflection`/`development` 之上，引入显式 **Episodic Memory**（按时间线组织的情景事件）与 **Semantic Memory**（跨事件抽象的概念/偏好）双通道。分阶段路径（M1 检索质量 → M2 分层 → M3 图谱与产品面）见 `docs/agent-evolution-plan-2026-10.md` §2.3。
+- 在 `services/memory/`（7 类型 + 生命周期 + 混合检索）与 `reflection`/`development` 之上，引入显式 **Episodic Memory**（按时间线组织的情景事件）与 **Semantic Memory**（跨事件抽象的概念/偏好）双通道。分阶段路径（M1 检索质量 → M2 分层 → M3 图谱与产品面）见 `docs/agent-evolution-plan-2026-10.md` §2.3。**M1（`MEV-001`~`MEV-004`）与 M2（`MEV-005`~`MEV-008`）已于 2026-10-16 全部交付**；M3（`MEV-009`~`MEV-014`，记忆图谱与产品面）待开工。
 - 复用 `memory_candidates`（四源摄取 + 幂等）、`embeddings`（向量）、`retriever`（混合排序）作为检索底座。
 
 ### 11.3 Evaluation System

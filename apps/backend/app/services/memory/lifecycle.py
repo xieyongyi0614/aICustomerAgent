@@ -10,6 +10,7 @@ on_promoted 对新转正记忆做冲突检测：同主题 → supersede/merge �
 保留期后 purge 物理删除（含 links）。
 """
 
+import json
 import logging
 import math
 import time
@@ -65,6 +66,7 @@ _FORGET_ABLE_STATUSES = (STATUS_ACTIVE, STATUS_DECAYED)
 
 _DEFAULT_SALIENCE = 0.5
 _PURGE_BATCH_LIMIT = 200
+_MAX_LAYER_MULTIPLIER = 10.0
 
 
 class IllegalTransitionError(Exception):
@@ -88,12 +90,45 @@ def _similarity(left: str, right: str) -> float:
     return _lcs_length(left, right) / longer
 
 
-def decay_lambda_for(memory_type: str) -> float:
+def decay_lambda_for(memory_type: str, layer: str | None = None) -> float:
+    """类型级 λ（唯一基准）× 层乘数（`MEV-008`）；`layer=None` 或表为空 → 逐字节同基线。"""
     table = get_settings().decay_lambdas()
     canonical = memory_types.normalize_type(memory_type) or memory_type
     if canonical in table:
-        return float(table[canonical])
-    return max(float(value) for value in table.values())
+        base = float(table[canonical])
+    else:
+        base = max(float(value) for value in table.values())
+    return base * _layer_decay_multiplier(layer)
+
+
+def _layer_decay_multiplier(layer: str | None) -> float:
+    """按层读取 λ 乘数；缺该层 / 表为空 / 非法 JSON / 非数值 / 越界 → `1.0`（不抛）。
+
+    回落 `1.0` 而非 `0`：`0` 会让 `exp(-0)=1` 使记忆永不衰减（静默失控），`1.0` 等价「未配置」。
+    """
+    if not layer:
+        return 1.0
+    raw = get_settings().memory_decay_layer_multiplier_json
+    try:
+        table = json.loads(raw)
+    except (TypeError, ValueError):
+        logger.warning("层衰减乘数表非法 JSON，回落 1.0：%r", raw)
+        return 1.0
+    if not isinstance(table, dict):
+        logger.warning("层衰减乘数表非对象，回落 1.0：%r", raw)
+        return 1.0
+    value = table.get(layer)
+    if value is None:
+        return 1.0
+    try:
+        multiplier = float(value)
+    except (TypeError, ValueError):
+        logger.warning("层衰减乘数非数值，回落 1.0：layer=%s value=%r", layer, value)
+        return 1.0
+    if not 0.0 < multiplier <= _MAX_LAYER_MULTIPLIER:
+        logger.warning("层衰减乘数越界，回落 1.0：layer=%s value=%s", layer, multiplier)
+        return 1.0
+    return multiplier
 
 
 _reinforce_pending: list[str] = []
@@ -189,7 +224,7 @@ def _decay_batch(now: datetime, trace=None) -> int:
                 if elapsed_days < 1.0:
                     continue
                 scanned += 1
-                lam = decay_lambda_for(row.type)
+                lam = decay_lambda_for(row.type, row.layer)
                 base = row.salience if row.salience is not None else _DEFAULT_SALIENCE
                 row.salience = base * math.exp(-lam * elapsed_days)
                 row.last_decayed_at = now

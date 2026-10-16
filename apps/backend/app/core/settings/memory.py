@@ -90,6 +90,8 @@ class MemorySettings(BaseSettings):
     memory_semantic_mode: str = "off"
     memory_semantic_min_sources: int = 3
     memory_semantic_max_per_run: int = 5
+    memory_layer_quota: str = ""
+    memory_decay_layer_multiplier_json: str = "{}"
     memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
     )

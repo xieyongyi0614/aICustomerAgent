@@ -59,6 +59,11 @@ TEMPORAL_QUERY_KEYWORDS = (
 
 _DEFAULT_SALIENCE = 0.5
 
+LAYER_EPISODIC = "episodic"
+LAYER_SEMANTIC = "semantic"
+
+_QUOTA_MAX_WEIGHT = 100
+
 
 @dataclass
 class RankedMemory:
@@ -418,6 +423,94 @@ def _resolve_queries(query_text: str, settings) -> tuple[list[str], str]:
     return [query_text, *rewritten], REWRITE_MODE_LITE
 
 
+def parse_layer_quota(raw: str) -> tuple[int, int] | None:
+    """解析 `memory_layer_quota`（`"<episodic>:<semantic>"`，如 `"3:5"`）。
+
+    空串 → `None`（禁用态，**不告警**，保证默认零行为变化）；形态 / 取值非法 →
+    `None` + 单条 warning（回落禁用态，**不抛**）。纯函数，同一输入恒定输出。
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+    parts = text.split(":")
+    if len(parts) != 2:
+        logger.warning("MEMORY_LAYER_QUOTA=%r 形态非法（应为 a:b），回落禁用", raw)
+        return None
+    try:
+        episodic_weight = int(parts[0].strip())
+        semantic_weight = int(parts[1].strip())
+    except ValueError:
+        logger.warning("MEMORY_LAYER_QUOTA=%r 非整数，回落禁用", raw)
+        return None
+    if not 0 < episodic_weight <= _QUOTA_MAX_WEIGHT or not (
+        0 < semantic_weight <= _QUOTA_MAX_WEIGHT
+    ):
+        logger.warning("MEMORY_LAYER_QUOTA=%r 取值越界，回落禁用", raw)
+        return None
+    return episodic_weight, semantic_weight
+
+
+def _resolve_layer(memory: UserMemory) -> tuple[str, bool]:
+    """解析条目所属层，返回 `(layer, is_unknown)`。
+
+    层是**派生依据**（`core/constants.py::LAYER_FOR_TYPE`），不是来源真相：优先取
+    `memory.layer`（若读模型携带），否则按 `type` 派生——两者由 `MEV-005` 的不变量
+    `layer ≡ layer_for_type(type)` 保证一致。未知 → `DEFAULT_LAYER`（调用方聚合告警一次）。
+    """
+    layer = getattr(memory, "layer", None)
+    if layer in memory_types.MEMORY_LAYERS:
+        return layer, False
+    canonical = memory_types.normalize_type(getattr(memory, "type", None))
+    mapped = memory_types.LAYER_FOR_TYPE.get(canonical or "")
+    if mapped is not None:
+        return mapped, False
+    return memory_types.DEFAULT_LAYER, True
+
+
+def _quota_select(
+    ranked: list[RankedMemory], limit: int, quota: tuple[int, int]
+) -> list[RankedMemory]:
+    """按层分配名额（`floor`）+ 另一层补齐；层内保持既有次序，**不改任何分数**。
+
+    `episodic_quota = floor(N·a/(a+b))`、`semantic_quota = N - episodic_quota`；
+    某层可选项不足其名额时全取，剩余名额由另一层按既有次序补齐，保证结果条数 ==
+    `min(N, 候选总数)`。
+    """
+    episodic_quota = math.floor(limit * quota[0] / (quota[0] + quota[1]))
+    semantic_quota = limit - episodic_quota
+
+    buckets: dict[str, list[RankedMemory]] = {LAYER_EPISODIC: [], LAYER_SEMANTIC: []}
+    unknown = 0
+    for item in ranked:
+        layer, is_unknown = _resolve_layer(item.memory)
+        unknown += int(is_unknown)
+        buckets[layer].append(item)
+    if unknown:
+        logger.warning(
+            "记忆层缺失或未知，已归入 %s：%s 条", memory_types.DEFAULT_LAYER, unknown
+        )
+
+    taken = {
+        LAYER_EPISODIC: min(episodic_quota, len(buckets[LAYER_EPISODIC])),
+        LAYER_SEMANTIC: min(semantic_quota, len(buckets[LAYER_SEMANTIC])),
+    }
+    selected = buckets[LAYER_EPISODIC][:episodic_quota] + buckets[LAYER_SEMANTIC][
+        :semantic_quota
+    ]
+
+    shortfall = limit - len(selected)
+    for layer in (LAYER_EPISODIC, LAYER_SEMANTIC):
+        if shortfall <= 0:
+            break
+        extra = buckets[layer][taken[layer] : taken[layer] + shortfall]
+        selected.extend(extra)
+        shortfall -= len(extra)
+
+    order = {item.memory.id: index for index, item in enumerate(ranked)}
+    selected.sort(key=lambda item: order[item.memory.id])
+    return selected
+
+
 def retrieve(
     user_id: str,
     query: str,
@@ -472,7 +565,11 @@ def retrieve(
         kept.append(item)
     kept.sort(key=lambda item: (-item.score, -item.memory.importance))
     kept, rerank_mode = _maybe_rerank(query_text, kept, settings)
-    kept = kept[:limit]
+    layer_quota = parse_layer_quota(settings.memory_layer_quota)
+    if layer_quota is None:
+        kept = kept[:limit]
+    else:
+        kept = _quota_select(kept, limit, layer_quota)
     result = RankedMemories(
         items=kept, mode=mode, rerank_mode=rerank_mode, rewrite_mode=rewrite_mode
     )
