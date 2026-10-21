@@ -6,7 +6,7 @@ from sqlalchemy import text as sa_text
 
 from app.core import ids, timeutil
 from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE
-from app.core.db import Memory, SessionLocal
+from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.models.memory import MemoryType, UserMemory
 
 VALID_MEMORY_TYPES = get_args(MemoryType)
@@ -171,6 +171,29 @@ def get_memory(memory_id: str) -> UserMemory | None:
     with SessionLocal() as session:
         row = session.get(Memory, memory_id)
         return _to_memory(row) if row else None
+
+
+def list_links(
+    memory_ids: list[str],
+    relations: list[str] | tuple[str, ...] | None = None,
+) -> list[tuple[str, str, str]]:
+    """按源记忆批量读取链接（只读）：返回 `(memory_id, related_memory_id, relation)`。"""
+    if not memory_ids:
+        return []
+    with SessionLocal() as session:
+        query = session.query(
+            MemoryLinkRow.memory_id,
+            MemoryLinkRow.related_memory_id,
+            MemoryLinkRow.relation,
+        ).filter(MemoryLinkRow.memory_id.in_(list(memory_ids)))
+        if relations:
+            query = query.filter(MemoryLinkRow.relation.in_(list(relations)))
+        rows = query.order_by(
+            MemoryLinkRow.memory_id,
+            MemoryLinkRow.related_memory_id,
+            MemoryLinkRow.relation,
+        ).all()
+        return [(memory_id, related_id, relation) for memory_id, related_id, relation in rows]
 
 
 def get_source_refs(memory_ids: list[str]) -> dict[str, dict]:

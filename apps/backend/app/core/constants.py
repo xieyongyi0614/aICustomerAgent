@@ -46,6 +46,25 @@ LAYER_FOR_TYPE: dict[str, str] = {
 `services/memory/types.py` 再导出本表并承载带归一的 `layer_for_type()`。
 """
 
+MEMORY_LINK_RELATIONS_LEGACY: tuple[str, ...] = (
+    "supersedes",
+    "merges",
+    "contradicts",
+)
+"""`memory_links.relation` 既有三值（冲突消解产物，顺序冻结）。"""
+
+MEMORY_LINK_RELATIONS: tuple[str, ...] = (
+    *MEMORY_LINK_RELATIONS_LEGACY,
+    "caused_by",
+    "before",
+    "related",
+)
+"""`memory_links.relation` 全量值域（★ 冻结；前 3 项 == LEGACY）。
+
+定义落在 core 层以便 `core/db/memory.py` 直接构造 CHECK，避免 core 反向依赖服务层；
+`services/memory/types.py` 再导出同一对象。
+"""
+
 RELATIONSHIP_EVENT_DELTAS: dict[str, RelationshipDelta] = {
     "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, respect=0.01, comfort=0.03, tension=-0.02),
     "user_help": RelationshipDelta(trust=0.05, intimacy=0.03, familiarity=0.02, respect=0.03, comfort=0.02),

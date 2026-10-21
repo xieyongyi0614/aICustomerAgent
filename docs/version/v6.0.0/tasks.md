@@ -32,8 +32,8 @@
 
 | 项 | 内容 |
 |---|---|
-| 链尾现状 | `apps/backend/migrations/versions/0010_memory_layer_and_enums.py`（增量链 `0002`~`0010` 已存在） |
-| 本版本新增 | **`0010`**（**合并迁移**：`ck_memories_type` 收窄为 7 值 + `ck_relationship_events_source` 收窄为两值 + `memories.layer` 列/回填/索引，服务 `MEV-015` + 回放退役清账 + `MEV-005`，2026-10-16 入链）；**`0011`**（`memory_links.relation` CHECK 扩展，服务 `MEV-009`，未开工）；`SAG-002` 若开工再顺延取号 |
+| 链尾现状 | `apps/backend/migrations/versions/0011_memory_link_relations.py`（增量链 `0002`~`0011` 已存在） |
+| 本版本新增 | **`0010`**（**合并迁移**：`ck_memories_type` 收窄为 7 值 + `ck_relationship_events_source` 收窄为两值 + `memories.layer` 列/回填/索引，服务 `MEV-015` + 回放退役清账 + `MEV-005`，2026-10-16 入链）；**`0011`**（`memory_links.relation` CHECK 扩展，服务 `MEV-009`，2026-10-20 入链）；`SAG-002` 若开工再顺延取号 |
 | 合并纪律（2026-10-16 用户裁决） | **同一版本内、尚未在任何环境应用的迁移合并为单条**，不再逐域拆分（库可重建为前提）；已应用的迁移仍不可改写。原「一个迁移承载一个域面」仅适用于跨版本/已发布迁移 |
 | 串行纪律 | 同一批迁移必须**串行入链**，不得并行改链尾；同一版本可合并，但**不得跳号或回填历史** |
 | 已知陷阱 | 加一条迁移会打破跨版本钉测（`MIGRATION_HEAD` / `SCHEMA_TABLE_COUNT` / `SCHEMA_COLUMNS_DIGEST`，单点 `tests/support/schema_pins.py`）→ 执行前先取干净基线测 blast radius（继承 `docs/version/v5.0.0/tasks.md` §0.3） |
@@ -240,8 +240,8 @@
 
 | 项 | 状态 |
 |---|---|
-| Task Detail | **已生成（28/28）**（2026-10-14）。**M0**：`MEV-015`（遗留记忆类型退役，迁移 `0010`）——2026-10-16 由审查驱动直接实施，**未生成 Task Detail**（同批清账：`0011` 关系事件源枚举收窄）。**M1**：`MEV-001`（lite 重排）/ `MEV-002`（query 改写与多路召回）/ `MEV-003`（词表与标签覆盖）/ `MEV-004`（可观测与离线门槛）。**M2**：`MEV-005`（`layer` 列与迁移 `0010`，合并入单条）/ `MEV-006`（情景聚合）/ `MEV-007`（语义抽象）/ `MEV-008`（分层配额与衰减调制）。**M3**：`MEV-009`（`memory_links` 值域与 1-hop，迁移 `0011`）/ `MEV-010`（关系抽取）/ `MEV-011`（记忆搜索与筛选 API）/ `MEV-012`（主题卡片，只读派生）/ `MEV-013`（客户端记忆面：Web 可编辑 + 移动端搜索）/ `MEV-014`（部分遗忘）。**P1**：`PLN-001`（澄清判定闸）/ `PLN-002`（上下文与 prompt 槽位）/ `PLN-003`（挂起载体，零迁移）/ `PLN-004`（前台恢复）/ `PLN-005`（超时兜底）。**P2**：`PLN-006`（移动端澄清卡片）/ `PLN-007`（结构化端点 + Web plans 视图）/ `PLN-008`（审计与归因）/ `PLN-009`（移动端审批 UI）。**S（未排期）**：`SAG-000`（红线裁决，阻塞项）/ `SAG-001`（身份抽象）/ `SAG-002`（Run 血缘，迁移 `0012`）/ `SAG-003`（派发与收敛 + S-C 最小验证）/ `SAG-004`（域架构文档）。体例见 `tasks/README.md`（10 节）。**已登记的依赖/落点修正**：`PLN-006` 依赖改为 `PLN-007`（客户端需结构化端点）；`MEV-014` 留痕由 `merge_chain` 改为 `source_ref.partial_forget_history`（避免虚增 `source_count`）；`MEV-012` 与注册表「后台 job 周期计算」的显式偏差（改为读时派生）；`MEV-002` 落点由「`services/conversation/context.py` 调用处扩展为并集打分」改为「`services/memory/retriever.py` 内部多 query 召回 + 归并」（`conversation/context.py` 零改动，签名冻结） |
-| 迁移编号占用 | `0010` = **合并迁移**（MEV-015 词表收窄 + 回放退役清账 + MEV-005 `layer`），已入链；`0011` = MEV-009（未开工）；`SAG-002` 顺延待取号（不得并行改链尾） |
+| Task Detail | **已生成（28/28）**（2026-10-14）。**M0**：`MEV-015`（遗留记忆类型退役，迁移 `0010`）——2026-10-16 由审查驱动直接实施，**未生成 Task Detail**（同批清账：`0011` 关系事件源枚举收窄）。**M1**：`MEV-001`（lite 重排）/ `MEV-002`（query 改写与多路召回）/ `MEV-003`（词表与标签覆盖）/ `MEV-004`（可观测与离线门槛）。**M2**：`MEV-005`（`layer` 列与迁移 `0010`，合并入单条）/ `MEV-006`（情景聚合）/ `MEV-007`（语义抽象）/ `MEV-008`（分层配额与衰减调制）。**M3**：`MEV-009`（`memory_links` 值域与 1-hop，迁移 `0011`，**已实施 2026-10-20**）/ `MEV-010`（关系抽取）/ `MEV-011`（记忆搜索与筛选 API）/ `MEV-012`（主题卡片，只读派生）/ `MEV-013`（客户端记忆面：Web 可编辑 + 移动端搜索）/ `MEV-014`（部分遗忘）。**P1**：`PLN-001`（澄清判定闸）/ `PLN-002`（上下文与 prompt 槽位）/ `PLN-003`（挂起载体，零迁移）/ `PLN-004`（前台恢复）/ `PLN-005`（超时兜底）。**P2**：`PLN-006`（移动端澄清卡片）/ `PLN-007`（结构化端点 + Web plans 视图）/ `PLN-008`（审计与归因）/ `PLN-009`（移动端审批 UI）。**S（未排期）**：`SAG-000`（红线裁决，阻塞项）/ `SAG-001`（身份抽象）/ `SAG-002`（Run 血缘，迁移 `0012`）/ `SAG-003`（派发与收敛 + S-C 最小验证）/ `SAG-004`（域架构文档）。体例见 `tasks/README.md`（10 节）。**已登记的依赖/落点修正**：`PLN-006` 依赖改为 `PLN-007`（客户端需结构化端点）；`MEV-014` 留痕由 `merge_chain` 改为 `source_ref.partial_forget_history`（避免虚增 `source_count`）；`MEV-012` 与注册表「后台 job 周期计算」的显式偏差（改为读时派生）；`MEV-002` 落点由「`services/conversation/context.py` 调用处扩展为并集打分」改为「`services/memory/retriever.py` 内部多 query 召回 + 归并」（`conversation/context.py` 零改动，签名冻结） |
+| 迁移编号占用 | `0010` = **合并迁移**（MEV-015 词表收窄 + 回放退役清账 + MEV-005 `layer`），已入链；`0011` = MEV-009（已实施 2026-10-20）；`SAG-002` 顺延待取号（不得并行改链尾） |
 | 待决策项 | ① 澄清超时策略（自动继续 / 自动驳回 / 永久等待）；② 是否为新 memory 模块补静态扫描；③ `MEV-008` 配额取值；④ subAgent 红线（SAG-000） |
 | 未登记项 | V6.0.0 **不覆盖**：审批触达（飞书推送）、审批审计归因表、Self Improvement 闭环、多通道（Discord / Telegram）——属其他方向，须另立注册表 |
 | 基线同步 | 已完成（2026-10-14）：§3.4 D2/D3、§3.6 D1、§8.2 / §11.2 / §11.3 路径更正、§8.7 新增 Plan Clarification Gate 扩展点 |

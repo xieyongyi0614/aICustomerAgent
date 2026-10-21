@@ -277,8 +277,9 @@ class TestPreserve:
         ) == ("hybrid", "structured", "degraded")
 
     def test_no_new_migration_and_pins_unchanged(self):
-        assert schema_pins.MIGRATION_HEAD == "0010"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
+        # MEV-009（2026-10-20）：迁移 0011 合法入链，HEAD/PARENT 推进；MEV-008 自身仍零迁移。
+        assert schema_pins.MIGRATION_HEAD == "0011"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == schema_pins.schema_columns_digest()
 

@@ -3,7 +3,7 @@
 import json
 import logging
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
 
@@ -19,6 +19,7 @@ _MIN_EPISODIC_EVENTS = 2
 _MEMORY_SEMANTIC_MODES = ("off", "auto")
 _MIN_SEMANTIC_SOURCES = 2
 _MAX_SEMANTIC_PER_RUN = 50
+_MEMORY_GRAPH_EXPAND_MODES = ("off", "one_hop")
 
 
 class MemorySettings(BaseSettings):
@@ -92,6 +93,9 @@ class MemorySettings(BaseSettings):
     memory_semantic_max_per_run: int = 5
     memory_layer_quota: str = ""
     memory_decay_layer_multiplier_json: str = "{}"
+    memory_graph_expand_mode: str = "off"
+    memory_graph_expand_seeds: int = Field(default=3, ge=1, le=10)
+    memory_graph_expand_decay: float = Field(default=0.7, gt=0.0, le=1.0)
     memory_hypothetical_triggers_json: str = (
         '["假装", "如果", "假如", "要是", "扮演", "假设", "作为"]'
     )
@@ -141,6 +145,15 @@ class MemorySettings(BaseSettings):
         mode = str(value or "").strip().lower()
         if mode not in _MEMORY_SEMANTIC_MODES:
             logger.warning("MEMORY_SEMANTIC_MODE=%r 非法，回落 off", value)
+            return "off"
+        return mode
+
+    @field_validator("memory_graph_expand_mode", mode="before")
+    @classmethod
+    def normalize_graph_expand_mode(cls, value) -> str:
+        mode = str(value or "").strip().lower()
+        if mode not in _MEMORY_GRAPH_EXPAND_MODES:
+            logger.warning("MEMORY_GRAPH_EXPAND_MODE=%r 非法，回落 off", value)
             return "off"
         return mode
 

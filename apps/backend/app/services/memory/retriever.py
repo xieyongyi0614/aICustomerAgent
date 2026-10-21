@@ -64,6 +64,9 @@ LAYER_SEMANTIC = "semantic"
 
 _QUOTA_MAX_WEIGHT = 100
 
+GRAPH_EXPAND_ONE_HOP = "one_hop"
+EXPAND_REASON_PREFIX = "hop:"
+
 
 @dataclass
 class RankedMemory:
@@ -511,6 +514,76 @@ def _quota_select(
     return selected
 
 
+def _expand_one_hop(
+    kept: list[RankedMemory],
+    *,
+    user_id: str,
+    settings,
+    rejected_contents: list[str],
+    cooldown_ids: set[str],
+    query_embedding: list[float] | None,
+    query_text: str,
+    now: datetime,
+) -> tuple[list[RankedMemory], int]:
+    """以最终排序前 N 条为种子，追加其 1-hop 邻居（降权、去重、不重排直连命中）。"""
+    seeds = kept[: settings.memory_graph_expand_seeds]
+    if not seeds:
+        return [], 0
+    seed_ids = [item.memory.id for item in seeds]
+    seed_rank = {memory_id: index for index, memory_id in enumerate(seed_ids)}
+    links = memory_repository.list_links(
+        seed_ids, relations=memory_types.MEMORY_LINK_RELATIONS
+    )
+    links = sorted(
+        links,
+        key=lambda link: (
+            seed_rank.get(link[0], len(seed_rank)),
+            link[0],
+            link[1],
+            link[2],
+        ),
+    )
+
+    seen = {item.memory.id for item in kept}
+    neighbors: dict[str, str] = {}
+    for _, related_id, relation in links:
+        if related_id in seen:
+            continue
+        neighbors.setdefault(related_id, relation)
+    if not neighbors:
+        return [], 0
+
+    facts = _row_facts(list(neighbors))
+    query_types = _detect_query_types(query_text)
+    temporal = _is_temporal_query(query_text)
+    expanded: list[RankedMemory] = []
+    for neighbor_id, relation in neighbors.items():
+        memory = memory_repository.get_memory(neighbor_id)
+        if memory is None or memory.user_id != user_id:
+            continue
+        if memory.status != STATUS_ACTIVE or memory.superseded_by is not None:
+            continue
+        fact = facts.get(neighbor_id, {})
+        if fact.get("visibility") == VISIBILITY_HYPOTHETICAL:
+            continue
+        if _filter_reasons(memory, rejected_contents, cooldown_ids) is not None:
+            continue
+        item = _score_all(
+            [memory],
+            {neighbor_id: fact},
+            query_embedding,
+            query_types,
+            now,
+            temporal,
+        )[0]
+        item.score *= settings.memory_graph_expand_decay
+        item.reason = f"{EXPAND_REASON_PREFIX}{relation}"
+        expanded.append(item)
+
+    expanded.sort(key=lambda item: (-item.score, item.memory.id))
+    return expanded, len(expanded)
+
+
 def retrieve(
     user_id: str,
     query: str,
@@ -523,10 +596,12 @@ def retrieve(
     limit = top_k or settings.memory_top_k
     now = timeutil.now()
     query_text = (query or "").strip()
+    primary_embedding: list[float] | None = None
 
     queries, rewrite_mode = _resolve_queries(query_text, settings)
     if len(queries) > 1:
         query_embeddings = memory_embeddings.embed_queries(queries)
+        primary_embedding = query_embeddings[0] if query_embeddings else None
         recalls = [
             _recall(user_id, character_id, text, now, query_embeddings[index])
             for index, text in enumerate(queries)
@@ -542,6 +617,7 @@ def retrieve(
         query_embedding = (
             memory_embeddings.embed_query(query_text) if query_text else None
         )
+        primary_embedding = query_embedding
         ranked, mode, pool_size = _recall(
             user_id, character_id, query_text, now, query_embedding
         )
@@ -565,6 +641,29 @@ def retrieve(
         kept.append(item)
     kept.sort(key=lambda item: (-item.score, -item.memory.importance))
     kept, rerank_mode = _maybe_rerank(query_text, kept, settings)
+    expanded_ids: set[str] = set()
+    expand_trace: dict = {}
+    if settings.memory_graph_expand_mode == GRAPH_EXPAND_ONE_HOP:
+        try:
+            expanded, expanded_count = _expand_one_hop(
+                kept,
+                user_id=user_id,
+                settings=settings,
+                rejected_contents=rejected_contents,
+                cooldown_ids=cooldown_ids,
+                query_embedding=primary_embedding,
+                query_text=query_text,
+                now=now,
+            )
+        except Exception as exc:
+            logger.warning("记忆 1-hop 扩展失败，跳过：%s", exc.__class__.__name__)
+        else:
+            expanded_ids = {item.memory.id for item in expanded}
+            kept = kept + expanded
+            expand_trace = {
+                "expand_mode": GRAPH_EXPAND_ONE_HOP,
+                "expanded_count": expanded_count,
+            }
     layer_quota = parse_layer_quota(settings.memory_layer_quota)
     if layer_quota is None:
         kept = kept[:limit]
@@ -575,6 +674,8 @@ def retrieve(
     )
 
     for item in kept:
+        if item.memory.id in expanded_ids:
+            continue
         memory_lifecycle.record_reinforce(item.memory.id)
     _trace(
         trace,
@@ -591,6 +692,7 @@ def retrieve(
         pool_size=pool_size,
         returned=[_item_digest(item) for item in kept],
         filtered=[_item_digest(item) for item in filtered],
+        **expand_trace,
     )
     return result
 

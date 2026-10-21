@@ -40,8 +40,9 @@ PRESERVED_FILE_DIGESTS = {
     "app/services/memory/semantic.py": (
         "28e10bfae6f2685b09693bd65312a218d7104022819b76eac4ec658994b34a26"
     ),
+    # MEV-009（2026-10-20）：`types.py` 仅新增链接关系常量再导出，摘要同步。
     "app/services/memory/types.py": (
-        "2db8a166877cf092345c26753d22c75aed8517417105cc8135048b68c4c54f7b"
+        "934157620299e6cb1c4323300856bcf5e616f49ec3972b63c5ca24fc4bda866e"
     ),
 }
 

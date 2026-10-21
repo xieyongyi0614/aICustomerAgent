@@ -54,7 +54,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # 分层写入声明（2026-10-16，MEV-005）：`create_memory` / `create_memory_and_supersede`
     # 落库时按 `core.constants.LAYER_FOR_TYPE` 显式赋值 `layer`（迁移撤默认后漏设即失败）
     # —— 非 TOOL-008 改脏。原值 d959dabc。
-    "app/repositories/memory_repository.py": "1c85603c4859a561f96b0c9391928c3f9ed368771e1ae2cc5b4b1b5c279e8a0b",
+    # 1-hop 链接读面声明（2026-10-20，MEV-009）：新增只读 `list_links`，既有函数零改动
+    # —— 非 TOOL-008 改脏。原值 1c85603c。
+    "app/repositories/memory_repository.py": "602ec51672130a5146b8368166fb1b552cf36082cd855e8c2c915dd1c77d7b9b",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`

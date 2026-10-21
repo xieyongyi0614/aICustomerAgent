@@ -156,7 +156,7 @@ def test_ban_no_second_agent_run_kind_literals_are_known():
 
 
 def test_ban_no_second_memory_tables_unchanged():
-    """结构面：记忆域三张表与 V2.3.0 逐字节同构（无新表、无新列、无新索引）。"""
+    """结构面：记忆域三张表列/索引与 V2.3.0 同构；`memory_links` CHECK 按 MEV-009 扩值域。"""
     from app.core.db import Base
 
     assert set(support.MEMORY_TABLES) <= set(Base.metadata.tables)

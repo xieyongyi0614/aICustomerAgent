@@ -60,8 +60,9 @@ PRESERVED_FILE_DIGESTS = {
     "app/services/memory/lifecycle.py": (
         "7e07d94bf49547d88cd8d8ba573586c1581762bdea4374094aa82db9343d98cb"
     ),
+    # MEV-009（2026-10-20）：`retriever.py` 合法新增 1-hop 扩展，摘要同步。
     "app/services/memory/retriever.py": (
-        "90cca1582e99807c0bdb80e42b48d84c5d1a7254098595baf8ac53a9939c856f"
+        "8b6aee9633df0f143ce66631b85da2c406d17c572e2645148267c5e38e1ffd19"
     ),
     "app/services/memory/episodic.py": (
         "5dac7df90c46e5806cbeae24bd1580e6da0fd6618bc05581910f1369e02f8c81"
@@ -665,7 +666,8 @@ class TestBoundaries:
             assert file_digest(relative) == PRESERVED_FILE_DIGESTS[relative], relative
 
     def test_no_new_migration_and_pins_unchanged(self):
-        assert schema_pins.MIGRATION_HEAD == "0010"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
+        # MEV-009（2026-10-20）：迁移 0011 入链，HEAD/PARENT 推进为 0011/0010。
+        assert schema_pins.MIGRATION_HEAD == "0011"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == schema_pins.schema_columns_digest()

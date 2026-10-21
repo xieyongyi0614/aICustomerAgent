@@ -293,8 +293,9 @@ class TestContracts:
         # 钉值升级声明（2026-10-16）：V6.0.0 合并迁移 `0010` 入链（MEV-015 词表收窄 +
         # 关系事件源收窄 + MEV-005 `memories.layer`），HEAD/PARENT 由 `0009`/`0008` 推进为
         # `0010`/`0009`；表数不变（零新表），列摘要因新增 `layer` 列而刷新。
-        assert schema_pins.MIGRATION_HEAD == "0010"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
+        # MEV-009（2026-10-20）：迁移 0011 入链，HEAD/PARENT 推进为 0011/0010。
+        assert schema_pins.MIGRATION_HEAD == "0011"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "2088c55108ab39a1"
 

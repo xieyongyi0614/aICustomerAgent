@@ -8,7 +8,13 @@
 
 import logging
 
-from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE, MEMORY_LAYERS
+from app.core.constants import (
+    DEFAULT_LAYER,
+    LAYER_FOR_TYPE,
+    MEMORY_LAYERS,
+    MEMORY_LINK_RELATIONS,
+    MEMORY_LINK_RELATIONS_LEGACY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +26,8 @@ __all__ = [
     "LEGACY_MEMORY_TYPES",
     "LEGACY_TYPE_ALIASES",
     "MEMORY_LAYERS",
+    "MEMORY_LINK_RELATIONS",
+    "MEMORY_LINK_RELATIONS_LEGACY",
     "TYPE_AFFINITY_KEYWORDS",
     "layer_for_type",
     "normalize_type",

@@ -13,8 +13,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.constants import DEFAULT_LAYER
+from app.core.constants import DEFAULT_LAYER, MEMORY_LINK_RELATIONS
 from app.core.db.base import Base, UtcDateTime, VectorType
+
+
+def _sql_in_list(column: str, values: tuple[str, ...]) -> str:
+    return f"{column} IN (" + ", ".join(f"'{value}'" for value in values) + ")"
 
 
 class Memory(Base):
@@ -129,7 +133,7 @@ class MemoryLinkRow(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "relation IN ('supersedes', 'merges', 'contradicts')",
+            _sql_in_list("relation", MEMORY_LINK_RELATIONS),
             name="ck_memory_links_relation",
         ),
         Index("idx_memory_links_memory", "memory_id"),
