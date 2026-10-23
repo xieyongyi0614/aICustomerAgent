@@ -1,0 +1,147 @@
+digraph autonomous_tick_flow {
+    graph [
+        rankdir=TB,
+        splines=true,
+        overlap=false,
+        nodesep=0.4,
+        ranksep=0.45,
+        bgcolor="#FFFFFF",
+        fontname="Microsoft YaHei",
+        fontsize=12,
+        labelloc=t,
+        label="后台自治周期（life_loop tick）\n快照 2026-10-23 @ e07669d7 · 证据：baseline §4.2 + app/application/life_loop.py"
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Microsoft YaHei",
+        fontsize=9,
+        color="#94A3B8",
+        fillcolor="#FFFFFF",
+        penwidth=1.0
+    ];
+    edge [
+        fontname="Microsoft YaHei",
+        fontsize=7.5,
+        color="#475569",
+        arrowsize=0.65
+    ];
+
+    worker [label="life_loop worker\n常驻循环：先 sleep 后 tick", fillcolor="#E0F2FE"];
+    discovery [label="工作发现\n0 LLM：trigger / goal / idle 候选", fillcolor="#E0F2FE"];
+    perUser [label="逐用户\nrun_autonomous_cycle", fillcolor="#E0F2FE"];
+    open [label="open autonomous_tick Run\nProfile 快照", fillcolor="#EDE9FE"];
+
+    subgraph cluster_state {
+        label="观察与状态准备";
+        style="rounded,dashed";
+        color="#C4B5FD";
+        fontcolor="#5B21B6";
+        perception [label="perception", fillcolor="#EDE9FE"];
+        stateUpdate [label="state_update\n情绪 / 关系读即衰减", fillcolor="#EDE9FE"];
+        stateSnapshot [label="state_snapshot", fillcolor="#EDE9FE"];
+    }
+
+    subgraph cluster_goal {
+        label="目标 / 记忆 / 反思";
+        style="rounded,dashed";
+        color="#BBF7D0";
+        fontcolor="#166534";
+        goalCheck [label="goal_check\n到期 / 供给候选", fillcolor="#DCFCE7"];
+        goalStack [label="goal_stack\n只读编译", fillcolor="#DCFCE7"];
+        goalSupply [label="goal_supply", fillcolor="#DCFCE7"];
+        goalAdvance [label="goal_advance\nPlanScheduler / Observer", fillcolor="#DCFCE7"];
+        memoryRetrieval [label="memory_retrieval", fillcolor="#DCFCE7"];
+        reflectionCheck [label="reflection_check", fillcolor="#DCFCE7"];
+    }
+
+    subgraph cluster_decision {
+        label="决策与经验回写";
+        style="rounded,dashed";
+        color="#FDE68A";
+        fontcolor="#92400E";
+        decision [label="decision（唯一 LLM capable + critical）\n两道预算闸 → llm_gateway.acquire\n→ autonomy_engine.tick", fillcolor="#FEF3C7"];
+        worldExp [label="world_experience\n世界体验回写", fillcolor="#FEF3C7"];
+    }
+
+    close [label="close_run\n终态 + 成本汇总", fillcolor="#DCFCE7"];
+
+    subgraph cluster_maintenance {
+        label="tick 尾部维护（按间隔调度）";
+        style="rounded,dashed";
+        color="#FED7AA";
+        fontcolor="#9A3412";
+        worldMaintenance [label="world_maintenance", fillcolor="#FFEDD5"];
+        worldSimulation [label="world_simulation", fillcolor="#FFEDD5"];
+        actionRetry [label="action_retry", fillcolor="#FFEDD5"];
+        actionSchedule [label="action_schedule", fillcolor="#FFEDD5"];
+        outboxConsume [label="outbox_consume\n常开", fillcolor="#FFEDD5"];
+        triggerReconcile [label="trigger_reconcile", fillcolor="#FFEDD5"];
+        ledgerDigest [label="ledger_digest\n日结 / 周报", fillcolor="#FFEDD5"];
+    }
+
+    subgraph cluster_event {
+        label="event_driven Profile（Flow C）";
+        style="rounded,dashed";
+        color="#FBCFE8";
+        fontcolor="#9D174D";
+        eventPregate [label="event_pregate\n白名单世界事件", fillcolor="#FCE7F3"];
+        escalate [label="升级为完整 Run", fillcolor="#FCE7F3"];
+        skip [label="其余事件：0 消耗", fillcolor="#FCE7F3"];
+    }
+
+    subgraph cluster_other {
+        label="其它常驻后台循环（lifespan）";
+        style="rounded,dashed";
+        color="#CBD5E1";
+        fontcolor="#334155";
+        jobWorker [label="memory job worker", fillcolor="#F1F5F9"];
+        evolution [label="agent evolution worker\n指标快照 / 人格编译 / goal rebalance", fillcolor="#F1F5F9"];
+        retention [label="observability retention", fillcolor="#F1F5F9"];
+        idWatermark [label="ID 高水位刷写", fillcolor="#F1F5F9"];
+    }
+
+    llm [label="LLM Gateway\n预算 / 降级 / 日配额", shape=box, style="rounded,filled", fillcolor="#E2E8F0", color="#64748B"];
+    db [label="PostgreSQL\nloop_runs · decision_records\ncharacter_goals · action_records", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
+
+    worker -> discovery [label="每个 tick"];
+    discovery -> perUser [label="有工作用户"];
+    perUser -> open;
+    open -> perception;
+    perception -> stateUpdate;
+    stateUpdate -> stateSnapshot;
+    stateSnapshot -> goalCheck;
+    goalCheck -> goalStack;
+    goalStack -> goalSupply;
+    goalSupply -> goalAdvance;
+    goalAdvance -> memoryRetrieval;
+    memoryRetrieval -> reflectionCheck;
+    reflectionCheck -> decision;
+    decision -> llm [label="经 Gateway 调用", style=dashed];
+    decision -> worldExp;
+    worldExp -> close;
+    close -> eventPregate [label="tick 尾部"];
+    eventPregate -> escalate [label="命中白名单"];
+    eventPregate -> skip [label="其余"];
+
+    discovery -> worldMaintenance [label="按间隔", style=dashed];
+    worldMaintenance -> worldSimulation [style=dashed];
+    worldSimulation -> actionRetry [style=dashed];
+    actionRetry -> actionSchedule [style=dashed];
+    actionSchedule -> outboxConsume [style=dashed];
+    outboxConsume -> triggerReconcile [style=dashed];
+    triggerReconcile -> ledgerDigest [style=dashed];
+
+    open -> db [style=dashed, label="run 台账"];
+    goalAdvance -> db [style=dashed, label="计划 / 决策"];
+    worldExp -> db [style=dashed, label="状态回写"];
+
+    note [
+        shape=note,
+        label="六段认知循环（observe/reason/plan/act/reflect/update）\n当前为影子/测试实现；默认生产走 profiles.py 的 Profile 阶段序列。\nruntime_six_stage_loop_enabled=True 时 run() 可走六段，\n但不属于默认生产基线。",
+        fillcolor="#FFFBEB",
+        color="#D97706",
+        fontcolor="#92400E",
+        fontsize=8
+    ];
+}

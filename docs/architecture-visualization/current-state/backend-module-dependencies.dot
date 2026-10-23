@@ -1,0 +1,126 @@
+digraph backend_module_dependencies {
+    graph [
+        rankdir=TB,
+        splines=true,
+        overlap=false,
+        nodesep=0.45,
+        ranksep=0.65,
+        bgcolor="#FFFFFF",
+        fontname="Microsoft YaHei",
+        fontsize=12,
+        labelloc=t,
+        label="后端分层依赖（允许方向）\n快照 2026-10-23 @ e07669d7 · 证据：docs/current-system-architecture-baseline.md §2.2"
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Microsoft YaHei",
+        fontsize=10,
+        color="#94A3B8",
+        fillcolor="#FFFFFF",
+        penwidth=1.1
+    ];
+    edge [
+        fontname="Microsoft YaHei",
+        fontsize=8,
+        color="#475569",
+        arrowsize=0.7
+    ];
+
+    subgraph cluster_entry {
+        label="入口层";
+        style="rounded,dashed";
+        color="#BAE6FD";
+        fontcolor="#075985";
+        channels [label="Channel Adapters\nchannels/base.py\nchannels/feishu/*", fillcolor="#E0F2FE"];
+        api [label="API v1\napi/v1/*\nHTTP + NDJSON 流", fillcolor="#E0F2FE"];
+    }
+
+    subgraph cluster_app {
+        label="应用编排层";
+        style="rounded,dashed";
+        color="#FDE68A";
+        fontcolor="#92400E";
+        application [label="Application Orchestration\nchat_pipeline / post_process\nlife_loop / world_engine\naction_engine / autonomy_engine", fillcolor="#FEF3C7"];
+        workers [label="In-process Workers\nlife loop · memory job worker\nagent evolution · observability retention", fillcolor="#FEF3C7"];
+    }
+
+    subgraph cluster_runtime {
+        label="Agent Runtime";
+        style="rounded,dashed";
+        color="#C4B5FD";
+        fontcolor="#5B21B6";
+        runtime [label="Agent Runtime\ncontroller / profiles / loop\ncontext / events / trigger_router\nllm_gateway / recovery", fillcolor="#EDE9FE"];
+    }
+
+    subgraph cluster_domain {
+        label="领域服务";
+        style="rounded,dashed";
+        color="#BBF7D0";
+        fontcolor="#166534";
+        domains [label="Domain Services\n角色 · 关系 · 记忆 · 反思 · 成长\n目标 · 规划 · 决策\n行动 · 工具 · 世界\n生活域 · 身份 · 治理 · 评估", fillcolor="#DCFCE7"];
+    }
+
+    subgraph cluster_chains {
+        label="LLM 链";
+        style="rounded,dashed";
+        color="#FBCFE8";
+        fontcolor="#9D174D";
+        chains [label="LLM Chains\nLangChain\nstructured.py 统一结构化输出", fillcolor="#FCE7F3"];
+    }
+
+    subgraph cluster_repo {
+        label="仓储层";
+        style="rounded,dashed";
+        color="#FED7AA";
+        fontcolor="#9A3412";
+        repositories [label="Repositories\n每表一仓\n业务层唯一 DB 访问面", fillcolor="#FFEDD5"];
+    }
+
+    subgraph cluster_core {
+        label="核心";
+        style="rounded,dashed";
+        color="#CBD5E1";
+        fontcolor="#334155";
+        core [label="Core Platform\nsettings · ORM 模型包\nllm_factory · ids · redis client", fillcolor="#F1F5F9"];
+    }
+
+    db [label="PostgreSQL 16 + pgvector\n57 张表 · Alembic head 0011", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
+    redis [label="Redis 7\n验证码 / OAuth state / ID 水位", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
+    llm [label="LLM Providers\nOpenAI-compatible", shape=box, style="rounded,filled", fillcolor="#E2E8F0", color="#64748B"];
+    external [label="SMTP / Open-Meteo / ext.api.*\n外部服务", shape=box, style="rounded,filled", fillcolor="#E2E8F0", color="#64748B"];
+
+    channels -> application [label="归一化 InboundMessage → 对话管线"];
+    api -> application [label="请求编排"];
+    api -> domains [label="产品域查询 / 命令"];
+    application -> runtime [label="Run 调度 / Profile 阶段"];
+    application -> domains [label="领域能力"];
+    application -> chains [label="辅助链"];
+    runtime -> domains [label="阶段实现"];
+    runtime -> repositories [label="Run / 快照 / 决策台账"];
+    domains -> chains [label="结构化输出"];
+    domains -> repositories [label="唯一 DB 写面"];
+    workers -> application [label="周期性 tick", style=dashed];
+    workers -> domains [label="维护任务", style=dashed];
+    chains -> core [label="llm_factory"];
+    repositories -> core [label="ORM / engine"];
+    domains -> core [label="settings / ids", style=dashed];
+    application -> core [label="settings / ids", style=dashed];
+    runtime -> core [label="settings / ids", style=dashed];
+    repositories -> db [label="SQL"];
+    runtime -> llm [label="经 LLM Gateway", style=dashed];
+    domains -> llm [label="经 chains / gateway", style=dashed];
+    domains -> external [label="EmailSender / 天气 / 工具", style=dashed];
+    core -> redis [label="Redis protocol", style=dashed];
+
+    forbidden [
+        shape=note,
+        label="禁止反向依赖（基线 §2.2）\napi → repositories / langchain\napplication → repositories（直接 SQL / prompt）\nchains → repositories / services\nservices → api\nrepositories → services（业务判断）\ncore → 业务",
+        fillcolor="#FEF2F2",
+        color="#DC2626",
+        fontcolor="#991B1B",
+        fontsize=9
+    ];
+
+    { rank=sink; forbidden; }
+}

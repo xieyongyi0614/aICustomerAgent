@@ -1,0 +1,138 @@
+digraph foreground_chat_flow {
+    graph [
+        rankdir=TB,
+        splines=true,
+        overlap=false,
+        nodesep=0.4,
+        ranksep=0.45,
+        bgcolor="#FFFFFF",
+        fontname="Microsoft YaHei",
+        fontsize=12,
+        labelloc=t,
+        label="前台对话主链路（一次用户消息）\n快照 2026-10-23 @ e07669d7 · 证据：baseline §4.1 + app/application/chat_pipeline.py"
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Microsoft YaHei",
+        fontsize=9,
+        color="#94A3B8",
+        fillcolor="#FFFFFF",
+        penwidth=1.0
+    ];
+    edge [
+        fontname="Microsoft YaHei",
+        fontsize=7.5,
+        color="#475569",
+        arrowsize=0.65
+    ];
+
+    user [label="App 用户 / 飞书用户", shape=person, fillcolor="#CCFBF1", color="#0F766E"];
+    ui [label="朝夕 App / Feishu", fillcolor="#E0F2FE"];
+    channel [label="通道归一\nweb REST / feishu adapter\nInboundMessage", fillcolor="#E0F2FE"];
+
+    subgraph cluster_runtime {
+        label="Agent Runtime（同步）";
+        style="rounded,dashed";
+        color="#C4B5FD";
+        fontcolor="#5B21B6";
+        open [label="01 open_foreground_run\nloop_runs 建行 + Profile 快照", fillcolor="#EDE9FE"];
+        assemble [label="02 assemble_snapshot\n人格 / 目标栈 / 状态", fillcolor="#EDE9FE"];
+        world [label="03 build_context\n世界切片（失败降级 None）", fillcolor="#EDE9FE"];
+        ctx [label="04 context_builder\n历史窗口 / 摘要 / 记忆召回", fillcolor="#EDE9FE"];
+        scene [label="05 scene_service.load", fillcolor="#EDE9FE"];
+        goal [label="06 _select_goal\n紧张度 / 情绪 / 深夜豁免", fillcolor="#EDE9FE"];
+    }
+
+    subgraph cluster_decision {
+        label="决策与收敛";
+        style="rounded,dashed";
+        color="#FDE68A";
+        fontcolor="#92400E";
+        parallel [label="07 四链并行（asyncio.gather）\nrole_router · turn_analyzer\nscene_intent · intention", fillcolor="#FEF3C7"];
+        mode [label="08 mode_stabilize\n候选 vs 已确认", fillcolor="#FEF3C7"];
+        sceneResolve [label="09 scene_service.resolve\npending 动作续接", fillcolor="#FEF3C7"];
+        intention [label="10 enforce_intention\n确定性校验 / 策略降级", fillcolor="#FEF3C7"];
+        decision [label="11 前台决策管线\ndecision_pipeline + goal_stack（只读）", fillcolor="#FEF3C7"];
+        behavior [label="12 behavior_engine.resolve\n策略 / 预算 / 习惯 / 关系解锁", fillcolor="#FEF3C7"];
+        style [label="13 build_style_context\n人格轴快照 + development overlay", fillcolor="#FEF3C7"];
+        action [label="14 detect_action_intent\n（可选）", fillcolor="#FEF3C7"];
+    }
+
+    subgraph cluster_output {
+        label="生成与落库（读进链 / 写流出链）";
+        style="rounded,dashed";
+        color="#BBF7D0";
+        fontcolor="#166534";
+        meta [label="15 yield turn_meta\nrole_mode / analysis / scene / goal", fillcolor="#DCFCE7"];
+        answer [label="16 answer_chain.astream\nLLM Gateway → token 流", fillcolor="#DCFCE7"];
+        save [label="17 conversation_service.save_turn\nSQL 落库", fillcolor="#DCFCE7"];
+        schedule [label="18 schedule_post_process\n独立容错", fillcolor="#DCFCE7"];
+        done [label="20 yield done\nsession_id / turn_id / request_id", fillcolor="#DCFCE7"];
+        close [label="21 close_run\n终态 + 成本汇总", fillcolor="#DCFCE7"];
+    }
+
+    subgraph cluster_post {
+        label="后台后处理（异步 asyncio task）";
+        style="rounded,dashed";
+        color="#FBCFE8";
+        fontcolor="#9D174D";
+        p1 [label="scene_update", fillcolor="#FCE7F3"];
+        p2 [label="state_update", fillcolor="#FCE7F3"];
+        p3 [label="goal_review", fillcolor="#FCE7F3"];
+        p4 [label="summary", fillcolor="#FCE7F3"];
+        p5 [label="memory_extract", fillcolor="#FCE7F3"];
+    }
+
+    obs [label="19 observability 收口\ntrace / decision / turn 审计", fillcolor="#E2E8F0"];
+    db [label="PostgreSQL\ncharacter_state · relationship_state\nmemories · worlds · loop_runs", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
+    fail [label="critical 段失败？\nreply_generation", shape=diamond, style="filled", fillcolor="#FEE2E2", color="#DC2626"];
+
+    user -> ui [label="发送消息"];
+    ui -> channel [label="HTTPS / Webhook"];
+    channel -> open [label="归一化"];
+    open -> assemble;
+    assemble -> world;
+    world -> ctx;
+    ctx -> scene;
+    scene -> goal;
+    goal -> parallel;
+    parallel -> mode;
+    mode -> sceneResolve;
+    sceneResolve -> intention;
+    intention -> decision;
+    decision -> behavior;
+    behavior -> style;
+    style -> action;
+    action -> meta;
+    meta -> answer [label="首帧元数据先出"];
+    answer -> save;
+    save -> schedule;
+    schedule -> obs;
+    obs -> done;
+    done -> close;
+
+    schedule -> p1 [style=dashed, label="并发"];
+    schedule -> p2 [style=dashed];
+    schedule -> p3 [style=dashed];
+    schedule -> p4 [style=dashed];
+    schedule -> p5 [style=dashed];
+    p5 -> db [style=dashed, label="写记忆"];
+
+    ctx -> db [style=dashed, label="read"];
+    save -> db [label="write"];
+    obs -> db [style=dashed, label="trace / decision"];
+    close -> db [label="run terminal"];
+
+    answer -> fail [style=dashed, color="#DC2626", fontcolor="#991B1B", label="critical"];
+    fail -> close [style=dashed, color="#DC2626", fontcolor="#991B1B", label="degraded / aborted"];
+
+    note [
+        shape=note,
+        label="Profile 段（9）包裹业务步骤（21）：\nperception → context_assembly → turn_decisions → mode_stabilize\n→ scene_resolve → behavior_resolve → action_planning\n→ reply_generation → record_handoff。\n段序列唯一声明在 profiles.py；生产固定经 AgentLoop 驱动。\n\n规则：DB 写入在流式回答结束后执行；\n后处理失败不影响已产出回答。\n世界读取只经 world_repository，异常降级 None。",
+        fillcolor="#FFFBEB",
+        color="#D97706",
+        fontcolor="#92400E",
+        fontsize=8
+    ];
+}
