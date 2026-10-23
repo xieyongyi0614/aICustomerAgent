@@ -56,7 +56,9 @@ FROZEN_SOURCES: dict[str, str] = {
     # —— 非 TOOL-008 改脏。原值 d959dabc。
     # 1-hop 链接读面声明（2026-10-20，MEV-009）：新增只读 `list_links`，既有函数零改动
     # —— 非 TOOL-008 改脏。原值 1c85603c。
-    "app/repositories/memory_repository.py": "602ec51672130a5146b8368166fb1b552cf36082cd855e8c2c915dd1c77d7b9b",
+    # 双向链接声明（2026-10-20，MEV-010）：`list_links` 改为双向匹配并归一为「种子在前」，
+    # 既有函数零改动 —— 非 TOOL-008 改脏。原值 602ec516。
+    "app/repositories/memory_repository.py": "8a87f6c0614be5a5569045b95528e9c3b35fc05fc32e9e37a1f6264ae54ad3ca",
     # memory 域清理声明（2026-09-29）：`MemoryStatus` 补 `decayed` / `forgotten` 两态
     # （原缺致 `memory_repository._to_memory` 读这两态抛 ValidationError，按 id 读非
     # active 记忆的路径会 500）；`EvaluationVerdict` 从已删除的 `models/memory.py`

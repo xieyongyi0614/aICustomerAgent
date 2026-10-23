@@ -57,8 +57,10 @@ PRESERVED_FILE_DIGESTS = {
     "app/services/memory/evaluator.py": (
         "f33da2b3323773d2d04a5169d3b204164c64dc1e3c2276f17ce613eae2829286"
     ),
+    # MEV-010（2026-10-20）：`lifecycle.py` 合法新增只写函数 `create_relation_link`，
+    # 既有函数与状态机逐字节未变，整文件摘要同步。
     "app/services/memory/lifecycle.py": (
-        "7e07d94bf49547d88cd8d8ba573586c1581762bdea4374094aa82db9343d98cb"
+        "f3aece508afa8834bbe718b7e800ff46d09f041fff463f9505c7e5e3d39ab655"
     ),
     # MEV-009（2026-10-20）：`retriever.py` 合法新增 1-hop 扩展，摘要同步。
     "app/services/memory/retriever.py": (

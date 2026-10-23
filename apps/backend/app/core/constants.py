@@ -65,6 +65,17 @@ MEMORY_LINK_RELATIONS: tuple[str, ...] = (
 `services/memory/types.py` 再导出同一对象。
 """
 
+MEMORY_LINK_EXTRACTABLE_RELATIONS: tuple[str, ...] = (
+    "caused_by",
+    "before",
+    "related",
+)
+"""关系抽取允许写入的三值（`MEV-010`；★ 冻结）。
+
+既有 `supersedes` / `merges` / `contradicts` 由 `lifecycle.on_promoted` 独占并伴随
+状态变更，关系抽取链**不得**写入，避免链接与记忆状态双写。
+"""
+
 RELATIONSHIP_EVENT_DELTAS: dict[str, RelationshipDelta] = {
     "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, respect=0.01, comfort=0.03, tension=-0.02),
     "user_help": RelationshipDelta(trust=0.05, intimacy=0.03, familiarity=0.02, respect=0.03, comfort=0.02),

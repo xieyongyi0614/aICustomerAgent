@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import get_args
 
-from sqlalchemy import text as sa_text
+from sqlalchemy import or_, text as sa_text
 
 from app.core import ids, timeutil
 from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE
@@ -177,15 +177,25 @@ def list_links(
     memory_ids: list[str],
     relations: list[str] | tuple[str, ...] | None = None,
 ) -> list[tuple[str, str, str]]:
-    """按源记忆批量读取链接（只读）：返回 `(memory_id, related_memory_id, relation)`。"""
+    """按种子记忆批量读取链接（只读、**双向匹配**）：返回 `(seed_id, neighbor_id, relation)`。
+
+    行可能以任一方向存储；反向命中时归一为「种子在前」，消费方无需关心存储方向
+    （`MEV-010` 要求；1-hop 扩展因此无需改代码）。
+    """
     if not memory_ids:
         return []
+    seed_ids = set(memory_ids)
     with SessionLocal() as session:
         query = session.query(
             MemoryLinkRow.memory_id,
             MemoryLinkRow.related_memory_id,
             MemoryLinkRow.relation,
-        ).filter(MemoryLinkRow.memory_id.in_(list(memory_ids)))
+        ).filter(
+            or_(
+                MemoryLinkRow.memory_id.in_(seed_ids),
+                MemoryLinkRow.related_memory_id.in_(seed_ids),
+            )
+        )
         if relations:
             query = query.filter(MemoryLinkRow.relation.in_(list(relations)))
         rows = query.order_by(
@@ -193,7 +203,14 @@ def list_links(
             MemoryLinkRow.related_memory_id,
             MemoryLinkRow.relation,
         ).all()
-        return [(memory_id, related_id, relation) for memory_id, related_id, relation in rows]
+
+    normalized: set[tuple[str, str, str]] = set()
+    for memory_id, related_id, relation in rows:
+        if memory_id in seed_ids:
+            normalized.add((memory_id, related_id, relation))
+        else:
+            normalized.add((related_id, memory_id, relation))
+    return sorted(normalized)
 
 
 def get_source_refs(memory_ids: list[str]) -> dict[str, dict]:

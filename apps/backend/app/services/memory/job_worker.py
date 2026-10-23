@@ -8,7 +8,6 @@ MEM-004 条件回填 / MEM-005 日桶衰减均已幂等）。同轮附带 flush 
 embedding 攒批窗口，补齐两个内存态通道的周期驱动。
 """
 
-import asyncio
 import logging
 import time
 from datetime import datetime, timedelta
@@ -22,6 +21,7 @@ from app.repositories import background_job_repository
 from app.services.memory import embeddings as memory_embeddings
 from app.services.memory import episodic as memory_episodic
 from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import relations as memory_relations
 from app.services.memory import semantic as memory_semantic
 logger = logging.getLogger(__name__)
 
@@ -37,11 +37,17 @@ _JOB_HANDLERS = {
     memory_episodic.JOB_TYPE_MEMORY_EPISODIC_AGGREGATE: memory_episodic.run_aggregate_job,
     # 语义抽象（MEV-007）：同上；门控在 handler 内（mode=off → 零动作、零 LLM）
     memory_semantic.JOB_TYPE_MEMORY_SEMANTIC_ABSTRACT: memory_semantic.run_semantic_job,
+    # 关系抽取（MEV-010）：payload={"memory_id": ...} 时处理单条，否则批量一轮
+    memory_relations.JOB_TYPE_MEMORY_LINK_EXTRACT: memory_relations.run_extract_job,
 }
 
-_TICK_HOOKS: list = [memory_episodic.run_aggregate_tick, memory_semantic.run_semantic_tick]
-"""周期挂靠点：默认挂情景聚合（MEV-006）与语义抽象（MEV-007）入队 hook，
-门控在各自 hook 内（mode=off → 零动作、不查库）。"""
+_TICK_HOOKS: list = [
+    memory_episodic.run_aggregate_tick,
+    memory_semantic.run_semantic_tick,
+    memory_relations.run_extract_tick,
+]
+"""周期挂靠点：默认挂情景聚合（MEV-006）、语义抽象（MEV-007）与关系抽取（MEV-010）
+入队 hook，门控在各自 hook 内（mode=off → 零动作、不查库）。"""
 
 _CLAIM_BATCH_LIMIT = 20
 
@@ -149,11 +155,15 @@ def _execute_job(job_id: str, now: datetime) -> str:
         if job is None or job.status != "running":
             return "gone"
         job_type = job.job_type
+        payload = dict(job.payload) if isinstance(job.payload, dict) else {}
     handler = _JOB_HANDLERS.get(job_type)
     try:
         if handler is None:
             raise ValueError(f"未知 job_type: {job_type}")
-        handler()
+        if payload:
+            handler(**payload)
+        else:
+            handler()
     except Exception as exc:
         return _reschedule_or_fail(job_id, exc, now)
     return _mark_done(job_id)

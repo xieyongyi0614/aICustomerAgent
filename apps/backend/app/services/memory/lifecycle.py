@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 
 from app.core import ids, timeutil
+from app.core.constants import MEMORY_LINK_EXTRACTABLE_RELATIONS
 from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.core.settings import get_settings
 from app.services.memory import types as memory_types
@@ -388,6 +389,58 @@ def _create_link(session, memory_id: str, related_memory_id: str, relation: str)
             created_at=timeutil.now(),
         )
     )
+
+
+def create_relation_link(
+    memory_id: str,
+    related_memory_id: str,
+    relation: str,
+    trace=None,
+) -> bool:
+    """关系抽取的唯一写面：白名单校验 → `_link_exists` 去重 → 写入。
+
+    只接受 `MEV-010` 三义（caused_by / before / related）；既有冲突三义由
+    `on_promoted` 独占，越界一律拒绝。返回 `True` 表示本次真实新增。
+    """
+    started = time.perf_counter()
+    if relation not in MEMORY_LINK_EXTRACTABLE_RELATIONS:
+        logger.warning("关系抽取值越界，拒绝写入：%r", relation)
+        _trace(
+            trace,
+            started,
+            event="relation_link",
+            status="rejected",
+            memory_id=memory_id,
+            related_memory_id=related_memory_id,
+            relation=relation,
+        )
+        return False
+    if not memory_id or not related_memory_id or memory_id == related_memory_id:
+        return False
+    with SessionLocal() as session:
+        if _link_exists(session, memory_id, related_memory_id, relation):
+            _trace(
+                trace,
+                started,
+                event="relation_link",
+                outcome="duplicate",
+                memory_id=memory_id,
+                related_memory_id=related_memory_id,
+                relation=relation,
+            )
+            return False
+        _create_link(session, memory_id, related_memory_id, relation)
+        session.commit()
+    _trace(
+        trace,
+        started,
+        event="relation_link",
+        outcome="created",
+        memory_id=memory_id,
+        related_memory_id=related_memory_id,
+        relation=relation,
+    )
+    return True
 
 
 def explicit_forget(memory_id: str, trace=None) -> bool:
