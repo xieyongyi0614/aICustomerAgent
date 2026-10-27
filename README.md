@@ -19,7 +19,7 @@
 ├── apps/
 │   ├── backend/           # FastAPI 后端（详见 apps/backend/README.md）
 │   │   ├── app/           #   api / application / services / repositories / chains / core / prompts / character
-│   │   ├── migrations/    #   Alembic 迁移链（0001 ~ 0011）
+│   │   ├── migrations/    #   Alembic 迁移链（0001 ~ 0010）
 │   │   └── tests/         #   pytest 分层（unit / integration / e2e / golden；FakeLLM 注入）
 │   ├── frontend/          # React 调试控制台（详见 apps/frontend/README.md）
 │   │   └── src/           #   api / app / components / features / hooks / stores / mocks

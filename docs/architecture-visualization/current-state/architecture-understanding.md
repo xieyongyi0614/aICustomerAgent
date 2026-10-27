@@ -44,7 +44,7 @@
 | 朝夕 App | 产品客户端：聊天、生活域、记忆、简报、车辆、更新 | Flutter + Riverpod + GoRouter + Dio + Drift |
 | Debug Console | 调试与观测控制台；**不是产品 UI**。Docker 镜像中由后端托管静态产物 | React 19 + TypeScript + Vite |
 | Backend API | 通道接入、HTTP API、Agent Runtime、领域服务、后台循环、发布服务 | Python 3.13 + FastAPI + LangChain |
-| PostgreSQL 16 + pgvector | 57 张表；Schema 唯一真相 = Alembic 迁移链（head `0011`） | SQL / SQLAlchemy / Alembic |
+| PostgreSQL 16 + pgvector | 57 张表；Schema 唯一真相 = Alembic 迁移链（head `0010`） | SQL / SQLAlchemy / Alembic |
 | Redis 7 | 验证码、OAuth state、雪花 ID 高水位等短生命状态 | Redis |
 | 发布制品存储 | APK 与更新说明；本地卷 `/srv/backend/releases` | Filesystem |
 
@@ -104,7 +104,7 @@ Web 与飞书最终都收敛到 `services/agent_service.stream_chat` → `applic
 
 ## 7. 数据与状态
 
-- **Schema 唯一真相**：Alembic 迁移链（`0001` 基线 + `0002`~`0011` 增量）。`create_all` 只在测试内存 SQLite 豁免。
+- **Schema 唯一真相**：Alembic 迁移链（`0001` 基线 + `0002`~`0010` 增量）。`create_all` 只在测试内存 SQLite 豁免。
 - **单一写面**：业务层不直接操作 ORM，一律经 `repositories/`；计划落库只经 `goal_repository`；Run 唯一写面 = `loop_runs`。
 - **账本与状态分离**：`relationship_events`（append-only 时序权威）、`relationship_state`（当前态，version 乐观锁）、`relationship_snapshots`（版本化快照）。
 - **版本化表**：`goal_plans`、`relationship_snapshots`、`agent_state_snapshots`、`world_snapshots`。

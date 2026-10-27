@@ -80,11 +80,10 @@ INCREMENTAL_MIGRATION_FILES: tuple[str, ...] = (
     "0007_ledger_entry_identity_split.py",
     "0008_ledger_categories_aliases_encoding.py",
     "0009_app_release_artifacts.py",
-    # V6.0.0 合并迁移声明（2026-10-16）：类型词表收窄 + 关系事件源收窄 + `memories.layer`
-    # 三项合并为单条迁移（用户裁决：同版本未应用迁移不再逐域拆分）。
+    # V6.0.0 合并迁移声明（2026-10-16 / 2026-10-27）：类型词表收窄 + 关系事件源收窄 +
+    # `memories.layer` + `memory_links.relation` 值域扩至 6 值四项合并为单条迁移
+    # （用户裁决：同版本未应用迁移不再逐域拆分）。
     "0010_memory_layer_and_enums.py",
-    # V6.0.0 MEV-009（2026-10-20）：`memory_links.relation` 值域扩至 6 值（仅 CHECK 变更）。
-    "0011_memory_link_relations.py",
 )
 
 # 旧账同步声明（2026-10-15）：表集在 0002~0009 增量迁移期间合法增长后漏同步本摘要
@@ -125,8 +124,8 @@ BASELINE_TABLE_DIGESTS: dict[str, tuple[str, str, str]] = {
     "conversation_summaries": ("dfb4a7f2e6b6ba3a", "e3b0c44298fc1c14", "e3b0c44298fc1c14"),
     "messages": ("859d319a9c244bfb", "28485ce6aa400d11", "80cc53e497c96a49"),
     "memory_candidates": ("2e5d80cbd4a5c8e5", "41df4f3ee6f0c7bc", "1152da1a25969f8a"),
-    # MEV-009（2026-10-20）：`ck_memory_links_relation` 由 3 值扩为 6 值（迁移 `0011`），
-    # 列与索引不变；checks 摘要有意演进。原值 283ca81681e4286f。
+    # MEV-009（2026-10-20）：`ck_memory_links_relation` 由 3 值扩为 6 值（迁移 `0010`，
+    # 2026-10-27 由原 `0011` 并入），列与索引不变；checks 摘要有意演进。原值 283ca81681e4286f。
     "memory_links": ("3d3ded6c6e54c04a", "169f5b014f65f79f", "35da9fa6f9d0bbf0"),
     # 词表收窄 + 分层声明（2026-10-16，MEV-015 / MEV-005）：`ck_memories_type` 由 9 值收窄为
     # 7 值、加 `ck_memories_layer` CHECK，并新增 `layer` 列与 `idx_memories_user_layer_status`

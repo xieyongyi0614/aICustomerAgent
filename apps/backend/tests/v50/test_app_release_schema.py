@@ -66,7 +66,7 @@ def test_schema_columns_digest_matches_pin():
 def test_migration_chain_head_matches_pin():
     script = ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini")))
     assert script.get_heads() == [MIGRATION_HEAD]
-    # 钉值升级声明（2026-10-16）：`0010` / `0011` 入链后 0009（本任务迁移）不再是链尾，
+    # 钉值升级声明（2026-10-16 / 2026-10-27）：合并迁移 `0010` 入链后 0009（本任务迁移）不再是链尾，
     # 断言改为**不绑定链尾**：「本任务迁移自身在链上且父版本不变」——后续迁移不再动本用例。
     app_release_revision = script.get_revision("0009")
     assert app_release_revision is not None

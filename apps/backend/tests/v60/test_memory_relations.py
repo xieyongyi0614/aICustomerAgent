@@ -500,14 +500,14 @@ class TestPreserve:
         )
 
     def test_no_new_migration_and_pins_unchanged(self):
-        assert schema_pins.MIGRATION_HEAD == "0011"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "2088c55108ab39a1"
         versions = sorted(
             path.name for path in (BACKEND_ROOT / "migrations" / "versions").glob("*.py")
         )
-        assert versions[-1].startswith("0011_")
+        assert versions[-1].startswith("0010_")
         assert not any(name.startswith("0012_") for name in versions)
 
     def test_link_chain_uses_lite_profile(self, monkeypatch, fake_llm):

@@ -33,7 +33,7 @@ from tests.support.frozen_surface import file_digest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION_FILE = (
-    BACKEND_ROOT / "migrations" / "versions" / "0011_memory_link_relations.py"
+    BACKEND_ROOT / "migrations" / "versions" / "0010_memory_layer_and_enums.py"
 )
 
 NOW = datetime(2026, 10, 16, 12, 0, 0, tzinfo=timezone.utc)
@@ -96,7 +96,7 @@ def _function_digest(function) -> str:
 
 
 def _migration_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("migration_0011", MIGRATION_FILE)
+    spec = importlib.util.spec_from_file_location("migration_0010", MIGRATION_FILE)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -504,7 +504,7 @@ class TestMigrationRoundTrip:
                 {"now": now},
             )
 
-        command.downgrade(cfg, "0010")
+        command.downgrade(cfg, "0009")
         with engine.connect() as connection:
             rows = connection.execute(
                 text("SELECT id, relation FROM memory_links ORDER BY id")
@@ -560,30 +560,30 @@ class TestPreserve:
             assert file_digest(relative) == digest, relative
 
     def test_pins_updated_and_table_count_unchanged(self):
-        assert schema_pins.MIGRATION_HEAD == "0011"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == "2088c55108ab39a1"
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == schema_pins.schema_columns_digest()
 
     def test_all_repo_pin_tests_green(self):
-        assert schema_pins.MIGRATION_HEAD == "0011"
+        assert schema_pins.MIGRATION_HEAD == "0010"
         stale = []
         current = Path(__file__).resolve()
         for path in (BACKEND_ROOT / "tests").rglob("*.py"):
             if path.resolve() == current:
                 continue
             source = path.read_text(encoding="utf-8")
-            if 'MIGRATION_HEAD == "0010"' in source:
+            if 'MIGRATION_HEAD == "0009"' in source:
                 stale.append(path)
-            if 'MIGRATION_HEAD_PARENT == "0009"' in source:
+            if 'MIGRATION_HEAD_PARENT == "0008"' in source:
                 stale.append(path)
         assert not stale
 
 
 def test_migration_module_metadata():
     migration = _migration_module()
-    assert migration.revision == "0011"
-    assert migration.down_revision == "0010"
+    assert migration.revision == "0010"
+    assert migration.down_revision == "0009"
     assert migration.NEW_RELATIONS == NEW_RELATIONS
     assert migration.LEGACY_RELATIONS == LEGACY_RELATIONS

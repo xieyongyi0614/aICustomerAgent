@@ -41,10 +41,10 @@
 
 | 结论 | 证据 | 置信度 |
 |---|---|---|
-| Schema 唯一真相 = Alembic 迁移链；基线 `0001` + 增量 `0002`~`0011` | `apps/backend/migrations/versions/`；baseline §6.1、ADR-14 | high |
+| Schema 唯一真相 = Alembic 迁移链；基线 `0001` + 增量 `0002`~`0010` | `apps/backend/migrations/versions/`；baseline §6.1、ADR-14 | high |
 | 当前 57 张表 | `app/core/db/` 的 57 个 `__tablename__`；`migrations/versions/0001_squashed_full_schema.py` + 增量 | high |
 | 关系域账本 / 状态 / 快照三分离 | baseline §3.3、§6.1；`relationship_events` / `relationship_state` / `relationship_snapshots` | high |
-| 记忆 7 规范类型 + 六态生命周期 + 1-hop 图谱 | baseline §3.6、§8.2；迁移 `0010` / `0011` | high |
+| 记忆 7 规范类型 + 六态生命周期 + 1-hop 图谱 | baseline §3.6、§8.2；迁移 `0010` | high |
 | 四源摄取：Conversation / ActionRecord / WorldEvent / RelationshipEvent | baseline §3.6；`services/memory/sources.py` | high |
 | 世界读写只经 `world_repository`，异常降级 | baseline §3.2、§2.2 | high |
 | 计划落库只经 `goal_repository` 计划面 | baseline §3.4、§8.6 | high |

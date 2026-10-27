@@ -668,8 +668,9 @@ class TestBoundaries:
             assert file_digest(relative) == PRESERVED_FILE_DIGESTS[relative], relative
 
     def test_no_new_migration_and_pins_unchanged(self):
-        # MEV-009（2026-10-20）：迁移 0011 入链，HEAD/PARENT 推进为 0011/0010。
-        assert schema_pins.MIGRATION_HEAD == "0011"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
+        # MEV-009（2026-10-20，2026-10-27 并入 0010）：`memory_links.relation` 值域扩展随
+        # 合并迁移入链，HEAD/PARENT 为 0010/0009。
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == schema_pins.schema_columns_digest()

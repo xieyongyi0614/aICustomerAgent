@@ -9,7 +9,7 @@ digraph data_domains {
         fontname="Microsoft YaHei",
         fontsize=12,
         labelloc=t,
-        label="数据域与 Source of Truth（57 张表）\n快照 2026-10-23 @ e07669d7 · 证据：baseline §6 + migrations/versions/0001~0011"
+        label="数据域与 Source of Truth（57 张表）\n快照 2026-10-23 @ e07669d7 · 证据：baseline §6 + migrations/versions/0001~0010"
     ];
     node [
         shape=box,

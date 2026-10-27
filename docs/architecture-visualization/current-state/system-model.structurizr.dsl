@@ -20,7 +20,7 @@ workspace "朝夕 AI Companion (AICustomerServiceAgent)" "当前态 C4 模型。
                 workers = component "In-process Workers" "life loop、memory job worker、agent evolution、observability retention、ID 水位刷写。" "asyncio" "Component"
                 core = component "Core Platform" "settings、ORM 模型包、llm_factory、雪花 ID、Redis 客户端。" "Python" "Component"
             }
-            db = container "PostgreSQL 16 + pgvector" "Schema 唯一真相 = Alembic 迁移链；head 0011。" "PostgreSQL" "Database"
+            db = container "PostgreSQL 16 + pgvector" "Schema 唯一真相 = Alembic 迁移链；head 0010。" "PostgreSQL" "Database"
             redis = container "Redis 7" "验证码、OAuth state、雪花 ID 高水位等短生命状态。" "Redis" "Database"
             artifacts = container "发布制品存储" "APK 制品与更新说明；本地卷 /srv/backend/releases。" "Filesystem" "Storage"
         }

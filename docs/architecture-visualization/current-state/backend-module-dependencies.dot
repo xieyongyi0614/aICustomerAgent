@@ -85,7 +85,7 @@ digraph backend_module_dependencies {
         core [label="Core Platform\nsettings · ORM 模型包\nllm_factory · ids · redis client", fillcolor="#F1F5F9"];
     }
 
-    db [label="PostgreSQL 16 + pgvector\n57 张表 · Alembic head 0011", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
+    db [label="PostgreSQL 16 + pgvector\n57 张表 · Alembic head 0010", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
     redis [label="Redis 7\n验证码 / OAuth state / ID 水位", shape=cylinder, fillcolor="#DBEAFE", color="#1D4ED8"];
     llm [label="LLM Providers\nOpenAI-compatible", shape=box, style="rounded,filled", fillcolor="#E2E8F0", color="#64748B"];
     external [label="SMTP / Open-Meteo / ext.api.*\n外部服务", shape=box, style="rounded,filled", fillcolor="#E2E8F0", color="#64748B"];

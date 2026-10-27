@@ -1,8 +1,8 @@
 """MEV-005 分层列与回填：映射 / 回填幂等 / schema 一致性 / 写入不变量。
 
 契约：`docs/version/v6.0.0/tasks/MEV-005.md` §4.1（迁移与模型契约、层映射、写入路径赋值）。
-合并说明：迁移 `0010_memory_layer_and_enums.py` 同时承载词表收窄、事件源收窄与 `memories.layer`
-（用户裁决 2026-10-16：同版本未应用迁移不再逐域拆分）。
+合并说明：迁移 `0010_memory_layer_and_enums.py` 同时承载词表收窄、事件源收窄、`memories.layer`
+与 `memory_links.relation` 值域扩展（用户裁决 2026-10-16 / 2026-10-27：同版本未应用迁移不再逐域拆分）。
 """
 
 from __future__ import annotations
@@ -177,9 +177,10 @@ class TestMigrationFile:
     def test_pins_follow_the_merged_migration(self):
         from tests.support import schema_pins
 
-        # MEV-009（2026-10-20）：迁移 0011 入链，HEAD/PARENT 推进为 0011/0010。
-        assert schema_pins.MIGRATION_HEAD == "0011"
-        assert schema_pins.MIGRATION_HEAD_PARENT == "0010"
+        # MEV-009（2026-10-20，2026-10-27 并入 0010）：`memory_links.relation` 值域扩展随
+        # 合并迁移入链，HEAD/PARENT 为 0010/0009。
+        assert schema_pins.MIGRATION_HEAD == "0010"
+        assert schema_pins.MIGRATION_HEAD_PARENT == "0009"
         assert schema_pins.SCHEMA_TABLE_COUNT == 57
         assert schema_pins.SCHEMA_COLUMNS_DIGEST == schema_pins.schema_columns_digest()
 
