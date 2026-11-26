@@ -4,6 +4,38 @@
 
 技术栈：Flutter + Riverpod 3 + GoRouter + Dio + Freezed + Drift(SQLite) + Flutter Hooks，Material 3 仅作交互底座、视觉由自研设计系统接管。
 
+## 界面效果
+
+图片来源：**Android 模拟器（Medium Phone API 36）上 release 包实机运行截图**，数据来自本地后端真实写入（2026-11-26）；只覆盖已实现页面，未实现的模块不在此展示。
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/login.png" width="150" /><br /><sub>登录 · 邮箱入口</sub></td>
+    <td align="center"><img src="docs/screenshots/verify.png" width="150" /><br /><sub>验证码 · 六位输入</sub></td>
+    <td align="center"><img src="docs/screenshots/home.png" width="150" /><br /><sub>首页 · 今日任务与 AI 总结</sub></td>
+    <td align="center"><img src="docs/screenshots/chat.png" width="150" /><br /><sub>对话 · 流式回复与连续记忆</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/life.png" width="150" /><br /><sub>生活 · 模块宫格与生活小结</sub></td>
+    <td align="center"><img src="docs/screenshots/briefing.png" width="150" /><br /><sub>早间简报 · 天气 / 任务 / 车辆 / 消费</sub></td>
+    <td align="center"><img src="docs/screenshots/ledger.png" width="150" /><br /><sub>账本 · 月度汇总与待确认</sub></td>
+    <td align="center"><img src="docs/screenshots/ledger-add.png" width="150" /><br /><sub>记一笔 · 金额键盘 + 分类</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/ledger-auto.png" width="150" /><br /><sub>同步与 AI 规则</sub></td>
+    <td align="center"><img src="docs/screenshots/schedule.png" width="150" /><br /><sub>日程 · AI 排法与待办</sub></td>
+    <td align="center"><img src="docs/screenshots/memo.png" width="150" /><br /><sub>备忘录 · AI 归类</sub></td>
+    <td align="center"><img src="docs/screenshots/memory.png" width="150" /><br /><sub>记忆 · 可查可改可忘</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/car.png" width="150" /><br /><sub>车辆 · 电车状态与养车支出</sub></td>
+    <td align="center"><img src="docs/screenshots/car-add.png" width="150" /><br /><sub>养车记一笔</sub></td>
+    <td align="center"><img src="docs/screenshots/car-profile.png" width="150" /><br /><sub>车辆档案 · 保险 / 年检 / 保养</sub></td>
+    <td align="center"><img src="docs/screenshots/profile.png" width="150" /><br /><sub>我的 · 人格模式与主动关怀</sub></td>
+    <td align="center"><img src="docs/screenshots/profile-privacy.png" width="150" /><br /><sub>隐私 · 导出与一键清空</sub></td>
+  </tr>
+</table>
+
 ## 环境要求
 
 - **Flutter ≥ 3.44.0（含 Dart ≥ 3.13.4）** —— 由 `pubspec.yaml` 与 `pubspec.lock` 的 SDK 约束决定。先 `flutter --version` 核对；版本过低会在 `pub get` 时直接报 `version solving failed`。
@@ -165,13 +197,14 @@ lib/
 ├── design_system/     # tokens（色/字/距/径/影/动效/Lucide 图标）、components、orb（AI 核心球）
 └── features/          # 按域垂直切分：data / domain / presentation
     ├── home/          #   首页聚合
-    ├── life/          #   生活记录与随手记
-    ├── ledger/        #   账本
-    ├── chat/          #   流式对话（NDJSON 增量渲染 + 本地历史缓存投影）
+    ├── life/          #   生活工具箱（含备忘录 / 日程页）
+    ├── ledger/        #   账本（记账四步 / 同步与 AI 规则）
+    ├── chat/          #   流式对话（NDJSON 增量渲染 + 本地历史缓存投影）+ 对话记账台账
+    ├── car/           #   车辆（用车 / 养车记一笔 / 车辆档案）
+    ├── album/         #   相册（仅本地：相簿 / 批量管理 / 单张 / AI 整理建议）
     ├── memory/        #   长期记忆
-    ├── health/        #   健康（含授权同意流）
     ├── briefing/      #   早/晚简报
-    └── profile/       #   我的（登录 / 隐私与数据导出删除）
+    └── profile/       #   我的（登录 / 邮箱验证码 / 隐私 / 关于）
 ```
 
 ## 路由与页面
@@ -181,10 +214,14 @@ GoRouter 全量路由（壳层 Tab 5 位：首页 / 动态 / 对话 / 生活 / �
 | 路由 | 页面 |
 |---|---|
 | `/home` · `/dynamic` · `/chat` · `/life` · `/profile` | 主 Tab 五页（`/dynamic` 是可变「动态」位，默认渲染记账；在生活页拖动模块卡重排，宫格第一格即改设） |
+| `/login` · `/verify` | 登录（邮箱验证码）/ 验证码输入 |
 | `/chat/ledger?conversationId=` | 对话记账台账 |
-| `/ledger` | 账本页 |
-| `/briefing?form=morning\|evening` | 早/晚简报（通知点开直达） |
-| `/health` · `/health/consent` | 健康页 / 健康授权同意 |
+| `/ledger` · `/ledger/add` · `/ledger/auto` | 账本 / 记一笔 / 同步与 AI 规则 |
+| `/memo` · `/schedule` | 备忘录 / 日程 |
+| `/car` · `/car/add?kind=` · `/car/profile` | 车辆 / 养车记一笔 / 车辆档案 |
+| `/album` · `/album/manage` · `/album/detail` · `/album/photo` · `/album/ai` | 相册 / 批量管理 / 相簿详情 / 单张照片 / AI 整理建议 |
+| `/briefing?type=morning\|evening` | 早/晚简报（通知点开直达） |
+| `/memory` | 记忆（已降级为「我的」子页，不再是底部主 Tab） |
 | `/profile/privacy` | 隐私（数据导出与删除） |
 | `/profile/about` | 关于（版本真值 / 检查更新 / 仅 Wi-Fi 下载；skill 登记 `B20 #about`） |
 
@@ -193,20 +230,23 @@ GoRouter 全量路由（壳层 Tab 5 位：首页 / 动态 / 对话 / 生活 / �
 | 端点 | 用途 |
 |---|---|
 | `POST /auth/email/code` · `POST /auth/email/verify` | 邮箱验证码登录（发码 / 验码换长期令牌） |
-| `GET /home/summary` | 首页聚合（今日事项 / 花销 / 健康） |
-| `POST /chat/message` | 流式对话（NDJSON 事件流，Freezed union 建模 + 增量 Markdown 渲染） |
-| `GET /ledger/summary` · `GET/POST /ledger/entries` | 账本汇总与条目（记账四步） |
-| `GET /memory/items` · `POST /memory/items/{id}/forget` | 长期记忆查询与遗忘 |
-| `GET /life/data` · `GET /life/export` · `DELETE /life/data` | 生活数据读取 / 导出 / 删除（隐私页） |
-| `GET /brief/{form}` · `GET/PUT /brief/prefs/me` | 早/晚简报内容与偏好 |
-| `GET /health/score` · `POST /health/sync` | 健康分与数据同步 |
+| `GET /auth/bindings` · `POST /auth/feishu/authorize` · `POST /auth/feishu/bind` · `POST /auth/feishu/bind/claim` · `POST /auth/feishu/login/claim` | 第三方身份绑定（飞书授权 / 绑定 / 领取） |
+| `GET /home/summary` | 首页聚合（今日事项 / 花销 / 简报入口） |
+| `POST /chat/message` · `GET /conversations/latest` · `GET /conversations/{id}/messages` | 流式对话（NDJSON 事件流，Freezed union 建模 + 增量 Markdown 渲染）与会话历史 |
+| `GET /ledger/summary` · `GET/POST /ledger/entries` · `GET /ledger/pending` · `POST /ledger/pending/{key}/confirm\|ignore` | 账本汇总 / 条目 / 待确认账单确认或忽略 |
+| `GET /ledger/categories` · `GET/POST /ledger/rules` · `GET /ledger/auto-summary` · `POST /ledger/classify-preview` | 分类、AI 学会的规则、自动记账摘要与分类预览 |
+| `GET /car/overview` · `GET/POST /car/entries` · `GET/PUT /car/profile` · `GET /car/services` | 车辆概览 / 用车养车条目 / 车辆档案 / 保养服务 |
+| `GET/POST /tasks` · `DELETE /tasks/{id}` · `POST /tasks/{id}/complete` | 任务（备忘录与日程共用的待办数据面） |
+| `GET /memory/items` · `PATCH /memory/items/{id}` · `POST /memory/items/{id}/forget` | 长期记忆查询 / 修正 / 遗忘 |
+| `GET /briefing` · `GET/PUT /briefing/preferences` | 早/晚简报内容与偏好 |
+| `GET /life/export` · `DELETE /life/data` | 隐私页数据导出 / 清除 |
 | `GET /app-release/latest` | 检查更新（`platform` / `channel` / `version_code`；无更新返回 `200 + has_update:false`） |
 | `GET /app-release/artifacts/{id}/download` | 制品下载（支持 `Range` 断点续传；不鉴权——冷启动路径不可依赖 token） |
 
 ## 测试
 
 ```bash
-flutter test                    # 单元 + widget + golden（18 个测试文件）
+flutter test                    # 单元 + widget + golden（50 个测试文件）
 flutter test integration_test   # 冒烟（app_smoke_test）
 ```
 
