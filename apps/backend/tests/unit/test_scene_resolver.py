@@ -1,5 +1,6 @@
+from app.core import timeutil
 from app.models.scene import PendingAction, SceneState
-from app.services import scene_service
+from app.services.conversation import scene as scene_service
 
 
 def _state(pending=None):
@@ -91,7 +92,7 @@ def _stale_state(pending=None, hours_ago=30.0):
         location="厨房",
         current_activity="煮面",
         pending_action=pending,
-        last_active_at=datetime.now() - timedelta(hours=hours_ago),
+        last_active_at=timeutil.now() - timedelta(hours=hours_ago),
     )
 
 
@@ -110,14 +111,6 @@ def test_recent_activity_keeps_scene_alive():
     new_state, directive = scene_service.resolve("continue_scene", state, 4)
     assert new_state.pending_action.status == "pending"
     assert new_state.current_activity == "煮面"
-    assert directive is not None and "先完成待完成动作" in directive
-
-
-def test_idle_reset_disabled_keeps_scene_alive(override_settings):
-    override_settings(scene_idle_reset_enabled=False)
-    state = _stale_state(PendingAction(action="煮面", created_at_turn=1))
-    new_state, directive = scene_service.resolve("continue_scene", state, 4)
-    assert new_state.pending_action.status == "pending"
     assert directive is not None and "先完成待完成动作" in directive
 
 

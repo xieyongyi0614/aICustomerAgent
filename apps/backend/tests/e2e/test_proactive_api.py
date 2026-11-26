@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.main import app
 from app.models.autonomy import ProactiveAction
 from app.repositories import proactive_repository
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 
 
 def _action(**overrides) -> ProactiveAction:
@@ -41,12 +42,7 @@ def test_pending_empty_by_default(db_session_factory):
 def test_pending_lists_delivered_and_ack_transitions(
     db_session_factory, monkeypatch
 ):
-    class _SimClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return NOW + timedelta(minutes=1)
-
-    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW + timedelta(minutes=1))
     proactive_repository.enqueue(_action())
     proactive_repository.transition("api-a1", "approved", now=NOW)
     proactive_repository.transition(

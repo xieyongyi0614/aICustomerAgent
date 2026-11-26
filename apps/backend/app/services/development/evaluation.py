@@ -12,6 +12,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import (
     DevelopmentChangeRow,
     DevelopmentStateRow,
@@ -22,14 +23,14 @@ from app.core.settings import get_settings
 from app.services.development import aggregate
 from app.services.development import audit as development_audit
 from app.services.development import policy as development_policy
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     DevelopmentChangeRef,
     DevelopmentSlice,
     DevelopmentStateRef,
 )
 from app.core.db import Memory, ReflectionRunRow, EvidenceLinkRow
 from app.models.memory import MemoryCandidate, MemoryExtraction
-from app.services.memory2 import evaluator as memory_evaluator, ingest as memory_ingest
+from app.services.memory import evaluator as memory_evaluator, ingest as memory_ingest
 from app.services.reflection import (
     lifecycle as reflection_lifecycle,
     reflector as reflection_reflector,
@@ -62,9 +63,7 @@ STATEMENT_PREFERENCE = "用户偏好简短的回复"
 
 
 def collect_slice(user_id: str) -> DevelopmentSlice | None:
-    """EvaluationContext 只读切片：Flag OFF 或无任何行 → None。"""
-    if not get_settings().v2_development_enabled:
-        return None
+    """EvaluationContext 只读切片：无任何行 → None。"""
     with SessionLocal() as session:
         states = (
             session.query(DevelopmentStateRow)
@@ -118,7 +117,7 @@ def collect_slice(user_id: str) -> DevelopmentSlice | None:
 
 def run_scenarios(session_factory, now=None) -> list[dict]:
     """注入式场景 runner：调用方负责 SessionLocal 环境与确定性数据（0 LLM）。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     return [
         _run_compile_idempotent(session_factory, now),
         _run_cap_saturation(session_factory, now),
@@ -146,7 +145,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
             "pass": bool(total) and score >= spec["threshold"],
         }
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": timeutil.now().isoformat(timespec="seconds"),
         "metrics": metrics,
         "gate_passed": all(m["pass"] for m in metrics.values()),
         "failed_scenarios": [
@@ -158,9 +157,7 @@ def compute_metrics(scenario_results: list[dict]) -> dict:
 
 
 def build_db_report() -> dict:
-    """只读 DB 统计（offline_evaluator development 小节引用；Flag OFF 为空）。"""
-    if not get_settings().v2_development_enabled:
-        return {}
+    """只读 DB 统计（offline_evaluator development 小节引用）。"""
     with SessionLocal() as session:
         states = session.query(DevelopmentStateRow).all()
         changes = session.query(DevelopmentChangeRow).all()
@@ -272,7 +269,7 @@ def _run_cap_saturation(session_factory, now) -> dict:
     user_id = f"eval-{scenario_id}"
     failures: list[str] = []
     settings = get_settings()
-    cap = settings.v2_development_preference_max_token_delta
+    cap = settings.development_preference_max_token_delta
     for index in range(10):
         _seed_insight(
             session_factory,
@@ -458,22 +455,14 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
     → 反思强化（confidence 提升）→ 调制演进；周期 3：用户反驳 → 失效 → 回退基线。
     每周期执行归因链审计（memory→evidence→insight→changes→state）。
     """
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     user_id = user_id or f"eval-{SCENARIO_GROWTH_LOOP}"
     settings = get_settings()
     failures: list[str] = []
     stats: dict = {"insight_ids": [], "state_keys": [], "cycles": 0}
 
-    if not settings.v2_memory_enabled:
-        stats["stopped_at"] = "memory"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
-
     _seed_cluster(session_factory, user_id, PRESSURE_CONTENTS, now)
     stats["cycles"] = 1
-
-    if not settings.v2_reflection_enabled:
-        stats["stopped_at"] = "reflection"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
 
     insight1 = _grow_reflect_once(
         session_factory, user_id, now, INSIGHT_STATEMENT_CYCLE1
@@ -483,10 +472,6 @@ def run_growth_loop(session_factory, now=None, user_id=None) -> dict:
         return _result(SCENARIO_GROWTH_LOOP, failures, stats)
     stats["insight_ids"].append(insight1)
     stats["cycles"] = 2
-
-    if not settings.v2_development_enabled:
-        stats["stopped_at"] = "development"
-        return _result(SCENARIO_GROWTH_LOOP, failures, stats)
 
     if not _grow_compile(session_factory, user_id, insight1):
         failures.append("周期 1 调制未生效")

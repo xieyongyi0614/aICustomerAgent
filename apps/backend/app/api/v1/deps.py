@@ -2,7 +2,13 @@ from fastapi import HTTPException, Request, status
 
 from app.api.v1.schemas import ChatRequest
 from app.core.llm_factory import get_llm
-from app.core.settings import SettingsError
+from app.core.settings import SettingsError, get_settings
+
+
+def debug_surface_gate() -> None:
+    """调试台面门禁：`DEBUG_SURFACE_ENFORCED=true` 时统一 404（防端点探测）。"""
+    if get_settings().debug_surface_enforced:
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 def get_chat_llm(body: ChatRequest, request: Request):

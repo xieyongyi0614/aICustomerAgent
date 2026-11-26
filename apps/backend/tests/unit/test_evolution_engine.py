@@ -3,8 +3,8 @@
 from datetime import datetime
 
 from app.models.relationship import InteractionSignal, RelationshipDelta, RelationshipState
-from app.services import relationship_evolution as revo
-from app.services import relationship_signal as rs
+from app.engines import relationship_evolution as revo
+from app.engines import relationship_signal as rs
 
 
 def _state(**overrides) -> RelationshipState:
@@ -74,15 +74,6 @@ def test_d5_salience_modulation():
     high = revo.apply_dynamics(base, _state(trust=0.0), {}, _signal(salience=0.9))[0]
     assert abs(low.trust - 0.04) < 1e-9
     assert abs(high.trust - 0.056) < 1e-9
-
-
-def test_dynamics_disabled_returns_base():
-    base = RelationshipDelta(trust=0.02)
-    dynamics, flags = revo.apply_dynamics(
-        base, _state(), {("gratitude", "positive"): 3}, _signal(), enabled=False
-    )
-    assert flags == {}
-    assert dynamics.trust == 0.02
 
 
 def test_rate_limit_turn_cap():

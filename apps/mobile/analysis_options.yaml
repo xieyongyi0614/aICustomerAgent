@@ -1,0 +1,27 @@
+# APP-001 lint 基线：flutter_lints + 本项目纪律
+# Flutter Hooks 边界（代码评审清单，不引入额外 lint 包）：
+#   允许：useAnimationController / useTextEditingController / useDebounce / useMemoized
+#   禁止：useState 存业务状态、useEffect 拉数据、与 StatefulWidget 混用
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+  errors:
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    avoid_print: true
+    prefer_single_quotes: true
+    always_declare_return_types: true
+    avoid_dynamic_calls: true
+    prefer_final_locals: true
+    unawaited_futures: true
+    # 550/650/750 在 Flutter 无对应 FontWeight 常量；散落色值由 test/scaffold 静态断言拦截

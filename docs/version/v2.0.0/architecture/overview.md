@@ -1,6 +1,6 @@
 # v2.0.0 Architecture Overview
 
-> 原则继承自 v1.0.0 backend-refactor：application 编排层最薄、规则做厚、LLM 边界干净、「读取进链、写入出链」、单一真相源可重放。
+> 原则继承自 v1.0.0：application 编排层最薄、规则做厚、LLM 边界干净、「读取进链、写入出链」、单一真相源可重放。
 
 ## 1. 分层视图
 

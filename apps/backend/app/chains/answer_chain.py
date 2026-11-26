@@ -4,6 +4,7 @@ from typing import AsyncIterator
 
 from langchain_core.runnables import Runnable
 
+from app.core import timeutil
 from app.core.llm_factory import get_llm
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
@@ -29,10 +30,19 @@ def build_chain(
     prompt=None,
     world_ctx=None,
     action_ctx=None,
+    style_ctx=None,
 ) -> Runnable:
     if prompt is None:
         prompt = PromptBuilder.build(
-            mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
+            mode,
+            state,
+            analysis,
+            scene_ctx,
+            goal_ctx,
+            behavior_ctx,
+            world_ctx,
+            action_ctx,
+            style_ctx,
         )
     model = llm if llm is not None else get_llm()
     return prompt | model.bind(max_tokens=answer_max_tokens(state))
@@ -48,7 +58,7 @@ def answer_max_tokens(state: ConversationState) -> int:
     delta = overlay.style.max_tokens_delta
     if delta >= 0:
         return base
-    floor = min(base, settings.v2_development_answer_min_tokens)
+    floor = min(base, settings.development_answer_min_tokens)
     return max(floor, base + delta)
 
 
@@ -80,11 +90,12 @@ async def astream(
     behavior_ctx=None,
     world_ctx=None,
     action_ctx=None,
+    style_ctx=None,
 ) -> AsyncIterator[str]:
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
     prompt = PromptBuilder.build(
-        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx
+        mode, state, analysis, scene_ctx, goal_ctx, behavior_ctx, world_ctx, action_ctx, style_ctx
     )
     chain = build_chain(
         mode, state, analysis, llm, scene_ctx, goal_ctx, behavior_ctx, prompt=prompt, action_ctx=action_ctx
@@ -102,13 +113,10 @@ async def astream(
             section_budget=prompt_capture.section_budget_from_messages(formatted),
         )
 
-    capture = get_settings().observability_persist_enabled
-    handler = UsageCallbackHandler() if capture else None
+    handler = UsageCallbackHandler()
     first_token_ms = None
     try:
-        async for chunk in chain.astream(
-            {}, config={"callbacks": [handler]} if capture else None
-        ):
+        async for chunk in chain.astream({}, config={"callbacks": [handler]}):
             usage = getattr(chunk, "usage_metadata", None)
             if usage and trace is not None:
                 trace.add_token_usage(
@@ -123,13 +131,11 @@ async def astream(
                     first_token_ms = (time.perf_counter() - started) * 1000
                 yield text
     except Exception as exc:
-        if capture:
-            _record_answer_call(
-                llm, trace, handler, started, started_at, first_token_ms,
-                LLM_CALL_ERROR, exc.__class__.__name__,
-            )
-        raise
-    if capture:
         _record_answer_call(
-            llm, trace, handler, started, started_at, first_token_ms, LLM_CALL_OK, None
+            llm, trace, handler, started, started_at, first_token_ms,
+            LLM_CALL_ERROR, exc.__class__.__name__,
         )
+        raise
+    _record_answer_call(
+        llm, trace, handler, started, started_at, first_token_ms, LLM_CALL_OK, None
+    )

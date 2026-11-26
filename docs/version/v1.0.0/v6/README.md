@@ -1,6 +1,6 @@
 # Roleplay V6：Character Goal & Intention
 
-> 状态：**设计完成，待实现**。任务入口 `tasks.md`。前置：V1~V5 + Backend Refactor 全部完成。
+> 状态：**设计完成，待实现**。任务入口 `tasks.md`。前置：V1~V5 全部完成。
 
 ## 1. V6 解决什么问题
 

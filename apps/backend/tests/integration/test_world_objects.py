@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import world_engine
 from app.models.world import ObjectStatus
 
@@ -60,7 +61,7 @@ def test_consume_to_zero_destroys(db_session_factory):
 def test_expiry_time_evolution_idempotent(db_session_factory):
     object_id = _seed()
     world_engine.apply_object_action("default-user", object_id, "cut")
-    now = datetime(2026, 9, 1, 13, 0)
+    now = timeutil.ensure_aware(datetime(2026, 9, 1, 13, 0))
     assert world_engine.expire_due_objects("default-user", now=now) == 1
     obj = world_engine.find_object_by_name("default-user", "西瓜")
     assert obj.state == "expired"
@@ -69,7 +70,7 @@ def test_expiry_time_evolution_idempotent(db_session_factory):
 
 def test_expiry_not_yet_due_untouched(db_session_factory):
     object_id = _seed()
-    early = datetime(2026, 8, 31, 12, 0)
+    early = timeutil.ensure_aware(datetime(2026, 8, 31, 12, 0))
     assert world_engine.expire_due_objects("default-user", now=early) == 0
     obj = world_engine.find_object_by_name("default-user", "西瓜")
     assert obj.state == "whole"
@@ -92,4 +93,4 @@ def test_last_action_audit_trail(db_session_factory):
     created_at = world_engine.find_object_by_name("default-user", "西瓜").last_action_at
     cut = world_engine.apply_object_action("default-user", object_id, "cut")
     assert cut.last_action_at >= created_at
-    assert cut.last_action_at <= datetime.now() + timedelta(seconds=1)
+    assert cut.last_action_at <= timeutil.now() + timedelta(seconds=1)

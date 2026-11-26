@@ -1,22 +1,20 @@
-"""V8 debug world 端点：全量状态、手动播种、环境、位置、快照。"""
+"""V8 debug world 端点：全量状态、手动建档、环境、位置、快照。"""
 
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from app.character.asuna.world import DEFAULT_HOUSEHOLD
 from app.main import app
 
 
 @pytest.mark.asyncio
 async def test_debug_world_endpoints(db_session_factory):
-    seed_names = {o["name"] for o in DEFAULT_HOUSEHOLD["objects"]}
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         state = await client.get("/api/v1/debug/world")
         assert state.status_code == 200
         body = state.json()
         assert body["world"]["current_location"] == "home.living_room"
-        assert {o["name"] for o in body["entities"]} == seed_names
+        assert {o["name"] for o in body["entities"]} == set()
 
         created = await client.post(
             "/api/v1/debug/world/entities",
@@ -49,4 +47,4 @@ async def test_debug_world_endpoints(db_session_factory):
 
         state = await client.get("/api/v1/debug/world")
         assert state.json()["world"]["current_location"] == "home.kitchen"
-        assert {o["name"] for o in state.json()["entities"]} == seed_names | {"西瓜"}
+        assert {o["name"] for o in state.json()["entities"]} == {"西瓜"}

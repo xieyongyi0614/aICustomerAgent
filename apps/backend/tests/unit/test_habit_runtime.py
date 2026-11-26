@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.services import habit_runtime
-from app.services.behavior_engine import match_habits
-from app.services.habit_runtime import derive_habit_candidates, load_effective_habits
+from app.engines import habit as habit_runtime
+from app.engines.behavior import match_habits
+from app.engines.habit import derive_habit_candidates, load_effective_habits
 
 
 class _Event:
@@ -23,11 +23,6 @@ def test_derive_candidates_at_threshold():
     candidates = derive_habit_candidates(events)
     assert [c.id for c in candidates] == ["auto_conflict_cool_down"]
     assert candidates[0].id.startswith("auto_")
-
-
-def test_derive_ignores_memory_replay_events():
-    events = [_Event("conflict"), _Event("conflict", source="memory_replay")]
-    assert derive_habit_candidates(events) == []
 
 
 def test_effective_habits_default_is_asset_only():

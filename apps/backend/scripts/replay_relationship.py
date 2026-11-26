@@ -7,7 +7,7 @@
 import argparse
 import json
 
-from app.services import relationship_audit
+from app.services.relationship import audit as relationship_audit
 
 
 def main() -> None:

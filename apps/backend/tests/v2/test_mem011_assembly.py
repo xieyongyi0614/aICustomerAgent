@@ -5,12 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.context_builder import _select_retrieval_segment, _working_window
-from app.services.memory2 import lifecycle, retriever
-from app.services.memory2.retriever import RankedMemories, RankedMemory
+from app.services.conversation.context import _select_retrieval_segment, _working_window
+from app.services.memory import lifecycle, retriever
+from app.services.memory.retriever import RankedMemories, RankedMemory
 
 
 @pytest.fixture
@@ -22,7 +23,6 @@ def asm_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (memory_repository, retriever, lifecycle):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -36,7 +36,7 @@ def _clean_buffer():
 
 
 def _memory(id, content, importance=0.7, last_accessed_at=None, user_id="u1"):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             memory_repository.Memory(
@@ -57,7 +57,7 @@ def _memory(id, content, importance=0.7, last_accessed_at=None, user_id="u1"):
 
 
 def _ranked(*contents, importance=0.7):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     items = []
     for index, content in enumerate(contents):
         memory = memory_repository.UserMemory(
@@ -82,7 +82,7 @@ class _Message:
 
 class TestRetrievalBudget:
     def test_within_budget_all_selected(self, asm_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_retrieval_budget", 800)
+        monkeypatch.setattr(get_settings(), "memory_retrieval_budget", 800)
         ranked = _ranked("短记忆一", "短记忆二", "短记忆三")
         selected, used, dropped = _select_retrieval_segment(ranked)
         assert len(selected) == 3
@@ -90,8 +90,8 @@ class TestRetrievalBudget:
         assert dropped == 0
 
     def test_over_budget_truncated_by_freshness(self, asm_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_retrieval_budget", 15)
-        now = datetime.datetime.now()
+        monkeypatch.setattr(get_settings(), "memory_retrieval_budget", 15)
+        now = timeutil.now()
         stale = now - datetime.timedelta(days=10)
         _memory("m-fresh", "新鲜的长记忆内容排在前面", last_accessed_at=now)
         _memory("m-stale", "陈旧的短记忆", last_accessed_at=stale)
@@ -104,8 +104,8 @@ class TestRetrievalBudget:
         assert [m.id for m in selected] == ["m-fresh"]
         assert dropped == 1
     def test_freshness_ordering_beats_score_order(self, asm_db):
-        now = datetime.datetime.now()
-        old = datetime.datetime.now() - datetime.timedelta(days=5)
+        now = timeutil.now()
+        old = timeutil.now() - datetime.timedelta(days=5)
         high_score_old = memory_repository.UserMemory(
             id="m-old", user_id="u1", character_id="asuna", type="user_fact",
             content="高分但旧", importance=0.9, created_at=now, updated_at=now,
@@ -146,9 +146,8 @@ class TestWorkingWindow:
 class TestAssembleTrace:
     def test_trace_records_budget_usage(self, asm_db, monkeypatch):
         from app.models.conversation import ChatMessage
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         _memory("m1", "用户喜欢吃西瓜")
 
         class _Step:
@@ -201,10 +200,10 @@ class TestAssembleTrace:
         trace = _TraceSpy()
         result = asyncio.run(context_builder.build("s1", "u1", "查询", trace=trace))
         assert [m.id for m in result.memories] == ["m1"]
-        steps = [s for s in trace.records if s.name == "context_assemble_v2"]
+        steps = [s for s in trace.records if s.name == "context_assemble"]
         assert len(steps) == 1
         extra = steps[0].extra
         assert extra["retrieval_selected"] == 1
-        assert extra["retrieval_budget"] == get_settings().v2_memory_retrieval_budget
+        assert extra["retrieval_budget"] == get_settings().memory_retrieval_budget
         assert extra["working_messages"] == 4
         assert extra["retrieval_dropped"] == 0

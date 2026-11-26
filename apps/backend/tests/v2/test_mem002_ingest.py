@@ -5,10 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, MemoryCandidateRow
 from app.models.memory import MemoryCandidate, MemoryExtraction
-from app.services.memory2 import ingest
-from app.services.memory2.ingest import (
+from app.services.memory import ingest
+from app.services.memory.ingest import (
     VISIBILITY_HYPOTHETICAL,
     VISIBILITY_PRIVATE,
     classify_conversation_visibility,
@@ -109,7 +110,7 @@ class TestVocabPrefilter:
 
 class TestCreateCandidate:
     def test_assembles_fields(self, ingest_db):
-        row = ingest._create_candidate(
+        row = ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="记住用户生日在五月", proposed_type="user_fact",
@@ -120,13 +121,13 @@ class TestCreateCandidate:
         assert row.source_ref == {"table": "action_records", "id": "a1"}
 
     def test_idempotent_same_source_returns_existing(self, ingest_db):
-        ingest._create_candidate(
+        ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="内容A", proposed_type="user_fact",
             source_kind="user_derived", salience_init=0.6,
         )
-        second = ingest._create_candidate(
+        second = ingest.create_candidate(
             user_id="u1", character_id="asuna",
             source_table="action_records", source_id="a1",
             content="内容B", proposed_type="user_fact",
@@ -138,6 +139,16 @@ class TestCreateCandidate:
                 source_table="action_records", source_id="a1"
             ).count()
         assert count == 1
+
+    def test_normalizes_legacy_type_at_entry(self, ingest_db):
+        """入口归一（2026-10-16，MEV-015）：遗留名不落候选表，直接落规范类型。"""
+        row = ingest.create_candidate(
+            user_id="u1", character_id="asuna",
+            source_table="action_records", source_id="a9",
+            content="用户帮我修过电脑", proposed_type="relationship_event",
+            source_kind="user_derived", salience_init=0.6,
+        )
+        assert row.proposed_type == "relationship_fact"
 
 
 class TestIngestFromConversation:
@@ -223,12 +234,27 @@ class TestIngestFromWorldEvent:
             id="w1", status="completed", title="面试通过",
             importance="high", user_id="u1",
         )
+        event.completed_at = datetime.datetime(2026, 9, 29, 12, 0)
         row = ingest.ingest_from_world_event(event, user_id="u1")
         assert row is not None
         assert row.source_table == "world_events"
-        assert row.content == "面试通过"
-        assert row.proposed_type == "important_event"
+        assert row.content == "用户在09月29日完成了面试通过"
+        assert row.proposed_type == "experience"
         assert row.salience == 0.8
+
+    def test_content_matches_world_bridge_format(self, ingest_db):
+        """两通道内容必须逐字一致，否则富描述会被裸标题顶掉（台账 §5.2.1）。"""
+
+        from app.services.world import memory_bridge as world_memory_bridge
+
+        event = _world_event(
+            id="w3", status="completed", title="面试通过",
+            importance="high", user_id="u1",
+        )
+        event.completed_at = datetime.datetime(2026, 9, 29, 12, 0)
+        row = ingest.ingest_from_world_event(event, user_id="u1")
+        expected = world_memory_bridge.to_memory_candidates(event)[0]["content"]
+        assert row.content == expected
 
     def test_non_completed_skipped(self, ingest_db):
         event = _world_event(
@@ -243,7 +269,7 @@ class TestIngestFromRelationshipEvent:
         row = ingest.ingest_from_relationship_event(event)
         assert row is not None
         assert row.source_table == "relationship_events"
-        assert row.proposed_type == "relationship_event"
+        assert row.proposed_type == "relationship_fact"
 
     def test_idempotent(self, ingest_db):
         event = _relationship_event(id="r1", user_id="u1", type="praise")
@@ -261,7 +287,7 @@ def _action_record(id, action_type, status, params=None):
 
     return ActionRecord(
         id=id, user_id="u1", character_id="asuna", action_type=action_type,
-        params=params or {}, status=status, created_at=datetime.datetime.now(),
+        params=params or {}, status=status, created_at=timeutil.now(),
     )
 
 
@@ -271,7 +297,7 @@ def _world_event(id, status, title, importance, user_id):
     return WorldEvent(
         id=id, world_id=f"home:{user_id}", type="reminder",
         title=title, importance=importance, status=status,
-        created_at=datetime.datetime.now(), updated_at=datetime.datetime.now(),
+        created_at=timeutil.now(), updated_at=timeutil.now(),
     )
 
 
@@ -284,5 +310,5 @@ def _relationship_event(id, user_id, type, cause=""):
         impact=RelationshipDelta(intimacy=0.03, trust=0.02, familiarity=0.01,
                                  tension=-0.01, respect=0.0, comfort=0.0),
         confidence=0.9, source="conversation", cause=cause,
-        created_at=datetime.datetime.now(),
+        created_at=timeutil.now(),
     )

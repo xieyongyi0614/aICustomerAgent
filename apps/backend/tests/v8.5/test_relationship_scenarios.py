@@ -15,9 +15,9 @@ from app.models.relationship import (
     RelationshipEvent,
     RelationshipState,
 )
-from app.services import relationship_conflict as rconf
-from app.services import relationship_evolution as revo
-from app.services.autonomy_policy import PolicySnapshot, _apply_relationship_rules
+from app.engines import relationship_conflict as rconf
+from app.engines import relationship_evolution as revo
+from app.engines.autonomy import PolicySnapshot, _apply_relationship_rules
 from app.core.settings import get_settings
 
 START = datetime(2026, 8, 1, 12, 0, 0)

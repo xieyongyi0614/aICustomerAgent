@@ -4,9 +4,9 @@
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.db import PromptSnapshotRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import CallSite, PromptSnapshot
@@ -45,7 +45,7 @@ def _from_model(snapshot: PromptSnapshot, created_at: datetime) -> PromptSnapsho
 
 
 def save(snapshot: PromptSnapshot) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(snapshot, now))

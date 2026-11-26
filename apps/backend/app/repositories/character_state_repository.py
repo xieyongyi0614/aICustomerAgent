@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import CharacterStateRow, SessionLocal
 from app.models.character_state import CharacterState
 
@@ -26,7 +27,7 @@ def get_state(user_id: str) -> CharacterState:
 
 
 def upsert_state(user_id: str, state: CharacterState) -> CharacterState:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(CharacterStateRow, user_id)
         if row is None:

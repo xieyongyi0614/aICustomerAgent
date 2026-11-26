@@ -1,0 +1,581 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/state/auth_epoch.dart';
+import '../../../app/state/persona_mode.dart';
+import '../../../app/theme/theme_context.dart';
+import '../../../core/notify/local_brief_notifier.dart';
+import '../../../core/storage/prefs_store.dart';
+import '../../../core/updater/update_providers.dart';
+import '../../../design_system/components/components.dart';
+import '../../../design_system/orb/orb.dart';
+import '../data/auth_repository.dart';
+import '../data/care_prefs_repository.dart';
+import '../data/memory_count_repository.dart';
+import 'feishu_sign_in.dart';
+
+/// B8 #profile 我的：相识卡 + 人格卡 + 设置组 + 主动关怀 + 退出登录。
+class ProfilePage extends ConsumerStatefulWidget {
+  const ProfilePage({super.key, this.authRepository, this.feishuFlow});
+
+  final AuthRepository? authRepository;
+  final FeishuSignIn? feishuFlow;
+
+  @override
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  late final AuthRepository _auth = widget.authRepository ?? AuthRepository();
+  late final FeishuSignIn _feishuFlow =
+      widget.feishuFlow ?? FeishuSignIn(authRepository: widget.authRepository);
+  final _careRepo = CarePrefsRepository();
+  final _memoryCountRepo = MemoryCountRepository();
+  String? _nickname;
+  int _days = 1;
+  int? _memoryCount;
+  CarePrefs? _care;
+  bool _careBusy = false;
+  BindingsResult? _bindings;
+  bool _feishuBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIdentity();
+    _loadCare();
+    _loadMemoryCount();
+    _loadBindings();
+  }
+
+  Future<void> _loadBindings() async {
+    try {
+      final result = await _auth.fetchBindings();
+      if (!mounted) return;
+      setState(() => _bindings = result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _bindings = null);
+    }
+  }
+
+  /// 未绑定 → 走飞书授权绑定；已绑定 → 二次确认后解绑。
+  Future<void> _onFeishuRowTap() async {
+    if (_feishuBusy) return;
+    if (_bindings?.feishuBound ?? false) {
+      await _confirmUnbindFeishu();
+      return;
+    }
+    setState(() => _feishuBusy = true);
+    try {
+      final result = await _feishuFlow.bind();
+      if (!mounted) return;
+      setState(() {
+        _bindings = result;
+        _feishuBusy = false;
+      });
+      _notice('飞书已绑定，以后在飞书里也能找到亚丝娜');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice('绑定没成功，稍后再试');
+    }
+  }
+
+  Future<void> _confirmUnbindFeishu() async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: '解绑飞书',
+      message: '解绑后飞书里会成为独立账号，App 里的记忆不会丢失。',
+      confirmLabel: '解绑',
+      icon: AppIcons.link,
+      danger: true,
+    );
+    if (!confirmed) return;
+    setState(() => _feishuBusy = true);
+    try {
+      final result = await _auth.unbindFeishu();
+      if (!mounted) return;
+      setState(() {
+        _bindings = result;
+        _feishuBusy = false;
+      });
+      _notice('已解绑飞书');
+    } on AuthCodeException catch (e) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _feishuBusy = false);
+      _notice('解绑没成功，稍后再试');
+    }
+  }
+
+  void _notice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+      ),
+    );
+  }
+
+  String _feishuSubtitle() {
+    if (_feishuBusy) return '正在等待飞书授权…';
+    final bindings = _bindings;
+    if (bindings == null) return '未连接 · 点击重试';
+    if (bindings.feishuBound) return '已绑定 · 飞书里也能找到亚丝娜';
+    return '未绑定 · 绑定后可在飞书聊天';
+  }
+
+  /// 「检查更新」行副标题：四态与服务端实际状态一致，不写「即将开放」这类占位。
+  String _updateSubtitle(UpdateState state) {
+    final current = state.versionLabel;
+    switch (state.stage) {
+      case UpdateStage.checking:
+        return '正在检查…';
+      case UpdateStage.failed:
+        return '检查没成功，可以再试一次';
+      case UpdateStage.available:
+      case UpdateStage.confirmWifi:
+      case UpdateStage.downloading:
+      case UpdateStage.verifying:
+      case UpdateStage.readyToInstall:
+      case UpdateStage.permissionRequired:
+        final latest = state.decision?.latestVersionLabel ?? '';
+        return latest.isEmpty ? '有新版本可用' : '$latest 可用';
+      case UpdateStage.upToDate:
+        return '已是最新';
+      case UpdateStage.idle:
+        return current.isEmpty ? '看看有没有新版本' : '当前 $current';
+    }
+  }
+
+  Future<void> _loadMemoryCount() async {
+    try {
+      final total = await _memoryCountRepo.fetchTotal();
+      if (!mounted) return;
+      setState(() => _memoryCount = total);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _memoryCount = null);
+    }
+  }
+
+  Future<void> _loadCare() async {
+    try {
+      final care = await _careRepo.fetch();
+      if (!mounted) return;
+      setState(() => _care = care);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _care = null);
+    }
+  }
+
+  /// 后端 PUT 是整体替换：先取当前值合并，city 原样回传避免清空天气定位。
+  Future<void> _toggleBrief({required bool evening, required bool on}) async {
+    if (_careBusy) return;
+    setState(() => _careBusy = true);
+    try {
+      final current = await _careRepo.fetch();
+      final morningAt = evening
+          ? current.morningAt
+          : (on ? (current.morningAt ?? '08:00') : null);
+      final eveningAt = !evening
+          ? current.eveningAt
+          : (on ? (current.eveningAt ?? '21:30') : null);
+      final saved = await _careRepo.save(
+        morningAt: morningAt,
+        eveningAt: eveningAt,
+        city: current.city,
+      );
+      if (!mounted) return;
+      setState(() => _care = saved);
+      await _rescheduleNotify(saved);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('保存失败，请检查网络后重试')),
+      );
+    } finally {
+      if (mounted) setState(() => _careBusy = false);
+    }
+  }
+
+  Future<void> _rescheduleNotify(CarePrefs care) async {
+    final notifier = LocalBriefNotifier.shared;
+    if (notifier == null) return;
+    await notifier.cancelAll();
+    final morning = _parseHHmm(care.morningAt);
+    if (morning != null) {
+      await notifier.scheduleDaily(hour: morning.$1, minute: morning.$2, evening: false);
+    }
+    final evening = _parseHHmm(care.eveningAt);
+    if (evening != null) {
+      await notifier.scheduleDaily(hour: evening.$1, minute: evening.$2, evening: true);
+    }
+  }
+
+  (int, int)? _parseHHmm(String? hhmm) {
+    if (hhmm == null || !hhmm.contains(':')) return null;
+    final parts = hhmm.split(':');
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return (h, m);
+  }
+
+  Future<void> _loadIdentity() async {
+    try {
+      final prefs = await PrefsStore.load();
+      final loggedIn = await _auth.hasToken();
+      final raw = prefs.firstUsedAt();
+      var firstUsedAt = raw == null ? null : DateTime.tryParse(raw);
+      if (loggedIn && firstUsedAt == null) {
+        await prefs.markLoginSeen();
+        firstUsedAt = DateTime.now();
+      }
+      final days = firstUsedAt == null
+          ? 1
+          : DateTime.now().difference(firstUsedAt).inDays + 1;
+      if (!mounted) return;
+      setState(() {
+        _nickname = prefs.nickname();
+        _days = days;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _days = 1);
+    }
+  }
+
+  void _noticePersonaEdit() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('人格编辑还没上线，先用下面的模式切换相处方式吧'),
+      ),
+    );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: '退出登录',
+      message: '退出后需要重新登录才能继续同步，本机数据不会丢失。',
+      confirmLabel: '退出登录',
+      icon: AppIcons.logOut,
+      danger: true,
+    );
+    if (!confirmed) return;
+    await _auth.signOut();
+    final prefs = await PrefsStore.load();
+    await prefs.clearIdentity();
+    ref.read(authEpochProvider.notifier).bump();
+    if (!mounted) return;
+    context.go('/login');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final type = context.typography;
+    final radii = context.radii;
+    final mode = ref.watch(personaModeProvider);
+    final name = (_nickname == null || _nickname!.isEmpty) ? '你' : _nickname!;
+    return Scaffold(
+      backgroundColor: colors.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: context.spacing.screenPadding,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: context.gradients.avatar,
+                  ),
+                  child: Text(
+                    name.characters.first,
+                    style: type.sectionTitle.copyWith(
+                      fontSize: 20,
+                      color: colors.avatarText,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: type.title.copyWith(fontSize: 18)),
+                      const SizedBox(height: 3),
+                      Text(
+                        '与亚丝娜相识 $_days 天',
+                        style: type.sub.copyWith(
+                          fontSize: 12.5,
+                          color: colors.ink2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: context.gradients.deepPersona,
+                borderRadius: radii.rLg,
+                boxShadow: context.elevation.deep,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Orb(size: OrbSize.md),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '亚丝娜',
+                              style: type.sectionTitle.copyWith(
+                                color: colors.onDeepPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '温柔可靠 · 会主动关心你的生活',
+                              style: type.sub.copyWith(
+                                fontSize: 12,
+                                color: colors.onDeepSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _noticePersonaEdit,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                colors.onDeepPrimary.withValues(alpha: 0.14),
+                            borderRadius: radii.rFull,
+                          ),
+                          child: Text(
+                            '编辑人格',
+                            style: type.label.copyWith(
+                              fontSize: 12,
+                              letterSpacing: 0,
+                              color: colors.onDeepPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ModeSelector(
+                    value: mode,
+                    onChanged: (m) =>
+                        ref.read(personaModeProvider.notifier).set(m),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SettingGroup(
+              children: [
+                SettingRow(
+                  title: '记忆管理',
+                  subtitle: _memoryCount == null
+                      ? '查看、编辑、遗忘'
+                      : '$_memoryCount 条 · 查看、编辑、遗忘',
+                  icon: AppIcons.brain,
+                  iconBg: colors.tileAi,
+                  iconColor: colors.aiPrimary,
+                  trailing: Icon(
+                    AppIcons.chevronRight,
+                    size: 16,
+                    color: colors.ink3,
+                  ),
+                  onTap: () => context.push('/memory'),
+                ),
+                SettingRow(
+                  title: '飞书账号',
+                  subtitle: _feishuSubtitle(),
+                  icon: AppIcons.messageCircle,
+                  iconBg: colors.tileInfo,
+                  iconColor: colors.tagPreferenceFg,
+                  trailing: _feishuBusy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          (_bindings?.feishuBound ?? false) ? '已绑定' : '去绑定',
+                          style: type.caption.copyWith(
+                            color: (_bindings?.feishuBound ?? false)
+                                ? colors.ink2
+                                : colors.aiPrimary,
+                          ),
+                        ),
+                  onTap: _onFeishuRowTap,
+                ),
+                SettingRow(
+                  title: '隐私设置',
+                  subtitle: '一键清空 · 导出数据',
+                  icon: AppIcons.lock,
+                  iconBg: colors.tileMoney,
+                  iconColor: colors.tagHabitFg,
+                  trailing: Icon(
+                    AppIcons.chevronRight,
+                    size: 16,
+                    color: colors.ink3,
+                  ),
+                  onTap: () => context.push('/profile/privacy'),
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final update = ref.watch(updateControllerProvider);
+                    final controller =
+                        ref.read(updateControllerProvider.notifier);
+                    return SettingRow(
+                      title: '检查更新',
+                      subtitle: _updateSubtitle(update),
+                      icon: AppIcons.download,
+                      iconBg: colors.tileInfo,
+                      iconColor: colors.tagPreferenceFg,
+                      trailing: update.stage == UpdateStage.checking
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              AppIcons.chevronRight,
+                              size: 16,
+                              color: colors.ink3,
+                            ),
+                      onTap: () => controller.check(manual: true),
+                      showDivider: false,
+                    );
+                  },
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 6, 2, 11),
+              child: Text('主动关怀', style: type.sectionTitle),
+            ),
+            SettingGroup(
+              children: [
+                SettingRow(
+                  title: '早间简报',
+                  subtitle: (_care?.morningAt) == null
+                      ? '已关闭 · 开启后每天定时推送'
+                      : '每天 ${_care!.morningAt} · 「我整理了你的今天」',
+                  trailing: _care == null
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : AppToggle(
+                          value: _care!.morningOn,
+                          onChanged: (_) => _toggleBrief(
+                            evening: false,
+                            on: !_care!.morningOn,
+                          ),
+                        ),
+                ),
+                SettingRow(
+                  title: '晚间总结',
+                  subtitle: (_care?.eveningAt) == null
+                      ? '已关闭 · 开启后每天定时推送'
+                      : '每天 ${_care!.eveningAt} · 回顾今天，安顿明天',
+                  trailing: _care == null
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : AppToggle(
+                          value: _care!.eveningOn,
+                          onChanged: (_) => _toggleBrief(
+                            evening: true,
+                            on: !_care!.eveningOn,
+                          ),
+                        ),
+                ),
+                SettingRow(
+                  title: '状态异常提醒',
+                  subtitle: '健康接入完成后开放（M4 门控）',
+                  trailing: Text(
+                    '即将开放',
+                    style: type.caption.copyWith(color: colors.ink3),
+                  ),
+                  showDivider: false,
+                ),
+              ],
+            ),
+            GestureDetector(
+              onTap: _confirmSignOut,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                alignment: Alignment.center,
+                child: Text(
+                  '退出登录',
+                  style: type.body.copyWith(color: colors.danger),
+                ),
+              ),
+            ),
+            Consumer(
+              builder: (context, ref, _) {
+                final version =
+                    ref.watch(updateControllerProvider).localVersion;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => context.push('/profile/about'),
+                    child: Text(
+                      '朝夕 ${version == null ? '—' : 'v${version.versionName}'}'
+                      ' (MVP) · Personal AI OS 的第一步',
+                      textAlign: TextAlign.center,
+                      style: type.numeric(type.sub).copyWith(color: colors.ink2),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+}

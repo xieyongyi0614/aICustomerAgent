@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.models.autonomy import ProactiveAction
 from app.models.evaluation import (
     DimensionScore,
@@ -66,7 +67,7 @@ def _report(verdict="pass", score=0.9, dimension=EvaluationDimension.PERSONA, wi
         scores={dimension: DimensionScore(dimension=dimension, score=score)},
         verdict=verdict,
         issues=[build_issue(IssueCode.MEMORY_MISSED)] if with_issue else [],
-        created_at=datetime.now(),
+        created_at=timeutil.now(),
     )
 
 
@@ -80,8 +81,8 @@ def _action(status):
         intention="check_in",
         reason="r",
         status=status,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=timeutil.now(),
+        updated_at=timeutil.now(),
     )
 
 

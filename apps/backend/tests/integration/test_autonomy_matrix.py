@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.application import autonomy_engine
 from app.application.post_process import reset_user_write_locks
 from app.character.asuna import PERSISTENT_GOALS
@@ -20,11 +21,12 @@ from app.repositories import (
     goal_repository,
     proactive_repository,
 )
-from app.services import conversation_service, proactive_executor
-from app.services.trace_collector import TurnTraceSession
+from app.services.conversation import service as conversation_service
+from app.services.autonomy import executor as proactive_executor
+from app.services.observability.collector import TurnTraceSession
 from tests.conftest import wait_until
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 USER = "default-user"
 
 
@@ -85,14 +87,7 @@ def test_case13_concurrent_executor_and_chat_turn(db_session_factory, fake_llm):
 
 def test_case14_scenario_full_chain(db_session_factory, fake_llm, monkeypatch):
     """S1：我去忙了 → 闲置 → ACT(check_in) → 主动消息 → pending → ack。"""
-    from app.repositories import proactive_repository
-
-    class _SimClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return NOW + timedelta(minutes=40)
-
-    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW + timedelta(minutes=40))
     session_id = _setup(db_session_factory)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
     llm_factory.set_llm(llm)
@@ -116,7 +111,7 @@ def test_case14_scenario_full_chain(db_session_factory, fake_llm, monkeypatch):
             assert ack.status_code == 200
 
         session = __import__(
-            "app.services.trace_collector", fromlist=["get_trace_collector"]
+            "app.services.observability.collector", fromlist=["get_trace_collector"]
         ).get_trace_collector().get(delivered_ids[0])
         assert session is not None
         step_names = [s.name for s in session.steps]

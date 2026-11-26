@@ -1,20 +1,21 @@
 from app.application import chat_pipeline
-from app.services import agent_service
 
 
-def test_agent_service_reexports_pipeline_symbols():
-    assert agent_service.background_tasks is chat_pipeline.background_tasks
-    assert agent_service.EmptyLLMResponseError is chat_pipeline.EmptyLLMResponseError
-    assert agent_service.run_chat_pipeline is chat_pipeline.run_chat_pipeline
+def test_agent_service_shell_retired():
+    """T-33：`services/agent_service` 兼容壳已退役，入口收敛到 `chat_pipeline`。"""
+    import importlib.util
+
+    assert importlib.util.find_spec("app.services.agent_service") is None
+    assert callable(chat_pipeline.stream_chat)
+    assert chat_pipeline.EmptyLLMResponseError is not None
 
 
 def test_background_tasks_set_shared_with_pipeline_registration():
     sentinel = object()
     chat_pipeline.background_tasks.add(sentinel)
     assert sentinel in chat_pipeline.background_tasks
-    assert sentinel in agent_service._background_tasks
     chat_pipeline.background_tasks.discard(sentinel)
-    assert sentinel not in agent_service._background_tasks
+    assert sentinel not in chat_pipeline.background_tasks
 
 
 def test_post_process_registry_contains_v5_v6_v65_steps():
@@ -27,11 +28,14 @@ def test_post_process_registry_contains_v5_v6_v65_steps():
         "run_goal_review",
         "run_summary",
         "run_memory_extract",
+        "run_ledger_extraction",
+        "run_ledger_confirmation",
         "run_budget_observer",
         "run_evaluation",
         "run_world_update",
         "run_character_action_sync",
         "run_action_planning",
+        "run_memory_evaluate",
     ]
 
 
@@ -44,13 +48,13 @@ def test_post_process_step_isolation(db_session_factory, monkeypatch):
         run_state_update,
     )
     from app.models.conversation import ChatMessage, ConversationState
-    from app.services.trace_collector import TurnTraceSession
+    from app.services.observability.collector import TurnTraceSession
     from tests.conftest import FakeLLM
 
     async def boom(*args, **kwargs):
         raise RuntimeError("state down")
 
-    import app.services.state_service as state_service_module
+    import app.services.conversation.state as state_service_module
 
     monkeypatch.setattr(state_service_module.state_update_chain, "update", boom)
     ctx = PostProcessContext(
@@ -74,7 +78,7 @@ def test_post_process_step_isolation(db_session_factory, monkeypatch):
     asyncio.run(run_memory_extract(ctx))
     steps = {s.name: s.status for s in ctx.trace.steps}
     assert steps.get("state_update") == "error"
-    assert steps.get("memory_extract") == "ok" or "memory_extract" in steps
+    assert steps.get("memory_extractor") == "ok" or "memory_extractor" in steps
 
 
 def test_user_write_lock_serializes_post_process(monkeypatch):

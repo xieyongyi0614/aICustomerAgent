@@ -17,13 +17,14 @@ import json
 import logging
 import time
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.development import ModulationProposal
 from app.models.reflection import Insight
 from app.services.development import aggregate
 from app.repositories import background_job_repository
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 from app.services.reflection import lifecycle as reflection_lifecycle
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ def arbitration_comparator(proposal: dict, existing) -> bool:
     existing_time = _insight_created_at(existing.source_insight_id)
     if proposal_time is None or existing_time is None:
         return False
-    return proposal_time > existing_time
+    return timeutil.ensure_aware(proposal_time) > timeutil.ensure_aware(existing_time)
 
 
 def apply_proposals(
@@ -176,19 +177,19 @@ def compile_insight_by_id(insight_id: str, trace=None) -> bool:
 def register_runtime() -> None:
     """Flag ON 编排层注册：job handler + 创建事件订阅（Reflection 不感知消费方）。"""
 
-    memory2_job_worker.register_job_type(JOB_TYPE_COMPILE, run_compile_jobs)
+    memory_job_worker.register_job_type(JOB_TYPE_COMPILE, run_compile_jobs)
     reflection_lifecycle.register_insight_created_listener(on_insight_created)
 
 
 def _compile_preference(base, statement: str, strength: float, settings) -> list:
-    max_delta = settings.v2_development_preference_max_token_delta
+    max_delta = settings.development_preference_max_token_delta
     proposals = []
     delta = -int(strength * max_delta)
     if delta < 0:
         proposals.append(
             _proposal(base, KEY_RESPONSE_STYLE_LENGTH, {"max_tokens_delta": delta})
         )
-    tone = _first_keyword_rule(settings.v2_development_preference_tone_rules_json, statement)
+    tone = _first_keyword_rule(settings.development_preference_tone_rules_json, statement)
     if tone:
         proposals.append(_proposal(base, KEY_RESPONSE_STYLE_TONE, {"tone_hint": tone}))
     return proposals
@@ -196,7 +197,7 @@ def _compile_preference(base, statement: str, strength: float, settings) -> list
 
 def _compile_belief(base, statement: str, settings) -> list:
     proposals = []
-    topics = _keyword_matches(settings.v2_development_belief_topic_rules_json, statement)
+    topics = _keyword_matches(settings.development_belief_topic_rules_json, statement)
     if topics:
         proposals.append(
             _proposal(
@@ -206,7 +207,7 @@ def _compile_belief(base, statement: str, settings) -> list:
             )
         )
     candidates = _keyword_values(
-        settings.v2_development_belief_habit_templates_json, statement
+        settings.development_belief_habit_templates_json, statement
     )
     if candidates:
         proposals.append(
@@ -216,7 +217,7 @@ def _compile_belief(base, statement: str, settings) -> list:
 
 
 def _compile_pattern(base, strength: float, settings) -> list:
-    max_delta = settings.v2_development_pattern_goal_tier_delta_max
+    max_delta = settings.development_pattern_goal_tier_delta_max
     goal_delta = round(strength * max_delta, 2)
     return [
         _proposal(base, KEY_GOAL_USER_CARE_WEIGHT, {"tier_delta": goal_delta}),

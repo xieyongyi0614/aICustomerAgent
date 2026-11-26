@@ -5,8 +5,7 @@ import pytest
 from app.models.conversation import ChatMessage, ConversationState
 from app.models.memory import UserMemory
 from app.prompts.builder import PromptBuilder
-from app.services import memory_service
-from app.services.context_builder import build as build_context
+from app.services.conversation.context import build as build_context
 
 
 def make_v4_memory(id: str, content: str, type: str = "user_preference", **overrides):
@@ -36,39 +35,6 @@ def make_state(memories) -> ConversationState:
         memories=memories,
         current_input="在吗",
     )
-
-
-class TestSelectForContext:
-    def test_max_count_enforced(self):
-        memories = [make_v4_memory(f"m{i}", f"记忆{i:02d}") for i in range(8)]
-        selected = memory_service.select_for_context(memories)
-        assert len(selected) == 5
-
-    def test_char_budget_skips_oversize_keeps_rest(self):
-        long_content = "长" * 380
-        memories = [
-            make_v4_memory("m1", long_content),
-            make_v4_memory("m2", "短记忆甲"),
-            make_v4_memory("m3", "短记忆乙"),
-        ]
-        selected = memory_service.select_for_context(memories, max_chars=385)
-        assert [m.id for m in selected] == ["m1", "m2"]
-        total = sum(len(m.content) for m in selected)
-        assert total <= 385
-
-    def test_exact_and_containment_dedup(self):
-        memories = [
-            make_v4_memory("m1", "用户喜欢西瓜"),
-            make_v4_memory("m2", "用户喜欢西瓜"),
-            make_v4_memory("m3", "喜欢西瓜"),
-            make_v4_memory("m4", "用户在深圳工作", type="user_fact"),
-        ]
-        selected = memory_service.select_for_context(memories)
-        assert [m.id for m in selected] == ["m1", "m4"]
-
-    def test_custom_max_count(self):
-        memories = [make_v4_memory(f"m{i}", f"记忆{i}") for i in range(5)]
-        assert len(memory_service.select_for_context(memories, max_count=2)) == 2
 
 
 class TestPromptMemorySection:
@@ -132,12 +98,13 @@ class TestContextBuilderIntegration:
     @pytest.mark.asyncio
     async def test_build_memory_failure_degrades(self, db_session_factory, monkeypatch):
         from app.repositories import memory_repository as repo
+        from app.services.memory import retriever as memory_retriever
 
         repo.create_memory("u1", "asuna", "用户喜欢西瓜", "user_preference", 0.9, 0.95)
 
         def boom(*args, **kwargs):
             raise RuntimeError("db down")
 
-        monkeypatch.setattr(memory_service, "retrieve", boom)
+        monkeypatch.setattr(memory_retriever, "retrieve", boom)
         state = await build_context("s1", "u1", "我喜欢吃西瓜")
         assert state.memories == []

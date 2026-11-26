@@ -10,12 +10,14 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.chains.answer_chain import answer_max_tokens
 from app.core.db import DevelopmentStateRow
 from app.models.behavior_strategy import BehaviorDirective
 from app.models.conversation import ConversationState
 from app.models.development import DevelopmentOverlay, DevelopmentStyleParams
-from app.services import behavior_engine, goal_service
+from app.engines import behavior as behavior_engine
+from app.services.goal import service as goal_service
 from app.services.development import aggregate
 
 pytestmark = pytest.mark.xdist_group("development")
@@ -34,7 +36,7 @@ class StubTrace:
 def _seed_modulation(
     session_factory, key, value, *, strength=0.8, insight_id="ins-w1", kind="preference"
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentStateRow(
@@ -54,21 +56,13 @@ def _seed_modulation(
         session.commit()
 
 
-def test_read_overlay_flag_off_returns_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=False)
-    _seed_modulation(
-        db_session_factory, "response_style.length", {"max_tokens_delta": -150}
-    )
-    assert aggregate.read_overlay(USER) is None
-
-
 def test_read_overlay_empty_data_returns_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     assert aggregate.read_overlay(USER) is None
 
 
 def test_read_overlay_composes_all_rows(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     _seed_modulation(
         db_session_factory, "response_style.length", {"max_tokens_delta": -150}
     )
@@ -123,7 +117,7 @@ def test_read_overlay_composes_all_rows(db_session_factory, override_settings):
 def test_read_overlay_drops_duplicate_and_invalid_candidates(
     db_session_factory, override_settings
 ):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     _seed_modulation(
         db_session_factory,
         "behavior.habit_candidates",
@@ -166,7 +160,7 @@ def test_resolve_without_overlay_matches_v1_directive(db_session_factory):
 
 
 def test_resolve_applies_overlay_to_directive(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     overlay = DevelopmentOverlay(
         style=DevelopmentStyleParams(tone_hint="更简练、直给"),
         care_hint="最近特别在意他的休息",
@@ -188,7 +182,7 @@ def test_resolve_applies_overlay_to_directive(db_session_factory, override_setti
 def test_goal_weights_flip_selection(db_session_factory):
     from app.models.goal import GoalRecord
 
-    now = datetime.now()
+    now = timeutil.now()
     companion = GoalRecord(
         user_id=USER,
         type="user_care",
@@ -231,7 +225,7 @@ def test_goal_weights_flip_selection(db_session_factory):
 
 
 def test_answer_max_tokens_overlay_and_clamp(override_settings):
-    override_settings(answer_max_tokens=800, v2_development_answer_min_tokens=300)
+    override_settings(answer_max_tokens=800, development_answer_min_tokens=300)
     base_state = _conversation_state(overlay=None)
     assert answer_max_tokens(base_state) == 800
     lowered = _conversation_state(
@@ -287,7 +281,7 @@ def _strategy():
 
 
 def test_development_apply_trace_payload(override_settings):
-    override_settings(answer_max_tokens=800, v2_development_answer_min_tokens=300)
+    override_settings(answer_max_tokens=800, development_answer_min_tokens=300)
     trace = StubTrace()
     overlay = DevelopmentOverlay(
         style=DevelopmentStyleParams(max_tokens_delta=-200, tone_hint="更简练"),

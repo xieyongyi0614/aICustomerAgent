@@ -1,19 +1,20 @@
 """V9 Action Relationship Bridge（relationship-impact.md §2~§5，V9-008）。
 
-V9 零直写 RelationshipState：信号经既有 apply_relationship_v5（三层钳制）
+V9 零直写 RelationshipState：信号经既有 apply_relationship_update（三层钳制）
 + commit_relationship_update 通道投递；门控 action_relationship_enabled 默认关。
 """
 
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.character.asuna.action import ACTION_RELATIONSHIP_MAP
 from app.core.settings import get_settings
 from app.models.action import ActionRecord
 from app.models.relationship import RelationshipDelta, RelationshipEvent
 from app.repositories import relationship_event_repository, relationship_repository
-from app.services import state_engine
-from app.services.state_service import _day_impact_totals
+from app.engines import state as state_engine
+from app.services.conversation.state import _day_impact_totals
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +51,10 @@ def deliver_action_signal(record: ActionRecord, user_id: str) -> dict | None:
         events = relationship_event_repository.list_events(user_id, limit=500)
         if _same_turn_dialog_user_help(record, events):
             return None
-        now = datetime.now()
+        now = timeutil.now()
         relationship = relationship_repository.get_relationship(user_id)
         day_positive, day_negative = _day_impact_totals(user_id, now, events=events)
-        new_relationship, applied = state_engine.apply_relationship_v5(
+        new_relationship, applied = state_engine.apply_relationship_update(
             relationship,
             event_type,
             magnitude,
@@ -63,7 +64,7 @@ def deliver_action_signal(record: ActionRecord, user_id: str) -> dict | None:
         )
         event = RelationshipEvent(
             user_id=user_id,
-            session_id=record.session_id,
+            session_id=record.session_id or "",
             type=event_type,
             magnitude=magnitude,
             impact=applied if isinstance(applied, RelationshipDelta) else RelationshipDelta(),

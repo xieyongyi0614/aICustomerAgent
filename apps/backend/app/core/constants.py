@@ -4,9 +4,7 @@ from app.models.relationship import RelationshipDelta
 
 STAGE_ORDER = ("stranger", "friend", "close_friend", "partner")
 
-RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "tension")
-
-RELATIONSHIP_DIMENSIONS_V85 = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
+RELATIONSHIP_DIMENSIONS = ("intimacy", "trust", "familiarity", "respect", "comfort", "tension")
 
 EMOTION_EVENTS: dict[str, dict] = {
     "praise": {"emotion": "happy", "delta": 0.3},
@@ -25,6 +23,58 @@ MAGNITUDE_COEFFICIENTS: dict[str, float] = {
     "normal": 1.0,
     "strong": 1.4,
 }
+
+MEMORY_LAYERS: tuple[str, ...] = ("episodic", "semantic")
+"""记忆通道层（顺序冻结，`ck_memories_layer` 同域）：episodic = 时间线经历；semantic = 跨事件抽象。"""
+
+DEFAULT_LAYER = "semantic"
+"""未知类型的回落层（记忆域降级纪律：warning 而不抛）。"""
+
+LAYER_FOR_TYPE: dict[str, str] = {
+    "user_preference": "semantic",
+    "user_fact": "semantic",
+    "experience": "episodic",
+    "relationship_fact": "semantic",
+    "commitment": "semantic",
+    "milestone_event": "episodic",
+    "behavior_pattern": "semantic",
+}
+"""类型 → 层映射（★ 冻结；键 = 规范记忆类型 7 值，有枚举断言钉住）。
+
+层是**检索分通道与生命周期差异化的派生依据**，不是来源真相（真相仍是 `source_ref` + 候选表）。
+定义落在 core 层以便仓储写入路径（`memory_repository`）直接消费，避免仓储反向依赖服务层；
+`services/memory/types.py` 再导出本表并承载带归一的 `layer_for_type()`。
+"""
+
+MEMORY_LINK_RELATIONS_LEGACY: tuple[str, ...] = (
+    "supersedes",
+    "merges",
+    "contradicts",
+)
+"""`memory_links.relation` 既有三值（冲突消解产物，顺序冻结）。"""
+
+MEMORY_LINK_RELATIONS: tuple[str, ...] = (
+    *MEMORY_LINK_RELATIONS_LEGACY,
+    "caused_by",
+    "before",
+    "related",
+)
+"""`memory_links.relation` 全量值域（★ 冻结；前 3 项 == LEGACY）。
+
+定义落在 core 层以便 `core/db/memory.py` 直接构造 CHECK，避免 core 反向依赖服务层；
+`services/memory/types.py` 再导出同一对象。
+"""
+
+MEMORY_LINK_EXTRACTABLE_RELATIONS: tuple[str, ...] = (
+    "caused_by",
+    "before",
+    "related",
+)
+"""关系抽取允许写入的三值（`MEV-010`；★ 冻结）。
+
+既有 `supersedes` / `merges` / `contradicts` 由 `lifecycle.on_promoted` 独占并伴随
+状态变更，关系抽取链**不得**写入，避免链接与记忆状态双写。
+"""
 
 RELATIONSHIP_EVENT_DELTAS: dict[str, RelationshipDelta] = {
     "user_care": RelationshipDelta(trust=0.04, intimacy=0.03, familiarity=0.01, respect=0.01, comfort=0.03, tension=-0.02),

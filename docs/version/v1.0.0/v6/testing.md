@@ -2,7 +2,7 @@
 
 ## 1. 约定
 
-沿用：pytest + pytest-asyncio、FakeLLM（structured_responses 按 schema 名分发）、单元测试内存 SQLite、HTTP/e2e 走 TestClient、测试禁止真实 LLM。新增 `tests/golden/` 快照护栏（Backend Refactor 已就位）。
+沿用：pytest + pytest-asyncio、FakeLLM（structured_responses 按 schema 名分发）、单元测试内存 SQLite、HTTP/e2e 走 TestClient、测试禁止真实 LLM。新增 `tests/golden/` 快照护栏。
 
 ## 2. 测试矩阵（14 项必测）
 

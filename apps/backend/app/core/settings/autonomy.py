@@ -10,7 +10,6 @@ from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings, Setting
 class AutonomySettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    autonomy_enabled: bool = True
     autonomy_tick_seconds: int = 60
     autonomy_inactivity_minutes: int = 30
     autonomy_min_interval_minutes: int = 240

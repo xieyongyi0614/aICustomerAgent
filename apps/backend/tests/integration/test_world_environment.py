@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.core import timeutil
 from app.application import world_engine, world_engine as engine_module
 from app.repositories import world_repository
 from app.services.world.context_selector import environment_lighting_suggestion
@@ -18,8 +19,8 @@ def test_manual_environment_and_interpreter_weather(db_session_factory):
 def test_lighting_suggestion_applied_once_and_respects_manual(db_session_factory, override_settings):
     override_settings(world_time_mode="story")
     world_engine.ensure_world("default-user")
-    evening = datetime(2026, 9, 1, 20, 0)
-    world_engine.advance_time("default-user", evening - datetime.now())
+    evening = timeutil.ensure_aware(datetime(2026, 9, 1, 20, 0))
+    world_engine.advance_time("default-user", evening - timeutil.now())
     world_engine.run_turn_update("default-user", "今天聊了聊天")
     world = world_engine.get_world("default-user")
     assert world.environment.lighting == environment_lighting_suggestion(evening)

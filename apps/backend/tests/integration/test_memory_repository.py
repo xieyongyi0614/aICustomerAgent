@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.memory import UserMemory
 from app.repositories import memory_repository as repo
 
@@ -84,7 +85,7 @@ class TestCreateMemory:
             )
 
     def test_expires_at_persisted(self, db_session_factory):
-        expires = datetime.now() + timedelta(days=1)
+        expires = timeutil.now() + timedelta(days=1)
         memory = repo.create_memory(
             user_id="u1",
             character_id="asuna",
@@ -115,8 +116,8 @@ class TestListActive:
 
     def test_character_scope_includes_wildcard(self, db_session_factory):
         repo.create_memory("u1", "*", "通用事实", "user_fact", 0.9)
-        repo.create_memory("u1", "asuna", "角色事件", "relationship_event", 0.7)
-        repo.create_memory("u1", "kirito", "他人事件", "relationship_event", 0.7)
+        repo.create_memory("u1", "asuna", "角色事件", "relationship_fact", 0.7)
+        repo.create_memory("u1", "kirito", "他人事件", "relationship_fact", 0.7)
         contents = [m.content for m in repo.list_active("u1", "asuna")]
         assert sorted(contents) == ["他人事件", "角色事件", "通用事实"] or contents == [
             "角色事件",

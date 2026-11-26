@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.observability import CallSite, LlmCallRecord
 from app.repositories import llm_call_repository
 
@@ -26,7 +27,7 @@ def make_record(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         error_kind=None if status == "ok" else "RuntimeError",
-        started_at=datetime.now(),
+        started_at=timeutil.now(),
     )
 
 
@@ -71,11 +72,11 @@ def test_search_filters(db_session_factory):
     assert len(llm_call_repository.search(turn_id="102")) == 1
     assert len(llm_call_repository.search(call_site="judge")) == 1
     assert len(llm_call_repository.search(model="fake")) == 2
-    assert len(llm_call_repository.search(since=datetime.now() + timedelta(hours=1))) == 0
+    assert len(llm_call_repository.search(since=timeutil.now() + timedelta(hours=1))) == 0
     assert len(llm_call_repository.search()) == 2
 
 
 def test_prune_before(db_session_factory):
     llm_call_repository.save(make_record(record_id="old"))
-    assert llm_call_repository.prune_before(datetime.now() + timedelta(days=1)) >= 1
+    assert llm_call_repository.prune_before(timeutil.now() + timedelta(days=1)) >= 1
     assert llm_call_repository.get_by_request("req-1") == []

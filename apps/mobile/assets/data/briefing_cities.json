@@ -1,0 +1,1540 @@
+[
+ {
+  "name": "北京",
+  "region": "北京"
+ },
+ {
+  "name": "天津",
+  "region": "天津"
+ },
+ {
+  "name": "石家庄",
+  "region": "河北"
+ },
+ {
+  "name": "唐山",
+  "region": "河北"
+ },
+ {
+  "name": "秦皇岛",
+  "region": "河北"
+ },
+ {
+  "name": "邯郸",
+  "region": "河北"
+ },
+ {
+  "name": "邢台",
+  "region": "河北"
+ },
+ {
+  "name": "保定",
+  "region": "河北"
+ },
+ {
+  "name": "张家口",
+  "region": "河北"
+ },
+ {
+  "name": "承德",
+  "region": "河北"
+ },
+ {
+  "name": "沧州",
+  "region": "河北"
+ },
+ {
+  "name": "廊坊",
+  "region": "河北",
+  "saveAs": "廊坊市"
+ },
+ {
+  "name": "衡水",
+  "region": "河北",
+  "saveAs": "衡水市"
+ },
+ {
+  "name": "太原",
+  "region": "山西"
+ },
+ {
+  "name": "大同",
+  "region": "山西"
+ },
+ {
+  "name": "阳泉",
+  "region": "山西"
+ },
+ {
+  "name": "长治",
+  "region": "山西"
+ },
+ {
+  "name": "晋城",
+  "region": "山西"
+ },
+ {
+  "name": "朔州",
+  "region": "山西",
+  "saveAs": "Shuozhou"
+ },
+ {
+  "name": "晋中",
+  "region": "山西",
+  "saveAs": "Jinzhong"
+ },
+ {
+  "name": "运城",
+  "region": "山西",
+  "saveAs": "Yuncheng"
+ },
+ {
+  "name": "忻州",
+  "region": "山西"
+ },
+ {
+  "name": "临汾",
+  "region": "山西"
+ },
+ {
+  "name": "吕梁",
+  "region": "山西"
+ },
+ {
+  "name": "呼和浩特",
+  "region": "内蒙古"
+ },
+ {
+  "name": "包头",
+  "region": "内蒙古"
+ },
+ {
+  "name": "乌海",
+  "region": "内蒙古",
+  "saveAs": "Wuhai"
+ },
+ {
+  "name": "赤峰",
+  "region": "内蒙古"
+ },
+ {
+  "name": "通辽",
+  "region": "内蒙古",
+  "saveAs": "Tongliao"
+ },
+ {
+  "name": "鄂尔多斯",
+  "region": "内蒙古"
+ },
+ {
+  "name": "呼伦贝尔",
+  "region": "内蒙古"
+ },
+ {
+  "name": "巴彦淖尔",
+  "region": "内蒙古"
+ },
+ {
+  "name": "乌兰察布",
+  "region": "内蒙古"
+ },
+ {
+  "name": "兴安",
+  "region": "内蒙古"
+ },
+ {
+  "name": "阿拉善",
+  "region": "内蒙古"
+ },
+ {
+  "name": "沈阳",
+  "region": "辽宁"
+ },
+ {
+  "name": "大连",
+  "region": "辽宁"
+ },
+ {
+  "name": "鞍山",
+  "region": "辽宁"
+ },
+ {
+  "name": "抚顺",
+  "region": "辽宁",
+  "saveAs": "抚顺市"
+ },
+ {
+  "name": "本溪",
+  "region": "辽宁",
+  "saveAs": "本溪市"
+ },
+ {
+  "name": "丹东",
+  "region": "辽宁"
+ },
+ {
+  "name": "锦州",
+  "region": "辽宁",
+  "saveAs": "锦州市"
+ },
+ {
+  "name": "营口",
+  "region": "辽宁"
+ },
+ {
+  "name": "阜新",
+  "region": "辽宁",
+  "saveAs": "阜新市"
+ },
+ {
+  "name": "辽阳",
+  "region": "辽宁"
+ },
+ {
+  "name": "盘锦",
+  "region": "辽宁",
+  "saveAs": "Panjin"
+ },
+ {
+  "name": "铁岭",
+  "region": "辽宁"
+ },
+ {
+  "name": "朝阳",
+  "region": "辽宁"
+ },
+ {
+  "name": "葫芦岛",
+  "region": "辽宁"
+ },
+ {
+  "name": "长春",
+  "region": "吉林"
+ },
+ {
+  "name": "吉林",
+  "region": "吉林"
+ },
+ {
+  "name": "四平",
+  "region": "吉林"
+ },
+ {
+  "name": "辽源",
+  "region": "吉林",
+  "saveAs": "辽源市"
+ },
+ {
+  "name": "通化",
+  "region": "吉林"
+ },
+ {
+  "name": "白山",
+  "region": "吉林"
+ },
+ {
+  "name": "松原",
+  "region": "吉林",
+  "saveAs": "Songyuan"
+ },
+ {
+  "name": "白城",
+  "region": "吉林"
+ },
+ {
+  "name": "延边",
+  "region": "吉林",
+  "saveAs": "Yanbian"
+ },
+ {
+  "name": "哈尔滨",
+  "region": "黑龙江"
+ },
+ {
+  "name": "齐齐哈尔",
+  "region": "黑龙江"
+ },
+ {
+  "name": "鸡西",
+  "region": "黑龙江"
+ },
+ {
+  "name": "鹤岗",
+  "region": "黑龙江"
+ },
+ {
+  "name": "双鸭山",
+  "region": "黑龙江"
+ },
+ {
+  "name": "大庆",
+  "region": "黑龙江"
+ },
+ {
+  "name": "伊春",
+  "region": "黑龙江"
+ },
+ {
+  "name": "佳木斯",
+  "region": "黑龙江"
+ },
+ {
+  "name": "七台河",
+  "region": "黑龙江",
+  "saveAs": "Qitaihe"
+ },
+ {
+  "name": "牡丹江",
+  "region": "黑龙江"
+ },
+ {
+  "name": "黑河",
+  "region": "黑龙江"
+ },
+ {
+  "name": "绥化",
+  "region": "黑龙江"
+ },
+ {
+  "name": "大兴安岭",
+  "region": "黑龙江"
+ },
+ {
+  "name": "上海",
+  "region": "上海"
+ },
+ {
+  "name": "南京",
+  "region": "江苏"
+ },
+ {
+  "name": "无锡",
+  "region": "江苏"
+ },
+ {
+  "name": "徐州",
+  "region": "江苏"
+ },
+ {
+  "name": "常州",
+  "region": "江苏",
+  "saveAs": "常州市"
+ },
+ {
+  "name": "苏州",
+  "region": "江苏"
+ },
+ {
+  "name": "南通",
+  "region": "江苏"
+ },
+ {
+  "name": "连云港",
+  "region": "江苏",
+  "saveAs": "Lianyungang"
+ },
+ {
+  "name": "淮安",
+  "region": "江苏"
+ },
+ {
+  "name": "盐城",
+  "region": "江苏"
+ },
+ {
+  "name": "扬州",
+  "region": "江苏",
+  "saveAs": "扬州市"
+ },
+ {
+  "name": "镇江",
+  "region": "江苏"
+ },
+ {
+  "name": "泰州",
+  "region": "江苏",
+  "saveAs": "泰州市"
+ },
+ {
+  "name": "宿迁",
+  "region": "江苏",
+  "saveAs": "Suqian"
+ },
+ {
+  "name": "杭州",
+  "region": "浙江"
+ },
+ {
+  "name": "宁波",
+  "region": "浙江"
+ },
+ {
+  "name": "温州",
+  "region": "浙江",
+  "saveAs": "温州市"
+ },
+ {
+  "name": "嘉兴",
+  "region": "浙江"
+ },
+ {
+  "name": "湖州",
+  "region": "浙江",
+  "saveAs": "Huzhou"
+ },
+ {
+  "name": "绍兴",
+  "region": "浙江"
+ },
+ {
+  "name": "金华",
+  "region": "浙江"
+ },
+ {
+  "name": "衢州",
+  "region": "浙江",
+  "saveAs": "衢州市"
+ },
+ {
+  "name": "舟山",
+  "region": "浙江"
+ },
+ {
+  "name": "台州",
+  "region": "浙江"
+ },
+ {
+  "name": "丽水",
+  "region": "浙江"
+ },
+ {
+  "name": "合肥",
+  "region": "安徽"
+ },
+ {
+  "name": "芜湖",
+  "region": "安徽"
+ },
+ {
+  "name": "蚌埠",
+  "region": "安徽"
+ },
+ {
+  "name": "淮南",
+  "region": "安徽",
+  "saveAs": "Huainan"
+ },
+ {
+  "name": "马鞍山",
+  "region": "安徽"
+ },
+ {
+  "name": "淮北",
+  "region": "安徽"
+ },
+ {
+  "name": "铜陵",
+  "region": "安徽"
+ },
+ {
+  "name": "安庆",
+  "region": "安徽"
+ },
+ {
+  "name": "黄山",
+  "region": "安徽"
+ },
+ {
+  "name": "滁州",
+  "region": "安徽"
+ },
+ {
+  "name": "阜阳",
+  "region": "安徽"
+ },
+ {
+  "name": "宿州",
+  "region": "安徽",
+  "saveAs": "宿州市"
+ },
+ {
+  "name": "六安",
+  "region": "安徽"
+ },
+ {
+  "name": "亳州",
+  "region": "安徽"
+ },
+ {
+  "name": "池州",
+  "region": "安徽"
+ },
+ {
+  "name": "宣城",
+  "region": "安徽",
+  "saveAs": "Xuancheng"
+ },
+ {
+  "name": "福州",
+  "region": "福建"
+ },
+ {
+  "name": "厦门",
+  "region": "福建",
+  "saveAs": "厦门市"
+ },
+ {
+  "name": "莆田",
+  "region": "福建"
+ },
+ {
+  "name": "三明",
+  "region": "福建"
+ },
+ {
+  "name": "泉州",
+  "region": "福建",
+  "saveAs": "泉州市"
+ },
+ {
+  "name": "漳州",
+  "region": "福建",
+  "saveAs": "漳州市"
+ },
+ {
+  "name": "南平",
+  "region": "福建"
+ },
+ {
+  "name": "龙岩",
+  "region": "福建"
+ },
+ {
+  "name": "宁德",
+  "region": "福建"
+ },
+ {
+  "name": "南昌",
+  "region": "江西"
+ },
+ {
+  "name": "景德镇",
+  "region": "江西",
+  "saveAs": "Jingdezhen"
+ },
+ {
+  "name": "萍乡",
+  "region": "江西"
+ },
+ {
+  "name": "九江",
+  "region": "江西"
+ },
+ {
+  "name": "新余",
+  "region": "江西"
+ },
+ {
+  "name": "鹰潭",
+  "region": "江西",
+  "saveAs": "鹰潭市"
+ },
+ {
+  "name": "赣州",
+  "region": "江西"
+ },
+ {
+  "name": "吉安",
+  "region": "江西"
+ },
+ {
+  "name": "宜春",
+  "region": "江西",
+  "saveAs": "Yichun"
+ },
+ {
+  "name": "抚州",
+  "region": "江西",
+  "saveAs": "抚州市"
+ },
+ {
+  "name": "上饶",
+  "region": "江西"
+ },
+ {
+  "name": "济南",
+  "region": "山东"
+ },
+ {
+  "name": "青岛",
+  "region": "山东"
+ },
+ {
+  "name": "淄博",
+  "region": "山东"
+ },
+ {
+  "name": "枣庄",
+  "region": "山东"
+ },
+ {
+  "name": "东营",
+  "region": "山东"
+ },
+ {
+  "name": "烟台",
+  "region": "山东"
+ },
+ {
+  "name": "潍坊",
+  "region": "山东"
+ },
+ {
+  "name": "济宁",
+  "region": "山东"
+ },
+ {
+  "name": "泰安",
+  "region": "山东"
+ },
+ {
+  "name": "威海",
+  "region": "山东"
+ },
+ {
+  "name": "日照",
+  "region": "山东"
+ },
+ {
+  "name": "临沂",
+  "region": "山东"
+ },
+ {
+  "name": "德州",
+  "region": "山东"
+ },
+ {
+  "name": "聊城",
+  "region": "山东"
+ },
+ {
+  "name": "滨州",
+  "region": "山东",
+  "saveAs": "滨州市"
+ },
+ {
+  "name": "菏泽",
+  "region": "山东"
+ },
+ {
+  "name": "郑州",
+  "region": "河南"
+ },
+ {
+  "name": "开封",
+  "region": "河南"
+ },
+ {
+  "name": "洛阳",
+  "region": "河南"
+ },
+ {
+  "name": "平顶山",
+  "region": "河南"
+ },
+ {
+  "name": "安阳",
+  "region": "河南"
+ },
+ {
+  "name": "鹤壁",
+  "region": "河南",
+  "saveAs": "鹤壁市"
+ },
+ {
+  "name": "新乡",
+  "region": "河南"
+ },
+ {
+  "name": "焦作",
+  "region": "河南",
+  "saveAs": "焦作市"
+ },
+ {
+  "name": "濮阳",
+  "region": "河南"
+ },
+ {
+  "name": "许昌",
+  "region": "河南",
+  "saveAs": "Xuchang"
+ },
+ {
+  "name": "漯河",
+  "region": "河南"
+ },
+ {
+  "name": "三门峡",
+  "region": "河南"
+ },
+ {
+  "name": "南阳",
+  "region": "河南"
+ },
+ {
+  "name": "商丘",
+  "region": "河南",
+  "saveAs": "Shangqiu"
+ },
+ {
+  "name": "信阳",
+  "region": "河南"
+ },
+ {
+  "name": "周口",
+  "region": "河南"
+ },
+ {
+  "name": "驻马店",
+  "region": "河南",
+  "saveAs": "Zhumadian"
+ },
+ {
+  "name": "济源",
+  "region": "河南"
+ },
+ {
+  "name": "武汉",
+  "region": "湖北"
+ },
+ {
+  "name": "黄石",
+  "region": "湖北"
+ },
+ {
+  "name": "十堰",
+  "region": "湖北"
+ },
+ {
+  "name": "宜昌",
+  "region": "湖北"
+ },
+ {
+  "name": "襄阳",
+  "region": "湖北"
+ },
+ {
+  "name": "鄂州",
+  "region": "湖北",
+  "saveAs": "鄂州市"
+ },
+ {
+  "name": "荆门",
+  "region": "湖北",
+  "saveAs": "荆门市"
+ },
+ {
+  "name": "孝感",
+  "region": "湖北"
+ },
+ {
+  "name": "荆州",
+  "region": "湖北",
+  "saveAs": "荆州市"
+ },
+ {
+  "name": "黄冈",
+  "region": "湖北"
+ },
+ {
+  "name": "咸宁",
+  "region": "湖北",
+  "saveAs": "Xianning"
+ },
+ {
+  "name": "随州",
+  "region": "湖北",
+  "saveAs": "随州市"
+ },
+ {
+  "name": "恩施",
+  "region": "湖北"
+ },
+ {
+  "name": "仙桃",
+  "region": "湖北",
+  "saveAs": "Xiantao"
+ },
+ {
+  "name": "潜江",
+  "region": "湖北",
+  "saveAs": "Qianjiang"
+ },
+ {
+  "name": "天门",
+  "region": "湖北"
+ },
+ {
+  "name": "长沙",
+  "region": "湖南"
+ },
+ {
+  "name": "株洲",
+  "region": "湖南"
+ },
+ {
+  "name": "湘潭",
+  "region": "湖南"
+ },
+ {
+  "name": "衡阳",
+  "region": "湖南"
+ },
+ {
+  "name": "邵阳",
+  "region": "湖南"
+ },
+ {
+  "name": "岳阳",
+  "region": "湖南"
+ },
+ {
+  "name": "常德",
+  "region": "湖南"
+ },
+ {
+  "name": "张家界",
+  "region": "湖南"
+ },
+ {
+  "name": "益阳",
+  "region": "湖南",
+  "saveAs": "Yiyang"
+ },
+ {
+  "name": "郴州",
+  "region": "湖南"
+ },
+ {
+  "name": "永州",
+  "region": "湖南"
+ },
+ {
+  "name": "怀化",
+  "region": "湖南",
+  "saveAs": "怀化市"
+ },
+ {
+  "name": "娄底",
+  "region": "湖南",
+  "saveAs": "娄底市"
+ },
+ {
+  "name": "湘西",
+  "region": "湖南"
+ },
+ {
+  "name": "广州",
+  "region": "广东"
+ },
+ {
+  "name": "韶关",
+  "region": "广东"
+ },
+ {
+  "name": "深圳",
+  "region": "广东"
+ },
+ {
+  "name": "珠海",
+  "region": "广东"
+ },
+ {
+  "name": "汕头",
+  "region": "广东",
+  "saveAs": "汕头市"
+ },
+ {
+  "name": "佛山",
+  "region": "广东"
+ },
+ {
+  "name": "江门",
+  "region": "广东"
+ },
+ {
+  "name": "湛江",
+  "region": "广东",
+  "saveAs": "湛江市"
+ },
+ {
+  "name": "茂名",
+  "region": "广东"
+ },
+ {
+  "name": "肇庆",
+  "region": "广东",
+  "saveAs": "肇庆市"
+ },
+ {
+  "name": "惠州",
+  "region": "广东"
+ },
+ {
+  "name": "梅州",
+  "region": "广东"
+ },
+ {
+  "name": "汕尾",
+  "region": "广东"
+ },
+ {
+  "name": "河源",
+  "region": "广东"
+ },
+ {
+  "name": "阳江",
+  "region": "广东"
+ },
+ {
+  "name": "清远",
+  "region": "广东",
+  "saveAs": "清远市"
+ },
+ {
+  "name": "东莞",
+  "region": "广东"
+ },
+ {
+  "name": "中山",
+  "region": "广东"
+ },
+ {
+  "name": "潮州",
+  "region": "广东",
+  "saveAs": "潮州市"
+ },
+ {
+  "name": "揭阳",
+  "region": "广东",
+  "saveAs": "揭阳市"
+ },
+ {
+  "name": "云浮",
+  "region": "广东",
+  "saveAs": "云浮市"
+ },
+ {
+  "name": "南宁",
+  "region": "广西"
+ },
+ {
+  "name": "柳州",
+  "region": "广西"
+ },
+ {
+  "name": "桂林",
+  "region": "广西"
+ },
+ {
+  "name": "梧州",
+  "region": "广西",
+  "saveAs": "梧州市"
+ },
+ {
+  "name": "北海",
+  "region": "广西"
+ },
+ {
+  "name": "防城港",
+  "region": "广西"
+ },
+ {
+  "name": "钦州",
+  "region": "广西",
+  "saveAs": "钦州市"
+ },
+ {
+  "name": "贵港",
+  "region": "广西",
+  "saveAs": "贵港市"
+ },
+ {
+  "name": "玉林",
+  "region": "广西"
+ },
+ {
+  "name": "百色",
+  "region": "广西",
+  "saveAs": "Baise"
+ },
+ {
+  "name": "贺州",
+  "region": "广西",
+  "saveAs": "贺州市"
+ },
+ {
+  "name": "河池",
+  "region": "广西",
+  "saveAs": "Hechi"
+ },
+ {
+  "name": "来宾",
+  "region": "广西",
+  "saveAs": "来宾市"
+ },
+ {
+  "name": "崇左",
+  "region": "广西"
+ },
+ {
+  "name": "海口",
+  "region": "海南"
+ },
+ {
+  "name": "三亚",
+  "region": "海南"
+ },
+ {
+  "name": "三沙",
+  "region": "海南"
+ },
+ {
+  "name": "儋州",
+  "region": "海南",
+  "saveAs": "Danzhou"
+ },
+ {
+  "name": "五指山",
+  "region": "海南"
+ },
+ {
+  "name": "琼海",
+  "region": "海南",
+  "saveAs": "琼海市"
+ },
+ {
+  "name": "文昌",
+  "region": "海南"
+ },
+ {
+  "name": "万宁",
+  "region": "海南",
+  "saveAs": "Wanning"
+ },
+ {
+  "name": "东方",
+  "region": "海南"
+ },
+ {
+  "name": "重庆",
+  "region": "重庆"
+ },
+ {
+  "name": "成都",
+  "region": "四川"
+ },
+ {
+  "name": "自贡",
+  "region": "四川",
+  "saveAs": "自贡市"
+ },
+ {
+  "name": "攀枝花",
+  "region": "四川"
+ },
+ {
+  "name": "泸州",
+  "region": "四川",
+  "saveAs": "泸州市"
+ },
+ {
+  "name": "德阳",
+  "region": "四川"
+ },
+ {
+  "name": "绵阳",
+  "region": "四川"
+ },
+ {
+  "name": "广元",
+  "region": "四川"
+ },
+ {
+  "name": "遂宁",
+  "region": "四川",
+  "saveAs": "遂宁市"
+ },
+ {
+  "name": "内江",
+  "region": "四川"
+ },
+ {
+  "name": "乐山",
+  "region": "四川"
+ },
+ {
+  "name": "南充",
+  "region": "四川"
+ },
+ {
+  "name": "眉山",
+  "region": "四川"
+ },
+ {
+  "name": "宜宾",
+  "region": "四川"
+ },
+ {
+  "name": "广安",
+  "region": "四川"
+ },
+ {
+  "name": "达州",
+  "region": "四川",
+  "saveAs": "达州市"
+ },
+ {
+  "name": "雅安",
+  "region": "四川"
+ },
+ {
+  "name": "巴中",
+  "region": "四川"
+ },
+ {
+  "name": "资阳",
+  "region": "四川",
+  "saveAs": "Ziyang"
+ },
+ {
+  "name": "阿坝",
+  "region": "四川"
+ },
+ {
+  "name": "甘孜",
+  "region": "四川"
+ },
+ {
+  "name": "凉山",
+  "region": "四川"
+ },
+ {
+  "name": "贵阳",
+  "region": "贵州"
+ },
+ {
+  "name": "六盘水",
+  "region": "贵州"
+ },
+ {
+  "name": "遵义",
+  "region": "贵州",
+  "saveAs": "遵义市"
+ },
+ {
+  "name": "安顺",
+  "region": "贵州"
+ },
+ {
+  "name": "毕节",
+  "region": "贵州"
+ },
+ {
+  "name": "铜仁",
+  "region": "贵州",
+  "saveAs": "Tongren"
+ },
+ {
+  "name": "黔东南",
+  "region": "贵州",
+  "saveAs": "Qiandongnan"
+ },
+ {
+  "name": "黔南",
+  "region": "贵州",
+  "saveAs": "Qiannan"
+ },
+ {
+  "name": "昆明",
+  "region": "云南"
+ },
+ {
+  "name": "曲靖",
+  "region": "云南",
+  "saveAs": "曲靖市"
+ },
+ {
+  "name": "玉溪",
+  "region": "云南"
+ },
+ {
+  "name": "保山",
+  "region": "云南"
+ },
+ {
+  "name": "昭通",
+  "region": "云南",
+  "saveAs": "昭通市"
+ },
+ {
+  "name": "丽江",
+  "region": "云南"
+ },
+ {
+  "name": "普洱",
+  "region": "云南"
+ },
+ {
+  "name": "临沧",
+  "region": "云南",
+  "saveAs": "Lincang"
+ },
+ {
+  "name": "楚雄",
+  "region": "云南"
+ },
+ {
+  "name": "红河",
+  "region": "云南"
+ },
+ {
+  "name": "文山",
+  "region": "云南"
+ },
+ {
+  "name": "西双版纳",
+  "region": "云南"
+ },
+ {
+  "name": "大理",
+  "region": "云南"
+ },
+ {
+  "name": "德宏",
+  "region": "云南",
+  "saveAs": "Dehong"
+ },
+ {
+  "name": "怒江",
+  "region": "云南"
+ },
+ {
+  "name": "迪庆",
+  "region": "云南",
+  "saveAs": "Diqing"
+ },
+ {
+  "name": "拉萨",
+  "region": "西藏"
+ },
+ {
+  "name": "日喀则",
+  "region": "西藏"
+ },
+ {
+  "name": "昌都",
+  "region": "西藏"
+ },
+ {
+  "name": "林芝",
+  "region": "西藏",
+  "saveAs": "Nyingchi"
+ },
+ {
+  "name": "山南",
+  "region": "西藏"
+ },
+ {
+  "name": "那曲",
+  "region": "西藏"
+ },
+ {
+  "name": "阿里",
+  "region": "西藏"
+ },
+ {
+  "name": "西安",
+  "region": "陕西"
+ },
+ {
+  "name": "铜川",
+  "region": "陕西"
+ },
+ {
+  "name": "宝鸡",
+  "region": "陕西"
+ },
+ {
+  "name": "咸阳",
+  "region": "陕西"
+ },
+ {
+  "name": "渭南",
+  "region": "陕西"
+ },
+ {
+  "name": "延安",
+  "region": "陕西"
+ },
+ {
+  "name": "汉中",
+  "region": "陕西",
+  "saveAs": "Hanzhong"
+ },
+ {
+  "name": "榆林",
+  "region": "陕西"
+ },
+ {
+  "name": "安康",
+  "region": "陕西"
+ },
+ {
+  "name": "商洛",
+  "region": "陕西",
+  "saveAs": "Shangluo"
+ },
+ {
+  "name": "兰州",
+  "region": "甘肃"
+ },
+ {
+  "name": "嘉峪关",
+  "region": "甘肃"
+ },
+ {
+  "name": "金昌",
+  "region": "甘肃"
+ },
+ {
+  "name": "白银",
+  "region": "甘肃"
+ },
+ {
+  "name": "天水",
+  "region": "甘肃"
+ },
+ {
+  "name": "武威",
+  "region": "甘肃"
+ },
+ {
+  "name": "张掖",
+  "region": "甘肃"
+ },
+ {
+  "name": "平凉",
+  "region": "甘肃"
+ },
+ {
+  "name": "酒泉",
+  "region": "甘肃",
+  "saveAs": "酒泉市"
+ },
+ {
+  "name": "庆阳",
+  "region": "甘肃"
+ },
+ {
+  "name": "定西",
+  "region": "甘肃"
+ },
+ {
+  "name": "陇南",
+  "region": "甘肃",
+  "saveAs": "Longnan"
+ },
+ {
+  "name": "临夏",
+  "region": "甘肃",
+  "saveAs": "Linxia"
+ },
+ {
+  "name": "甘南",
+  "region": "甘肃"
+ },
+ {
+  "name": "西宁",
+  "region": "青海"
+ },
+ {
+  "name": "海东",
+  "region": "青海"
+ },
+ {
+  "name": "海北",
+  "region": "青海"
+ },
+ {
+  "name": "黄南",
+  "region": "青海"
+ },
+ {
+  "name": "果洛",
+  "region": "青海"
+ },
+ {
+  "name": "海西",
+  "region": "青海"
+ },
+ {
+  "name": "银川",
+  "region": "宁夏"
+ },
+ {
+  "name": "石嘴山",
+  "region": "宁夏",
+  "saveAs": "Shizuishan"
+ },
+ {
+  "name": "吴忠",
+  "region": "宁夏"
+ },
+ {
+  "name": "固原",
+  "region": "宁夏",
+  "saveAs": "Guyuan"
+ },
+ {
+  "name": "中卫",
+  "region": "宁夏"
+ },
+ {
+  "name": "乌鲁木齐",
+  "region": "新疆"
+ },
+ {
+  "name": "克拉玛依",
+  "region": "新疆"
+ },
+ {
+  "name": "吐鲁番",
+  "region": "新疆"
+ },
+ {
+  "name": "哈密",
+  "region": "新疆",
+  "saveAs": "Hami"
+ },
+ {
+  "name": "昌吉",
+  "region": "新疆",
+  "saveAs": "Changji"
+ },
+ {
+  "name": "博尔塔拉",
+  "region": "新疆",
+  "saveAs": "Bortala"
+ },
+ {
+  "name": "阿克苏",
+  "region": "新疆"
+ },
+ {
+  "name": "克孜勒苏",
+  "region": "新疆"
+ },
+ {
+  "name": "喀什",
+  "region": "新疆"
+ },
+ {
+  "name": "和田",
+  "region": "新疆"
+ },
+ {
+  "name": "伊犁",
+  "region": "新疆",
+  "saveAs": "Ili"
+ },
+ {
+  "name": "塔城",
+  "region": "新疆"
+ },
+ {
+  "name": "阿勒泰",
+  "region": "新疆"
+ },
+ {
+  "name": "石河子",
+  "region": "新疆"
+ },
+ {
+  "name": "阿拉尔",
+  "region": "新疆"
+ },
+ {
+  "name": "图木舒克",
+  "region": "新疆"
+ },
+ {
+  "name": "五家渠",
+  "region": "新疆",
+  "saveAs": "Wujiaqu"
+ },
+ {
+  "name": "北屯",
+  "region": "新疆"
+ },
+ {
+  "name": "铁门关",
+  "region": "新疆"
+ },
+ {
+  "name": "双河",
+  "region": "新疆"
+ },
+ {
+  "name": "可克达拉",
+  "region": "新疆",
+  "saveAs": "Kokdala"
+ },
+ {
+  "name": "昆玉",
+  "region": "新疆",
+  "saveAs": "Kunyu"
+ },
+ {
+  "name": "胡杨河",
+  "region": "新疆"
+ },
+ {
+  "name": "新星",
+  "region": "新疆"
+ },
+ {
+  "name": "白杨",
+  "region": "新疆"
+ },
+ {
+  "name": "香港",
+  "region": "香港"
+ },
+ {
+  "name": "澳门",
+  "region": "澳门"
+ },
+ {
+  "name": "台北",
+  "region": "台湾",
+  "saveAs": "Taipei"
+ },
+ {
+  "name": "新北",
+  "region": "台湾"
+ },
+ {
+  "name": "台中",
+  "region": "台湾",
+  "saveAs": "Taichung"
+ },
+ {
+  "name": "台南",
+  "region": "台湾"
+ },
+ {
+  "name": "高雄",
+  "region": "台湾"
+ }
+]

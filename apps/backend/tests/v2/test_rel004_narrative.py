@@ -18,28 +18,27 @@ from app.repositories import (
     relationship_repository,
     relationship_snapshot_repository,
 )
-from app.services import (
-    relationship_audit,
-    relationship_narrative,
-)
-from app.services.evaluation_context import (
+from app.services.relationship import audit as relationship_audit
+from app.services.relationship import narrative as relationship_narrative
+from app.services.evaluation.context import (
     EvaluationContext,
     NarrativeFactRef,
     NarrativeMilestoneRef,
     NarrativeSlice,
 )
-from app.services.evaluation_rules.relationship import (
+from app.services.evaluation.rules.relationship import (
     NarrativeFactProvenanceRule,
     NarrativeMilestoneProvenanceRule,
 )
-from app.services.memory2.ingest import NARRATIVE_MILESTONE_PREFIX
+from app.services.memory.ingest import NARRATIVE_MILESTONE_PREFIX
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)
 
 
 @pytest.fixture
 def rel_flag(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
+    """v2 开关已删除，叙事通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _seed_insight(
@@ -115,7 +114,7 @@ class TestNarrativeMilestone:
 
     def test_low_confidence_skipped(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_min_confidence", 0.75
+            get_settings(), "relationship_narrative_min_confidence", 0.75
         )
         with relationship_narrative.SessionLocal() as session:
             session.add(
@@ -137,7 +136,7 @@ class TestNarrativeMilestone:
 
     def test_daily_cap(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:all_nighter": {"title": "熬夜", "keywords": ["熬夜"], "all": true},'
             ' "narrative:trip": {"title": "旅行", "keywords": ["旅行"], "all": true}}',
         )
@@ -153,7 +152,7 @@ class TestNarrativeMilestone:
 
     def test_any_mode_matching(self, _offline_repos, rel_flag, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:any_rule": {"title": "任意", "keywords": ["旅行", "熬夜"],'
             ' "all": false}}',
         )
@@ -235,7 +234,7 @@ class TestNarrativeRules:
 
     def test_milestone_provenance_violations(self, monkeypatch):
         monkeypatch.setattr(
-            get_settings(), "v2_relationship_narrative_whitelist_json",
+            get_settings(), "relationship_narrative_whitelist_json",
             '{"narrative:all_nighter": {"title": "熬夜", "keywords": ["熬夜"], "all": true}}',
         )
         unprovenanced = _slice(

@@ -5,6 +5,7 @@ export type DebugTabValue =
   | "scene"
   | "state"
   | "memory"
+  | "world"
   | "trace"
   | "raw"
 

@@ -6,10 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import lifecycle, retriever
+from app.services.memory import lifecycle, retriever
 
 
 @pytest.fixture
@@ -22,7 +23,6 @@ def retrieve_db(monkeypatch):
     monkeypatch.setattr(retriever, "SessionLocal", testing_session)
     monkeypatch.setattr(memory_repository, "SessionLocal", testing_session)
     monkeypatch.setattr(lifecycle, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -50,7 +50,7 @@ def _memory(
     last_accessed_at=None,
     created_at=None,
 ):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             MemoryRow(
@@ -87,14 +87,14 @@ def _rejected_candidate(id, content, user_id="u1", created_at=None):
                 source_id=f"src-{id}",
                 status="rejected",
                 reason="low_score:0.10",
-                created_at=created_at or datetime.datetime.now(),
+                created_at=created_at or timeutil.now(),
             )
         )
         session.commit()
 
 
 def _contradicts_pair(survivor_id, dead_id, dead_updated_at=None):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     _memory(survivor_id, f"{survivor_id} 内容")
     _memory(dead_id, f"{dead_id} 内容", status="superseded")
     with retriever.SessionLocal() as session:
@@ -128,7 +128,7 @@ class TestScoring:
         assert retriever._cosine([1.0], [1.0, 2.0]) == 0.0
 
     def test_structured_components(self):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         memory = memory_repository.UserMemory(
             id="m1", user_id="u1", character_id="asuna", type="user_preference",
             content="内容", importance=0.9, created_at=now, updated_at=now,
@@ -137,7 +137,7 @@ class TestScoring:
         assert score == pytest.approx((1.0 + 0.9 + 0.6) / 3.0)
 
     def test_recency_half_life(self):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         memory = memory_repository.UserMemory(
             id="m1", user_id="u1", character_id="asuna", type="user_fact",
             content="内容", importance=0.5, created_at=now, updated_at=now,
@@ -154,11 +154,10 @@ class TestScoring:
         assert retriever._detect_query_types("今天天气") == set()
 
     def test_hybrid_score_weighting(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_semantic", 0.5)
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_structured", 0.3)
-        monkeypatch.setattr(get_settings(), "v2_memory_weight_affinity", 0.2)
-        now = datetime.datetime.now()
+        monkeypatch.setattr(get_settings(), "memory_weight_semantic", 0.5)
+        monkeypatch.setattr(get_settings(), "memory_weight_structured", 0.3)
+        monkeypatch.setattr(get_settings(), "memory_weight_affinity", 0.2)
+        now = timeutil.now()
         _memory("m1", "用户喜欢吃西瓜", embedding=json.dumps([1.0, 0.0]), created_at=now)
         _embed_stub(monkeypatch, {"我喜欢吃水果": [1.0, 0.0]})
         result = retriever.retrieve("u1", "我喜欢吃水果", top_k=5)
@@ -172,7 +171,6 @@ class TestScoring:
 
 class TestRecall:
     def test_paraphrase_recall_via_semantic(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "用户喜欢吃西瓜", embedding=json.dumps([0.9, 0.1]))
         _memory("m2", "用户在深圳工作", type="user_fact", embedding=json.dumps([0.0, 1.0]))
         _embed_stub(
@@ -184,17 +182,8 @@ class TestRecall:
         result2 = retriever.retrieve("u1", "在哪里上班", top_k=1)
         assert result2.items[0].memory.id == "m2"
 
-    def test_structured_only_when_vector_disabled(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
-        _memory("m1", "用户喜欢吃西瓜")
-        _embed_stub(monkeypatch, {"爱吃西瓜吗": [0.9, 0.1]})
-        result = retriever.retrieve("u1", "爱吃西瓜吗")
-        assert result.mode == "structured"
-        assert all(item.semantic == 0.0 for item in result.items)
-        assert result.items
 
     def test_degraded_when_embedding_unavailable(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "用户喜欢吃西瓜")
         _embed_stub(monkeypatch, {"爱吃西瓜吗": None})
         result = retriever.retrieve("u1", "爱吃西瓜吗")
@@ -202,7 +191,6 @@ class TestRecall:
         assert result.items[0].memory.id == "m1"
 
     def test_null_embedding_row_still_structured(self, retrieve_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", True)
         _memory("m1", "无向量记忆", embedding=None)
         _embed_stub(monkeypatch, {"查询": [1.0, 0.0]})
         result = retriever.retrieve("u1", "查询")
@@ -242,19 +230,19 @@ class TestFilters:
         _memory("m1", "用户喜欢吃香菜")
         _rejected_candidate(
             "rc1", "用户喜欢吃香菜",
-            created_at=datetime.datetime.now() - datetime.timedelta(hours=25),
+            created_at=timeutil.now() - datetime.timedelta(hours=25),
         )
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == ["m1"]
 
     def test_contradicts_cooldown_survivor_filtered(self, retrieve_db):
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _contradicts_pair("survivor", "dead", dead_updated_at=now)
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == []
 
     def test_contradicts_beyond_cooldown_survivor_visible(self, retrieve_db):
-        stale = datetime.datetime.now() - datetime.timedelta(hours=25)
+        stale = timeutil.now() - datetime.timedelta(hours=25)
         _contradicts_pair("survivor", "dead", dead_updated_at=stale)
         result = retriever.retrieve("u1", "查询")
         assert [item.memory.id for item in result.items] == ["survivor"]
@@ -293,7 +281,7 @@ class TestTrace:
 
         trace = _TraceSpy()
         retriever.retrieve("u1", "查询", trace=trace)
-        steps = [s for s in trace.records if s.name == "memory_retrieve_v2"]
+        steps = [s for s in trace.records if s.name == "memory_recall"]
         assert len(steps) == 1
         returned_ids = [entry["id"] for entry in steps[0].extra["returned"]]
         assert returned_ids == ["m1"]
@@ -305,9 +293,8 @@ class TestContextBuilderWiring:
     def test_v2_branch_feeds_select_for_context(self, retrieve_db, monkeypatch):
         from app.models.character_state import CharacterState
         from app.models.relationship import RelationshipState
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
-        monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
         _memory("m1", "用户喜欢吃西瓜")
 
         class _Conversation:

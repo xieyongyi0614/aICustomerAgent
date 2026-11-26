@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import SettingsError, get_settings
 from app.models.world import (
     EventImportance,
@@ -99,7 +100,7 @@ def test_time_context_day_line():
 def test_world_context_defaults():
     context = WorldContext(
         time=TimeContext(
-            now=datetime.now(), weekday="周一", part_of_day="morning", time_mode=WorldTimeMode.REAL_SYNC
+            now=timeutil.now(), weekday="周一", part_of_day="morning", time_mode=WorldTimeMode.REAL_SYNC
         ),
         location={
             "current": "home.living_room",
@@ -133,14 +134,12 @@ def test_world_facts_defaults():
     assert facts.salient_events == []
 
 
-def test_world_settings_defaults(monkeypatch):
-    monkeypatch.delenv("WORLD_ENABLED", raising=False)
+def test_world_settings_defaults():
     get_settings.cache_clear()
     settings = get_settings()
-    assert settings.world_enabled is True
     assert settings.world_time_mode == "real_sync"
     assert settings.world_context_char_budget == 600
-    assert settings.world_llm_assist_enabled is False
+    assert "world_llm_assist_enabled" not in type(settings).model_fields
     assert settings.world_memory_importance()["normal"] == 0.6
     get_settings.cache_clear()
 

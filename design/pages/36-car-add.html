@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 36 养车记一笔 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Car Add（养车记一笔） ============ */
+.type-scroll{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;margin:0 -2px}
+.type-scroll::-webkit-scrollbar{display:none}
+.type{flex:none;display:flex;align-items:center;gap:7px;background:var(--card);border-radius:99px;box-shadow:var(--shadow-card);padding:9px 15px;font-size:13px;font-weight:650;color:var(--ink2);border:1.5px solid transparent;cursor:pointer}
+.type svg{width:15px;height:15px}
+.type.on{border-color:rgba(51,188,140,.55);color:var(--ink)}
+.type.on svg{color:var(--health)}
+.amount{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:22px 18px;text-align:right;margin-top:12px;font-variant-numeric:tabular-nums}
+.amount .a-l{text-align:left;font-size:12px;color:var(--ink3);margin-bottom:4px}
+.amount .a-v{font-size:38px;font-weight:750;letter-spacing:-.02em}
+.amount .a-v .cur{font-size:22px;font-weight:700;margin-right:4px}
+.form{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:4px 18px;margin-top:14px}
+.f-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.f-row:last-child{border-bottom:none}
+.f-row .f-l{font-size:13px;color:var(--ink2);width:70px;flex:none}
+.f-row .f-v{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.f-row .f-v.ph{color:var(--ink3);font-weight:400}
+.f-row .f-v small{font-size:11px;font-weight:400;color:var(--ink3);margin-left:6px}
+.f-row .f-go{margin-left:auto;color:var(--ink3);display:flex}
+.f-row .f-go svg{width:15px;height:15px}
+.ai-hint{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ai1);background:rgba(122,92,255,.08);border:1px solid rgba(122,92,255,.16);border-radius:12px;padding:9px 13px;margin-top:14px}
+.ai-hint svg{width:14px;height:14px;flex:none}
+.sync-note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);margin-top:14px;padding:0 4px}
+.sync-note svg{width:14px;height:14px;color:var(--health);flex:none}
+.save{display:block;text-align:center;background:var(--ink);color:#fff;font-size:15px;font-weight:700;border-radius:99px;padding:15px;margin-top:18px;box-shadow:0 12px 26px rgba(27,28,35,.22);cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Car Add ================= -->
+    <div class="screen" id="car-add">
+      <a class="back" href="35-car.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>车辆</a>
+
+      <div class="type-scroll">
+        <div class="type on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>充电</div>
+        <div class="type"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>加油</div>
+        <div class="type"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M3 12h18"/></svg>里程</div>
+        <div class="type"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4h9l3 4v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>停车</div>
+        <div class="type"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17h16M6 17V9a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8M9 21v-4M15 21v-4"/></svg>过路</div>
+        <div class="type"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>保养</div>
+      </div>
+
+      <div class="amount">
+        <div class="a-l">本次金额</div>
+        <div class="a-v"><span class="cur">¥</span>42.00</div>
+      </div>
+
+      <div class="form">
+        <div class="f-row"><span class="f-l">充电度数</span><span class="f-v">42.5 kWh<small>单价自动换算 ¥0.99 / kWh</small></span></div>
+        <div class="f-row"><span class="f-l">充电站</span><span class="f-v">国家电网 · 科技园快充站</span><span class="f-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+        <div class="f-row"><span class="f-l">当前里程</span><span class="f-v">12,480 km<small>较上次 +38 km</small></span></div>
+        <div class="f-row"><span class="f-l">时间</span><span class="f-v">今天 23:12</span><span class="f-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+        <div class="f-row"><span class="f-l">备注</span><span class="f-v ph">补充点什么…（选填）</span></div>
+      </div>
+
+      <div class="ai-hint">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+        谷电时段充电，单价比你上月均价低 ¥0.12，已帮你标记录入
+      </div>
+
+      <div class="sync-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        这笔费用会同时计入「生活 · 记账」的养车分类，不用重复记
+      </div>
+
+      <a class="save" href="35-car.html">保存记录</a>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · 养车记一笔</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

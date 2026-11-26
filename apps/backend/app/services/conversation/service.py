@@ -1,0 +1,66 @@
+from app.core.settings import get_settings
+from app.models.conversation import ChatMessage
+from app.repositories import conversation_repository as repo
+from app.repositories import proactive_repository
+
+
+def ensure_conversation(session_id: str, user_id: str):
+    return repo.get_or_create_conversation(session_id, user_id)
+
+
+def find_conversation(session_id: str):
+    return repo.find_conversation(session_id)
+
+
+def load_window(
+    session_id: str, max_messages: int | None = None, max_chars: int | None = None
+) -> list[ChatMessage]:
+    settings = get_settings()
+    limit = max_messages or settings.conversation_max_messages
+    char_budget = max_chars or settings.conversation_max_chars
+    messages = repo.get_recent_messages(session_id, limit)
+    result = [ChatMessage(role=m.role, content=m.content) for m in messages]
+    total = sum(len(m.content) for m in result)
+    while result and total > char_budget:
+        dropped = result.pop(0)
+        total -= len(dropped.content)
+    return result
+
+
+def save_turn(
+    session_id: str,
+    user_message: str,
+    ai_reply: str,
+    mode_write_back: str | None = None,
+) -> int:
+    repo.save_message(session_id, "human", user_message)
+    ai_message = repo.save_message(session_id, "ai", ai_reply)
+    if mode_write_back is not None:
+        repo.update_mode(session_id, mode_write_back)
+    return ai_message.id
+
+
+def save_proactive_turn(session_id: str, text: str) -> int:
+    message = repo.save_message(session_id, "ai", text, is_proactive=True)
+    repo.touch_conversation(session_id)
+    return message.id
+
+
+def set_preferred_mode(user_id: str, mode: str) -> str | None:
+    """N3 Role Mode 写路径：写最近会话的 confirmed mode。"""
+    from app.services.conversation import history as history_service
+
+    conversation = history_service.find_latest_conversation(user_id)
+    if conversation is None:
+        return None
+    repo.update_mode(conversation.id, mode)
+    return conversation.id
+
+
+def reset_proactive_on_user_message(user_id: str) -> None:
+    """用户发言复位（cooldown.md §5）：delivered 未 acked → acked；candidate → discarded。"""
+    proactive_repository.reset_on_user_message(user_id)
+
+
+def message_count(session_id: str) -> int:
+    return repo.count_messages(session_id)

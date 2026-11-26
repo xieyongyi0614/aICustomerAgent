@@ -4,6 +4,7 @@ from datetime import datetime
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
+from app.core import timeutil
 from app.models.observability import CallSite
 from app.services.observability.llm_capture import (
     UsageCallbackHandler,
@@ -64,7 +65,7 @@ def test_build_llm_record_ok():
         _FakeModel(),
         handler,
         started,
-        datetime.now(),
+        timeutil.now(),
         ttft_ms=12.345,
         request_id="req-1",
     )
@@ -84,7 +85,7 @@ def test_build_llm_record_error_without_usage():
         _FakeModel(),
         None,
         started,
-        datetime.now(),
+        timeutil.now(),
         status="error",
         error_kind="RuntimeError",
     )

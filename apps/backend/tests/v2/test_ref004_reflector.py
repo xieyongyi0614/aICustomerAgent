@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import EvidenceLinkRow, InsightRow, Memory, ReflectionRunRow
 from app.models.reflection import InsightDraft, ReflectionProposal
 from app.services.reflection import reflector
@@ -55,7 +56,7 @@ class ScriptedLLM:
 
 
 def _seed_cluster_memory(session_factory, memory_id, *, created_at, content, source="user_stated"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -80,7 +81,7 @@ def _seed_cluster_memory(session_factory, memory_id, *, created_at, content, sou
 
 
 def _seed_fatigue(session_factory, *, count=5):
-    now = datetime.now()
+    now = timeutil.now()
     for i in range(count):
         _seed_cluster_memory(
             session_factory,
@@ -92,7 +93,7 @@ def _seed_fatigue(session_factory, *, count=5):
 
 
 def _seed_run(session_factory, run_id, *, status="queued", user=USER):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             ReflectionRunRow(
@@ -142,7 +143,7 @@ def _proposal(**overrides) -> ReflectionProposal:
 
 @pytest.fixture
 def reflection_on(override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
 
 
 @pytest.fixture(autouse=True)
@@ -153,7 +154,7 @@ def _patch_llm(monkeypatch):
 
 
 def test_count_factor_curve():
-    curve = reflector.get_settings().v2_reflection_confidence_count_curve_json
+    curve = reflector.get_settings().reflection_confidence_count_curve_json
     assert reflector._count_factor(3, curve) == 0.65
     assert reflector._count_factor(4, curve) == 0.75
     assert reflector._count_factor(5, curve) == 0.85
@@ -170,7 +171,7 @@ def test_calibrate_confidence_monotonic_and_capped():
     assert strong > mid > weak
     assert strong <= 0.95
     capped = reflector.calibrate_confidence(0.9, 6, ["user_stated", "ai_inferred"], settings)
-    assert capped == settings.v2_reflection_ai_inferred_cap
+    assert capped == settings.reflection_ai_inferred_cap
 
 
 def test_review_rejects_hallucinated_evidence_ids():
@@ -204,7 +205,7 @@ def test_review_rejects_missing_counter_evidence():
 
 
 def test_review_rejects_below_min_confidence(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_min_confidence=0.99)
+    override_settings( reflection_min_confidence=0.99)
     settings = reflector.get_settings()
     proposal = _proposal()
     accepted, rejected = reflector._calibrate_and_review(
@@ -225,13 +226,6 @@ def test_review_accepts_valid_draft():
     assert final > 0.6
 
 
-def test_flag_off_skips_execution(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=False)
-    _seed_run(db_session_factory, "run-off")
-    assert reflector.run_queued_reflections() == 0
-    assert _run_row(db_session_factory, "run-off").status == "queued"
-
-
 def test_evidence_gone_completes_without_llm(db_session_factory, reflection_on, _patch_llm):
     _seed_run(db_session_factory, "run-gone")
     result = reflector.execute_run("run-gone")
@@ -249,7 +243,7 @@ def test_end_to_end_creates_insight_with_evidence_links(
 ):
     now = _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-e2e")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     result = reflector.execute_run(run_id)
     assert result == "done"
@@ -282,7 +276,7 @@ def test_end_to_end_creates_insight_with_evidence_links(
 def test_same_run_reexecution_is_idempotent(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-idem")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     assert reflector.execute_run(run_id) == "done"
     _patch_llm.proposals = [_proposal(statement="重复结论")]
@@ -296,7 +290,7 @@ def test_same_run_reexecution_is_idempotent(db_session_factory, reflection_on, _
 def test_llm_double_failure_marks_run_failed(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-fail")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.errors = [RuntimeError("500"), RuntimeError("500")]
     result = reflector.execute_run(run_id)
     assert result == "failed"
@@ -313,7 +307,7 @@ def test_all_drafts_rejected_completes_without_insights(
 ):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-rej")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [
         ReflectionProposal(
             insights=[
@@ -337,7 +331,7 @@ def test_all_drafts_rejected_completes_without_insights(
 
 def test_claim_is_conditional_update(db_session_factory, reflection_on):
     _seed_run(db_session_factory, "run-claim", status="queued")
-    now = datetime.now()
+    now = timeutil.now()
     assert reflector._claim_run("run-claim", now) is True
     assert reflector._claim_run("run-claim", now) is False
     assert _run_row(db_session_factory, "run-claim").status == "running"
@@ -345,23 +339,23 @@ def test_claim_is_conditional_update(db_session_factory, reflection_on):
 
 def test_timeout_recovery_requeues_running(db_session_factory, reflection_on):
     _seed_run(db_session_factory, "run-zombie", status="running")
-    stale = datetime.now() - timedelta(
-        minutes=reflector.get_settings().v2_reflection_run_timeout_minutes + 1
+    stale = timeutil.now() - timedelta(
+        minutes=reflector.get_settings().reflection_run_timeout_minutes + 1
     )
     with db_session_factory() as session:
         row = session.get(ReflectionRunRow, "run-zombie")
         row.updated_at = stale
         session.commit()
-    assert reflector._recover_timed_out_runs(datetime.now()) == 1
+    assert reflector._recover_timed_out_runs(timeutil.now()) == 1
     assert _run_row(db_session_factory, "run-zombie").status == "queued"
-    assert reflector._recover_timed_out_runs(datetime.now()) == 0
+    assert reflector._recover_timed_out_runs(timeutil.now()) == 0
 
 
 def test_new_reflection_supersedes_conflicting_old_insight(
     db_session_factory, reflection_on, _patch_llm
 ):
     _seed_fatigue(db_session_factory)
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             InsightRow(
@@ -380,7 +374,7 @@ def test_new_reflection_supersedes_conflicting_old_insight(
         )
         session.commit()
     run_id = _seed_run(db_session_factory, "run-sup")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     assert reflector.execute_run(run_id) == "done"
     insights = {row.id: row for row in _insights(db_session_factory)}
@@ -405,7 +399,7 @@ def test_run_queued_reflections_processes_all(db_session_factory, reflection_on,
 def test_trace_records_calibration(db_session_factory, reflection_on, _patch_llm):
     _seed_fatigue(db_session_factory)
     run_id = _seed_run(db_session_factory, "run-trace")
-    assert reflector._claim_run(run_id, datetime.now()) is True
+    assert reflector._claim_run(run_id, timeutil.now()) is True
     _patch_llm.proposals = [_proposal()]
     trace = StubTrace()
     reflector.execute_run(run_id, trace=trace)
@@ -434,7 +428,7 @@ def _window(coherence=0.9):
 def _provided(count=5):
     from app.models.reflection import EvidenceMember
 
-    now = datetime.now()
+    now = timeutil.now()
     return [
         EvidenceMember(
             memory_id=f"mem-ev-{i}",

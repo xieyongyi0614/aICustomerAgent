@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.application import observability
 from app.core.db import (
     DecisionRecordRow,
@@ -18,7 +19,7 @@ from app.repositories import (
 
 
 def _seed_old_and_fresh(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     old = now - timedelta(days=30)
     fresh = now
     with trace_repository.SessionLocal() as session:
@@ -81,7 +82,6 @@ def _row_count(row_cls, repo_module):
 
 
 def test_prune_all_keeps_fresh_and_removes_expired(db_session_factory, override_settings):
-    override_settings(observability_persist_enabled=True)
     _seed_old_and_fresh(db_session_factory)
 
     pruned = observability.prune_all()

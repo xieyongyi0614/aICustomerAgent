@@ -2,7 +2,7 @@ import pytest
 
 from app.models.behavior_strategy import StageBehaviorParams
 from app.models.scene import SceneContext, SceneState
-from app.services.behavior_engine import compute_budget
+from app.engines.behavior import compute_budget
 
 STRANGER = StageBehaviorParams(
     physical_contact="none", affection_verbosity="restrained",

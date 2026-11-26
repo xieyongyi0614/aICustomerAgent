@@ -1,13 +1,13 @@
 from app.chains.structured import build_structured_chain
 from app.core.settings import get_settings
 from app.models.memory import MemoryExtraction
-from app.prompts.extractor import V4_EXTRACTOR_PROMPT
+from app.prompts.extractor import MEMORY_EXTRACTOR_PROMPT
 
 
 def build_extraction_chain(llm=None):
     return build_structured_chain(
         [
-            ("system", V4_EXTRACTOR_PROMPT),
+            ("system", MEMORY_EXTRACTOR_PROMPT),
             (
                 "user",
                 "用户消息：{user_input}\nAI 回复：{ai_reply}\n最近对话：\n{recent_context}",

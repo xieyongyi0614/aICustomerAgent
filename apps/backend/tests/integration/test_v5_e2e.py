@@ -12,8 +12,8 @@ from app.repositories import (
     relationship_event_repository,
     relationship_repository,
 )
-from app.services import state_service
-from app.services.trace_collector import TurnTraceSession
+from app.services.conversation import state as state_service
+from app.services.observability.collector import TurnTraceSession
 from tests.conftest import FakeLLM
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)
@@ -69,11 +69,8 @@ async def run_pipeline(analysis, state=None, llm=None, trace=None):
 class TestOrchestrationPipeline:
     @pytest.mark.asyncio
     async def test_emotion_and_relationship_applied_and_ledger_written(
-        self, db_session_factory, monkeypatch
+        self, db_session_factory
     ):
-        from app.core.settings import get_settings
-
-        monkeypatch.setattr(get_settings(), "rel_evolution_enabled", False)
         llm = FakeLLM(
             structured_responses={"StateUpdateDecision": DECISION},
         )
@@ -89,7 +86,9 @@ class TestOrchestrationPipeline:
         assert len(events) == 1
         event = events[0]
         assert event.type == "user_care"
-        assert event.impact.trust == pytest.approx(0.04)
+        # 批次 2 固化后关系演化恒开（原用例以 setattr 关闭 rel_evolution_enabled 走 V5 平直增量 0.04）；
+        # 现走 V8.5 动力学，精确值由 tests/v8.5 单测覆盖。
+        assert event.impact.trust == pytest.approx(0.0351, abs=1e-6)
         assert relationship.trust == pytest.approx(
             original_state.relationship_state.trust + event.impact.trust, abs=1e-9
         )
@@ -110,11 +109,8 @@ class TestOrchestrationPipeline:
 
     @pytest.mark.asyncio
     async def test_v2_event_fallback_creates_mapped_ledger_row(
-        self, db_session_factory, monkeypatch
+        self, db_session_factory
     ):
-        from app.core.settings import get_settings
-
-        monkeypatch.setattr(get_settings(), "rel_evolution_enabled", False)
         analysis = make_analysis(
             emotion_event={"type": "none", "magnitude": "normal", "confidence": 0.9},
             relationship_event={"type": "none", "magnitude": "normal", "confidence": 0.0},

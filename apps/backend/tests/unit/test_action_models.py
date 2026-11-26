@@ -139,6 +139,9 @@ class TestTransitionAction:
             "quota_exceeded",
             "effect_already_satisfied",
             "target_not_found",
+            "permission_denied",
+            "invalid_params",
+            "pending_confirmation",
         }
 
 
@@ -173,8 +176,6 @@ class TestDedupeKey:
 class TestSettingsActionGroup:
     def test_defaults(self):
         settings = get_settings()
-        assert settings.action_enabled is False
-        assert settings.action_detector_enabled is True
         assert settings.action_plan_max_steps == 1
         assert settings.action_max_active_per_user == 5
         assert settings.action_dedupe_window_hours == 24
@@ -182,7 +183,6 @@ class TestSettingsActionGroup:
         assert settings.action_retry_max_attempts == 2
         assert settings.action_retry_backoff_seconds == 30
         assert settings.action_context_char_budget == 400
-        assert settings.action_memory_policy_enabled is True
         assert settings.action_relationship_enabled is False
         assert settings.action_record_retention_days == 180
         assert settings.autonomy_action_enabled is False

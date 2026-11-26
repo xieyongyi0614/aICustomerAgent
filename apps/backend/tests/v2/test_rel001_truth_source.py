@@ -1,37 +1,35 @@
 """REL-001 关系事实真相源统一测试。
 
 覆盖：里程碑转写通道（类型/salience/source_ref/幂等/insight 溯源位）、
-v1 直写旁路 Flag 门控、v1 遗留记忆迁移（dry-run/apply/幂等/校验）、
-debug timeline 账本↔记忆互相溯源。
+v1 直写旁路已删除（静态守卫）、debug timeline 账本↔记忆互相溯源。
+
+注：v1 遗留类型迁移（原 `memory/migration.py`）已于 2026-10-15 整体删除——
+存量库可重建，迁移无对象；本文件对应的 `TestLegacyMigration` 同步移除。
 """
 
+import pathlib
 from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import Memory
 from app.core.settings import get_settings
-from app.models.character_state import CharacterState
 from app.models.relationship import (
     MilestoneRecord,
     RelationshipDelta,
     RelationshipEvent,
-    RelationshipState,
 )
 from app.repositories import (
     memory_repository,
     relationship_event_repository,
     relationship_milestone_repository,
 )
-from app.services import (
-    relationship_conflict,
-    relationship_memory,
-    relationship_milestone,
-    state_service,
-)
-from app.services.memory2 import ingest, migration
-from app.services.memory2.types import V2_MEMORY_TYPES
+from app.services.memory import ingest
+from app.services.memory.types import CANONICAL_MEMORY_TYPES
+
+BACKEND = pathlib.Path(__file__).resolve().parents[2]
 
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)
@@ -100,120 +98,24 @@ class TestMilestoneIngest:
         assert row.source_ref["insight_id"] == "ins-7"
 
     def test_milestone_event_type_is_canonical(self):
-        assert "milestone_event" in V2_MEMORY_TYPES
-        assert "relationship_fact" in V2_MEMORY_TYPES
+        assert "milestone_event" in CANONICAL_MEMORY_TYPES
+        assert "relationship_fact" in CANONICAL_MEMORY_TYPES
 
 
 class TestV1BypassGate:
-    @pytest.fixture
-    def subsystem_stubs(self, monkeypatch):
-        relationship = RelationshipState()
-        monkeypatch.setattr(
-            relationship_conflict,
-            "evaluate_conflict",
-            lambda *a, **k: SimpleNamespace(
-                state=relationship, system_events=[], record=None, transition=""
-            ),
-        )
-        monkeypatch.setattr(
-            relationship_conflict,
-            "decay_tension",
-            lambda *a, **k: SimpleNamespace(system_events=[], state=relationship),
-        )
-        monkeypatch.setattr(
-            relationship_milestone,
-            "process_milestones",
-            lambda ctx, state: (state, []),
-        )
-        monkeypatch.setattr(state_service, "_capture_snapshot_if_needed", lambda *a, **k: None)
-        calls: list[str] = []
-        monkeypatch.setattr(
-            relationship_memory,
-            "to_memory_candidates",
-            lambda *a, **k: calls.append("shape") or [SimpleNamespace(content="x")],
-        )
-        monkeypatch.setattr(
-            relationship_memory,
-            "deliver_candidates",
-            lambda candidates, user_id: calls.append(f"deliver:{user_id}"),
-        )
-        return calls, relationship
+    """v1 直写旁路已随 memory 域清理删除（2026-09-29）：关系记忆不再有 v1 投递通道。"""
 
-    def _run(self, relationship, user_id="u-rel1"):
-        state_service._run_relationship_subsystems(
-            user_id=user_id,
-            session_id="s-1",
-            state=None,
-            analysis=None,
-            character=CharacterState(),
-            new_relationship=relationship,
-            turn_events=[],
-            user_input="",
-            recent_events=[],
-            now=NOW,
-        )
+    def test_v1_delivery_module_is_removed(self):
+        assert not (BACKEND / "app/services/relationship_memory.py").exists()
 
-    def test_flag_off_keeps_v1_delivery(self, _offline_repos, subsystem_stubs, monkeypatch):
-        calls, relationship = subsystem_stubs
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        self._run(relationship)
-        assert "shape" in calls
-        assert "deliver:u-rel1" in calls
-
-    def test_flag_on_skips_v1_delivery(self, _offline_repos, subsystem_stubs, monkeypatch):
-        calls, relationship = subsystem_stubs
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-        self._run(relationship)
-        assert calls == []
-
-    def test_flag_default_off(self):
-        assert get_settings().v2_relationship_evolved_enabled is False
-
-
-class TestLegacyMigration:
-    def _seed_legacy(self, user_id="u-mig", content="我们一起去看过海"):
-        return memory_repository.create_memory(
-            user_id=user_id,
-            character_id="asuna",
-            content=content,
-            memory_type="relationship_event",
-            importance=0.8,
-            confidence=0.8,
-            source="ai_inferred",
-        )
-
-    def test_dry_run_report(self, _offline_repos):
-        self._seed_legacy()
-        report = migration.collect_report()
-        assert report["pending_rows"] == 1
-        assert report["per_user"] == {"u-mig": 1}
-        assert report["without_source_ref"] == 1
-        assert report["replay_source_rows"] == 1
-        assert report["target_type"] == "relationship_fact"
-
-    def test_apply_migrates_and_verifies(self, _offline_repos):
-        memory = self._seed_legacy()
-        report = migration.apply_migration(batch_size=10)
-        assert report["mode"] == "apply"
-        assert report["migrated"] == 1
-        assert report["verification"]["remaining_rows"] == 0
-        assert report["verification"]["alias_mapping_ok"] is True
-        assert report["verification"]["retriever_alias_ok"] is True
-        assert report["verification"]["v1_affinity_ok"] is True
-        row = memory_repository.get_memory(memory.id)
-        assert row.type == "relationship_fact"
-        assert row.content == "我们一起去看过海"
-        assert row.source == "ai_inferred"
-
-    def test_apply_idempotent(self, _offline_repos):
-        self._seed_legacy()
-        assert migration.apply_migration(batch_size=10)["migrated"] == 1
-        assert migration.apply_migration(batch_size=10)["migrated"] == 0
+    def test_state_service_has_no_v1_delivery_reference(self):
+        source = (BACKEND / "app/services/conversation/state.py").read_text(encoding="utf-8")
+        assert "relationship_memory" not in source
 
 
 class TestTimelineNarrativeLink:
     def test_event_and_milestone_linked_to_memory(self, _offline_repos):
-        from app.api.v1.debug import get_relationship_timeline
+        from app.api.v1.debug.relationship import get_relationship_timeline
 
         user_id = "u-link"
         event = relationship_event_repository.create_event(
@@ -235,7 +137,7 @@ class TestTimelineNarrativeLink:
             title="第一次袒露心事",
             now=NOW,
         )
-        now = datetime.now()
+        now = timeutil.now()
         with memory_repository.SessionLocal() as session:
             session.add(
                 Memory(

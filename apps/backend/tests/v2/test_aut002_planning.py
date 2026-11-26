@@ -10,13 +10,14 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.models.goal import GoalPlanRecord
 from app.repositories import (
     background_job_repository,
     goal_repository,
 )
-from app.services import goal_planning as planning
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.goal import planning
+from app.services.memory import job_worker as memory_job_worker
 
 NOW = datetime(2026, 9, 8, 12, 0, 0)
 USER = "aut2-user"
@@ -48,11 +49,7 @@ VALID_SUB_GOALS = [
 
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
-    override_settings(
-        v2_autonomy_advanced_enabled="true",
-        observability_persist_enabled="false",
-        world_enabled="false",
-    )
+    override_settings()
     monkeypatch.setattr(
         planning,
         "_ask_llm_with_retry",
@@ -74,7 +71,7 @@ def _stub_overlay(monkeypatch, weights=None):
 
 
 def _stub_patterns(monkeypatch, patterns):
-    from app.services import relationship_patterns as pattern_service
+    from app.services.relationship import patterns as pattern_service
 
     monkeypatch.setattr(
         pattern_service, "read_relationship_patterns", lambda user_id, character_id="asuna": (patterns, {})
@@ -178,12 +175,6 @@ class TestMaterialize:
         assert len(first["created"]) == 1
         assert second["created"] == []
 
-    def test_flag_off_skips(self, override_settings, monkeypatch):
-        override_settings(v2_autonomy_advanced_enabled="false")
-        result = planning.materialize(USER, now=NOW)
-        assert result["status"] == "skipped"
-        assert result["skip_reason"] == "flag_disabled"
-
 
 class TestEnqueueAndGate:
     def test_enqueue_idempotency_key_and_rejects_bad_trigger(self, aut_on):
@@ -194,7 +185,7 @@ class TestEnqueueAndGate:
             planning.enqueue_planning(USER, goal.id, "whenever")
 
     def test_plan_goal_flag_off_skipped(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="false")
+        override_settings()
         assert planning.plan_goal("ghost", planning.TRIGGER_CREATED)["status"] == "skipped"
 
     def test_plan_goal_rejects_non_layered_goal(self, aut_on):
@@ -208,7 +199,7 @@ class TestEnqueueAndGate:
     def test_attempt_cap_rejects_fourth_request_without_llm(self, aut_on, monkeypatch):
         goal = _make_goal()
         for version in range(1, 4):
-            now = datetime.now()
+            now = timeutil.now()
             goal_repository.create_plan(
                 GoalPlanRecord(
                     goal_id=goal.id,
@@ -267,7 +258,7 @@ class TestEnqueueAndGate:
         assert [spec.index for spec in latest.sub_goals] == [1, 2]
 
     def test_gate_rejects_oversize_plan(self, aut_on, override_settings):
-        override_settings(v2_autonomy_subgoal_max_count="1")
+        override_settings(autonomy_subgoal_max_count="1")
         goal = _make_goal()
         outcome = planning.plan_goal(goal.id, planning.TRIGGER_CREATED)
         assert outcome["status"] == "rejected"
@@ -315,10 +306,10 @@ class TestEnqueueAndGate:
 
 class TestJobHandler:
     def test_runtime_registration(self, override_settings):
-        override_settings(v2_autonomy_advanced_enabled="true")
+        override_settings()
         planning.register_runtime()
         assert (
-            memory2_job_worker._JOB_HANDLERS[planning.JOB_TYPE_PLANNING]
+            memory_job_worker._JOB_HANDLERS[planning.JOB_TYPE_PLANNING]
             is planning.run_planning_jobs
         )
 
@@ -332,12 +323,6 @@ class TestJobHandler:
 
 
 class TestLifeLoopSupplyStep:
-    def test_step_flag_off_skipped(self, db_session_factory, override_settings):
-        from app.application import life_loop
-
-        override_settings(v2_autonomy_advanced_enabled="false")
-        detail = life_loop._step_goal_supply(USER, NOW)
-        assert detail["skip_reason"] == "flag_disabled"
 
     def test_step_throttled_within_interval(self, aut_on, monkeypatch):
         from app.application import life_loop
@@ -354,7 +339,7 @@ class TestLifeLoopSupplyStep:
     def test_step_wires_world_facts_and_creates(self, aut_on, override_settings, monkeypatch):
         from app.application import life_loop
 
-        override_settings(world_enabled="true")
+        override_settings()
         captured: dict = {}
 
         def _fake_materialize(user_id, world_facts=None, now=None):
@@ -372,6 +357,6 @@ class TestLifeLoopSupplyStep:
 
 
 def test_trace_step_registered():
-    from app.services.trace_collector import TRACE_STEP_NAMES
+    from app.services.observability.collector import TRACE_STEP_NAMES
 
     assert "goal_planning" in TRACE_STEP_NAMES

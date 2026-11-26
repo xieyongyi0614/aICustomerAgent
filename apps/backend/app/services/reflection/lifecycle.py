@@ -1,7 +1,7 @@
 """Insight 生命周期（REF-001 + REF-005 策略层）。
 
 状态机 active→superseded|invalidated（两终态互斥、不复活、非法转换拒绝），
-与 memory2 状态机同构但独立实现（Reflection 只写本域三表，不 import memory2）。
+与 memory 状态机同构但独立实现（Reflection 只写本域三表，不 import memory）。
 迁移 API 全部单事务：条件 UPDATE 带 status='active'，影响 0 行即 no-op，天然幂等。
 invalidated_reason 必填由服务层前置校验 + DB CHECK 兜底；supersede 要求新行存在
 且 active，不产生悬挂引用。原行不删除（审计保留）。
@@ -13,13 +13,13 @@ REF-005 策略层：澄清话语 ↔ Insight 匹配（LCS 归一相似度，阈�
 
 import logging
 import time
-import uuid
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import InsightRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.reflection import Insight
-from app.services.memory_conflict import _lcs_length
+from app.engines.memory_conflict import _lcs_length
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def invalidate_insight(
         raise ValueError("invalidated_reason 必填")
     if source not in INVALIDATION_SOURCES:
         raise ValueError(f"非法失效来源: {source}")
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(InsightRow, insight_id)
         if row is None:
@@ -126,7 +126,7 @@ def supersede_insight(old_id: str, new_id: str, reason: str = "", trace=None) ->
             return False
         old_row.status = transition(old_row.status, EVENT_SUPERSEDE)
         old_row.superseded_by = new_id
-        old_row.updated_at = datetime.now()
+        old_row.updated_at = timeutil.now()
         session.commit()
         notify_invalidation_listeners(
             old_row.user_id,
@@ -166,7 +166,7 @@ def list_active_insights(
     """active Insight 只读查询（confidence DESC, created_at DESC）；REF-007 消费。"""
     settings = get_settings()
     threshold = (
-        min_confidence if min_confidence is not None else settings.v2_reflection_min_confidence
+        min_confidence if min_confidence is not None else settings.reflection_min_confidence
     )
     with SessionLocal() as session:
         query = session.query(InsightRow).filter(
@@ -262,7 +262,7 @@ def match_insights_for_invalidation(
     threshold = (
         threshold
         if threshold is not None
-        else get_settings().v2_reflection_invalidate_match_threshold
+        else get_settings().reflection_invalidate_match_threshold
     )
     scored = [
         (insight, statement_similarity(content, insight.statement))
@@ -279,7 +279,7 @@ def observe_negation(
     """澄清通道：唯一高匹配 → invalidated；多匹配/低匹配/无匹配保守忽略（0 LLM）。"""
     started = time.perf_counter()
     settings = get_settings()
-    threshold = settings.v2_reflection_invalidate_match_threshold
+    threshold = settings.reflection_invalidate_match_threshold
     with SessionLocal() as session:
         rows = (
             session.query(InsightRow)
@@ -336,7 +336,7 @@ def find_superseded_insights(
     threshold = (
         threshold
         if threshold is not None
-        else get_settings().v2_reflection_invalidate_match_threshold
+        else get_settings().reflection_invalidate_match_threshold
     )
     return [
         insight.id

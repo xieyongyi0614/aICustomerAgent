@@ -6,7 +6,7 @@ import pytest
 
 from app.models.relationship import RelationshipDelta, RelationshipState
 from app.repositories import relationship_milestone_repository
-from app.services import relationship_milestone as rms
+from app.services.relationship import milestone as rms
 
 NOW = datetime(2026, 8, 31, 12, 0, 0)
 

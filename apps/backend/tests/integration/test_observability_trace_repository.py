@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.observability import RuntimeTrace, TraceEvent, TraceKind, TraceStep
 from app.repositories import trace_repository
 
@@ -79,5 +80,5 @@ def test_list_by_conversation_orders_recent_first(db_session_factory):
 def test_prune_before_removes_only_expired(db_session_factory):
     trace_repository.save(make_trace(trace_id="req-old"))
     assert trace_repository.get_by_trace_id("req-old") is not None
-    assert trace_repository.prune_before(datetime.now() + timedelta(days=1)) >= 1
+    assert trace_repository.prune_before(timeutil.now() + timedelta(days=1)) >= 1
     assert trace_repository.get_by_trace_id("req-old") is None

@@ -5,12 +5,12 @@ from app.models.behavior_strategy import ActionBudget, BehaviorStrategy
 from app.models.conversation import ConversationState
 from app.models.intention import ValidatedIntention
 from app.models.scene import PendingAction, SceneContext, SceneState
-from app.services.behavior_engine import (
+from app.engines.behavior import (
     classify_activity,
     match_habits,
     resolve,
 )
-from app.services.behavior_engine import _apply_modifiers
+from app.engines.behavior import _apply_modifiers
 
 
 def _intention(name="continue_topic", degraded=False):
@@ -40,7 +40,7 @@ def _scene_ctx(state=None, intent="chat"):
 
 
 def test_strategy_mapping_covers_reactive_intentions():
-    from app.services.behavior_engine import INTENTION_STRATEGY_MAP
+    from app.engines.behavior import INTENTION_STRATEGY_MAP
     from app.models.intention import IntentionType
     from typing import get_args
 

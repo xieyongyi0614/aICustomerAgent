@@ -12,7 +12,7 @@ from app.core import llm_factory
 from app.core.db import Message
 from app.main import app
 from app.repositories import conversation_repository, decision_repository, goal_repository
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from tests.conftest import wait_until
 
 NOW = datetime(2026, 8, 30, 14, 0)
@@ -32,7 +32,6 @@ def _setup(db_session_factory, session_id="s1"):
 
 
 def test_debug_decisions_endpoint(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     llm = fake_llm(response=["忙完了吗？记得喝口水。"])
     llm_factory.set_llm(llm)

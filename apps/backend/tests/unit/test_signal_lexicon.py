@@ -10,7 +10,7 @@ from app.character.asuna.relationship_lexicon import (
     describe_comfort,
     describe_respect,
 )
-from app.services import relationship_signal as rs
+from app.engines import relationship_signal as rs
 
 
 def test_sensitive_lexicon_must_not_miss():

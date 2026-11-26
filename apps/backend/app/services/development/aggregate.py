@@ -1,7 +1,7 @@
 """Development Aggregate 读写（DEV-001）。
 
 状态机 active→superseded|retired（终态不复活、非法转换拒绝），与 reflection
-状态机同构但独立实现（Development 只写本域两表，不 import reflection/memory2）。
+状态机同构但独立实现（Development 只写本域两表，不 import reflection/memory）。
 upsert_modulation 单事务完成「读同 key active → 仲裁 → 新建/替换/落败留痕 +
 changes 行」：select 带 with_for_update（PG 行锁串行化并发仲裁；SQLite 测试库
 顺序执行天然安全），迁移 API 全部条件化，重复输入 no-op 天然幂等。
@@ -13,10 +13,10 @@ DEV-002 注入「同 strength 取较新 Insight」的完整比较器。
 
 import logging
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.development import (
@@ -26,6 +26,7 @@ from app.models.development import (
     DevelopmentStyleParams,
 )
 
+from app.core import ids
 logger = logging.getLogger(__name__)
 
 STEP_NAME = "development_state"
@@ -106,7 +107,7 @@ def upsert_modulation(
     started = time.perf_counter()
     if not 0.0 <= strength <= 1.0:
         raise ValueError(f"strength 越界: {strength}")
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     reason_created = change_reason or REASON_COMPILED
     reason_arbitrated = change_reason or REASON_ARBITRATED
     reason_lost = change_reason or REASON_ARBITRATED_LOST
@@ -191,7 +192,7 @@ def retire_modulation(
 ) -> bool:
     """active→retired（调制撤除无继任）；无 active 行幂等 no-op 返回 False。"""
     started = time.perf_counter()
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         active = (
             session.query(DevelopmentStateRow)
@@ -272,9 +273,7 @@ _SUMMARY_LABELS = {
 
 
 def read_overlay(user_id: str, character_id: str = "asuna") -> DevelopmentOverlay | None:
-    """DEV-003 叠加层读取：Flag OFF / 无 active / 读取失败 → None（fail-safe 到 v1）。"""
-    if not get_settings().v2_development_enabled:
-        return None
+    """DEV-003 叠加层读取：无 active / 读取失败 → None（fail-safe 到 v1）。"""
     try:
         rows = list_active_modulations(user_id, character_id)
     except Exception:
@@ -340,7 +339,7 @@ def _apply_row(overlay: DevelopmentOverlay, row, value: dict, summary_parts: lis
 
 def _insert(session, user_id, character_id, proposal: dict, status: str, now: datetime):
     row = DevelopmentStateRow(
-        id=f"dev:{uuid.uuid4().hex}",
+        id=ids.new_id_str(),
         user_id=user_id,
         character_id=character_id,
         kind=proposal["kind"],
@@ -368,7 +367,7 @@ def _record_change(
 ):
     session.add(
         DevelopmentChangeRow(
-            id=f"devc:{uuid.uuid4().hex}",
+            id=ids.new_id_str(),
             development_state_id=state_id,
             before=before,
             after=after,

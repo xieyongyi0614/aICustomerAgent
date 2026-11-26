@@ -28,9 +28,7 @@ USER = "outbox-user"
 @pytest.fixture()
 def outbox_on(override_settings):
     override_settings(
-        V2_ACTION_OUTBOX_ENABLED="true",
-        world_enabled="true",
-        action_enabled="true",
+        ACTION_OUTBOX_ENABLED="true",
     )
     yield
 
@@ -188,7 +186,7 @@ class TestConsumer:
     def test_retry_backoff_then_dead_letter(
         self, db_session_factory, outbox_on, monkeypatch, override_settings
     ):
-        override_settings(v2_life_loop_outbox_max_attempts="3")
+        override_settings(life_loop_outbox_max_attempts="3")
 
         def boom(*args, **kwargs):
             raise RuntimeError("world down")
@@ -251,7 +249,7 @@ class TestCapabilityDeferral:
 
 class TestDebugOutbox:
     def test_get_action_attaches_outbox_status(self, db_session_factory, outbox_on):
-        from app.api.v1.action import get_action
+        from app.api.v1.debug.action import get_action
 
         record = _make_succeeded_record("act-dbg")
         integrate_result(record, ActionResult(status="succeeded", effects=[]))

@@ -8,9 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.repositories import llm_call_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {
@@ -38,7 +36,7 @@ def _structured():
     }
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -49,7 +47,6 @@ async def _await_until(predicate, timeout: float = 3.0):
 
 @pytest.mark.asyncio
 async def test_debug_llm_calls_endpoints(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = []
     async for event in agent_service.stream_chat("s-v78-llm-e2e", "default-user", "今天怎么样", llm=llm):

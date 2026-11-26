@@ -1,0 +1,32 @@
+tool_id: ext.api.weather.current
+name: 查询天气
+description: 查询指定城市的当前天气，返回温度与天气现象作为回复素材。
+when_to_use: 回复需要外部天气事实作为素材时使用
+when_not_to_use: 只需要世界内部环境事实时不要使用
+capability: external_api
+action: call
+http:
+  method: GET
+  url: https://api.example.com/v1/weather
+  auth:
+    type: bearer
+    env: EXT_API_WEATHER_TOKEN
+  params:
+    city: "{params.city}"
+    units: metric
+  timeout_seconds: 5
+input_schema:
+  parameters:
+    - name: city
+      type: string
+      required: true
+      description: 城市名
+      max_length: 40
+response_map:
+  weather.temperature: "$.data.temperature:num"
+  weather.condition: "$.data.condition"
+permission:
+  level: sensitive
+  scope: ["external:api.example.com"]
+  confirm: first_time
+side_effects: ["read", "send_external"]

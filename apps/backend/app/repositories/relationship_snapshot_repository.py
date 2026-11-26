@@ -1,14 +1,15 @@
 """V8.5 relationship_snapshots 仓储：关键帧快照，限频保留，回滚锚点。"""
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import delete, select
 
+from app.core import timeutil
+from app.core import ids
 from app.core.db import RelationshipSnapshotRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.relationship import RelationshipSnapshot, RelationshipState
-from app.core.constants import RELATIONSHIP_DIMENSIONS_V85
+from app.core.constants import RELATIONSHIP_DIMENSIONS
 
 
 def _to_snapshot(row: RelationshipSnapshotRow) -> RelationshipSnapshot:
@@ -26,7 +27,7 @@ def _to_snapshot(row: RelationshipSnapshotRow) -> RelationshipSnapshot:
 
 
 def _dimensions_from_state(state: RelationshipState) -> dict[str, float]:
-    return {dim: getattr(state, dim, 0.0) for dim in RELATIONSHIP_DIMENSIONS_V85}
+    return {dim: getattr(state, dim, 0.0) for dim in RELATIONSHIP_DIMENSIONS}
 
 
 def list_snapshots(user_id: str, limit: int = 50) -> list[RelationshipSnapshot]:
@@ -61,10 +62,10 @@ def create_snapshot(
     trigger: str = "manual",
     now: datetime | None = None,
 ) -> RelationshipSnapshot:
-    created_at = now or datetime.now()
+    created_at = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = RelationshipSnapshotRow(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             character_id="asuna",
             version=version,

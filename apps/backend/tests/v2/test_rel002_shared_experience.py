@@ -18,8 +18,8 @@ from app.repositories import (
     relationship_event_repository,
     world_repository,
 )
-from app.services import relationship_shared
-from app.services.context_builder import _load_shared_experiences, _select_shared_entries
+from app.services.relationship import shared as relationship_shared
+from app.services.conversation.context import _load_shared_experiences, _select_shared_entries
 
 BASE = datetime(2026, 9, 1, 10, 0, 0)
 
@@ -99,7 +99,7 @@ def _world_event(
     world_repository.save_event(
         WorldEvent(
             id=event_id,
-            world_id=world_repository.world_id_for(user_id),
+            world_id=world_repository.ensure_world(user_id).world_id,
             type="task",
             title=title,
             importance=importance,
@@ -122,9 +122,9 @@ class TestProjection:
         assert all(entry.kind == "relationship_event" for entry in entries)
         assert entries[0].source_ref == {"table": "relationship_events", "id": "e1"}
 
-    def test_excludes_none_type_and_replay_source(self, _offline_repos):
+    def test_excludes_none_type_rows(self, _offline_repos):
+        """`type=none`（无互动实质）不进投影；`memory_replay` 派生行已随该源值退役消失。"""
         _event("e-none", type="none", source="system", cause="")
-        _event("e-replay", source="memory_replay")
         _event("e-system", type="none", source="system", cause="冲突结算")
         _event("e-ok", source="system", cause="和解")
         entries = relationship_shared.collect_shared_experiences("u-rel2")
@@ -205,7 +205,7 @@ class TestSelectionAndRender:
         assert payload["reasons"]["e1"] == "over_limit"
 
     def test_budget_drops_overflow(self, _offline_repos, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_relationship_shared_budget_chars", 60)
+        monkeypatch.setattr(get_settings(), "relationship_shared_budget_chars", 60)
         entries = [
             self._entry("long", "很" * 50, BASE),
             self._entry("short", "短", BASE + timedelta(days=1)),
@@ -267,21 +267,11 @@ class TestAssemblyWiring:
 
     def test_flag_on_end_to_end(self, _offline_repos, monkeypatch):
         self._seed()
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         state = _run_build(context_builder)
         titles = [entry.title for entry in state.shared_experiences]
         assert "深夜长谈" in titles or "那天我们聊到凌晨" in titles
-
-    def test_flag_off_no_segment(self, _offline_repos, monkeypatch):
-        self._seed()
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        from app.services import context_builder
-
-        state = _run_build(context_builder)
-        assert state.shared_experiences == []
-        assert PromptBuilder.build_shared_experience_section(state) is None
 
 
 def _run_build(context_builder):

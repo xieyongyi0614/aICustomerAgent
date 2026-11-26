@@ -9,8 +9,7 @@ from app.repositories import (
     memory_repository,
     summary_repository,
 )
-from app.services import agent_service
-
+from app.application import chat_pipeline as agent_service
 USER = "default-user"
 
 

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from app.core import timeutil
+from app.core import ids
 from app.core.db import EmotionHistoryRow, SessionLocal
 from app.models.emotion import EmotionHistoryEntry
 
@@ -31,10 +33,11 @@ def append(
     energy_after: float,
     stage_after: str,
 ) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         session.add(
             EmotionHistoryRow(
+                id=ids.new_id(),
                 user_id=user_id,
                 session_id=session_id,
                 user_emotion=user_emotion,

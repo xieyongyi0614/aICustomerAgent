@@ -13,8 +13,9 @@ from app.application.chat_pipeline import active_generations
 from app.application.post_process import reset_user_write_locks
 from app.models.autonomy import ProactiveAction
 from app.repositories import conversation_repository, proactive_repository
-from app.services import conversation_service, proactive_executor
-from app.services.trace_collector import TurnTraceSession
+from app.services.conversation import service as conversation_service
+from app.services.autonomy import executor as proactive_executor
+from app.services.observability.collector import TurnTraceSession
 
 NOW = datetime(2026, 8, 30, 14, 0)
 

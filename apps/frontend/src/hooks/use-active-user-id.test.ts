@@ -6,10 +6,10 @@ import { useActiveUserId } from "./use-active-user-id"
 import { useChatStore } from "@/stores/chat-store"
 
 describe("useActiveUserId", () => {
-  it("falls back to default-user before session hydration", () => {
+  it("returns empty before session hydration (no fabricated identity)", () => {
     useChatStore.setState({ sessionId: null })
     const { result } = renderHook(() => useActiveUserId())
-    expect(result.current).toBe("default-user")
+    expect(result.current).toBe("")
   })
 
   it("follows the active session identity once hydrated", () => {

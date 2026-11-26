@@ -1,7 +1,7 @@
 """V7-005：Proactive Chain（FakeLLM 生成 / 空文本失败 / 模板符校验）。"""
 
 from app.chains import proactive_chain
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 
 def test_generate_returns_text_via_fakellm(fake_llm):

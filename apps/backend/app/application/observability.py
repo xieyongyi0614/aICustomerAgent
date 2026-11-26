@@ -8,6 +8,7 @@ import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.observability import (
     DecisionKind,
@@ -37,10 +38,30 @@ background_tasks: set = set()
 
 current_trace: ContextVar = ContextVar("observability_current_trace", default=None)
 
+current_correlation_id: ContextVar = ContextVar(
+    "observability_correlation_id", default=None
+)
+
+
+def bind_correlation_id(correlation_id: str | None):
+    """绑定当前执行上下文的因果链标识（RT-019）；返回 token 供调用方还原。
+
+    只影响 trace 落库时写入 `runtime_traces.correlation_id`（列由 `0052` 建）；
+    未绑定（默认 `None`）时列恒为 NULL，行为与 V2.6.1 逐字节一致。
+    """
+    return current_correlation_id.set(correlation_id)
+
+
+def reset_correlation_id(token) -> None:
+    try:
+        current_correlation_id.reset(token)
+    except (ValueError, RuntimeError):
+        logger.exception("correlation_id 还原失败，已忽略")
+
 
 def prune_all() -> int:
     """保留策略统一清理（persistence.md §3）：按各自 TTL prune 四张观测表。"""
-    now = datetime.now()
+    now = timeutil.now()
     settings = get_settings()
     total = 0
     total += trace_repository.prune_before(
@@ -61,7 +82,7 @@ def prune_all() -> int:
 async def run_retention_loop() -> None:
     """lifespan 常驻低频清理：失败仅 log，下轮再清（V7.8-010）。"""
 
-    async def _tick():
+    def _tick():
         pruned = prune_all()
         if pruned:
             logger.info("观测数据保留清理：%d 行", pruned)
@@ -100,15 +121,33 @@ def spawn_background(coro) -> bool:
     except RuntimeError:
         loop = None
     if main is not None and main.is_running() and loop is not main:
-        asyncio.run_coroutine_threadsafe(coro, main)
+        future = asyncio.run_coroutine_threadsafe(coro, main)
+        future.add_done_callback(_log_future_exception)
         return True
     if loop is not None:
         task = loop.create_task(coro)
         background_tasks.add(task)
         task.add_done_callback(background_tasks.discard)
+        task.add_done_callback(_log_task_exception)
         return True
     coro.close()
     return False
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error is not None:
+        logger.error("后台任务异常未捕获: %r", error, exc_info=error)
+
+
+def _log_future_exception(future) -> None:
+    if future.cancelled():
+        return
+    error = future.exception()
+    if error is not None:
+        logger.error("后台任务异常未捕获（跨线程投递）: %r", error, exc_info=error)
 
 
 def _derive_status(trace) -> str:
@@ -146,6 +185,7 @@ def _assemble_trace(
     turn_id: str | None = None,
     action_id: str | None = None,
     events: list[TraceEvent] | None = None,
+    correlation_id: str | None = None,
 ) -> RuntimeTrace:
     snapshot = trace.snapshot()
     return RuntimeTrace(
@@ -155,6 +195,7 @@ def _assemble_trace(
         conversation_id=session_id,
         turn_id=turn_id,
         action_id=action_id,
+        correlation_id=correlation_id,
         status=_derive_status(trace),
         started_at=getattr(trace, "created_at", None),
         duration_ms=snapshot.get("total_ms", 0.0),
@@ -219,8 +260,6 @@ def on_turn_finished(
     drain_background: bool = True,
 ) -> None:
     """turn 收尾挂载点（H1）：调度 write-behind 持久化，热路径零 IO。"""
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(
         _flush_turn_trace(
             trace,
@@ -231,15 +270,18 @@ def on_turn_finished(
             action_id=action_id,
             post_process_task=post_process_task,
             drain_background=drain_background,
+            correlation_id=current_correlation_id.get(),
         )
     )
 
 
 def on_turn_error(trace, user_id: str, session_id: str) -> None:
     """失败运行必存（runtime-trace.md §5）：不采样，直接调度落库。"""
-    if not get_settings().observability_persist_enabled:
-        return
-    _spawn(_flush_error_trace(trace, user_id, session_id))
+    _spawn(
+        _flush_error_trace(
+            trace, user_id, session_id, correlation_id=current_correlation_id.get()
+        )
+    )
 
 
 async def _await_post_process(post_process_task, drain_background: bool = True) -> None:
@@ -265,6 +307,7 @@ async def _flush_turn_trace(
     action_id: str | None,
     post_process_task,
     drain_background: bool = True,
+    correlation_id: str | None = None,
 ) -> None:
     await _await_post_process(post_process_task, drain_background)
     trace.obs_flushed = True
@@ -288,6 +331,7 @@ async def _flush_turn_trace(
             turn_id=turn_id,
             action_id=action_id,
             events=events,
+            correlation_id=correlation_id,
         )
         trace_repository.save(record)
     except Exception:
@@ -344,8 +388,6 @@ def record_llm_call(record: LlmCallRecord) -> None:
 
 
 def submit_llm_call(record: LlmCallRecord) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_save_llm_call(record))
 
 
@@ -366,8 +408,6 @@ def record_prompt_snapshot(snapshot) -> None:
 
 
 def submit_prompt_snapshot(snapshot) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_save_prompt_snapshot(snapshot))
 
 
@@ -386,18 +426,22 @@ async def _save_prompt_snapshot(snapshot) -> None:
 
 
 def on_decision(record: DecisionRecord) -> None:
-    """决策记录入口（decision-history.md §3）：自治 tick 无 trace 上下文，直接后台写。"""
-    if not get_settings().observability_persist_enabled:
-        return
-    _spawn(_save_decision(record))
+    """决策记录入口：单行落库同步写，避免 write-behind 在短生命周期 loop 上丢失。"""
+    try:
+        decision_repository.save(record)
+    except Exception:
+        logger.exception("决策记录落库失败，已忽略")
 
 
 def record_turn_decisions(
-    trace, user_id: str, session_id: str, selected_goal, intention, behavior
+    trace, user_id: str, session_id: str, selected_goal, intention, behavior,
+    pipeline_audit: dict | None = None,
 ) -> None:
-    """turn 级决策后置采集（decision-history.md §3）：只读结果对象，零控制流变更。"""
-    if not get_settings().observability_persist_enabled:
-        return
+    """turn 级决策后置采集（decision-history.md §3）：只读结果对象，零控制流变更。
+
+    pipeline_audit（V2.1.0 AGENT-004）：统一决策管线的候选清单/六维得分/逐闸结果，
+    随 TURN_INTENTION 行落 decision_records.candidates（异步，不占热路径）。
+    """
     try:
         max_chars = get_settings().observability_step_extra_max_chars
         request_id = trace.request_id
@@ -441,6 +485,7 @@ def record_turn_decisions(
                     decision=getattr(intention, "intention", None) or "none",
                     reason=getattr(intention, "reason", "") or "",
                     input_snapshot=intention_payload,
+                    candidates=pipeline_audit,
                 )
             )
         )
@@ -477,8 +522,6 @@ def record_turn_decisions(
 
 
 def mark_decision_outcome(action_id: str, outcome: str) -> None:
-    if not get_settings().observability_persist_enabled:
-        return
     _spawn(_mark_decision_outcome(action_id, outcome))
 
 
@@ -496,10 +539,18 @@ async def _mark_decision_outcome(action_id: str, outcome: str) -> None:
         logger.exception("决策 outcome 补写失败，已忽略")
 
 
-async def _flush_error_trace(trace, user_id: str, session_id: str) -> None:
+async def _flush_error_trace(
+    trace, user_id: str, session_id: str, correlation_id: str | None = None
+) -> None:
     trace.obs_flushed = True
     try:
-        record = _assemble_trace(trace, TraceKind.TURN, user_id, session_id)
+        record = _assemble_trace(
+            trace,
+            TraceKind.TURN,
+            user_id,
+            session_id,
+            correlation_id=correlation_id,
+        )
         trace_repository.save(record)
     except Exception:
         logger.exception("error trace 持久化失败，已忽略")

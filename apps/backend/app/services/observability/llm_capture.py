@@ -11,8 +11,8 @@ from datetime import datetime
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 
+from app.core import timeutil
 from app.core.llm_factory import profile_id_of, provider_of
-from app.core.settings import get_settings
 from app.models.observability import (
     LLM_CALL_ERROR,
     LLM_CALL_OK,
@@ -123,14 +123,11 @@ class _ObservedChain:
 
 
 def _observed_invoke(observed, input_data, config, kwargs, run):
-    from app.application import observability
-
-    if not get_settings().observability_persist_enabled:
-        return run(observed, input_data, config, kwargs)
+    from app.services.observability import port as observability
 
     handler = UsageCallbackHandler()
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
     _capture_structured_prompt(observed, input_data)
     try:
         result = run(observed, input_data, _with_callbacks(config, handler), kwargs)
@@ -170,14 +167,11 @@ def _run_observed_sync(observed, input_data, config, kwargs):
 
 
 async def _run_observed(observed, input_data, config, kwargs, sync: bool):
-    from app.application import observability
-
-    if not get_settings().observability_persist_enabled:
-        return await observed._inner.ainvoke(input_data, config=config, **kwargs)
+    from app.services.observability import port as observability
 
     handler = UsageCallbackHandler()
     started = time.perf_counter()
-    started_at = datetime.now()
+    started_at = timeutil.now()
     _capture_structured_prompt(observed, input_data)
     try:
         result = await observed._inner.ainvoke(

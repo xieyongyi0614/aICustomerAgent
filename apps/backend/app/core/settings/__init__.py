@@ -11,24 +11,38 @@ from pydantic_settings import BaseSettings
 
 from app.core.settings._shared import DOMAIN_MODEL_CONFIG, STAGE_KEYS, SettingsError
 from app.core.settings.action import ActionSettings
+from app.core.settings.action_execution import ActionExecutionSettings
+from app.core.settings.agent_runtime import AgentRuntimeSettings
+from app.core.settings.app_release import AppReleaseSettings
 from app.core.settings.autonomy import AutonomySettings
 from app.core.settings.autonomy_advanced import AutonomyAdvancedSettings
+from app.core.settings.car import CarSettings
 from app.core.settings.character import CharacterSettings
 from app.core.settings.database import DatabaseSettings
 from app.core.settings.evaluation import EvaluationSettings
+from app.core.settings.email import EmailSettings
+from app.core.settings.feishu import FeishuSettings
 from app.core.settings.goal import GoalSettings
+from app.core.settings.ids import IdsSettings
+from app.core.settings.debug import DebugSettings
+from app.core.settings.ledger import LedgerSettings
+from app.core.settings.life import LifeSettings
 from app.core.settings.life_loop import LifeLoopSettings
 from app.core.settings.llm import LlmProfile, LlmSettings
 from app.core.settings.memory import MemorySettings
 from app.core.settings.observability import ObservabilitySettings
 from app.core.settings.pipeline import PipelineSettings
+from app.core.settings.plan import PlanSettings
 from app.core.settings.reflection_development import (
     DevelopmentSettings,
     ReflectionSettings,
     RelationshipEvolvedSettings,
 )
 from app.core.settings.relationship import RelationshipSettings
+from app.core.settings.tool import ToolSettings
+from app.core.settings.weather import WeatherSettings
 from app.core.settings.world import WorldSettings
+from app.core.settings.world_simulation import WorldSimulationSettings
 
 
 class Settings(
@@ -42,13 +56,27 @@ class Settings(
     RelationshipEvolvedSettings,
     RelationshipSettings,
     GoalSettings,
+    LifeSettings,
+    LedgerSettings,
     AutonomySettings,
     LifeLoopSettings,
     AutonomyAdvancedSettings,
+    AgentRuntimeSettings,
+    CarSettings,
     ActionSettings,
+    ActionExecutionSettings,
     EvaluationSettings,
+    FeishuSettings,
+    EmailSettings,
     ObservabilitySettings,
     WorldSettings,
+    WorldSimulationSettings,
+    ToolSettings,
+    PlanSettings,
+    WeatherSettings,
+    IdsSettings,
+    AppReleaseSettings,
+    DebugSettings,
     BaseSettings,
 ):
     model_config = DOMAIN_MODEL_CONFIG

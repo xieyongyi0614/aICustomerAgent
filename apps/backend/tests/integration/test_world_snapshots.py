@@ -32,7 +32,7 @@ def test_restore_rolls_world_back(db_session_factory):
     assert "西瓜" in restored_names
     assert "蛋糕" not in restored_names
 
-    labels = [snap.label for snap in world_repository.list_snapshots(world_repository.world_id_for("default-user"))]
+    labels = [snap.label for snap in world_repository.list_snapshots(world_repository.ensure_world("default-user").world_id)]
     assert "pre_restore" in labels
 
 

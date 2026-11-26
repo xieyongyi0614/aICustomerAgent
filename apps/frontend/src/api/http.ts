@@ -1,3 +1,5 @@
+import { authHeaders } from "@/api/auth-token"
+
 export class ApiError extends Error {
   readonly status?: number
   readonly code?: string
@@ -43,7 +45,11 @@ export async function toApiErrorFromResponse(response: Response): Promise<ApiErr
 }
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${resolveApiBase()}${path}`, init)
+  const headers = new Headers(init?.headers)
+  for (const [key, value] of Object.entries(authHeaders())) {
+    if (!headers.has(key)) headers.set(key, value)
+  }
+  const response = await fetch(`${resolveApiBase()}${path}`, { ...init, headers })
   if (!response.ok) {
     throw await toApiErrorFromResponse(response)
   }

@@ -13,6 +13,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import InsightRow, Memory
 from app.services.reflection import lifecycle
 
@@ -60,7 +61,7 @@ def _seed_insight(
     type_="pattern",
     user_id=USER,
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -81,7 +82,7 @@ def _seed_insight(
 
 
 def _seed_negated_memory(session_factory, memory_id, content, *, relation="negate"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -116,8 +117,7 @@ def _clean_listeners():
 
 
 def test_match_threshold_unique_high_match(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     invalidated = lifecycle.observe_negation(
@@ -131,8 +131,7 @@ def test_match_threshold_unique_high_match(db_session_factory, override_settings
 
 
 def test_match_ambiguous_multiple_ignored(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.5
+    override_settings( reflection_invalidate_match_threshold=0.5
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     _seed_insight(db_session_factory, "ins-b", "用户最近持续处于工作压力中，情绪疲惫")
@@ -143,8 +142,7 @@ def test_match_ambiguous_multiple_ignored(db_session_factory, override_settings)
 
 
 def test_match_below_threshold_ignored(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     for fuzzy in FUZZY_CLARIFICATIONS:
@@ -153,13 +151,12 @@ def test_match_below_threshold_ignored(db_session_factory, override_settings):
 
 
 def test_match_empty_candidate_set(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     assert lifecycle.observe_negation(USER, "mem-x", NEGATION_VARIANTS[0]) == []
 
 
 def test_rebuttal_variants_invalidate_and_keep_row(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     for index, variant in enumerate(NEGATION_VARIANTS):
         user = f"{USER}-{index}"
@@ -177,8 +174,7 @@ def test_rebuttal_variants_invalidate_and_keep_row(db_session_factory, override_
 def test_repeat_negation_is_idempotent_and_hook_fires_once(
     db_session_factory, override_settings
 ):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     hook = HookRecorder()
@@ -192,7 +188,7 @@ def test_repeat_negation_is_idempotent_and_hook_fires_once(
 
 
 def test_invalidation_listener_receives_change(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     hook = HookRecorder()
     lifecycle.register_invalidation_listener(hook)
@@ -205,7 +201,7 @@ def test_invalidation_listener_receives_change(db_session_factory, override_sett
 
 
 def test_listener_exception_does_not_break_transition(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
 
     def _boom(user_id, changed):
@@ -218,7 +214,7 @@ def test_listener_exception_does_not_break_transition(db_session_factory, overri
 
 
 def test_supersede_insight_notifies_listeners(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-old", STATEMENT)
     _seed_insight(db_session_factory, "ins-new", STATEMENT + "（更强的结论）")
     hook = HookRecorder()
@@ -258,7 +254,7 @@ def test_find_superseded_insights_scope_type_and_threshold():
 
 
 def test_noop_invalidation_does_not_fire_hook(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     hook = HookRecorder()
     lifecycle.register_invalidation_listener(hook)
@@ -268,8 +264,7 @@ def test_noop_invalidation_does_not_fire_hook(db_session_factory, override_setti
 
 
 def test_invalidate_trace_records_matching(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_invalidate_match_threshold=0.7
+    override_settings( reflection_invalidate_match_threshold=0.7
     )
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     trace = StubTrace()
@@ -307,7 +302,7 @@ def test_post_process_wiring_observes_negations(db_session_factory, override_set
     """编排层接线：approve + relation=negate 的转正记忆触发失效匹配。"""
     from app.application.post_process import _observe_negations
 
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     _seed_negated_memory(db_session_factory, "mem-neg", NEGATION_VARIANTS[0])
     _seed_negated_memory(
@@ -326,7 +321,7 @@ def test_post_process_wiring_observes_negations(db_session_factory, override_set
 def test_post_process_wiring_without_negate_signal_noop(db_session_factory, override_settings):
     from app.application.post_process import _observe_negations
 
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "ins-a", STATEMENT)
     _seed_negated_memory(
         db_session_factory, "mem-plain", NEGATION_VARIANTS[0], relation="replace"

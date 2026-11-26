@@ -51,12 +51,26 @@ def create_event(event: RelationshipEvent) -> RelationshipEvent:
         return _to_event(row)
 
 
-def list_events(user_id: str, limit: int = 50) -> list[RelationshipEvent]:
+def list_events(
+    user_id: str,
+    limit: int = 50,
+    *,
+    session_id: str | None = None,
+    since=None,
+    until=None,
+) -> list[RelationshipEvent]:
     with SessionLocal() as session:
+        query = session.query(RelationshipEventRow).filter(
+            RelationshipEventRow.user_id == user_id
+        )
+        if session_id is not None:
+            query = query.filter(RelationshipEventRow.session_id == session_id)
+        if since is not None:
+            query = query.filter(RelationshipEventRow.created_at >= since)
+        if until is not None:
+            query = query.filter(RelationshipEventRow.created_at <= until)
         rows = (
-            session.query(RelationshipEventRow)
-            .filter(RelationshipEventRow.user_id == user_id)
-            .order_by(RelationshipEventRow.created_at.desc())
+            query.order_by(RelationshipEventRow.created_at.desc())
             .limit(limit)
             .all()
         )

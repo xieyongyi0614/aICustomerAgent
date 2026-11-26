@@ -72,10 +72,10 @@ class TestMapping:
             calls["quantity"] = quantity
             return _FakeConsumeResult(ok=True, obj=obj)
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: obj)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object", fake_consume)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt1"))
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: obj)
+        monkeypatch.setattr("app.application.world_engine.consume_object", fake_consume)
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt1"))
 
         action = _validated(_action("CONSUME", "鸡蛋", 2.0))
         execute_actions([action], user_id="u1")
@@ -92,11 +92,11 @@ class TestMapping:
             calls["quantity"] = quantity
             return _FakeObj("e2", name, quantity=quantity, location_id=location_id)
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.get_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e2", name, quantity=1.0))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.create_object", fake_create)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt2"))
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.get_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e2", name, quantity=1.0))
+        monkeypatch.setattr("app.application.world_engine.create_object", fake_create)
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt2"))
 
         action = _validated(_action("CREATE", "面条", 1.0))
         execute_actions([action], user_id="u1")
@@ -112,10 +112,10 @@ class TestMapping:
             calls["location_id"] = location_id
             return _FakeObj("e1", "牛奶", location_id=location_id)
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", "牛奶", location_id="home.living_room"))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.move_object", fake_move)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt3"))
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", "牛奶", location_id="home.living_room"))
+        monkeypatch.setattr("app.application.world_engine.move_object", fake_move)
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt3"))
 
         action = _validated(_action("MOVE", "牛奶", quantity=None, object_id="e1", location_id="home.kitchen"))
         execute_actions([action], user_id="u1")
@@ -125,10 +125,10 @@ class TestMapping:
 
 class TestJudgement:
     def test_create_none_failed(self, monkeypatch):
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.get_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: None)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.create_object", lambda *args, **kwargs: None)
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.get_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: None)
+        monkeypatch.setattr("app.application.world_engine.create_object", lambda *args, **kwargs: None)
 
         action = _validated(_action("CREATE", "面", 1.0))
         results = execute_actions([action], user_id="u1")
@@ -139,14 +139,14 @@ class TestJudgement:
     def test_consume_ok_false_failed_with_original_code(self, monkeypatch):
         from app.models.world import ConsumeError
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
         obj = _FakeObj("e1", "鸡蛋", quantity=1.0)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: obj)
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: obj)
         monkeypatch.setattr(
-            "app.services.character_action.mutator.world_engine.consume_object",
+            "app.application.world_engine.consume_object",
             lambda uid, ref, quantity: _FakeConsumeResult(ok=False, obj=obj, error=ConsumeError.INSUFFICIENT_QUANTITY),
         )
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
 
         action = _validated(_action("CONSUME", "鸡蛋", 3.0))
         results = execute_actions([action], user_id="u1")
@@ -155,14 +155,14 @@ class TestJudgement:
         assert action.status == WorldActionStatus.FAILED
 
     def test_engine_exception_failed(self, monkeypatch):
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
 
         def boom(user_id, ref, quantity):
             raise RuntimeError("engine crashed")
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", "鸡蛋", quantity=6.0))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object", boom)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", "鸡蛋", quantity=6.0))
+        monkeypatch.setattr("app.application.world_engine.consume_object", boom)
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
 
         action = _validated(_action("CONSUME", "鸡蛋", 1.0))
         results = execute_actions([action], user_id="u1")
@@ -170,7 +170,7 @@ class TestJudgement:
         assert action.status == WorldActionStatus.FAILED
 
     def test_world_unavailable_all_failed(self, monkeypatch):
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: None)
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: None)
 
         a1 = _validated(_action("CONSUME", "鸡蛋", 1.0))
         a2 = _validated(_action("CREATE", "面", 1.0))
@@ -193,11 +193,11 @@ class TestEvents:
             captured.update(kw)
             return _FakeEvent("evtX")
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
         obj = _FakeObj("e1", "鸡蛋", quantity=6.0)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: obj)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object", lambda uid, ref, q: _FakeConsumeResult(ok=True, obj=obj))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", fake_record)
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: obj)
+        monkeypatch.setattr("app.application.world_engine.consume_object", lambda uid, ref, q: _FakeConsumeResult(ok=True, obj=obj))
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", fake_record)
 
         action = _validated(_action("CONSUME", "鸡蛋", 2.0))
         action.dedupe_key = "dk1"
@@ -213,10 +213,10 @@ class TestEvents:
     def test_failed_action_no_event(self, monkeypatch):
         calls = {"events": 0}
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: None)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object", lambda uid, ref, q: _FakeConsumeResult(ok=False, error=None))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _noop(calls))
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: None)
+        monkeypatch.setattr("app.application.world_engine.consume_object", lambda uid, ref, q: _FakeConsumeResult(ok=False, error=None))
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _noop(calls))
 
         action = _validated(_action("CONSUME", "鸡蛋", 1.0))
         execute_actions([action], user_id="u1")
@@ -235,12 +235,12 @@ class TestOrdering:
             order.append(f"create:{name}")
             return _FakeObj("e_new", name, quantity=quantity)
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.get_world", lambda uid: _FakeWorld())
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", name, quantity=1.0))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object", fake_consume)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.create_object", fake_create)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.get_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: _FakeObj("e1", name, quantity=1.0))
+        monkeypatch.setattr("app.application.world_engine.consume_object", fake_consume)
+        monkeypatch.setattr("app.application.world_engine.create_object", fake_create)
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
 
         create = _validated(_action("CREATE", "煎蛋卷", 1.0))
         consume = _validated(_action("CONSUME", "煎蛋卷", 1.0))
@@ -250,12 +250,12 @@ class TestOrdering:
     def test_rejected_before_applied_stays_independent(self, monkeypatch):
         calls = {"consumed": 0}
 
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.ensure_world", lambda uid: _FakeWorld())
+        monkeypatch.setattr("app.application.world_engine.ensure_world", lambda uid: _FakeWorld())
         obj = _FakeObj("e1", "鸡蛋", quantity=6.0)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.find_object_by_name", lambda uid, name: obj)
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.consume_object",
+        monkeypatch.setattr("app.application.world_engine.find_object_by_name", lambda uid, name: obj)
+        monkeypatch.setattr("app.application.world_engine.consume_object",
                             lambda uid, ref, q: calls.__setitem__("consumed", calls["consumed"] + 1) or _FakeConsumeResult(ok=True, obj=obj))
-        monkeypatch.setattr("app.services.character_action.mutator.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
+        monkeypatch.setattr("app.application.world_engine.record_character_action_event", lambda uid, **kw: _FakeEvent("evt"))
 
         bad = _action("CONSUME", "鸡蛋", 1.0)
         bad.transition(ActionTransitionEvent.VALIDATE_REJECT)

@@ -1,4 +1,5 @@
 import { ApiError, resolveApiBase, toApiErrorFromResponse } from '@/api/http'
+import { authHeaders } from '@/api/auth-token'
 import type {
   ChatSendRequest,
   ChatStreamListeners,
@@ -202,7 +203,10 @@ export class FetchChatStreamTransport implements ChatStreamTransport {
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${CHAT_ENDPOINT}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
         body: JSON.stringify({
           session_id: request.sessionId ?? null,
           content: request.content,

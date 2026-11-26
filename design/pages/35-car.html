@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 35 车辆 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ 共享组件 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title h2{font-size:16.5px;font-weight:700}
+.sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ Car（车辆主页） ============ */
+.grow{flex:1}
+.car-hero{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;display:flex;align-items:center;gap:14px;margin-top:14px}
+.ch-top{display:flex;align-items:center;gap:8px}
+.ch-name{font-size:17px;font-weight:700}
+.ch-plate{font-size:12px;font-weight:700;color:var(--ai2);background:rgba(62,139,255,.12);border-radius:8px;padding:3px 8px;letter-spacing:.02em}
+.ch-range{font-size:13px;font-weight:600;color:var(--ink2);margin-top:10px}
+.ch-range b{font-size:21px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ch-sub{font-size:11.5px;color:var(--ink3);margin-top:4px}
+.ch-live{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--health);margin-top:8px}
+.ch-live i{width:6px;height:6px;border-radius:50%;background:var(--health)}
+.ch-ring{position:relative;width:86px;height:86px;flex:none}
+.ch-ring svg{width:86px;height:86px;transform:rotate(-90deg)}
+.ch-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
+.ch-pct small{font-size:9.5px;font-weight:600;color:var(--ink3);margin-top:1px}
+.metric .spark{display:flex;align-items:flex-end;gap:3px;height:22px;margin-top:9px}
+.metric .spark i{flex:1;border-radius:3px;background:linear-gradient(180deg,#33BC8C,#9FE8CF)}
+.cat-note{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--ink2)}
+.loan-card{background:linear-gradient(140deg,#23232E,#33304A 60%,#3E3A63);color:#fff;border-radius:var(--r-lg);padding:20px;box-shadow:0 16px 36px rgba(30,28,55,.35)}
+.loan-card .l-top{display:flex;align-items:center}
+.loan-card .l-l{font-size:12px;opacity:.72}
+.loan-card .l-badge{margin-left:auto;font-size:11.5px;font-weight:650;background:rgba(255,157,118,.22);color:#FFC4A8;padding:4px 10px;border-radius:99px}
+.loan-card .l-v{font-size:30px;font-weight:750;letter-spacing:-.02em;margin-top:5px;font-variant-numeric:tabular-nums}
+.loan-card .l-v small{display:block;font-size:12px;font-weight:600;opacity:.7;margin-top:4px;letter-spacing:0}
+.loan-card .l-bar{height:7px;border-radius:99px;background:rgba(255,255,255,.16);margin-top:14px;overflow:hidden}
+.loan-card .l-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#FFD9C2,#FF9D76)}
+.loan-card .l-meta{display:flex;font-size:11.5px;opacity:.72;margin-top:8px}
+.loan-card .l-meta span:last-child{margin-left:auto}
+.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.metric{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:13px 12px}
+.metric .m-ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:9px}
+.metric .m-ic svg{width:14px;height:14px}
+.metric .m-v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.metric .m-v small{font-size:11px;font-weight:600;color:var(--ink3);margin-left:1px}
+.metric .m-n{font-size:11px;color:var(--ink3);margin-top:2px}
+.cat{margin-bottom:13px}
+.cat .c-top{display:flex;font-size:13px;margin-bottom:6px}
+.cat .c-top b{font-weight:600}
+.cat .c-top span{margin-left:auto;color:var(--ink2)}
+.cat .c-bar{height:8px;border-radius:99px;background:#F0EFE9;overflow:hidden}
+.cat .c-bar i{display:block;height:100%;border-radius:99px}
+.remind{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.remind:last-child{border-bottom:none}
+.remind .r-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none}
+.remind .r-ic svg{width:17px;height:17px}
+.remind .r-t{font-size:14px;font-weight:600}
+.remind .r-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.remind .r-v{margin-left:auto;font-size:12px;font-weight:650;color:var(--ink2);text-align:right;flex:none}
+.remind .r-v.soon{color:#E07B4F}
+.tx{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.tx:last-child{border-bottom:none}
+.tx .x-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none}
+.tx .x-ic svg{width:17px;height:17px}
+.tx .x-t{font-size:14px;font-weight:600}
+.tx .x-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.tx .x-v{margin-left:auto;font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.add-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:#fff;font-size:15px;font-weight:700;border-radius:99px;padding:15px;margin-top:20px;box-shadow:0 12px 26px rgba(27,28,35,.22);cursor:pointer}
+.add-btn svg{width:17px;height:17px}
+.entry{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:13px 18px;margin-top:14px;cursor:pointer}
+.entry .e-ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(122,92,255,.12);color:var(--ai1)}
+.entry .e-ic svg{width:17px;height:17px}
+.entry .e-t{font-size:14px;font-weight:600}
+.entry .e-s{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.entry .e-go{margin-left:auto;color:var(--ink3);display:flex;flex:none}
+.entry .e-go svg{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Car ================= -->
+    <div class="screen" id="car">
+      <a class="back" href="30-life.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>生活</a>
+
+      <div class="ai-card">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的观察</div>
+        <p>这个月养车花了 ¥612，其中电费只有 ¥102——同级别油车大概要 ¥600。你有 80% 的充电在 23 点后的谷电时段，这个习惯一个月帮你省约 ¥45。另外，下周三限行尾号 4 和 9，建议地铁通勤，我已记进提醒。</p>
+      </div>
+
+      <div class="car-hero">
+        <div class="grow">
+          <div class="ch-top"><span class="ch-name">比亚迪 汉 EV</span><span class="ch-plate">沪 A·D8F2K</span></div>
+          <div class="ch-range">续航约 <b>470</b> km</div>
+          <div class="ch-sub">昨晚 23:10 家充完成 · 谷电 ¥0.31/kWh</div>
+          <div class="ch-live"><i></i>车机互联已连接 · 10 分钟前同步</div>
+        </div>
+        <div class="ch-ring">
+          <svg viewBox="0 0 86 86">
+            <defs><linearGradient id="batg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#33BC8C"/><stop offset="1" stop-color="#9FE8CF"/></linearGradient></defs>
+            <circle cx="43" cy="43" r="35" fill="none" stroke="#F0EFE9" stroke-width="7"/>
+            <circle cx="43" cy="43" r="35" fill="none" stroke="url(#batg)" stroke-width="7" stroke-linecap="round" stroke-dasharray="219.9" stroke-dashoffset="48.4"/>
+          </svg>
+          <div class="ch-pct">78%<small>当前电量</small></div>
+        </div>
+      </div>
+
+      <div class="loan-card" style="margin-top:14px">
+        <div class="l-top"><span class="l-l">车贷 · 剩余待还</span><span class="l-badge">下期 10 月 5 日</span></div>
+        <div class="l-v">¥69,300<small>月供 ¥3,850 · 已还 18 / 36 期</small></div>
+        <div class="l-bar"><i style="width:50%"></i></div>
+        <div class="l-meta"><span>已还 50%</span><span>2028 年 9 月结清</span></div>
+      </div>
+
+      <div class="sec-title"><h2>电车状态</h2><span class="hint">9 月</span></div>
+      <div class="metric-row">
+        <div class="metric"><div class="m-ic" style="background:rgba(51,188,140,.12);color:var(--health)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg></div><div class="m-v">186<small> kWh</small></div><div class="m-n">本月充电</div><div class="spark"><i style="height:42%"></i><i style="height:58%"></i><i style="height:50%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:82%"></i><i style="height:100%"></i></div></div>
+        <div class="metric"><div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="m-v">14.2<small> kWh</small></div><div class="m-n">百公里电耗</div></div>
+        <div class="metric"><div class="m-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg></div><div class="m-v">12,480<small> km</small></div><div class="m-n">总里程 · 本月 +890</div></div>
+      </div>
+
+      <div class="sec-title"><h2>本月养车支出</h2><span class="hint">共 ¥612</span></div>
+      <div class="card" style="background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px">
+        <div class="cat"><div class="c-top"><b>洗车 / 小保养</b><span>¥200</span></div><div class="c-bar"><i style="width:82%;background:linear-gradient(90deg,#EFA63C,#FFD08A)"></i></div></div>
+        <div class="cat"><div class="c-top"><b>停车</b><span>¥180</span></div><div class="c-bar"><i style="width:74%;background:linear-gradient(90deg,#3E8BFF,#9CC2FF)"></i></div></div>
+        <div class="cat"><div class="c-top"><b>过路费</b><span>¥130</span></div><div class="c-bar"><i style="width:53%;background:linear-gradient(90deg,#7A5CFF,#C3B3FF)"></i></div></div>
+        <div class="cat" style="margin-bottom:2px"><div class="c-top"><b>充电费</b><span>¥102</span></div><div class="c-bar"><i style="width:42%;background:linear-gradient(90deg,#33BC8C,#9FE8CF)"></i></div></div>
+        <div class="cat-note">充电只占了 17%——家充谷电的习惯，是这份账单这么省的主力。—— 亚丝娜</div>
+      </div>
+
+      <div class="sec-title"><h2>车辆提醒</h2><span class="hint">我会提前告诉你</span></div>
+      <div class="card" style="background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:6px 18px">
+        <div class="remind">
+          <div class="r-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg></div>
+          <div><div class="r-t">保养提醒</div><div class="r-s">还剩 2,100 km 或 45 天 · 以先到为准</div></div>
+          <div class="r-v">11 月中旬</div>
+        </div>
+        <div class="remind">
+          <div class="r-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg></div>
+          <div><div class="r-t">车险到期</div><div class="r-s">2027-01-15 · 我会提前 60 天提醒你比价续保</div></div>
+          <div class="r-v">还有 15 个月</div>
+        </div>
+        <div class="remind">
+          <div class="r-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
+          <div><div class="r-t">限行提醒</div><div class="r-s">下周三 · 尾号 4 和 9 · 建议地铁通勤</div></div>
+          <div class="r-v soon">6 天后</div>
+        </div>
+      </div>
+
+      <div class="sec-title"><h2>最近记录</h2><span class="hint">AI 自动分类</span></div>
+      <div class="card" style="background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:6px 18px">
+        <div class="tx"><div class="x-ic" style="background:rgba(51,188,140,.12);color:var(--health)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg></div><div><div class="x-t">充电 · 国家电网快充站</div><div class="x-s">昨天 23:12 · 语音记账 · 谷电时段</div></div><span class="x-v">-42</span></div>
+        <div class="tx"><div class="x-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4h9l3 4v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM15 4v4h3"/></svg></div><div><div class="x-t">停车 · 公司地库月卡</div><div class="x-s">9 月 28 日 · 自动同步</div></div><span class="x-v">-180</span></div>
+        <div class="tx"><div class="x-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18M3 12h18"/></svg></div><div><div class="x-t">里程 · 通勤往返</div><div class="x-s">每天自动记录 · 本周 190 km</div></div><span class="x-v" style="font-size:12.5px;color:var(--ink2)">38 km</span></div>
+      </div>
+
+      <a class="entry" href="39-car-profile.html">
+        <div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+        <div><div class="e-t">车辆档案</div><div class="e-s">我的车 · 保险 / 年检 / 保养记录</div></div>
+        <span class="e-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="add-btn" href="36-car-add.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>记一笔养车记录</a>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · 车辆</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

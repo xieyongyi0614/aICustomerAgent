@@ -6,8 +6,4 @@ recent_context；默认 None 回退空串，前台路径零漂移。独立模块
 proactive_executor ↔ life_loop 循环导入。
 """
 
-import contextvars
-
-memory_digest_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "life_loop_memory_digest", default=None
-)
+from app.core.runtime_state import memory_digest_var

@@ -4,19 +4,16 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.services.action.detector import detect_action_intent
 
-NOW = datetime(2026, 9, 3, 14, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 3, 14, 0, 0))
 
 
 @pytest.fixture
 def action_on(override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     yield
-
-
-def test_disabled_returns_none():
-    assert detect_action_intent("提醒我开会", now=NOW) is None
 
 
 def test_no_action_message(action_on):
@@ -29,7 +26,7 @@ def test_create_reminder_confident(action_on):
     assert intent.action_type == "create_reminder"
     assert intent.confidence == "confident"
     assert intent.params["content"] == "开会"
-    assert datetime.fromisoformat(intent.params["due_at"]) == datetime(2026, 9, 4, 8, 0)
+    assert datetime.fromisoformat(intent.params["due_at"]) == timeutil.ensure_aware(datetime(2026, 9, 4, 8, 0))
 
 
 def test_create_reminder_ambiguous_without_due(action_on):
@@ -94,3 +91,20 @@ def test_dedupe_key_stable(action_on):
     a = detect_action_intent("明天早上8点提醒我开会", now=NOW)
     b = detect_action_intent("明天早上8点提醒我开会", now=NOW)
     assert a.dedupe_key == b.dedupe_key
+
+
+def test_ledger_spend_phrase_records(action_on):
+    """消费动词 + 金额的组合判定要覆盖「花费 X 买 Y」这类日常说法。"""
+    intent = detect_action_intent("今天花费10块钱买鸡蛋", now=NOW)
+    assert intent is not None
+    assert intent.action_type == "record_ledger_entry"
+
+
+def test_ledger_buy_with_amount_records(action_on):
+    intent = detect_action_intent("早上买了豆浆10块", now=NOW)
+    assert intent is not None
+    assert intent.action_type == "record_ledger_entry"
+
+
+def test_ledger_buy_without_amount_is_not_recording(action_on):
+    assert detect_action_intent("帮我买牛奶", now=NOW).action_type == "create_object"

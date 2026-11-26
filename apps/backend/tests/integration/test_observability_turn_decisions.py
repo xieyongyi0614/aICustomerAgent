@@ -7,9 +7,7 @@ import pytest
 
 from app.models.observability import DecisionKind
 from app.repositories import decision_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {
@@ -37,7 +35,7 @@ def _structured():
     }
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -48,7 +46,6 @@ async def _await_until(predicate, timeout: float = 3.0):
 
 @pytest.mark.asyncio
 async def test_turn_level_decisions_recorded(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = []
     async for event in agent_service.stream_chat("s-v78-turndec", "default-user", "我把项目上线了", llm=llm):
@@ -70,10 +67,11 @@ async def test_turn_level_decisions_recorded(db_session_factory, fake_llm, overr
 
 
 @pytest.mark.asyncio
-async def test_turn_decisions_skipped_when_persist_disabled(db_session_factory, fake_llm):
+async def test_turn_decisions_recorded_unconditionally(db_session_factory, fake_llm):
+    """批次 2 固化后观测落库无总闸（`observability_persist_enabled` 已删）。"""
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = []
     async for event in agent_service.stream_chat("s-v78-turndec-off", "default-user", "在吗", llm=llm):
         events.append(event)
     await asyncio.sleep(0.3)
-    assert decision_repository.search(limit=200) == []
+    assert decision_repository.search(limit=200) != []

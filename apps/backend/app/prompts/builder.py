@@ -1,3 +1,5 @@
+import logging
+
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -22,6 +24,7 @@ from app.character.asuna.relationship_lexicon import (
 )
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
+from app.models.style_contract import StyleContract
 from app.core.settings import get_settings
 from app.services.world.context_selector import render_world_section
 from app.prompts.behavior import build_activity_section, build_behavior_section
@@ -29,14 +32,28 @@ from app.prompts.goal import build_goal_section, build_intention_section
 from app.prompts.scene import build_scene_sections
 from app.repositories import relationship_milestone_repository
 from app.services.action.context import render_action_section
-from app.services.relationship_milestone import MILESTONES
+from app.services.relationship.milestone import MILESTONES
+
+logger = logging.getLogger(__name__)
 
 MEMORY_TYPE_LABELS = {
     "user_preference": "偏好",
     "user_fact": "事实",
-    "important_event": "事件",
-    "relationship_event": "关系事件",
+    "experience": "经历",
+    "relationship_fact": "关系",
+    "commitment": "目标",
+    "milestone_event": "里程碑",
+    "behavior_pattern": "习惯",
 }
+"""记忆类型中文标签（键覆盖 `CANONICAL_MEMORY_TYPES` 全部 7 值，有静态用例钉住）。
+
+键顺序 = `CANONICAL_MEMORY_TYPES`。措辞与记忆产品读面
+（`services/memory/product_view.py::TYPE_LABELS`）同源；其中
+`user_fact` / `experience` 与 `commitment` / `milestone_event` 在该表内同标签，
+此处按「标签两两不同」纪律细化为「事实 / 经历」「目标 / 里程碑」。
+遗留类型名（`important_event` / `relationship_event`）已退役，不再入表；
+`memory_type_label` 对未覆盖值落回原值并告警（旧库行不会因此失败）。
+"""
 
 INSIGHT_TYPE_LABELS = {
     "belief": "看法",
@@ -44,8 +61,21 @@ INSIGHT_TYPE_LABELS = {
     "pattern": "模式",
 }
 
+
+def memory_type_label(memory_type: str) -> str:
+    """标签查表：未覆盖的类型落回原值并告警（prompt 装配不得因数据异常失败）。"""
+    label = MEMORY_TYPE_LABELS.get(memory_type)
+    if label is None:
+        logger.warning("unknown memory type for label: %s", memory_type)
+        return memory_type
+    return label
+
+
 EMOTION_BUDGET_CHARS = 120
 RELATIONSHIP_BUDGET_CHARS = 150
+
+STYLE_SECTION_HEADER = "【本轮表达风格】"
+STYLE_SECTION_BUDGET_CHARS = 300
 
 SHARED_EXPERIENCE_HEADER = "【共同经历】"
 SHARED_EXPERIENCE_NOTE = "（这是你们一起经历过的事，仅自然相关时提起，不要罗列）"
@@ -144,6 +174,41 @@ class PromptBuilder:
         )
 
     @staticmethod
+    def build_agent_state_section() -> str | None:
+        """V2.1.0 AGENT-002：Run 内组装的统一意识状态只读段（contextvar 通道）。
+
+        仅渲染兴趣/焦点净新增行；Flag 关闭或无快照时返回 None，段不出现。
+        """
+        from app.application.agent_state_context import get_snapshot
+
+        snapshot = get_snapshot()
+        if snapshot is None:
+            return None
+        lines = snapshot.prompt_lines()
+        if not lines:
+            return None
+        return chr(10).join(lines) + chr(10) + "（这是你此刻真实的兴趣与关注，自然融入表达即可，不要罗列）"
+
+    @staticmethod
+    def build_goal_stack_section(state: ConversationState) -> str | None:
+        """V2.1.0 AGENT-003：层叠目标栈只读段（L3/L2/L1 各一行，空层跳过）。"""
+        layered = getattr(state, "layered_goals", None) or []
+        if not layered:
+            return None
+        labels = {"long_term": "长期", "medium": "中期", "short_term": "当前"}
+        by_layer = {}
+        for goal in layered:
+            by_layer.setdefault(goal.layer, goal)
+        lines = [
+            f"{labels[layer]}：{goal.description}"
+            for layer in ("long_term", "medium", "short_term")
+            if (goal := by_layer.get(layer)) is not None
+        ]
+        if not lines:
+            return None
+        return chr(10).join(["【目标方向】", *lines]) + chr(10) + "（这些是你自己想做的事，与用户话题自然结合即可，不要刻意汇报）"
+
+    @staticmethod
     def build_relationship_section(
         state: ConversationState,
         *,
@@ -196,7 +261,7 @@ class PromptBuilder:
         if not entries:
             return None
         settings = get_settings()
-        budget = settings.v2_relationship_shared_budget_chars
+        budget = settings.relationship_shared_budget_chars
         lines = [SHARED_EXPERIENCE_HEADER]
         used = len(SHARED_EXPERIENCE_HEADER)
         for entry in entries:
@@ -214,7 +279,7 @@ class PromptBuilder:
         if not patterns:
             return None
         settings = get_settings()
-        budget = settings.v2_relationship_pattern_budget_chars
+        budget = settings.relationship_pattern_budget_chars
         lines = [RELATIONSHIP_PATTERN_HEADER]
         used = len(RELATIONSHIP_PATTERN_HEADER)
         for pattern in patterns:
@@ -230,6 +295,21 @@ class PromptBuilder:
             used += len(line)
         lines.append(RELATIONSHIP_PATTERN_NOTE)
         return "\n".join(lines)
+
+    @staticmethod
+    def build_style_section(style_ctx: StyleContract | None) -> str | None:
+        """V2.2.0 CHAR-007：StyleContract → prompt 风格段（behavior_ctx 并列，Q5）。"""
+        if style_ctx is None:
+            return None
+        lines = style_ctx.prompt_lines()
+        if not lines:
+            return None
+        section = _append_within_budget(
+            STYLE_SECTION_HEADER, lines, STYLE_SECTION_BUDGET_CHARS
+        )
+        if len(section) <= len(STYLE_SECTION_HEADER):
+            return None
+        return section
 
     @staticmethod
     def build_behavior_section(analysis: TurnAnalysis) -> str:
@@ -274,17 +354,31 @@ class PromptBuilder:
         behavior_ctx=None,
         world_ctx=None,
         action_ctx=None,
+        style_ctx=None,
     ) -> ChatPromptTemplate:
-        world_text = render_world_section(
-            world_ctx, get_settings().world_context_char_budget
+        settings = get_settings()
+        roleplay = settings.roleplay_prompt_mode == "full"
+        world_budget = settings.world_prompt_char_budget
+        brief = getattr(world_ctx, "brief", None) if world_ctx is not None else None
+        world_text = (
+            render_world_section(world_ctx, world_budget, brief=brief)
+            if roleplay
+            else None
         )
 
         action_text = render_action_section(
             action_ctx, get_settings().action_context_char_budget
         )
-        identity = [("system", section) for section in PromptBuilder.build_identity_sections()]
+        identity = (
+            [
+                ("system", section)
+                for section in PromptBuilder.build_identity_sections()
+            ]
+            if roleplay
+            else []
+        )
         state_sections: list[str] = []
-        if analysis is not None:
+        if analysis is not None and roleplay:
             milestone_title = _safe_recent_milestone_title(state.user_id)
             state_sections = [
                 _literal(PromptBuilder.build_emotion_section(state)),
@@ -296,16 +390,22 @@ class PromptBuilder:
                 ),
             ]
         tail_sections: list[str] = []
+        style_section = None
+        if style_ctx is not None and roleplay:
+            style_section = PromptBuilder.build_style_section(style_ctx)
+            if style_section is not None:
+                style_section = _literal(style_section)
         if world_text:
             tail_sections.append(_literal(world_text))
         if action_text:
             tail_sections.append(_literal(action_text))
-        tail_sections.append(
-            MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
-        )
+        if roleplay:
+            tail_sections.append(
+                MODE_INSTRUCTIONS.get(mode, MODE_INSTRUCTIONS["default"])
+            )
         behavior_section = None
         activity_section = None
-        if analysis is not None and behavior_ctx is not None:
+        if roleplay and analysis is not None and behavior_ctx is not None:
             activity_section = build_activity_section(behavior_ctx)
             if behavior_ctx.fallback_directive is not None:
                 tail_sections.append(_literal(build_behavior_section(behavior_ctx)))
@@ -315,14 +415,14 @@ class PromptBuilder:
                     behavior_section = _literal(behavior_section)
             if activity_section is not None:
                 activity_section = _literal(activity_section)
-        elif analysis is not None:
+        elif analysis is not None and roleplay:
             tail_sections.append(PromptBuilder.build_behavior_section(analysis))
         scene_budget = (
             behavior_ctx.budget
             if behavior_ctx is not None and behavior_ctx.fallback_directive is None
             else None
         )
-        if scene_ctx is not None:
+        if scene_ctx is not None and roleplay:
             tail_sections.extend(
                 _literal(section) for section in build_scene_sections(scene_ctx, scene_budget)
             )
@@ -347,6 +447,7 @@ class PromptBuilder:
             + (len(goal_section) if goal_section else 0)
             + (len(intention_section) if intention_section else 0)
             + (len(behavior_section) if behavior_section else 0)
+            + (len(style_section) if style_section else 0)
             + len(state.current_input)
             + 120
         )
@@ -354,6 +455,8 @@ class PromptBuilder:
 
         messages = list(identity)
         messages.extend(("system", text) for text in state_sections)
+        if style_section is not None:
+            messages.append(("system", style_section))
         if goal_section is not None:
             messages.append(("system", goal_section))
         if intention_section is not None:
@@ -363,7 +466,7 @@ class PromptBuilder:
 
         if memories:
             memory_lines = "\n".join(
-                f"- ({MEMORY_TYPE_LABELS.get(m.type, m.type)}) {m.content}"
+                f"- ({memory_type_label(m.type)}) {m.content}"
                 for m in memories
             )
             messages.append(
@@ -390,7 +493,7 @@ class PromptBuilder:
             )
 
         overlay = getattr(state, "development_overlay", None)
-        if overlay is not None and overlay.modulation_summary:
+        if roleplay and overlay is not None and overlay.modulation_summary:
             messages.append(
                 (
                     "system",
@@ -400,11 +503,29 @@ class PromptBuilder:
                 )
             )
 
-        pattern_section = PromptBuilder.build_relationship_pattern_section(state)
+        agent_state_section = (
+            PromptBuilder.build_agent_state_section() if roleplay else None
+        )
+        if agent_state_section:
+            messages.append(("system", _literal(agent_state_section)))
+
+        goal_stack_section = PromptBuilder.build_goal_stack_section(state)
+        if goal_stack_section:
+            messages.append(("system", _literal(goal_stack_section)))
+
+        pattern_section = (
+            PromptBuilder.build_relationship_pattern_section(state)
+            if roleplay
+            else None
+        )
         if pattern_section:
             messages.append(("system", _literal(pattern_section)))
 
-        shared_section = PromptBuilder.build_shared_experience_section(state)
+        shared_section = (
+            PromptBuilder.build_shared_experience_section(state)
+            if roleplay
+            else None
+        )
         if shared_section:
             messages.append(("system", _literal(shared_section)))
 

@@ -37,11 +37,7 @@ _REDACT_PREVIEW_CHARS = 200
 
 
 def enabled() -> bool:
-    settings = get_settings()
-    return (
-        settings.observability_persist_enabled
-        and settings.observability_prompt_capture_mode != "disabled"
-    )
+    return get_settings().observability_prompt_capture_mode != "disabled"
 
 
 def _role_of(message) -> str:
@@ -127,7 +123,7 @@ def capture_prompt_snapshot(
     model=None,
     section_budget: dict | None = None,
 ) -> None:
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not enabled():
         return
@@ -155,7 +151,7 @@ def capture_prompt_snapshot(
 
 def capture_judge_snapshot(call_site: CallSite, model=None) -> None:
     """judge 快照只记元数据（prompt-debug.md §6）：不存 judge prompt 原文。"""
-    from app.application import observability
+    from app.services.observability import port as observability
 
     if not enabled():
         return

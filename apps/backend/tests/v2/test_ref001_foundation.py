@@ -10,6 +10,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from app.core import timeutil
 from app.services.reflection import lifecycle
 
 pytestmark = pytest.mark.xdist_group("migration")
@@ -29,7 +30,7 @@ def _seed_insight(
     from app.core.db import InsightRow
     from datetime import datetime
 
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             InsightRow(
@@ -181,14 +182,15 @@ def sqlite_round_trip(tmp_path_factory):
 def _seed_round_trip_rows(url):
     from datetime import datetime
 
-    now = datetime.now().isoformat(sep=" ")
+    now = timeutil.now().isoformat(sep=" ")
     engine = create_engine(url)
     with engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO memories (id, user_id, content, type, importance,"
+                # `layer` 由迁移 `0010` 加入且**无 server_default**（fail-closed）：裸 SQL 必须显式给值
+                "INSERT INTO memories (id, user_id, content, type, layer, importance,"
                 " character_id, confidence, source, status, created_at, updated_at)"
-                " VALUES ('mem-rt', 'u-rt', 'v1 往返数据', 'user_fact', 0.5, '*',"
+                " VALUES ('mem-rt', 'u-rt', 'v1 往返数据', 'user_fact', 'semantic', 0.5, '*',"
                 " 0.9, 'ai_inferred', 'active', :now, :now)"
             ),
             {"now": now},
@@ -220,22 +222,11 @@ def _seed_round_trip_rows(url):
     engine.dispose()
 
 
-def test_round_trip_structure_and_data(sqlite_round_trip):
-    cfg, url = sqlite_round_trip
+def test_head_structure_and_seed_data(sqlite_round_trip):
+    """原 0024 逆放用例随迁移链折叠退役；保留 head 态结构与数据写入断言。"""
+    _cfg, url = sqlite_round_trip
     _seed_round_trip_rows(url)
 
-    command.downgrade(cfg, "0024")
-    engine = create_engine(url)
-    inspector = inspect(engine)
-    assert not (REFLECTION_TABLES & set(inspector.get_table_names()))
-    with engine.connect() as conn:
-        memory = conn.execute(
-            text("SELECT id, user_id, content, status FROM memories WHERE id = 'mem-rt'")
-        ).fetchone()
-    assert memory == ("mem-rt", "u-rt", "v1 往返数据", "active")
-    engine.dispose()
-
-    command.upgrade(cfg, "head")
     engine = create_engine(url)
     inspector = inspect(engine)
     assert REFLECTION_TABLES <= set(inspector.get_table_names())
@@ -252,6 +243,8 @@ def test_round_trip_structure_and_data(sqlite_round_trip):
     } <= run_columns
     link_columns = {c["name"] for c in inspector.get_columns("evidence_links")}
     assert {"id", "insight_id", "memory_id", "weight", "created_at"} <= link_columns
+    # 合并迁移 `0010` 在 SQLite 上同样生效：`memories.layer` 存在（列 + 回填 + 撤默认）
+    assert "layer" in {c["name"] for c in inspector.get_columns("memories")}
 
     with engine.connect() as conn:
         memory = conn.execute(

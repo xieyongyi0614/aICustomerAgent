@@ -1,0 +1,748 @@
+"""Memory 2.0 混合检索与排序（MEM-006）。
+
+语义（cosine）+ 结构化（recency/importance/salience）+ 类型亲和混合打分；
+向量路 ANN top-N ∪ 结构路 list_active 池合并去重后统一打分。query 或行向量
+缺席自动降级纯结构化；被拒/被纠正冷却期（24h）条目硬过滤并记 trace 原因。
+reinforce 命中只投 MEM-005 缓冲，读路径零直写。Flag OFF 时本模块不被调用。
+"""
+
+import json
+import logging
+import math
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+
+from app.chains import memory_query_rewrite_chain as memory_query_rewrite
+from app.chains import memory_rerank_chain as memory_rerank
+from app.core import timeutil
+from app.core.db import Memory, MemoryCandidateRow, MemoryLinkRow, SessionLocal
+from app.core.settings import get_settings
+from app.models.memory import UserMemory
+from app.repositories import memory_repository
+from app.services.memory import embeddings as memory_embeddings
+from app.services.memory import lifecycle as memory_lifecycle
+from app.services.memory import types as memory_types
+from app.engines.memory_conflict import same_topic
+
+logger = logging.getLogger(__name__)
+
+STEP_NAME = "memory_recall"
+
+MODE_HYBRID = "hybrid"
+MODE_STRUCTURED = "structured"
+MODE_DEGRADED = "degraded"
+
+RERANK_MODE_OFF = "off"
+RERANK_MODE_LITE = "lite"
+
+REWRITE_MODE_OFF = "off"
+REWRITE_MODE_LITE = "lite"
+
+VISIBILITY_HYPOTHETICAL = "hypothetical"
+STATUS_ACTIVE = "active"
+STATUS_CANDIDATE_REJECTED = "rejected"
+RELATION_CONTRADICTS = "contradicts"
+
+TEMPORAL_QUERY_KEYWORDS = (
+    "什么时候",
+    "多久",
+    "上次",
+    "最近",
+    "昨天",
+    "前天",
+    "上周",
+    "之前",
+    "哪天",
+    "几号",
+)
+
+_DEFAULT_SALIENCE = 0.5
+
+LAYER_EPISODIC = "episodic"
+LAYER_SEMANTIC = "semantic"
+
+_QUOTA_MAX_WEIGHT = 100
+
+GRAPH_EXPAND_ONE_HOP = "one_hop"
+EXPAND_REASON_PREFIX = "hop:"
+
+
+@dataclass
+class RankedMemory:
+    memory: UserMemory
+    semantic: float = 0.0
+    structured: float = 0.0
+    affinity: float = 0.0
+    penalty: float = 0.0
+    score: float = 0.0
+    reason: str = ""
+    rerank_score: float | None = None
+    matched_queries: str = ""
+
+
+@dataclass
+class RankedMemories:
+    items: list[RankedMemory] = field(default_factory=list)
+    mode: str = MODE_STRUCTURED
+    rerank_mode: str = RERANK_MODE_OFF
+    rewrite_mode: str = REWRITE_MODE_OFF
+
+    def memories(self) -> list[UserMemory]:
+        return [item.memory for item in self.items]
+
+
+def _detect_query_types(query: str) -> set[str]:
+    return {
+        memory_type
+        for memory_type, keywords in memory_types.TYPE_AFFINITY_KEYWORDS.items()
+        if any(keyword in query for keyword in keywords)
+    }
+
+
+def _is_temporal_query(query: str) -> bool:
+    return any(keyword in query for keyword in TEMPORAL_QUERY_KEYWORDS)
+
+
+def _cosine(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right))
+    norm_left = math.sqrt(sum(a * a for a in left))
+    norm_right = math.sqrt(sum(b * b for b in right))
+    if norm_left == 0.0 or norm_right == 0.0:
+        return 0.0
+    return max(0.0, min(1.0, dot / (norm_left * norm_right)))
+
+
+def _recency(memory: UserMemory, now: datetime) -> float:
+    settings = get_settings()
+    reference = timeutil.ensure_aware(memory.last_accessed_at or memory.created_at)
+    now = timeutil.ensure_aware(now)
+    days = max((now - reference).total_seconds() / 86400, 0.0)
+    return 0.5 ** (days / settings.memory_recency_half_life_days)
+
+
+def _structured_score(memory: UserMemory, salience: float | None, now: datetime) -> float:
+    recency = _recency(memory, now)
+    importance = memory.importance if memory.importance is not None else 0.5
+    salience_value = salience if salience is not None else _DEFAULT_SALIENCE
+    return (recency + importance + salience_value) / 3.0
+
+
+def _affinity_score(memory: UserMemory, query_types: set[str]) -> float:
+    if not query_types:
+        return 0.5
+    memory_type = memory_types.normalize_type(memory.type)
+    return 1.0 if memory_type is not None and memory_type in query_types else 0.0
+
+
+def _recently_rejected_contents(user_id: str, now: datetime) -> list[str]:
+    cutoff = now - timedelta(hours=get_settings().memory_rejected_cooldown_hours)
+    with SessionLocal() as session:
+        rows = (
+            session.query(MemoryCandidateRow.content)
+            .filter(
+                MemoryCandidateRow.user_id == user_id,
+                MemoryCandidateRow.status == STATUS_CANDIDATE_REJECTED,
+                MemoryCandidateRow.created_at >= cutoff,
+            )
+            .all()
+        )
+        return [row[0] for row in rows if row[0]]
+
+
+def _contradicts_cooldown_ids(user_id: str, now: datetime) -> set[str]:
+    """被纠正未满冷却期的 contradicts 对侧：对侧行已离开 active 且 24h 内被处置。"""
+    cutoff = now - timedelta(hours=get_settings().memory_rejected_cooldown_hours)
+    with SessionLocal() as session:
+        actives = (
+            session.query(Memory)
+            .filter(Memory.user_id == user_id, Memory.status == STATUS_ACTIVE)
+            .all()
+        )
+        active_ids = {row.id for row in actives}
+        if not active_ids:
+            return set()
+        rows = (
+            session.query(MemoryLinkRow)
+            .filter(MemoryLinkRow.relation == RELATION_CONTRADICTS)
+            .all()
+        )
+        cooled: set[str] = set()
+        for link in rows:
+            counterpart_id = None
+            if link.memory_id in active_ids:
+                counterpart_id = link.related_memory_id
+            elif link.related_memory_id in active_ids:
+                counterpart_id = link.memory_id
+            if counterpart_id is None:
+                continue
+            counterpart = session.get(Memory, counterpart_id)
+            if counterpart is None or counterpart.status == STATUS_ACTIVE:
+                continue
+            resolved_at = timeutil.ensure_aware(
+                counterpart.updated_at or counterpart.created_at
+            )
+            if resolved_at >= cutoff:
+                survivor = (
+                    link.memory_id
+                    if link.memory_id in active_ids
+                    else link.related_memory_id
+                )
+                cooled.add(survivor)
+        return cooled
+
+
+def _filter_reasons(
+    memory: UserMemory,
+    rejected_contents: list[str],
+    cooldown_ids: set[str],
+) -> str | None:
+    if memory.id in cooldown_ids:
+        return "contradicts_cooldown"
+    for rejected in rejected_contents:
+        if _same_topic(memory.content or "", rejected):
+            return "recently_rejected"
+    return None
+
+
+def _same_topic(left: str, right: str) -> bool:
+    return same_topic(left, right)
+
+
+def _row_facts(memory_ids: list[str]) -> dict[str, dict]:
+    """批量读取 salience / embedding / visibility（DB 为 SoT，向量列可 NULL）。"""
+    if not memory_ids:
+        return {}
+    facts: dict[str, dict] = {}
+    with SessionLocal() as session:
+        rows = (
+            session.query(Memory.id, Memory.salience, Memory.embedding, Memory.visibility)
+            .filter(Memory.id.in_(memory_ids))
+            .all()
+        )
+        for memory_id, salience, embedding, visibility in rows:
+            facts[memory_id] = {
+                "salience": salience,
+                "embedding": _parse_vector(embedding),
+                "visibility": visibility,
+            }
+    return facts
+
+
+def _parse_vector(value) -> list[float] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return None
+        return parsed if isinstance(parsed, list) else None
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return None
+
+
+def _weighted_score(
+    semantic: float,
+    structured: float,
+    affinity: float,
+    memory: UserMemory,
+    now: datetime,
+    temporal: bool,
+) -> float:
+    settings = get_settings()
+    score = (
+        settings.memory_weight_semantic * semantic
+        + settings.memory_weight_structured * structured
+        + settings.memory_weight_affinity * affinity
+    )
+    if temporal:
+        score += settings.memory_temporal_recency_boost * _recency(memory, now)
+    return score
+
+
+def _score_all(
+    memories: list[UserMemory],
+    facts: dict[str, dict],
+    query_embedding: list[float] | None,
+    query_types: set[str],
+    now: datetime,
+    temporal: bool = False,
+) -> list[RankedMemory]:
+    ranked = []
+    for memory in memories:
+        fact = facts.get(memory.id, {})
+        embedding = fact.get("embedding")
+        semantic = 0.0
+        if query_embedding is not None and embedding is not None:
+            semantic = _cosine(query_embedding, embedding)
+        structured = _structured_score(memory, fact.get("salience"), now)
+        affinity = _affinity_score(memory, query_types)
+        score = _weighted_score(semantic, structured, affinity, memory, now, temporal)
+        ranked.append(
+            RankedMemory(
+                memory=memory,
+                semantic=semantic,
+                structured=structured,
+                affinity=affinity,
+                score=score,
+            )
+        )
+    return ranked
+
+
+def _rerank_sort_key(item: RankedMemory):
+    has_rerank = item.rerank_score is not None
+    return (
+        0 if has_rerank else 1,
+        -(item.rerank_score or 0.0),
+        -item.score,
+        -item.memory.importance,
+        item.memory.id,
+    )
+
+
+def _maybe_rerank(
+    query: str, ranked: list[RankedMemory], settings
+) -> tuple[list[RankedMemory], str]:
+    if settings.memory_rerank_mode != RERANK_MODE_LITE:
+        return ranked, RERANK_MODE_OFF
+    if len(ranked) < settings.memory_rerank_min_candidates:
+        return ranked, RERANK_MODE_OFF
+    pool = ranked[: settings.memory_rerank_top_k]
+    candidates = [(item.memory.id, item.memory.content or "") for item in pool]
+    try:
+        scored = memory_rerank.rerank_memories_sync(query, candidates)
+    except Exception as exc:
+        logger.warning("记忆重排失败，降级既有排序：%s", exc.__class__.__name__)
+        return ranked, RERANK_MODE_OFF
+    by_id = {item.memory.id: item for item in ranked}
+    applied = 0
+    for entry in scored:
+        target = by_id.get(entry.id)
+        if target is None:
+            continue
+        target.rerank_score = float(entry.score)
+        applied += 1
+    if not applied:
+        return ranked, RERANK_MODE_OFF
+    return sorted(ranked, key=_rerank_sort_key), RERANK_MODE_LITE
+
+
+def _recall(
+    user_id: str,
+    character_id: str,
+    query_text: str,
+    now: datetime,
+    query_embedding: list[float] | None,
+) -> tuple[list[RankedMemory], str, int]:
+    """单 query 召回（结构路 ∪ 向量路）+ 逐候选分量；query 向量由调用方统一提供。
+
+    多路检索时调用方一次批量向量化全部 query（`embed_queries`），逐路不再各自网络往返。
+    """
+    pool = _candidate_pool(user_id, character_id)
+    facts = _row_facts([memory.id for memory in pool])
+    pool = [m for m in pool if facts.get(m.id, {}).get("visibility") != VISIBILITY_HYPOTHETICAL]
+    mode = MODE_STRUCTURED
+    if query_text:
+        if query_embedding is not None:
+            mode = MODE_HYBRID
+            vector_hits = _vector_recall(user_id, character_id, query_embedding)
+            known = {memory.id for memory in pool}
+            extra = [m for m in vector_hits if m.id not in known]
+            pool = pool + extra
+            facts.update(_row_facts([m.id for m in extra]))
+            pool = [m for m in pool if facts.get(m.id, {}).get("visibility") != VISIBILITY_HYPOTHETICAL]
+        elif pool:
+            mode = MODE_DEGRADED
+
+    query_types = _detect_query_types(query_text)
+    ranked = _score_all(
+        pool, facts, query_embedding, query_types, now, temporal=_is_temporal_query(query_text)
+    )
+    return ranked, mode, len(pool)
+
+
+def _merge_ranked(
+    ranked_lists: list[list[RankedMemory]], now: datetime, temporal: bool
+) -> list[RankedMemory]:
+    """多路归并：按 memory.id 去重，分量与惩罚取最大，score 用同一公式与权重重算。
+
+    `matched_queries` 记录命中该记忆的 query 序号（`q0` = 原 query），供 MEV-004 归因。
+    """
+    merged: dict[str, RankedMemory] = {}
+    order: list[str] = []
+    hits: dict[str, list[str]] = {}
+    for index, ranked in enumerate(ranked_lists):
+        tag = f"q{index}"
+        for item in ranked:
+            memory_id = item.memory.id
+            target = merged.get(memory_id)
+            if target is None:
+                target = RankedMemory(memory=item.memory)
+                merged[memory_id] = target
+                order.append(memory_id)
+                hits[memory_id] = []
+            target.semantic = max(target.semantic, item.semantic)
+            target.structured = max(target.structured, item.structured)
+            target.affinity = max(target.affinity, item.affinity)
+            target.penalty = max(target.penalty, item.penalty)
+            if tag not in hits[memory_id]:
+                hits[memory_id].append(tag)
+
+    merged_items: list[RankedMemory] = []
+    for memory_id in order:
+        item = merged[memory_id]
+        item.score = _weighted_score(
+            item.semantic, item.structured, item.affinity, item.memory, now, temporal
+        )
+        item.matched_queries = ",".join(hits[memory_id])
+        merged_items.append(item)
+    return merged_items
+
+
+def _merge_mode(modes: list[str]) -> str:
+    if MODE_HYBRID in modes:
+        return MODE_HYBRID
+    if MODE_DEGRADED in modes:
+        return MODE_DEGRADED
+    return MODE_STRUCTURED
+
+
+def _resolve_queries(query_text: str, settings) -> tuple[list[str], str]:
+    """解析本次检索的 query 集合：`lite` 且改写返回非空才扩多路，否则单路 + `off`。"""
+    if settings.memory_query_rewrite_mode != REWRITE_MODE_LITE or not query_text:
+        return [query_text], REWRITE_MODE_OFF
+    try:
+        rewritten = memory_query_rewrite.rewrite_queries_sync(query_text)
+    except Exception as exc:
+        logger.warning("记忆查询改写失败，回落单 query：%s", exc.__class__.__name__)
+        return [query_text], REWRITE_MODE_OFF
+    if not rewritten:
+        return [query_text], REWRITE_MODE_OFF
+    return [query_text, *rewritten], REWRITE_MODE_LITE
+
+
+def parse_layer_quota(raw: str) -> tuple[int, int] | None:
+    """解析 `memory_layer_quota`（`"<episodic>:<semantic>"`，如 `"3:5"`）。
+
+    空串 → `None`（禁用态，**不告警**，保证默认零行为变化）；形态 / 取值非法 →
+    `None` + 单条 warning（回落禁用态，**不抛**）。纯函数，同一输入恒定输出。
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+    parts = text.split(":")
+    if len(parts) != 2:
+        logger.warning("MEMORY_LAYER_QUOTA=%r 形态非法（应为 a:b），回落禁用", raw)
+        return None
+    try:
+        episodic_weight = int(parts[0].strip())
+        semantic_weight = int(parts[1].strip())
+    except ValueError:
+        logger.warning("MEMORY_LAYER_QUOTA=%r 非整数，回落禁用", raw)
+        return None
+    if not 0 < episodic_weight <= _QUOTA_MAX_WEIGHT or not (
+        0 < semantic_weight <= _QUOTA_MAX_WEIGHT
+    ):
+        logger.warning("MEMORY_LAYER_QUOTA=%r 取值越界，回落禁用", raw)
+        return None
+    return episodic_weight, semantic_weight
+
+
+def _resolve_layer(memory: UserMemory) -> tuple[str, bool]:
+    """解析条目所属层，返回 `(layer, is_unknown)`。
+
+    层是**派生依据**（`core/constants.py::LAYER_FOR_TYPE`），不是来源真相：优先取
+    `memory.layer`（若读模型携带），否则按 `type` 派生——两者由 `MEV-005` 的不变量
+    `layer ≡ layer_for_type(type)` 保证一致。未知 → `DEFAULT_LAYER`（调用方聚合告警一次）。
+    """
+    layer = getattr(memory, "layer", None)
+    if layer in memory_types.MEMORY_LAYERS:
+        return layer, False
+    canonical = memory_types.normalize_type(getattr(memory, "type", None))
+    mapped = memory_types.LAYER_FOR_TYPE.get(canonical or "")
+    if mapped is not None:
+        return mapped, False
+    return memory_types.DEFAULT_LAYER, True
+
+
+def _quota_select(
+    ranked: list[RankedMemory], limit: int, quota: tuple[int, int]
+) -> list[RankedMemory]:
+    """按层分配名额（`floor`）+ 另一层补齐；层内保持既有次序，**不改任何分数**。
+
+    `episodic_quota = floor(N·a/(a+b))`、`semantic_quota = N - episodic_quota`；
+    某层可选项不足其名额时全取，剩余名额由另一层按既有次序补齐，保证结果条数 ==
+    `min(N, 候选总数)`。
+    """
+    episodic_quota = math.floor(limit * quota[0] / (quota[0] + quota[1]))
+    semantic_quota = limit - episodic_quota
+
+    buckets: dict[str, list[RankedMemory]] = {LAYER_EPISODIC: [], LAYER_SEMANTIC: []}
+    unknown = 0
+    for item in ranked:
+        layer, is_unknown = _resolve_layer(item.memory)
+        unknown += int(is_unknown)
+        buckets[layer].append(item)
+    if unknown:
+        logger.warning(
+            "记忆层缺失或未知，已归入 %s：%s 条", memory_types.DEFAULT_LAYER, unknown
+        )
+
+    taken = {
+        LAYER_EPISODIC: min(episodic_quota, len(buckets[LAYER_EPISODIC])),
+        LAYER_SEMANTIC: min(semantic_quota, len(buckets[LAYER_SEMANTIC])),
+    }
+    selected = buckets[LAYER_EPISODIC][:episodic_quota] + buckets[LAYER_SEMANTIC][
+        :semantic_quota
+    ]
+
+    shortfall = limit - len(selected)
+    for layer in (LAYER_EPISODIC, LAYER_SEMANTIC):
+        if shortfall <= 0:
+            break
+        extra = buckets[layer][taken[layer] : taken[layer] + shortfall]
+        selected.extend(extra)
+        shortfall -= len(extra)
+
+    order = {item.memory.id: index for index, item in enumerate(ranked)}
+    selected.sort(key=lambda item: order[item.memory.id])
+    return selected
+
+
+def _expand_one_hop(
+    kept: list[RankedMemory],
+    *,
+    user_id: str,
+    settings,
+    rejected_contents: list[str],
+    cooldown_ids: set[str],
+    query_embedding: list[float] | None,
+    query_text: str,
+    now: datetime,
+) -> tuple[list[RankedMemory], int]:
+    """以最终排序前 N 条为种子，追加其 1-hop 邻居（降权、去重、不重排直连命中）。"""
+    seeds = kept[: settings.memory_graph_expand_seeds]
+    if not seeds:
+        return [], 0
+    seed_ids = [item.memory.id for item in seeds]
+    seed_rank = {memory_id: index for index, memory_id in enumerate(seed_ids)}
+    links = memory_repository.list_links(
+        seed_ids, relations=memory_types.MEMORY_LINK_RELATIONS
+    )
+    links = sorted(
+        links,
+        key=lambda link: (
+            seed_rank.get(link[0], len(seed_rank)),
+            link[0],
+            link[1],
+            link[2],
+        ),
+    )
+
+    seen = {item.memory.id for item in kept}
+    neighbors: dict[str, str] = {}
+    for _, related_id, relation in links:
+        if related_id in seen:
+            continue
+        neighbors.setdefault(related_id, relation)
+    if not neighbors:
+        return [], 0
+
+    facts = _row_facts(list(neighbors))
+    query_types = _detect_query_types(query_text)
+    temporal = _is_temporal_query(query_text)
+    expanded: list[RankedMemory] = []
+    for neighbor_id, relation in neighbors.items():
+        memory = memory_repository.get_memory(neighbor_id)
+        if memory is None or memory.user_id != user_id:
+            continue
+        if memory.status != STATUS_ACTIVE or memory.superseded_by is not None:
+            continue
+        fact = facts.get(neighbor_id, {})
+        if fact.get("visibility") == VISIBILITY_HYPOTHETICAL:
+            continue
+        if _filter_reasons(memory, rejected_contents, cooldown_ids) is not None:
+            continue
+        item = _score_all(
+            [memory],
+            {neighbor_id: fact},
+            query_embedding,
+            query_types,
+            now,
+            temporal,
+        )[0]
+        item.score *= settings.memory_graph_expand_decay
+        item.reason = f"{EXPAND_REASON_PREFIX}{relation}"
+        expanded.append(item)
+
+    expanded.sort(key=lambda item: (-item.score, item.memory.id))
+    return expanded, len(expanded)
+
+
+def retrieve(
+    user_id: str,
+    query: str,
+    character_id: str = "asuna",
+    top_k: int | None = None,
+    trace=None,
+) -> RankedMemories:
+    started = time.perf_counter()
+    settings = get_settings()
+    limit = top_k or settings.memory_top_k
+    now = timeutil.now()
+    query_text = (query or "").strip()
+    primary_embedding: list[float] | None = None
+
+    queries, rewrite_mode = _resolve_queries(query_text, settings)
+    if len(queries) > 1:
+        query_embeddings = memory_embeddings.embed_queries(queries)
+        primary_embedding = query_embeddings[0] if query_embeddings else None
+        recalls = [
+            _recall(user_id, character_id, text, now, query_embeddings[index])
+            for index, text in enumerate(queries)
+        ]
+        ranked = _merge_ranked(
+            [items for items, _, _ in recalls],
+            now,
+            temporal=any(_is_temporal_query(text) for text in queries),
+        )
+        mode = _merge_mode([recall_mode for _, recall_mode, _ in recalls])
+        pool_size = len(ranked)
+    else:
+        query_embedding = (
+            memory_embeddings.embed_query(query_text) if query_text else None
+        )
+        primary_embedding = query_embedding
+        ranked, mode, pool_size = _recall(
+            user_id, character_id, query_text, now, query_embedding
+        )
+
+    rejected_contents = _recently_rejected_contents(user_id, now) if pool_size else []
+    cooldown_ids = _contradicts_cooldown_ids(user_id, now) if pool_size else set()
+
+    kept: list[RankedMemory] = []
+    filtered: list[RankedMemory] = []
+    for item in ranked:
+        reason = _filter_reasons(item.memory, rejected_contents, cooldown_ids)
+        if reason is not None:
+            item.penalty = (
+                settings.memory_penalty_rejected
+                if reason == "recently_rejected"
+                else settings.memory_penalty_contradicts
+            )
+            item.reason = reason
+            filtered.append(item)
+            continue
+        kept.append(item)
+    kept.sort(key=lambda item: (-item.score, -item.memory.importance))
+    kept, rerank_mode = _maybe_rerank(query_text, kept, settings)
+    expanded_ids: set[str] = set()
+    expand_trace: dict = {}
+    if settings.memory_graph_expand_mode == GRAPH_EXPAND_ONE_HOP:
+        try:
+            expanded, expanded_count = _expand_one_hop(
+                kept,
+                user_id=user_id,
+                settings=settings,
+                rejected_contents=rejected_contents,
+                cooldown_ids=cooldown_ids,
+                query_embedding=primary_embedding,
+                query_text=query_text,
+                now=now,
+            )
+        except Exception as exc:
+            logger.warning("记忆 1-hop 扩展失败，跳过：%s", exc.__class__.__name__)
+        else:
+            expanded_ids = {item.memory.id for item in expanded}
+            kept = kept + expanded
+            expand_trace = {
+                "expand_mode": GRAPH_EXPAND_ONE_HOP,
+                "expanded_count": expanded_count,
+            }
+    layer_quota = parse_layer_quota(settings.memory_layer_quota)
+    if layer_quota is None:
+        kept = kept[:limit]
+    else:
+        kept = _quota_select(kept, limit, layer_quota)
+    result = RankedMemories(
+        items=kept, mode=mode, rerank_mode=rerank_mode, rewrite_mode=rewrite_mode
+    )
+
+    for item in kept:
+        if item.memory.id in expanded_ids:
+            continue
+        memory_lifecycle.record_reinforce(item.memory.id)
+    _trace(
+        trace,
+        started,
+        mode=mode,
+        rerank_mode=rerank_mode,
+        rewrite_mode=rewrite_mode,
+        queries_count=len(queries),
+        matched_queries=[
+            {"id": item.memory.id, "queries": item.matched_queries}
+            for item in kept
+            if item.matched_queries
+        ],
+        pool_size=pool_size,
+        returned=[_item_digest(item) for item in kept],
+        filtered=[_item_digest(item) for item in filtered],
+        **expand_trace,
+    )
+    return result
+
+
+def _vector_recall(
+    user_id: str, character_id: str, query_embedding: list[float]
+) -> list[UserMemory]:
+    try:
+        return memory_repository.search_by_vector(
+            user_id,
+            character_id,
+            query_embedding,
+            limit=get_settings().memory_vector_recall_k,
+        )
+    except Exception as exc:
+        logger.warning("向量召回失败，降级结构化：%s", exc.__class__.__name__)
+        return []
+
+
+def _candidate_pool(user_id: str, character_id: str) -> list[UserMemory]:
+    settings = get_settings()
+    try:
+        pool = memory_repository.list_active(
+            user_id, character_id, limit=settings.memory_candidate_pool_limit
+        )
+    except Exception:
+        logger.exception("记忆候选池读取失败，本轮检索降级为空")
+        return []
+    return [
+        memory
+        for memory in pool
+        if memory.status == STATUS_ACTIVE and memory.content and memory.superseded_by is None
+    ]
+
+
+def _item_digest(item: RankedMemory) -> dict:
+    return {
+        "id": item.memory.id,
+        "semantic": round(item.semantic, 4),
+        "structured": round(item.structured, 4),
+        "affinity": round(item.affinity, 4),
+        "score": round(item.score, 4),
+        **({"rerank_score": round(item.rerank_score, 4)} if item.rerank_score is not None else {}),
+        **({"matched_queries": item.matched_queries} if item.matched_queries else {}),
+        **({"penalty_reason": item.reason} if item.reason else {}),
+    }
+
+
+def _trace(trace, started: float, **extra) -> None:
+    if trace is None:
+        return
+    duration = (time.perf_counter() - started) * 1000
+    trace.record(STEP_NAME, duration, "ok", **extra)

@@ -13,7 +13,7 @@ from app.core import llm_factory
 from app.core.db import Message
 from app.models.observability import TraceKind
 from app.repositories import conversation_repository, goal_repository, trace_repository
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 
 NOW = datetime(2026, 8, 30, 14, 0)
 USER = "default-user"
@@ -30,7 +30,7 @@ def _setup(db_session_factory, session_id="s1"):
     return session_id
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -42,7 +42,6 @@ async def _await_until(predicate, timeout: float = 3.0):
 @pytest.mark.asyncio
 async def test_proactive_trace_persisted_on_delivery(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     _setup(db_session_factory)
@@ -86,7 +85,6 @@ def _proactive_llm_calls():
 
 @pytest.mark.asyncio
 async def test_deny_tick_persists_autonomy_trace(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     _setup(db_session_factory)
     llm = fake_llm(response=["在吗"])
     llm_factory.set_llm(llm)

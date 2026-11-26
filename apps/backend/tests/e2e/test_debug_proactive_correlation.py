@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import timeutil
 from app.application import autonomy_engine
 from app.application.post_process import reset_user_write_locks
 from app.character.asuna import PERSISTENT_GOALS
@@ -14,10 +15,10 @@ from app.core import llm_factory
 from app.core.db import Message
 from app.main import app
 from app.repositories import conversation_repository, goal_repository, trace_repository
-from app.services import conversation_service
+from app.services.conversation import service as conversation_service
 from tests.conftest import wait_until
 
-NOW = datetime(2026, 8, 30, 14, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 8, 30, 14, 0))
 USER = "default-user"
 
 
@@ -35,18 +36,9 @@ def _setup(db_session_factory, session_id="s1"):
 def test_debug_proactive_correlation_bundle(
     db_session_factory, fake_llm, override_settings, monkeypatch
 ):
-    from app.repositories import proactive_repository
-
-    class _SimClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return NOW + timedelta(minutes=40)
-
-    monkeypatch.setattr(proactive_repository, "datetime", _SimClock)
+    monkeypatch.setattr(timeutil, "now", lambda: NOW + timedelta(minutes=40))
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
-        evaluation_enabled=True,
         evaluation_llm_judge_sample_rate=0,
     )
     _setup(db_session_factory)

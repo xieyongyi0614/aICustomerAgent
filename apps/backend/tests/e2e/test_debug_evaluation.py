@@ -3,7 +3,8 @@ import asyncio
 from app.core.settings import get_settings
 from app.main import app
 from app.repositories import evaluation_repository
-from app.services import agent_service
+from app.application import chat_pipeline as agent_service
+from tests.conftest import WAIT_TIMEOUT
 
 
 def _structured():
@@ -32,8 +33,8 @@ def _structured():
     }
 
 
-async def _wait_report(turn_id: str, timeout: float = 2.0):
-    deadline = asyncio.get_event_loop().time() + timeout
+async def _wait_report(turn_id: str, timeout: float | None = None):
+    deadline = asyncio.get_event_loop().time() + (timeout or WAIT_TIMEOUT)
     while asyncio.get_event_loop().time() < deadline:
         report = evaluation_repository.get_by_subject("turn", turn_id)
         if report is not None:
@@ -43,7 +44,6 @@ async def _wait_report(turn_id: str, timeout: float = 2.0):
 
 
 async def test_debug_evaluation_endpoints(db_session_factory, fake_llm, monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     get_settings.cache_clear()
     try:
         llm = fake_llm(response="今天也不错哦。*微笑*", structured_responses=_structured())

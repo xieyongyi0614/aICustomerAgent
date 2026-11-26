@@ -7,10 +7,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.repositories import evaluation_repository, trace_repository
-from app.services import agent_service
-
-
+from app.repositories import evaluation_repository, prompt_snapshot_repository, trace_repository
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {
@@ -38,7 +36,7 @@ def _structured():
     }
 
 
-async def _await_until(predicate, timeout: float = 4.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -50,9 +48,7 @@ async def _await_until(predicate, timeout: float = 4.0):
 @pytest.mark.asyncio
 async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
-        evaluation_enabled=True,
         evaluation_llm_judge_sample_rate=0,
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
@@ -67,6 +63,16 @@ async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_se
     )
     report = evaluation_repository.get_by_subject("turn", turn_id)
     assert report.meta.request_id == request_id
+
+    # 通道收敛声明（2026-09-30，台账 §5.2）：post_process 末位新增 run_memory_evaluate
+    # 收尾步，提示词快照随 trace flush（post_process 结束后）落库——评估可见不再蕴含
+    # flush 完成，等待 answer 快照可查再断言关联包。
+    assert await _await_until(
+        lambda: any(
+            getattr(s.call_site, "value", s.call_site) == "answer"
+            for s in prompt_snapshot_repository.get_by_turn(turn_id)
+        )
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -90,7 +96,6 @@ async def test_turn_correlation_bundle(db_session_factory, fake_llm, override_se
 async def test_chat_response_carries_request_id_header(
     db_session_factory, fake_llm, llm_override, override_settings
 ):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     llm_override(llm)
     transport = ASGITransport(app=app)
@@ -100,7 +105,7 @@ async def test_chat_response_carries_request_id_header(
         ) as resp:
             assert resp.status_code == 200
             header_request_id = resp.headers.get("x-request-id")
-            assert header_request_id is not None and len(header_request_id) == 32
+            assert header_request_id is not None and header_request_id.isdigit()
             body = await resp.aread()
         import json
 

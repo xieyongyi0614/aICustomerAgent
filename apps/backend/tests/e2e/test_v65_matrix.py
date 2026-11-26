@@ -134,7 +134,7 @@ def test_v65_008_state_snapshot_exposes_mode_and_behavior(client, fake_llm):
 
 
 def test_v65_008_state_snapshot_defaults_without_turn(client):
-    from app.services import trace_collector
+    from app.services.observability import collector as trace_collector
 
     trace_collector.reset_trace_collector()
     snapshot = client.get("/api/v1/state").json()
@@ -142,7 +142,7 @@ def test_v65_008_state_snapshot_defaults_without_turn(client):
 
 
 def test_v65_010_budget_observer_flags_violation(client, fake_llm):
-    from app.services import trace_collector
+    from app.services.observability import collector as trace_collector
 
     llm = fake_llm(
         response=["*笑了笑* *点头* *转身走开*"],

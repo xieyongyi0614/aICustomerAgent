@@ -19,9 +19,6 @@ class RelationshipSettings(BaseSettings):
     rel_max_turn_delta: float = 0.15
     rel_max_day_delta: float = 0.30
     rel_tension_freeze: float = 0.5
-    rel_replay_discount: float = 0.5
-    rel_replay_min_idle_hours: float = 24.0
-    rel_evolution_enabled: bool = True
     rel_repetition_decay: float = 0.7
     rel_trust_negative_amp: float = 1.5
     rel_comfort_drift: float = 0.05
@@ -29,10 +26,7 @@ class RelationshipSettings(BaseSettings):
         '{"stranger": 0.45, "friend": 0.60, "close_friend": 0.70, "partner": 0.80}'
     )
     rel_milestone_delta_cap: float = 0.10
-    rel_signal_llm_enabled: bool = False
     rel_signal_evidence_window: int = 20
-    rel_milestone_enabled: bool = True
-    rel_conflict_enabled: bool = True
     rel_conflict_cold_hours: float = 12.0
     rel_conflict_max_cold_days: float = 7.0
     rel_conflict_recover_positive: int = 2

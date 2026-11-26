@@ -3,10 +3,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.autonomy import ProactiveAction
 from app.models.evaluation_judge import ProactiveJudgeResult
 from app.repositories import evaluation_repository, proactive_repository
-from app.services.evaluation_engine import schedule_proactive_evaluation
+from app.services.evaluation.engine import schedule_proactive_evaluation
 
 ACTION_ID = "act-eval-1"
 
@@ -21,7 +22,7 @@ def make_judge_llm(fake_llm):
 
 
 def make_action(delivered_at: datetime | None = None) -> ProactiveAction:
-    now = datetime.now()
+    now = timeutil.now()
     return ProactiveAction(
         id=ACTION_ID,
         user_id="default-user",
@@ -39,8 +40,8 @@ def make_action(delivered_at: datetime | None = None) -> ProactiveAction:
 
 
 async def wait_report(timeout: float = 2.0):
-    deadline = datetime.now() + timedelta(seconds=timeout)
-    while datetime.now() < deadline:
+    deadline = timeutil.now() + timedelta(seconds=timeout)
+    while timeutil.now() < deadline:
         report = evaluation_repository.get_by_subject("proactive_action", ACTION_ID)
         if report is not None:
             return report
@@ -50,7 +51,6 @@ async def wait_report(timeout: float = 2.0):
 
 @pytest.fixture
 def enable_evaluation(monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     from app.core.settings import get_settings
 
     get_settings.cache_clear()
@@ -83,7 +83,7 @@ async def test_proactive_evaluation_saves_report(db_session_factory, fake_llm, e
 async def test_proactive_evaluation_quiet_hours_issue(
     db_session_factory, fake_llm, enable_evaluation
 ):
-    late_evening = datetime.now().replace(hour=23, minute=30, second=0)
+    late_evening = timeutil.now().replace(hour=23, minute=30, second=0)
     action = make_action(delivered_at=late_evening)
     proactive_repository.enqueue(
         action.model_copy(update={"status": "candidate", "payload_text": None})
@@ -106,7 +106,7 @@ async def test_proactive_evaluation_quiet_hours_issue(
 async def test_evaluation_failure_does_not_break_send_path(
     db_session_factory, fake_llm, enable_evaluation, monkeypatch
 ):
-    from app.services import evaluation_engine
+    from app.services.evaluation import engine as evaluation_engine
 
     def boom(*args, **kwargs):
         raise RuntimeError("merge failed")
@@ -129,7 +129,8 @@ async def test_evaluation_failure_does_not_break_send_path(
     assert delivered.status == "delivered"
 
 
-async def test_disabled_skips_evaluation(db_session_factory, fake_llm):
+async def test_evaluation_always_scheduled(db_session_factory, fake_llm):
+    """批次 2 固化后自治评估无总闸（`evaluation_enabled` 已删）：投递即评。"""
     action = make_action()
     proactive_repository.enqueue(
         action.model_copy(update={"status": "candidate", "payload_text": None})
@@ -142,4 +143,4 @@ async def test_disabled_skips_evaluation(db_session_factory, fake_llm):
         payload_text=action.payload_text,
     )
     schedule_proactive_evaluation(delivered, make_judge_llm(fake_llm))
-    assert await wait_report(timeout=0.4) is None
+    assert await wait_report(timeout=2.0) is not None

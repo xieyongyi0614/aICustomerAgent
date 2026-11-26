@@ -50,8 +50,7 @@ def _world_notes(user_id: str) -> list[str]:
     return list(world.notes or [])
 
 
-def test_consume_closed_loop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_consume_closed_loop(db_session_factory):
     world_engine.create_object(
         "cas-u1", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -71,8 +70,7 @@ def test_consume_closed_loop(db_session_factory, override_settings):
     assert text.index("测试蛋 × 4") < text.index("最近世界变化：")
 
 
-def test_create_closed_loop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_create_closed_loop(db_session_factory):
     world_engine.ensure_world("cas-u2")
     _run(_ctx("cas-u2", ai_reply="我做好了一碗面。", current_turn=1))
 
@@ -84,35 +82,7 @@ def test_create_closed_loop(db_session_factory, override_settings):
     assert "做出面" in render_world_section(context)
 
 
-def test_gate_off_is_byte_identical(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="false")
-    world_engine.create_object(
-        "cas-u3", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
-    )
-    world_engine.record_character_action_event(
-        "cas-u3",
-        action_type="CONSUME",
-        target_name="测试蛋",
-        quantity=2.0,
-        object_id=None,
-        before={"quantity": 6.0},
-        after={"quantity": 4.0},
-        location_from=None,
-        location_to=None,
-        dedupe_key="dk-off",
-        session_id="s1",
-        turn_id="t1",
-    )
-
-    context = world_engine.build_context("cas-u3")
-    assert context is not None
-    assert context.recent_world_changes == []
-    text = render_world_section(context)
-    assert "最近世界变化" not in text
-
-
-def test_gate_on_after_events_renders_tag(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_recorded_action_events_render_tag(db_session_factory):
     world_engine.create_object(
         "cas-u4", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -134,8 +104,7 @@ def test_gate_on_after_events_renders_tag(db_session_factory, override_settings)
     assert context.recent_world_changes == ["消耗测试蛋 ×2"]
 
 
-def test_no_applied_actions_keeps_notes_untouched(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_no_applied_actions_keeps_notes_untouched(db_session_factory):
     world_engine.create_object(
         "cas-u5", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=1.0
     )
@@ -147,8 +116,7 @@ def test_no_applied_actions_keeps_notes_untouched(db_session_factory, override_s
     assert _world_notes("cas-u5") == ["测试蛋已从冰箱取出"]
 
 
-def test_interpreter_and_cas_notes_coexist(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_interpreter_and_cas_notes_coexist(db_session_factory):
     world_engine.create_object(
         "cas-u6", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -163,8 +131,7 @@ def test_interpreter_and_cas_notes_coexist(db_session_factory, override_settings
     assert notes.index("测试蛋已从冰箱取出") < notes.index("消耗测试蛋 ×2")
 
 
-def test_replay_same_turn_no_duplicate(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_replay_same_turn_no_duplicate(db_session_factory):
     world_engine.create_object(
         "cas-u7", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
     )
@@ -190,20 +157,7 @@ def test_step_handlers_order_relative_to_world_and_planning():
     assert order["run_world_update"] < order["run_character_action_sync"] < order["run_action_planning"]
 
 
-def test_gate_off_handler_is_noop(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="false")
-    world_engine.create_object(
-        "cas-u8", name="测试蛋", category="food", location_id="home.kitchen.fridge", quantity=6.0
-    )
-    _run(_ctx("cas-u8", ai_reply="我用了两个测试蛋。", current_turn=1))
-    assert world_engine.find_object_by_name("cas-u8", "测试蛋").quantity == 6.0
-    assert _world_notes("cas-u8") == []
-    assert world_engine.build_context("cas-u8").recent_world_changes == []
-
-
-def test_grounding_cap_and_take_consume_chain(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
-
+def test_grounding_cap_and_take_consume_chain(db_session_factory):
     from app.models.world import InventoryItem
     from app.services.grounding.inventory_guard import (
         check_inventory_grounding,
@@ -212,6 +166,14 @@ def test_grounding_cap_and_take_consume_chain(db_session_factory, override_setti
 
     user_id = "cas-take"
     world_engine.ensure_world(user_id)
+    world_engine.create_object(
+        user_id,
+        name="鸡蛋",
+        category="food",
+        location_id="home.kitchen.fridge",
+        quantity=6,
+        consumable=True,
+    )
     raw_reply = "从冰箱拿出鸡蛋6个，熟练地磕进碗里煎好。"
     inventory = [
         InventoryItem(
@@ -238,10 +200,17 @@ def test_grounding_cap_and_take_consume_chain(db_session_factory, override_setti
     assert "消耗鸡蛋 ×2" in _world_notes(user_id)
 
 
-def test_omitted_subject_take_consumes_from_context(db_session_factory, override_settings):
-    override_settings(v2_character_action_sync_enabled="true")
+def test_omitted_subject_take_consumes_from_context(db_session_factory):
     user_id = "cas-omit"
     world_engine.ensure_world(user_id)
+    world_engine.create_object(
+        user_id,
+        name="鸡蛋",
+        category="food",
+        location_id="home.kitchen.fridge",
+        quantity=6,
+        consumable=True,
+    )
     ctx = _ctx(
         user_id,
         ai_reply="刚才拿了两个出来煎给你了，冰箱里应该还剩四个。",

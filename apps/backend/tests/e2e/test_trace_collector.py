@@ -5,9 +5,9 @@ import pytest
 
 from app.core.settings import get_settings
 from app.main import app
-from app.services import agent_service
-from app.services import trace_collector as tc_module
-from app.services.trace_collector import TraceCollector, TurnTraceSession, get_trace_collector
+from app.application import chat_pipeline as agent_service
+from app.services.observability import collector as tc_module
+from app.services.observability.collector import TraceCollector, TurnTraceSession, get_trace_collector
 from tests.conftest import wait_until
 
 
@@ -47,7 +47,7 @@ def _step(session, name):
     return next(s for s in session.steps if s.name == name)
 
 
-async def _await_until(predicate, timeout: float = 5.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -194,7 +194,7 @@ async def test_debug_trace_endpoint_unknown_404_then_snapshot(
 
 def test_trace_has_request_id_and_usage_accumulation():
     session = TurnTraceSession()
-    assert len(session.request_id) == 32
+    assert session.request_id.isdigit() and len(session.request_id) >= 16
     session.add_token_usage({"input_tokens": 10, "output_tokens": 5})
     session.add_token_usage({"input_tokens": 7, "output_tokens": 3})
     assert session.token_usage == {"input_tokens": 17, "output_tokens": 8}

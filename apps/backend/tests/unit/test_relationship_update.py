@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from app.models.relationship import RelationshipDelta, RelationshipState
-from app.services import state_engine
+from app.engines import state as state_engine
 
 
 def make_state(**overrides):
@@ -24,7 +24,7 @@ TODAY = datetime(2026, 8, 29, 12, 0, 0)
 
 def apply(state, event_type, magnitude="normal", behavior="normal_reply",
           day_positive=None, day_negative=None):
-    return state_engine.apply_relationship_v5(
+    return state_engine.apply_relationship_update(
         state,
         event_type,
         magnitude,

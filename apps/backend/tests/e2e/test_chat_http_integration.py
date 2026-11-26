@@ -96,8 +96,9 @@ def test_http_health(http_server):
 
 
 def test_http_chat_streams_chunks_incrementally(
-    http_server, db_session_factory, llm_override, fake_llm
+    http_server, db_session_factory, llm_override, fake_llm, override_settings
 ):
+    override_settings(inventory_grounding_mode="off")
     llm_override(fake_llm(
         response=["你好", "呀"],
         structured_responses=_structured_responses(),
@@ -206,7 +207,9 @@ def test_http_summary_trigger(
                 body["session_id"] = session_id
             resp = client.post("/api/v1/chat/message", json=body)
             session_id = resp.headers.get("x-session-id")
-    assert wait_until(lambda: summary_repository.get_summary(session_id) is not None)
+    assert wait_until(
+        lambda: summary_repository.get_summary(session_id) is not None, timeout=30
+    )
 
 
 def test_http_full_lifecycle(

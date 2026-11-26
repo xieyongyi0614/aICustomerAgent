@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import (
     Base,
     DevelopmentStateRow,
@@ -27,18 +28,18 @@ from app.core.settings import get_settings
 from app.models.reflection import InsightDraft, ReflectionProposal
 from app.repositories import background_job_repository, memory_repository
 from app.services.development import aggregate, audit, evaluation, policy
-from app.services.memory2 import (
-    attribution as memory2_attribution,
-    commands as memory2_commands,
+from app.services.memory import (
+    attribution as memory_attribution,
+    commands as memory_commands,
     evaluator as memory_evaluator,
     ingest as memory_ingest,
-    job_worker as memory2_job_worker,
+    job_worker as memory_job_worker,
     lifecycle as memory_lifecycle,
-    retriever as memory2_retriever,
+    retriever as memory_retriever,
 )
+from app.services.reflection.evidence import collectors as reflection_evidence
 from app.services.reflection import (
     attribution as reflection_attribution,
-    evidence as reflection_evidence,
     evaluation as reflection_evaluation,
     lifecycle as reflection_lifecycle,
     reflector as reflection_reflector,
@@ -79,7 +80,7 @@ class _EvaluatorStubLLM:
     """候选评估兜底 stub：灰区恒准（approve）。"""
 
     async def __call__(self, content, proposed_type, related_contents, llm=None):
-        from app.models.memory2 import EvaluationVerdict
+        from app.models.memory import EvaluationVerdict
 
         return EvaluationVerdict(approve=True, type=None, reason="离线确定性兜底")
 
@@ -107,13 +108,13 @@ def growth_env(monkeypatch):
     Base.metadata.create_all(engine)
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (
-        memory2_attribution,
-        memory2_commands,
+        memory_attribution,
+        memory_commands,
         memory_evaluator,
         memory_ingest,
-        memory2_job_worker,
+        memory_job_worker,
         memory_lifecycle,
-        memory2_retriever,
+        memory_retriever,
         memory_repository,
         background_job_repository,
         reflection_attribution,
@@ -130,9 +131,6 @@ def growth_env(monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", True)
-    monkeypatch.setattr(settings, "v2_reflection_enabled", True)
-    monkeypatch.setattr(settings, "v2_development_enabled", True)
 
     stub = ScriptedLLM(
         [
@@ -153,7 +151,7 @@ def growth_env(monkeypatch):
 
 
 def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
-    now = datetime.now()
+    now = timeutil.now()
     result = evaluation.run_growth_loop(growth_env["session"], now=now)
     assert result["failures"] == [], result["failures"]
     assert result["stats"]["cycles"] == 3
@@ -166,7 +164,7 @@ def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
     assert report["metrics"]["E-DEV-04"]["pass"] is True
 
     REPORT_DIR.mkdir(exist_ok=True)
-    report_path = REPORT_DIR / f"dev-growth-{datetime.now():%Y%m%d}.json"
+    report_path = REPORT_DIR / f"dev-growth-{timeutil.now():%Y%m%d}.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
@@ -175,7 +173,7 @@ def test_growth_loop_full_cycle_passes_gate(growth_env, monkeypatch):
 
 
 def test_growth_loop_amplitude_evolves_with_new_evidence(growth_env):
-    now = datetime.now()
+    now = timeutil.now()
     result = evaluation.run_growth_loop(growth_env["session"], now=now)
     assert result["failures"] == []
     insight_ids = result["stats"]["insight_ids"]
@@ -197,45 +195,8 @@ def test_growth_loop_amplitude_evolves_with_new_evidence(growth_env):
     assert delta2 == pytest.approx(round(confidence2 * 0.5, 2), abs=0.001)
 
 
-def test_growth_loop_flag_off_memory_stops_first(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "memory"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 0
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryRow).count() == 0
-
-
-def test_growth_loop_flag_off_reflection_stops_second(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_reflection_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "reflection"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 0
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryRow).count() > 0
-
-
-def test_growth_loop_flag_off_development_stops_third(growth_env, monkeypatch):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "v2_development_enabled", False)
-    result = evaluation.run_growth_loop(growth_env["session"])
-    assert result["stats"]["stopped_at"] == "development"
-    assert result["failures"] == []
-    with growth_env["session"]() as session:
-        assert session.query(InsightRow).count() == 1
-        assert session.query(DevelopmentStateRow).count() == 0
-        assert session.query(MemoryCandidateRow).count() >= 0
-    assert aggregate.read_overlay("eval-growth_loop") is None
-
-
 def test_growth_loop_cycle2_experience_ingested_via_p1(growth_env):
-    now = datetime.now()
+    now = timeutil.now()
     evaluation.run_growth_loop(growth_env["session"], now=now)
     with growth_env["session"]() as session:
         contents = [

@@ -21,7 +21,8 @@ from app.repositories import (
 )
 from app.models.goal import GoalRecord
 from app.repositories import goal_repository
-from app.services import life_loop_budget, trigger_evaluator
+from app.services.life import budget as life_loop_budget
+from app.services.autonomy import trigger as trigger_evaluator
 
 NOW = datetime(2026, 9, 7, 12, 0, 0)
 USER = "life-memory-user"
@@ -38,11 +39,7 @@ def _reset_budget_cache():
 @pytest.fixture()
 def life_loop_on(override_settings):
     trigger_evaluator._followup_registry.clear()
-    override_settings(
-        V2_LIFE_LOOP_ENABLED="true",
-        world_enabled="false",
-        v2_memory_enabled="true",
-    )
+    override_settings()
     yield
     trigger_evaluator._followup_registry.clear()
     life_loop._maintenance_last.clear()
@@ -93,28 +90,31 @@ class TestListTopSalience:
 
 
 class TestMemoryDigestStep:
-    def test_step_sets_digest_and_records_ids(
+    @pytest.mark.asyncio
+    async def test_step_sets_digest_and_records_ids(
         self, db_session_factory, life_loop_on
     ):
         _seed_memory("m-x", "显式嘱托", 0.95)
         cycle_ctx: dict = {}
-        entry = life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        entry = await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert entry["status"] == "ok"
         assert entry["memory_ids"] == ["m-x"]
         assert "显式嘱托" in memory_digest_var.get()
         memory_digest_var.reset(cycle_ctx["digest_token"])
         assert memory_digest_var.get() is None
 
-    def test_digest_budget_truncated(self, db_session_factory, life_loop_on):
+    @pytest.mark.asyncio
+    async def test_digest_budget_truncated(self, db_session_factory, life_loop_on):
         _seed_memory("m-long", "长" * 300, 0.9)
         cycle_ctx: dict = {}
-        life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert len(memory_digest_var.get()) <= 600
         memory_digest_var.reset(cycle_ctx["digest_token"])
 
-    def test_no_salient_memory_skips(self, db_session_factory, life_loop_on):
+    @pytest.mark.asyncio
+    async def test_no_salient_memory_skips(self, db_session_factory, life_loop_on):
         cycle_ctx: dict = {}
-        entry = life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
+        entry = await life_loop._step_memory_retrieval(USER, NOW, cycle_ctx)
         assert entry["status"] == "skipped"
         assert entry["skip_reason"] == "no_salient_memory"
         assert "digest_token" not in cycle_ctx
@@ -126,9 +126,9 @@ class TestProactiveDigestInjection:
         self, db_session_factory, monkeypatch, override_settings
     ):
         from app.models.autonomy import ProactiveAction
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
 
-        override_settings(V2_MEMORY_ENABLED="false")
+        override_settings()
         token = memory_digest_var.set("重要记忆摘要")
         try:
             captured: dict = {}
@@ -180,7 +180,7 @@ class TestProactiveDigestInjection:
         self, db_session_factory, monkeypatch, override_settings
     ):
         from app.models.autonomy import ProactiveAction
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
 
         assert memory_digest_var.get() is None
         captured: dict = {}
@@ -225,15 +225,11 @@ class TestProactiveDigestInjection:
 
 
 class TestReflectionCheckStep:
-    def test_flag_off_skipped(self, db_session_factory, life_loop_on):
-        entry = life_loop._step_reflection_check(USER, NOW)
-        assert entry["status"] == "skipped"
-        assert entry["skip_reason"] == "reflection_disabled"
 
     def test_delegates_to_ref003_and_throttles(
         self, db_session_factory, life_loop_on, monkeypatch, override_settings
     ):
-        override_settings(v2_reflection_enabled="true")
+        override_settings()
         calls: list = []
 
         def fake_trigger(user_id, trigger="scheduled", now=None, trace=None):

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 高保真原型 — 按页面拆分总览</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#FAF9F6;--card:#FFFFFF;--ink:#1B1C23;--ink2:#62646E;--ink3:#9C9DA7;
+  --line:#EAE8E1;--ai1:#7A5CFF;--ai2:#3E8BFF;
+  --grad:linear-gradient(135deg,#8B6DFF,#4D8DFF 55%,#2BD2E8);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:56px 24px 80px}
+.eyebrow{display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.22em;color:var(--ai1);background:rgba(122,92,255,.08);border:1px solid rgba(122,92,255,.2);padding:6px 16px;border-radius:99px;margin-bottom:18px}
+h1{font-size:32px;font-weight:800;letter-spacing:-.02em}
+.lede{color:var(--ink2);margin-top:12px;font-size:15px;max-width:620px}
+.group{margin-top:38px}
+.group h2{font-size:14px;font-weight:800;letter-spacing:.12em;color:var(--ai1);display:flex;align-items:center;gap:10px}
+.group h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.plist{margin-top:14px;display:grid;gap:10px}
+.pitem{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 18px;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s}
+.pitem:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(27,28,35,.07);text-decoration:none}
+.pitem .no{width:38px;height:34px;border-radius:11px;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none;font-family:Menlo,Consolas,monospace}
+.pitem .info{min-width:0}
+.pitem .nm{font-size:15px;font-weight:700}
+.pitem .ds{display:block;font-size:12.5px;color:var(--ink2);margin-top:2px}
+.pitem .go{margin-left:auto;font-size:12.5px;color:var(--ai1);font-weight:700;flex:none;white-space:nowrap}
+.more{margin-top:38px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px}
+.more h3{font-size:14px;margin-bottom:10px}
+.more a{color:var(--ai2);text-decoration:none;font-size:14px;display:block;padding:4px 0}
+.more a:hover{text-decoration:underline}
+.more p{font-size:12.5px;color:var(--ink3);margin-top:8px}
+.foot{margin-top:34px;text-align:center;color:var(--ink3);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">PROTOTYPE · SPLIT BY PAGE</div>
+  <h1>朝夕 · 高保真原型总览</h1>
+  <p class="lede">23 个页面各为一个独立 HTML（零依赖，可直接双击打开）；页内按钮、返回键与底部导航已改写为文件互跳，跳转关系与连续原型一致。文件编号十位对应信息架构分组。</p>
+
+  <div class="group"><h2>⓪ 登录 / 初见</h2>
+    <div class="plist">
+      <a class="pitem" href="00-login.html"><span class="no">00</span><span class="info"><span class="nm">登录欢迎页（邮箱优先）</span><span class="ds">呼吸 Orb + 品牌首句 + 邮箱登录 / 注册；微信 / 手机号降级为次级入口</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="01-verify.html"><span class="no">01</span><span class="info"><span class="nm">邮箱验证码页</span><span class="ds">6 位验证码（重发倒计时 / 错误态）→ 称呼设置（未注册自动建号）</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="group"><h2>① 首页 Home</h2>
+    <div class="plist">
+      <a class="pitem" href="10-home.html"><span class="no">10</span><span class="info"><span class="nm">首页 · AI Life Center</span><span class="ds">今日 AI 总结 / 状态三宫格 / 任务 / 消费 / 问问亚丝娜</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="11-briefing.html"><span class="no">11</span><span class="info"><span class="nm">早间简报（主动式）</span><span class="ds">08:00 深夜紫全屏简报：天气 / 日程 / 任务 / 生活节奏</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="group"><h2>② 对话 Chat</h2>
+    <div class="plist">
+      <a class="pitem" href="20-chat.html"><span class="no">20</span><span class="info"><span class="nm">对话 · 旅行规划 Tool Call</span><span class="ds">沉浸式对话 + 记忆调用提示 + 工具调用过程卡</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="21-chat-ledger.html"><span class="no">21</span><span class="info"><span class="nm">对话 · AI 记账子流程</span><span class="ds">「午饭 35 元」→ 提取金额 / 分类 / 时间 / 保存全步骤</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="group"><h2>③ 生活 Life</h2>
+    <div class="plist">
+      <a class="pitem" href="30-life.html"><span class="no">30</span><span class="info"><span class="nm">生活 · 生活工具箱</span><span class="ds">6 模块宫格（记账 / 备忘录 / 日程 / 健康 / 车辆 / 相册）+ 长按模块卡可设为底部「动态」位</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="41-memo.html"><span class="no">41</span><span class="info"><span class="nm">备忘录</span><span class="ds">AI 按主题归类 + 记录时间 / 到期 / 提醒来源行 + 快速捕获，每条都写清被用到哪里</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="42-schedule.html"><span class="no">42</span><span class="info"><span class="nm">日程</span><span class="ds">日历与任务合一：亚丝娜的排法 + 今日时间线 + 即将到来（旅行 / 还款 / 备忘提醒）</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="31-ledger.html"><span class="no">31</span><span class="info"><span class="nm">记账</span><span class="ds">月度总览 + 亚丝娜的观察 + 待确认账单 + 单一「记一笔」入口 + 分类支出 + 账单列表</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="32-health.html"><span class="no">32</span><span class="info"><span class="nm">健康</span><span class="ds">AI Insight Hero + 睡眠 7 日趋势 + 今日指标</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="33-ledger-add.html"><span class="no">33</span><span class="info"><span class="nm">记一笔（统一录入）</span><span class="ds">说给亚丝娜（AI 解析卡确认入账）/ 键盘输入（金额键盘 + 分类宫格）同页切换</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="34-ledger-auto.html"><span class="no">34</span><span class="info"><span class="nm">同步与 AI 规则</span><span class="ds">本月自动记 42 笔 · 同步来源管理（微信 / 支付宝 / 短信 / 语音）+ AI 学会的规则</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="35-car.html"><span class="no">35</span><span class="info"><span class="nm">车辆</span><span class="ds">车贷还款进度 + 电车充电 / 电耗 / 里程 + 养车支出 + 保养 / 保险 / 限行提醒</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="36-car-add.html"><span class="no">36</span><span class="info"><span class="nm">养车记一笔</span><span class="ds">充电 / 加油 / 里程 / 停车 / 过路 / 保养六类表单，费用同步进记账</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="37-album.html"><span class="no">37</span><span class="info"><span class="nm">相册（仅本地）</span><span class="ds">本机存储占用 + 分类相簿 + 最近添加 + AI 整理建议（本机分析）</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="38-album-manage.html"><span class="no">38</span><span class="info"><span class="nm">相册批量管理</span><span class="ds">AI 预选可清理照片 + 多选 + 批量移动 / 加标签 / 删除（30 天可恢复）</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="39-car-profile.html"><span class="no">39</span><span class="info"><span class="nm">车辆档案</span><span class="ds">我的车 + 保险 / 年检 / 充电桩 / 保养周期 + 保养记录时间线与下次保养倒计时</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="62-album-ai.html"><span class="no">62</span><span class="info"><span class="nm">AI 整理建议</span><span class="ds">本机扫完 2,847 张的整理报告：截图 / 连拍 / 重复保存三类建议 + 我的整理原则</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="60-album-detail.html"><span class="no">60</span><span class="info"><span class="nm">相簿详情</span><span class="ds">点进相簿看照片墙：按日期分组，✦ 标出我留下的连拍原片</span></span><span class="go">打开 ↗</span></a>
+      <a class="pitem" href="61-photo-view.html"><span class="no">61</span><span class="info"><span class="nm">单张照片</span><span class="ds">大图 + 本机读取的照片信息 + 收藏 / 移到相簿 / 删除（仅本机）</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="group"><h2>④ 记忆 Memory（已收进「我的」）</h2>
+    <div class="plist">
+      <a class="pitem" href="40-memory.html"><span class="no">40</span><span class="info"><span class="nm">记忆（「我的」子页）</span><span class="ds">偏好 / 习惯 / 目标 / 当下分组记忆卡，来源可追溯；不再是底部主 Tab</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="group"><h2>⑤ 我的 Profile</h2>
+    <div class="plist">
+      <a class="pitem" href="50-profile.html"><span class="no">50</span><span class="info"><span class="nm">我的</span><span class="ds">人格卡 + Role Mode + 设备 / 授权 / 隐私 + 主动关怀开关</span></span><span class="go">打开 ↗</span></a>
+    </div>
+  </div>
+
+  <div class="more">
+    <h3>完整文件</h3>
+    <a href="../ai-life-agent-prototype.html">ai-life-agent-prototype.html — 11 页连续原型（#hash 深链跳转）↗</a>
+    <a href="../ai-life-agent-design.html#sec4">ai-life-agent-design.html — 产品设计方案 · 第四节为每页设计说明 ↗</a>
+    <p>两个单文件设计稿保持原样未改动；本目录为按页面拆分的浏览版。</p>
+  </div>
+
+  <div class="foot">朝夕 · AI Personal Life Agent — 设计稿按页面拆分</div>
+</div>
+</body>
+</html>

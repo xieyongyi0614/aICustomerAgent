@@ -4,12 +4,13 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application import world_engine
 from app.repositories import memory_repository, world_repository
 from app.services.action.capabilities import register_builtin
 from app.services.action.registry import CapabilityRegistry, ExecutionContext
 
-NOW = datetime(2026, 9, 3, 14, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 3, 14, 0, 0))
 USER = "u-action"
 
 
@@ -27,7 +28,7 @@ def ctx(registry):
 
 @pytest.mark.asyncio
 async def test_reminder_create_world_event(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     reminder = world_engine  # noqa: F841
     from app.services.action.capabilities.reminder import ReminderCapability
 
@@ -40,14 +41,16 @@ async def test_reminder_create_world_event(ctx, override_settings):
     assert event is not None
     assert event.type == "reminder"
     assert event.title == "开会"
-    assert event.due_at == datetime.fromisoformat("2026-09-04T08:00:00")
+    assert event.due_at == timeutil.ensure_aware(
+        datetime.fromisoformat("2026-09-04T08:00:00")
+    )
     assert event.source.value == "autonomy"
     assert event.status.value == "scheduled"
 
 
 @pytest.mark.asyncio
 async def test_reminder_cancel(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.reminder import ReminderCapability
 
     cap = ReminderCapability()
@@ -59,7 +62,7 @@ async def test_reminder_cancel(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_reminder_cancel_no_target_fails(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.reminder import ReminderCapability
 
     result = await ReminderCapability().execute("cancel", {"target": "不存在"}, ctx)
@@ -69,7 +72,7 @@ async def test_reminder_cancel_no_target_fails(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_memory_save_user_stated(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.memory import MemoryCapability
 
     result = await MemoryCapability().execute("save", {"fact": "我生日是7月30日"}, ctx)
@@ -81,8 +84,37 @@ async def test_memory_save_user_stated(ctx, override_settings):
 
 
 @pytest.mark.asyncio
+async def test_memory_save_normalizes_legacy_type(ctx, override_settings):
+    """写入口归一（2026-10-15）：参数里的遗留类型名不落库，落 `normalize_type` 后的规范类型。"""
+    override_settings()
+    from app.services.action.capabilities.memory import MemoryCapability
+
+    result = await MemoryCapability().execute(
+        "save", {"fact": "我生日是7月30日", "memory_type": "important_event"}, ctx
+    )
+    assert result.status == "succeeded"
+    memory = memory_repository.get_memory(result.payload["memory_id"])
+    assert memory.type == "experience"
+
+
+@pytest.mark.asyncio
+async def test_memory_save_unknown_type_fails_closed(ctx, override_settings):
+    """表外类型 fail-closed：不落库、不抛异常，返回 permanent 失败。"""
+    override_settings()
+    from app.services.action.capabilities.memory import MemoryCapability
+
+    before = memory_repository.list_by_user(USER)
+    result = await MemoryCapability().execute(
+        "save", {"fact": "表外类型事实", "memory_type": "brand_new"}, ctx
+    )
+    assert result.status == "failed"
+    assert result.payload["failure_kind"] == "permanent"
+    assert memory_repository.list_by_user(USER) == before
+
+
+@pytest.mark.asyncio
 async def test_world_action_create_and_use(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     cap = WorldActionCapability()
@@ -99,7 +131,7 @@ async def test_world_action_create_and_use(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_world_action_move(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     cap = WorldActionCapability()
@@ -111,7 +143,7 @@ async def test_world_action_move(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_world_action_move_unknown_location(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.world_action import WorldActionCapability
 
     await WorldActionCapability().execute("create", {"object": "牛奶"}, ctx)
@@ -121,7 +153,7 @@ async def test_world_action_move_unknown_location(ctx, override_settings):
 
 @pytest.mark.asyncio
 async def test_environment_query_readonly(ctx, override_settings):
-    override_settings(world_enabled=True)
+    override_settings()
     from app.services.action.capabilities.environment_query import EnvironmentQueryCapability
 
     world_engine.set_environment(USER, weather="晴", temperature_c=26.0)
@@ -135,21 +167,14 @@ async def test_environment_query_readonly(ctx, override_settings):
     assert after.updated_at == before.updated_at
 
 
-@pytest.mark.asyncio
-async def test_search_and_notification_unavailable(ctx):
+async def test_search_unavailable_and_notification_wired(ctx):
+    """检索无可用来源（明确降级）；通知能力已接线（V2.4.0 起不再整体 unavailable）。"""
     from app.services.action.capabilities.notification import NotificationCapability
     from app.services.action.capabilities.search import SearchCapability
 
-    assert (await SearchCapability().execute("query", {"query": "x"}, ctx)).status == "unavailable"
-    assert (await NotificationCapability().execute("send", {"content": "x"}, ctx)).status == "unavailable"
-
-
-@pytest.mark.asyncio
-async def test_world_unavailable_when_disabled(override_settings):
-    override_settings(world_enabled=False)
-    from app.core.settings import get_settings
-    from app.services.action.capabilities.reminder import ReminderCapability
-
-    ctx = ExecutionContext(user_id=USER, record_id="act_test", now=NOW, settings=get_settings())
-    result = await ReminderCapability().execute("create", {"content": "开会", "due_at": "2026-09-04T08:00:00"}, ctx)
-    assert result.status == "unavailable"
+    search = await SearchCapability().execute("query", {"query": "x"}, ctx)
+    assert search.status == "unavailable"
+    assert search.payload["reason_kind"] == "source_not_configured"
+    assert (await NotificationCapability().execute("send", {"content": "x"}, ctx)).status == (
+        "succeeded"
+    )

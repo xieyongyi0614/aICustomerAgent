@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import SceneStateRow, SessionLocal
 from app.models.scene import PendingAction, SceneState
 
@@ -33,7 +34,7 @@ def get_scene_state(session_id: str) -> SceneState:
 
 
 def upsert_scene_state(session_id: str, state: SceneState) -> SceneState:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(SceneStateRow, session_id)
         if row is None:
@@ -54,5 +55,4 @@ def upsert_scene_state(session_id: str, state: SceneState) -> SceneState:
         row.completed_actions = state.completed_actions
         row.updated_at = now
         session.commit()
-        session.refresh(row)
         return _to_state(row)

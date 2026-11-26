@@ -14,7 +14,7 @@ from app.models.character_action import (
     ActionTransitionEvent,
 )
 from app.models.world import ObjectStatus
-from app.application.world_engine import ensure_world
+from app.services.world import engine_port as world_engine
 from app.repositories import world_repository
 
 logger = logging.getLogger(__name__)
@@ -273,14 +273,10 @@ def validate_actions(
     recent_dedupe_keys: set[str] | None = None,
 ) -> list[ValidationResult]:
     settings = get_settings()
-    if not settings.world_enabled:
-        for action in candidates:
-            action.transition(ActionTransitionEvent.VALIDATE_REJECT)
-        return [ValidationResult(a, "rejected", WorldActionReason.DISABLED) for a in candidates]
 
     try:
         if user_id:
-            world = ensure_world(user_id)
+            world = world_engine.ensure_world(user_id)
         else:
             world = None
 

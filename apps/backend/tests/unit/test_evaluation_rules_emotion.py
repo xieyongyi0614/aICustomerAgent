@@ -1,8 +1,8 @@
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     EmotionSlice,
     EvaluationContext,
 )
-from app.services.evaluation_rules import emotion as emotion_rules
+from app.services.evaluation.rules import emotion as emotion_rules
 
 
 def make_ctx(

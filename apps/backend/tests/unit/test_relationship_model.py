@@ -14,7 +14,8 @@ from app.models.relationship import (
     RelationshipDelta,
     RelationshipState,
 )
-from app.services import relationship_evolution, state_engine
+from app.engines import relationship_evolution
+from app.engines import state as state_engine
 
 
 NOW = datetime(2026, 8, 31, 12, 0, 0)
@@ -109,7 +110,7 @@ class TestDimensionDefaults:
 class TestStageInsensitiveToNewDimensions:
     def test_stage_path_ignores_respect_and_comfort(self):
         state = make_state(intimacy=0.60, trust=0.60, familiarity=0.40)
-        baseline = state_engine.apply_relationship_v5(
+        baseline = state_engine.apply_relationship_update(
             state, "none", "normal", "normal_reply", RelationshipDelta(), RelationshipDelta()
         )
         extremes = make_state(
@@ -119,7 +120,7 @@ class TestStageInsensitiveToNewDimensions:
             respect=1.0,
             comfort=0.0,
         )
-        padded = state_engine.apply_relationship_v5(
+        padded = state_engine.apply_relationship_update(
             extremes, "none", "normal", "normal_reply", RelationshipDelta(), RelationshipDelta()
         )
         assert baseline[0].stage == padded[0].stage == "close_friend"
@@ -129,7 +130,7 @@ class TestStageInsensitiveToNewDimensions:
 
     def test_v5_state_update_never_moves_new_dimensions(self):
         state = make_state()
-        new, applied = state_engine.apply_relationship_v5(
+        new, applied = state_engine.apply_relationship_update(
             state, "user_care", "normal", "comfort", RelationshipDelta(), RelationshipDelta()
         )
         assert applied.respect == pytest.approx(0.0)

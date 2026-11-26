@@ -4,13 +4,14 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
+from app.core import timeutil
 from app.models.relationship import (
     RelationshipDelta,
     RelationshipEventType,
     RelationshipState,
 )
 from app.repositories import relationship_repository
-from app.services.state_engine import RELATIONSHIP_EVENT_DELTAS
+from app.engines.state import RELATIONSHIP_EVENT_DELTAS
 
 
 class TestRelationshipStateTension:
@@ -120,4 +121,4 @@ class TestDateTimeCompat:
         )
         loaded = relationship_repository.get_relationship("u3")
         assert isinstance(loaded.updated_at, datetime)
-        assert loaded.updated_at.tzinfo is None or loaded.updated_at < datetime.now(timezone.utc).replace(tzinfo=None)
+        assert loaded.updated_at <= timeutil.now()

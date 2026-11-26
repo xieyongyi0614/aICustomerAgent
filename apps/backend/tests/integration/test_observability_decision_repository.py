@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.observability import DecisionKind, DecisionRecord
 from app.repositories import decision_repository
 
@@ -56,11 +57,11 @@ def test_search_filters(db_session_factory):
     assert len(decision_repository.search(kind="proactive_autonomy")) == 2
     assert len(decision_repository.search(action_id="act-2")) == 1
     assert decision_repository.search(action_id="act-2")[0].decision == "act"
-    assert len(decision_repository.search(since=datetime.now() + timedelta(hours=1))) == 0
+    assert len(decision_repository.search(since=timeutil.now() + timedelta(hours=1))) == 0
     assert len(decision_repository.search(user_id="nobody")) == 0
 
 
 def test_prune_before(db_session_factory):
     decision_repository.save(make_record(record_id="dec-old"))
-    assert decision_repository.prune_before(datetime.now() + timedelta(days=1)) >= 1
+    assert decision_repository.prune_before(timeutil.now() + timedelta(days=1)) >= 1
     assert decision_repository.search(user_id="default-user") == []

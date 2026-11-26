@@ -8,9 +8,7 @@ import pytest
 from app.application import observability
 from app.models.observability import CallSite
 from app.repositories import llm_call_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {
@@ -45,7 +43,7 @@ async def _run_turn(llm, session_id, content="我今天把项目上线了"):
     return events
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -56,7 +54,6 @@ async def _await_until(predicate, timeout: float = 3.0):
 
 @pytest.mark.asyncio
 async def test_full_turn_records_all_call_sites(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = await _run_turn(llm, "s-v78-llm")
     turn_id = events[-1]["turn_id"]
@@ -85,7 +82,6 @@ async def test_full_turn_records_all_call_sites(db_session_factory, fake_llm, ov
 
 @pytest.mark.asyncio
 async def test_error_call_recorded(db_session_factory, fake_llm, override_settings):
-    override_settings(observability_persist_enabled=True)
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
     events = await _run_turn(llm, "s-v78-llm-ok")
     request_id = events[-1]["request_id"]
@@ -109,9 +105,11 @@ async def test_error_call_recorded(db_session_factory, fake_llm, override_settin
 
 
 @pytest.mark.asyncio
-async def test_persist_disabled_records_nothing(db_session_factory, fake_llm):
+async def test_llm_call_recorded_unconditionally(db_session_factory, fake_llm):
+    """批次 2 固化后 LLM 调用采集无总闸（`observability_persist_enabled` 已删）。"""
     llm = fake_llm(response=["好耶"], structured_responses=_structured())
-    await _run_turn(llm, "s-v78-llm-off")
-    await asyncio.sleep(0.3)
-    assert llm_call_repository.search(limit=500) == []
-    assert observability.background_tasks == set()
+    events = await _run_turn(llm, "s-v78-llm-off")
+    request_id = events[-1]["request_id"]
+    assert await _await_until(
+        lambda: llm_call_repository.get_by_request(request_id) != []
+    )

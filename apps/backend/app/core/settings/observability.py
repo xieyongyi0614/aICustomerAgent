@@ -15,7 +15,6 @@ from app.core.settings._shared import (
 class ObservabilitySettings(BaseSettings):
     model_config = DOMAIN_MODEL_CONFIG
 
-    observability_persist_enabled: bool = True
     observability_trace_sample_rate: float = 1.0
     observability_prompt_capture_mode: str = "sampled"
     observability_prompt_sample_rate: float = 0.2

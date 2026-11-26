@@ -8,26 +8,26 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.emotion import TurnAnalysis
-from app.services import (
-    behavior_engine,
-    conversation_service,
-    evaluation_engine,
-    goal_service,
-    memory_service,
-    scene_service,
-    state_service,
-    summary_service,
-)
+from app.engines import behavior as behavior_engine
+from app.services.conversation import service as conversation_service
+from app.services.evaluation import engine as evaluation_engine
+from app.services.goal import service as goal_service
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
+from app.services.conversation import summary as summary_service
+from app.services.autonomy import trigger as trigger_evaluator
 from app.application import world_engine
 from app.models.action import ActionIntent
 from app.models.character_action import TurnRef
 from app.models.memory import MemoryExtraction
 from app.repositories import memory_repository, world_repository
-from app.services.memory2 import (
+from app.services.memory import (
     commands as memory_commands,
     ingest as memory_ingest,
     sources as memory_sources,
@@ -59,6 +59,8 @@ class PostProcessContext:
     intention: object | None = None
     behavior: object | None = None
     action_intent: object | None = None
+    # 本轮登记待确认的账目金额（分）：确定性链路据此让位，保证同一笔只有一个写面
+    ledger_pending_amount: int | None = None
 
 
 async def run_scene_update(ctx: PostProcessContext) -> None:
@@ -148,23 +150,8 @@ async def run_summary(ctx: PostProcessContext) -> None:
 async def run_memory_extract(ctx: PostProcessContext) -> None:
     started = time.perf_counter()
     try:
-        if get_settings().v2_memory_enabled:
-            await _run_memory_ingest_v2(ctx)
-            await _run_memory_evaluate_v2(ctx)
-        else:
-            recent_turns = ctx.state.messages[-get_settings().memory_recent_context_messages :]
-            recent_context = "\n".join(
-                f"用户：{m.content}" if m.role == "human" else f"亚丝娜：{m.content}"
-                for m in recent_turns
-            )
-            await memory_service.extract_and_save(
-                ctx.user_id,
-                ctx.user_input,
-                ctx.ai_reply,
-                llm=ctx.llm,
-                trace=ctx.trace,
-                recent_context=recent_context,
-            )
+        await _ingest_memory_candidates(ctx)
+        await _evaluate_memory_candidates(ctx)
         if ctx.trace is not None:
             ctx.trace.record(
                 "memory_extractor", (time.perf_counter() - started) * 1000
@@ -180,7 +167,7 @@ async def run_memory_extract(ctx: PostProcessContext) -> None:
             )
 
 
-async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
+async def _ingest_memory_candidates(ctx: PostProcessContext) -> None:
     """v2 摄取通道：显式命令优先，未命中再走四源收敛到 memory_candidates。
 
     ActionRecord/完结 WorldEvent/RelationshipEvent 在本轮后续步骤（world/action）才产生，
@@ -207,12 +194,13 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
     if not isinstance(extraction, MemoryExtraction):
         extraction = MemoryExtraction.model_validate(extraction)
     source_id_base = f"conv:{ctx.user_id}:{ctx.session_id}"
-    memory_ingest.ingest_from_conversation(
+    conversation_rows = memory_ingest.ingest_from_conversation(
         ctx.user_id,
         extraction,
         source_id_base=source_id_base,
         trace=ctx.trace,
     )
+    _register_followups(ctx.user_id, conversation_rows)
     for record in memory_sources.fetch_action_records(ctx.user_id):
         try:
             memory_ingest.ingest_from_action_record(record, trace=ctx.trace)
@@ -239,7 +227,29 @@ async def _run_memory_ingest_v2(ctx: PostProcessContext) -> None:
             )
 
 
-async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
+def _register_followups(user_id: str, rows) -> None:
+    """V7-010：带时间语义的事件候选 → scheduled_followup 登记。
+
+    唯一生产者原为 v1 `extract_and_save`（随其删除断链），现承接于 v2 摄取通道
+    的会话候选行；due = 最近一次 18:00（已过则顺延次日），消费端 `poll_due_followup`
+    与登记表写入均为既有通道。
+    """
+    now = timeutil.now()
+    for row in rows:
+        keyword = trigger_evaluator.find_followup_event(row.content or "")
+        if keyword is None:
+            continue
+        due = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        if due <= now:
+            due += timedelta(days=1)
+        try:
+            trigger_evaluator.register_followup(user_id, due, f"{keyword}近况跟进")
+            logger.info("scheduled_followup 登记：%s due=%s", keyword, due)
+        except Exception:
+            logger.exception("followup 登记失败，跳过")
+
+
+async def _evaluate_memory_candidates(ctx: PostProcessContext) -> None:
     """v2 评估通道：pending 候选规则分三段判定，灰区才走 lite LLM 兜底。
 
     尾部接线 REF-003：flush 强化缓冲并把落库 id 喂给反思事件计数；
@@ -247,10 +257,10 @@ async def _run_memory_evaluate_v2(ctx: PostProcessContext) -> None:
     Insight 失效匹配（MEM-005/Memory 侧 contradicts 并存语义零修改）。
     """
 
-    decisions = await memory_evaluator.evaluate_pending(ctx.user_id, trace=ctx.trace)
+    decisions = await memory_evaluator.evaluate_pending(
+        ctx.user_id, trace=ctx.trace, llm=ctx.llm
+    )
 
-    if not get_settings().v2_reflection_enabled:
-        return
     try:
         flushed_ids = memory_lifecycle.flush_reinforce_buffer(trace=ctx.trace)
         if flushed_ids:
@@ -319,17 +329,77 @@ async def run_evaluation(ctx: PostProcessContext) -> None:
 
 
 async def run_world_update(ctx: PostProcessContext) -> None:
-    """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。"""
+    """V8 第 8 步：解释用户消息 → 世界状态迁移 + 到期处理（world-engine 侧容错）。
+    V2.3.0 追加：用户处境检出（确定性模式，独立子闸）。
+    物品录入（2026-10-10）：步骤**内部**增强（不新增步骤、不改序列）——默认家庭库存
+    种子已移除，物品只在用户**显式要求记录**时（确定性前置闸命中）走 LLM 抽取建档。"""
     try:
         world_engine.run_turn_update(ctx.user_id, ctx.user_input, trace=ctx.trace)
     except Exception:
         logger.exception("世界更新步骤异常（双保险，不应触达）")
+    try:
+        from app.services.world import user_situation
+
+        user_situation.detect_from_message(
+            ctx.user_id,
+            ctx.user_input,
+            evidence={"session_id": ctx.session_id, "turn": ctx.current_turn},
+        )
+    except Exception:
+        logger.exception("用户处境检出异常")
+    await _run_object_intake(ctx)
+
+
+async def _run_object_intake(ctx: PostProcessContext) -> None:
+    """用户显式要求记录物品 → LLM 抽取 → 建档。
+
+    幂等：同名物品已存在则跳过（避免与词表链路/多轮重复录入）。前置闸未命中零 LLM。
+    """
+    from app.chains.object_intake_chain import extract_objects, has_record_intent
+
+    if not has_record_intent(ctx.user_input):
+        return
+    started = time.perf_counter()
+    try:
+        intake = await asyncio.to_thread(extract_objects, ctx.user_input, llm=ctx.llm)
+        created: list[str] = []
+        for item in intake.items:
+            if world_engine.find_object_by_name(ctx.user_id, item.name) is not None:
+                continue
+            obj = world_engine.create_object(
+                ctx.user_id,
+                name=item.name,
+                category=item.category,
+                quantity=item.quantity,
+                unit=item.unit,
+                consumable=item.category in ("food", "drink"),
+                **{
+                    key: value
+                    for key, value in (
+                        ("price_minor", item.price_minor),
+                        ("purchased_at", item.purchased_at),
+                    )
+                    if value is not None
+                },
+            )
+            if obj is not None:
+                created.append(item.name)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "object_intake",
+                (time.perf_counter() - started) * 1000,
+                "ok",
+                extracted=len(intake.items),
+                created=len(created),
+            )
+    except Exception:
+        logger.exception("物品录入失败，不影响本轮回答")
+        if ctx.trace is not None:
+            ctx.trace.record("object_intake", 0.0, "error", error="object intake failed")
 
 
 async def run_character_action_sync(ctx: PostProcessContext) -> None:
     """CAS 第 9 步：提取 → 校验 → 执行（ACTION-004）→ 摘要写 notes（ACTION-005 写侧）。"""
-    if not get_settings().v2_character_action_sync_enabled:
-        return
     started = time.perf_counter()
     try:
         from app.services.character_action.extractor import extract_actions
@@ -403,9 +473,48 @@ async def run_character_action_sync(ctx: PostProcessContext) -> None:
             )
 
 
+def _defer_to_ledger_pending(
+    ctx: PostProcessContext, intent: ActionIntent
+) -> bool:
+    """本轮同一笔已登记待确认 → 确定性链路让位（账本单写面）。
+
+    原先两条链路对同一条消息各写一遍：词表链路先入账、LLM 抽取链路再登记待确认，
+    用户一点确认就落第二笔（实测 240 元牛杂：16:57 落一笔，17:10 确认后又落一笔）。
+    金额一致才让位——金额对不上说明两条链路读到的不是同一笔，此时不拦。
+    """
+    deferred_amount = getattr(ctx, "ledger_pending_amount", None)
+    if deferred_amount is None:
+        return False
+    if intent.action_type != "record_ledger_entry":
+        return False
+    amount = intent.params.get("amount_minor")
+    if not isinstance(amount, int) or amount != deferred_amount:
+        return False
+    if ctx.trace is not None:
+        ctx.trace.record(
+            "action_planning",
+            0.0,
+            "deferred",
+            reason="ledger_pending_confirmation",
+            amount_minor=amount,
+        )
+    return True
+
+
 async def run_action_planning(ctx: PostProcessContext) -> None:
-    """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。"""
-    if not get_settings().action_enabled:
+    """V9 第 9 步：行动意图检出 → 六闸门 → 计划 → 执行 → 四通道整合。
+
+    V2.4.0 TOOL-004：步骤**内部**增强（不新增步骤、不改序列）——工具面子闸开启时
+    先投影工具面，把 `surface.tool_ids` 作为 capability 候选喂给既有决策管线（工具候选
+    只参与六维评分与审计落库，前台 `chat_response` 恒胜出），投影结果随既有
+    `trace.record()` 进 `runtime_traces.steps`。子闸关闭时零行为差异。
+
+    V2.4.0 TOOL-005：同样只做步骤**内部**增强——权限闸开启时先检出确认意图（确定性词表 +
+    问句守卫，零新增 LLM），命中则在既有步骤内处理确认轮次并提前返回；未命中或闸门关闭时
+    行为与 TOOL-004 一致。确认话术以 `record.gate_reason=pending_confirmation` 的行动记录
+    进入下一轮既有 `ActionContext` 回复素材（本步骤不改序列、不新增步骤）。
+    """
+    if await _run_confirmation_round(ctx):
         return
 
     action_intent = ctx.action_intent
@@ -417,6 +526,8 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
         except Exception:
             logger.exception("行动意图反序列化失败，跳过第 9 步")
             return
+    if _defer_to_ledger_pending(ctx, action_intent):
+        return
     started = time.perf_counter()
     try:
         from app.application.action_engine import run_action_planning as _run
@@ -427,16 +538,20 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             goal = getattr(selected_goal, "goal", None)
             if goal is not None:
                 goal_id = getattr(goal, "id", None)
-        await _run(
+        surface_extra = _observe_tool_surface(ctx, goal_id)
+        record = await _run(
             ctx.user_id,
             action_intent,
             session_id=ctx.session_id,
             goal_id=goal_id,
         )
+        surface_extra.update(_observe_pending_confirmation(record))
+        surface_extra.update(_observe_tool_evidence(ctx))
         if ctx.trace is not None:
             ctx.trace.record(
                 "action_planning",
                 (time.perf_counter() - started) * 1000,
+                **surface_extra,
             )
     except Exception:
         logger.exception("行动规划步骤异常（双保险，不应触达）")
@@ -446,30 +561,341 @@ async def run_action_planning(ctx: PostProcessContext) -> None:
             )
 
 
+async def _run_confirmation_round(ctx: PostProcessContext) -> bool:
+    """确认轮次检出与执行（TOOL-005 §2.3 步骤④）；未命中返回 False（按普通对话处理）。"""
+    started = time.perf_counter()
+    try:
+        from app.application.action_engine import run_confirmation_round
+        from app.services.tool.confirmation import (
+            get_confirmation_detector,
+            get_confirmation_service,
+        )
+
+        pending = get_confirmation_service().pending(ctx.user_id)
+        if not pending:
+            return False
+        detected = get_confirmation_detector().detect(ctx.user_input, pending)
+        if detected is None:
+            return False
+        request_id, verb = detected
+        record = await run_confirmation_round(
+            ctx.user_id, request_id, approved=verb == "approve", session_id=ctx.session_id
+        )
+        _record_confirmation_trace(ctx, started, request_id, verb, record)
+        return True
+    except Exception:
+        logger.exception("确认轮次处理失败，降级为普通对话")
+        return False
+
+
+def _record_confirmation_trace(
+    ctx: PostProcessContext, started: float, request_id: str, verb: str, record
+) -> None:
+    """确认轮次的观测面（独立容错：记账失败不影响"本轮已被消费"的事实）。"""
+    if ctx.trace is None:
+        return
+    try:
+        ctx.trace.record(
+            "confirmation_round",
+            (time.perf_counter() - started) * 1000,
+            "ok",
+            request_id=request_id,
+            verb=verb,
+            record_id=None if record is None else record.id,
+            record_status=None if record is None else record.status,
+        )
+    except Exception:
+        logger.exception("确认轮次 trace 记账失败")
+
+
+def _observe_pending_confirmation(record) -> dict:
+    """确认态观测（TOOL-005 §2.3）：话术随既有 `trace.record()` 进回复素材与观测面。"""
+    if record is None or getattr(record, "gate_reason", None) != "pending_confirmation":
+        return {}
+    result = record.result or {}
+    return {
+        "pending_confirmation": {
+            "record_id": record.id,
+            "tool_id": (record.steps[0].get("tool_id") if record.steps else None),
+            "prompt": result.get("error"),
+        }
+    }
+
+
+def _observe_tool_evidence(ctx: PostProcessContext) -> dict:
+    """工具证据反思接线（TOOL-009 §2.3）：只读 `action_records` 投影喂 reinforce 计数。
+
+    接线失败记日志、不影响行动规划（与 REF-003 既有接线同款纪律）。
+    """
+    try:
+        fired = reflection_triggers.observe_tool_evidence_from_records(
+            ctx.user_id, trace=ctx.trace
+        )
+    except Exception:
+        logger.exception("工具证据反思接线失败，不影响行动规划")
+        return {}
+    if not fired:
+        return {}
+    return {"tool_evidence_reinforce": fired}
+
+
+def _observe_tool_surface(ctx: PostProcessContext, goal_id: str | None) -> dict:
+    """第 9 步内部工具面观测（失败不影响本步骤）。"""
+    settings = get_settings()
+    try:
+        from app.application.agent_runtime.models import RUN_KIND_FOREGROUND_CHAT
+        from app.services.tool.context import ToolContext
+        from app.services.tool.registry import get_tool_registry
+        from app.services.tool.surface import ToolSurfaceResolver
+
+        registry = get_tool_registry()
+        now = timeutil.now()
+        surface = ToolSurfaceResolver(registry, settings).resolve(
+            RUN_KIND_FOREGROUND_CHAT,
+            ToolContext(
+                user_id=ctx.user_id,
+                now=now,
+                settings=settings,
+                run_kind=RUN_KIND_FOREGROUND_CHAT,
+                run_id=getattr(ctx.trace, "request_id", None),
+                source="conversation",
+            ),
+        )
+        audit = _run_tool_decision(ctx, surface, goal_id, now)
+        _persist_tool_decision(ctx, surface, audit)
+        return {
+            "tool_surface": {
+                "run_kind": surface.run_kind,
+                "surface_hash": surface.surface_hash,
+                "tool_ids": list(surface.tool_ids),
+                "excluded": [dict(item) for item in surface.excluded],
+            },
+            "tool_winner": None if audit is None else _audit_winner(audit),
+        }
+    except Exception:
+        logger.exception("工具面投影失败，跳过（不影响行动规划）")
+        return {}
+
+
+def _run_tool_decision(
+    ctx: PostProcessContext, surface, goal_id: str | None, now: datetime
+) -> dict | None:
+    """把工具面作为 capability 候选接入既有决策管线（纯评分 + 审计；不改变前台回复）。"""
+    from app.engines import decision as decision_pipeline
+
+    if not surface.tool_ids:
+        return None
+    result = decision_pipeline.run_pipeline(
+        capabilities=list(surface.tool_ids),
+        chat_response=True,
+        chat_response_intention=getattr(
+            getattr(ctx, "intention", None), "intention", None
+        ),
+        chat_response_goal_id=goal_id,
+        run=None,
+        now=now,
+    )
+    audit = result.audit
+    audit["surface_hash"] = surface.surface_hash
+    audit["winner"] = result.winner.source if result.winner is not None else None
+    return audit
+
+
+def _audit_winner(audit: dict) -> str | None:
+    winner = next(
+        (item for item in audit.get("candidates", []) if item.get("won")),
+        None,
+    )
+    if winner is None:
+        return None
+    payload = winner.get("tool_id") or winner.get("source")
+    return payload
+
+
+def _persist_tool_decision(ctx: PostProcessContext, surface, audit: dict | None) -> None:
+    """工具候选审计落既有 `decision_records`（kind 复用既有值域，零迁移）。"""
+    if audit is None:
+        return
+    from app.application.observability import on_decision
+    from app.models.observability import DecisionKind, DecisionRecord
+
+    on_decision(
+        DecisionRecord(
+            kind=DecisionKind.TURN_INTENTION,
+            request_id=getattr(ctx.trace, "request_id", None),
+            user_id=ctx.user_id,
+            conversation_id=ctx.session_id,
+            decision="tool_surface",
+            reason=surface.surface_hash,
+            input_snapshot={"tool_ids": list(surface.tool_ids)},
+            candidates=audit,
+        )
+    )
+
+
+async def run_ledger_extraction(ctx: PostProcessContext) -> None:
+    """账本抽取候选（PLA-007）：零写库，只产候选并分流标记。失败不影响回答。"""
+    try:
+        from datetime import datetime
+
+        from app.chains.ledger_extraction_chain import classify_extraction, extract_ledger
+        from app.core.settings import get_settings
+
+        extraction = extract_ledger(
+            ctx.user_input,
+            message_id=ctx.session_id,
+            now=timeutil.now(),
+            llm=ctx.llm,
+        )
+        decision = classify_extraction(
+            extraction,
+            min_confidence=get_settings().ledger_extraction_min_confidence,
+        )
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "ledger_extraction",
+                0.0,
+                "ok" if decision != "ignore" else "skip",
+                decision=decision,
+                confidence=extraction.confidence,
+            )
+    except Exception:
+        logger.exception("账本抽取失败，忽略本轮候选")
+
+
+def _ledger_detected_payload(ctx: PostProcessContext) -> dict | None:
+    """同轮**确定性词表链路**的解析（明细 + 已归一类目），交给待确认承载。
+
+    返回 None = 本轮没有可直接入账的确定性解析（只有 LLM 认为是记账的情形），
+    此时待确认沿用原有语义（纯 LLM 抽取）。
+    """
+    intent = ctx.action_intent
+    if isinstance(intent, dict):
+        try:
+            intent = ActionIntent.model_validate(intent)
+        except Exception:
+            return None
+    if intent is None or getattr(intent, "action_type", None) != "record_ledger_entry":
+        return None
+    params = getattr(intent, "params", None) or {}
+    amount_minor = params.get("amount_minor")
+    if not isinstance(amount_minor, int) or amount_minor <= 0:
+        return None
+    note = str(params.get("note") or "").strip()
+    direction = str(params.get("direction") or "expense")
+    detected: dict = {
+        "amount_minor": amount_minor,
+        "direction": direction,
+        "note": note or None,
+    }
+    if not note:
+        return detected
+    from app.services.ledger import category as category_service
+    from app.services.ledger import ensure_user_bootstrap
+
+    ensure_user_bootstrap(ctx.user_id)
+    kind = "income" if direction == "income" else "expense"
+    result = category_service.normalize(ctx.user_id, note, kind=kind)
+    if result.category_id:
+        detected["category_name"] = result.category_name
+    return detected
+
+
+async def run_ledger_confirmation(ctx: PostProcessContext) -> None:
+    """PLA-010 确认挂接：需澄清则登记待确认；超时清理。失败不影响回答。"""
+    try:
+        from datetime import datetime
+
+        from app.services.ledger.confirmation import should_confirm
+        from app.services.ledger.pending import expire_if_due, register_pending
+
+        now = timeutil.now()
+        expire_if_due(ctx.session_id, now=now)
+        from app.chains.ledger_extraction_chain import extract_ledger
+
+        extraction = extract_ledger(
+            ctx.user_input,
+            message_id=ctx.session_id,
+            now=now,
+            llm=ctx.llm,
+        )
+        request = should_confirm(
+            extraction,
+            now=now,
+            source_ref=ctx.session_id,
+        )
+        if request is None:
+            return
+        detected = _ledger_detected_payload(ctx)
+        record = register_pending(
+            user_id=ctx.user_id,
+            session_id=ctx.session_id,
+            request=request,
+            extraction=extraction,
+            detected=detected,
+            now=now,
+        )
+        if detected is not None and detected.get("amount_minor") == request.amount_minor:
+            ctx.ledger_pending_amount = int(detected["amount_minor"])
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "ledger_confirmation",
+                0.0,
+                "asked" if record is not None else "deduped",
+                reason=request.reason,
+                pending_key=request.pending_key,
+                question=request.question,
+                deferred_to_pending=ctx.ledger_pending_amount is not None,
+            )
+    except Exception:
+        logger.exception("账本确认挂接失败，忽略本轮")
+
+
+async def run_memory_evaluate(ctx: PostProcessContext) -> None:
+    """收尾评估步（memory 域通道收敛第 3 批）：本轮世界/行动步骤投递的候选当轮转正。
+
+    v2 评估原本只在第 5 步执行，而世界事件完结（第 10 步）与工具记忆投递
+    （第 12 步内 `integrate_result`）产出的候选要等下一轮第 5 步才被评估——
+    记忆可见性会比旁路直写时期晚一轮。本步补一次 `evaluate_pending`：
+    无待评估候选时为一次空查询，有则同轮转正（REF 接线复用 `_evaluate_memory_candidates`，
+    缓冲区二刷为空操作）。
+    """
+    started = time.perf_counter()
+    try:
+        await _evaluate_memory_candidates(ctx)
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "memory_evaluate_tail", (time.perf_counter() - started) * 1000
+            )
+    except Exception:
+        logger.exception("记忆收尾评估失败，不影响本轮回答")
+        if ctx.trace is not None:
+            ctx.trace.record(
+                "memory_evaluate_tail",
+                (time.perf_counter() - started) * 1000,
+                "error",
+                error="memory evaluate tail failed",
+            )
+
+
 STEP_HANDLERS = (
     run_scene_update,
     run_state_update,
     run_goal_review,
     run_summary,
     run_memory_extract,
+    run_ledger_extraction,
+    run_ledger_confirmation,
     run_budget_observer,
     run_evaluation,
     run_world_update,
     run_character_action_sync,
     run_action_planning,
+    run_memory_evaluate,
 )
 
 
-_user_write_locks: dict[str, asyncio.Lock] = {}
-
-
-def get_user_write_lock(user_id: str) -> asyncio.Lock:
-    """per-user 写锁公共入口（REF-010）；V7 Executor 复用同一把锁。"""
-    return _user_write_locks.setdefault(user_id, asyncio.Lock())
-
-
-def reset_user_write_locks() -> None:
-    _user_write_locks.clear()
+from app.core.runtime_state import get_user_write_lock, reset_user_write_locks
 
 
 async def run_post_process(ctx: PostProcessContext) -> None:

@@ -110,7 +110,7 @@ def test_decision_record_defaults():
         decision="act",
         reason="触发 conversation_inactivity",
     )
-    assert len(record.id) == 32
+    assert record.id.isdigit()
     assert record.outcome is None
     assert record.confidence is None
     assert isinstance(record.created_at, datetime)
@@ -161,10 +161,8 @@ def test_schema_call_sites_cover_structured_chains():
 
 
 def test_observability_settings_defaults(monkeypatch):
-    monkeypatch.delenv("OBSERVABILITY_PERSIST_ENABLED", raising=False)
     get_settings.cache_clear()
     settings = get_settings()
-    assert settings.observability_persist_enabled is True
     assert settings.observability_trace_sample_rate == 1.0
     assert settings.observability_prompt_capture_mode == "sampled"
     assert settings.observability_prompt_sample_rate == 0.2
@@ -178,12 +176,10 @@ def test_observability_settings_defaults(monkeypatch):
 
 def test_observability_settings_env_override(override_settings):
     override_settings(
-        observability_persist_enabled=False,
         observability_prompt_sample_rate=0.5,
         observability_trace_retention_days=9,
     )
     settings = get_settings()
-    assert settings.observability_persist_enabled is False
     assert settings.observability_prompt_sample_rate == 0.5
     assert settings.observability_trace_retention_days == 9
 

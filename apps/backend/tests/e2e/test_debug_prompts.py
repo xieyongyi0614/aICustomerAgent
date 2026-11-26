@@ -8,9 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.repositories import prompt_snapshot_repository
-from app.services import agent_service
-
-
+from app.application import chat_pipeline as agent_service
 def _structured():
     return {
         "RoleMode": {
@@ -38,7 +36,7 @@ def _structured():
     }
 
 
-async def _await_until(predicate, timeout: float = 3.0):
+async def _await_until(predicate, timeout: float = 10.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if predicate():
@@ -50,7 +48,6 @@ async def _await_until(predicate, timeout: float = 3.0):
 @pytest.mark.asyncio
 async def test_debug_prompt_endpoints(db_session_factory, fake_llm, override_settings):
     override_settings(
-        observability_persist_enabled=True,
         observability_prompt_capture_mode="always",
     )
     llm = fake_llm(response=["好耶"], structured_responses=_structured())

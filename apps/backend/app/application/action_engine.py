@@ -3,25 +3,60 @@
 行动域唯一编排器：create_record → evaluate_gates → assemble_plan →
 execute_plan → integrate_result。全部发生在 post_process 第 9 步（per-user 写锁内）
 或重试维护循环中。只做调度与容错，检出/闸门/执行逻辑在 services。
+
+V2.4.0：`execute_plan` 的步骤执行经 `ToolExecutor`（五段短路 + 结果归一），
+`steps[]` 增量落 `tool_id` / `permission` / `validation` / `duration_ms`。
+
+V2.4.0 TOOL-005：装配 `PermissionSnapshot` 下传执行器（快照装配在引擎侧，
+闸门内零 IO）；`pending_confirmation` 步骤登记确认请求并把确认话术投影进行动结果
+（回复素材），确认态映射为 `ActionRecord.status="planned"` + `gate_reason=pending_confirmation`；
+用户批准后的确认轮次复用原记录与幂等键重新执行（不产生第二条 `ActionRecord`）；
+过期确认请求复用既有 action 维护步清理（不新增维护步）。
+
+V2.4.0 TOOL-007：总闸开启时 `_build_snapshot` 经 `WorldContextBuilder` 八段预读世界事实并
+注入 `ToolContext`（挂 `snapshot.tool_context`），供工具面投影与工具执行复用；工具写世界
+仍只走"`deferred_world_op` → outbox → `world_engine`"唯一路径（本模块不新增写面）。
+总闸关闭时不装配（`snapshot.tool_context is None`），行为与 V2.3.0 逐字节一致。
 """
 
 import asyncio
 import logging
 from datetime import datetime, timedelta
 
+from app.character.asuna.action import ACTION_CAPABILITY_MAP
 from app.core.settings import get_settings
+from app.core import clock as logical_clock
 from app.models.action import (
+    Action,
     ActionEffect,
     ActionResult,
     ActionPlan,
     ActionRecord,
     ActionIntent,
+    ActionStep,
     transition_action,
 )
+from app.models.tool import ToolInvocation
 from app.repositories import action_repository
 from app.services.action.executor import CapabilityExecutor
 from app.services.action.planner import GateSnapshot, assemble_plan, evaluate_gates
 from app.services.action.registry import ExecutionContext, get_capability_registry
+from app.services.tool.confirmation import get_confirmation_service
+from app.services.tool.context import DEFAULT_SOURCE, ToolContext
+from app.services.tool.executor import ToolExecutor, resolve_step_binding
+from app.services.tool.permission import (
+    CONFIRM_KIND_ALWAYS,
+    CONFIRM_KIND_FIRST_TIME,
+    CONFIRM_POLICY_ALWAYS,
+    PermissionDecision,
+    PermissionSnapshot,
+    ToolPermissionGate,
+    build_confirm_prompt,
+    confirm_policy,
+    required_scope,
+)
+from app.services.tool.registry import ToolRegistry, get_tool_registry
+from app.services.tool.world_context import WORLD_FACTS_KEYS, apply_world_facts, build_tool_context
 from app.application import world_engine
 from app.application.worker_loop import run_worker_loop
 from app.services.action import memory_bridge, relationship_bridge
@@ -31,16 +66,38 @@ logger = logging.getLogger(__name__)
 ACTIVE_STATUSES = ("created", "planned", "executing")
 RETRYABLE_FAILURES = ("transient", "timeout")
 
+GATE_REASON_PENDING_CONFIRMATION = "pending_confirmation"
+GATE_REASON_PERMISSION_DENIED = "permission_denied"
+
+
+
+_TOOL_ACTION_FAILURE_KINDS: dict[str, str] = {
+    "invalid": "permanent",
+    "denied": "permanent",
+    "unavailable": "unavailable",
+    "timeout": "timeout",
+    "transient": "transient",
+    "permanent": "permanent",
+}
+
 
 def _now() -> datetime:
-    return datetime.now()
+    return logical_clock.logical_now()
 
 
-def new_record(intent: ActionIntent, user_id: str, session_id: str | None, source: str = "conversation") -> ActionRecord:
+def new_record(
+    intent: ActionIntent,
+    user_id: str,
+    session_id: str | None,
+    source: str = "conversation",
+    *,
+    run_id: str | None = None,
+) -> ActionRecord:
     return ActionRecord(
         id=action_repository.new_record_id(),
         user_id=user_id,
         session_id=session_id,
+        run_id=run_id,
         source=source,
         action_type=intent.action_type,
         intent=intent.model_dump(mode="json"),
@@ -53,27 +110,83 @@ def new_record(intent: ActionIntent, user_id: str, session_id: str | None, sourc
 
 
 def _build_snapshot(user_id: str, settings) -> GateSnapshot:
-    """装配六闸门快照（读世界现状与既有记录，闸门内零 IO）。"""
+    """装配六闸门快照（读世界现状与既有记录，闸门内零 IO）。
+
+    V2.4.0 TOOL-007：总闸开启时额外装配 `ToolContext`（八段世界事实预读）并挂到
+    `snapshot.tool_context`，供闸门后的工具面投影与工具执行复用（同一快照，零重复 IO）；
+    总闸关闭返回 `None` → 投影与执行走 V9 原路径，行为与 V2.3.0 一致。
+    """
     snapshot = GateSnapshot(settings=settings, registry=get_capability_registry(), now=_now())
     snapshot.records = [
-        {"dedupe_key": r.dedupe_key, "status": r.status, "created_at": r.created_at}
+        {
+            "id": r.id,
+            "dedupe_key": r.dedupe_key,
+            "status": r.status,
+            "created_at": r.created_at,
+        }
         for r in action_repository.list_records(user_id, limit=200)
     ]
     snapshot.active_count = sum(1 for r in snapshot.records if r["status"] in ACTIVE_STATUSES)
     try:
         world = world_engine.get_world(user_id)
         if world is not None:
-            snapshot.world_available = getattr(settings, "world_enabled", True)
+            snapshot.world_available = True
         snapshot.active_object_names = [o.name for o in world_engine.list_active_objects(user_id)]
         events = world_engine.list_active_events(user_id)
         snapshot.active_reminder_titles = [e.title for e in events if e.type in ("reminder", "appointment")]
     except Exception:
         logger.exception("世界快照装配失败，G6 退化为不否决")
+    snapshot.tool_context = _build_tool_context(user_id, settings, snapshot.now, snapshot.run_kind)
     return snapshot
 
 
-async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionContext) -> ActionResult:
-    """执行计划：step 归一回填 steps/result；重试保留同 Record。"""
+def _build_tool_context(
+    user_id: str, settings, now: datetime, run_kind: str
+) -> ToolContext | None:
+    """工具上下文预读（TOOL-007 §2.3）。
+
+    装配失败不抛出（`WorldContextBuilder` 逐段降级）；本函数自身异常同样降级为
+    `None`——工具系统是行动链路的旁路，任何失败都不得影响行动规划。
+    """
+    try:
+        base = ToolContext(
+            user_id=user_id,
+            now=now,
+            settings=settings,
+            run_kind=run_kind,
+            source=DEFAULT_SOURCE,
+        )
+        return build_tool_context(base, settings=settings, now=now)
+    except Exception:
+        logger.exception("工具上下文预读失败，降级为空世界事实")
+        return None
+
+
+def _tool_context_for_execution(
+    ctx: ExecutionContext, preloaded: ToolContext | None
+) -> ToolContext:
+    """执行用 `ToolContext`：执行上下文定身份（record_id / now / settings），
+    预读快照供世界事实（TOOL-007 §2.3"预读注入"）；未预读则世界事实留空（降级）。"""
+    base = ToolContext.from_execution_context(ctx)
+    if preloaded is None:
+        return base
+    return apply_world_facts(base, {key: getattr(preloaded, key) for key in WORLD_FACTS_KEYS})
+
+
+async def execute_plan(
+    record: ActionRecord,
+    plan: ActionPlan,
+    ctx: ExecutionContext,
+    *,
+    permission_snapshot: PermissionSnapshot | None = None,
+    tool_context: ToolContext | None = None,
+) -> ActionResult:
+    """执行计划：step 归一回填 steps/result；重试保留同 Record。
+
+    `tool_context`（TOOL-007）：`_build_snapshot` 预读的世界事实快照；缺省时按执行上下文
+    重建（世界事实留空）。
+    恒经 ActionExecutor 统一分派（V2.6.0 主路径；总闸已随 vXX_ 开关体系删除）。
+    """
     settings = get_settings()
     storage = get_capability_registry()
     executor = CapabilityExecutor(storage, settings.action_execution_timeout_seconds)
@@ -82,45 +195,374 @@ async def execute_plan(record: ActionRecord, plan: ActionPlan, ctx: ExecutionCon
     record.updated_at = _now()
     action_repository.save_record(record)
 
-    step_dicts: list[dict] = []
-    for step in plan.steps:
-        result = await executor.run(step, ctx)
-        step_dicts.append(
-            {
-                "index": step.index,
-                "capability": step.capability,
-                "action": step.action,
-                "params": step.params,
-                "status": "failed" if result.status != "succeeded" else "succeeded",
-                "result": result.model_dump(mode="json"),
-            }
-        )
+    return await _execute_plan_via_action_executor(
+        record,
+        plan,
+        ctx,
+        settings,
+        storage,
+        executor,
+        permission_snapshot=permission_snapshot,
+        tool_context=tool_context,
+    )
 
-    record.steps = step_dicts
-    all_ok = all(s["status"] == "succeeded" for s in record.steps)
-    if all_ok:
-        result_out = ActionResult(status="succeeded", effects=[])
-        record.status = transition_action("executing", "step_all_succeeded") or record.status
-    else:
-        step_result = record.steps[0].get("result", {})
-        failure_kind = (step_result.get("payload") or {}).get("failure_kind") or "transient"
-        result_out = ActionResult(
-            status="failed",
-            effects=[],
-            error=str(step_result.get("error"))[:80],
-            failure_kind=failure_kind,
+
+async def _execute_plan_via_action_executor(
+    record: ActionRecord,
+    plan: ActionPlan,
+    ctx: ExecutionContext,
+    settings,
+    storage,
+    capability_executor: CapabilityExecutor,
+    *,
+    permission_snapshot: PermissionSnapshot | None = None,
+    tool_context: ToolContext | None = None,
+) -> ActionResult:
+    """V2.6.0 主路径：ActionExecutor 统一分派；可解析出工具绑定的动作经工具五段执行。
+
+    `ToolExecutor` 取模块级名字（测试经 `monkeypatch.setattr(action_engine, "ToolExecutor", …)`
+    注入五段探针）；工具绑定优先路由见 `ActionExecutor.run`（裁决 B）。
+    """
+    from app.models.action import Action
+    from app.services.action.executor import ActionExecutor
+    from app.services.tool.health import ToolHealthTracker
+
+    exec_tool_ctx = tool_context
+    tool_registry = get_tool_registry()
+    tool_executor = ToolExecutor(
+        tool_registry,
+        capability_executor,
+        settings=settings,
+        health=ToolHealthTracker(tool_registry, settings),
+    )
+
+    def tool_resolver(action: Action):
+        step = ActionStep(
+            index=0,
+            capability="",
+            action="",
+            params=dict(action.parameters or {}),
         )
-        if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
-            record.status = "executing"
-            record.attempt += 1
-            backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
-            record.next_retry_at = _now() + timedelta(seconds=backoff)
-        else:
-            record.status = "failed"
-    record.result = result_out.model_dump(mode="json")
+        if plan.steps:
+            step = plan.steps[0]
+        binding = resolve_step_binding(tool_registry, step)
+        if binding is None:
+            return None, None
+        intent = (
+            ActionIntent.model_validate(record.intent)
+            if record.intent
+            else plan.intent
+        )
+        invocation = ToolInvocation(
+            tool_id=binding.tool_id,
+            params=dict(step.params if plan.steps else action.parameters or {}),
+            rationale=str((record.intent or {}).get("evidence", "")),
+            source=record.source,
+            intent=intent,
+            goal_id=record.goal_id,
+            dedupe_key=record.dedupe_key,
+        )
+        return binding, invocation
+
+    if exec_tool_ctx is None:
+        exec_tool_ctx = _tool_context_for_execution(ctx, tool_context)
+
+    action = Action(
+        id=record.id,
+        type=record.action_type,
+        target=record.user_id,
+        parameters=dict(record.params or {}),
+        priority=record.priority,
+        status=record.status,
+        created_at=record.created_at,
+        source=record.source,
+        goal_id=record.goal_id,
+        dedupe_key=record.dedupe_key,
+        run_id=record.session_id,
+    )
+
+    binding, invocation = tool_resolver(action)
+
+    if plan.steps and binding is None:
+        return _unresolved_binding_short_circuit(record, plan, settings)
+
+    def resolved_resolver(_action: Action):
+        return binding, invocation
+
+    action_executor = ActionExecutor(
+        storage,
+        timeout_seconds=settings.action_execution_timeout_seconds,
+        tool_executor=tool_executor,
+        tool_resolver=resolved_resolver,
+        permission_snapshot=permission_snapshot,
+        tool_context=exec_tool_ctx,
+    )
+    result_out = await action_executor.run(action, ctx)
+    from app.services.action.executor import step_extras_from_result, step_result_payload
+
+    tool_meta = result_out.metadata if isinstance(result_out.metadata, dict) else {}
+    confirm_prompt: str | None = None
+    if tool_meta.get("tool_status") == "pending_confirmation":
+        confirm_prompt = _register_pending_confirmation(
+            action, tool_meta, tool_registry, resolved_resolver, exec_tool_ctx, settings
+        )
+        if confirm_prompt:
+            result_out = result_out.model_copy(update={"error": confirm_prompt})
+
+    capability_name, capability_action = ACTION_CAPABILITY_MAP.get(
+        record.action_type, ("", "")
+    )
+    extras = step_extras_from_result(result_out)
+    tool_status = tool_meta.get("tool_status")
+    step_status = (
+        "skipped"
+        if tool_status in TOOL_SHORT_CIRCUIT_OUTCOMES
+        else (
+            "succeeded"
+            if result_out.status == "succeeded"
+            else ("partial" if result_out.status == "partial" else "failed")
+        )
+    )
+    step_result = step_result_payload(result_out)
+    if tool_meta.get("usage") is not None:
+        step_result.setdefault("usage", tool_meta.get("usage"))
+    step_dicts = [
+        {
+            "index": 0,
+            "capability": capability_name,
+            "action": capability_action,
+            "params": tool_meta.get("params") or dict(record.params or {}),
+            "status": step_status,
+            "result": step_result,
+            **extras,
+        }
+    ]
+    record.steps = step_dicts
+    _apply_action_result_to_record(record, result_out, settings)
+    record.result = step_result_payload(result_out)
     record.updated_at = _now()
     action_repository.save_record(record)
     return result_out
+
+
+def _unresolved_binding_short_circuit(record: ActionRecord, plan: ActionPlan, settings) -> ActionResult:
+    """绑定不可解析（能力无注册工具 / 面剔除后无候选）：五段不执行，记录短路为
+    `unavailable`（E8 契约：未执行 ≠ 执行失败）。"""
+    result_out = ActionResult(
+        status="failed",
+        failure_kind="unavailable",
+        error="工具不可用（未注册 / 已禁用 / 已熔断）",
+        metadata={"tool_status": "unavailable", "source": "tool"},
+    )
+    from app.services.action.executor import step_result_payload
+
+    capability_name, capability_action = ACTION_CAPABILITY_MAP.get(
+        record.action_type, ("", "")
+    )
+    record.steps = [
+        {
+            "index": 0,
+            "capability": plan.steps[0].capability or capability_name,
+            "action": plan.steps[0].action or capability_action,
+            "params": dict(record.params or {}),
+            "status": "skipped",
+            "result": {
+                "status": "unavailable",
+                "error": "工具不可用（未注册 / 已禁用 / 已熔断）",
+            },
+            "tool_id": None,
+            "permission": {},
+            "validation": None,
+            "duration_ms": 0,
+        }
+    ]
+    _apply_action_result_to_record(record, result_out, settings)
+    record.result = step_result_payload(result_out)
+    record.updated_at = _now()
+    action_repository.save_record(record)
+    return result_out
+
+
+def _register_pending_confirmation(
+    action: Action,
+    tool_meta: dict,
+    tool_registry: ToolRegistry,
+    tool_resolver,
+    tool_ctx: ToolContext,
+    settings,
+) -> str | None:
+    """确认请求登记（TOOL-005 §2.3 语义，主路径唯一登记点）：闸门内零 IO 之外的 DB 写
+    只发生在执行器之外的本函数；登记失败返回 None（调用方按 deny 保守处理）。"""
+    definition = None
+    try:
+        binding, invocation = tool_resolver(action)
+    except Exception:
+        logger.exception("确认请求登记前解析绑定失败")
+        return None
+    if binding is None or invocation is None:
+        return None
+    definition = tool_registry.get(binding.tool_id)
+    if definition is None:
+        return None
+    payload = dict(tool_meta.get("permission") or {})
+    decision = PermissionDecision(
+        decision=str(payload.get("decision") or "confirm_required"),
+        level=payload.get("level") or definition.permission.level,
+        reason=str(payload.get("reason") or "confirm_required"),
+        confirm_prompt=build_confirm_prompt(definition, invocation),
+        scope_required=required_scope(definition),
+        confirm_kind=_confirm_kind(definition),
+    )
+    request = get_confirmation_service(settings).request(invocation, decision, tool_ctx)
+    if request is None:
+        logger.warning("确认请求登记失败，本轮不执行外部调用：tool_id=%s", definition.id)
+        return None
+    return request.prompt
+
+
+def _confirm_kind(definition) -> str:
+    if confirm_policy(definition) == CONFIRM_POLICY_ALWAYS:
+        return CONFIRM_KIND_ALWAYS
+    return CONFIRM_KIND_FIRST_TIME
+
+
+TOOL_SHORT_CIRCUIT_OUTCOMES: dict[str, tuple[str, str]] = {
+    "unavailable": ("cancelled", "capability_unavailable"),
+    "denied": ("cancelled", "permission_denied"),
+    "invalid": ("cancelled", "invalid_params"),
+    "pending_confirmation": ("planned", "pending_confirmation"),
+}
+"""工具五段前置短路的记录终态（原 `_TOOL_RECORD_OUTCOMES` 契约，裁决 B 恢复）：
+未执行的动作不落 failed（区别于执行失败），`cancelled`/`planned` 承载短路口径。"""
+
+
+def _apply_action_result_to_record(record: ActionRecord, result_out: ActionResult, settings) -> None:
+    tool_status = (
+        result_out.metadata.get("tool_status")
+        if isinstance(result_out.metadata, dict)
+        else None
+    )
+    if tool_status in TOOL_SHORT_CIRCUIT_OUTCOMES:
+        record.status, record.gate_reason = TOOL_SHORT_CIRCUIT_OUTCOMES[tool_status]
+        return
+    if result_out.status == "succeeded":
+        record.status = transition_action("executing", "step_all_succeeded") or record.status
+        return
+    if result_out.status == "partial":
+        record.status = "failed"
+        record.gate_reason = result_out.failure_kind or "partial"
+        return
+    failure_kind = result_out.failure_kind or "transient"
+    if failure_kind in RETRYABLE_FAILURES and record.attempt < settings.action_retry_max_attempts:
+        record.status = "executing"
+        record.attempt += 1
+        backoff = settings.action_retry_backoff_seconds * (2 ** (record.attempt - 1))
+        record.next_retry_at = _now() + timedelta(seconds=backoff)
+        return
+    event = (
+        "step_retryable_failed"
+        if failure_kind in RETRYABLE_FAILURES
+        else "step_permanent_failed"
+    )
+    record.status = transition_action("executing", event, attempts_exceeded=True) or "failed"
+
+
+async def execute_existing_record(
+    record: ActionRecord, *, session_id: str | None = None
+) -> ActionResult | None:
+    """复用既有 ActionRecord 执行（Manager.execute 唯一委托入口，不新建记录）。"""
+    settings = get_settings()
+    if record.status not in ("created", "planned", "executing"):
+        return None
+    intent_data = record.intent or {}
+    if not intent_data:
+        record.status = transition_action(
+            record.status if record.status != "executing" else "executing",
+            "step_permanent_failed",
+            attempts_exceeded=True,
+        ) or "failed"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return ActionResult(
+            status="failed", error="missing_intent", failure_kind="permanent"
+        )
+    intent = ActionIntent.model_validate(intent_data)
+    if record.status == "created":
+        snapshot = _build_snapshot(record.user_id, settings)
+        snapshot.records = [r for r in snapshot.records if r.get("id") != record.id]
+        snapshot.active_count = sum(
+            1 for r in snapshot.records if r["status"] in ACTIVE_STATUSES
+        )
+        decision = evaluate_gates(intent, snapshot)
+        if not decision.allowed:
+            record.status = transition_action("created", "gate_reject") or "cancelled"
+            record.gate_reason = decision.reason
+            record.updated_at = _now()
+            action_repository.save_record(record)
+            return ActionResult(
+                status="failed",
+                error=str(decision.reason or "gate_reject"),
+                failure_kind="permanent",
+            )
+        record.status = transition_action("created", "gate_pass") or "planned"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    else:
+        snapshot = _build_snapshot(record.user_id, settings)
+
+    if record.status == "planned":
+        started = transition_action("planned", "execute_start")
+        if started is None:
+            return None
+        record.status = started
+        record.updated_at = _now()
+        action_repository.save_record(record)
+
+    plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
+    if plan is None:
+        record.status = "cancelled"
+        record.gate_reason = "capability_unavailable"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return ActionResult(
+            status="failed",
+            error="capability_unavailable",
+            failure_kind="unavailable",
+        )
+    if session_id is not None and record.session_id is None:
+        record.session_id = session_id
+    ctx = ExecutionContext(
+        user_id=record.user_id,
+        character_id=record.character_id,
+        record_id=record.id,
+        now=_now(),
+        settings=settings,
+    )
+    result = await execute_plan(
+        record,
+        plan,
+        ctx,
+        permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+        tool_context=snapshot.tool_context,
+    )
+    if record.status != "failed":
+        _apply_feedback(record, result)
+    else:
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    return result
+
+
+def _build_permission_snapshot(
+    user_id: str, settings
+) -> PermissionSnapshot | None:
+    """权限快照装配（TOOL-005 §2.2）：唯一读 IO 入口在 `ToolPermissionGate.build_snapshot`。
+
+    装配在引擎侧完成并下传执行器，使权限闸内（`evaluate`）保持零 IO；装配失败返回
+    `None`，执行器据此走快照不可用拒绝态。
+    """
+    return ToolPermissionGate(settings).build_snapshot(user_id, _now(), settings)
+
 
 def _append_effect(record: ActionRecord, kind: str, ref: str, detail: str) -> None:
     result = ActionResult(**record.result) if record.result else ActionResult(status="succeeded", effects=[])
@@ -128,39 +570,85 @@ def _append_effect(record: ActionRecord, kind: str, ref: str, detail: str) -> No
     record.result = result.model_dump(mode="json")
 
 
+def _effect_ref(step_result: dict, kind: str) -> str | None:
+    """新键优先：从 `ToolResult.effects`（V2.4.0）取效果引用；缺省返回 None 走旧键兜底。"""
+    effects = step_result.get("effects")
+    if not isinstance(effects, list):
+        return None
+    for effect in effects:
+        if isinstance(effect, dict) and effect.get("kind") == kind and effect.get("ref"):
+            return str(effect["ref"])
+    return None
+
+
+def _deliver_memory(record: ActionRecord, settings) -> dict | None:
+    """记忆投递路由（TOOL-008 §2.3）：走泛化键（工具记忆子闸已随 V2.4.0 转正删除）。"""
+    return memory_bridge.deliver(record, record.user_id, record.character_id)
+
+
 def integrate_result(record: ActionRecord, result: ActionResult) -> None:
-    """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。"""
+    """结果整合四通道（execution-engine.md §1）：世界/记忆/关系/note。
+
+    V2.4.0：效果引用读 `steps[].result.effects`（新键）优先，`payload` 旧键兜底——
+    兼容窗口 ≥ 一个版本，Flag off 时等价于 V9 原路径。
+    V2.4.0 TOOL-008：记忆投递经 `_deliver_memory` 路由，子闸 off 时调用与参数不变。
+    V2.6.1：反馈投影不在本函数内联——唯一入口为 `integration.apply_result_feedback`。
+    """
     settings = get_settings()
 
     effects = list(result.effects)
     if record.status == "succeeded":
         payloads = [(s.get("result") or {}).get("payload", {}) for s in record.steps]
         first_payload = next(iter(payloads)) if payloads else {}
+        first_result = (record.steps[0].get("result") or {}) if record.steps else {}
         if record.action_type in ("create_reminder", "cancel_reminder"):
-            event_id = first_payload.get("world_event_id")
+            event_id = _effect_ref(first_result, "world") or first_payload.get("world_event_id")
             if event_id:
                 effects.append(ActionEffect(kind="world", ref=event_id, detail=_detail_for(record)))
         if record.action_type == "remember_fact":
-            memory_id = first_payload.get("memory_id")
+            memory_id = _effect_ref(first_result, "memory") or first_payload.get("memory_id")
             if memory_id:
                 effects.append(ActionEffect(kind="memory", ref=memory_id, detail="已记住"))
 
-    record.result = ActionResult(
-        status=result.status, effects=effects, error=result.error, failure_kind=result.failure_kind
+    minimal = ActionResult(
+        status=result.status,
+        effects=effects,
+        error=result.error,
+        failure_kind=result.failure_kind,
     ).model_dump(mode="json")
+    existing = record.result if isinstance(record.result, dict) else None
+    if existing and "payload" in existing:
+        merged = dict(existing)
+        merged.update(
+            {
+                "status": minimal["status"],
+                "effects": minimal["effects"],
+                "error": minimal["error"],
+                "failure_kind": minimal["failure_kind"],
+            }
+        )
+        record.result = merged
+    else:
+        record.result = minimal
 
-    if settings.v2_action_outbox_enabled:
+    if settings.action_outbox_enabled:
         _integrate_via_outbox(record)
         return
 
-    if settings.action_enabled:
-        memory_payload = memory_bridge.deliver_action_memory(record, record.user_id, record.character_id)
-        if memory_payload:
-            _append_effect(record, "memory", memory_payload.get("memory_id", ""), "已记住")
-        relationship_bridge.deliver_action_signal(record, record.user_id)
+    memory_payload = _deliver_memory(record, settings)
+    if memory_payload:
+        _append_effect(record, "memory", memory_payload.get("memory_id", ""), "已记住")
+    relationship_bridge.deliver_action_signal(record, record.user_id)
 
     record.updated_at = _now()
     action_repository.save_record(record)
+
+
+def _apply_feedback(record: ActionRecord, result: ActionResult) -> None:
+    """主路径唯一反馈入口：委托 `integration.apply_result_feedback`。"""
+    from app.services.action import integration as action_integration
+
+    action_integration.apply_result_feedback(record, result)
 
 
 def _integrate_via_outbox(record: ActionRecord) -> None:
@@ -191,14 +679,82 @@ def _detail_for(record: ActionRecord) -> str:
     return f"创建提醒 WorldEvent due {due}" if due else f"创建提醒 {content}"
 
 
+def _normalize_use_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
+    """use_object 参数归一（引擎侧唯一读 IO 点）：raw 参照 → 世界实体名 + 数量清单。
+
+    "煮碗面要俩鸡蛋" → items=[面条×1, 鸡蛋×2]；主对象无法归一时保持原样
+    （下游库存校验自然失败，宁缺毋滥）。
+    """
+    if intent.action_type != "use_object":
+        return intent
+    params = dict(intent.params)
+    items: list[dict] = []
+    for item in params.get("items") or []:
+        obj = world_engine.resolve_inventory_ref(user_id, str(item.get("object", "")))
+        if obj is not None:
+            items.append({"object": obj.id, "quantity": float(item.get("quantity") or 1)})
+    primary = world_engine.resolve_inventory_ref(user_id, str(params.get("object", "")))
+    if primary is not None:
+        params["object"] = primary.name
+        if all(item["object"] != primary.id for item in items):
+            items.insert(0, {"object": primary.id, "quantity": 1.0})
+    if not items:
+        return intent
+    params["items"] = items
+    return intent.model_copy(update={"params": params})
+
+
+def _ensure_ledger_categories(intent: ActionIntent, user_id: str) -> None:
+    """记账前置：类目树未播种时「明细 → 类目」归一必然落空。
+
+    归一跑在执行之前，而账户 / 种子类目的播种原本只发生在执行期的能力层
+    （`_account_id_for` → `ensure_user_bootstrap`），于是**用户的第一笔对话记账
+    总是「未分类」**（实测：种子类目与首笔账同一时刻落库，首笔 category_id 为空、
+    第二笔起才有类目）。这里把播种提到归一之前，归一失败只可能是「确实没猜出来」。
+    """
+    if intent.action_type != "record_ledger_entry":
+        return
+    from app.services.ledger import ensure_user_bootstrap
+
+    ensure_user_bootstrap(user_id)
+
+
+def _normalize_ledger_intent(intent: ActionIntent, user_id: str) -> ActionIntent:
+    """ledger record 参数归一（引擎侧唯一读 IO 点）：明细文本 → 类目 id。
+
+    对话里只有自然语言（"记账早餐20元，购买了2个鸡蛋"），类目靠归一服务按
+    name / alias / 去后缀 / 子串四级规则落定；没有明细就不猜，保持「未分类」。
+    能力层只收结构化 id（PLA-009 D2 禁自由文本入参），故解析放在这里而不在能力里。
+    """
+    if intent.action_type != "record_ledger_entry":
+        return intent
+    params = dict(intent.params)
+    if params.get("category_id"):
+        return intent
+    hint = str(params.get("note") or "").strip()
+    if not hint:
+        return intent
+    from app.services.ledger import category as category_service
+
+    kind = "income" if str(params.get("direction")) == "income" else "expense"
+    result = category_service.normalize(user_id, hint, kind=kind)
+    if not result.category_id:
+        return intent
+    params["category_id"] = result.category_id
+    return intent.model_copy(update={"params": params})
+
+
 async def run_action_planning(
     user_id: str, intent: ActionIntent, session_id: str | None = None,
     goal_id: str | None = None, source: str = "conversation",
 ) -> ActionRecord | None:
-    """第 9 步入口：门控 + 建记录 + 六闸门 + 装配 + 执行 + 整合。"""
+    """第 9 步入口：建记录 + 闸门 + 装配 + 执行 + 整合。"""
     settings = get_settings()
-    if not settings.action_enabled or intent is None:
+    if intent is None:
         return None
+    intent = _normalize_use_intent(intent, user_id)
+    _ensure_ledger_categories(intent, user_id)
+    intent = _normalize_ledger_intent(intent, user_id)
     record = new_record(intent, user_id, session_id, source)
 
     snapshot = _build_snapshot(user_id, settings)
@@ -226,20 +782,128 @@ async def run_action_planning(
         user_id=user_id, character_id=record.character_id, record_id=record.id,
         now=_now(), settings=settings,
     )
-    result = await execute_plan(record, plan, ctx)
+    result = await execute_plan(
+        record, plan, ctx, permission_snapshot=_build_permission_snapshot(user_id, settings),
+        tool_context=snapshot.tool_context,
+    )
     if record.status != "failed":
-        integrate_result(record, result)
+        _apply_feedback(record, result)
     else:
         record.updated_at = _now()
         action_repository.save_record(record)
     return record
 
 
+async def run_confirmation_round(
+    user_id: str,
+    request_id: str,
+    *,
+    approved: bool,
+    session_id: str | None = None,
+) -> ActionRecord | None:
+    """确认轮次（TOOL-005 §2.3 步骤④）：以原 `invocation_snapshot` 与 `dedupe_key` 复用原记录。
+
+    批准 → 原记录（六闸门首次已过，状态 `planned`）直接从 `executing` 续跑，**不产生第二条
+    `ActionRecord`**、不重新抽取参数、不重新评估 G4（避免自我去重）；否定 / 过期 → 原记录转
+    `cancelled` + `permission_denied`，工具不执行（零外部调用）。
+    """
+    settings = get_settings()
+    service = get_confirmation_service(settings)
+    outcome = service.resolve(request_id, approved=approved, source="user_confirm")
+    request = outcome.request
+    if request is None:
+        logger.info("确认请求不存在，确认轮次跳过：request_id=%s", request_id)
+        return None
+    record = _pending_confirmation_record(user_id, request.dedupe_key)
+    if outcome.status != "approved":
+        if record is None:
+            return None
+        record.status = "cancelled"
+        record.gate_reason = GATE_REASON_PERMISSION_DENIED
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return record
+    if record is None:
+        logger.warning(
+            "确认请求已批准但未找到待确认行动记录，不新建记录：request_id=%s", request_id
+        )
+        return None
+    try:
+        return await _resume_confirmed_record(record, request, settings, session_id)
+    finally:
+        if not service.confirm_ttl_reuse():
+            service.release_session_grant(user_id, request.tool_id)
+
+
+async def _resume_confirmed_record(
+    record: ActionRecord, request, settings, session_id: str | None
+) -> ActionRecord:
+    intent = _confirmed_intent(record, request)
+    snapshot = _build_snapshot(record.user_id, settings)
+    plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
+    if plan is None:
+        record.status = "failed"
+        record.gate_reason = "capability_unavailable"
+        record.updated_at = _now()
+        action_repository.save_record(record)
+        return record
+    record.intent = intent.model_dump(mode="json")
+    record.params = dict(intent.params)
+    record.dedupe_key = intent.dedupe_key
+    record.gate_reason = None
+    if session_id is not None:
+        record.session_id = session_id
+    ctx = ExecutionContext(
+        user_id=record.user_id,
+        character_id=record.character_id,
+        record_id=record.id,
+        now=_now(),
+        settings=settings,
+    )
+    result = await execute_plan(
+        record,
+        plan,
+        ctx,
+        permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+        tool_context=snapshot.tool_context,
+    )
+    if record.status != "failed":
+        _apply_feedback(record, result)
+    else:
+        record.updated_at = _now()
+        action_repository.save_record(record)
+    return record
+
+
+def _confirmed_intent(record: ActionRecord, request) -> ActionIntent:
+    """原调用快照优先（参数与幂等键原样复用），缺省回退记录意图。"""
+    try:
+        intent = request.invocation().intent
+    except Exception:
+        logger.exception("确认请求快照还原失败，回退记录意图：request_id=%s", request.request_id)
+        intent = ActionIntent.model_validate(record.intent)
+    dedupe_key = request.dedupe_key or intent.dedupe_key or record.dedupe_key
+    return intent.model_copy(update={"dedupe_key": dedupe_key, "confidence": "confident"})
+
+
+def _pending_confirmation_record(user_id: str, dedupe_key: str) -> ActionRecord | None:
+    if not dedupe_key:
+        return None
+    window = timedelta(hours=get_settings().action_dedupe_window_hours)
+    try:
+        records = action_repository.list_by_dedupe(user_id, dedupe_key, _now() - window)
+    except Exception:
+        logger.exception("待确认行动记录查询失败：dedupe_key=%s", dedupe_key)
+        return None
+    for record in records:
+        if record.gate_reason == GATE_REASON_PENDING_CONFIRMATION and record.status == "planned":
+            return record
+    return None
+
+
 def collect_facts(user_id: str) -> dict:
     """有界 action_facts 事实包（autonomy-integration.md §2，H-A5）。失败返回 {}。"""
     try:
-        if not get_settings().action_enabled:
-            return {}
         records = action_repository.list_records(user_id, limit=50)
         active = [r for r in records if r.status in ACTIVE_STATUSES]
         reminders = [
@@ -266,10 +930,27 @@ def collect_facts(user_id: str) -> dict:
             for r in records
             if r.status == "failed"
         ][:3]
+        recent_feedback = []
+        for r in records:
+            stored = r.result if isinstance(r.result, dict) else None
+            if not stored or stored.get("feedback_kinds") is None:
+                continue
+            recent_feedback.append(
+                {
+                    "action": r.action_type,
+                    "status": r.status,
+                    "feedback_kinds": list(stored.get("feedback_kinds") or []),
+                    "temporary_execution": bool(stored.get("temporary_execution", False)),
+                    "plan_step": stored.get("plan_step"),
+                }
+            )
+            if len(recent_feedback) >= 5:
+                break
         return {
             "active_plans": len(active),
             "pending_reminders": pending_reminders[:5],
             "recent_failures": recent_failures,
+            "recent_feedback": recent_feedback,
             "last_action_at": (
                 records[0].updated_at.isoformat() if records and records[0].updated_at else None
             ),
@@ -280,12 +961,11 @@ def collect_facts(user_id: str) -> dict:
 
 
 async def run_action_retry_loop():
-    """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划（action_enabled 门控）。"""
+    """lifespan 维护循环：重试到期的 retryable 行动 + 处理过期计划。"""
 
     async def _tick():
-        if get_settings().action_enabled:
-            await _process_due_retries()
-            _expire_planned()
+        await _process_due_retries()
+        _expire_planned()
 
     await run_worker_loop(
         "action retry loop",
@@ -300,16 +980,22 @@ async def _process_due_retries():
         settings = get_settings()
         for record in records:
             try:
-                record, plan = _rebuild_plan(record, settings)
+                record, plan, snapshot = _rebuild_plan(record, settings)
                 if plan is None:
                     continue
                 ctx = ExecutionContext(
                     user_id=record.user_id, character_id=record.character_id,
                     record_id=record.id, now=_now(), settings=settings,
                 )
-                result = await execute_plan(record, plan, ctx)
+                result = await execute_plan(
+                    record,
+                    plan,
+                    ctx,
+                    permission_snapshot=_build_permission_snapshot(record.user_id, settings),
+                    tool_context=snapshot.tool_context,
+                )
                 if record.status != "failed":
-                    integrate_result(record, result)
+                    _apply_feedback(record, result)
             except Exception:
                 logger.exception("行动重试失败，保持执行中状态")
     except Exception:
@@ -329,9 +1015,55 @@ def _expire_planned():
                 action_repository.save_record(record)
     except Exception:
         logger.exception("行动过期扫描失败")
+    _expire_pending_confirmations()
+    _recover_stale_executing()
+
+
+def _recover_stale_executing() -> int:
+    """architecture §11.4：孤儿 executing 超时置 failed，避免永久非终态。"""
+    settings = get_settings()
+    try:
+        cutoff = _now() - timedelta(minutes=settings.action_executing_timeout_minutes)
+        records = action_repository.list_stale_executing(cutoff, limit=50)
+        recovered = 0
+        for record in records:
+            next_status = transition_action("executing", "step_permanent_failed") or "failed"
+            record.status = next_status
+            record.gate_reason = "timeout"
+            if record.attempt < settings.action_retry_max_attempts:
+                record.next_retry_at = _now() + timedelta(
+                    seconds=settings.action_retry_backoff_seconds
+                )
+            record.updated_at = _now()
+            action_repository.save_record(record)
+            recovered += 1
+        if recovered:
+            logger.info("孤儿 executing 恢复：%d 条", recovered)
+        return recovered
+    except Exception:
+        logger.exception("孤儿 executing 恢复扫描失败")
+        return 0
+
+
+def _expire_pending_confirmations() -> int:
+    """TOOL-005 过期清理挂接点：复用既有 action 计划过期维护步（不新增维护步）。
+
+    挂接在 `_expire_planned` 函数体内（life_loop 维护步序列零改动）；清理失败仅记日志，
+    下一轮维护重试，不影响行动过期扫描。
+    """
+    settings = get_settings()
+    try:
+        expired = get_confirmation_service(settings).expire_due(_now())
+    except Exception:
+        logger.exception("确认请求过期清理失败，下轮维护重试")
+        return 0
+    if expired:
+        logger.info("过期确认请求已清理：%d 条", expired)
+    return expired
 
 
 def _rebuild_plan(record: ActionRecord, settings):
+    """重试重建计划：返回（记录，计划，快照）——快照供 TOOL-007 世界事实复用。"""
     intent = ActionIntent.model_validate(record.intent)
     snapshot = _build_snapshot(record.user_id, settings)
     plan = assemble_plan(intent, snapshot, _now(), goal_id=record.goal_id)
@@ -340,5 +1072,5 @@ def _rebuild_plan(record: ActionRecord, settings):
         record.gate_reason = "capability_unavailable"
         record.updated_at = _now()
         action_repository.save_record(record)
-        return record, None
-    return record, plan
+        return record, None, snapshot
+    return record, plan, snapshot

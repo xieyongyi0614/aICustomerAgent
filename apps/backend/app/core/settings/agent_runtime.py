@@ -1,0 +1,42 @@
+"""Agent Runtime 域设置（V2.1.0 AGENT-001）：统一 Run 模型总闸、前台收编、Gateway 旋钮。"""
+
+from app.core.settings._shared import DOMAIN_MODEL_CONFIG, BaseSettings
+
+
+class AgentRuntimeSettings(BaseSettings):
+    model_config = DOMAIN_MODEL_CONFIG
+
+    foreground_run_llm_budget: int = 8
+    foreground_gateway_enforced: bool = False
+    light_llm_profile: str = ""
+    agent_event_escalation_types: str = ""
+    goal_medium_timeout_days: int = 7
+    goal_short_timeout_hours: int = 24
+    decision_weight: float = 1.0
+    evolution_window_days: int = 7
+    evolution_max_drift_per_week: float = 0.05
+    agent_evolution_interval_seconds: float = 3600.0
+    metric_trend_windows: int = 7
+    metric_breach_streak: int = 2
+    metric_floor_action_quality: float = 0.5
+    metric_floor_goal_progress: float = 0.5
+    metric_floor_decision_quality: float = 0.5
+    metric_floor_persona_consistency: float = 0.9
+    interest_weight_goal: float = 1.0
+    interest_weight_preference: float = 1.0
+    interest_weight_memory: float = 1.0
+    interest_weight_world: float = 1.0
+    interest_top_n: int = 3
+    state_snapshot_min_interval_minutes: int = 15
+    state_snapshot_retention_days: int = 90
+    runtime_session_tracking_enabled: bool = False
+    runtime_state_versioning_enabled: bool = False
+    runtime_context_freeze_enabled: bool = False
+    runtime_event_bus_enabled: bool = False
+    runtime_loop_optional_stages: str = ""
+    runtime_reflect_in_loop_enabled: bool = False
+    runtime_inbound_gateway_channels: str = ""
+    runtime_outbound_gateway_channels: str = ""
+    runtime_six_stage_loop_enabled: bool = False
+    runtime_orphan_run_timeout_minutes: int = 30
+    runtime_orphan_run_sweep_enabled: bool = True

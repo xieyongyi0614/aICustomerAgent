@@ -11,9 +11,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.db import BackgroundJobRow, Memory, ReflectionRunRow
-from app.services.memory2 import job_worker as memory2_job_worker
-from app.services.memory2 import lifecycle as memory2_lifecycle
+from app.services.memory import job_worker as memory_job_worker
+from app.services.memory import lifecycle as memory_lifecycle
 from app.services.reflection import evidence as reflection_evidence
 from app.services.reflection import triggers
 
@@ -37,7 +38,7 @@ def _seed_cluster_memory(
     content="用户说最近加班很累",
     user_id=USER,
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             Memory(
@@ -62,7 +63,7 @@ def _seed_cluster_memory(
 
 
 def _seed_passing_evidence(session_factory, *, count=5):
-    now = datetime.now()
+    now = timeutil.now()
     for i in range(count):
         _seed_cluster_memory(
             session_factory,
@@ -102,21 +103,12 @@ def _reset_state():
 
 @pytest.fixture
 def reflection_on(override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     return True
 
 
-def test_flag_off_returns_off_and_writes_nothing(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=False)
-    result = triggers.trigger_for_user(USER, CHARACTER, now=datetime.now())
-    assert result == "off"
-    assert _runs(db_session_factory) == []
-    assert _jobs(db_session_factory) == []
-    assert triggers.run_reflection_trigger_tick(now=datetime.now()) == 0
-
-
 def test_no_evidence_day_skips_with_zero_llm(db_session_factory, reflection_on):
-    now = datetime.now()
+    now = timeutil.now()
     result = triggers.trigger_for_user(USER, CHARACTER, now=now)
     assert result == "skipped"
     runs = _runs(db_session_factory)
@@ -186,7 +178,7 @@ def test_quota_occupying_statuses_only(db_session_factory, reflection_on, monkey
     ]
     for index, (run_status, expected) in enumerate(cases):
         user = f"u-quota-{index}"
-        now = datetime.now()
+        now = timeutil.now()
         for i in range(5):
             _seed_cluster_memory(
                 db_session_factory,
@@ -227,7 +219,7 @@ def test_event_storm_only_first_enqueues(db_session_factory, reflection_on):
 
 
 def test_event_cooldown_window_blocks_repeat(db_session_factory, reflection_on, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_event_cooldown_hours=24.0)
+    override_settings( reflection_event_cooldown_hours=24.0)
     now = _seed_passing_evidence(db_session_factory)
     ids = [f"mem-trg-{i}" for i in range(5)]
     triggers.observe_reinforce(USER, ids)
@@ -250,13 +242,15 @@ def test_scheduled_tick_once_per_user_per_day(db_session_factory, reflection_on,
 
 def test_scheduled_tick_before_schedule_hour_idle(db_session_factory, reflection_on):
     now = _seed_passing_evidence(db_session_factory)
-    early = now.replace(hour=3, minute=59, second=0, microsecond=0)
+    early = timeutil.ensure_aware(
+        timeutil.local(now).replace(hour=3, minute=59, second=0, microsecond=0)
+    )
     assert triggers.run_reflection_trigger_tick(now=early) == 0
     assert _jobs(db_session_factory) == []
 
 
 def test_scheduled_tick_skipped_day_writes_one_row(db_session_factory, reflection_on):
-    now = datetime.now().replace(hour=5, minute=0, second=0, microsecond=0)
+    now = timeutil.now().replace(hour=5, minute=0, second=0, microsecond=0)
     _seed_cluster_memory(db_session_factory, "mem-sparse", created_at=now - timedelta(days=1))
     assert triggers.run_reflection_trigger_tick(now=now) == 1
     runs = _runs(db_session_factory)
@@ -305,28 +299,28 @@ def test_trace_records_trigger_decision(db_session_factory, reflection_on):
 
 
 def test_day_bucket_key_format():
-    now = datetime(2026, 9, 6, 5, 0, 0)
+    now = timeutil.ensure_aware(datetime(2026, 9, 6, 5, 0, 0))
     assert triggers._day_bucket_key("u-1", now) == "reflect:u-1:2026-09-06"
 
 
 def test_tick_hook_wiring_and_isolation(monkeypatch):
     hooks: list = []
-    monkeypatch.setattr(memory2_job_worker, "_TICK_HOOKS", hooks)
-    memory2_job_worker.register_tick_hook(hooks.append)
+    monkeypatch.setattr(memory_job_worker, "_TICK_HOOKS", hooks)
+    memory_job_worker.register_tick_hook(hooks.append)
 
     def _boom(now):
         raise RuntimeError("hook down")
 
-    memory2_job_worker.register_tick_hook(_boom)
-    stats = memory2_job_worker.run_job_tick()
+    memory_job_worker.register_tick_hook(_boom)
+    stats = memory_job_worker.run_job_tick()
     assert isinstance(stats, dict)
     assert hooks  # 正常 hook 已被调用；抛异常的 hook 被隔离不中断 tick
 
 
 def test_flush_returns_memory_ids(db_session_factory):
-    now = datetime.now()
+    now = timeutil.now()
     _seed_cluster_memory(db_session_factory, "m-flush", created_at=now)
-    memory2_lifecycle.record_reinforce("m-flush")
-    flushed = memory2_lifecycle.flush_reinforce_buffer()
+    memory_lifecycle.record_reinforce("m-flush")
+    flushed = memory_lifecycle.flush_reinforce_buffer()
     assert flushed == ["m-flush"]
-    assert memory2_lifecycle.flush_reinforce_buffer() == []
+    assert memory_lifecycle.flush_reinforce_buffer() == []

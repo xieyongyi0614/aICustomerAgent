@@ -194,3 +194,34 @@ class TestExtractCandidates:
         await extractor_chain.extract_candidates("x", "y", llm=llm)
         assert any("（无）" in str(m) for m in llm.seen_messages)
 
+
+class TestPromptTypeContract:
+    """类型口径（2026-10-16）：正文逐字列出 7 规范类型，且不出现 2 个遗留类型名。
+
+    口径由 2026-10-15 审查（`docs/refactor/memory-migration-and-version-naming-audit-2026-10-15.md` §3.2）
+    裁决：旧正文只列 4 类且含遗留名，导致 LLM 永远产不出
+    `commitment` / `milestone_event` / `behavior_pattern`。
+    """
+
+    def test_prompt_lists_every_canonical_type(self):
+        from app.prompts.extractor import MEMORY_EXTRACTOR_PROMPT
+        from app.services.memory.types import CANONICAL_MEMORY_TYPES
+
+        missing = [
+            memory_type
+            for memory_type in CANONICAL_MEMORY_TYPES
+            if memory_type not in MEMORY_EXTRACTOR_PROMPT
+        ]
+        assert missing == []
+
+    def test_prompt_does_not_advertise_legacy_types(self):
+        from app.prompts.extractor import MEMORY_EXTRACTOR_PROMPT
+        from app.services.memory.types import LEGACY_MEMORY_TYPES
+
+        leaked = [
+            memory_type
+            for memory_type in LEGACY_MEMORY_TYPES
+            if memory_type in MEMORY_EXTRACTOR_PROMPT
+        ]
+        assert leaked == []
+

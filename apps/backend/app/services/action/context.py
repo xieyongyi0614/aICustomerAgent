@@ -2,17 +2,32 @@
 
 装配与渲染行动上下文段：让角色知道"我做过什么、成败如何"。
 纯函数渲染 + 有界查询，action_ctx=None 时 prompt 字节与 V8.5 完全一致。
+
+V2.4.0 TOOL-005：待确认行动（`gate_reason=pending_confirmation`）的确认话术进入回复素材——
+权限闸开启时该行动以小节形式传入角色语气确认话术（TOOL-005 §2.3 步骤③），关闭时渲染
+与 V9 逐字节一致。
+
+V2.4.0 收敛：已完成/失败的旧事**只作背景素材**——段头明示"只作背景、不要展开点评"，
+终态选取改为失败优先 + 完成最多 1 条。此前模型会把旧账当成要回应的内容
+（实测：用户说"明天早上8点，叫我起床签到"，回复大半在点评上一条已完成的记账）。
 """
 
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.character.asuna.tool import CONFIRM_PROMPT_MAX_CHARS
 from app.core.settings import get_settings
 from app.models.action import TERMINAL_STATUSES
 from app.repositories import action_repository
 
 logger = logging.getLogger(__name__)
+
+GATE_REASON_PENDING_CONFIRMATION = "pending_confirmation"
+
+# 【行动】段的框架提示：这段是"我做过什么"的**背景事实**，不是本轮话题。
+# 缺了这行说明时，模型会把终态素材（尤其刚记完的账）当成要展开的内容。
+ACTION_SECTION_HEADER = "【行动】（我最近做过的事，只作背景，可一句话交代，不要展开点评）"
 
 
 @dataclass
@@ -31,7 +46,27 @@ class ActionContext:
     items: list[ActionItem] = field(default_factory=list)
 
 
+def _pending_confirmation_prompt(record) -> str | None:
+    """待确认行动的确认话术（角色语气）；非待确认态返回 None。"""
+    if getattr(record, "gate_reason", None) != GATE_REASON_PENDING_CONFIRMATION:
+        return None
+    result = record.result or {}
+    text = " ".join(str(result.get("error") or "").split())
+    return text[:CONFIRM_PROMPT_MAX_CHARS] or None
+
+
 def _summarize_record(record) -> ActionItem:
+    confirmation_prompt = _pending_confirmation_prompt(record)
+    if confirmation_prompt is not None:
+        return ActionItem(
+            action_type=record.action_type,
+            status=record.status,
+            summary=confirmation_prompt,
+            updated_at=record.updated_at,
+            gate_reason=record.gate_reason,
+            attempt=record.attempt,
+            record_id=record.id,
+        )
     params = record.params or {}
     action_type = record.action_type
     if action_type == "create_reminder":
@@ -61,6 +96,11 @@ def _summarize_record(record) -> ActionItem:
         summary = f"搜索：{query}"
     elif action_type == "send_notification":
         summary = "发送通知"
+    elif action_type == "record_ledger_entry":
+        minor = params.get("amount_minor")
+        amount = f"¥{minor // 100}.{minor % 100:02d}" if isinstance(minor, int) else ""
+        direction = "收入" if params.get("direction") == "income" else "支出"
+        summary = f"记一笔：{direction}{amount}"
     else:
         summary = action_type
 
@@ -93,10 +133,12 @@ def _status_label(item: ActionItem) -> str:
     return item.status
 
 
+def _by_recency(items: list[ActionItem]) -> list[ActionItem]:
+    return sorted(items, key=lambda i: i.updated_at or datetime.min, reverse=True)
+
+
 def build_action_context(user_id: str, session_id: str | None = None) -> ActionContext | None:
     settings = get_settings()
-    if not settings.action_enabled:
-        return None
     try:
         records = action_repository.list_records(user_id, limit=20)
         if not records:
@@ -106,9 +148,15 @@ def build_action_context(user_id: str, session_id: str | None = None) -> ActionC
         for record in records:
             items.append(_summarize_record(record))
         non_terminal = [i for i in items if i.status not in TERMINAL_STATUSES]
-        terminal = [i for i in items if i.status in TERMINAL_STATUSES]
-        terminal.sort(key=lambda i: i.updated_at or datetime.min, reverse=True)
-        selected = non_terminal[:3] + terminal[:2]
+        # cancelled（闸门否决）不进 prompt，也不占终态槽位——否则会把真正可见的行挤掉。
+        failed = _by_recency([i for i in items if i.status == "failed"])
+        done = _by_recency(
+            [i for i in items if i.status in TERMINAL_STATUSES and i.status == "succeeded"]
+        )
+        # 终态 2 格：失败优先（下一轮要补救，衔接价值最高），完成最多 1 条——
+        # 已完成的事一条够衔接，两条会让旧事占掉半屏素材并被当成当前话题。
+        terminal_slots = (failed[:2] + done[:1])[:2]
+        selected = non_terminal[:3] + terminal_slots
         selected = selected[:5]
         return ActionContext(items=selected) if selected else None
     except Exception:
@@ -119,7 +167,7 @@ def build_action_context(user_id: str, session_id: str | None = None) -> ActionC
 def render_action_section(ctx: ActionContext | None, budget: int = 400) -> str:
     if ctx is None or not ctx.items:
         return ""
-    lines: list[str] = ["【行动】"]
+    lines: list[str] = [ACTION_SECTION_HEADER]
     for item in ctx.items:
         label = _status_label(item)
         if item.status == "cancelled":

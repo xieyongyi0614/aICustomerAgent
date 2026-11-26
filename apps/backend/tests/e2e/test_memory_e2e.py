@@ -76,7 +76,7 @@ def test_memory_roundtrip_across_turns(db_session_factory, fake_llm):
             assert resp.status_code == 200
             assert wait_until(
                 lambda: any(
-                    m.content == "用户喜欢西瓜"
+                    m.content == "用户喜欢西瓜" and m.status == "active"
                     for m in repo.list_by_user("default-user")
                 )
             )

@@ -12,19 +12,20 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import DevelopmentChangeRow, DevelopmentStateRow
 from app.main import app
 from app.services.development import aggregate
 from app.services.development import evaluation as development_evaluation
-from app.services.evaluation_context import DevelopmentChangeRef, DevelopmentStateRef, DevelopmentSlice
-from app.services.evaluation_rules import run_rules
-from app.services.evaluation_rules.development import (
+from app.services.evaluation.context import DevelopmentChangeRef, DevelopmentStateRef, DevelopmentSlice
+from app.services.evaluation.rules import run_rules
+from app.services.evaluation.rules.development import (
     ChangeUnattributedRule,
     ConcurrentActiveRule,
     OverCapRule,
     StaleActiveRule,
 )
-from app.services.trace_collector import TRACE_STEP_NAMES
+from app.services.observability.collector import TRACE_STEP_NAMES
 
 pytestmark = pytest.mark.xdist_group("development")
 
@@ -42,7 +43,7 @@ def _seed_state(
     status="active",
     kind="preference",
 ):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentStateRow(
@@ -63,7 +64,7 @@ def _seed_state(
 
 
 def _seed_change(session_factory, change_id, state_id, *, insight_id="ins-5"):
-    now = datetime.now()
+    now = timeutil.now()
     with session_factory() as session:
         session.add(
             DevelopmentChangeRow(
@@ -127,7 +128,7 @@ def test_rule_skips_when_slice_absent():
 
 
 def _ctx(development: DevelopmentSlice | None):
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     return EvaluationContext(
         subject="offline_batch",
@@ -183,7 +184,7 @@ def test_stale_active_rule_detects_invalidated_source():
 
 
 def test_rules_registered_in_engine():
-    from app.services.evaluation_rules import RULES
+    from app.services.evaluation.rules import RULES
 
     codes = {type(rule).code for rule in RULES}
     assert {
@@ -218,16 +219,11 @@ def test_offline_scenarios_pass_gate(db_session_factory):
         assert report["metrics"][metric_id]["pass"] is True
 
 
-def test_build_db_report_flag_off_empty(override_settings):
-    override_settings(v2_development_enabled=False)
-    assert development_evaluation.build_db_report() == {}
-
-
 def test_build_db_report_counts(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=True)
+    override_settings()
     from app.core.db import InsightRow
 
-    now = datetime.now()
+    now = timeutil.now()
     with db_session_factory() as session:
         session.add(
             InsightRow(
@@ -254,5 +250,5 @@ def test_build_db_report_counts(db_session_factory, override_settings):
 
 
 def test_collect_slice_flag_off_none(db_session_factory, override_settings):
-    override_settings(v2_development_enabled=False)
+    override_settings()
     assert development_evaluation.collect_slice(USER) is None

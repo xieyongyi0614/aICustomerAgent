@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.evaluation import (
     DimensionScore,
     EvaluationDimension,
@@ -37,7 +38,7 @@ def make_report(
         issues=issues,
         context_digest={"reply": "你好"},
         meta=EvaluationMeta(judge_used=True, model_name="fake"),
-        created_at=created_at or datetime.now(),
+        created_at=created_at or timeutil.now(),
     )
 
 
@@ -57,8 +58,8 @@ def test_save_and_get_roundtrip(db_session_factory):
 
 
 def test_same_subject_keeps_latest(db_session_factory):
-    old = make_report(created_at=datetime.now() - timedelta(hours=1))
-    new = make_report(created_at=datetime.now())
+    old = make_report(created_at=timeutil.now() - timedelta(hours=1))
+    new = make_report(created_at=timeutil.now())
     evaluation_repository.save(old)
     evaluation_repository.save(new)
 
@@ -72,7 +73,7 @@ def test_list_by_user_ordering(db_session_factory):
         evaluation_repository.save(
             make_report(
                 subject_id=f"t{index}",
-                created_at=datetime.now() - timedelta(minutes=10 - index),
+                created_at=timeutil.now() - timedelta(minutes=10 - index),
             )
         )
     reports = evaluation_repository.list_by_user("default-user")
@@ -80,13 +81,13 @@ def test_list_by_user_ordering(db_session_factory):
 
 
 def test_retention_lazy_prune_on_save(db_session_factory):
-    evaluation_repository.save(make_report(created_at=datetime.now() - timedelta(days=60)))
+    evaluation_repository.save(make_report(created_at=timeutil.now() - timedelta(days=60)))
     assert evaluation_repository.get_by_subject("turn", "t1") is None
 
     evaluation_repository.save(make_report(subject_id="t2"))
     assert evaluation_repository.get_by_subject("turn", "t2") is not None
 
-    deleted = evaluation_repository.prune_before(datetime.now() + timedelta(days=1))
+    deleted = evaluation_repository.prune_before(timeutil.now() + timedelta(days=1))
     assert deleted == 1
     assert evaluation_repository.get_by_subject("turn", "t2") is None
 

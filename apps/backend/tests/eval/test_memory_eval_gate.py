@@ -2,7 +2,7 @@
 
 双态执行入口：
 - Flag ON 影子态 = 本文件（确定性 stub：LLM 由场景级拒绝表驱动、向量由字符桶
-  伪语义函数驱动），逐场景走真实 memory2 链路（ingest→evaluate→lifecycle→
+  伪语义函数驱动），逐场景走真实 memory 链路（ingest→evaluate→lifecycle→
   retriever→commands），聚合 E-MEM-01~06 报告并断言 Gate 通过。
 - Flag OFF golden 态 = tests/golden（prompt_snapshots 字节级对比），由
   regression-checklist 引用执行。
@@ -23,7 +23,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow, MemoryLinkRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import (
+from app.services.memory import (
     attribution,
     commands,
     embeddings,
@@ -33,7 +33,7 @@ from app.services.memory2 import (
     offline_metrics,
     retriever,
 )
-from app.services.memory2.offline_metrics import build_report
+from app.services.memory.offline_metrics import build_report
 
 SCENARIO_DIR = Path(__file__).parent / "memory_scenarios"
 REPORT_DIR = Path(__file__).parent / "reports"
@@ -56,7 +56,7 @@ class _StubLLM:
         self.reject_contents: set[str] = set()
 
     async def __call__(self, content, proposed_type, related_contents, llm=None):
-        from app.models.memory2 import EvaluationVerdict
+        from app.models.memory import EvaluationVerdict
 
         self.calls += 1
         if content in self.reject_contents:
@@ -83,17 +83,15 @@ def gate_env(monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "v2_memory_enabled", True)
-    monkeypatch.setattr(settings, "v2_memory_vector_enabled", True)
-    monkeypatch.setattr(settings, "v2_memory_eval_threshold_high", 0.75)
-    monkeypatch.setattr(settings, "v2_memory_eval_threshold_low", 0.35)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_source", 0.35)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_novelty", 0.30)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_affinity", 0.20)
-    monkeypatch.setattr(settings, "v2_memory_eval_weight_salience", 0.15)
+    monkeypatch.setattr(settings, "memory_eval_threshold_high", 0.75)
+    monkeypatch.setattr(settings, "memory_eval_threshold_low", 0.35)
+    monkeypatch.setattr(settings, "memory_eval_weight_source", 0.35)
+    monkeypatch.setattr(settings, "memory_eval_weight_novelty", 0.30)
+    monkeypatch.setattr(settings, "memory_eval_weight_affinity", 0.20)
+    monkeypatch.setattr(settings, "memory_eval_weight_salience", 0.15)
     monkeypatch.setattr(settings, "memory_conflict_threshold", 0.6)
-    monkeypatch.setattr(settings, "v2_memory_retrieval_budget", 800)
-    monkeypatch.setattr(settings, "v2_memory_reinforce_boost", 0.1)
+    monkeypatch.setattr(settings, "memory_retrieval_budget", 800)
+    monkeypatch.setattr(settings, "memory_reinforce_boost", 0.1)
 
     stub = _StubLLM()
     monkeypatch.setattr(evaluator, "_ask_llm", stub)
@@ -172,7 +170,7 @@ class ScenarioRunner:
 
     def _do_seed(self, step) -> list[str]:
         failures: list[str] = []
-        row = self._create_candidate(step)
+        row = self.create_candidate(step)
         before = self.stub.calls
         decision = asyncio.run(evaluator.evaluate_candidate(row, self._active_contents()))
         expect = self._expect(step)
@@ -290,7 +288,7 @@ class ScenarioRunner:
         result_ids = [item.memory.id for item in result.items]
         result_refs = [self._ref_of(mid) for mid in result_ids]
         total_chars = sum(len(item.memory.content) for item in result.items)
-        if total_chars > get_settings().v2_memory_retrieval_budget:
+        if total_chars > get_settings().memory_retrieval_budget:
             self.context_violations.append(
                 f"{step.get('query')}: 检索段 {total_chars} 超预算"
             )
@@ -409,10 +407,10 @@ class ScenarioRunner:
         )
         return failures
 
-    def _create_candidate(self, step):
+    def create_candidate(self, step):
         scenario_ref = step.get("source_id") or f"{step['ref']}"
         visibility = step.get("visibility", "private")
-        return ingest._create_candidate(
+        return ingest.create_candidate(
             user_id="u1",
             character_id="asuna",
             source_table="conversation",

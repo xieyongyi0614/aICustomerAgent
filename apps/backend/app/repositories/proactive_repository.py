@@ -6,6 +6,7 @@
 import logging
 from datetime import datetime
 
+from app.core import timeutil
 from app.core.db import ProactiveActionRow, SessionLocal
 from app.models.autonomy import TERMINAL_STATUSES, ProactiveAction
 
@@ -43,13 +44,14 @@ def _to_model(row: ProactiveActionRow) -> ProactiveAction:
         updated_at=row.updated_at,
         delivered_at=row.delivered_at,
         message_id=row.message_id,
+        external_message_id=row.external_message_id,
         acked_at=row.acked_at,
     )
 
 
 def enqueue(action: ProactiveAction) -> bool:
     """candidate 行落库；同 user 存在任意非终态行（深度 1）或同 dedupe_key 已处理过则拒绝。"""
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         blocking = (
             session.query(ProactiveActionRow)
@@ -98,7 +100,7 @@ def enqueue(action: ProactiveAction) -> bool:
 
 def get_active(user_id: str, now: datetime | None = None) -> ProactiveAction | None:
     """可执行的非终态行：candidate/approved，或重试到期的 failed（终态 failed 无 next_retry_at，不取）。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         rows = (
             session.query(ProactiveActionRow)
@@ -137,7 +139,7 @@ def transition(
     **fields,
 ) -> ProactiveAction | None:
     """状态机校验的单步迁移；非法迁移返回 None。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         row = session.get(ProactiveActionRow, action_id)
         if row is None:
@@ -163,9 +165,17 @@ def get_by_id(action_id: str) -> ProactiveAction | None:
         return _to_model(row) if row is not None else None
 
 
-def list_pending(user_id: str, now: datetime | None = None) -> list[ProactiveAction]:
-    """delivered 未 acked；超 24h 未 ack 惰性置 expired（软状态审计）。"""
-    now = now or datetime.now()
+def list_pending(
+    user_id: str,
+    now: datetime | None = None,
+    expired_out: list[str] | None = None,
+) -> list[ProactiveAction]:
+    """delivered 未 acked；超 24h 未 ack 惰性置 expired（软状态审计）。
+
+    expired_out 非 None 时收集本次被置 expired 的 action id，供调用方
+    补写 decision_records outcome（AUTO-006 结果记录闭环）。
+    """
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         rows = (
             session.query(ProactiveActionRow)
@@ -182,6 +192,8 @@ def list_pending(user_id: str, now: datetime | None = None) -> list[ProactiveAct
                     row.status = "expired"
                     row.updated_at = now
                     changed = True
+                    if expired_out is not None:
+                        expired_out.append(row.id)
                     continue
             if row.status in PENDING_STATUSES:
                 result.append(_to_model(row))
@@ -194,6 +206,7 @@ def aggregate_episode(
     user_id: str, episode_start: datetime
 ) -> tuple[datetime | None, int]:
     """返回 (last_proactive_at, episode 内 delivered 次数)，cooldown.md §2 记账口径。"""
+    episode_start = timeutil.ensure_aware(episode_start)
     with SessionLocal() as session:
         rows = (
             session.query(ProactiveActionRow)
@@ -214,7 +227,7 @@ def aggregate_episode(
 
 def reset_on_user_message(user_id: str, now: datetime | None = None) -> None:
     """用户发言复位（cooldown.md §5）：delivered 未 acked → acked；candidate/approved → discarded。"""
-    now = now or datetime.now()
+    now = timeutil.ensure_aware(now) or timeutil.now()
     with SessionLocal() as session:
         rows = (
             session.query(ProactiveActionRow)
@@ -233,6 +246,16 @@ def reset_on_user_message(user_id: str, now: datetime | None = None) -> None:
             row.updated_at = now
         if rows:
             session.commit()
+
+
+def find_by_dedupe_key(dedupe_key: str) -> ProactiveAction | None:
+    with SessionLocal() as session:
+        row = (
+            session.query(ProactiveActionRow)
+            .filter(ProactiveActionRow.dedupe_key == dedupe_key)
+            .first()
+        )
+        return _to_model(row) if row is not None else None
 
 
 def list_users_with_history() -> list[str]:

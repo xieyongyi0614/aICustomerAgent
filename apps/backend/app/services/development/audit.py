@@ -24,7 +24,7 @@ from app.repositories import background_job_repository
 from app.services.development import aggregate
 from app.services.development import policy as development_policy
 from app.services.reflection import lifecycle as reflection_lifecycle
-from app.services.memory2 import job_worker as memory2_job_worker
+from app.services.memory import job_worker as memory_job_worker
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ def rebuild_state(user_id: str) -> int:
 def register_rollback_listener() -> None:
     """Flag ON 编排层注册：失效事件订阅 + 回退 job handler。"""
 
-    memory2_job_worker.register_job_type(JOB_TYPE_ROLLBACK, run_rollback_jobs)
+    memory_job_worker.register_job_type(JOB_TYPE_ROLLBACK, run_rollback_jobs)
     reflection_lifecycle.register_invalidation_listener(on_invalidation)
 
 

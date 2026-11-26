@@ -1,0 +1,109 @@
+digraph data_domains {
+    graph [
+        rankdir=TB,
+        splines=true,
+        overlap=false,
+        nodesep=0.55,
+        ranksep=0.6,
+        bgcolor="#FFFFFF",
+        fontname="Microsoft YaHei",
+        fontsize=12,
+        labelloc=t,
+        label="数据域与 Source of Truth（57 张表）\n快照 2026-10-23 @ e07669d7 · 证据：baseline §6 + migrations/versions/0001~0010"
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Microsoft YaHei",
+        fontsize=9,
+        color="#94A3B8",
+        fillcolor="#FFFFFF",
+        penwidth=1.1
+    ];
+    edge [
+        fontname="Microsoft YaHei",
+        fontsize=8,
+        color="#475569",
+        arrowsize=0.7
+    ];
+
+    subgraph cluster_identity {
+        label="身份与会话";
+        style="rounded,dashed";
+        color="#BAE6FD";
+        fontcolor="#075985";
+        identity [label="身份与通道\nusers · channel_identities\nfeishu_dedupe_ledger · feishu_deliveries", fillcolor="#E0F2FE"];
+        conversation [label="会话与场景\nconversations · messages\nconversation_summaries · scene_state", fillcolor="#E0F2FE"];
+    }
+
+    subgraph cluster_character {
+        label="角色与关系";
+        style="rounded,dashed";
+        color="#99F6E4";
+        fontcolor="#115E59";
+        relationship [label="关系（状态 + 账本 + 快照）\nrelationship_state · relationship_events\nrelationship_milestones · relationship_conflicts\nrelationship_snapshots", fillcolor="#CCFBF1"];
+        character [label="角色状态与人格\ncharacter_state · emotion_history\npersonality_state", fillcolor="#CCFBF1"];
+    }
+
+    subgraph cluster_memory {
+        label="记忆与成长";
+        style="rounded,dashed";
+        color="#BBF7D0";
+        fontcolor="#166534";
+        memory [label="记忆（Source of Truth）\nmemories · memory_candidates · memory_links", fillcolor="#DCFCE7"];
+        growth [label="反思与成长\ninsights · reflection_runs · evidence_links\ndevelopment_state · development_changes", fillcolor="#DCFCE7"];
+    }
+
+    subgraph cluster_plan {
+        label="目标 / 行动 / 世界";
+        style="rounded,dashed";
+        color="#FDE68A";
+        fontcolor="#92400E";
+        goal [label="目标与计划\ncharacter_goals · goal_plans", fillcolor="#FEF3C7"];
+        action [label="行动\naction_records · action_schedules", fillcolor="#FEF3C7"];
+        world [label="世界\nworlds · world_entities · world_events\nworld_snapshots · daily_plans · user_situations", fillcolor="#FEF3C7"];
+    }
+
+    subgraph cluster_life {
+        label="生活域";
+        style="rounded,dashed";
+        color="#FBCFE8";
+        fontcolor="#9D174D";
+        life [label="生活域\nledger_accounts · ledger_categories · ledger_entries\ncar_profiles · car_loans · car_service_records\ncar_mileage_logs · life_tasks · briefing_preferences", fillcolor="#FCE7F3"];
+    }
+
+    subgraph cluster_runtime {
+        label="运行、后台与发布";
+        style="rounded,dashed";
+        color="#CBD5E1";
+        fontcolor="#334155";
+        runtime [label="Run 台账与观测\nloop_runs · agent_state_snapshots\nagent_metric_snapshots · runtime_traces\nllm_call_records · prompt_snapshots · evaluation_reports", fillcolor="#F1F5F9"];
+        background [label="后台机制\nbackground_jobs · trigger_registry\noutbox_events · proactive_actions", fillcolor="#F1F5F9"];
+        release [label="发布\napp_releases · app_release_artifacts", fillcolor="#F1F5F9"];
+    }
+
+    identity -> conversation [label="user_id 归属"];
+    identity -> life [label="user_id 归属"];
+    conversation -> relationship [label="互动信号上游"];
+    conversation -> memory [label="四源摄取：对话", style=dashed];
+    relationship -> memory [label="四源摄取：关系事件", style=dashed];
+    action -> memory [label="四源摄取：ActionRecord", style=dashed];
+    world -> memory [label="四源摄取：WorldEvent", style=dashed];
+    memory -> growth [label="evidence_links"];
+    growth -> character [label="人格轴调制"];
+    goal -> action [label="计划步骤执行"];
+    action -> world [label="deferred_world_op → outbox → world_engine", style=dashed];
+    action -> background [label="结果投递 / 幂等"];
+    world -> background [label="事件桥"];
+    conversation -> runtime [label="loop_runs.session_id"];
+    action -> runtime [label="run_id 关联"];
+
+    note [
+        shape=note,
+        label="所有领域表以 user_id 归属（雪花 ID，VARCHAR 存十进制串）。\n关系事件 / 行动 / 决策 / Run 台账为 append-only；\n世界快照、计划、人格状态为版本化表。",
+        fillcolor="#FFFBEB",
+        color="#D97706",
+        fontcolor="#92400E",
+        fontsize=8
+    ];
+}

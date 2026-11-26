@@ -9,7 +9,7 @@ HOME_LOCATIONS = {
         "parent_id": None,
         "traits": ["indoor"],
         "available_actions": ["休息", "聊天"],
-        "description": "你和亚丝娜的家",
+        "description": "你的家",
     },
     "home.living_room": {
         "name": "客厅",
@@ -77,6 +77,132 @@ LOCATION_ALIASES = {
     "桌面": "home.dining_area",
     "桌上": "home.dining_area",
 }
+
+WORLD_LOCATIONS = {
+    "school": {
+        "name": "学校",
+        "parent_id": None,
+        "traits": ["indoor", "outdoor_exposed"],
+        "available_actions": ["上课", "学习", "聊天"],
+        "description": "亚丝娜就读的学校",
+    },
+    "school.classroom": {
+        "name": "教室",
+        "parent_id": "school",
+        "traits": ["indoor", "quiet"],
+        "available_actions": ["上课", "学习", "聊天"],
+    },
+    "school.library": {
+        "name": "图书馆",
+        "parent_id": "school",
+        "traits": ["indoor", "quiet"],
+        "available_actions": ["学习", "看书"],
+    },
+    "school.playground": {
+        "name": "操场",
+        "parent_id": "school",
+        "traits": ["outdoor_exposed"],
+        "available_actions": ["运动", "散步"],
+    },
+    "company": {
+        "name": "公司",
+        "parent_id": None,
+        "traits": ["indoor"],
+        "available_actions": ["工作", "开会"],
+        "description": "工作的地方",
+    },
+    "company.workstation": {
+        "name": "工位",
+        "parent_id": "company",
+        "traits": ["indoor", "quiet"],
+        "available_actions": ["工作"],
+    },
+    "company.meeting_room": {
+        "name": "会议室",
+        "parent_id": "company",
+        "traits": ["indoor"],
+        "available_actions": ["开会", "讨论"],
+    },
+    "cafe": {
+        "name": "咖啡店",
+        "parent_id": None,
+        "traits": ["indoor", "food_related", "public"],
+        "available_actions": ["点单", "聊天", "休息"],
+        "description": "常去的咖啡店",
+    },
+    "cafe.main": {
+        "name": "咖啡店堂区",
+        "parent_id": "cafe",
+        "traits": ["indoor", "food_related", "public"],
+        "available_actions": ["点单", "聊天", "休息"],
+    },
+    "cafe.terrace": {
+        "name": "咖啡店露台",
+        "parent_id": "cafe",
+        "traits": ["outdoor_exposed", "food_related", "public"],
+        "available_actions": ["点单", "聊天", "透气"],
+    },
+    "park": {
+        "name": "公园",
+        "parent_id": None,
+        "traits": ["outdoor_exposed"],
+        "available_actions": ["散步", "休息"],
+        "description": "附近的公园",
+    },
+    "park.path": {
+        "name": "公园步道",
+        "parent_id": "park",
+        "traits": ["outdoor_exposed"],
+        "available_actions": ["散步", "跑步"],
+    },
+    "park.bench": {
+        "name": "公园长椅",
+        "parent_id": "park",
+        "traits": ["outdoor_exposed", "quiet"],
+        "available_actions": ["休息", "聊天"],
+    },
+    "travel_seaside": {
+        "name": "海边",
+        "parent_id": None,
+        "traits": ["outdoor_exposed", "travel"],
+        "available_actions": ["散步", "看海", "休息"],
+        "description": "旅行目的地：海边",
+    },
+    "travel_hotel": {
+        "name": "旅行酒店",
+        "parent_id": None,
+        "traits": ["indoor", "travel"],
+        "available_actions": ["休息", "睡觉"],
+        "description": "旅行住宿的酒店",
+    },
+}
+
+WORLD_LOCATION_REGISTRY = {**HOME_LOCATIONS, **WORLD_LOCATIONS}
+
+LOCATION_ALIASES.update(
+    {
+        "学校": "school",
+        "教室": "school.classroom",
+        "图书馆": "school.library",
+        "操场": "school.playground",
+        "公司": "company",
+        "工位": "company.workstation",
+        "会议室": "company.meeting_room",
+        "咖啡店": "cafe.main",
+        "咖啡馆": "cafe.main",
+        "咖啡厅": "cafe.main",
+        "咖啡店露台": "cafe.terrace",
+        "公园": "park.path",
+        "长椅": "park.bench",
+        "公园长椅": "park.bench",
+        "步道": "park.path",
+        "海边": "travel_seaside",
+        "海滩": "travel_seaside",
+        "沙滩": "travel_seaside",
+        "旅行酒店": "travel_hotel",
+        "酒店": "travel_hotel",
+    }
+)
 
 WORLD_WEATHER_VALUES = ("sunny", "cloudy", "rain", "snow", "windy")
 
@@ -176,56 +302,9 @@ OBJECT_CREATION_HINTS = {
     "咖啡豆": "drink",
 }
 
-DEFAULT_HOUSEHOLD = {
-    "name": "默认家庭库存",
-    "objects": [
-        {
-            "name": "鸡蛋",
-            "category": "food",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 6,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "牛奶",
-            "category": "drink",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 1,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "可乐",
-            "category": "drink",
-            "location_id": "home.kitchen.fridge",
-            "quantity": 2,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "面条",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 2,
-            "unit": "piece",
-            "consumable": True,
-        },
-        {
-            "name": "大米",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 2,
-            "unit": "kg",
-            "consumable": True,
-        },
-        {
-            "name": "面包",
-            "category": "food",
-            "location_id": "home.kitchen.cabinet",
-            "quantity": 1,
-            "unit": "piece",
-            "consumable": True,
-        },
-    ],
+OBJECT_NAME_ALIASES: dict[str, tuple[str, ...]] = {
+    "面条": ("面",),
+    "鸡蛋": ("蛋",),
+    "大米": ("米",),
+    "牛奶": ("奶",),
 }

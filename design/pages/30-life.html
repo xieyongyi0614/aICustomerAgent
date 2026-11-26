@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 30 生活 — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 110px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 18px 118px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.row{display:flex;align-items:center}
+.grow{flex:1}
+h1.pt{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--ink2)}
+.card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px}
+.card,.b-start{display:block}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ 共享组件 ============ */
+.sec-title{display:flex;align-items:baseline;margin:24px 2px 11px}
+.sec-title h2{font-size:16.5px;font-weight:700}
+.sec-title .hint{margin-left:auto;font-size:12px;color:var(--ink3)}
+
+/* ============ AI 核心球 ============ */
+.orb{position:relative;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#D9CCFF 0%,#8B6DFF 34%,#4D6BFF 66%,#1FB9D8 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.5) inset,0 10px 30px rgba(102,90,255,.45),0 0 60px rgba(63,150,255,.35);
+  animation:breathe 4.2s ease-in-out infinite;
+}
+.orb::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 68% 72%,rgba(43,210,232,.85),transparent 46%),radial-gradient(circle at 30% 26%,rgba(255,255,255,.9),transparent 30%);
+  mix-blend-mode:screen;animation:swirl 7s linear infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+@keyframes swirl{to{transform:rotate(360deg)}}
+.orb.lg{width:76px;height:76px}.orb.md{width:34px;height:34px}.orb.sm{width:22px;height:22px}
+
+/* ============ 底部 Tab ============ */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:88px;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(18px);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:12px 10px 0}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--ink3);cursor:pointer;font-weight:600}
+.tab svg{width:23px;height:23px}
+.tab.on{color:var(--ink)}
+.tab.orb-tab{flex:0 0 76px;position:relative}
+.orb-btn{position:absolute;top:-24px;left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:var(--grad-ai);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(102,90,255,.45),0 0 0 6px rgba(245,244,240,.9)}
+.orb-btn svg{width:24px;height:24px}
+.orb-tab span{margin-top:36px}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:760px){.demo-nav{display:none}}
+
+/* ============ AI 结论卡与操作 ============ */
+.ai-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px;overflow:hidden}
+.ai-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:var(--grad-ai);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;pointer-events:none}
+.ai-card .tag{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ai1);letter-spacing:.06em;margin-bottom:9px}
+.ai-card p{font-size:14.5px;line-height:1.75;color:#33343D}
+.ai-actions{display:flex;gap:9px;margin-top:13px}
+.chip-btn{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ai1);background:rgba(122,92,255,.09);border:1px solid rgba(122,92,255,.20);border-radius:999px;padding:7px 14px;cursor:pointer}
+.chip-btn.ghost{color:var(--ink2);background:var(--card);border-color:var(--line)}
+
+/* ============ Life ============ */
+.life-hero{display:flex;align-items:center;margin-bottom:16px}
+.lh-date{font-size:12.5px;font-weight:600;color:var(--ink3);letter-spacing:.02em}
+.lh-hi{font-size:23px;font-weight:700;letter-spacing:-.01em;margin-top:3px}
+.lh-sub{font-size:13px;color:var(--ink2);margin-top:3px}
+.mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.mod{position:relative;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:15px 10px 13px;text-align:center;cursor:pointer;transition:transform .15s}
+.mod .dyn-tag{position:absolute;top:8px;right:8px;font-size:9.5px;font-weight:650;color:var(--ai1);background:rgba(122,92,255,.10);border:1px solid rgba(122,92,255,.20);border-radius:999px;padding:1px 6px;line-height:1.5}
+.tap-hint{font-size:12px;color:var(--ink3);margin:0 2px 12px}
+.mod:active{transform:scale(.96)}
+.mod .m-ic{width:42px;height:42px;border-radius:14px;margin:0 auto 9px;display:flex;align-items:center;justify-content:center}
+.mod .m-ic svg{width:20px;height:20px}
+.mod .m-n{font-size:13px;font-weight:650}
+.mod .m-s{font-size:10.5px;color:var(--ink3);margin-top:3px}
+.mod .m-trend{font-size:10px;font-weight:650;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen-wrap">
+    <div class="island"></div>
+    <div class="statusbar" id="statusbar"><span>9:41</span><span class="sicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+
+    <!-- ================= Life ================= -->
+    <div class="screen" id="life">
+      <div class="life-hero">
+        <div class="grow">
+          <div class="lh-date">10月3日 · 周五</div>
+          <div class="lh-hi">早上好，阿远</div>
+          <div class="lh-sub">今天的生活，亚丝娜帮你看着呢</div>
+        </div>
+        <div class="orb md"></div>
+      </div>
+
+      <div class="ai-card">
+        <div class="tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>亚丝娜的生活小结</div>
+        <p>今天有 3 项日程，15:00 和产品组对齐方案，纪要模板我已备好。本月消费 ¥3,420，节奏健康；车辆下周三限行，那天记得别开车。另外相册里躺着 76 张可以清理的照片，要现在处理吗？</p>
+        <div class="ai-actions">
+          <a class="chip-btn" href="42-schedule.html">查看今日日程</a>
+          <a class="chip-btn ghost" href="38-album-manage.html">去清理相册</a>
+        </div>
+      </div>
+
+      <div class="tap-hint" style="margin-top:14px">长按卡片拖动重排 · 第一格就是底部导航的「动态」</div>
+      <div class="sec-title" style="margin-top:2px"><h2>生活模块</h2><span class="hint">6 个 · 都在帮你跑</span></div>
+      <div class="mod-grid">
+        <a class="mod" href="31-ledger.html">
+          <span class="dyn-tag">✦ 动态</span>
+          <div class="m-ic" style="background:rgba(239,166,60,.14);color:var(--money)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg></div>
+          <div class="m-n">记账</div><div class="m-s">本月 ¥3,420</div>
+          <div class="m-trend" style="color:var(--health)">↓ 比上月少 8%</div>
+        </a>
+        <a class="mod" href="41-memo.html">
+          <div class="m-ic" style="background:rgba(122,92,255,.12);color:var(--ai1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+          <div class="m-n">备忘录</div><div class="m-s">11 条备忘</div>
+          <div class="m-trend" style="color:var(--ai1)">已归好 3 个主题</div>
+        </a>
+        <a class="mod" href="42-schedule.html">
+          <div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/></svg></div>
+          <div class="m-n">日程</div><div class="m-s">今日 3 项</div>
+          <div class="m-trend" style="color:var(--ai2)">15:00 产品对齐会</div>
+        </a>
+        <a class="mod" href="32-health.html">
+          <div class="m-ic" style="background:rgba(255,107,107,.12);color:#F06A6A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
+          <div class="m-n">健康</div><div class="m-s">综合 86 分</div>
+          <div class="m-trend" style="color:var(--health)">状态不错 · 继续保持</div>
+        </a>
+        <a class="mod" href="35-car.html">
+          <div class="m-ic" style="background:rgba(62,139,255,.12);color:var(--ai2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11 6.6 6.2A2 2 0 0 1 8.5 4.8h7a2 2 0 0 1 1.9 1.4L19 11M5 11h14a2 2 0 0 1 2 2v4h-2.2M5 11a2 2 0 0 0-2 2v4h2.2m0 0a2 2 0 1 0 4 0m-4 0h9.6m0 0a2 2 0 1 0 4 0"/></svg></div>
+          <div class="m-n">车辆</div><div class="m-s">本月 ¥612</div>
+          <div class="m-trend" style="color:#E07B4F">下周三限行 · 已提醒</div>
+        </a>
+        <a class="mod" href="37-album.html">
+          <div class="m-ic" style="background:rgba(255,157,118,.16);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 20"/></svg></div>
+          <div class="m-n">相册</div><div class="m-s">2,847 张</div>
+          <div class="m-trend" style="color:var(--ink2)">76 张可清理 · 仅本机</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ================= Tab Bar ================= -->
+    <div class="tabbar" id="tabbar">
+      <a class="tab" data-go="home" href="10-home.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H14v-6h-4v6H4.5A1.5 1.5 0 0 1 3 20v-9.5z"/></svg>首页
+      </a>
+      <a class="tab" data-go="dynamic" href="31-ledger.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="14" rx="3"/><path d="M16 6V5a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v1M17 13h.01"/></svg>记账
+      </a>
+      <a class="tab on" data-go="life" href="30-life.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>生活
+      </a>
+      <a class="tab orb-tab" data-go="chat" href="20-chat.html">
+        <div class="orb-btn"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg></div>
+        <span>对话</span>
+      </a>
+      <a class="tab" data-go="profile" href="50-profile.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>我的
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="page-tip"><b>朝夕 · 生活</b> — 高保真原型 · 按页拆分<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-prototype.html#life">连续原型</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

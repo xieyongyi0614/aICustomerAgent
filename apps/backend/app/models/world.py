@@ -10,7 +10,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core import timeutil
 from app.models.observability import bound_extra, bound_text
+from app.models.world_simulation import WorldBrief
 
 WORLD_DB_CATEGORIES = ("food", "drink", "tool", "furniture", "clothing", "device", "misc")
 
@@ -52,6 +54,12 @@ class EventSource(StrEnum):
     MANUAL = "manual"
     AUTONOMY = "autonomy"
     CHARACTER = "character"
+    TIME = "time"
+    WEATHER = "weather"
+    CALENDAR = "calendar"
+    USER_EVIDENCE = "user_evidence"
+    DAILY_LIFE = "daily_life"
+    SIMULATION = "simulation"
 
 
 PART_OF_DAY_CN = {
@@ -66,13 +74,13 @@ WEEKDAY_CN = ("周一", "周二", "周三", "周四", "周五", "周六", "周�
 
 
 def part_of_day(now: datetime) -> str:
-    if 5 <= now.hour < 11:
+    if 5 <= timeutil.local(now).hour < 11:
         return "morning"
-    if 11 <= now.hour < 14:
+    if 11 <= timeutil.local(now).hour < 14:
         return "afternoon"
-    if 14 <= now.hour < 18:
+    if 14 <= timeutil.local(now).hour < 18:
         return "dusk"
-    if 18 <= now.hour < 23:
+    if 18 <= timeutil.local(now).hour < 23:
         return "evening"
     return "late_night"
 
@@ -145,6 +153,7 @@ class World(BaseModel):
     name: str = "家"
     time_mode: WorldTimeMode = WorldTimeMode.REAL_SYNC
     sim_time: datetime | None = None
+    sim_last_advanced_at: datetime | None = None
     sim_rate: float = 1.0
     current_location: str = "home.living_room"
     environment: WorldEnvironment = Field(default_factory=WorldEnvironment)
@@ -165,6 +174,7 @@ class WorldEvent(BaseModel):
     completed_at: datetime | None = None
     payload: dict[str, Any] = {}
     source: EventSource = EventSource.USER_MENTION
+    idempotency_key: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -219,6 +229,8 @@ class InventoryItem(BaseModel):
     location_name: str | None = None
     state: str
     consumable: bool = False
+    price_minor: int | None = None
+    purchased_at: str | None = None
 
 
 class ConsumeResult(BaseModel):
@@ -248,6 +260,7 @@ class WorldContext(BaseModel):
     salient_events: list[EventBrief] = []
     recent_world_changes: list[str] = []
     notes: list[str] = []
+    brief: WorldBrief | None = None
 
 
 class WorldFacts(BaseModel):
@@ -277,3 +290,59 @@ def bounded_notes(notes: list[str], max_chars: int) -> list[str]:
         bounded.append(text)
         total += len(text)
     return bounded
+
+
+class ObjectIntakeItem(BaseModel):
+    """用户显式录入的单件物品规格。
+
+    LLM 只填 `price_yuan` 与 `purchased_at_hint`（原话）；`price_minor`（整数分）与
+    `purchased_at`（ISO 日期）由链侧归一填入，供「已用天数 / 日均金额」计算。
+    """
+
+    name: str
+    category: str = "misc"
+    quantity: float = 1.0
+    unit: str = ""
+    price_yuan: float | None = None
+    purchased_at_hint: str | None = None
+    price_minor: int | None = None
+    purchased_at: str | None = None
+
+
+class ObjectIntake(BaseModel):
+    """用户消息 → 物品录入意图；`is_record_intent=False` 时 `items` 恒空。"""
+
+    is_record_intent: bool = False
+    confidence: float = 0.0
+    items: tuple[ObjectIntakeItem, ...] = ()
+
+
+def usage_cost(
+    price_minor: int | None,
+    purchased_at: str | None,
+    now: datetime | None = None,
+) -> dict | None:
+    """按购买价（整数分）与购买日算「已用天数 / 日均金额（分）」。
+
+    缺价或缺日期返回 None；当天购买按 1 天计（避免除零）。纯函数，不落库。
+    """
+    if not isinstance(price_minor, int) or price_minor <= 0 or not purchased_at:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(purchased_at))
+    except (TypeError, ValueError):
+        return None
+    # 展示用日期取**原串的本地日期**（`ensure_aware` 会转 UTC，跨时区会偏移一天）。
+    local_date = parsed.date().isoformat()
+    purchased = timeutil.ensure_aware(parsed)
+    if purchased is None:
+        return None
+    moment = timeutil.ensure_aware(now) or timeutil.now()
+    days = max((moment - purchased).days, 1)
+    return {
+        "days_used": days,
+        "daily_cost_minor": round(price_minor / days),
+        "price_minor": price_minor,
+        "purchased_at": local_date,
+    }
+

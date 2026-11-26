@@ -8,7 +8,7 @@ from app.repositories import (
     evaluation_repository,
     memory_repository,
 )
-from app.services.offline_evaluator import evaluate_session
+from app.services.evaluation.offline import evaluate_session
 
 SESSION_ID = "conv-offline"
 

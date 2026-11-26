@@ -7,9 +7,9 @@ from app.models.evaluation import (
     Issue,
     IssueCode,
 )
-from app.services import evaluation_rules
-from app.services.evaluation_context import EvaluationContext
-from app.services.evaluation_rules import (
+from app.services.evaluation import rules as evaluation_rules
+from app.services.evaluation.context import EvaluationContext
+from app.services.evaluation.rules import (
     RULES,
     compute_rule_scores,
     eligible_dimensions,
@@ -90,6 +90,27 @@ def test_run_rules_honors_dimension_toggle(monkeypatch):
                 code=IssueCode.BEHAVIOR_BUDGET_EXCEEDED,
                 severity="warning",
                 dimension=EvaluationDimension.BEHAVIOR,
+            ),
+        )
+        RULES[:] = [rule]
+        assert run_rules(make_ctx()) == []
+        assert eligible_dimensions("turn", get_settings()) == []
+    finally:
+        get_settings.cache_clear()
+
+
+def test_run_rules_honors_development_dimension_toggle(monkeypatch):
+    monkeypatch.setenv("EVALUATION_DEVELOPMENT_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().evaluation_development_enabled is False
+        rule = DummyRule(
+            IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED,
+            EvaluationDimension.DEVELOPMENT,
+            issue=Issue(
+                code=IssueCode.DEVELOPMENT_CHANGE_UNATTRIBUTED,
+                severity="critical",
+                dimension=EvaluationDimension.DEVELOPMENT,
             ),
         )
         RULES[:] = [rule]

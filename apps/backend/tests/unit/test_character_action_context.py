@@ -92,6 +92,16 @@ def test_derivation_empty_input():
     assert recent_world_changes_from_events([]) == []
 
 
+def test_derivation_non_positive_limit_yields_nothing():
+    """`limit <= 0` = 不注入该段。曾因 `append` 先于 `len(rows) >= limit` 判断而返回 1 条。"""
+    events = [
+        _change_event(datetime(2026, 9, 1, 10), "消耗鸡蛋 ×1", "a"),
+        _change_event(datetime(2026, 9, 1, 11), "做出面", "b"),
+    ]
+    assert recent_world_changes_from_events(events, limit=0) == []
+    assert recent_world_changes_from_events(events, limit=-1) == []
+
+
 def test_build_world_context_default_is_empty():
     context = build_world_context(_world(), [_object()], [], _time())
     assert context.recent_world_changes == []

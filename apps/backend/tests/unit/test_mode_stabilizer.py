@@ -1,9 +1,10 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 
+from app.core import timeutil
 from app.application.chat_pipeline import _idle_seconds_since, _stabilize_mode
-from app.services import mode_service
-from app.services.mode_service import stabilize
+from app.engines import mode as mode_service
+from app.engines.mode import stabilize
 
 
 class _StateStub:
@@ -97,7 +98,7 @@ def test_idle_seconds_handles_aware_non_utc_offset():
 
 
 def test_idle_seconds_handles_naive_moment():
-    moment = datetime.now() - timedelta(minutes=10)
+    moment = timeutil.now() - timedelta(minutes=10)
     assert 599 <= _idle_seconds_since(moment) <= 601
 
 
@@ -113,7 +114,7 @@ def test_stabilize_mode_with_aware_mode_entered_at_no_typeerror():
 
 
 def test_stabilize_mode_with_naive_mode_entered_at_recent_keeps_confirmed():
-    state = _StateStub("immersive", datetime.now() - timedelta(minutes=1))
+    state = _StateStub("immersive", timeutil.now() - timedelta(minutes=1))
     d = _stabilize_mode(None, state, "s-naive")
     assert (d.effective, d.rule) == ("immersive", "R5")
 

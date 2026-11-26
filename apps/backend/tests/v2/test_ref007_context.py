@@ -10,7 +10,7 @@ import pytest
 
 from app.core.db import InsightRow
 from app.prompts.builder import PromptBuilder
-from app.services.context_builder import _load_context_insights
+from app.services.conversation.context import _load_context_insights
 from app.services.reflection import lifecycle as reflection_lifecycle
 
 USER = "u-ctx"
@@ -60,7 +60,7 @@ def _seed_insight(
 
 
 def test_filter_threshold_scope_and_limit(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "i-low", "低置信", confidence=0.3)
     _seed_insight(db_session_factory, "i-world", "世界认知", confidence=0.9, scope="world")
     _seed_insight(db_session_factory, "i-rel", "关系认知", confidence=0.7, scope="relationship")
@@ -75,7 +75,7 @@ def test_filter_threshold_scope_and_limit(db_session_factory, override_settings)
 
 
 def test_max_items_cap_and_over_limit_reason(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_context_max_items=2)
+    override_settings( reflection_context_max_items=2)
     for i in range(4):
         _seed_insight(
             db_session_factory, f"i-{i}", f"认知条目 {i}", confidence=0.9 - i * 0.05
@@ -87,7 +87,7 @@ def test_max_items_cap_and_over_limit_reason(db_session_factory, override_settin
 
 
 def test_budget_full_memory_leaves_no_insight(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "i-top", "用户最近持续处于工作压力中", confidence=0.9)
     selected, payload = _load_context_insights(USER, retrieval_used=800)
     assert selected == []
@@ -96,7 +96,7 @@ def test_budget_full_memory_leaves_no_insight(db_session_factory, override_setti
 
 
 def test_budget_partial_takes_first_fit(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True, v2_reflection_context_max_items=5)
+    override_settings( reflection_context_max_items=5)
     _seed_insight(db_session_factory, "i-big", "很长" * 80, confidence=0.95)
     _seed_insight(db_session_factory, "i-small", "短认知", confidence=0.9)
     selected, payload = _load_context_insights(USER, retrieval_used=770)
@@ -105,8 +105,7 @@ def test_budget_partial_takes_first_fit(db_session_factory, override_settings):
 
 
 def test_statement_truncated_with_ellipsis(db_session_factory, override_settings):
-    override_settings(
-        v2_reflection_enabled=True, v2_reflection_context_statement_chars=10
+    override_settings( reflection_context_statement_chars=10
     )
     _seed_insight(db_session_factory, "i-long", "这是一条远超截断长度的认知陈述句", confidence=0.9)
     selected, _payload = _load_context_insights(USER, retrieval_used=0)
@@ -116,7 +115,7 @@ def test_statement_truncated_with_ellipsis(db_session_factory, override_settings
 
 
 def test_invalidated_immediately_exits(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(
         db_session_factory,
         "i-gone",
@@ -137,16 +136,8 @@ def test_invalidated_immediately_exits(db_session_factory, override_settings):
     assert selected == []
 
 
-def test_flag_off_returns_empty(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=False)
-    _seed_insight(db_session_factory, "i-top", "用户最近持续处于工作压力中", confidence=0.9)
-    selected, payload = _load_context_insights(USER, retrieval_used=0)
-    assert selected == []
-    assert payload == {}
-
-
 def test_query_failure_degrades_to_empty(db_session_factory, override_settings, monkeypatch):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
 
     def _boom(*args, **kwargs):
         raise RuntimeError("db down")
@@ -158,7 +149,7 @@ def test_query_failure_degrades_to_empty(db_session_factory, override_settings, 
 
 
 def test_trace_records_decisions(db_session_factory, override_settings):
-    override_settings(v2_reflection_enabled=True)
+    override_settings()
     _seed_insight(db_session_factory, "i-top", "用户最近持续处于工作压力中", confidence=0.9)
     trace = StubTrace()
     _load_context_insights(USER, retrieval_used=0, trace=trace)

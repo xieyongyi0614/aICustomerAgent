@@ -6,12 +6,12 @@ LlmCallRecord / MetricReport；不绑定 LLM、数据库与 HTTP。
 
 import hashlib
 import json
-import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
+from app.core import ids, timeutil
 
 
 class TraceKind(StrEnum):
@@ -92,7 +92,7 @@ def deterministic_sample(key: str, rate: float) -> bool:
 
 
 def new_record_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()
 
 
 class TraceStep(BaseModel):
@@ -117,6 +117,7 @@ class RuntimeTrace(BaseModel):
     conversation_id: str | None = None
     turn_id: str | None = None
     action_id: str | None = None
+    correlation_id: str | None = None
     status: str = "complete"
     started_at: datetime | None = None
     duration_ms: float = 0.0
@@ -172,7 +173,8 @@ class DecisionRecord(BaseModel):
     reason: str = ""
     confidence: float | None = None
     outcome: str | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    candidates: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 class PromptSnapshot(BaseModel):
@@ -185,7 +187,7 @@ class PromptSnapshot(BaseModel):
     messages: list[dict[str, Any]] = []
     section_budget: dict[str, Any] | None = None
     truncated: bool = False
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 class LlmCallRecord(BaseModel):
@@ -204,7 +206,7 @@ class LlmCallRecord(BaseModel):
     cost_estimate: float | None = None
     error_kind: str | None = None
     started_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
 
 def estimate_cost(
@@ -289,7 +291,7 @@ class BusinessMetrics(BaseModel):
 
 class MetricReport(BaseModel):
     window_hours: float
-    generated_at: datetime = Field(default_factory=datetime.now)
+    generated_at: datetime = Field(default_factory=timeutil.now)
     pipeline: PipelineMetrics = PipelineMetrics()
     llm: LlmMetrics = LlmMetrics()
     quality: QualityMetrics = QualityMetrics()

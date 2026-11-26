@@ -46,7 +46,7 @@ async def test_action_off_no_action_intent_key(asgi_client):
 
 @pytest.mark.asyncio
 async def test_action_on_detects_intent_in_turn_meta(asgi_client, override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     resp = await asgi_client.post("/api/v1/chat/message", json={"content": "明天早上8点提醒我开会"})
     lines = [line for line in resp.text.splitlines() if line.strip()]
     meta = _turn_meta(lines)
@@ -56,7 +56,7 @@ async def test_action_on_detects_intent_in_turn_meta(asgi_client, override_setti
 
 @pytest.mark.asyncio
 async def test_action_on_non_action_message_no_key(asgi_client, override_settings):
-    override_settings(action_enabled=True)
+    override_settings()
     resp = await asgi_client.post("/api/v1/chat/message", json={"content": "今天心情不错"})
     lines = [line for line in resp.text.splitlines() if line.strip()]
     meta = _turn_meta(lines)

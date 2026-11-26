@@ -3,9 +3,13 @@
 输入：证据组（成员含截断内容/时间/来源/weight，按 weight 降序取 top）+ 类型约束
 说明 + scope 选项 + 反例字段强制。输出 ReflectionProposal 结构化 JSON。
 LLM 无权：决定 confidence 终值（代码按证据强度折算）、直写其他域、修改证据。
+
+TOOL-009 §2.2：工具效能证据窗复用同一 Prompt 骨架，仅系统提示与类型/scope 约束段
+按证据来源切换；`build_reflection_messages(window)` 不传类型域时逐字节等同 V2.3.0。
 """
 
 from app.core.settings import get_settings
+from app.models.reflection import TOOL_INSIGHT_SCOPES
 
 REFLECTION_SYSTEM_PROMPT = """你是角色的反思引擎：从一组已沉淀的记忆证据中形成关于用户的认知（Insight）。
 
@@ -17,6 +21,29 @@ REFLECTION_SYSTEM_PROMPT = """你是角色的反思引擎：从一组已沉淀�
 - scope 取值：user（关于用户本人）/ relationship（关于你们的关系）/ world（关于环境世界）。
 
 只依据给出的证据组输出，不要臆造信息。"""
+
+TOOL_SYSTEM_PROMPT = """你是角色的反思引擎：从一组工具执行事实（执行结果与用户对结果的反应）中形成关于「自身能力可靠性与交互方式」的认知（Insight）。
+
+判定原则：
+- 结论必须完全由给出的证据支撑，不得超出证据可支撑的范围（不要外推、不要脑补细节）。
+- 每条候选结论必须引用支撑它的证据编号（evidence_ids），引用不存在的证据编号视为无效。
+- 每条候选结论必须填写 counter_evidence 字段：说明「证据不支持什么」；确无反例时填「无」。
+- 这是工具层面的事实，不是用户自述：不要对用户的性格、人格或你们的关系下结论。
+
+只依据给出的证据组输出，不要臆造信息。"""
+
+CORE_FIELD_RULE = (
+    "type、scope、evidence_ids（引用 [E编号] 对应的成员 id）、"
+    "counter_evidence（证据不支持什么，无反例填「无」）、self_confidence（0~1 自评，"
+    "仅作参考，终值由系统按证据强度校准）。"
+)
+
+TOOL_TYPE_RULE = (
+    "type 只能取以下工具效能类型之一：capability_note（能力可靠性自省）/ "
+    "usage_preference（工具使用偏好）/ interaction_calibration（交互方式校正）；"
+    "禁止输出性格 / 人格 / 关系类结论。"
+)
+TOOL_SCOPE_RULE = f"scope 只能取：{' / '.join(TOOL_INSIGHT_SCOPES)}。"
 
 EVIDENCE_LINE_TEMPLATE = "[E{index}] ({date} {source}) {content}"
 
@@ -44,21 +71,28 @@ def build_evidence_block(window, max_members: int, content_chars: int) -> tuple[
     return "\n".join(lines), provided
 
 
-def build_reflection_messages(window) -> list[tuple[str, str]]:
+def build_reflection_messages(
+    window, insight_types: tuple[str, ...] | None = None
+) -> list[tuple[str, str]]:
+    """证据组 → LLM 消息；`insight_types` 非空表示工具效能证据窗（类型域受约束）。"""
     settings = get_settings()
     evidence_block, _provided = build_evidence_block(
         window,
-        settings.v2_reflection_evidence_max_members,
-        settings.v2_reflection_evidence_content_chars,
+        settings.reflection_evidence_max_members,
+        settings.reflection_evidence_content_chars,
     )
+    if insight_types:
+        system_prompt = TOOL_SYSTEM_PROMPT
+        field_rule = f"{TOOL_TYPE_RULE}{TOOL_SCOPE_RULE}{CORE_FIELD_RULE}"
+    else:
+        system_prompt = REFLECTION_SYSTEM_PROMPT
+        field_rule = CORE_FIELD_RULE
     user_prompt = (
         f"证据组（同一主题的时间窗聚合，共 {len(_provided)} 条）：\n{evidence_block}\n\n"
         "请从以上证据形成候选 Insight（最多 3 条），每条包含 statement（陈述句）、"
-        "type、scope、evidence_ids（引用 [E编号] 对应的成员 id）、"
-        "counter_evidence（证据不支持什么，无反例填「无」）、self_confidence（0~1 自评，"
-        "仅作参考，终值由系统按证据强度校准）。"
+        f"{field_rule}"
     )
     return [
-        ("system", REFLECTION_SYSTEM_PROMPT),
+        ("system", system_prompt),
         ("user", user_prompt),
     ]

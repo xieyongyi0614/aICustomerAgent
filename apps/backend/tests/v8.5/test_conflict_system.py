@@ -10,7 +10,7 @@ from app.models.relationship import (
     RelationshipEvent,
     RelationshipState,
 )
-from app.services import relationship_conflict as rconf
+from app.engines import relationship_conflict as rconf
 
 NOW = datetime(2026, 8, 31, 12, 0, 0)
 

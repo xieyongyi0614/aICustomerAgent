@@ -1,18 +1,23 @@
-"""V2 类型体系收口测试：7 规范类型 + 2 遗留类型的归一化、存储与检索亲和。"""
+"""V2 类型体系收口测试：7 规范类型（存储词表）+ 遗留名的入站归一、存储与检索亲和。
+
+2026-10-16 词表收窄（迁移 `0010`）后，`important_event` / `relationship_event` 不再可存储，
+只作为**入站兼容名**（LLM 输出 / 旧行）经 `normalize_type` 归一。"""
 
 import datetime
 from typing import get_args
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow
 from app.core.settings import get_settings
 from app.models.memory import MemoryType, UserMemory
 from app.repositories import memory_repository
-from app.services.memory2 import evaluator, lifecycle, retriever, types
+from app.services.memory import evaluator, lifecycle, retriever, types
 
 
 @pytest.fixture
@@ -24,14 +29,12 @@ def types_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (memory_repository, evaluator, lifecycle, retriever):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 1.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
     evaluator.reset_evaluator_state()
     yield testing_session
     evaluator.reset_evaluator_state()
@@ -55,7 +58,7 @@ def _candidate(id, content, proposed_type, source="user_stated"):
         salience=0.8,
         status="pending",
         visibility="private",
-        created_at=datetime.datetime.now(),
+        created_at=timeutil.now(),
     )
     with memory_repository.SessionLocal() as session:
         session.add(row)
@@ -84,13 +87,11 @@ class TestNormalizeType:
     def test_normalize(self, raw, expected):
         assert types.normalize_type(raw) == expected
 
-    def test_storage_type_accepts_legacy_and_canonical(self):
-        for value in types.STORAGE_MEMORY_TYPES:
-            assert types.storage_type(value) == value
-        assert types.storage_type("goal") is None
+    def test_entry_compat_names_are_alias_keys(self):
+        assert types.LEGACY_MEMORY_TYPES == tuple(types.LEGACY_TYPE_ALIASES)
 
-    def test_model_literal_covers_storage_set(self):
-        assert set(types.STORAGE_MEMORY_TYPES) == set(get_args(MemoryType))
+    def test_model_literal_covers_canonical_set(self):
+        assert set(types.CANONICAL_MEMORY_TYPES) == set(get_args(MemoryType))
 
 
 class TestPromotionNormalization:
@@ -131,14 +132,14 @@ class TestPromotionNormalization:
                         type="goal",
                         importance=0.5,
                         status="active",
-                        created_at=datetime.datetime.now(),
-                        updated_at=datetime.datetime.now(),
+                        created_at=timeutil.now(),
+                        updated_at=timeutil.now(),
                     )
                 )
                 session.commit()
 
-    def test_user_memory_loads_all_storage_types(self, types_db):
-        for memory_type in types.STORAGE_MEMORY_TYPES:
+    def test_user_memory_loads_all_canonical_types(self, types_db):
+        for memory_type in types.CANONICAL_MEMORY_TYPES:
             memory = UserMemory(
                 id=f"m-{memory_type}",
                 user_id="u1",
@@ -146,10 +147,24 @@ class TestPromotionNormalization:
                 type=memory_type,
                 content="内容",
                 importance=0.5,
-                created_at=datetime.datetime.now(),
-                updated_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
             assert memory.type == memory_type
+
+    def test_user_memory_rejects_legacy_type(self, types_db):
+        """存储值对象只认 7 规范值：遗留名不再可构造（写入口负责归一）。"""
+        with pytest.raises(ValidationError):
+            UserMemory(
+                id="m-legacy",
+                user_id="u1",
+                character_id="asuna",
+                type="important_event",
+                content="内容",
+                importance=0.5,
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
+            )
 
 
 class TestRetrieverAffinityAliases:
@@ -157,25 +172,26 @@ class TestRetrieverAffinityAliases:
         assert retriever._detect_query_types("面试经历") == {"experience"}
         assert retriever._detect_query_types("我们一起去过") == {"relationship_fact"}
 
-    def test_legacy_stored_type_matches_canonical_query(self):
-        memory = UserMemory(
-            id="m1",
-            user_id="u1",
-            character_id="asuna",
-            type="important_event",
-            content="内容",
-            importance=0.5,
-            created_at=datetime.datetime.now(),
-            updated_at=datetime.datetime.now(),
-        )
-        assert retriever._affinity_score(memory, {"experience"}) == 1.0
+
+class TestEvaluatorAffinityUnification:
+    def test_canonical_and_legacy_proposed_types_score_alike(self):
+        """映射统一后规范名与遗留名同分（原规范名 experience 被误罚 0.0 的不一致消除）。"""
+        assert evaluator._type_affinity("用户明天有一场面试", "experience") == 1.0
+        assert evaluator._type_affinity("用户明天有一场面试", "important_event") == 1.0
+
+    def test_cross_group_still_rejected(self):
+        assert evaluator._type_affinity("我喜欢吃西瓜", "important_event") == 0.0
+        assert evaluator._type_affinity("我喜欢吃西瓜", "user_preference") == 1.0
+
+    def test_no_hit_neutral(self):
+        assert evaluator._type_affinity("今天天气不错", "user_preference") == 0.5
 
 
 class TestDecayLambdaAliases:
     def test_legacy_type_uses_canonical_lambda(self, monkeypatch):
         monkeypatch.setattr(
             get_settings(),
-            "v2_memory_decay_lambda_json",
+            "memory_decay_lambda_json",
             '{"experience": 0.03, "relationship_fact": 0.03}',
         )
         assert lifecycle.decay_lambda_for("important_event") == pytest.approx(0.03)

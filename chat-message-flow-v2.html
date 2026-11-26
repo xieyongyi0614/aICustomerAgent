@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对话流程梳理 v2（前台一次用户消息）</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --line:#334155;
+    --ink:#e2e8f0; --muted:#94a3b8;
+    --chan:#3b82f6; --fg:#10b981; --crit:#f59e0b; --post:#a78bfa; --stream:#64748b;
+    --title:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:32px 20px 80px}
+  .wrap{max-width:1120px;margin:0 auto}
+  h1{color:var(--title);font-size:26px;margin:0 0 4px}
+  h2{color:var(--title);font-size:19px;margin:40px 0 14px;display:flex;align-items:center;gap:10px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:28px}
+  .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .flow{display:flex;flex-direction:column;gap:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px;position:relative}
+  .arrow{text-align:center;color:var(--muted);font-size:15px;line-height:1;padding:6px 0}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;font-weight:700;font-size:13px;color:#0b1120;margin-right:10px;flex:none}
+  .name{font-weight:700;font-size:15px}
+  .en{color:var(--muted);font-size:12px;margin-left:8px;font-family:Consolas,monospace}
+  .desc{color:var(--muted);font-size:13px;margin-top:6px}
+  .tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font-size:11px;padding:2px 8px;border-radius:20px;background:#0b1120;color:var(--muted);border:1px solid var(--line)}
+  .tag.hot{color:#fbbf24;border-color:#92400e}
+  .tag.llm{color:#93c5fd;border-color:#1e40af}
+  .crit-badge{position:absolute;top:12px;right:14px;font-size:11px;color:#f59e0b;border:1px solid #92400e;padding:1px 8px;border-radius:20px}
+  .col2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .side{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .side h3{color:var(--title);font-size:15px;margin:0 0 10px}
+  ol{margin:0;padding-left:20px}
+  li{color:var(--ink);font-size:13px;margin:6px 0}
+  li b{color:var(--title)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px}
+  .leg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .sw{width:12px;height:12px;border-radius:3px}
+  code{font-family:Consolas,monospace;font-size:12px;color:#7dd3fc}
+  .note{background:#0b1120;border-left:3px solid var(--post);border-radius:8px;padding:10px 14px;color:var(--muted);font-size:13px;margin-top:10px}
+  .inline-sub{font-size:12px;color:var(--muted);margin-left:6px}
+  .sub-cards{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .sub-card{flex:1 1 200px;background:#0b1120;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .sub-card b{color:var(--ink);font-size:12.5px}
+  .sub-card p{color:var(--muted);font-size:11.5px;margin:4px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>对话流程梳理 v2</h1>
+  <div class="sub">一次用户消息从进入通道到「流式回答 + 后台沉淀」的完整链路（基于当前代码实现，非旧版图）</div>
+
+  <div class="legend">
+    <span class="leg"><span class="sw" style="background:var(--chan)"></span>通道 / 入口</span>
+    <span class="leg"><span class="sw" style="background:var(--fg)"></span>前台管线（9 段）</span>
+    <span class="leg"><span class="sw" style="background:var(--crit)"></span>关键段（LLM 唯一 critical）</span>
+    <span class="leg"><span class="sw" style="background:var(--post)"></span>后台后处理</span>
+    <span class="leg"><span class="sw" style="background:var(--stream)"></span>流式输出</span>
+  </div>
+
+  <!-- 入口 -->
+  <h2><span class="dot" style="background:var(--chan)"></span>一、入口：通道归一</h2>
+  <div class="flow">
+    <div class="card">
+      <span class="num" style="background:var(--chan)">A</span>
+      <span class="name">Web REST</span><span class="en">POST /api/v1/chat/message</span>
+      <div class="desc">Bearer token 鉴权（require_user 解析 user_id）；校验 content 非空；无 session_id 则新建会话；选择 LLM profile。</div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="card">
+      <span class="num" style="background:var(--chan)">B</span>
+      <span class="name">飞书 Webhook</span><span class="en">POST /api/v1/feishu/events</span>
+      <div class="desc">验签 / 解密 / challenge / 去重 / 限流 → adapter 收件箱合并排队 → 身份解析 → 会话串行。</div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="card">
+      <span class="num" style="background:var(--chan)">C</span>
+      <span class="name">统一入口</span><span class="en">chat_pipeline.stream_chat</span>
+      <div class="desc">两条通道都归一为通道无关的 InboundMessage，收敛到同一对话编排（对话逻辑唯一）。trace 兜底创建 + observability 上下文 set/reset。</div>
+    </div>
+  </div>
+
+  <!-- 前台管线 -->
+  <h2><span class="dot" style="background:var(--fg)"></span>二、前台对话管线（foreground_chat Profile · 9 段）</h2>
+
+  <div class="flow">
+    <div class="card">
+      <span class="num" style="background:var(--fg)">1</span>
+      <span class="name">perception</span><span class="en">感知锚点</span>
+      <div class="desc">入站已由网关归一，本段不引入额外业务（仅为与自治 Profile 对齐的段序占位）。</div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">2</span>
+      <span class="name">context_assembly</span><span class="en">上下文装配</span>
+      <div class="desc">装配 Agent 状态快照（人格基线/目标栈）→ 世界上下文切片（只读、有界、失败降级 None）→ 会话状态（历史窗口/摘要/记忆召回）→ 场景状态加载 → 本轮目标选择。</div>
+      <div class="sub-cards">
+        <div class="sub-card"><b>AgentState 快照</b><p>agent_state_assembler</p></div>
+        <div class="sub-card"><b>世界上下文</b><p>world_engine（旁路纪律，异常仅降级）</p></div>
+        <div class="sub-card"><b>会话状态</b><p>context_builder（历史/摘要/记忆）</p></div>
+        <div class="sub-card"><b>场景 + 目标</b><p>scene_service.load + _select_goal</p></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">3</span>
+      <span class="name">turn_decisions</span><span class="en">四链并行检测</span>
+      <div class="desc">asyncio.gather 并行执行四条 LLM 链（return_exceptions=True，单链失败互不拖累，逐项归一降级）。</div>
+      <div class="sub-cards">
+        <div class="sub-card"><b>role_router</b><p>候选角色模式 + 置信度</p></div>
+        <div class="sub-card"><b>turn_analyzer</b><p>轮次分析：用户情绪/事件/行为</p></div>
+        <div class="sub-card"><b>scene_intent</b><p>场景意图分类</p></div>
+        <div class="sub-card"><b>intention</b><p>意图决策</p></div>
+      </div>
+      <div class="tags"><span class="tag llm">LLM capable</span><span class="tag">失败逐项降级</span></div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">4</span>
+      <span class="name">mode_stabilize</span><span class="en">模式稳定</span>
+      <div class="desc">候选模式 vs 已确认模式，稳定器 R5 依据置信度与距上次切换时长抑制抖动，产出生效模式 effective_mode。</div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">5</span>
+      <span class="name">scene_resolve</span><span class="en">场景收敛 + 意图校验 + 前台决策</span>
+      <div class="desc">场景收敛（pending 动作续接/新意图）→ enforce_intention 意图确定性校验（策略降级）→ 前台决策管线（目标栈只读，前后台同一代码路径，胜者恒为 chat_response）。</div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">6</span>
+      <span class="name">behavior_resolve</span><span class="en">行为解析 + 风格契约</span>
+      <div class="desc">关系上下文（阶段/亲密度/冲突态/解锁项）→ 行为引擎解析（策略/预算/习惯/关系解锁）→ 风格契约装配（人格轴快照 + development overlay）。</div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">7</span>
+      <span class="name">action_planning</span><span class="en">行动意图检出 + 首帧</span>
+      <div class="desc">检出行动意图（可选）→ 组装并发出首帧 turn_meta（角色模式/分析/场景/意图/目标/行为/模式/行动意图/记忆引用）。</div>
+      <div class="tags"><span class="tag">发出 turn_meta</span></div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="crit-badge">唯一 critical</span>
+      <span class="num" style="background:var(--crit)">8</span>
+      <span class="name">reply_generation</span><span class="en">流式回答生成</span>
+      <div class="desc">经 LLM Gateway 解析 answer LLM → answer_chain.astream 逐 token 产出（首 token 计时、token 用量采集）→ 可选 inventory grounding（rewrite/annotate 时缓冲整段，冲突则补发替换帧）。</div>
+      <div class="tags"><span class="tag llm">LLM capable</span><span class="tag hot">critical</span><span class="tag">逐 token 推送</span></div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="card">
+      <span class="num" style="background:var(--fg)">9</span>
+      <span class="name">record_handoff</span><span class="en">落库交接</span>
+      <div class="desc">保存本轮消息 → 复位主动行为 → 调度后台 post_process → observability 收口（trace 落库 / decision 记录 / turn 决策审计）→ 发出 done 结束帧。</div>
+    </div>
+  </div>
+
+  <div class="note">前台 9 段由 <code>profiles.py</code> 的 <code>foreground_chat</code> Profile 唯一声明；段本体是 <code>run_chat_pipeline</code> 内的闭包，经 AgentLoop 驱动（C-2 线性旧链与开关字段已于 2026-10-15 删除，前台回退 = git revert）。</div>
+
+  <!-- 流式协议 -->
+  <h2><span class="dot" style="background:var(--stream)"></span>三、流式输出协议（NDJSON）</h2>
+  <div class="card">
+    <span class="name">事件帧序列</span><span class="en">application/x-ndjson</span>
+    <div class="desc">客户端依次收到：<code>turn_meta</code>（回合元信息）→ <code>delta</code>（增量 token，多次）→ <code>reply_replace</code>（grounding 修正时，可选）→ <code>done</code>（session_id / turn_id / request_id）；工具步骤帧随时插入。</div>
+  </div>
+
+  <!-- 后台后处理 -->
+  <h2><span class="dot" style="background:var(--post)"></span>四、后台后处理（post_process · 13 步，异步独立容错）</h2>
+  <div class="side">
+    <h3>回答已产出后异步执行（失败不影响已产出回答；per-user 写锁内串行）</h3>
+    <ol>
+      <li><b>scene_update</b> —— 场景状态更新并持久化</li>
+      <li><b>state_update</b> —— 角色状态（情绪/能量/强度）应用与保存</li>
+      <li><b>goal_review</b> —— 目标评审（创建/完成/过期/取消）</li>
+      <li><b>summary</b> —— 会话摘要更新（达阈值时）</li>
+      <li><b>memory_extract</b> —— 记忆提取（显式命令优先，四源幂等入 candidates）</li>
+      <li><b>ledger_extraction</b> —— 账本抽取候选（零写库）</li>
+      <li><b>ledger_confirmation</b> —— 账本确认挂接（待确认登记/超时清理）</li>
+      <li><b>budget_observer</b> —— 行为预算观测（违规告警）</li>
+      <li><b>evaluation</b> —— 回合评估（规则 + LLM Judge 采样）</li>
+      <li><b>world_update</b> —— 世界状态迁移 + 用户处境检出 + 物品录入</li>
+      <li><b>character_action_sync</b> —— 角色动作提取→校验→执行→写世界 notes</li>
+      <li><b>action_planning</b> —— 行动六闸门→计划→执行→四通道整合</li>
+      <li><b>memory_evaluate</b> —— 收尾记忆评估（本轮候选同轮转正）</li>
+    </ol>
+  </div>
+
+  <h2><span class="dot" style="background:var(--post)"></span>五、旁路：后台自治周期（life_loop）</h2>
+  <div class="side">
+    <h3>autonomous_tick Profile（与前台并列的第二条 Run 链路，非用户消息驱动）</h3>
+    <div class="sub">perception → state_update → state_snapshot → goal_check → goal_stack → goal_supply → goal_advance → memory_retrieval → reflection_check → decision → world_experience</div>
+    <div class="note">decision 是唯一 LLM capable 且 critical 段；event_driven Profile 仅白名单世界事件升级为完整 Run，其余 0 消耗。</div>
+  </div>
+
+</div>
+</body>
+</html>

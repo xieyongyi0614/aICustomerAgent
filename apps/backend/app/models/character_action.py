@@ -5,12 +5,12 @@ WorldAction 值对象 + 状态机 + 幂等键：三层之间的唯一契约。
 """
 
 import hashlib
-import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
+from app.core import ids, timeutil
 
 ActionType = Literal["CREATE", "MOVE", "CONSUME"]
 
@@ -122,7 +122,7 @@ def make_world_action_dedupe_key(
 
 
 def make_action_id() -> str:
-    return f"wa_{uuid.uuid4().hex[:8]}"
+    return ids.new_id_str()
 
 
 class TargetRef(BaseModel):
@@ -151,7 +151,7 @@ class WorldAction(BaseModel):
     status: WorldActionStatus = WorldActionStatus.CANDIDATE
     dedupe_key: str = ""
     turn_ref: TurnRef
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=timeutil.now)
 
     @model_validator(mode="after")
     def validate_action(self):

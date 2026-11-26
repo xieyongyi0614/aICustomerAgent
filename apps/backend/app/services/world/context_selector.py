@@ -18,6 +18,7 @@ from app.models.world import (
     WorldEvent,
     WorldObject,
     part_of_day,
+    usage_cost,
 )
 from app.services.world.locations import build_location_context, location_name
 
@@ -29,6 +30,8 @@ EVENT_STATUS_CN = {
 
 
 def recent_world_changes_from_events(events: list[WorldEvent], limit: int = 3) -> list[str]:
+    if limit <= 0:
+        return []
     seen: set[str] = set()
     rows: list[str] = []
     ordered = sorted(
@@ -96,6 +99,7 @@ def build_world_context(
 
     inventory = []
     for obj in entities:
+        props = obj.properties or {}
         inventory.append(
             InventoryItem(
                 name=obj.name,
@@ -105,6 +109,8 @@ def build_world_context(
                 location_name=location_name(obj.location_id),
                 state=obj.state,
                 consumable=obj.consumable,
+                price_minor=props.get("price_minor"),
+                purchased_at=props.get("purchased_at"),
             )
         )
 
@@ -133,8 +139,15 @@ def _environment_salient(environment: WorldEnvironment) -> bool:
     )
 
 
-def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | None:
-    """渲染【当前世界】段；ctx 为 None → None（Prompt 字节不变的关键路径）。"""
+def render_world_section(
+    ctx: WorldContext | None,
+    budget: int = 600,
+    brief=None,
+    now: datetime | None = None,
+) -> str | None:
+    """渲染【当前世界】段；ctx 为 None → None（Prompt 字节不变的关键路径）。
+    brief（V2.3.0 WorldBrief）非空时其行优先于其余行进入预算。
+    now 仅用于「已用天数 / 日均金额」计算（缺省取当前时间）。"""
     if ctx is None:
         return None
 
@@ -142,7 +155,7 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     head = f"{ctx.time.day_line()}。你在{location_path}。"
 
     env_line = _environment_line(ctx)
-    event_lines = [_event_line(brief) for brief in ctx.salient_events]
+    event_lines = [_event_line(event) for event in ctx.salient_events]
     recent_lines = _recent_changes_lines(ctx.recent_world_changes)
     recent_set = set(ctx.recent_world_changes)
     note_lines = [note for note in ctx.notes if note not in recent_set]
@@ -150,12 +163,18 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
         "家里的物品、数量、位置以本清单为准，不得凭空捏造或增减；"
         "未列出的物品视为不存在，不得声称拥有或还有。"
     )
-    inventory_lines = _inventory_lines(ctx.inventory)
+    inventory_lines = _inventory_lines(ctx.inventory, now=now)
+
+    brief_lines: list[str] = []
+    if brief is not None:
+        for line in (brief.time_line, brief.place_line, brief.situations_line, brief.events_line):
+            if line:
+                brief_lines.append(line)
 
     body: list[str] = []
     prefix = "【当前世界】\n"
     total = len(prefix) + len(head)
-    for line in (
+    for line in brief_lines + (
         [guide_line]
         + inventory_lines
         + recent_lines
@@ -173,7 +192,7 @@ def render_world_section(ctx: WorldContext | None, budget: int = 600) -> str | N
     return prefix + head + "\n" + "\n".join(body)
 
 
-def _inventory_lines(items) -> list[str]:
+def _inventory_lines(items, now: datetime | None = None) -> list[str]:
     grouped: dict = {}
     for item in items:
         grouped.setdefault(item.location_id, []).append(item)
@@ -184,15 +203,23 @@ def _inventory_lines(items) -> list[str]:
         )
         lines.append(f"{loc_name}：")
         for obj in objs:
-            lines.append(f"  {_inventory_item_line(obj)}")
+            lines.append(f"  {_inventory_item_line(obj, now=now)}")
     return lines
 
 
-def _inventory_item_line(item) -> str:
+def _inventory_item_line(item, now: datetime | None = None) -> str:
     qty = int(item.quantity) if item.quantity == int(item.quantity) else f"{item.quantity:g}"
     if item.unit and item.unit not in ("piece", "个"):
-        return f"{item.name} × {qty}{item.unit}"
-    return f"{item.name} × {qty}"
+        base = f"{item.name} × {qty}{item.unit}"
+    else:
+        base = f"{item.name} × {qty}"
+    cost = usage_cost(item.price_minor, item.purchased_at, now=now)
+    if cost is None:
+        return base
+    return (
+        f"{base}（购于 {cost['purchased_at']}，¥{cost['price_minor'] / 100:.2f}，"
+        f"已用 {cost['days_used']} 天，日均 ¥{cost['daily_cost_minor'] / 100:.2f}）"
+    )
 
 
 def _recent_changes_lines(rows: list[str]) -> list[str]:

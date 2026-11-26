@@ -6,86 +6,141 @@ from fastapi import FastAPI
 
 from app.api.rate_limit import chat_rate_limit_middleware
 from app.api.v1.router import api_router
-from app.application import autonomy_worker, observability, world_engine
+from app.application import observability
+from app.application.agent_runtime import outbound as outbound_gateway
+from app.application import agent_evolution_worker
+from app.channels.feishu import delivery
+from app.channels.feishu.identity import FEISHU_CHANNEL
+from app.core import redis_client
+from app.core import ids as id_service
 from app.core.settings import get_settings
-from app.core.settings.enablement import validate_enablement_chain
-from app.services import memory_service
-from app.application.action_engine import run_action_retry_loop
+from app.services.delivery import outbound as proactive_delivery
+from app.services.tool import channel_tools
+from app.services.tool.ext_api import get_manifest_loader
 from app.application.life_loop import run_life_loop_worker
 from app.services.development.audit import register_rollback_listener
 from app.services.development.policy import (
     register_runtime as register_development_runtime,
 )
-from app.services.goal_planning import register_runtime as register_goal_runtime
-from app.services.memory2.job_worker import run_job_worker_loop
+from app.services.goal.planning import register_runtime as register_goal_runtime
+from app.services.memory.job_worker import run_job_worker_loop
+from app.services.planning.revision_listener import (
+    register_runtime as register_plan_revision_listener,
+)
 from app.services.reflection.reflector import register_executor
 from app.services.reflection.triggers import register_with_job_worker
-from app.services.relationship_narrative import register_narrative_listener
+from app.services.relationship.narrative import register_narrative_listener
 
 logging.basicConfig(level=logging.INFO)
 
-_reclaim_task: asyncio.Task | None = None
-_autonomy_task: asyncio.Task | None = None
 _observability_cleanup_task: asyncio.Task | None = None
-_world_maintenance_task: asyncio.Task | None = None
-_action_maintenance_task: asyncio.Task | None = None
-_v2_job_worker_task: asyncio.Task | None = None
+_job_worker_task: asyncio.Task | None = None
 _life_loop_task: asyncio.Task | None = None
+_agent_evolution_task: asyncio.Task | None = None
+_ids_watermark_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    global _reclaim_task, _autonomy_task, _observability_cleanup_task
-    global _world_maintenance_task, _action_maintenance_task, _v2_job_worker_task
-    global _life_loop_task
-    validate_enablement_chain(get_settings())
-    _reclaim_task = asyncio.create_task(memory_service.run_memory_reclaim_loop())
-    observability.set_main_loop(asyncio.get_running_loop())
-    if (
-        get_settings().v2_memory_enabled
-        or get_settings().v2_reflection_enabled
-        or get_settings().v2_development_enabled
-        or get_settings().v2_relationship_evolved_enabled
-        or get_settings().v2_autonomy_advanced_enabled
-    ):
-        _v2_job_worker_task = asyncio.create_task(run_job_worker_loop())
-    if get_settings().v2_autonomy_advanced_enabled:
-        register_goal_runtime()
-    if get_settings().v2_reflection_enabled:
-        register_with_job_worker()
-        register_executor()
-    if get_settings().v2_development_enabled:
-        register_development_runtime()
-        register_rollback_listener()
-    if get_settings().v2_relationship_evolved_enabled:
-        register_narrative_listener()
-    if get_settings().v2_life_loop_enabled:
-        _life_loop_task = asyncio.create_task(run_life_loop_worker())
-        logging.getLogger(__name__).info("v2 life loop 已接管周期调度（归并 autonomy/world/action 三循环）")
-    else:
-        if get_settings().autonomy_enabled:
-            _autonomy_task = asyncio.create_task(autonomy_worker.run_autonomy_worker())
+    global _observability_cleanup_task
+    global _job_worker_task
+    global _life_loop_task, _agent_evolution_task
+    global _ids_watermark_task
+    from app.services.action import port as action_port
+    from app.services.autonomy import port as autonomy_port
+    from app.services.memory import job_worker
+    from app.services.observability import port as observability_port
+    from app.services.world import engine_port
+
+    from app.application import action_engine as _action_engine_impl
+    from app.application import autonomy_bridge as _autonomy_bridge_impl
+    from app.application import world_engine as _world_engine_impl
+    from app.application.worker_loop import run_worker_loop
+
+    action_port.register_action_engine(_action_engine_impl)
+    observability_port.register_observability(observability)
+    engine_port.register_world_engine(_world_engine_impl)
+    autonomy_port.register_autonomy_bridge(_autonomy_bridge_impl)
+    job_worker.register_worker_loop(run_worker_loop)
+    from app.core.runtime_state import assert_single_instance_runtime
+
+    assert_single_instance_runtime()
+    if redis_client.is_configured():
+        if await redis_client.ping_redis():
+            logging.getLogger(__name__).info("Redis 连接正常")
         else:
-            logging.getLogger(__name__).info("autonomy_enabled=false，Worker 未启动")
-        if get_settings().world_enabled:
-            _world_maintenance_task = asyncio.create_task(
-                world_engine.run_world_maintenance_loop()
+            logging.getLogger(__name__).warning(
+                "Redis 连接失败，邮箱验证码登录将不可用"
             )
-        if get_settings().action_enabled:
-            _action_maintenance_task = asyncio.create_task(run_action_retry_loop())
-    if get_settings().observability_persist_enabled:
-        _observability_cleanup_task = asyncio.create_task(
-            observability.run_retention_loop()
+    await id_service.startup_guard()
+    _ids_watermark_task = asyncio.create_task(id_service.run_high_water_flusher())
+    observability.set_main_loop(asyncio.get_running_loop())
+    _job_worker_task = asyncio.create_task(run_job_worker_loop())
+    register_goal_runtime()
+    register_with_job_worker()
+    register_executor()
+    register_plan_revision_listener()
+    register_development_runtime()
+    register_rollback_listener()
+    register_narrative_listener()
+    from app.services.world.event_bridge import register_character_event_listeners
+
+    register_character_event_listeners()
+    _life_loop_task = asyncio.create_task(run_life_loop_worker())
+    logging.getLogger(__name__).info(
+        "life loop 已接管周期调度（归并 autonomy/world/action 三循环）"
+    )
+    if get_settings().feishu_enabled:
+        proactive_delivery.register_proactive_outbound(
+            proactive_delivery.ProactiveOutbound(
+                channel=FEISHU_CHANNEL, send=delivery.send_proactive
+            )
         )
+        logging.getLogger(__name__).info("主动消息出站端口已注册：%s", FEISHU_CHANNEL)
+        channel_tools.register_channel_adapter(
+            FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
+        )
+        logging.getLogger(__name__).info(
+            "工具层通道出站适配器已注册：%s", FEISHU_CHANNEL
+        )
+        # RT-014：出站归一网关注册（组合根才允许 import app.channels.feishu）
+        outbound_gateway.register_adapter(
+            FEISHU_CHANNEL, delivery.FeishuChannelAdapter()
+        )
+        logging.getLogger(__name__).info("出站归一网关适配器已注册：%s", FEISHU_CHANNEL)
+        # 组合根职责：通道层不得 import app.repositories（依赖 allowlist fail-closed），
+        # 故出站幂等的持久化实现只能在这里注入。**无开关**——跨进程幂等是必需能力，
+        # 缺了它多实例下会重复回复用户。
+        from app.services.delivery import ledger as feishu_delivery_ledger_service
+
+        delivery.set_persistent_idempotency(
+            feishu_delivery_ledger_service.claim,
+            feishu_delivery_ledger_service.release,
+        )
+        logging.getLogger(__name__).info("飞书出站幂等已接入持久化存储（跨进程）")
+    report = get_manifest_loader().load(get_settings().tool_ext_manifest_path)
+    logging.getLogger(__name__).info(
+        "外部 API 工具清单加载完成：path=%s loaded=%d skipped=%d",
+        report.path or "<未配置>",
+        len(report.loaded),
+        len(report.skipped),
+    )
+    _observability_cleanup_task = asyncio.create_task(
+        observability.run_retention_loop()
+    )
+    _agent_evolution_task = asyncio.create_task(
+        agent_evolution_worker.run_agent_evolution_worker()
+    )
+    logging.getLogger(__name__).info(
+        "agent evolution worker 已启动（指标快照 + 人格编译 + goal rebalance）"
+    )
     yield
     for task in (
-        _reclaim_task,
-        _autonomy_task,
         _observability_cleanup_task,
-        _world_maintenance_task,
-        _action_maintenance_task,
-        _v2_job_worker_task,
+        _job_worker_task,
         _life_loop_task,
+        _agent_evolution_task,
+        _ids_watermark_task,
     ):
         if task is not None:
             task.cancel()
@@ -93,13 +148,12 @@ async def lifespan(application: FastAPI):
                 await task
             except asyncio.CancelledError:
                 pass
-    _reclaim_task = None
-    _autonomy_task = None
     _observability_cleanup_task = None
-    _world_maintenance_task = None
-    _action_maintenance_task = None
-    _v2_job_worker_task = None
+    _job_worker_task = None
     _life_loop_task = None
+    _ids_watermark_task = None
+    await id_service.flush_high_water()
+    await redis_client.close_redis()
 
 
 def create_app() -> FastAPI:

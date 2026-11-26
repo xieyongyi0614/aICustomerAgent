@@ -8,27 +8,25 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
 from app.models.evaluation import EvaluationDimension, IssueCode
 from app.models.goal import GoalPlanRecord, SubGoalSpec
 from app.repositories import goal_repository
-from app.services import goal_arbitration
-from app.services.evaluation_context import collect_goal_slice
-from app.services.evaluation_rules import run_rules
-from app.services.evaluation_rules.goal import RULES
+from app.services.goal import arbitration as goal_arbitration
+from app.services.evaluation.context import collect_goal_slice
+from app.services.evaluation.rules import run_rules
+from app.services.evaluation.rules.goal import RULES
 
-NOW = datetime(2026, 9, 8, 12, 0, 0)
+NOW = timeutil.ensure_aware(datetime(2026, 9, 8, 12, 0, 0))
 USER = "aut5-user"
 
 
 @pytest.fixture()
 def aut_on(override_settings, monkeypatch):
-    override_settings(
-        v2_autonomy_advanced_enabled="true",
-        observability_persist_enabled="false",
-    )
+    override_settings()
     monkeypatch.setattr(
-        "app.services.goal_arbitration.development_aggregate.read_overlay",
+        "app.services.goal.arbitration.development_aggregate.read_overlay",
         lambda user_id, character_id="asuna": None,
     )
     yield
@@ -68,7 +66,7 @@ def _done_spec(index=1, capability="create_reminder"):
 
 
 def _ctx(slice_):
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     return EvaluationContext(
         subject="goal",
@@ -156,7 +154,7 @@ class TestRules:
         assert IssueCode.GOAL_ARBITRATION_MISSING in issues
 
     def test_planning_budget_exceeded_flagged(self, db_session_factory, aut_on, override_settings):
-        override_settings(v2_autonomy_planning_max_attempts="2")
+        override_settings(autonomy_planning_max_attempts="2")
         goal = _goal()
         for version in range(1, 5):
             _plan(goal.id, version=version, status="rejected")
@@ -164,7 +162,7 @@ class TestRules:
         assert IssueCode.GOAL_PLANNING_BUDGET_EXCEEDED in issues
 
     def test_execution_cap_exceeded_flagged(self, db_session_factory, aut_on, override_settings):
-        override_settings(v2_autonomy_goal_max_active_hours="1")
+        override_settings(autonomy_goal_max_active_hours="1")
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)], updated_at=NOW - timedelta(hours=48))
         issues = _issues(collect_goal_slice(USER, now=NOW))
@@ -186,9 +184,16 @@ class TestRules:
     def test_clean_slice_passes_all(self, db_session_factory, aut_on, monkeypatch):
         import app.application.observability as observability
 
+        from app.core.db import GoalRow
+        from app.repositories.goal_repository import SessionLocal
+
         monkeypatch.setattr(observability, "on_decision", lambda record: None)
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)])
+        with SessionLocal() as session:
+            row = session.get(GoalRow, goal.id)
+            row.updated_at = NOW
+            session.commit()
         slice_ = collect_goal_slice(USER, now=NOW)
         plan_ref = slice_.plans[0]
         plan_ref.sub_goal_statuses = ["done"]
@@ -207,7 +212,7 @@ class TestDimensionMapping:
             assert dimension_of(code) == EvaluationDimension.GOAL
 
     def test_goal_rules_registered(self):
-        from app.services.evaluation_rules import RULES
+        from app.services.evaluation.rules import RULES
 
         goal_codes = {rule.code for rule in RULES if rule.dimension == EvaluationDimension.GOAL}
         assert len(goal_codes) == 6
@@ -215,7 +220,7 @@ class TestDimensionMapping:
 
 class TestOfflineStats:
     def test_goal_stats_section(self, db_session_factory, aut_on):
-        from app.services.offline_evaluator import _goal_stats
+        from app.services.evaluation.offline import _goal_stats
 
         goal = _goal()
         _plan(goal.id, specs=[_done_spec(1)])

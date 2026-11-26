@@ -1,9 +1,9 @@
 """V5 测试矩阵保留用例：testing.md 17 项中仅此两例具备独立断言价值。
 
 Case 1~11、13~15 的断言由细粒度文件承载（test_emotion_update / test_emotion_decay /
-test_relationship_update / test_relationship_stage / test_state_engine /
-test_memory_replay / test_v5_e2e）；Case 17（V2/V3/V4 全量回归零破坏）
-由全量 pytest 运行本身覆盖。
+test_relationship_update / test_relationship_stage / test_state_engine / test_v5_e2e）；
+Case 17（V2/V3/V4 全量回归零破坏）由全量 pytest 运行本身覆盖。
+（原 Case 14 的 `test_memory_replay` 已于 2026-10-16 随回放补记功能退役删除。）
 """
 
 import pytest
@@ -13,7 +13,8 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import TurnAnalysis
 from app.models.relationship import RelationshipState
 from app.repositories import character_state_repository
-from app.services import scene_service, state_service
+from app.services.conversation import scene as scene_service
+from app.services.conversation import state as state_service
 from tests.conftest import FakeLLM
 
 DECISION = {"inner_state": "平静", "current_topic": "日常"}

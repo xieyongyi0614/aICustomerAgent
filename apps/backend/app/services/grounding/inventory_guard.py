@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.character.asuna.narrative import NARRATIVE_OBJECT_NOUNS
-from app.character.asuna.world import OBJECT_CREATION_HINTS
+from app.character.asuna.world import OBJECT_CREATION_HINTS, OBJECT_NAME_ALIASES
 from app.models.world import InventoryItem
 
 _CHINESE_QTY = {
@@ -106,15 +106,15 @@ _BARE_QTY_RE = re.compile(
     r"([一-鿿]{1,8})"
 )
 
-_TAKE_VERBS = ("拿出", "取出", "拿走", "拿了")
+_TAKE_VERBS = ("拿出", "取出", "拿走", "拿了", "加了", "加")
 
 _TAKE_QTY_FIRST_RE = re.compile(
-    r"(拿出|取出|拿走|拿了)\s*([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)"
+    r"(拿出|取出|拿走|拿了|加了|加)\s*([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)"
     r"[个份只颗瓶盒碗块片]?\s*([一-鿿]{1,6})"
 )
 
 _TAKE_QTY_LAST_RE = re.compile(
-    r"(拿出|取出|拿走|拿了)\s*([一-鿿]{1,6})\s*"
+    r"(拿出|取出|拿走|拿了|加了|加)\s*([一-鿿]{1,6})\s*"
     r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)[个份只颗瓶盒碗块片]?"
 )
 
@@ -253,22 +253,26 @@ def _fmt_requested_num(value: float) -> str:
 def extract_requested_counts(
     message: str, inventory: list[InventoryItem]
 ) -> dict[str, float]:
-    """从用户消息抽取『数量 + 物品』的请求要求：{库存名: 数量}。"""
+    """从用户消息抽取『数量 + 物品』的请求要求：{库存名: 数量}。
+
+    匹配面含角色资产别名表（"俩个蛋" → 鸡蛋）。
+    """
     if not message:
         return {}
     inv = _inventory_map(inventory)
     requested: dict[str, float] = {}
     for name in sorted(inv, key=len, reverse=True):
-        pattern = re.compile(
-            r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)\s*"
-            r"[个份只颗瓶盒碗块片]?\s*" + re.escape(name)
-        )
-        match = pattern.search(message)
-        if not match:
-            continue
-        qty = _parse_qty(match.group(1))
-        if qty is not None:
-            requested[name] = qty
+        for surface in (name, *OBJECT_NAME_ALIASES.get(name, ())):
+            pattern = re.compile(
+                r"([一二两俩三四五六七八九十半]+|\d+(?:\.\d+)?)\s*"
+                r"[个份只颗瓶盒碗块片]?\s*" + re.escape(surface)
+            )
+            match = pattern.search(message)
+            if match:
+                qty = _parse_qty(match.group(1))
+                if qty is not None:
+                    requested[name] = qty
+                break
     return requested
 
 

@@ -4,9 +4,10 @@
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
+from app.core import timeutil
+from app.core import ids
 from app.core.db import RuntimeTraceRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import RuntimeTrace, TraceEvent, TraceKind, TraceStep
@@ -22,6 +23,7 @@ def _to_model(row: RuntimeTraceRow) -> RuntimeTrace:
         conversation_id=row.conversation_id,
         turn_id=row.turn_id,
         action_id=row.action_id,
+        correlation_id=row.correlation_id,
         status=row.status,
         started_at=row.started_at,
         duration_ms=row.duration_ms or 0.0,
@@ -41,6 +43,7 @@ def _from_model(trace: RuntimeTrace, created_at: datetime) -> RuntimeTraceRow:
         conversation_id=trace.conversation_id,
         turn_id=trace.turn_id,
         action_id=trace.action_id,
+        correlation_id=trace.correlation_id,
         status=trace.status,
         started_at=trace.started_at,
         duration_ms=trace.duration_ms,
@@ -54,7 +57,7 @@ def _from_model(trace: RuntimeTrace, created_at: datetime) -> RuntimeTraceRow:
 
 
 def save(trace: RuntimeTrace) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(trace, now))
@@ -94,6 +97,50 @@ def list_by_conversation(conversation_id: str, limit: int = 20) -> list[RuntimeT
         return [_to_model(row) for row in rows]
 
 
+def list_by_correlation_id(correlation_id: str, limit: int = 200) -> list[RuntimeTraceRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(RuntimeTraceRow.correlation_id == correlation_id)
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
+def list_by_action_ids(action_ids: list[str], limit: int = 200) -> list[RuntimeTraceRow]:
+    if not action_ids:
+        return []
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(RuntimeTraceRow.action_id.in_(action_ids))
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
+def list_rows_by_user_window(
+    user_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    limit: int = 200,
+) -> list[RuntimeTraceRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(RuntimeTraceRow)
+            .filter(
+                RuntimeTraceRow.user_id == user_id,
+                RuntimeTraceRow.created_at >= started_at,
+                RuntimeTraceRow.created_at <= ended_at,
+            )
+            .order_by(RuntimeTraceRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
 def list_since(cutoff: datetime, limit: int = 5000) -> list[RuntimeTrace]:
     with SessionLocal() as session:
         rows = (
@@ -118,4 +165,4 @@ def prune_before(cutoff: datetime) -> int:
 
 
 def new_trace_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()

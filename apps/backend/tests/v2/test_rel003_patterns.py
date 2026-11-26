@@ -13,8 +13,8 @@ from app.core.settings import get_settings
 from app.models.conversation import ConversationState
 from app.models.development import RelationshipPattern
 from app.prompts.builder import PromptBuilder
-from app.services import relationship_patterns
-from app.services.autonomy_policy import PolicySnapshot, effective_interval_minutes
+from app.services.relationship import patterns as relationship_patterns
+from app.engines.autonomy import PolicySnapshot, effective_interval_minutes
 from app.services.development import aggregate
 
 NOW = datetime(2026, 9, 6, 12, 0, 0)
@@ -23,8 +23,8 @@ USER = "u-rel3"
 
 @pytest.fixture
 def rel_flags(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
+    """v2 开关已删除，关系模式通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _seed_insight(
@@ -108,17 +108,6 @@ class TestReadRelationshipPatterns:
         patterns, _ = relationship_patterns.read_relationship_patterns(USER)
         assert patterns == []
 
-    def test_dual_flag_matrix(self, _offline_repos, monkeypatch):
-        _seed_insight("ins-rel")
-        _seed_pattern("goal.user_care.weight", 0.8, "ins-rel")
-        monkeypatch.setattr(get_settings(), "v2_development_enabled", False)
-        patterns, payload = relationship_patterns.read_relationship_patterns(USER)
-        assert (patterns, payload["selected"]) == ([], [])
-        monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
-        monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", False)
-        patterns, payload = relationship_patterns.read_relationship_patterns(USER)
-        assert (patterns, payload["selected"]) == ([], [])
-
 
 class TestAutonomyReference:
     def test_snapshot_default_empty(self):
@@ -196,7 +185,7 @@ class TestRenderAndAssembly:
     def test_end_to_end_wiring(self, _offline_repos, rel_flags, monkeypatch):
         _seed_insight("ins-rel")
         _seed_pattern("goal.user_care.weight", 0.8, "ins-rel")
-        from app.services import context_builder
+        from app.services.conversation import context as context_builder
 
         monkeypatch.setattr(
             context_builder, "_load_shared_experiences", lambda *a, **k: ([], {})

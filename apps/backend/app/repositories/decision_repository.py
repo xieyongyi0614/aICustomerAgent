@@ -4,9 +4,12 @@ outcome 幂等补写（仅写空值）；retention 惰性清理在 save 路径�
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
+
+from app.core import timeutil
+from app.core import ids
 from app.core.db import DecisionRecordRow, SessionLocal
 from app.core.settings import get_settings
 from app.models.observability import DecisionKind, DecisionRecord
@@ -28,6 +31,7 @@ def _to_model(row: DecisionRecordRow) -> DecisionRecord:
         reason=row.reason or "",
         confidence=row.confidence,
         outcome=row.outcome,
+        candidates=row.candidates,
         created_at=row.created_at,
     )
 
@@ -46,12 +50,13 @@ def _from_model(record: DecisionRecord, created_at: datetime) -> DecisionRecordR
         reason=record.reason,
         confidence=record.confidence,
         outcome=record.outcome,
+        candidates=record.candidates,
         created_at=created_at,
     )
 
 
 def save(record: DecisionRecord) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     try:
         with SessionLocal() as session:
             session.merge(_from_model(record, now))
@@ -98,6 +103,7 @@ def search(
     action_id: str | None = None,
     request_id: str | None = None,
     limit: int = 50,
+    until: datetime | None = None,
 ) -> list[DecisionRecord]:
     with SessionLocal() as session:
         query = session.query(DecisionRecordRow)
@@ -107,6 +113,8 @@ def search(
             query = query.filter(DecisionRecordRow.kind == kind)
         if since is not None:
             query = query.filter(DecisionRecordRow.created_at >= since)
+        if until is not None:
+            query = query.filter(DecisionRecordRow.created_at <= until)
         if action_id is not None:
             query = query.filter(DecisionRecordRow.action_id == action_id)
         if request_id is not None:
@@ -117,6 +125,42 @@ def search(
             .all()
         )
         return [_to_model(row) for row in rows]
+
+
+def list_rows_by_user_window(
+    user_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    limit: int = 200,
+) -> list[DecisionRecordRow]:
+    with SessionLocal() as session:
+        return (
+            session.query(DecisionRecordRow)
+            .filter(
+                DecisionRecordRow.user_id == user_id,
+                DecisionRecordRow.created_at >= started_at,
+                DecisionRecordRow.created_at <= ended_at,
+            )
+            .order_by(DecisionRecordRow.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+
+def count_by_user(user_id: str) -> int:
+    """该用户的决策记录条数（版本投影用）。
+
+    与 `len(search(user_id=..., limit=1000))` 的区别（RT-ALL-code-review M-10）：
+    后者受 `search` 的 `limit` 截断（上限 1000），条数一旦触顶版本号就不再增长——
+    版本语义失真。本函数走 count 聚合，不受截断影响。
+    """
+    with SessionLocal() as session:
+        total = (
+            session.query(func.count(DecisionRecordRow.id))
+            .filter(DecisionRecordRow.user_id == user_id)
+            .scalar()
+        )
+        return int(total or 0)
 
 
 def prune_before(cutoff: datetime) -> int:
@@ -131,4 +175,4 @@ def prune_before(cutoff: datetime) -> int:
 
 
 def new_decision_id() -> str:
-    return uuid.uuid4().hex
+    return ids.new_id_str()

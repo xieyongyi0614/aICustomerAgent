@@ -2,10 +2,11 @@
 
 from datetime import datetime, timedelta
 
+from app.core import timeutil
 from app.models.world import World, WorldTimeMode
 from app.services.world.time_provider import TimeProvider
 
-FROZEN = datetime(2026, 8, 31, 23, 40)
+FROZEN = timeutil.ensure_aware(datetime(2026, 8, 31, 23, 40))
 
 
 def _world(mode, sim_time=None, rate=1.0):

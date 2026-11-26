@@ -19,10 +19,11 @@ from app.repositories import (
     conversation_repository,
     goal_repository,
 )
-from app.services import goal_arbitration, goal_observation
-from app.services.evaluation_context import collect_goal_slice
-from app.services.evaluation_rules import run_rules
-from app.services.goal_planning import (
+from app.services.goal import arbitration as goal_arbitration
+from app.services.goal import observation as goal_observation
+from app.services.evaluation.context import collect_goal_slice
+from app.services.evaluation.rules import run_rules
+from app.services.goal.planning import (
     TRIGGER_CREATED,
     materialize,
     plan_goal,
@@ -63,14 +64,8 @@ TWO_STEP_PLAN = [
 @pytest.fixture()
 def gate_env(db_session_factory, override_settings, monkeypatch):
     override_settings(
-        v2_autonomy_advanced_enabled="true",
-        action_enabled="true",
-        world_enabled="false",
-        v2_memory_enabled="false",
-        observability_persist_enabled="true",
-        v2_autonomy_subgoal_failure_threshold="3",
-        v2_autonomy_planning_max_attempts="3",
-    )
+        autonomy_subgoal_failure_threshold="3",
+        autonomy_planning_max_attempts="3")
 
     def _overlay(user_id, character_id="asuna"):
         from app.models.development import DevelopmentOverlay
@@ -82,13 +77,13 @@ def gate_env(db_session_factory, override_settings, monkeypatch):
     from app.repositories import decision_repository
 
     monkeypatch.setattr(
-        "app.services.goal_planning.development_aggregate.read_overlay", _overlay
+        "app.services.goal.planning.development_aggregate.read_overlay", _overlay
     )
     monkeypatch.setattr(
-        "app.services.goal_arbitration.development_aggregate.read_overlay", _overlay
+        "app.services.goal.arbitration.development_aggregate.read_overlay", _overlay
     )
     monkeypatch.setattr(
-        "app.services.goal_planning._ask_llm_with_retry",
+        "app.services.goal.planning._ask_llm_with_retry",
         lambda messages, settings: _planning_stub(messages, settings),
     )
     monkeypatch.setattr(
@@ -102,7 +97,7 @@ def gate_env(db_session_factory, override_settings, monkeypatch):
 def _planning_stub(messages, settings):
     import json
 
-    from app.services.goal_planning import PlanningProposal
+    from app.services.goal.planning import PlanningProposal
 
     payload = json.loads(messages[1][1])
     steps = 1 if payload.get("goal", {}).get("domain") == "relationship" else 2
@@ -147,7 +142,7 @@ def _new_session(user_id: str, index: int) -> str:
 
 def _run_issues(user_id: str) -> set:
     slice_ = collect_goal_slice(user_id, now=NOW)
-    from app.services.evaluation_context import EvaluationContext
+    from app.services.evaluation.context import EvaluationContext
 
     context = EvaluationContext(
         subject="goal",
@@ -218,7 +213,7 @@ class TestCompletionBranch:
         assert record.status == "completed"
 
         from app.core.db import MemoryCandidateRow
-        from app.services.memory2 import ingest as memory_ingest
+        from app.services.memory import ingest as memory_ingest
 
         with memory_ingest.SessionLocal() as session:
             row = (

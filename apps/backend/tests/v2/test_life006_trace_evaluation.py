@@ -25,7 +25,7 @@ from app.repositories import (
     proactive_repository,
     trigger_registry_repository as trigger_repo,
 )
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     EvaluationContext,
     LifeLoopProactiveRef,
     LifeLoopRunRef,
@@ -33,7 +33,7 @@ from app.services.evaluation_context import (
     LifeLoopTriggerRef,
     collect_life_loop_slice,
 )
-from app.services.evaluation_rules.autonomy import (
+from app.services.evaluation.rules.autonomy import (
     BUDGET_COMPLIANCE,
     RUN_COMPLETENESS,
     STORM_AND_REPEAT,
@@ -197,7 +197,7 @@ class TestProvenanceAndStorm:
         )
 
     def test_storm_threshold(self, override_settings):
-        override_settings(v2_life_loop_storm_daily_limit="3")
+        override_settings(life_loop_storm_daily_limit="3")
         proactive = [LifeLoopProactiveRef(action_id=f"pa-{i}") for i in range(4)]
         issue = STORM_AND_REPEAT.evaluate(
             _ctx(LifeLoopSlice(delivered_proactive=proactive))
@@ -259,13 +259,13 @@ class TestFivePointTrace:
         self, db_session_factory, monkeypatch, override_settings
     ):
         """delivered proactive → decision_records 溯源成立；断链 → 规则命中。"""
-        from app.services import proactive_executor
+        from app.services.autonomy import executor as proactive_executor
         from app.models.goal import GoalRecord
         from app.models.observability import DecisionKind, DecisionRecord
         from app.repositories import goal_repository
         from app.models.autonomy import ProactiveAction as PA
 
-        override_settings(V2_MEMORY_ENABLED="false")
+        override_settings()
 
         async def fake_generate(
             goal_description, intention, recent_context, llm=None, trace=None
@@ -331,7 +331,7 @@ class TestOfflineStats:
     def test_life_loop_stats_section(self, db_session_factory):
         from datetime import datetime as _dt
 
-        from app.services.offline_evaluator import _life_loop_stats
+        from app.services.evaluation.offline import _life_loop_stats
 
         created_at = _dt.now()
         run = loop_run_repository.create_run(
@@ -353,7 +353,7 @@ class TestOfflineStats:
         assert "outbox_dead_letters" in stats
 
     def test_outbox_dead_letter_counted(self, db_session_factory):
-        from app.services.offline_evaluator import _life_loop_stats
+        from app.services.evaluation.offline import _life_loop_stats
 
         outbox_repository.insert(
             {"action_id": "a1"}, idempotency_key="dl-1", now=NOW

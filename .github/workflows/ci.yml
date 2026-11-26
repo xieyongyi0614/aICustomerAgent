@@ -1,0 +1,83 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+      - working-directory: apps/mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          dart run build_runner build
+          git diff --exit-code
+          flutter test
+
+  backend:
+    name: backend（Fast：非 slow 全量）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - working-directory: apps/backend
+        run: |
+          pip install uv
+          uv sync
+          uv run pytest tests -q -m "not slow"
+
+  backend-full:
+    name: backend（Full：含 slow、legacy 与 PG 迁移）
+    needs: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: asuna
+          POSTGRES_PASSWORD: asuna
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U asuna"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://asuna:asuna@127.0.0.1:5432/asuna_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - working-directory: apps/backend
+        run: |
+          pip install uv
+          uv sync
+          uv run pytest --run-legacy -q

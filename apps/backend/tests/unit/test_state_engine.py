@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core import timeutil
 from app.models.character_state import CharacterState, StateUpdateDecision
 from app.models.emotion import TurnAnalysis, UserEmotion
 from app.models.behavior import BehaviorDecision
-from app.services import state_engine
+from app.engines import state as state_engine
 
 
 def _analysis(event, behavior="normal_reply", emotion="neutral"):
@@ -144,33 +145,33 @@ class TestNextStage:
 
 class TestApplyIdleRecovery:
     def test_recent_state_unchanged(self):
-        now = datetime.now()
+        now = timeutil.now()
         state = CharacterState(energy=0.3, mood="tired", updated_at=now - timedelta(hours=1))
         recovered = state_engine.apply_idle_recovery(state, now)
         assert recovered.energy == pytest.approx(0.3)
         assert recovered.mood == "tired"
 
     def test_idle_over_reset_hours_restores_energy_and_mood(self):
-        now = datetime.now()
+        now = timeutil.now()
         state = CharacterState(energy=0.3, mood="tired", updated_at=now - timedelta(hours=13))
         recovered = state_engine.apply_idle_recovery(state, now)
         assert recovered.energy == pytest.approx(0.85)
         assert recovered.mood == "calm"
 
     def test_recovery_never_lowers_high_energy(self):
-        now = datetime.now()
+        now = timeutil.now()
         state = CharacterState(energy=0.95, mood="calm", updated_at=now - timedelta(hours=48))
         recovered = state_engine.apply_idle_recovery(state, now)
         assert recovered.energy == pytest.approx(0.95)
 
     def test_no_updated_at_skips_recovery(self):
         state = CharacterState(energy=0.2, mood="tired", updated_at=None)
-        assert state_engine.apply_idle_recovery(state, datetime.now()) == state
+        assert state_engine.apply_idle_recovery(state, timeutil.now()) == state
 
 
 class TestApplyCharacter:
     def test_decision_ignores_mood_and_updates_inner_state_topic(self):
-        now = datetime.now()
+        now = timeutil.now()
         decision = StateUpdateDecision(
             mood="worried",
             mood_reason="用户连续熬夜",
@@ -187,7 +188,7 @@ class TestApplyCharacter:
         assert result.updated_at == now
 
     def test_none_decision_keeps_mood_and_topic_but_updates_energy(self):
-        now = datetime.now()
+        now = timeutil.now()
         result = state_engine.apply_character(
             CharacterState(energy=0.9, mood="happy", current_topic="旅行", inner_state="开心"),
             None,

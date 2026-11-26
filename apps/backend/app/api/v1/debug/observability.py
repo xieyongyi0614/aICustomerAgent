@@ -1,0 +1,312 @@
+"""可观测域调试端点：turn trace / trace 台账 / LLM 调用 / prompt 快照 / 指标 / 决策 / 评估 / 关联束。"""
+
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.auth import require_user
+from app.api.v1.deps import debug_surface_gate
+from app.core import timeutil
+from app.models.evaluation import EvaluationSubjectKind
+from app.repositories import (
+    conversation_repository,
+    decision_repository,
+    evaluation_repository,
+    llm_call_repository,
+    proactive_repository,
+    prompt_snapshot_repository,
+    trace_repository,
+)
+from app.services.observability.collector import get_trace_collector
+from app.services.observability.metrics_aggregator import (
+    build_metric_report,
+    summarize_llm_records,
+)
+from app.services.observability.prompt_capture import diff_prompt_snapshots
+
+observability_router = APIRouter(
+    dependencies=[Depends(debug_surface_gate), Depends(require_user)], tags=["debug"]
+)
+
+
+@observability_router.get("/debug/turns/{turn_id}/trace")
+def get_turn_trace(turn_id: str):
+    session = get_trace_collector().get(turn_id)
+    if session is not None:
+        return session.snapshot()
+    persisted = trace_repository.get_by_turn(turn_id)
+    if persisted is not None:
+        return persisted.api_dict()
+    raise HTTPException(status_code=404, detail="turn trace 不存在或已被清理")
+
+
+@observability_router.get("/debug/traces/{trace_id}")
+def get_trace_by_request_id(trace_id: str):
+    persisted = trace_repository.get_by_trace_id(trace_id)
+    if persisted is None:
+        raise HTTPException(status_code=404, detail="runtime trace 不存在或已过期")
+    return persisted.api_dict()
+
+
+@observability_router.get("/debug/traces")
+def list_traces(conversation_id: str, limit: int = 20):
+    traces = trace_repository.list_by_conversation(conversation_id, limit=max(1, min(limit, 100)))
+    return [trace.api_dict() for trace in traces]
+
+
+@observability_router.get("/debug/llm-calls")
+def list_llm_calls(
+    request_id: str | None = None,
+    turn_id: str | None = None,
+    window_hours: float | None = None,
+    call_site: str | None = None,
+    model: str | None = None,
+    limit: int = 100,
+):
+    since = (
+        timeutil.now() - timedelta(hours=window_hours) if window_hours is not None else None
+    )
+    records = llm_call_repository.search(
+        request_id=request_id,
+        turn_id=turn_id,
+        since=since,
+        call_site=call_site,
+        model=model,
+        limit=limit,
+    )
+    return [record.model_dump(mode="json") for record in records]
+
+
+@observability_router.get("/debug/llm-calls/summary")
+def summary_llm_calls(window_hours: float = 24):
+    since = timeutil.now() - timedelta(hours=window_hours)
+    records = llm_call_repository.list_since(since)
+    return summarize_llm_records(records, window_hours).model_dump(mode="json")
+
+
+@observability_router.get("/debug/turns/{turn_id}/prompts")
+def list_turn_prompts(turn_id: str):
+    snapshots = prompt_snapshot_repository.get_by_turn(turn_id)
+    if not snapshots:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return [snapshot.model_dump(mode="json") for snapshot in snapshots]
+
+
+@observability_router.get("/debug/prompts/compare")
+def compare_prompt_snapshots(a: str, b: str):
+    snapshot_a = prompt_snapshot_repository.get_by_id(a)
+    snapshot_b = prompt_snapshot_repository.get_by_id(b)
+    if snapshot_a is None or snapshot_b is None:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return diff_prompt_snapshots(snapshot_a, snapshot_b)
+
+
+@observability_router.get("/debug/prompts/{snapshot_id}")
+def get_prompt_snapshot(snapshot_id: str):
+    snapshot = prompt_snapshot_repository.get_by_id(snapshot_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="prompt 快照不存在或已过期")
+    return snapshot.model_dump(mode="json")
+
+
+@observability_router.get("/debug/metrics")
+def get_metrics(window_hours: float = 24, user_id: str | None = None):
+    window = timedelta(hours=max(window_hours, 0.001))
+    since = timeutil.now() - window
+    traces = [
+        trace
+        for trace in trace_repository.list_since(since)
+        if user_id is None or trace.user_id == user_id
+    ]
+    reports = [
+        report
+        for report in evaluation_repository.list_since(since)
+        if user_id is None or report.user_id == user_id
+    ]
+    llm_records = llm_call_repository.list_since(since)
+    message_pairs = conversation_repository.list_messages_since(since)
+    proactive_actions = proactive_repository.list_since(since)
+    report = build_metric_report(
+        window_hours,
+        traces,
+        llm_records,
+        reports,
+        message_pairs,
+        proactive_actions,
+    )
+    return report.model_dump(mode="json")
+
+
+@observability_router.get("/debug/decisions")
+def list_decisions(
+    user_id: str | None = None,
+    kind: str | None = None,
+    action_id: str | None = None,
+    window_hours: float | None = None,
+    limit: int = 50,
+):
+    since = (
+        timeutil.now() - timedelta(hours=window_hours) if window_hours is not None else None
+    )
+    records = decision_repository.search(
+        user_id=user_id,
+        kind=kind,
+        action_id=action_id,
+        since=since,
+        limit=limit,
+    )
+    return [record.model_dump(mode="json") for record in records]
+
+
+def _turn_trace_payload(turn_id: str):
+    persisted = trace_repository.get_by_turn(turn_id)
+    if persisted is not None:
+        return persisted.api_dict()
+    session = get_trace_collector().get(turn_id)
+    return session.snapshot() if session is not None else None
+
+
+def _turn_correlation_payload(turn_id: str) -> tuple[dict, bool]:
+    trace_payload = _turn_trace_payload(turn_id)
+    evaluation = evaluation_repository.get_by_subject(
+        EvaluationSubjectKind.TURN.value, turn_id
+    )
+    prompts = prompt_snapshot_repository.get_by_turn(turn_id)
+    llm_calls = llm_call_repository.get_by_turn(turn_id)
+    request_id = trace_payload.get("request_id") if trace_payload else None
+    decisions = (
+        decision_repository.search(request_id=request_id) if request_id else []
+    )
+    found = (
+        trace_payload is not None
+        or evaluation is not None
+        or bool(prompts)
+        or bool(llm_calls)
+        or bool(decisions)
+    )
+    payload = {
+        "turn_id": turn_id,
+        "request_id": request_id,
+        "trace": trace_payload,
+        "evaluation": evaluation.model_dump(mode="json") if evaluation else None,
+        "prompts": [snapshot.model_dump(mode="json") for snapshot in prompts],
+        "llm_calls": [record.model_dump(mode="json") for record in llm_calls],
+        "decisions": [record.model_dump(mode="json") for record in decisions],
+    }
+    return payload, found
+
+
+def _proactive_correlation_payload(action_id: str) -> tuple[dict, bool]:
+    action = proactive_repository.get_by_id(action_id)
+    message_id = action.message_id if action is not None else None
+    trace_payload = _turn_trace_payload(message_id) if message_id is not None else None
+    evaluation = evaluation_repository.get_by_subject(
+        EvaluationSubjectKind.PROACTIVE_ACTION.value, action_id
+    )
+    llm_calls = (
+        llm_call_repository.get_by_turn(message_id) if message_id is not None else []
+    )
+    decisions = decision_repository.search(action_id=action_id)
+    found = (
+        trace_payload is not None
+        or evaluation is not None
+        or bool(llm_calls)
+        or bool(decisions)
+    )
+    payload = {
+        "action_id": action_id,
+        "turn_id": message_id,
+        "trace": trace_payload,
+        "evaluation": evaluation.model_dump(mode="json") if evaluation else None,
+        "prompts": [],
+        "llm_calls": [record.model_dump(mode="json") for record in llm_calls],
+        "decisions": [record.model_dump(mode="json") for record in decisions],
+    }
+    return payload, found
+
+
+@observability_router.get("/debug/evaluations")
+def search_evaluations(
+    verdict: str | None = None,
+    dimension: str | None = None,
+    issue_code: str | None = None,
+    window_hours: float = 168,
+    limit: int = 20,
+    include: str | None = None,
+):
+    since = timeutil.now() - timedelta(hours=max(window_hours, 0.001))
+    reports = evaluation_repository.list_since(since, verdict=verdict)
+
+    def _match(report) -> bool:
+        if dimension is not None and dimension not in report.scores:
+            return False
+        if issue_code is not None and not any(
+            issue.code.value == issue_code for issue in report.issues
+        ):
+            return False
+        return True
+
+    matched = [report for report in reports if _match(report)][
+        : max(1, min(limit, 100))
+    ]
+    rows = []
+    for report in matched:
+        item = {
+            "subject": report.subject.value,
+            "subject_id": report.subject_id,
+            "session_id": report.session_id,
+            "user_id": report.user_id,
+            "overall_score": report.overall_score,
+            "verdict": report.verdict,
+            "scores": {
+                (dimension.value if hasattr(dimension, "value") else str(dimension)): score.model_dump()
+                for dimension, score in report.scores.items()
+            },
+            "issue_codes": [issue.code.value for issue in report.issues],
+            "meta": report.meta.model_dump(mode="json"),
+            "created_at": report.created_at.isoformat(),
+        }
+        if include == "correlation":
+            if report.subject == EvaluationSubjectKind.TURN:
+                payload, _ = _turn_correlation_payload(report.subject_id)
+            else:
+                payload, _ = _proactive_correlation_payload(report.subject_id)
+            item["correlation"] = payload
+        rows.append(item)
+    return rows
+
+
+@observability_router.get("/debug/turns/{turn_id}/correlation")
+def get_turn_correlation(turn_id: str):
+    payload, found = _turn_correlation_payload(turn_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
+    return payload
+
+
+@observability_router.get("/debug/proactive/{action_id}/correlation")
+def get_proactive_correlation(action_id: str):
+    payload, found = _proactive_correlation_payload(action_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="correlation 不存在或已过期")
+    return payload
+
+
+@observability_router.get("/debug/turns/{turn_id}/evaluation")
+def get_turn_evaluation(turn_id: str):
+    report = evaluation_repository.get_by_subject(
+        EvaluationSubjectKind.TURN.value, turn_id
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="评估报告不存在或已过期")
+    return report.model_dump(mode="json")
+
+
+@observability_router.get("/debug/proactive/{action_id}/evaluation")
+def get_proactive_evaluation(action_id: str):
+    report = evaluation_repository.get_by_subject(
+        EvaluationSubjectKind.PROACTIVE_ACTION.value, action_id
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="评估报告不存在或已过期")
+    return report.model_dump(mode="json")

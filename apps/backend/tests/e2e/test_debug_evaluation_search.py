@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from httpx import ASGITransport, AsyncClient
 import pytest
 
+from app.core import timeutil
 from app.main import app
 from app.models.evaluation import (
     DimensionScore,
@@ -36,12 +37,12 @@ def _report(
         overall_score=score,
         verdict=verdict,
         issues=[build_issue(IssueCode.EMOTION_OVERSHIFT)] if with_issue else [],
-        created_at=created_at or datetime.now(),
+        created_at=created_at or timeutil.now(),
     )
 
 
 def _seed():
-    now = datetime.now()
+    now = timeutil.now()
     trace_repository.save(
         RuntimeTrace(
             trace_id="s-req-low",

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝夕 · 01 验证码页（邮箱 + 手机号） — 高保真原型</title>
+<style>
+/* ============ 基础与主题 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;            /* 暖纸白：长期陪伴的背景 */
+  --card:#FFFFFF;
+  --ink:#1B1C23;           /* 主文字 */
+  --ink2:#6E7079;          /* 次文字 */
+  --ink3:#A7A8B1;          /* 弱文字 */
+  --line:#ECEAE3;
+  --ai1:#7A5CFF;           /* AI 紫 */
+  --ai2:#3E8BFF;           /* AI 蓝 */
+  --ai3:#2BD2E8;           /* AI 青 */
+  --warm:#FF9D76;          /* 温暖点缀 */
+  --health:#33BC8C;
+  --money:#EFA63C;
+  --error:#F06A6A;         /* 错误态 */
+  --grad-ai:linear-gradient(135deg,#8B6DFF 0%,#4D8DFF 55%,#2BD2E8 100%);
+  --shadow-card:0 10px 30px rgba(27,28,35,.06);
+  --r-lg:24px;--r-md:18px;--r-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","HarmonicOS Sans SC","Microsoft YaHei",sans-serif;
+  background:#0E0E13 radial-gradient(1200px 800px at 20% -10%,#1C1B2B 0%,#0E0E13 60%);
+  color:var(--ink);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:28px 12px 40px;
+}
+.page-tip{color:#8B8B96;font-size:13px;margin:18px 0 0;letter-spacing:.04em;text-align:center;line-height:1.8}
+.page-tip b{color:#C9C9D4;font-weight:600}
+.page-tip a{color:#9FB4FF}
+
+/* ============ 双机舞台 ============ */
+.stage{display:flex;gap:38px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.stage .cap{color:#8B8B96;font-size:12.5px;text-align:center;margin-top:14px;letter-spacing:.05em}
+.stage .cap b{color:#C9C9D4;font-weight:600}
+
+/* ============ 手机壳 ============ */
+.phone{
+  width:390px;height:min(844px,calc(100vh - 130px));min-height:640px;position:relative;flex:none;
+  border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2A2A31,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(122,92,255,.14);
+}
+.screen-wrap{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:20px;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:55;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;font-size:14.5px;font-weight:600;pointer-events:none}
+.statusbar .sicons{display:flex;gap:6px;align-items:center;color:inherit}
+
+/* ============ 屏幕通用 ============ */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:block;padding:60px 24px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+a{color:inherit;text-decoration:none}
+.row{display:flex;align-items:center}
+h1.pt{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--ink2)}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:14px;cursor:pointer;margin-bottom:14px;user-select:none;width:fit-content}
+.back svg{width:18px;height:18px}
+
+/* ============ AI 核心球 ============ */
+.orb{position:relative;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#D9CCFF 0%,#8B6DFF 34%,#4D6BFF 66%,#1FB9D8 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.5) inset,0 10px 30px rgba(102,90,255,.45),0 0 60px rgba(63,150,255,.35);
+  animation:breathe 4.2s ease-in-out infinite;
+}
+.orb::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 68% 72%,rgba(43,210,232,.85),transparent 46%),radial-gradient(circle at 30% 26%,rgba(255,255,255,.9),transparent 30%);
+  mix-blend-mode:screen;animation:swirl 7s linear infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+@keyframes swirl{to{transform:rotate(360deg)}}
+.orb.md{width:34px;height:34px}
+
+/* ============ 演示导航 ============ */
+.demo-nav{position:fixed;right:14px;bottom:14px;z-index:99;background:rgba(20,20,26,.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 12px;color:#C9C9D4;font-size:11px;line-height:1.5;max-width:170px}
+.demo-nav b{display:block;font-size:11.5px;margin-bottom:6px;color:#fff}
+.demo-nav a{display:inline-block;color:#9FB4FF;text-decoration:none;margin:2px 8px 2px 0;cursor:pointer}
+.demo-nav a:hover{text-decoration:underline}
+@media (max-width:900px){.demo-nav{display:none}}
+
+/* ============ 验证码分段输入 ============ */
+.vf-dest{margin-top:8px;font-size:13.5px;color:var(--ink2);line-height:1.7}
+.vf-dest b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.vf-dest .edit{color:var(--ai2);font-weight:600;font-size:12.5px;margin-left:8px}
+
+.code-row{display:flex;gap:8px;justify-content:space-between;margin:22px 0 4px}
+.code-cell{
+  width:47px;height:58px;border-radius:14px;background:var(--card);box-shadow:var(--shadow-card);
+  display:flex;align-items:center;justify-content:center;position:relative;
+  font-size:22px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;
+  border:1.5px solid transparent;
+}
+/* 当前聚焦格：AI 渐变描边 + 呼吸光标 */
+.code-cell.on{
+  background:linear-gradient(var(--card),var(--card)) padding-box,var(--grad-ai) border-box;
+  border:1.5px solid transparent;
+  box-shadow:0 8px 22px rgba(102,90,255,.22);
+}
+.code-cell .caret{width:2.5px;height:24px;border-radius:2px;background:var(--ai1);animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+/* 已填格：微放大强调 */
+.code-cell.filled{transform:scale(1.04)}
+/* 错误态 */
+.code-row.err .code-cell{border-color:rgba(240,106,106,.55);background:rgba(240,106,106,.05);box-shadow:none}
+.code-row.err .code-cell.filled{color:var(--error)}
+.vf-error{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12.5px;color:var(--error);font-weight:600}
+.vf-error svg{width:15px;height:15px;flex:none}
+
+/* 重发与帮助 */
+.vf-resend{display:flex;align-items:center;justify-content:space-between;margin-top:18px;font-size:12.5px}
+.vf-resend .cd{color:var(--ink3)}
+.vf-resend .cd b{color:var(--ai1);font-weight:700;font-variant-numeric:tabular-nums}
+.vf-resend .again{color:var(--ai1);font-weight:700}
+.vf-resend .help{color:var(--ai2);font-weight:600}
+
+/* 选填称呼 */
+.vf-field{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:16px;font-size:14.5px;margin-top:26px}
+.vf-field .ph{color:var(--ink3)}
+.vf-field svg{width:16px;height:16px;color:var(--ai1);flex:none}
+
+.lg-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border-radius:99px;padding:15px;font-size:15px;font-weight:700;margin-top:24px;cursor:pointer}
+.lg-btn.primary{background:var(--grad-ai);color:#fff;box-shadow:0 12px 28px rgba(102,90,255,.4)}
+.lg-btn svg{width:19px;height:19px}
+.lg-agree{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11.5px;color:var(--ink3);margin-top:14px;line-height:1.6}
+.lg-agree .box{width:14px;height:14px;border-radius:50%;border:1.5px solid #CBC9C0;position:relative;flex:none}
+.lg-agree .box::after{content:"";position:absolute;left:4px;top:2px;width:4px;height:7px;border:solid var(--health);border-width:0 1.8px 1.8px 0;transform:rotate(42deg)}
+.lg-agree b{color:var(--ink2);font-weight:600}
+.privacy-note{margin-top:22px;padding:15px 16px;border-radius:var(--r-md);background:rgba(51,188,140,.07);border:1px solid rgba(51,188,140,.18);font-size:12px;line-height:1.7;color:#2E7D5F}
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- ================= 左：邮箱验证码 · 填写中 ================= -->
+  <div>
+    <div class="phone">
+      <div class="screen-wrap">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="sicons">
+          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+        </span></div>
+
+        <div class="screen">
+          <a class="back" href="00-login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>返回</a>
+          <div class="row" style="gap:10px;margin:16px 0 8px"><div class="orb md"></div><div class="sub">亚丝娜 · 初次见面</div></div>
+          <h1 class="pt">输入邮箱验证码</h1>
+          <div class="vf-dest">6 位验证码已发送至 <b>asu***@gmail.com</b><a class="edit" href="00-login.html">修改</a></div>
+
+          <div class="code-row">
+            <div class="code-cell filled">3</div>
+            <div class="code-cell filled">8</div>
+            <div class="code-cell on"><span class="caret"></span></div>
+            <div class="code-cell"></div>
+            <div class="code-cell"></div>
+            <div class="code-cell"></div>
+          </div>
+
+          <div class="vf-resend">
+            <span class="cd"><b>48s</b> 后可重新发送</span>
+            <a class="help" href="#">收不到验证码？</a>
+          </div>
+
+          <div class="vf-field">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+            <span class="ph">想让我怎么称呼你？（选填）</span>
+          </div>
+
+          <a class="lg-btn primary" href="10-home.html">开始我们的第一天</a>
+          <div class="lg-agree"><span class="box"></span><span>已阅读并同意 <b>《用户协议》</b> 和 <b>《隐私政策》</b></span></div>
+          <div class="privacy-note">你的数据只属于你：记忆与对话本地优先存储，可随时导出或一键清空。</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>邮箱验证码</b> · 填写中（倒计时态）</div>
+  </div>
+
+  <!-- ================= 右：手机验证码 · 错误态 ================= -->
+  <div>
+    <div class="phone">
+      <div class="screen-wrap">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="sicons">
+          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 9.6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6C6.1 6 4.4 6.7 3.1 7.9l1.5 1.6A5 5 0 0 1 8 8.2c1.3 0 2.5.5 3.4 1.3l1.5-1.6A7.2 7.2 0 0 0 8 6zM8 1C4.7 1 1.7 2.3-.4 4.4l1.5 1.6A9.6 9.6 0 0 1 8 3.2c2.7 0 5.1 1 7 2.8l1.4-1.6A12 12 0 0 0 8 1z" transform="translate(0.5 -1)"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="15" height="7" rx="2" fill="currentColor"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+        </span></div>
+
+        <div class="screen">
+          <a class="back" href="00-login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>返回</a>
+          <div class="row" style="gap:10px;margin:16px 0 8px"><div class="orb md"></div><div class="sub">亚丝娜 · 初次见面</div></div>
+          <h1 class="pt">输入手机验证码</h1>
+          <div class="vf-dest">6 位验证码已发送至 <b>+86 138****8888</b><a class="edit" href="00-login.html">修改</a></div>
+
+          <div class="code-row err">
+            <div class="code-cell filled">1</div>
+            <div class="code-cell filled">0</div>
+            <div class="code-cell filled">2</div>
+            <div class="code-cell filled">4</div>
+            <div class="code-cell filled">5</div>
+            <div class="code-cell filled">7</div>
+          </div>
+          <div class="vf-error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+            验证码不正确，请核对后重试（剩余 4 次机会）
+          </div>
+
+          <div class="vf-resend">
+            <a class="again" href="#">重新发送验证码</a>
+            <a class="help" href="#">收不到验证码？</a>
+          </div>
+
+          <a class="lg-btn primary" href="10-home.html">登录 / 注册</a>
+          <div class="lg-agree"><span class="box"></span><span>已阅读并同意 <b>《用户协议》</b> 和 <b>《隐私政策》</b></span></div>
+          <div class="privacy-note">你的数据只属于你：记忆与对话本地优先存储，可随时导出或一键清空。</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>手机验证码</b> · 错误态（校验失败反馈）</div>
+  </div>
+
+</div>
+
+<div class="page-tip"><b>朝夕 · 验证码页</b> — 分段式输入 · 聚焦渐变描边 / 倒计时 / 错误态<br><a href="index.html">23 页总览</a> · <a href="../ai-life-agent-design.html#sec4">设计说明</a></div>
+
+<div class="demo-nav"><b>页面直达</b>
+  <a href="index.html">总览</a><a href="00-login.html">登录</a><a href="01-verify.html">验证</a><a href="10-home.html">首页</a><a href="11-briefing.html">简报</a><a href="20-chat.html">对话</a><a href="21-chat-ledger.html">AI记账</a><a href="30-life.html">生活</a><a href="41-memo.html">备忘</a><a href="42-schedule.html">日程</a><a href="31-ledger.html">账本</a><a href="32-health.html">健康</a><a href="33-ledger-add.html">记一笔</a><a href="34-ledger-auto.html">同步规则</a><a href="35-car.html">车辆</a><a href="36-car-add.html">养车记</a><a href="39-car-profile.html">车辆档案</a><a href="37-album.html">相册</a><a href="38-album-manage.html">批量管理</a><a href="62-album-ai.html">AI整理</a><a href="60-album-detail.html">相簿</a><a href="61-photo-view.html">单张</a><a href="40-memory.html">记忆</a><a href="50-profile.html">我的</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,282 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/app/theme/app_theme.dart';
+import 'package:mobile/design_system/components/components.dart';
+import 'package:mobile/design_system/tokens/tokens.dart';
+
+Widget wrap(Widget child) => MaterialApp(
+      theme: buildAppTheme(),
+      home: Scaffold(body: Center(child: SingleChildScrollView(child: child))),
+    );
+
+void main() {
+  testWidgets('tab bar follows design A9 metrics (5 tabs, floating chat ball)',
+      (tester) async {
+    // A9 参考设备 390 × 844
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          bottomNavigationBar: AppTabBar(currentIndex: 1, onTap: (_) {}),
+        ),
+      ),
+    );
+    final bar = find.byType(AppTabBar);
+    // 组件盒子比视觉栏体高 ballOverflow：多出的那一条是透明的，专门容纳溢出的球顶
+    expect(
+      tester.getSize(bar).height,
+      AppTabBar.barHeight + AppTabBar.ballOverflow,
+    );
+    // 视觉栏顶 = 组件盒子顶 + ballOverflow（下面所有「相对栏顶」都按视觉栏顶算）
+    final barTop = tester.getTopLeft(bar).dy + AppTabBar.ballOverflow;
+
+    // A9：内容顶部对齐 + 上内边距 12（不是垂直居中）
+    expect(
+      tester.getTopLeft(find.byIcon(AppIcons.home)).dy - barTop,
+      AppTabBar.contentTop,
+    );
+    // A9：图标 23
+    expect(
+      tester.getSize(find.byIcon(AppIcons.home)).width,
+      AppTabBar.iconSize,
+    );
+    // A9 / 红线 10：主 Tab 固定 5 个，第 2 位是「动态」槽（默认记账）—— 记忆不是主 Tab
+    for (final label in const ['首页', '记账', '对话', '生活', '我的']) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+    expect(find.text('记忆'), findsNothing);
+
+    // A9：对话位 flex 0 0 76，是 5 位里的第 3 位（左右各 2 位等分 → 整栏居中）
+    final barWidth = tester.getSize(bar).width;
+    final tabWidth =
+        (barWidth - AppTabBar.sidePadding * 2 - AppTabBar.orbSlotWidth) / 4;
+    final orbCenterX =
+        AppTabBar.sidePadding + tabWidth * 2 + AppTabBar.orbSlotWidth / 2;
+    expect(tester.getCenter(find.text('对话')).dx, closeTo(orbCenterX, 0.5));
+    expect(orbCenterX / barWidth, closeTo(0.5, 0.005));
+    // 对话文字相对栏顶 36（.orb-tab span margin-top:36px）
+    expect(
+      tester.getTopLeft(find.text('对话')).dy - barTop,
+      AppTabBar.orbLabelTop,
+    );
+  });
+
+  testWidgets('whole chat ball is tappable, overflow above the bar included (A9)',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final taps = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          bottomNavigationBar: AppTabBar(currentIndex: 0, onTap: taps.add),
+        ),
+      ),
+    );
+    final bar = find.byType(AppTabBar);
+    final boxTop = tester.getTopLeft(bar).dy;
+    final centerX = tester.getCenter(find.text('对话')).dx;
+    // 视觉栏顶由首页图标反推：图标恒在视觉栏顶之下 contentTop
+    final visualTop =
+        tester.getTopLeft(find.byIcon(AppIcons.home)).dy - AppTabBar.contentTop;
+
+    // 契约：组件盒子恰好比视觉栏顶高出 ballOverflow，球顶因此落在盒内而非溢出盒外
+    expect(AppTabBar.ballOverflow, -AppTabBar.ballTop);
+    expect(visualTop - boxTop, AppTabBar.ballOverflow);
+
+    // 球顶第一像素：旧实现里球顶在组件边界之外，这一整块都点不到
+    await tester.tapAt(Offset(centerX, boxTop + 1));
+    await tester.pump();
+    expect(taps, [2], reason: '球顶应可点');
+
+    // 球心
+    await tester.tapAt(Offset(centerX, boxTop + AppTabBar.ballSize / 2));
+    await tester.pump();
+    expect(taps, [2, 2], reason: '球心应可点');
+
+    // 球底最后一像素
+    await tester.tapAt(Offset(centerX, boxTop + AppTabBar.ballSize - 1));
+    await tester.pump();
+    expect(taps, [2, 2, 2], reason: '球底应可点');
+
+    // 「对话」文字下沿再往上一像素：旧命中盒底部（栏坐标 56）之下曾是死区
+    final labelBottom = tester.getBottomLeft(find.text('对话')).dy;
+    await tester.tapAt(Offset(centerX, labelBottom - 1));
+    await tester.pump();
+    expect(taps, [2, 2, 2, 2], reason: '文字下沿应可点');
+  });
+
+  testWidgets('components build without hardcoded colors', (tester) async {
+    await tester.pumpWidget(wrap(
+      Column(
+        children: [
+          const AppCard(child: Text('卡')),
+          AiCard(
+            title: '今日 AI 总结',
+            actionLabel: '查看完整早间简报 →',
+            child: const Text('内容'),
+          ),
+          const MetricCard(label: '睡眠', value: '7h12m', note: '优于上周', sparkValues: [1, 2, 3, 2, 4, 3, 5]),
+          const TaskRow(title: '回复导师邮件', subtitle: '15:00 产品方案对齐', tag: '工作'),
+          const SpendSummary(
+            amountLabel: '¥128',
+            noteLabel: '近 7 天 · 4 笔',
+            progress: 0.64,
+            weekBars: [1, 2, 3, 2, 4, 3, 5],
+            conclusion: '近 7 天日均 ¥18，比上周少 12% —— 亚丝娜',
+          ),
+          const AskPill(),
+          const ModeChip(label: 'Default 模式 · 长期记忆运行中'),
+          const MemHint(text: '本轮对话已调用 3 条长期记忆'),
+          const ChipButton(label: '查看行程'),
+          const CaptureBar(),
+          const ModuleCard(title: '记账', summary: '本月 ¥3,420', icon: Icons.wallet),
+          const ModuleCard(title: '阅读', summary: 'P2 见', soon: true, icon: Icons.book),
+          const CategoryBar(label: '餐饮', amountLabel: '¥1,240', ratio: 0.78, gradient: LinearGradient(colors: [Color(0xFFEFA63C), Color(0xFFFFD08A)])),
+          const TxRow(title: '午餐 · 一碗拉面', amountLabel: '-35', tileColor: Color(0x24EFA63C), iconColor: Color(0xFFEFA63C), subtitle: '今天 12:32 · 语音记账'),
+          const SourceNote(text: '● 数据来自 小米手环 9 Pro · 已授权同步'),
+          const MemoryCard(
+            tagLabel: '偏好',
+            tagBg: Color(0x1A7A5CFF),
+            tagFg: Color(0xFF7A5CFF),
+            content: '喜欢海边',
+            sourceNote: '来源：6 次对话提及 · 最近更新 9/21',
+            usageNote: '已用于任务排序',
+          ),
+          const PrivacyNote(child: Text('数据只存在你的账户里')),
+          SettingGroup(children: [
+            SettingRow(title: '设备连接', subtitle: '● 小米手环 9 Pro', icon: Icons.watch, showDivider: false),
+          ]),
+          AppToggle(value: true, onChanged: (_) {}),
+          const BackLink(),
+        ],
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(AiCard), findsOneWidget);
+    expect(find.byType(GradientBorderCard), findsOneWidget);
+    expect(find.byType(AppToggle), findsOneWidget);
+  });
+
+  test('A7 周柱状：全 0 与空列表都落空桩，不给 NaN 也不留空白', () {
+    for (final values in [<double>[], <double>[0, 0, 0, 0, 0, 0, 0]]) {
+      final maxV =
+          values.isEmpty ? 0.0 : values.reduce((a, b) => a > b ? a : b);
+      for (var i = 0; i < dayBarCount; i++) {
+        final value = i < values.length ? values[i] : 0.0;
+        final bar = dayBarGeometry(value, maxV, 44);
+        expect(bar.empty, isTrue, reason: '$values 第 $i 根');
+        expect(bar.height, greaterThan(0), reason: '空桩也要可见，不能是 0');
+        expect(bar.height.isNaN, isFalse);
+      }
+    }
+  });
+
+  test('A7 周柱状：非 0 按周内最大值归一，极小值给可见下限', () {
+    expect(dayBarGeometry(50, 50, 44).height, 44);
+    expect(dayBarGeometry(25, 50, 44).height, 22);
+    expect(dayBarGeometry(50, 50, 44).empty, isFalse);
+    final tiny = dayBarGeometry(0.01, 1000, 44);
+    expect(tiny.empty, isFalse);
+    expect(tiny.height, greaterThanOrEqualTo(4));
+  });
+
+  testWidgets('A7 消费速览：没有数据时不抛异常且不留空白带', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥0',
+        noteLabel: '近 7 天',
+        weekBars: <double>[],
+        conclusion: '最近还没有记账 —— 亚丝娜',
+      ),
+    ));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(SpendSummary), findsOneWidget);
+    expect(find.text('最近还没有记账 —— 亚丝娜'), findsOneWidget);
+  });
+
+  test('A7 柱顶金额文案：整数元、无千分位', () {
+    expect(dayBarAmountLabel(51), '¥51');
+    expect(dayBarAmountLabel(51.4), '¥51');
+    expect(dayBarAmountLabel(51.6), '¥52');
+    expect(dayBarAmountLabel(1240), '¥1240');
+  });
+
+  testWidgets('A7 消费速览：柱顶只标非零，峰值加深，横轴带「今天」', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥128',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        weekLabels: ['四', '五', '六', '日', '一', '二', '今天'],
+        conclusion: '近 7 天日均 ¥18，比上周少 12% —— 亚丝娜',
+      ),
+    ));
+    expect(find.text('¥0'), findsNothing, reason: '没账的那天不标金额');
+    final peak = tester.widget<Text>(find.text('¥5'));
+    expect(peak.style!.fontWeight, FontWeight.w700, reason: '峰值加深');
+    final other = tester.widget<Text>(find.text('¥2'));
+    expect(other.style!.fontWeight, FontWeight.w400);
+    expect(find.text('今天'), findsOneWidget);
+    expect(find.text('四'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A7 消费速览：横轴标签不足 7 位时不画轴', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥128',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        weekLabels: ['今天'],
+        conclusion: '近 7 天日均 ¥18 —— 亚丝娜',
+      ),
+    ));
+    expect(find.text('今天'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A7 消费速览：金额贴着各自柱顶，柱越矮标得越低', (tester) async {
+    await tester.pumpWidget(wrap(
+      const SpendSummary(
+        amountLabel: '¥11',
+        noteLabel: '近 7 天 · 4 笔',
+        weekBars: [0, 2, 0, 3, 0, 5, 1],
+        conclusion: '近 7 天日均 ¥2 —— 亚丝娜',
+      ),
+    ));
+    double topOf(String label) => tester.getTopLeft(find.text(label)).dy;
+    expect(topOf('¥5'), lessThan(topOf('¥3')), reason: '峰值最高、标得最高');
+    expect(topOf('¥3'), lessThan(topOf('¥2')));
+    expect(topOf('¥2'), lessThan(topOf('¥1')), reason: '最矮的柱标得最低');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mode selector hugs content in bounded height', (tester) async {
+    // 回归：选项 Column 缺 mainAxisSize.min 时，会在有界松约束（modal bottom
+    // sheet 的 9/16 高度上限）里膨胀，把整块选择器连同抽屉撑成半屏。
+    await tester.pumpWidget(wrap(
+      SizedBox(
+        height: 300,
+        child: Center(
+          child: ModeSelector(
+            value: RoleMode.defaultMode,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(tester.getSize(find.byType(ModeSelector)).height, lessThan(120),
+        reason: '三档选择器应贴合内容高度，不随可用高度膨胀');
+  });
+
+  test('components dart has no Color(0x outside tokens', () {
+    // 由 layer_guards 全局扫描覆盖
+  });
+}

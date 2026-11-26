@@ -11,7 +11,8 @@ from app.models.intention import IntentionDecision
 from app.models.relationship import RelationshipState
 from app.models.scene import PendingAction, SceneState
 from app.repositories import goal_repository
-from app.services import goal_service, intention_policy
+from app.services.goal import service as goal_service
+from app.services.goal import intention as intention_policy
 
 NOW = datetime(2026, 8, 29, 12, 0, 0)
 DAY = datetime(2026, 8, 29, 12, 0, 0)

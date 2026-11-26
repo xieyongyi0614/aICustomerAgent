@@ -4,12 +4,13 @@
 """
 
 import logging
-import uuid
 from datetime import datetime
 
 from sqlalchemy import and_ as sa_and_, or_ as sa_or_
 from sqlalchemy.orm import Session as _Session  # noqa: F401
 
+from app.core import timeutil
+from app.core import ids
 from app.core.db import (
     WorldEntityRow,
     WorldEventRow,
@@ -34,8 +35,14 @@ from app.models.world import (
 logger = logging.getLogger(__name__)
 
 
-def world_id_for(user_id: str) -> str:
-    return f"home:{user_id}"
+def find_world_id(user_id: str) -> str | None:
+    """按 user_id 查出世界主键；世界尚未建立时为 None。
+
+    主键不可由 user_id 推导（ADR-16 C2：新世界发雪花，存量行保留历史格式）。
+    """
+    with SessionLocal() as session:
+        row = session.query(WorldRow).filter(WorldRow.user_id == user_id).first()
+        return row.id if row is not None else None
 
 
 def _to_world(row: WorldRow) -> World:
@@ -45,6 +52,7 @@ def _to_world(row: WorldRow) -> World:
         name=row.name,
         time_mode=WorldTimeMode(row.time_mode),
         sim_time=row.sim_time,
+        sim_last_advanced_at=row.sim_last_advanced_at,
         sim_rate=row.sim_rate,
         current_location=row.current_location,
         environment=WorldEnvironment(**(row.environment or {})),
@@ -87,6 +95,7 @@ def _to_event(row: WorldEventRow) -> WorldEvent:
         completed_at=row.completed_at,
         payload=row.payload or {},
         source=EventSource(row.source),
+        idempotency_key=row.idempotency_key,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -94,13 +103,14 @@ def _to_event(row: WorldEventRow) -> WorldEvent:
 
 def ensure_world(user_id: str) -> World:
     with SessionLocal() as session:
-        world_id = world_id_for(user_id)
-        row = session.get(WorldRow, world_id)
+        row = session.query(WorldRow).filter(WorldRow.user_id == user_id).first()
         if row is None:
-            now = datetime.now()
+            now = timeutil.now()
             row = WorldRow(
-                id=world_id,
+                id=ids.new_id_str(),
                 user_id=user_id,
+                owner_type="user",
+                owner_id=user_id,
                 name="家",
                 time_mode=get_settings().world_time_mode,
                 sim_rate=get_settings().world_sim_rate,
@@ -117,18 +127,45 @@ def ensure_world(user_id: str) -> World:
 
 def get_world(user_id: str) -> World | None:
     with SessionLocal() as session:
-        row = session.get(WorldRow, world_id_for(user_id))
+        row = session.query(WorldRow).filter(WorldRow.user_id == user_id).first()
         return _to_world(row) if row is not None else None
 
 
+def get_owner_fields(user_id: str) -> dict[str, str | None] | None:
+    with SessionLocal() as session:
+        row = session.query(WorldRow).filter(WorldRow.user_id == user_id).first()
+        if row is None:
+            return None
+        return {"owner_type": row.owner_type, "owner_id": row.owner_id}
+
+
+def list_worlds_by_owner(
+    owner_type: str | None = None,
+    owner_id: str | None = None,
+    *,
+    limit: int | None = None,
+) -> list[World]:
+    with SessionLocal() as session:
+        query = session.query(WorldRow)
+        if owner_type is not None:
+            query = query.filter(WorldRow.owner_type == owner_type)
+        if owner_id is not None:
+            query = query.filter(WorldRow.owner_id == owner_id)
+        query = query.order_by(WorldRow.created_at)
+        if limit is not None:
+            query = query.limit(limit)
+        return [_to_world(row) for row in query.all()]
+
+
 def save_world(world: World) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldRow, world.world_id)
         if row is None:
             return
         row.name = world.name
         row.sim_time = world.sim_time
+        row.sim_last_advanced_at = world.sim_last_advanced_at
         row.sim_rate = world.sim_rate
         row.current_location = world.current_location
         row.environment = world.environment.model_dump(mode="json", exclude_none=True)
@@ -138,7 +175,7 @@ def save_world(world: World) -> None:
 
 
 def save_object(obj: WorldObject) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldEntityRow, obj.id)
         if row is None:
@@ -206,7 +243,7 @@ def count_active_objects(world_id: str) -> int:
 
 
 def save_event(event: WorldEvent) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = session.get(WorldEventRow, event.id)
         if row is None:
@@ -225,6 +262,7 @@ def save_event(event: WorldEvent) -> None:
         row.completed_at = event.completed_at
         row.payload = event.payload
         row.source = event.source.value
+        row.idempotency_key = event.idempotency_key
         row.updated_at = now
         session.commit()
 
@@ -290,7 +328,7 @@ def count_active_events(world_id: str) -> int:
 
 
 def save_snapshot(snapshot: StateSnapshot) -> None:
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         session.add(
             WorldSnapshotRow(
@@ -339,16 +377,16 @@ def get_snapshot(world_id: str, snapshot_id: str) -> StateSnapshot | None:
         )
 
 
-def new_object_id(category: str) -> str:
-    return f"{category}_{uuid.uuid4().hex[:8]}"
+def new_object_id() -> str:
+    return ids.new_id_str()
 
 
 def new_event_id() -> str:
-    return f"evt_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def new_snapshot_id() -> str:
-    return f"snap_{uuid.uuid4().hex[:12]}"
+    return ids.new_id_str()
 
 
 def list_all_worlds() -> list[World]:
@@ -412,8 +450,8 @@ def replace_entities(world_id: str, objects: list[WorldObject]) -> None:
                     properties=obj.properties,
                     status=obj.status.value,
                     last_action_at=obj.last_action_at,
-                    created_at=obj.created_at or datetime.now(),
-                    updated_at=obj.updated_at or datetime.now(),
+                    created_at=obj.created_at or timeutil.now(),
+                    updated_at=obj.updated_at or timeutil.now(),
                 )
             )
         session.commit()
@@ -436,8 +474,8 @@ def replace_events(world_id: str, events: list[WorldEvent]) -> None:
                     completed_at=event.completed_at,
                     payload=event.payload,
                     source=event.source.value,
-                    created_at=event.created_at or datetime.now(),
-                    updated_at=event.updated_at or datetime.now(),
+                    created_at=event.created_at or timeutil.now(),
+                    updated_at=event.updated_at or timeutil.now(),
                 )
             )
         session.commit()

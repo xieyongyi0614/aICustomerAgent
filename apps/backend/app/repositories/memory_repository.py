@@ -1,11 +1,12 @@
 import json
-import uuid
 from datetime import datetime
 from typing import get_args
 
-from sqlalchemy import text as sa_text
+from sqlalchemy import or_, text as sa_text
 
-from app.core.db import Memory, SessionLocal
+from app.core import ids, timeutil
+from app.core.constants import DEFAULT_LAYER, LAYER_FOR_TYPE
+from app.core.db import Memory, MemoryLinkRow, SessionLocal
 from app.models.memory import MemoryType, UserMemory
 
 VALID_MEMORY_TYPES = get_args(MemoryType)
@@ -48,13 +49,14 @@ def create_memory(
         raise ValueError(f"confidence 越界: {confidence}")
     if source not in ("user_stated", "user_derived", "ai_inferred"):
         raise ValueError(f"非法 source: {source}")
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = Memory(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             content=content,
             type=memory_type,
+            layer=LAYER_FOR_TYPE.get(memory_type, DEFAULT_LAYER),
             importance=importance,
             character_id=character_id,
             confidence=confidence,
@@ -171,6 +173,46 @@ def get_memory(memory_id: str) -> UserMemory | None:
         return _to_memory(row) if row else None
 
 
+def list_links(
+    memory_ids: list[str],
+    relations: list[str] | tuple[str, ...] | None = None,
+) -> list[tuple[str, str, str]]:
+    """按种子记忆批量读取链接（只读、**双向匹配**）：返回 `(seed_id, neighbor_id, relation)`。
+
+    行可能以任一方向存储；反向命中时归一为「种子在前」，消费方无需关心存储方向
+    （`MEV-010` 要求；1-hop 扩展因此无需改代码）。
+    """
+    if not memory_ids:
+        return []
+    seed_ids = set(memory_ids)
+    with SessionLocal() as session:
+        query = session.query(
+            MemoryLinkRow.memory_id,
+            MemoryLinkRow.related_memory_id,
+            MemoryLinkRow.relation,
+        ).filter(
+            or_(
+                MemoryLinkRow.memory_id.in_(seed_ids),
+                MemoryLinkRow.related_memory_id.in_(seed_ids),
+            )
+        )
+        if relations:
+            query = query.filter(MemoryLinkRow.relation.in_(list(relations)))
+        rows = query.order_by(
+            MemoryLinkRow.memory_id,
+            MemoryLinkRow.related_memory_id,
+            MemoryLinkRow.relation,
+        ).all()
+
+    normalized: set[tuple[str, str, str]] = set()
+    for memory_id, related_id, relation in rows:
+        if memory_id in seed_ids:
+            normalized.add((memory_id, related_id, relation))
+        else:
+            normalized.add((related_id, memory_id, relation))
+    return sorted(normalized)
+
+
 def get_source_refs(memory_ids: list[str]) -> dict[str, dict]:
     """批量读取 source_ref（REF-005 编排层识别 negate 信号用；只读）。"""
     if not memory_ids:
@@ -194,7 +236,7 @@ def update_memory_content(
         row.content = content
         if importance is not None:
             row.importance = importance
-        row.updated_at = datetime.now()
+        row.updated_at = timeutil.now()
         session.commit()
         session.refresh(row)
         return _to_memory(row)
@@ -206,7 +248,7 @@ def supersede_memory(old_id: str, new_id: str) -> None:
         if row is not None:
             row.status = "superseded"
             row.superseded_by = new_id
-            row.updated_at = datetime.now()
+            row.updated_at = timeutil.now()
             session.commit()
 
 
@@ -215,14 +257,14 @@ def invalidate_memory(memory_id: str) -> None:
         row = session.get(Memory, memory_id)
         if row is not None:
             row.status = "invalidated"
-            row.updated_at = datetime.now()
+            row.updated_at = timeutil.now()
             session.commit()
 
 
 def touch_last_accessed(memory_ids: list[str]) -> None:
     if not memory_ids:
         return
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         rows = session.query(Memory).filter(Memory.id.in_(memory_ids)).all()
         for row in rows:
@@ -258,13 +300,14 @@ def create_memory_and_supersede(
         raise ValueError(f"非法 memory_type: {memory_type}")
     if not 0.0 <= importance <= 1.0:
         raise ValueError(f"importance 越界: {importance}")
-    now = datetime.now()
+    now = timeutil.now()
     with SessionLocal() as session:
         row = Memory(
-            id=str(uuid.uuid4()),
+            id=ids.new_id_str(),
             user_id=user_id,
             content=content,
             type=memory_type,
+            layer=LAYER_FOR_TYPE.get(memory_type, DEFAULT_LAYER),
             importance=importance,
             character_id=character_id,
             confidence=confidence,

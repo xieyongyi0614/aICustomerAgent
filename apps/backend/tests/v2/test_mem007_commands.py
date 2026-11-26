@@ -5,10 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.repositories import memory_repository
-from app.services.memory2 import commands, evaluator, lifecycle
+from app.services.memory import commands, evaluator, lifecycle
 
 
 @pytest.fixture
@@ -20,8 +21,6 @@ def cmd_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (commands, evaluator, lifecycle, memory_repository):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -35,7 +34,7 @@ def _clean_state():
 
 
 def _memory(id, content, type="user_preference", status="active", user_id="u1", embedding="[0.1]", salience=0.7):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     with memory_repository.SessionLocal() as session:
         session.add(
             MemoryRow(
@@ -210,7 +209,7 @@ class TestForgetCommand:
 
 class TestPostProcessWiring:
     async def test_command_hit_skips_ingest(self, cmd_db, monkeypatch):
-        from app.application.post_process import PostProcessContext, _run_memory_ingest_v2
+        from app.application.post_process import PostProcessContext, _ingest_memory_candidates
         from app.models.conversation import ConversationState
         from app.models.emotion import TurnAnalysis
 
@@ -234,13 +233,13 @@ class TestPostProcessWiring:
             ),
             analysis=TurnAnalysis(),
         )
-        await _run_memory_ingest_v2(ctx)
+        await _ingest_memory_candidates(ctx)
         assert executed["ingest"] is False
         memories = [row for row in _rows() if row.status == "active"]
         assert len(memories) == 1
 
     async def test_command_miss_runs_ingest(self, cmd_db, monkeypatch):
-        from app.application.post_process import PostProcessContext, _run_memory_ingest_v2
+        from app.application.post_process import PostProcessContext, _ingest_memory_candidates
         from app.models.conversation import ConversationState
         from app.models.emotion import TurnAnalysis
         from app.models.memory import MemoryExtraction
@@ -269,7 +268,7 @@ class TestPostProcessWiring:
             ),
             analysis=TurnAnalysis(),
         )
-        await _run_memory_ingest_v2(ctx)
+        await _ingest_memory_candidates(ctx)
         assert _candidates() == []
 
 

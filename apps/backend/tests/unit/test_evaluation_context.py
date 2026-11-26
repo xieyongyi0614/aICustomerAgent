@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.core import timeutil
 from app.application.post_process import PostProcessContext
 from app.models.behavior_strategy import (
     ActionBudget,
@@ -13,7 +14,7 @@ from app.models.conversation import ChatMessage, ConversationState
 from app.models.emotion import EmotionEvent, TurnAnalysis
 from app.models.memory import UserMemory
 from app.models.relationship import RelationshipState
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     build_digest,
     collect_turn_context,
 )
@@ -27,7 +28,7 @@ def stub_repos(monkeypatch):
         emotion_history_repository,
         relationship_repository,
     )
-    from app.services import conversation_service
+    from app.services.conversation import service as conversation_service
 
     monkeypatch.setattr(conversation_service, "load_window", lambda *a, **k: [])
     monkeypatch.setattr(
@@ -42,7 +43,7 @@ def stub_repos(monkeypatch):
 
 
 def make_memory(content: str = "用户喜欢寿司", memory_id: str = "m1") -> UserMemory:
-    now = datetime.now()
+    now = timeutil.now()
     return UserMemory(
         id=memory_id,
         user_id="default-user",

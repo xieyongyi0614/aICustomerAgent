@@ -1,0 +1,67 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Gradle 构建产物（problems-report 等；android/ 下的 build 目录不被上方 /build/ 覆盖）
+/android/build/
+
+# Widget Preview related
+.widget_preview/
+
+# Plugin registrant 生成物：flutter pub get 按 pubspec 插件清单确定性再生成，不入库
+# （对齐官方模板约定：android/ios 模板默认忽略同类文件，windows/linux 模板不携带）
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# DevTools 本地偏好（打开 DevTools 自动生成）
+/devtools_options.yaml
+
+# golden 测试失败时的诊断输出（isolatedDiff/maskedDiff/masterImage/testImage），仅本地临时产物
+**/failures/

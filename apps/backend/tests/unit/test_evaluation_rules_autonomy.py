@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
-from app.services.evaluation_context import (
+from app.services.evaluation.context import (
     EvaluationContext,
     ProactiveSlice,
     StateSlice,
 )
-from app.services.evaluation_rules import autonomy as autonomy_rules
+from app.services.evaluation.rules import autonomy as autonomy_rules
 
 
 def make_ctx(

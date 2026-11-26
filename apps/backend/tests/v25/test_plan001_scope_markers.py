@@ -1,0 +1,522 @@
+"""PLAN-001 ↔ PLAN-002 范围标记：本包内「已落地」与「仍不得预埋」的可判定分界。
+
+这些断言是「只做本任务范围」红线（Task Detail §1.2 Non-Scope、§10.3「无代码骨架污染」）
+的可执行形式，属**有意的契约变更留痕**：后续任务落地对应产物时必须**显式更新本模块**，
+更新动作本身就是「范围越界已评审」的证据，而非本模块回归失败。
+
+| 标记 | 归属 | 状态 |
+|---|---|---|
+| `v25_*` Flag 与参数 | PLAN-002 | ✅ 已落地（13 Flag + 14 参数，总闸默认 off） |
+| `SubGoalSpec` 7 个新字段 | PLAN-002 | ✅ 已落地（19 字段快照） |
+| `GoalPlanRecord` 4 个新字段 | PLAN-002 | ✅ 已落地（12 字段快照） |
+| `CRITERION_FACT_SOURCES` 第四值 | PLAN-002 | ✅ 已落地（四值） |
+| `app/models/plan.py` / `settings/plan.py` | PLAN-002 | ✅ 已落地 |
+| 计划域装配 / 引擎模块（`context.py` / `engine.py`） | PLAN-003 | ✅ 已落地 |
+| 计划域拆解模块（`decompose.py`） | PLAN-004 | ✅ 已落地 |
+| 计划域调度 / 执行 / 观测 / 修订模块（四模块） | PLAN-005 | ✅ 已落地 |
+| 重规划监听器（`revision_listener.py`） | PLAN-010 | ✅ 已落地 |
+| `vXX_` 开关体系删除 | 横切重构 | ⏳ 待办（受影响的断言清单见末节，**不得整体删除本模块**） |
+
+PLAN-002 落地时的改动仅限本模块中「尚不存在」类断言翻转为「已存在」类断言 + 新增字段
+快照（原计划见 PLAN-001 Task Detail 的标记表）。
+
+PLAN-003 落地时按同一纪律改动本模块：`context.py` / `engine.py` 由「仍不得预埋」翻转为
+「已落地」，`decompose.py` 与 PLAN-005 五模块维持「不得预埋」（计划面四函数进 `goal_repository`
+调用白名单的留痕见 `goal_contract` 模块文档 §9）。
+
+PLAN-004 落地时按同一纪律改动本模块：`decompose.py` 翻转为「已落地」，PLAN-005 五模块
+**维持「不得预埋」**（拆解不调度 / 不执行 / 不观测 / 不修订——Task Detail §1.2 Non-Scope）。
+同任务的角色资产放行面扩容（`app.character.asuna.action`）见
+`test_plan001_static_scan.py::ALLOWED_CHARACTER_IMPORT_MODULES`。
+
+PLAN-005 落地时按同一纪律改动本模块：`scheduler.py` / `executor_bridge.py` / `observer.py` /
+`revision.py` 四者翻转为「已落地」，`revision_listener.py` **维持「不得预埋」**——反思监听器
+是 PLAN-010 的产物（Task Detail §5.5 边界：本任务只定义 `insight_driven` 理由码与判定入口，
+不读 Insight、不注册监听器），故本任务不预埋该模块。
+
+PLAN-006 落地时按同一纪律改动本模块：**无模块翻转**（Task Detail §4.1.1 明确「本任务不新建
+模块」，是对 PLAN-003 闸门 5/6 与 PLAN-005 执行桥的**契约补齐与断言加固**）。故本模块的
+「已落地 / 不得预埋」分界保持不变，只新增一条**接口级**标记：闸门 5/6 的两个判定函数
+（§6.1 冻结签名）以模块级纯函数形式落地于既有 `engine.py` 内，`revision_listener.py`
+**维持「不得预埋」**。
+
+PLAN-007 落地时按同一纪律改动本模块：同样**无模块翻转**（本任务对既有
+`autonomy_policy.py` / `autonomy_engine.py` 做增量接线，`decision_pipeline.py` 零改动），
+只新增一条**接口级**标记：`plan_facts` 的调制函数与装配函数落地于两个既有模块内
+（§4.1.2 组件划分），`revision_listener.py` **维持「不得预埋」**。
+同一落地的契约演进项：`PolicySnapshot.plan_facts` 由原定六键扩为**七键**
+（新增标量 `current_action_type`，见 `autonomy_policy.PLAN_FACTS_KEYS` 的留痕）。
+
+PLAN-008 落地时按同一纪律改动本模块：同样**无模块翻转**（§4.1.1 明确「本任务不新建模块」：
+World 源九段补进既有 `context.py`、终态广播补进既有 `observer.py`，`world_engine` /
+`world_repository` / `outbox_consumer` / `event_bridge` 零改动），只新增两条**接口级**标记：
+World 读白名单 `WORLD_READ_ENTRIES` 与终态广播映射 `TERMINAL_BROADCAST_OUTCOMES`。
+同一落地的契约演进项（两条，均属「逐段可降级」的直接后果）：
+
+- `PLAN_DEGRADED_REASONS` 由六值扩为**十三值**：World 源由三段一体细化为九段逐段可降级，
+  插入七条世界段标记（见 `context.WORLD_READ_ENTRIES` 与 `test_plan003_context.py`
+  `TestDegradedRegistry` 的留痕）。
+- `_WorldSource` 由三元组扩为**五字段**（新增 ① 时间上下文与逐段可降级清单）：
+  `_assemble_world` 的返回值由 `(source, degraded)` 收成单一载体（内部结构，非公开契约）。
+
+PLAN-009 落地时按同一纪律改动本模块：`memory_policy.py` 由「不存在」翻转为**「已落地」**
+（§4.1.1 明确本任务新建该模块：判据 A / `PlanMemoryPolicy` 边界表 / 候选构造 / 记忆通道），
+`revision_listener.py` **维持「不得预埋」**；包模块清单同步收编该模块名。
+同一落地的契约演进项：终态记忆映射 `TERMINAL_MEMORY_EVENTS`（落于既有 `observer.py`，
+与 PLAN-008 的 `TERMINAL_BROADCAST_OUTCOMES` 并列——广播与记忆是两条独立的终态通道）。
+
+PLAN-010 落地时按同一纪律改动本模块：`revision_listener.py` 由「仍不得预埋」翻转为
+**「已落地」**（§4.1.1 明确本任务新建该模块：`PlanningRevisionListener` / 三门槛 / 幂等键），
+包模块清单同步收编该模块名。同一落地的契约演进项（三条，均属「扩源而非新建」）：
+
+- `models/reflection.py::EVIDENCE_CHANNELS` 由两值扩为**三值**（追加 `plan`，既有两值顺序不变），
+  并新增 `PlanEvidenceWindow` / `PLAN_EVIDENCE_KIND`。
+- `services/reflection/evidence.py` 新增三个计划证据窗与 `plan_evidence_enabled` 子闸；
+  计划窗由既有 `aggregate_evidence_windows` 在子闸开启时**追加**（既有窗口顺序不变）。
+- `goal_planning._build_messages` / `propose_plan` 增 `evidence_refs` 可选入参（空值即
+  既有形态，prompt 逐字节不变）。`trigger_for_user` 与 `reflector` **零改动**。
+
+PLAN-011 / PLAN-012 的产物（调试端点 / 版本级验收）仍不在本包新增模块：
+`test_plan_reflection_listener_is_landed` 的负向断言把这一点一并钉住。
+
+PLAN-011 落地时按同一纪律改动本模块：同样**无模块翻转**（§4.1.1 明确「不新建仓储模块」：
+三个只读扩展落在既有 `goal_repository`、审计写入面与投影口落在既有 `observer.py`、6 个调试端点
+落在既有 `api/v1/debug.py`），只新增两条**接口级 / 负向**标记：
+
+- `PLAN_011_OBSERVER_INTERFACES`：审计写入面与投影口（`record_plan_advance` /
+  `record_plan_revision` / `project_plan_advance` / `project_plan_revision`）落于既有模块。
+- 负向：本包**不得**为接口 / 可观测层新增模块（`api.py` / `debug.py` / `interface.py` /
+  `audit.py` 一律不存在；包模块清单仍为 11 个文件）。
+
+同一落地的契约演进项（两条，均在既有模块内）：①
+`PLANNING_GOAL_REPOSITORY_ALLOWED_CALLS` 由 16 项扩为 **19 项**（三个只读扩展，见
+`goal_contract` 模块文档 §10）；② `goal_repository.PLAN_TERMINAL_STATUSES = ("rejected",
+"superseded")` 是零迁移下的终态投影（计划级**无** `completed` 取值，扩值需改 CHECK = 需迁移）。
+
+## vXX_ 开关体系删除（横切重构，`docs/refactor/flag-removal-audit.md`）
+
+本模块**不因开关消失而整体删除**——它是 PLAN-002 起各任务「范围越界已评审」的证据链，
+删掉即丢失评审留痕。开关删除按同一纪律处理：受影响的断言**显式改写**，未受影响的断言原样保留。
+
+受影响面只有一处：`test_plan_002_settings_are_embedded_and_the_master_stays_off`。
+`v25_*` 开关固化 ON / 去前缀后，`Settings.model_fields` 中不再存在 `v25_` 前缀项，故该用例的
+
+- `declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)`，
+- `len(PLAN_002_SETTINGS_FLAGS) == 13` 与 `len(PLAN_002_SETTINGS_PARAMS) == 14`，
+- `settings.planning_enabled is False` 与 `settings.plan_tool_required is True`
+
+都必须改为对**去前缀后字段名与默认值**的断言。两个常量 `PLAN_002_SETTINGS_FLAGS` /
+`PLAN_002_SETTINGS_PARAMS` 随字段改名同步去前缀（常量名与成员名都要改）；成员数是否变化
+取决于该批次的最终范围，须在改动时留痕。
+
+**留痕（去前缀横切重构，轨道 A）**：成员名已随 `vXX_` 前缀去除同步改名（27 项不变，13 + 14）；
+`declared` 的取值口径由「按 `v25_` 前缀筛选」改为 `set(PlanSettings.model_fields)`
+（`plan.py` 全域字段即该段集合），断言结构与数量不变。此改动使该用例不再依赖前缀命名，
+后续批次（v25 去门控）只需改默认值断言。
+
+**留痕（v25 去门控，批次 6）**：11 个门控 Flag 已删，`PLAN_002_SETTINGS_FLAGS` 收敛为保留的
+两个策略位（2 + 14 = 16 项）；`test_plan_002_settings_are_embedded_and_the_master_stays_off`
+按纪律改写为 `test_plan_002_settings_are_embedded_and_the_policy_bits_default_on`
+（总闸已不存在，「默认 off」反转为「策略位默认 on」），`PLAN_002_FLAG_CONTRACT_ASSERTIONS`
+同步更名。`services/reflection/evidence.py` 的 `plan_evidence_enabled` 子闸函数亦随批次删除，
+上文 74 行所述「子闸开启时追加」的扩源语义转为恒扩源（历史描述不改写）。
+
+**留痕（计划审批闸门，2026-10-10，ADR-21）**：新增策略位 `plan_require_approval`（默认 `False`），
+`PLAN_002_SETTINGS_FLAGS` 由 1 项扩为 **2 项**（2 + 13 = 15 项）；对应 `len(...) == 1` 断言改为
+`== 2`，并新增默认值断言 `settings.plan_require_approval is False`。该字段语义与
+`plan_tool_required` 同款——是「编排启用后的行为修饰位」（ON 时计划停在 `validated` 等人工批准，
+OFF 时维持「生成即 active 自动执行」），**非**计划编排总闸（总闸已随开关体系删除）。见
+`docs/current-system-architecture-baseline.md` §8.6 与 §10 ADR-21。
+
+本纪律由 `test_plan_002_flag_contract_assertions_survive_flag_removal` 消费
+（`PLAN_002_FLAG_CONTRACT_ASSERTIONS`）：若有人用「删掉用例」来消除开关删除引发的失败，
+该守卫会失败。
+"""
+
+import sys
+from pathlib import Path
+
+from app.core.settings import Settings, get_settings
+from app.core.settings.plan import PlanSettings
+from app.models.goal import (
+    CRITERION_FACT_SOURCES,
+    GoalPlanRecord,
+    SubGoalSpec,
+)
+from app.services.planning import goal_contract
+
+PLAN_002_SETTINGS_FLAGS = (
+    "plan_tool_required",
+    "plan_require_approval",
+)
+
+PLAN_002_SETTINGS_PARAMS = (
+    "plan_max_steps",
+    "plan_max_depth",
+    "plan_step_max_attempts",
+    "plan_revision_budget",
+    "plan_ttl_hours",
+    "plan_step_cooldown_minutes",
+    "plan_observation_window_minutes",
+    "plan_context_memory_limit",
+    "plan_context_insight_limit",
+    "plan_llm_profile",
+    "plan_replan_min_confidence",
+    "plan_reflection_min_samples",
+    "plan_memory_importance_floor",
+)
+
+PLAN_002_FLAG_CONTRACT_ASSERTIONS = (
+    "test_plan_002_settings_are_embedded_and_the_policy_bits_default_on",
+)
+"""vXX_ 开关体系删除时必须**显式改写**而非删除的用例（见模块文档末节）。
+
+开关固化 ON / 去前缀后该用例必然失败；正确做法是按纪律改写其断言，删除即丢失
+PLAN-002 的「范围越界已评审」留痕。由
+`test_plan_002_flag_contract_assertions_survive_flag_removal` 守卫。
+原用例名 `test_plan_002_settings_are_embedded_and_the_master_stays_off`
+在 v25 去门控批次按纪律改写并更名（见文档末节留痕）。
+"""
+
+PLAN_002_SUB_GOAL_FIELDS = (
+    "tool_id",
+    "kind",
+    "retry_policy",
+    "on_failure",
+    "expected_effects",
+    "observation_keys",
+    "binding_reason",
+)
+
+PLAN_002_GOAL_PLAN_FIELDS = (
+    "trigger",
+    "context_digest",
+    "revision_of",
+    "evidence_refs",
+)
+
+PLAN_005_LANDED_MODULES = (
+    "scheduler.py",
+    "executor_bridge.py",
+    "observer.py",
+    "revision.py",
+)
+
+PLAN_010_LANDED_MODULES = ("revision_listener.py",)
+"""PLAN-010 契约演进（原「不得预埋」翻转为「已落地」）：Plan 侧反思监听器。"""
+
+PLAN_003_LANDED_MODULES = ("context.py", "engine.py")
+
+PLAN_004_LANDED_MODULES = ("decompose",)
+
+PLAN_009_LANDED_MODULES = ("memory_policy.py",)
+"""PLAN-009 落地：计划终态记忆边界表模块（§4.1.1 本任务**新建**该模块）。"""
+
+PLAN_006_LANDED_INTERFACES = (
+    "_evaluate_tool_resolvable",
+    "_evaluate_tool_on_surface",
+)
+"""PLAN-006 §6.1 冻结的两个闸门判定接口（落于既有 `engine.py`，不新建模块）。"""
+
+PLAN_007_POLICY_INTERFACES = (
+    "_apply_plan_adjustments",
+    "_intention_action_type",
+)
+"""PLAN-007 §6.3 的调制接口（落于既有 `autonomy_policy.py`，不新建模块）。"""
+
+PLAN_007_ENGINE_INTERFACES = (
+    "_collect_plan_facts",
+    "_latest_active_plan",
+    "_plan_schedule_context",
+    "_blocked_steps",
+    "_last_advanced_at",
+)
+"""PLAN-007 §6.2 的装配接口（落于既有 `autonomy_engine.py`，装配点唯一）。"""
+
+PLAN_008_CONTEXT_INTERFACES = ("WORLD_READ_ENTRIES",)
+"""PLAN-008 §6.1 的世界只读白名单（落于既有 `context.py`，九段装配的触达面）。"""
+
+PLAN_008_OBSERVER_INTERFACES = ("TERMINAL_BROADCAST_OUTCOMES", "broadcast_goal_terminal")
+"""PLAN-008 §6.3 的终态广播接口（落于既有 `observer.py`，迁移路径唯一调用点）。"""
+
+PLAN_011_OBSERVER_INTERFACES = (
+    "record_plan_advance",
+    "record_plan_revision",
+    "project_plan_advance",
+    "project_plan_revision",
+)
+"""PLAN-011 §6.2 的审计写入面与投影口（落于既有 `observer.py`，**不新建模块**）。"""
+
+PLAN_011_FORBIDDEN_MODULES = (
+    "api.py",
+    "debug.py",
+    "interface.py",
+    "audit.py",
+    "observability.py",
+)
+"""本包不得存在的「接口层 / 可观测层」模块：管理面与审计面都落在既有模块内。"""
+
+
+def _backend_root() -> Path:
+    return Path(goal_contract.__file__).parents[3]
+
+
+def _planning_dir() -> Path:
+    return Path(goal_contract.__file__).parent
+
+
+def test_plan_002_settings_are_embedded_and_the_policy_bits_default_on():
+    settings = get_settings()
+    declared = set(PlanSettings.model_fields)
+    assert declared == set(PLAN_002_SETTINGS_FLAGS) | set(PLAN_002_SETTINGS_PARAMS)
+    assert len(PLAN_002_SETTINGS_FLAGS) == 2
+    assert len(PLAN_002_SETTINGS_PARAMS) == 13
+    assert settings.plan_tool_required is True
+    assert settings.plan_require_approval is False
+    assert (_backend_root() / "app" / "core" / "settings" / "plan.py").exists()
+
+
+def test_plan_002_flag_contract_assertions_survive_flag_removal():
+    """vXX_ 开关删除纪律：受影响用例必须**改写**而非删除（见模块文档末节）。
+
+    开关固化 ON 后 `test_plan_002_settings_are_embedded_and_the_master_stays_off`
+    必然失败；本守卫把「用删用例来消除失败」这条捷径堵掉。
+    """
+    module = sys.modules[__name__]
+    missing = [
+        name for name in PLAN_002_FLAG_CONTRACT_ASSERTIONS if not hasattr(module, name)
+    ]
+    assert missing == [], (
+        f"vXX_ 开关删除纪律要求这些用例保留并按纪律改写，而非删除：{missing}"
+    )
+
+
+def test_sub_goal_spec_carries_the_plan_002_fields_in_declared_order():
+    fields = tuple(SubGoalSpec.model_fields)
+    assert fields[:12] == (
+        "index",
+        "description",
+        "capability",
+        "params",
+        "criteria",
+        "depends_on",
+        "parent_index",
+        "status",
+        "attempt_count",
+        "last_observed_at",
+        "last_attempt_at",
+        "failure_note",
+    )
+    assert fields[12:] == PLAN_002_SUB_GOAL_FIELDS
+    assert len(fields) == 19
+
+
+def test_goal_plan_record_carries_the_plan_002_fields_in_declared_order():
+    assert tuple(GoalPlanRecord.model_fields) == (
+        "id",
+        "goal_id",
+        "version",
+        "status",
+        "sub_goals",
+        "rejection_reason",
+        "created_at",
+        "updated_at",
+    ) + PLAN_002_GOAL_PLAN_FIELDS
+
+
+def test_plan_domain_model_module_is_present():
+    assert (_backend_root() / "app" / "models" / "plan.py").exists()
+
+
+def test_plan_execution_modules_are_landed():
+    """PLAN-005 契约演进（原「不得预埋」翻转为「已落地」）：四模块存在。"""
+    missing = [name for name in PLAN_005_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+
+
+def test_plan_reflection_listener_is_landed():
+    """PLAN-010 契约演进（原「不得预埋」翻转为「已落地」）：Plan 侧反思监听器。
+
+    PLAN-010 §4.1.1 明确本任务**新建** `revision_listener.py`（`PlanningRevisionListener` +
+    幂等入队 + 第四注册点），故此处以显式清单翻转；同一落地**不新建**任何其他模块
+    （计划证据窗落在既有 `services/reflection/evidence.py`，证据通道值集落在既有
+    `models/reflection.py`）。
+    """
+    missing = [
+        name
+        for name in PLAN_010_LANDED_MODULES
+        if not (_planning_dir() / name).exists()
+    ]
+    assert missing == []
+    assert not (_planning_dir() / "reflection.py").exists()
+    assert not (_planning_dir() / "reflection_listener.py").exists()
+    assert not (_planning_dir() / "evidence.py").exists()
+
+
+def test_planning_engine_modules_are_landed():
+    missing = [name for name in PLAN_003_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+
+
+def test_plan_decompose_module_is_landed():
+    missing = [name for name in PLAN_004_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+
+
+def test_plan_009_lands_the_memory_boundary_table_module():
+    """PLAN-009 产物面：记忆边界表模块在位，且**没有**为记忆集成预埋别的模块。
+
+    Task Detail §4.1.1 明确本任务**新建** `memory_policy.py`（判据 A / 边界表 / 候选构造）；
+    故本任务与 PLAN-006 ~ PLAN-008 的「零新建模块」形态不同，此处以显式清单翻转，
+    `test_planning_package_holds_only_landed_modules` 同步收编该模块名。
+    """
+    missing = [name for name in PLAN_009_LANDED_MODULES if not (_planning_dir() / name).exists()]
+    assert missing == []
+    assert not (_planning_dir() / "memory.py").exists()
+    assert not (_planning_dir() / "memory_bridge.py").exists()
+    assert not (_planning_dir() / "memory_gate.py").exists()
+
+
+def test_plan_006_lands_the_two_gate_predicates_without_a_new_module():
+    """PLAN-006 产物面：两个闸门判定接口在位，且**没有**为工具治理新建模块。"""
+    from app.services.planning import engine as engine_mod
+
+    missing = [
+        name for name in PLAN_006_LANDED_INTERFACES if not hasattr(engine_mod, name)
+    ]
+    assert missing == []
+    assert not (_planning_dir() / "tool.py").exists()
+    assert not (_planning_dir() / "tool_gate.py").exists()
+
+
+def test_plan_007_lands_the_two_faces_without_a_new_module():
+    """PLAN-007 产物面：调制 + 装配函数在位，且**没有**为自治集成新建模块。"""
+    from app.application import autonomy_engine
+    from app.engines import autonomy as autonomy_policy
+
+    assert [
+        name
+        for name in PLAN_007_POLICY_INTERFACES
+        if not hasattr(autonomy_policy, name)
+    ] == []
+    assert [
+        name
+        for name in PLAN_007_ENGINE_INTERFACES
+        if not hasattr(autonomy_engine, name)
+    ] == []
+    assert not (_planning_dir() / "autonomy.py").exists()
+    assert not (_planning_dir() / "autonomy_feed.py").exists()
+
+
+def test_plan_007_packet_contract_is_seven_bounded_keys():
+    """PLAN-007 的契约演进留痕：`plan_facts` 七键（原六键 + 当前步动作身份）。"""
+    from app.engines import autonomy as autonomy_policy
+
+    assert autonomy_policy.PLAN_FACTS_KEYS == (
+        "active_goal_id",
+        "plan_version",
+        "current_step",
+        "current_action_type",
+        "steps_total",
+        "blocked_steps",
+        "last_advanced_at",
+    )
+    assert "plan_facts" in autonomy_policy.PolicySnapshot.__dataclass_fields__
+
+
+def test_plan_008_lands_the_two_faces_without_a_new_module():
+    """PLAN-008 产物面：世界只读白名单 + 终态广播接口在位，且**没有**为世界集成新建模块。"""
+    from app.services.planning import context as context_mod
+    from app.services.planning import observer as observer_mod
+
+    assert [
+        name for name in PLAN_008_CONTEXT_INTERFACES if not hasattr(context_mod, name)
+    ] == []
+    assert [
+        name for name in PLAN_008_OBSERVER_INTERFACES if not hasattr(observer_mod, name)
+    ] == []
+    assert not (_planning_dir() / "world.py").exists()
+    assert not (_planning_dir() / "world_integration.py").exists()
+    assert not (_planning_dir() / "world_broadcast.py").exists()
+
+
+def test_plan_008_degraded_registry_adds_only_world_segment_codes():
+    """PLAN-008 的契约演进留痕：`degraded` 值集扩七条世界段标记，其余逐字不变。"""
+    from app.services.planning import context as context_mod
+
+    codes = context_mod.PLAN_DEGRADED_REASONS
+    assert len(codes) == 13
+    assert codes[0] == "world_disabled"
+    assert codes[1:8] == (
+        "world_time_unavailable",
+        "world_environment_unavailable",
+        "world_location_unavailable",
+        "world_objects_unavailable",
+        "world_events_unavailable",
+        "world_brief_unavailable",
+        "world_context_unavailable",
+    )
+    assert codes[8:] == (
+        "scene_unavailable",
+        "situation_unavailable",
+        "memory_unavailable",
+        "reflection_unavailable",
+        "surface_unavailable",
+    )
+
+
+def test_plan_011_lands_the_audit_faces_without_a_new_module():
+    """PLAN-011 产物面：审计写入面 / 投影口在位，且**没有**为接口层新建模块。"""
+    from app.repositories import goal_repository
+    from app.services.planning import observer as observer_mod
+
+    assert [
+        name
+        for name in PLAN_011_OBSERVER_INTERFACES
+        if not hasattr(observer_mod, name)
+    ] == []
+    assert [
+        name
+        for name in (
+            "list_plans_by_status",
+            "count_plan_versions",
+            "list_terminal_plans_since",
+        )
+        if not hasattr(goal_repository, name)
+    ] == []
+    assert goal_repository.PLAN_TERMINAL_STATUSES == ("rejected", "superseded")
+    missing = [
+        name
+        for name in PLAN_011_FORBIDDEN_MODULES
+        if (_planning_dir() / name).exists()
+    ]
+    assert missing == []
+
+
+def test_planning_package_holds_only_landed_modules():
+    modules = [
+        path.relative_to(_planning_dir()).as_posix()
+        for path in _planning_dir().rglob("*.py")
+        if "__pycache__" not in path.parts
+    ]
+    modules.sort()
+    assert modules == [
+        "__init__.py",
+        "context.py",
+        "decompose/__init__.py",
+        "decompose/constants.py",
+        "decompose/decomposer.py",
+        "decompose/validator.py",
+        "engine.py",
+        "executor_bridge.py",
+        "goal_contract.py",
+        "memory_policy.py",
+        "observer.py",
+        "revision.py",
+        "revision_listener.py",
+        "scheduler.py",
+    ]
+
+
+def test_plan_002_fourth_criterion_source_is_embedded():
+    assert CRITERION_FACT_SOURCES == ("world", "state", "memory", "tool")

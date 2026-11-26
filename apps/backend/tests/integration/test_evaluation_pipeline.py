@@ -15,7 +15,7 @@ from app.models.emotion import TurnAnalysis
 from app.models.evaluation import EvaluationDimension
 from app.models.relationship import RelationshipState
 from app.repositories import evaluation_repository
-from app.services.trace_collector import TurnTraceSession
+from app.services.observability.collector import TurnTraceSession
 
 JUDGE_OK = {
     "persona": {
@@ -72,7 +72,6 @@ def make_ctx(llm=None) -> PostProcessContext:
 
 
 async def test_full_turn_evaluation_with_judge(db_session_factory, fake_llm, monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     from app.core.settings import get_settings
 
     get_settings.cache_clear()
@@ -98,7 +97,6 @@ async def test_full_turn_evaluation_with_judge(db_session_factory, fake_llm, mon
 
 
 async def test_judge_failure_degrades_to_rules_only(db_session_factory, fake_llm, monkeypatch):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     from app.core.settings import get_settings
 
     get_settings.cache_clear()
@@ -118,30 +116,9 @@ async def test_judge_failure_degrades_to_rules_only(db_session_factory, fake_llm
         get_settings.cache_clear()
 
 
-def test_evaluation_disabled_records_skipped_step(
-    db_session_factory, fake_llm, monkeypatch
-):
-    monkeypatch.setenv("EVALUATION_ENABLED", "false")
-    from app.core.settings import get_settings
-
-    get_settings.cache_clear()
-    try:
-        ctx = make_ctx()
-        import asyncio
-
-        asyncio.run(run_evaluation(ctx))
-        step = [s for s in ctx.trace.steps if s.name == "evaluation"][0]
-        assert step.status == "skipped"
-        assert evaluation_repository.get_by_subject("turn", "555") is None
-        assert ctx.trace.is_complete is False
-    finally:
-        get_settings.cache_clear()
-
-
 def test_sample_rate_zero_saves_rules_only_inline(
     db_session_factory, fake_llm, monkeypatch
 ):
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     monkeypatch.setenv("EVALUATION_LLM_JUDGE_SAMPLE_RATE", "0.0")
     from app.core.settings import get_settings
 
@@ -179,7 +156,6 @@ def test_is_complete_ignores_evaluation_step():
 
 async def test_run_post_process_includes_evaluation_step(db_session_factory, monkeypatch):
     """全链冒烟：七个步骤都执行且评估 step 存在（各步骤失败互不影响）。"""
-    monkeypatch.setenv("EVALUATION_ENABLED", "true")
     from app.core.settings import get_settings
 
     get_settings.cache_clear()

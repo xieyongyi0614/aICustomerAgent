@@ -7,12 +7,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
 from app.main import app
 from app.models.observability import RuntimeTrace, TraceStep
 from app.repositories import memory_repository, trace_repository
-from app.services.memory2 import attribution, evaluator, lifecycle
+from app.services.memory import attribution, evaluator, lifecycle
 
 
 @pytest.fixture
@@ -24,15 +25,13 @@ def attr_db(monkeypatch):
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     for module in (attribution, evaluator, lifecycle, memory_repository, trace_repository):
         monkeypatch.setattr(module, "SessionLocal", testing_session)
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_memory_vector_enabled", False)
     yield testing_session
     Base.metadata.drop_all(engine)
     engine.dispose()
 
 
 def _promote(candidate_id="c1", content="用户喜欢吃辣", source_ref=None):
-    now = datetime.datetime.now()
+    now = timeutil.now()
     ref = source_ref or {"table": "conversation", "id": "conv:u1:s1:0"}
     row = MemoryCandidateRow(
         id=candidate_id,
@@ -130,10 +129,10 @@ class TestMemoryAttribution:
         assert lifecycle_steps[0]["extra"]["event"] == "reinforce"
 
     def test_supersede_link_traced(self, attr_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 1.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 1.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
         old = MemoryRow(
             id="old",
             user_id="u1",
@@ -143,8 +142,8 @@ class TestMemoryAttribution:
             importance=0.6,
             status="active",
             salience=0.6,
-            created_at=datetime.datetime.now(),
-            updated_at=datetime.datetime.now(),
+            created_at=timeutil.now(),
+            updated_at=timeutil.now(),
         )
         with memory_repository.SessionLocal() as session:
             session.add(old)
@@ -186,20 +185,20 @@ class TestMemoryAttribution:
 
 class TestCandidateAttribution:
     def test_rejected_candidate_reason_visible(self, attr_db, monkeypatch):
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", 0.5)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", 0.0)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", 0.75)
-        monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", 0.35)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_source", 0.5)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", 0.0)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", 0.75)
+        monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", 0.35)
 
         async def _reject(*args, **kwargs):
-            from app.models.memory2 import EvaluationVerdict
+            from app.models.memory import EvaluationVerdict
 
             return EvaluationVerdict(approve=False, reason="无长期价值")
 
         monkeypatch.setattr(evaluator, "_ask_llm", _reject)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         row = MemoryCandidateRow(
             id="cx",
             user_id="u1",

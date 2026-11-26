@@ -11,7 +11,7 @@ import pytest
 
 from app.models.relationship import RelationshipState
 from app.repositories import relationship_snapshot_repository as snapshot_repo
-from app.services.state_service import _capture_snapshot_if_needed
+from app.services.conversation.state import _capture_snapshot_if_needed
 
 NOW = datetime(2026, 3, 1, 12, 0, 0)
 

@@ -5,10 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import timeutil
 from app.core.db import Base, Memory as MemoryRow, MemoryCandidateRow
 from app.core.settings import get_settings
-from app.models.memory2 import EvaluationVerdict
-from app.services.memory2 import evaluator
+from app.models.memory import EvaluationVerdict
+from app.services.memory import evaluator
 
 
 @pytest.fixture
@@ -34,19 +35,20 @@ def _clean_evaluator_state():
 
 @pytest.fixture
 def enabled(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_memory_enabled", True)
+    """v2 开关已删除，评估通路转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def _weights(monkeypatch, source=0.35, novelty=0.30, affinity=0.20, salience=0.15):
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_source", source)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_novelty", novelty)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_affinity", affinity)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_weight_salience", salience)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_source", source)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_novelty", novelty)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_affinity", affinity)
+    monkeypatch.setattr(get_settings(), "memory_eval_weight_salience", salience)
 
 
 def _thresholds(monkeypatch, high=0.75, low=0.35):
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_high", high)
-    monkeypatch.setattr(get_settings(), "v2_memory_eval_threshold_low", low)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_high", high)
+    monkeypatch.setattr(get_settings(), "memory_eval_threshold_low", low)
 
 
 def _candidate(
@@ -78,7 +80,7 @@ def _candidate(
         salience=salience,
         status=status,
         visibility=visibility,
-        created_at=created_at or datetime.datetime.now(),
+        created_at=created_at or timeutil.now(),
     )
     with evaluator.SessionLocal() as session:
         session.add(row)
@@ -149,8 +151,8 @@ def _active_memory(content, id="m0", user_id="u1"):
                 type="user_preference",
                 importance=0.6,
                 status="active",
-                created_at=datetime.datetime.now(),
-                updated_at=datetime.datetime.now(),
+                created_at=timeutil.now(),
+                updated_at=timeutil.now(),
             )
         )
         session.commit()
@@ -448,12 +450,6 @@ class TestPromoteIdempotency:
 
 
 class TestEvaluatePending:
-    async def test_flag_off_noop(self, eval_db):
-        _candidate("c1", "我喜欢吃西瓜")
-        decisions = await evaluator.evaluate_pending("u1")
-        assert decisions == []
-        assert _candidate_by_id("c1").status == "pending"
-        assert _memories() == []
 
     async def test_no_pending_returns_empty(self, eval_db, enabled):
         assert await evaluator.evaluate_pending("u1") == []
@@ -499,7 +495,7 @@ class TestEvaluatePending:
     async def test_oldest_first_ordering(self, eval_db, enabled, monkeypatch):
         _weights(monkeypatch, source=1.0, novelty=0, affinity=0, salience=0)
         _thresholds(monkeypatch)
-        now = datetime.datetime.now()
+        now = timeutil.now()
         _candidate(
             "c-late", "早的事件", proposed_type="user_fact", created_at=now
         )

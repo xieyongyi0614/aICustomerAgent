@@ -1,8 +1,8 @@
 """E-REL Gate：REL-004 关系域离线评估（场景集全规则 0 LLM）。
 
-Flag 影子态运行：v2_relationship_evolved_enabled 开启后跑真实服务链
+v2_relationship_evolved_enabled 开关已随 vXX_ 体系删除，开闸行为转常开：
 （narrative job → 里程碑账本行 → REL-001 转写 → 投影/模式/规则审计），
-报告归档 tests/eval/reports/rel-{date}.json。Flag 关闭走 tests/golden。
+报告归档 tests/eval/reports/rel-{date}.json；flag_off 影子样本走 collect 空路。
 """
 
 import json
@@ -11,8 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from app.core import timeutil
 from app.core.settings import get_settings
-from app.services import relationship_evaluation as evaluation
+from app.services.relationship import evaluation
 
 pytestmark = pytest.mark.xdist_group("relationship")
 
@@ -21,8 +22,8 @@ REPORT_DIR = Path(__file__).parent / "reports"
 
 @pytest.fixture
 def rel_eval_flags(monkeypatch):
-    monkeypatch.setattr(get_settings(), "v2_relationship_evolved_enabled", True)
-    monkeypatch.setattr(get_settings(), "v2_development_enabled", True)
+    """v2 开关已删除，开闸行为转常开；保留空夹具以兼容既有调用点。"""
+    yield
 
 
 def test_relationship_eval_gate(db_session_factory, rel_eval_flags):
@@ -35,16 +36,12 @@ def test_relationship_eval_gate(db_session_factory, rel_eval_flags):
         assert report["metrics"][metric_id]["pass"] is True, metric_id
 
     REPORT_DIR.mkdir(exist_ok=True)
-    report_path = REPORT_DIR / f"rel-{datetime.now():%Y%m%d}.json"
+    report_path = REPORT_DIR / f"rel-{timeutil.now():%Y%m%d}.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
     )
     assert report_path.exists()
-
-
-def test_build_db_report_flag_off(db_session_factory):
-    assert evaluation.build_db_report() == {}
 
 
 def test_build_db_report_flag_on(db_session_factory, rel_eval_flags):
