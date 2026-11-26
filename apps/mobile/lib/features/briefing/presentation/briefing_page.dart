@@ -132,6 +132,7 @@ class _BriefingPageState extends State<BriefingPage> {
   Future<void> _editCity() async {
     final currentCity = _prefs?.city?.trim() ?? '';
     final cities = _cities ?? await loadBriefingCities();
+    if (!mounted) return;
     final picked = await showChoiceSheet<String>(
       context: context,
       title: '天气城市',

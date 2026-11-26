@@ -61,21 +61,14 @@ UpdateCheckResult _result({
     );
 
 class _FakePlatform implements UpdatePlatform {
-  _FakePlatform({
-    this.apkFingerprint = _fingerprint,
-    this.selfFingerprint = _fingerprint,
-    this.installedCode = 0,
-    this.canInstall = true,
-    this.wifi = true,
-    this.installLaunched = true,
-  });
+  _FakePlatform({this.apkFingerprint = _fingerprint});
 
   String? apkFingerprint;
-  String? selfFingerprint;
-  int installedCode;
-  bool canInstall;
-  bool wifi;
-  bool installLaunched;
+  String? selfFingerprint = _fingerprint;
+  int installedCode = 0;
+  bool canInstall = true;
+  bool wifi = true;
+  bool installLaunched = true;
   int installCalls = 0;
 
   @override

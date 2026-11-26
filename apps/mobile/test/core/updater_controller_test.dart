@@ -192,7 +192,7 @@ void main() {
     final container = harness.container();
     await container.read(updateControllerProvider.notifier).onStartup();
     expect(container.read(updateControllerProvider).stage, UpdateStage.available);
-    expect(harness.adapter.seen.single.queryParameters!['channel'],
+    expect(harness.adapter.seen.single.queryParameters['channel'],
         AppEnv.flavor == 'prod' ? 'prod' : 'dev');
   });
 
