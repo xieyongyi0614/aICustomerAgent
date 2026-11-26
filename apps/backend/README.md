@@ -58,7 +58,7 @@ curl http://localhost:8020/health
 ## 数据库
 
 - 运行库为 PostgreSQL 16，连接串由 `DATABASE_URL` 配置（默认 `postgresql+psycopg://asuna:asuna@localhost:5432/asuna`）。
-- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，当前为单一基线迁移 `0001`，2026-09-29 全链折叠）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
+- Schema 唯一真相是 Alembic 迁移链（`migrations/versions/`，基线迁移 `0001`（2026-09-29 全链折叠）+ 增量迁移 `0002` ~ `0010`）；禁止 `create_all` 建表（单元测试内存 SQLite 属豁免）。
 - 连接池参数（`DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` / `DB_POOL_PRE_PING`）见配置项表。
 
 ## 核心能力
@@ -109,7 +109,8 @@ curl http://localhost:8020/health
 ## 测试
 
 ```bash
-uv run pytest             # 全量 7165 项（无本地 PG 实例时迁移一致性用例自动 skip）
+uv run pytest             # 默认收集 3600+ 项（无本地 PG 实例时迁移一致性用例自动 skip）
+uv run pytest --run-legacy  # 含 tests/v2、v8.5、v22~v26 历史套件，全量 7400+ 项
 uv run pylint app tests   # 代码检查
 ```
 

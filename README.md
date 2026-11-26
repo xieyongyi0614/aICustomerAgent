@@ -101,8 +101,9 @@ flutter run --dart-define-from-file=dart_defines/dev.json --flavor dev -d emulat
 ## 测试
 
 ```bash
-# 后端（apps/backend/ 下；全量 pytest 7000+ 项，无本地 PG 实例时迁移一致性用例自动 skip）
+# 后端（apps/backend/ 下；默认收集 3600+ 项，历史套件需 --run-legacy 才是 7400+ 项；无本地 PG 实例时迁移一致性用例自动 skip）
 uv run pytest
+uv run pytest --run-legacy   # 含 tests/v2、v8.5、v22~v26 历史套件
 uv run pylint app tests
 
 # 前端（apps/frontend/ 下）
